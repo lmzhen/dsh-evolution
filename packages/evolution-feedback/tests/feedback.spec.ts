@@ -47,4 +47,22 @@ describe('evolution-feedback', () => {
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
   })
+
+  it('ignores a malformed feedback file and stays functional', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-bad-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(home, 'evolution', 'feedback.json'), '{broken')
+    await ctx.plugin(Feedback)
+    await new Promise(resolve => setTimeout(resolve, 20))
+    ctx.evolutionFeedback.record('session-1', 'positive')
+    expect(ctx.evolutionFeedback.score('session-1')).toBe(1)
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
 })

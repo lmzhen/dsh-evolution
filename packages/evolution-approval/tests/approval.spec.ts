@@ -46,6 +46,26 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('keeps a pending record when the runner fails and retains rejection audit', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-fail-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'replay failed' }))
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'fail', args: {}, origin: 'background_review' })
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    expect(failed.ok).toBe(false)
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
+    const rejected = await ctx.evolutionApproval.reject(decision.pendingId!)
+    expect(rejected.ok).toBe(true)
+    expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('runs the replay exactly once when approve is called concurrently', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-atomic-'))
     const ctx = new Context()
