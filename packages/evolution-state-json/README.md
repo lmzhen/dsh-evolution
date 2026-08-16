@@ -22,5 +22,5 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - JSON provider serializes writers inside one process. Multi-process writers should use the storage-domain provider.
+- JSON provider serializes writers inside one process. Cross-process locking is a DSH storage-layer limitation (`storage-json` documents no cross-process write locking); multi-process deployments should route the evolution domain to a backend with cross-process semantics such as SQLite or remote storage.
 
