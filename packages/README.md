@@ -24,14 +24,24 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | `/evolution pending|approve|reject|curator run|curator report|restore` |
+| `scripts/install-layered.mjs` | Layered/host/agent/one-click installer with dry-run and uninstall |
 | `evolution-host` | Host-plane infrastructure bundle (no model tools) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
+| `evolution-capability` | Validates and stages Creator-mode capability packages; never executes model code |
 
 ## Installation
 
-See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
-compatibility flow, and profile override examples.
+```bash
+# layered: host bundle + Evolution agent preset
+node scripts/install-layered.mjs --profile web --mode layered
+
+# one-click compatibility bundle
+node scripts/install-layered.mjs --profile web --mode oneclick
+```
+
+See [INSTALL.md](./INSTALL.md) for every mode, production install, uninstall,
+capability governance, and profile override examples.
 
 ## Composition
 
