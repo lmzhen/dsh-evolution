@@ -51,7 +51,23 @@ export function buildLearningGraph(
 export const name = 'evolution-learning-graph'
 
 export function apply(ctx: Context): void {
-  // The graph is a pure query facility. Commands/UI consume buildLearningGraph
-  // directly; no model-visible state is registered here.
-  void ctx
+  ctx.inject(['commands'], (commandCtx) => {
+    const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
+    commands.register({
+      name: 'evolution graph',
+      description: 'Show the current learning graph',
+      recordInput: false,
+      handler: async () => {
+        const usage = ctx.get('skillUsage') as { report(): Promise<Map<string, unknown>> } | undefined
+        const memory = ctx.get('memory') as { read(target: 'memory' | 'user'): Promise<string[]> } | undefined
+        if (!usage || !memory) return { text: 'skill-usage or memory service is not mounted.' }
+        const usageMap = await usage.report()
+        const memoryEntries = await memory.read('memory')
+        const graph = buildLearningGraph(usageMap as unknown as Map<string, { use_count?: number; pinned?: boolean }>, memoryEntries)
+        const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
+        const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
+        return { text: lines.join('\n') + '\n\n' + edges.join('\n') }
+      },
+    })
+  })
 }

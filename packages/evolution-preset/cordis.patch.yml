@@ -21,6 +21,10 @@
     stageForeground: true
 - id: evolution-threat
   name: '@deepseek-ai/dsh-evolution-threat'
+- id: evolution-activity
+  name: '@deepseek-ai/dsh-evolution-activity'
+- id: evolution-feedback
+  name: '@deepseek-ai/dsh-evolution-feedback'
 - id: evolution-review
   name: '@deepseek-ai/dsh-evolution-review'
 - id: evolution-curator

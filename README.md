@@ -44,6 +44,8 @@ packages/
 ├── evolution-state/          # storage-domain-backed durable state
 ├── evolution-preset/         # recommended composition bundle
 ├── evolution-replay/         # replay/A-B evaluation primitives
+├── evolution-activity/       # session projection for evolution activity
+├── evolution-feedback/       # feedback-to-quality scoring
 ├── evolution-plan-validator/# deterministic plan validation
 ├── evolution-review/        # review signal gate + subagent orchestration
 ├── evolution-threat/        # tools/pre-execute threat guard
