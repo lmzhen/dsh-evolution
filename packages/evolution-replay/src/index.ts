@@ -76,7 +76,7 @@ export class EvolutionReplayDriver {
 
   record(event: {
     type: string
-    data: { planId: string; policyFingerprint?: string; memoryApplied: number; skillApplied: number; rejectedOps: number }
+    data: { planId: string; policyFingerprint?: string | undefined; memoryApplied: number; skillApplied: number; rejectedOps: number }
   }): void {
     if (event.type !== 'evolution/plan-applied') return
     const data = event.data

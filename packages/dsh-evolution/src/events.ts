@@ -17,7 +17,7 @@ export interface EvolutionReviewScheduledEvent {
 export interface EvolutionPlanAppliedEvent {
   planId: string
   /** Stable fingerprint of the policy snapshot that produced this plan. */
-  policyFingerprint?: string
+  policyFingerprint?: string | undefined
   memoryApplied: number
   skillApplied: number
   rejectedOps: number
