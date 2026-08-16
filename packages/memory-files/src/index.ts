@@ -19,6 +19,8 @@ export interface Config {
   userCharLimit?: number
   addDatePrefix?: boolean
   root?: string
+  /** How many consolidation failures one turn tolerates before the tool tells the model to stop retrying. */
+  maxConsolidationFailures?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -27,6 +29,7 @@ export const Config: z<Config> = z.object({
   userCharLimit: z.number().default(1375),
   addDatePrefix: z.boolean().default(false),
   root: z.string().default(''),
+  maxConsolidationFailures: z.number().default(3),
 })
 
 export function apply(ctx: Context, rawConfig: Config): void {
@@ -47,6 +50,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     memoryCharLimit: config.memoryCharLimit,
     userCharLimit: config.userCharLimit,
     addDatePrefix: config.addDatePrefix,
+    maxConsolidationFailures: config.maxConsolidationFailures,
     ...config.root ? { root: config.root } : {},
     io,
   })

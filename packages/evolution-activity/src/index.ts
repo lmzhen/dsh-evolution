@@ -38,7 +38,7 @@ type SessionEventLike =
   | { type: 'evolution/plan-applied'; data: { planId: string; memoryApplied: number; skillApplied: number; rejectedOps: number }; time: number }
   | { type: string }
 
-export function applyState(state: State, event: SessionEventLike): State {
+export function applyState(state: State, event: SessionEventLike, maxItems = 20): State {
   if (event.type !== 'evolution/plan-applied') return state
   const data = (event as { data: { planId: string; memoryApplied: number; skillApplied: number; rejectedOps: number }; time: number }).data
   const time = (event as { time: number }).time
@@ -53,13 +53,22 @@ export function applyState(state: State, event: SessionEventLike): State {
         rejectedOps: data.rejectedOps,
         at: time,
       },
-    ].slice(-20),
+    ].slice(-maxItems),
   }
 }
 
 export const name = 'evolution-activity'
 
-export function apply(ctx: Context): void {
+export interface Config {
+  maxItems?: number
+}
+
+export const Config = z.object({
+  maxItems: z.number().default(20),
+})
+
+export function apply(ctx: Context, rawConfig: Config = {}): void {
+  const maxItems = rawConfig.maxItems ?? 20
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     const runtime = (projectionCtx as unknown as {
       sessionProjections: {
@@ -77,7 +86,7 @@ export function apply(ctx: Context): void {
       key: 'evolution-activity',
       schema: activitySchema,
       init: () => ({ items: [] }),
-      apply: (state, event) => applyState(state, event as SessionEventLike),
+      apply: (state, event) => applyState(state, event as SessionEventLike, maxItems),
       view: state => ({ items: state.items }),
       stateVersion: 1,
     })

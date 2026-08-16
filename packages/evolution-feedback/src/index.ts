@@ -8,6 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { homedir } from 'node:os'
@@ -40,8 +41,8 @@ export class EvolutionFeedback {
   private chain: Promise<unknown> = Promise.resolve()
   private readonly path?: string
 
-  constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh')) {
-    if (io) this.path = join(home, 'evolution', 'feedback.json')
+  constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh'), pathOverride?: string) {
+    if (io) this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
   }
 
   private mutate<T>(task: () => Promise<T>): Promise<T> {
@@ -104,17 +105,29 @@ export class EvolutionFeedback {
 
 export const name = 'evolution-feedback'
 
+export interface Config {
+  /** Score below which curator receives quality_warn for a skill. */
+  qualityWarnThreshold?: number
+  /** Explicit feedback file path; empty derives $DSH_HOME/evolution/feedback.json. */
+  path?: string
+}
+
+export const Config: z<Config> = z.object({
+  qualityWarnThreshold: z.number().default(-0.25),
+  path: z.string().default(''),
+})
+
 interface SkillUsageLike {
   setQuality(name: string, score: number, warn: boolean): Promise<void>
 }
 
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, rawConfig: Config = {}): void {
   const ioRegistry = ctx.get('evolutionIo') as { provider(): IoLike } | undefined
   const io = ioRegistry ? {
     readText: (path: string) => ioRegistry.provider().readText(path),
     writeText: (path: string, content: string) => ioRegistry.provider().writeText(path, content),
   } : undefined
-  const feedback = new EvolutionFeedback(io)
+  const feedback = new EvolutionFeedback(io, process.env.DSH_HOME ?? join(homedir(), '.dsh'), rawConfig.path || undefined)
   if (io) {
     void feedback.restore(io).catch((error: unknown) => {
       ctx.logger.warn(error)
@@ -131,7 +144,8 @@ export function apply(ctx: Context): void {
       original(target, rating, note, kind ?? 'session', recordIo ?? io)
       if (kind === 'skill') {
         const score = feedback.score(target, 'skill')
-        void skillUsage.setQuality(target, score, score < -0.25).catch((error: unknown) => {
+        const warn = score < (rawConfig.qualityWarnThreshold ?? -0.25)
+        void skillUsage.setQuality(target, score, warn).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
       }

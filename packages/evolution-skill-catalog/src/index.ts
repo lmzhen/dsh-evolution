@@ -29,21 +29,26 @@ export const inject = ['skills', 'evolutionIo']
 
 export interface Config {
   root?: string
+  /** Whether catalog skills are advertised/loadable by the model. */
+  modelInvocable?: boolean
+  /** Whether catalog skills are advertised/loadable from user surfaces. */
+  userInvocable?: boolean
 }
 
 export const Config: z<Config> = z.object({
   root: z.string().default(''),
+  modelInvocable: z.boolean().default(true),
+  userInvocable: z.boolean().default(true),
 })
 
 /** Below filesystem's user rank so the evolution-owned tree wins duplicates. */
 export const EVOLUTION_SKILL_RANK = 390
 
-const INVOCATION: SkillInvocationPolicy = {
-  modelInvocable: true,
-  userInvocable: true,
-}
-
-export function apply(ctx: Context, rawConfig: Config): void {
+export function apply(ctx: Context, rawConfig: Config = {}): void {
+  const invocation: SkillInvocationPolicy = {
+    modelInvocable: rawConfig.modelInvocable ?? true,
+    userInvocable: rawConfig.userInvocable ?? true,
+  }
   const resolveIo = () => ctx.evolutionIo.provider()
   const io: EvolutionIoLike = {
     readText: path => resolveIo().readText(path),
@@ -65,7 +70,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return summaries.map(summary => ({
         name: summary.name,
         description: summary.description,
-        invocation: INVOCATION,
+        invocation,
         source: 'user-dsh' as const,
         provider: 'dsh-evolution',
         rank: EVOLUTION_SKILL_RANK,
@@ -84,7 +89,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return {
         name,
         description: summary.description,
-        invocation: INVOCATION,
+        invocation,
         source: 'user-dsh',
         provider: 'dsh-evolution',
         resourceBase: { kind: 'directory', path: summary.path },

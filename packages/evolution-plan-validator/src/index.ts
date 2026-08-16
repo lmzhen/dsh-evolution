@@ -36,6 +36,7 @@ export interface ValidationContext {
   maxOpsPerPlan?: number
   protectedSkillNames?: ReadonlySet<string>
   maxMemoryChars?: number
+  maxUserChars?: number
   maxSkillContentChars?: number
 }
 
@@ -108,7 +109,8 @@ function validateMemoryOp(op: MemoryOp, context: ValidationContext, index: numbe
   const text = (op.facts ?? op.content ?? '').trim()
   if (action !== 'remove' && text.length === 0) return `memory op ${index}: ${action} requires facts/content`
   if (action !== 'add' && !(op.old_text ?? '').trim()) return `memory op ${index}: ${action} requires old_text`
-  if (text.length > (context.maxMemoryChars ?? 2200)) return `memory op ${index}: content exceeds memory budget`
+  const budget = op.target === 'user' ? (context.maxUserChars ?? 1375) : (context.maxMemoryChars ?? 2200)
+  if (text.length > budget) return `memory op ${index}: content exceeds ${op.target === 'user' ? 'user' : 'memory'} budget`
   return null
 }
 

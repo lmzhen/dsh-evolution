@@ -25,6 +25,11 @@ export interface Config {
   skillInterval?: number
   /** Tools the one-shot review subagent may use. Defaults include the Anchored Standard discovery pair. */
   reviewToolAllow?: string[]
+  reviewTimeoutMs?: number
+  executionTimeoutMs?: number
+  reviewContextMessages?: number
+  reviewMessageChars?: number
+  reviewMaxDepth?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -33,6 +38,11 @@ export const Config: z<Config> = z.object({
   memoryInterval: z.number().default(10),
   skillInterval: z.number().default(10),
   reviewToolAllow: z.array(z.string()).default(['skill', 'skill_search', 'skill_load']),
+  reviewTimeoutMs: z.number().default(120_000),
+  executionTimeoutMs: z.number().default(30_000),
+  reviewContextMessages: z.number().default(60),
+  reviewMessageChars: z.number().default(2000),
+  reviewMaxDepth: z.number().default(0),
 })
 
 interface SubagentLike {
@@ -64,6 +74,7 @@ interface PolicyLike {
     maxOpsPerPlan: number
     protectedSkillNames: readonly string[]
     memoryChars: number
+    userChars: number
     skillContentChars: number
   }
 }
@@ -127,10 +138,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
         : routingPolicy?.get().skillReviewModel ?? 'deepseek-v4-pro'
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
-        prompt: [{ type: 'text', text: buildReviewRequest(session, kind, signal as { toolCalls: number; userChars: number; assistantChars: number }) }],
+        prompt: [{ type: 'text', text: buildReviewRequest(session, kind, signal as { toolCalls: number; userChars: number; assistantChars: number }, config.reviewContextMessages, config.reviewMessageChars) }],
         parent: agent,
-        signal: AbortSignal.timeout(120_000),
-        maxDepth: 0,
+        signal: AbortSignal.timeout(config.reviewTimeoutMs),
+        maxDepth: config.reviewMaxDepth,
         agentOptions: { provider: 'deepseek-official', model },
         persona: reviewPrompt(kind),
         toolFilter: { allow: [...config.reviewToolAllow] },
@@ -155,6 +166,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? 32,
         protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
         maxMemoryChars: snapshot?.memoryChars ?? 2200,
+        maxUserChars: snapshot?.userChars ?? 1375,
         maxSkillContentChars: snapshot?.skillContentChars ?? 100_000,
       })
       const actions = await executePlan(validation.accepted, agent)
@@ -213,7 +225,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         name: 'skill_manage',
         arguments: args,
         agent,
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(config.executionTimeoutMs),
       })
       return result.isError ? { ok: false, message: 'skill_manage execution failed' } : { ok: true, message: 'skill_manage executed' }
     }
@@ -236,13 +248,15 @@ function buildReviewRequest(
   session: Session,
   kind: ReviewKind,
   signal: { toolCalls: number; userChars: number; assistantChars: number },
+  maxMessages: number,
+  maxMessageChars: number,
 ): string {
   const messages: string[] = []
   const surface = session.deriveMessages()
-  for (const message of surface.slice(-60)) {
+  for (const message of surface.slice(-maxMessages)) {
     if (message.role === 'user' || message.role === 'assistant') {
       const text = message.content.map(block => block.type === 'text' ? block.text : '').join(' ').trim()
-      if (text) messages.push(`${message.role.toUpperCase()}: ${text.slice(0, 2000)}`)
+      if (text) messages.push(`${message.role.toUpperCase()}: ${text.slice(0, maxMessageChars)}`)
     }
   }
   return [

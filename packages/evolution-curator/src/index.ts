@@ -92,10 +92,22 @@ export class EvolutionCurator extends Service {
     }, 'evolution-curator.stop')
   }
 
+  private lifecycle(): { intervalHours: number; staleAfterDays: number; archiveAfterDays: number } {
+    const policy = this.ctx.get('evolutionPolicy') as {
+      get(): { curatorIntervalHours: number; staleAfterDays: number; archiveAfterDays: number } | undefined
+    } | undefined
+    const snapshot = policy?.get()
+    return {
+      intervalHours: snapshot?.curatorIntervalHours ?? this.intervalHours,
+      staleAfterDays: snapshot?.staleAfterDays ?? this.staleAfterDays,
+      archiveAfterDays: snapshot?.archiveAfterDays ?? this.archiveAfterDays,
+    }
+  }
+
   start(): void {
     if (!this.enabled || this.timer) return
     this.timer = setInterval(() => {
-      if (Date.now() - this.lastRun >= this.intervalHours * 3_600_000) void this.run()
+      if (Date.now() - this.lastRun >= this.lifecycle().intervalHours * 3_600_000) void this.run()
     }, 60 * 60 * 1000)
     this.timer.unref()
   }
@@ -173,8 +185,9 @@ export class EvolutionCurator extends Service {
       loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
       saveCuratorState(record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }): Promise<void>
     } | undefined
+    const lifecycle = this.lifecycle()
     const persisted = await stateService?.loadCuratorState()
-    if (persisted && Date.now() - persisted.lastRunAt < this.intervalHours * 3_600_000) {
+    if (persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport(runId, startedAt),
@@ -192,8 +205,8 @@ export class EvolutionCurator extends Service {
     const snapshotPath = await this.skills.snapshotAll('pre-curator-run')
     const usage: UsageMap = await loadUsage(root, this.io)
     const result = computeLifecycleTransitions(usage, {
-      staleAfterDays: this.staleAfterDays,
-      archiveAfterDays: this.archiveAfterDays,
+      staleAfterDays: lifecycle.staleAfterDays,
+      archiveAfterDays: lifecycle.archiveAfterDays,
       pruneBuiltins: true,
       qualityWarnStaleAfterDays: this.qualityWarnStaleAfterDays,
     })

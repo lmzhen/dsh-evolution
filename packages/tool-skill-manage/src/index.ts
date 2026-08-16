@@ -9,6 +9,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
@@ -18,6 +19,15 @@ import type {} from '@deepseek-ai/dsh-skill-usage'
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
+
+export interface Config {
+  /** Skill tree root; empty uses $DSH_HOME/skills. Align with skill-usage/catalog rows. */
+  root?: string
+}
+
+export const Config: z<Config> = z.object({
+  root: z.string().default(''),
+})
 
 interface ApprovalLike {
   request(input: { kind: 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
@@ -36,7 +46,7 @@ interface SkillWriteArgs {
   absorbed_into?: string
 }
 
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, rawConfig: Config = {}): void {
   const resolveIo = () => ctx.evolutionIo.provider()
   const io: EvolutionIoLike = {
     readText: path => resolveIo().readText(path),
@@ -47,7 +57,7 @@ export function apply(ctx: Context): void {
     rename: (path, destination) => resolveIo().rename(path, destination),
     copy: (path, destination) => resolveIo().copy(path, destination),
   }
-  const library = new SkillLibrary(undefined, io)
+  const library = new SkillLibrary(rawConfig.root || undefined, io)
 
   async function executeCore(args: SkillWriteArgs, origin: 'foreground' | 'background_review' = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
     const action = args.action

@@ -9,6 +9,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
 
@@ -43,6 +44,21 @@ export const DEFAULT_WEIGHTS: ReplayWeights = {
   cost: 0.001,
 }
 
+export interface Config {
+  maxPlans?: number
+  weights?: ReplayWeights
+}
+
+export const Config: z<Config> = z.object({
+  maxPlans: z.number().default(50),
+  weights: z.object({
+    accepted: z.number().default(10),
+    rejectedPenalty: z.number().default(15),
+    evidence: z.number().default(2),
+    cost: z.number().default(0.001),
+  }).default(DEFAULT_WEIGHTS),
+})
+
 export function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): number {
   return plan.acceptedOps * weights.accepted
     - plan.rejectedOps * weights.rejectedPenalty
@@ -73,6 +89,13 @@ declare module '@deepseek-ai/cordis' {
 
 export class EvolutionReplayDriver {
   private readonly plans: ReplayPlan[] = []
+  private readonly maxPlans: number
+  private readonly weights: ReplayWeights
+
+  constructor(config: Config = {}) {
+    this.maxPlans = config.maxPlans ?? 50
+    this.weights = config.weights ?? DEFAULT_WEIGHTS
+  }
 
   record(event: {
     type: string
@@ -89,22 +112,22 @@ export class EvolutionReplayDriver {
       evidenceQuotes: data.memoryApplied + data.skillApplied,
       estimatedInputChars: 0,
     })
-    if (this.plans.length > 50) this.plans.shift()
+    if (this.plans.length > this.maxPlans) this.plans.shift()
   }
 
   plansSnapshot(): ReplayPlan[] {
     return [...this.plans]
   }
 
-  compare(weights: ReplayWeights = DEFAULT_WEIGHTS): ReplayResult {
+  compare(weights: ReplayWeights = this.weights): ReplayResult {
     return comparePlans(this.plans, weights)
   }
 }
 
 export const name = 'evolution-replay'
 
-export function apply(ctx: Context): void {
-  const driver = new EvolutionReplayDriver()
+export function apply(ctx: Context, rawConfig: Config = {}): void {
+  const driver = new EvolutionReplayDriver(rawConfig)
   ctx.provide('evolutionReplay', driver)
   ctx.on('session/event', (_session, event) => {
     if (event.type === 'evolution/plan-applied') driver.record(event)
