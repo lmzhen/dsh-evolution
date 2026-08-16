@@ -91,6 +91,10 @@ standard DSH host, which already owns the storage/session/approval stack) is
 - **Policy pipeline**: threat policy sits in `tools/pre-execute`; immutable
   evolution policy is enforced by the monotonic `tools.guard`; approval is a
   staged, replayable service over the state seam.
+- **Anchored Standard compatibility**: evolution review subagents allow
+  `skill`, `skill_search`, and `skill_load` by default, and a vendored
+  compatibility fixture verifies the bootstrap/promote/unlock contract of
+  the anchored-standard presets against the actual third-party plugin code.
 
 ## Attribution
 

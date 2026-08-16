@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Anchored Standard compatibility
+
+- Review subagent `toolFilter` now defaults to `skill`, `skill_search`, and
+  `skill_load`, so review children can discover/load skills under anchored
+  presets that hide the plain `skill` tool.
+- Added an anchored-standard compatibility suite using the actual vendored
+  `tool-bootstrap.mjs`/`compaction-epoch.mjs` plugins: evolution tools stay
+  hidden during bootstrap, remain hidden after promotion, and appear only
+  after `dev_tool_search` unlocks them.
+
 ## Unreleased — optimization groups
 
 - Added `evolution-skill-catalog`: native `ctx.skills` provider with explicit invalidation on `evolution/skill-mutated`.

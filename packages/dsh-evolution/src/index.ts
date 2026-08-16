@@ -50,6 +50,8 @@ export interface Config {
   curatorIntervalHours?: number
   curatorArchiveAfterDays?: number
   skillsRootOverride?: string
+  /** Tools the one-shot review subagent may use (Anchored Standard defaults). */
+  reviewToolAllow?: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -67,6 +69,7 @@ export const Config: z<Config> = z.object({
   curatorIntervalHours: z.number().default(168),
   curatorArchiveAfterDays: z.number().default(90),
   skillsRootOverride: z.string().default(''),
+  reviewToolAllow: z.array(z.string()).default(['skill', 'skill_search', 'skill_load']),
 })
 
 const STATIC_GUIDANCE = `## Hermes Evolution
@@ -504,7 +507,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         signal: controller.signal,
         maxDepth: 0,
         persona: reviewPrompt(kind),
-        toolFilter: { allow: ['skill'] },
+        toolFilter: { allow: [...config.reviewToolAllow] },
         outputSchema: {
           type: 'object',
           additionalProperties: false,

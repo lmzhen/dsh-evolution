@@ -23,6 +23,8 @@ export interface Config {
   reviewMode?: string
   memoryInterval?: number
   skillInterval?: number
+  /** Tools the one-shot review subagent may use. Defaults include the Anchored Standard discovery pair. */
+  reviewToolAllow?: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -30,6 +32,7 @@ export const Config: z<Config> = z.object({
   reviewMode: z.string().default('subagent'),
   memoryInterval: z.number().default(10),
   skillInterval: z.number().default(10),
+  reviewToolAllow: z.array(z.string()).default(['skill', 'skill_search', 'skill_load']),
 })
 
 interface SubagentLike {
@@ -130,7 +133,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         maxDepth: 0,
         agentOptions: { provider: 'deepseek-official', model },
         persona: reviewPrompt(kind),
-        toolFilter: { allow: ['skill'] },
+        toolFilter: { allow: [...config.reviewToolAllow] },
         outputSchema: {
           type: 'object',
           additionalProperties: false,
