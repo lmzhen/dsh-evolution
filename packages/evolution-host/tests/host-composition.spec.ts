@@ -2,29 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { fileURLToPath } from 'node:url'
 
+import { HOST_ROW_IDS } from '../../test-support/row-contract.ts'
+
 const patch = loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))) as any[]
 
-const HOST_ROWS = [
-  'evolution-policy',
-  'evolution-io',
-  'evolution-io-node',
-  'evolution-state-storage',
-  'evolution-state-domain',
-  'evolution-state-json',
-  'evolution-state',
-  'memory',
-  'memory-files',
-  'skill-usage',
-  'evolution-approval',
-  'evolution-threat',
-  'evolution-review',
-  'evolution-curator',
-  'evolution-commands',
-  'evolution-activity',
-  'evolution-feedback',
-  'evolution-learning-graph',
-  'evolution-replay',
-]
+const HOST_ROWS = [...HOST_ROW_IDS]
 
 describe('evolution-host composition', () => {
   it('is a loader patch containing exactly the host-plane rows', () => {

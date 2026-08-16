@@ -51,6 +51,7 @@ packages/
 ├── evolution-host/                              # host-plane infrastructure bundle
 ├── evolution-agent/                             # Evolution agent preset (standard + tools)
 ├── evolution-preset/                            # one-click compatibility bundle
+├── evolution-capability/                        # staged, non-executing Creator adapter
 └── dsh-evolution/                               # compatibility facade + shared modules
 ```
 

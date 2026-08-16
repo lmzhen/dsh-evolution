@@ -42,6 +42,15 @@ node packages/evolution/scripts/install-layered.mjs \
   --profile web --mode layered --dry-run
 ```
 
+Uninstall the layered layout while keeping user data:
+
+```bash
+node packages/evolution/scripts/install-layered.mjs   --profile web --mode layered --uninstall
+```
+
+Only the profile rows, copied packages, and the agent preset directory are
+removed. Memory, skills, state, reports, and approval history remain.
+
 ## 2. Host-only install
 
 ```bash
@@ -151,3 +160,20 @@ vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
 
 Uninstalling only removes the profile row or preset directory; memory, skills,
 state, reports, and approval history remain under `$DSH_HOME`.
+
+## Capability governance
+
+`evolution-capability` is a staged, non-executing adapter for Creator mode. It
+validates a capability package shape and submits it through the same pending
+audit trail as memory/skills. Activation remains in Creator mode:
+
+```ts
+await ctx.evolutionCapability.submit({
+  name: 'my-capability',
+  purpose: 'One sentence purpose.',
+  code: { host: 'export function apply() {}' },
+})
+```
+
+It fails closed while `evolution-approval` is disabled, and it never executes
+`code` itself.

@@ -76,6 +76,11 @@ export class EvolutionApproval extends Service {
     return this.ctx.evolutionState as EvolutionStateLike
   }
 
+  /** Fail-closed capability adapters need to distinguish "allowed" from "enabled". */
+  get isEnabled(): boolean {
+    return this.enabled
+  }
+
   registerRunner(kind: PendingKind, runner: WriteRunner): () => void {
     this.runners.set(kind, runner)
     return () => {
@@ -142,7 +147,14 @@ export class EvolutionApproval extends Service {
     const record = (await this.list('pending')).find(item => item.id === id)
     if (!record) return { ok: false, message: `Pending write "${id}" not found.` }
     const runner = this.runners.get(record.kind)
-    if (!runner) return { ok: false, message: `No replay runner registered for kind "${record.kind}".` }
+    if (!runner) {
+      if (record.kind === 'capability') {
+        const resolution = await this.state().tryResolvePending(id, 'approved')
+        if (!resolution.applied) return { ok: false, message: `Pending write "${id}" was already resolved.` }
+        return { ok: true, message: 'Capability approved for manual activation in Creator mode (no code was executed).' }
+      }
+      return { ok: false, message: `No replay runner registered for kind "${record.kind}".` }
+    }
     const result = await runner(record.args)
     if (!result.ok) return { ok: false, message: result.message }
     const resolution = await this.state().tryResolvePending(id, 'approved')

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Phase 5 and final hardening
+
+- Added `@deepseek-ai/dsh-evolution-capability`: validates Creator-mode capability packages and stages them through the existing approval audit without executing code.
+- Approval of `capability` records records human intent for manual Creator-mode activation instead of failing on a missing runner.
+- Added uninstall support to the layered installer, preserving user data.
+- Added profile-override composition test.
+- Agent preset test now enforces byte-for-byte synchronization with the upstream standard preset.
+
 ## Unreleased — Phase 4 installer and docs
 
 - Added `scripts/install-layered.mjs` with host/agent/layered/oneclick modes and dry-run support.

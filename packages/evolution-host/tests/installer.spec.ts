@@ -39,6 +39,17 @@ describe('layered installer', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('uninstalls the layered installation without touching user data', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-uninstall-'))
+    await runInstaller(home, 'layered')
+    await runInstaller(home, 'layered', 'evo-test', ['--uninstall'])
+    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'evo-test', 'package.json'), 'utf8'))
+    expect(manifest.dsh.profile.bundles).toEqual([])
+    const { readdir } = await import('node:fs/promises')
+    expect(await readdir(join(home, 'profiles', 'evo-test', 'node_modules/@deepseek-ai'))).toHaveLength(0)
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('does not write profile files in dry-run mode', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-dry-'))
     await runInstaller(home, 'layered')

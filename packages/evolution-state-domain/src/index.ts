@@ -32,7 +32,7 @@ export const curatorStateSchema = z.object({
 
 export const pendingSchema = z.object({
   id: z.string(),
-  kind: z.union([z.literal('memory'), z.literal('skill'), z.literal('skill_batch')]),
+  kind: z.union([z.literal('memory'), z.literal('skill'), z.literal('skill_batch'), z.literal('capability')]),
   summary: z.string(),
   args: z.unknown(),
   createdAt: z.string(),

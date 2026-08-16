@@ -56,6 +56,8 @@
       config:
         enabled: false
         stageForeground: true
+    - id: evolution-capability
+      name: '@deepseek-ai/dsh-evolution-capability'
     - id: evolution-threat
       name: '@deepseek-ai/dsh-evolution-threat'
 

@@ -14,13 +14,14 @@
  * bundle package.
  */
 
-import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 
 const MODES = new Set(['host', 'agent', 'layered', 'oneclick'])
+const EVOLUTION_PREFIXES = ['dsh-evolution', 'dsh-memory', 'dsh-memory-files', 'dsh-skill-usage', 'dsh-tool-memory', 'dsh-tool-skill-manage']
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
 const EVOLUTION_SCOPE = '@deepseek-ai'
 const BUNDLES = {
@@ -113,6 +114,30 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
   return copies
 }
 
+async function removeBundleFromProfile(profileDir, bundleName) {
+  const manifestPath = join(profileDir, 'package.json')
+  if (!existsSync(manifestPath)) return false
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const bundles = manifest.dsh?.profile?.bundles
+  if (!Array.isArray(bundles) || !bundles.includes(bundleName)) return false
+  manifest.dsh.profile.bundles = bundles.filter(name => name !== bundleName)
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+  return true
+}
+
+async function removeCopiedEvolutionPackages(profileDir) {
+  const scopeDir = join(profileDir, 'node_modules', EVOLUTION_SCOPE)
+  if (!existsSync(scopeDir)) return 0
+  let removed = 0
+  for (const entry of await readdir(scopeDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    if (!EVOLUTION_PREFIXES.some(prefix => entry.name === prefix || entry.name.startsWith(`${prefix}-`))) continue
+    await rm(join(scopeDir, entry.name), { recursive: true, force: true })
+    removed += 1
+  }
+  return removed
+}
+
 async function installAgentPreset(home, dryRun, force) {
   const destination = agentPresetDirectory(home)
   if (!dryRun) {
@@ -125,6 +150,28 @@ async function installAgentPreset(home, dryRun, force) {
     }
   }
   return { destination, installed: true }
+}
+
+export async function uninstall(options = {}) {
+  const mode = options.mode ?? 'layered'
+  if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')}`)
+  const home = options.home ?? resolveHome(options.env)
+  const profile = options.profile ?? 'web'
+  const dryRun = options.dryRun === true
+  const profileDir = profileDirectory(home, profile)
+  const result = { mode, home, profile, profileDir, removedBundle: null, removedPackages: 0, removedAgentPreset: false }
+
+  if (mode === 'host' || mode === 'layered' || mode === 'oneclick') {
+    const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
+    result.removedBundle = bundleName
+    if (!dryRun) await removeBundleFromProfile(profileDir, bundleName)
+    result.removedPackages = dryRun ? EVOLUTION_PREFIXES.length : await removeCopiedEvolutionPackages(profileDir)
+  }
+  if (mode === 'agent' || mode === 'layered') {
+    result.removedAgentPreset = true
+    if (!dryRun) await rm(agentPresetDirectory(home), { recursive: true, force: true })
+  }
+  return result
 }
 
 export async function install(options = {}) {
@@ -164,6 +211,7 @@ function parseArgs(argv) {
     else if (arg === '--home') options.home = resolve(argv[++i])
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
+    else if (arg === '--uninstall') options.uninstall = true
     else throw new Error(`unknown argument ${arg}`)
   }
   return options
@@ -173,7 +221,16 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 if (isMain) {
   try {
     const options = parseArgs(process.argv.slice(2))
-    const result = await install(options)
+    if (options.uninstall) {
+      const result = await uninstall(options)
+      console.log(`uninstall mode:     ${result.mode}`)
+      console.log(`profile:  ${result.profile} (${result.profileDir})`)
+      if (result.removedBundle) console.log(`bundle:   ${result.removedBundle}`)
+      console.log(`packages: ${result.removedPackages}`)
+      console.log(`preset:   ${result.removedAgentPreset}`)
+      if (options.dryRun) console.log('dry-run:  no files were written')
+    } else {
+      const result = await install(options)
     console.log(`mode:     ${result.mode}`)
     console.log(`profile:  ${result.profile} (${result.profileDir})`)
     if (result.bundle) console.log(`bundle:   ${result.bundle}`)
@@ -181,7 +238,8 @@ if (isMain) {
     if (result.agentPreset) {
       console.log(`preset:   ${result.agentPreset.destination}${result.agentPreset.installed ? '' : ` (${result.agentPreset.reason})`}`)
     }
-    if (options.dryRun) console.log('dry-run:  no files were written')
+      if (options.dryRun) console.log('dry-run:  no files were written')
+    }
   } catch (error) {
     console.error(error)
     process.exitCode = 1

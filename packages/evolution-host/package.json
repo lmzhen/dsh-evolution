@@ -40,7 +40,8 @@
     "@deepseek-ai/dsh-evolution-activity": "workspace:^",
     "@deepseek-ai/dsh-evolution-feedback": "workspace:^",
     "@deepseek-ai/dsh-evolution-learning-graph": "workspace:^",
-    "@deepseek-ai/dsh-evolution-replay": "workspace:^"
+    "@deepseek-ai/dsh-evolution-replay": "workspace:^",
+    "@deepseek-ai/dsh-evolution-capability": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",

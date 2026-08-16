@@ -9,7 +9,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 
-export type PendingKind = 'memory' | 'skill' | 'skill_batch'
+export type PendingKind = 'memory' | 'skill' | 'skill_batch' | 'capability'
 export type PendingStatus = 'pending' | 'approved' | 'rejected'
 
 export interface ReviewStateRecord {

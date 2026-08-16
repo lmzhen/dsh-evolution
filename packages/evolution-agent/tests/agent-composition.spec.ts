@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const rows = loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))) as any[]
+const upstream = loadOverlayPatches('test', fileURLToPath(new URL('../../../../apps/cli/config/agent-presets/standard/agent.cordis.yml', import.meta.url))) as any[]
 const preset = readFileSync(fileURLToPath(new URL('../preset.yml', import.meta.url)), 'utf8')
 
 describe('evolution-agent composition', () => {
@@ -32,6 +33,20 @@ describe('evolution-agent composition', () => {
     expect(names).not.toContain('@deepseek-ai/dsh-skill-usage')
     expect(names).not.toContain('@deepseek-ai/dsh-evolution-state')
     expect(names).not.toContain('@deepseek-ai/dsh-evolution-approval')
+  })
+
+  it('keeps every upstream standard row byte-for-byte', () => {
+    const upstreamById = new Map(upstream.map((row: any) => [row.id, JSON.stringify(row)]))
+    const evolutionNames = new Set([
+      '@deepseek-ai/dsh-tool-memory',
+      '@deepseek-ai/dsh-tool-skill-manage',
+      '@deepseek-ai/dsh-evolution-skill-catalog',
+    ])
+    const standardRows = rows.filter((row: any) => !evolutionNames.has(row.name))
+    expect(standardRows).toHaveLength(upstream.length)
+    for (const row of standardRows) {
+      expect(upstreamById.get(row.id)).toBe(JSON.stringify(row))
+    }
   })
 
   it('ships preset metadata for the roster', () => {
