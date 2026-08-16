@@ -82,6 +82,17 @@ export class SkillUsageRegistry extends Service {
       await this.flush()
     })
   }
+
+  /** Write feedback-derived quality onto the usage sidecar; curator reads it. */
+  async setQuality(name: string, score: number, warn: boolean): Promise<void> {
+    await this.mutate(async map => {
+      const record = map.get(name)
+      if (!record) return
+      record.quality_score = score
+      record.quality_warn = warn
+      await this.flush()
+    })
+  }
 }
 
 export default SkillUsageRegistry

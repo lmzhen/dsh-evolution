@@ -87,6 +87,10 @@ export class EvolutionState extends Service {
   deletePending(id: string): Promise<void> {
     return this.storage().deletePending(id)
   }
+
+  tryResolvePending(id: string, status: 'approved' | 'rejected') {
+    return this.storage().tryResolvePending(id, status)
+  }
 }
 
 export default EvolutionState

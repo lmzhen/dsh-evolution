@@ -45,4 +45,34 @@ describe('evolution-approval', () => {
 
     await rm(home, { recursive: true, force: true })
   })
+
+  it('runs the replay exactly once when approve is called concurrently', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-atomic-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+
+    let applied = 0
+    ctx.evolutionApproval.registerRunner('memory', async () => {
+      await new Promise(resolve => setTimeout(resolve, 25))
+      applied += 1
+      return { ok: true, message: 'memory applied' }
+    })
+
+    const decision = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'atomic approval', args: { action: 'add', facts: 'x' }, origin: 'background_review',
+    })
+    const [a, b] = await Promise.all([
+      ctx.evolutionApproval.approve(decision.pendingId!),
+      ctx.evolutionApproval.approve(decision.pendingId!),
+    ])
+    expect(applied).toBe(1)
+    expect([a.ok, b.ok].filter(Boolean).length).toBeGreaterThanOrEqual(1)
+
+    await rm(home, { recursive: true, force: true })
+  })
 })

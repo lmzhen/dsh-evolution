@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — optimization groups
+
+- Added `evolution-skill-catalog`: native `ctx.skills` provider with explicit invalidation on `evolution/skill-mutated`.
+- Approval resolve is now atomic (`tryResolvePending`) across JSON and storage-domain providers, with in-process dedupe.
+- Feedback is durable through the IO seam and feeds `quality_score`/`quality_warn` into skill usage and curator thresholds.
+- Curator runs persist a JSON report; `/evolution curator report` reads it; optional `minIdleHours` skips runs during active sessions.
+
 ## Unreleased — seams and host-plane alignment
 
 - Added `evolution-io` registry + `evolution-io-node` atomic provider; native

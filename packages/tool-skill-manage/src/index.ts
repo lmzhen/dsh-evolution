@@ -13,6 +13,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution/src/io.ts'
+import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
 export const name = 'tool-skill-manage'
@@ -64,7 +65,14 @@ export function apply(ctx: Context): void {
     else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '')
     else result = { ok: false, message: `Unknown action "${action}".` }
 
-    if (result.ok && name && action !== 'list') await ctx.skillUsage.record(name, 'patch')
+    if (result.ok) {
+      if (name && action !== 'list') await ctx.skillUsage.record(name, 'patch')
+      ctx.emit('evolution/skill-mutated', {
+        action: action ?? '?',
+        name,
+        ...result.path && action === 'delete' ? { archivedPath: result.path } : result.path ? { filePath: result.path } : {},
+      })
+    }
     return { ok: result.ok, message: result.message, skills: [] }
   }
 

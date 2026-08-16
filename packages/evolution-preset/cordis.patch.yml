@@ -1,55 +1,76 @@
-# Recommended native dsh-evolution composition (patch form).
+# Recommended native dsh-evolution composition (bundle patch form).
 #
-# Same ordering guarantees as cordis.yml: IO seam first, storage-domain KV as
-# the primary evolution-state provider, then memory/skills, write-admission,
-# and the review/curator/observability layer. The legacy facade is not mounted.
-- id: evolution-policy
-  name: '@deepseek-ai/dsh-evolution-policy'
-- id: evolution-io
-  name: '@deepseek-ai/dsh-evolution-io'
-- id: evolution-io-node
-  name: '@deepseek-ai/dsh-evolution-io-node'
-# NOTE: the storage stack (`storage`, `storage-json`, `storage-domain`) is
+# This file is a DSH bundle PATCH: it inserts the evolution rows into the
+# profile's empty root composition and therefore uses the loader's
+# `- insert:` patch vocabulary, not the top-level entry list of cordis.yml.
+#
+# The storage stack (`storage`, `storage-json`, `storage-domain`) is
 # HOST-plane in DSH, exactly like session persistence and the native approval
 # stack. A preset must not own it. `evolution-state-domain` below joins the
 # host's storage-domain facility when present; `evolution-state-json` remains
 # the portable fallback and audit provider.
-- id: evolution-state-storage
-  name: '@deepseek-ai/dsh-evolution-state-storage'
-- id: evolution-state-domain
-  name: '@deepseek-ai/dsh-evolution-state-domain'
-- id: evolution-state-json
-  name: '@deepseek-ai/dsh-evolution-state-json'
-- id: evolution-state
-  name: '@deepseek-ai/dsh-evolution-state'
-- id: memory
-  name: '@deepseek-ai/dsh-memory'
-- id: memory-files
-  name: '@deepseek-ai/dsh-memory-files'
-- id: tool-memory
-  name: '@deepseek-ai/dsh-tool-memory'
-- id: skill-usage
-  name: '@deepseek-ai/dsh-skill-usage'
-- id: tool-skill-manage
-  name: '@deepseek-ai/dsh-tool-skill-manage'
-- id: evolution-approval
-  name: '@deepseek-ai/dsh-evolution-approval'
-  config:
-    enabled: false
-    stageForeground: true
-- id: evolution-threat
-  name: '@deepseek-ai/dsh-evolution-threat'
-- id: evolution-review
-  name: '@deepseek-ai/dsh-evolution-review'
-- id: evolution-curator
-  name: '@deepseek-ai/dsh-evolution-curator'
-- id: evolution-commands
-  name: '@deepseek-ai/dsh-evolution-commands'
-- id: evolution-activity
-  name: '@deepseek-ai/dsh-evolution-activity'
-- id: evolution-feedback
-  name: '@deepseek-ai/dsh-evolution-feedback'
-- id: evolution-learning-graph
-  name: '@deepseek-ai/dsh-evolution-learning-graph'
-- id: evolution-replay
-  name: '@deepseek-ai/dsh-evolution-replay'
+- insert:
+    # ── control plane ───────────────────────────────────────────────────────
+    - id: evolution-policy
+      name: '@deepseek-ai/dsh-evolution-policy'
+
+    # ── IO seam: one registry, one node:fs provider ─────────────────────────
+    - id: evolution-io
+      name: '@deepseek-ai/dsh-evolution-io'
+    - id: evolution-io-node
+      name: '@deepseek-ai/dsh-evolution-io-node'
+
+    # ── durable state: storage-domain KV first, portable JSON fallback ──────
+    - id: evolution-state-storage
+      name: '@deepseek-ai/dsh-evolution-state-storage'
+    - id: evolution-state-domain
+      name: '@deepseek-ai/dsh-evolution-state-domain'
+      # The storage-domain facility is host-plane. On hosts that do not mount
+      # it, keep this row dormant so the JSON provider remains the active
+      # state backend instead of turning the whole tree into a pending entry.
+      disabled: !!js ctx.get('storageDomain') === undefined
+    - id: evolution-state-json
+      name: '@deepseek-ai/dsh-evolution-state-json'
+    - id: evolution-state
+      name: '@deepseek-ai/dsh-evolution-state'
+
+    # ── memory: registry, provider, model-facing tool ───────────────────────
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+    - id: memory-files
+      name: '@deepseek-ai/dsh-memory-files'
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+
+    # ── skills: usage telemetry, model-facing management tool ───────────────
+    - id: skill-usage
+      name: '@deepseek-ai/dsh-skill-usage'
+    - id: tool-skill-manage
+      name: '@deepseek-ai/dsh-tool-skill-manage'
+    - id: evolution-skill-catalog
+      name: '@deepseek-ai/dsh-evolution-skill-catalog'
+
+    # ── write admission: staged approval (off by default) + threat guard ────
+    - id: evolution-approval
+      name: '@deepseek-ai/dsh-evolution-approval'
+      config:
+        enabled: false
+        stageForeground: true
+    - id: evolution-threat
+      name: '@deepseek-ai/dsh-evolution-threat'
+
+    # ── review / curator / observability / human controls ───────────────────
+    - id: evolution-review
+      name: '@deepseek-ai/dsh-evolution-review'
+    - id: evolution-curator
+      name: '@deepseek-ai/dsh-evolution-curator'
+    - id: evolution-commands
+      name: '@deepseek-ai/dsh-evolution-commands'
+    - id: evolution-activity
+      name: '@deepseek-ai/dsh-evolution-activity'
+    - id: evolution-feedback
+      name: '@deepseek-ai/dsh-evolution-feedback'
+    - id: evolution-learning-graph
+      name: '@deepseek-ai/dsh-evolution-learning-graph'
+    - id: evolution-replay
+      name: '@deepseek-ai/dsh-evolution-replay'

@@ -4,13 +4,16 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution/src/usage.ts'
-import { computeLifecycleTransitions } from '@deepseek-ai/dsh-evolution/src/curator.ts'
+import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport } from '@deepseek-ai/dsh-evolution/src/curator.ts'
+import { evolutionHome } from '@deepseek-ai/dsh-evolution/src/state-store.ts'
 import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution/src/prompts.ts'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution/src/io.ts'
 import type {} from '@deepseek-ai/dsh-evolution-state'
@@ -29,6 +32,10 @@ export interface Config {
   /** Spend one LLM review pass on stale candidates before the deterministic archive step. */
   llmReview?: boolean
   curatorProvider?: string
+  /** Quality-warned skills may turn stale after this many idle days. */
+  qualityWarnStaleAfterDays?: number
+  /** Skip automatic runs while any session was active within this many hours (0 disables). */
+  minIdleHours?: number
 }
 
 export class EvolutionCurator extends Service {
@@ -40,6 +47,8 @@ export class EvolutionCurator extends Service {
     archiveAfterDays: z.number().default(90),
     llmReview: z.boolean().default(false),
     curatorProvider: z.string().default('deepseek-official'),
+    qualityWarnStaleAfterDays: z.number().default(7),
+    minIdleHours: z.number().default(0),
   })
 
   readonly skills: SkillLibrary
@@ -50,6 +59,8 @@ export class EvolutionCurator extends Service {
   private readonly archiveAfterDays: number
   private readonly llmReview: boolean
   private readonly curatorProvider: string
+  private readonly qualityWarnStaleAfterDays: number
+  private readonly minIdleHours: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
 
@@ -71,6 +82,8 @@ export class EvolutionCurator extends Service {
     this.archiveAfterDays = config.archiveAfterDays ?? 90
     this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
+    this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? 7
+    this.minIdleHours = config.minIdleHours ?? 0
     this.lastRun = Date.now()
     this.ctx.effect(() => () => this.stop(), 'evolution-curator.stop')
   }
@@ -130,24 +143,39 @@ export class EvolutionCurator extends Service {
     }
   }
 
-  async run(): Promise<{ stale: string[]; archived: string[]; errors: string[] }> {
+  async run(): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: CuratorRunReport; skipped?: string }> {
+    const startedAt = new Date().toISOString()
+    const runId = randomUUID()
     const stateService = this.ctx.get('evolutionState') as {
       loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
       saveCuratorState(record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }): Promise<void>
     } | undefined
     const persisted = await stateService?.loadCuratorState()
     if (persisted && Date.now() - persisted.lastRunAt < this.intervalHours * 3_600_000) {
-      return { stale: [], archived: [], errors: [] }
+      return {
+        stale: [], archived: [], errors: [],
+        report: buildCuratorRunReport({ runId, startedAt, finishedAt: startedAt, staleCandidates: [], llmNominations: [], archiveCandidates: [], archived: [], failed: [] }),
+        skipped: 'interval',
+      }
+    }
+    if (this.minIdleHours > 0 && this.recentSessionActive()) {
+      return {
+        stale: [], archived: [], errors: [],
+        report: buildCuratorRunReport({ runId, startedAt, finishedAt: startedAt, staleCandidates: [], llmNominations: [], archiveCandidates: [], archived: [], failed: [] }),
+        skipped: 'active-session',
+      }
     }
     const root = this.skills.root
-    await this.skills.snapshotAll('pre-curator-run')
+    const snapshotPath = await this.skills.snapshotAll('pre-curator-run')
     const usage: UsageMap = await loadUsage(root, this.io)
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: this.staleAfterDays,
       archiveAfterDays: this.archiveAfterDays,
       pruneBuiltins: true,
+      qualityWarnStaleAfterDays: this.qualityWarnStaleAfterDays,
     })
     const errors: string[] = []
+    const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
     const llmNominations = this.llmReview ? await this.recommend(result.markStale) : []
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
     for (const name of archiveCandidates) {
@@ -156,17 +184,66 @@ export class EvolutionCurator extends Service {
         const record = usage.get(name)
         if (record) record.state = 'active'
         errors.push(`${name}: ${archived.message}`)
+      } else {
+        archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
       }
     }
     await saveUsage(root, usage, this.io)
     this.lastRun = Date.now()
+    const finishedAt = new Date().toISOString()
+    const report = buildCuratorRunReport({
+      runId,
+      startedAt,
+      finishedAt,
+      staleCandidates: result.markStale,
+      llmNominations,
+      archiveCandidates,
+      archived: archivedSkills,
+      failed: archiveCandidates.filter(name => errors.some(error => error.startsWith(`${name}:`))).map(name => {
+        const error = errors.find(item => item.startsWith(`${name}:`))
+        return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
+      }),
+      snapshotPath,
+    })
+    const reportsRoot = join(evolutionHome(), 'reports')
+    try {
+      await this.io.writeText(join(reportsRoot, `curator-${runId}.json`), JSON.stringify(report, null, 2))
+    } catch (error) {
+      // Report persistence is best-effort; curation decisions already landed.
+      this.ctx.logger.warn(`evolution-curator: failed to persist report ${runId}`)
+      this.ctx.logger.warn(error)
+    }
     await stateService?.saveCuratorState({
       lastRunAt: this.lastRun,
       runCount: (persisted?.runCount ?? 0) + 1,
-      lastSummary: `stale:${result.markStale.length} archived:${result.archive.length}`,
+      lastSummary: `stale:${result.markStale.length} archived:${archivedSkills.length}`,
       paused: false,
     })
-    return { stale: result.markStale, archived: result.archive, errors }
+    return { stale: result.markStale, archived: archivedSkills.map(item => item.name), errors, report }
+  }
+
+  private recentSessionActive(): boolean {
+    const agents = this.ctx.get('agents') as {
+      list(): Array<{ session: { events: ReadonlyArray<{ time: number }> } }>
+    } | undefined
+    if (!agents) return false
+    let latest = 0
+    for (const agent of agents.list()) {
+      const events = agent.session.events
+      const last = events.length === 0 ? 0 : events[events.length - 1]!.time
+      latest = Math.max(latest, last)
+    }
+    return latest > 0 && Date.now() - latest < this.minIdleHours * 3_600_000
+  }
+
+  async latestReport(): Promise<CuratorRunReport | null> {
+    const reportsRoot = join(evolutionHome(), 'reports')
+    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json')).sort().reverse()
+    const latest = names[0]
+    if (!latest) return null
+    const raw = await this.io.readText(join(reportsRoot, latest))
+    if (raw === null) return null
+    try { return JSON.parse(raw) as CuratorRunReport } catch { return null }
   }
 }
 

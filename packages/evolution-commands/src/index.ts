@@ -32,17 +32,30 @@ export function apply(ctx: Context): void {
           return { text: result.message }
         }
         if (input === 'curator run') {
-          const curator = ctx.get('evolutionCurator') as { run(): Promise<{ stale: string[]; archived: string[] }> } | undefined
+          const curator = ctx.get('evolutionCurator') as { run(): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: { runId: string; snapshotPath?: string } }> } | undefined
           if (!curator) return { text: 'Curator service not mounted.' }
           const result = await curator.run()
-          return { text: `Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived.` }
+          return { text: `Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}` }
+        }
+        if (input === 'curator report') {
+          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
+          if (!curator) return { text: 'Curator service not mounted.' }
+          const report = await curator.latestReport()
+          if (!report) return { text: 'No curator report available.' }
+          const lines = [
+            `runId=${report.runId}`,
+            `startedAt=${report.startedAt}`,
+            `archived=${report.archived.map(item => item.name).join(', ') || '(none)'}`,
+            `failed=${report.failed.map(item => `${item.name}: ${item.reason}`).join(', ') || '(none)'}`,
+          ]
+          return { text: lines.join('\n') }
         }
         if (input.startsWith('restore ')) {
           const curator = ctx.get('evolutionCurator') as { skills: { restoreLatestSnapshot(): Promise<{ ok: boolean; message: string }> } } | undefined
           const result = curator ? await curator.skills.restoreLatestSnapshot() : { ok: false, message: 'Curator service not mounted.' }
           return { text: result.message }
         }
-        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | restore.' }
+        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | restore.' }
       },
     })
   })

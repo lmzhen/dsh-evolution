@@ -38,6 +38,7 @@ interface EvolutionStateLike {
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
   deletePending(id: string): Promise<void>
+  tryResolvePending(id: string, status: 'approved' | 'rejected'): Promise<{ record: PendingRecord | null; applied: boolean }>
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -63,6 +64,7 @@ export class EvolutionApproval extends Service {
   private readonly enabled: boolean
   private readonly stageForeground: boolean
   private readonly runners = new Map<PendingKind, WriteRunner>()
+  private readonly inFlight = new Map<string, Promise<{ ok: boolean; message: string }>>()
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionApproval')
@@ -115,25 +117,39 @@ export class EvolutionApproval extends Service {
   }
 
   async approve(id: string): Promise<{ ok: boolean; message: string }> {
+    return await this.dedupe(id, () => this.doApprove(id))
+  }
+
+  async reject(id: string): Promise<{ ok: boolean; message: string }> {
+    return await this.dedupe(id, async () => {
+      const resolution = await this.state().tryResolvePending(id, 'rejected')
+      if (!resolution.applied || !resolution.record) {
+        return { ok: false, message: `Pending write "${id}" is not pending (already resolved or missing).` }
+      }
+      return { ok: true, message: `Rejected ${resolution.record.kind} write "${id}".` }
+    })
+  }
+
+  private dedupe(id: string, task: () => Promise<{ ok: boolean; message: string }>): Promise<{ ok: boolean; message: string }> {
+    const existing = this.inFlight.get(id)
+    if (existing) return existing
+    const run = task().finally(() => { this.inFlight.delete(id) })
+    this.inFlight.set(id, run)
+    return run
+  }
+
+  private async doApprove(id: string): Promise<{ ok: boolean; message: string }> {
     const record = (await this.list('pending')).find(item => item.id === id)
     if (!record) return { ok: false, message: `Pending write "${id}" not found.` }
     const runner = this.runners.get(record.kind)
     if (!runner) return { ok: false, message: `No replay runner registered for kind "${record.kind}".` }
     const result = await runner(record.args)
     if (!result.ok) return { ok: false, message: result.message }
-    record.status = 'approved'
-    record.resolvedAt = new Date().toISOString()
-    await this.state().savePending(record)
+    const resolution = await this.state().tryResolvePending(id, 'approved')
+    if (!resolution.applied) {
+      return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
+    }
     return { ok: true, message: `Approved ${record.kind}: ${result.message}` }
-  }
-
-  async reject(id: string): Promise<{ ok: boolean; message: string }> {
-    const record = (await this.list('pending')).find(item => item.id === id)
-    if (!record) return { ok: false, message: `Pending write "${id}" not found.` }
-    record.status = 'rejected'
-    record.resolvedAt = new Date().toISOString()
-    await this.state().savePending(record)
-    return { ok: true, message: `Rejected ${record.kind} write "${id}".` }
   }
 }
 

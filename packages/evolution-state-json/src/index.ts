@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -110,6 +110,18 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const map = await readJson<Record<string, PendingRecord>>('pending-state.json') ?? {}
         delete map[id]
         await writeJson('pending-state.json', map)
+      })
+    },
+
+    async tryResolvePending(id, status): Promise<PendingResolution> {
+      return await mutate(async () => {
+        const map = await readJson<Record<string, PendingRecord>>('pending-state.json') ?? {}
+        const record = map[id] ?? null
+        if (record === null || record.status !== 'pending') return { record, applied: false }
+        record.status = status
+        record.resolvedAt = new Date().toISOString()
+        await writeJson('pending-state.json', map)
+        return { record, applied: true }
       })
     },
   }

@@ -16,6 +16,18 @@
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../evolution-io"
+    },
+    {
+      "path": "../skill-usage"
+    },
+    {
+      "path": "../dsh-evolution"
+    },
+    {
+      "path": "../evolution-io-node"
     }
   ]
 }

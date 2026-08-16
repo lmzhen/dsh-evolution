@@ -36,7 +36,7 @@ instead of daemon threads, subagents instead of forked AIAgent instances.
 ```text
 packages/
 ├── memory/ + memory-files/ + tool-memory/       # memory seam, provider, tool
-├── skill-usage/ + tool-skill-manage/            # telemetry + skill_manage
+├── skill-usage/ + tool-skill-manage/ + evolution-skill-catalog/  # telemetry + skill_manage + native catalog
 ├── evolution-io/ + evolution-io-node/           # file-tree IO seam + atomic node provider
 ├── evolution-policy/                            # immutable control plane + tools.guard
 ├── evolution-plan-validator/                    # deterministic plan validation
@@ -45,7 +45,7 @@ packages/
 ├── evolution-approval/                          # staged write approval service
 ├── evolution-threat/                            # tools/pre-execute threat guard
 ├── evolution-review/                            # signal gate + subagent review
-├── evolution-curator/                           # 30/90-day lifecycle + LLM advisory pass
+├── evolution-curator/                           # lifecycle + LLM advisory + reports + min-idle
 ├── evolution-commands/ + evolution-learning-graph/
 ├── evolution-activity/ + evolution-feedback/ + evolution-replay/
 ├── evolution-preset/                            # cordis.yml + patch composition

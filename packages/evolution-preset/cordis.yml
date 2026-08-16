@@ -52,6 +52,8 @@
   name: '@deepseek-ai/dsh-skill-usage'
 - id: tool-skill-manage
   name: '@deepseek-ai/dsh-tool-skill-manage'
+- id: evolution-skill-catalog
+  name: '@deepseek-ai/dsh-evolution-skill-catalog'
 
 # ── write admission: staged approval (off by default) + threat guard ────────
 - id: evolution-approval

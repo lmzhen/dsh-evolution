@@ -11,6 +11,7 @@ const provider = (name: string) => ({
   listPending: async () => [],
   savePending: async () => {},
   deletePending: async () => {},
+  tryResolvePending: async () => ({ record: null, applied: false }),
 })
 
 describe('evolution-state-storage', () => {

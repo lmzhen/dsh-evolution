@@ -35,6 +35,11 @@ export interface PendingRecord {
   resolvedAt?: string | undefined
 }
 
+export interface PendingResolution {
+  record: PendingRecord | null
+  applied: boolean
+}
+
 export interface EvolutionStateStorage {
   readonly name: string
   loadReviewState(sessionId: string): Promise<ReviewStateRecord | null>
@@ -44,6 +49,8 @@ export interface EvolutionStateStorage {
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
   deletePending(id: string): Promise<void>
+  /** Atomically transition a pending record exactly once. */
+  tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>): Promise<PendingResolution>
 }
 
 declare module '@deepseek-ai/cordis' {

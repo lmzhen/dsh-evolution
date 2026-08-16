@@ -11,19 +11,19 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `dsh-evolution` | Legacy one-row facade + shared stores/prompts/signals (compatibility) |
 | `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
-| `skill-usage` / `tool-skill-manage` | Usage telemetry service + `skill_manage` tool |
+| `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
 | `evolution-policy` | Immutable policy snapshot + native `tools.guard` denials |
 | `evolution-plan-validator` | Deterministic validation for model-produced plans |
 | `evolution-state-storage` / `-domain` / `-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
 | `evolution-approval` | Hermes-style staged/pending writes over `evolutionState` |
 | `evolution-threat` | `tools/pre-execute` content threat guard |
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
-| `evolution-curator` | Deterministic 30/90-day lifecycle + optional LLM nomination pass |
+| `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
 | `evolution-activity` | Session projection over `evolution/plan-applied` |
-| `evolution-feedback` | Feedback-to-quality scoring |
+| `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
-| `evolution-commands` | `/evolution pending|approve|reject|curator run|restore` |
+| `evolution-commands` | `/evolution pending|approve|reject|curator run|curator report|restore` |
 | `evolution-preset` | Recommended composition (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 
 ## Composition

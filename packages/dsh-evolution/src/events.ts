@@ -5,6 +5,7 @@
  */
 
 import type {} from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/cordis'
 
 export interface EvolutionReviewScheduledEvent {
   kind: 'memory' | 'skill' | 'combined'
@@ -20,9 +21,23 @@ export interface EvolutionPlanAppliedEvent {
   rejectedOps: number
 }
 
+export interface EvolutionSkillMutatedEvent {
+  action: string
+  name: string
+  filePath?: string
+  archivedPath?: string
+}
+
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     'evolution/review-scheduled': EvolutionReviewScheduledEvent
     'evolution/plan-applied': EvolutionPlanAppliedEvent
+    'evolution/skill-mutated': EvolutionSkillMutatedEvent
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'evolution/skill-mutated'(event: EvolutionSkillMutatedEvent): void
   }
 }

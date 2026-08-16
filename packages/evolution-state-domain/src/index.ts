@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
-import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 
 export const name = 'evolution-state-domain'
 export const inject = ['evolutionStateStorage', 'storageDomain']
@@ -97,6 +97,22 @@ export function apply(ctx: Context): void {
 
     async deletePending(id) {
       await (await ensure()).table('pending').delete(id)
+    },
+
+    async tryResolvePending(id, status): Promise<PendingResolution> {
+      const table = (await ensure()).table('pending')
+      try {
+        let resolved: PendingRecord | null = null
+        const record = await table.update(id, current => {
+          if (current.status !== 'pending') return current
+          resolved = { ...current, status, resolvedAt: new Date().toISOString() }
+          return resolved
+        })
+        if (resolved === null) return { record: record.status === status ? record : null, applied: false }
+        return { record: resolved, applied: true }
+      } catch {
+        return { record: null, applied: false }
+      }
     },
   }
 
