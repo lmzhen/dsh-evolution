@@ -1,0 +1,14 @@
+dsh-evolution
+Copyright (c) 2025 dsh-evolution contributors
+
+This project is inspired by and adapts concepts and selected implementation
+patterns from Hermes Agent:
+
+  https://github.com/NousResearch/hermes-agent
+  Copyright (c) 2025 Nous Research
+  License: MIT
+
+The Hermes Agent MIT license text is reproduced in LICENSE for compliance.
+dsh-evolution is not affiliated with or endorsed by Nous Research. It is a
+separate implementation, re-architected for DeepSeek Harness and its Cordis
+plugin/service model.

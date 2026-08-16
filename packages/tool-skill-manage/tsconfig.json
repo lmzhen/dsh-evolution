@@ -1,0 +1,33 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../dsh-evolution"
+    },
+    {
+      "path": "../skill-usage"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../test-support/agent-loop-testkit"
+    }
+  ]
+}
