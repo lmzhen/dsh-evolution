@@ -16,24 +16,6 @@
     },
     {
       "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../dsh-evolution"
-    },
-    {
-      "path": "../../test-support/agent-loop-testkit"
-    },
-    {
-      "path": "../evolution-plan-validator"
     }
   ]
 }

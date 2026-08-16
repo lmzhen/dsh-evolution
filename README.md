@@ -18,7 +18,7 @@ agent the ability to improve itself across sessions:
 |---|---|---|
 | Durable memory | `MEMORY.md` / `USER.md` + `memory` tool | `ctx.memory` seam + `memory-files` provider + `tool-memory` |
 | Skill sedimentation | `skill_manage` | `ctx.skills` + `tool-skill-manage` + `skill-usage` |
-| Background review | post-turn forked review agent | `turn/end` signal gate + `ctx.subagents` one-shot review |
+| Background review | post-turn forked review agent | `turn/end` signal gate + `ctx.subagents` one-shot review + deterministic plan validator |
 | Skill curator | active → stale → archived | `evolution-curator` service + persistent state |
 | Usage telemetry | `.usage.json` | `ctx.skillUsage` |
 | Write approval | stage / approve / reject | `ctx.evolutionApproval` + pending store |
@@ -40,6 +40,8 @@ packages/
 ├── tool-memory/             # model-facing memory tool
 ├── skill-usage/             # ctx.skillUsage telemetry
 ├── tool-skill-manage/       # model-facing skill_manage tool
+├── evolution-policy/        # immutable control-plane policy
+├── evolution-plan-validator/# deterministic plan validation
 ├── evolution-review/        # review signal gate + subagent orchestration
 ├── evolution-threat/        # tools/pre-execute threat guard
 ├── evolution-curator/       # deterministic lifecycle + archive

@@ -152,6 +152,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
   const skills = new SkillLibrary(config.skillsRootOverride ?? skillsRoot())
   let memoryContextText = loadMemoryContextSync()
 
+  // Phase 1: monotonic control-plane guard. Policy is plugin config/state,
+  // never model-writable data. The guard runs before every tool body and is
+  // final: later listeners cannot turn a denial back into permission.
+  const policy = ctx.get('evolutionPolicy') as {
+    guardReason(toolName: string, args: unknown): string | undefined
+  } | undefined
+  if (policy) {
+    ctx.tools.guard(exec => policy.guardReason(exec.name, exec.arguments))
+  }
+
   /** File-backed memory preview for the DSH runtime-context projection. */
   function loadMemoryContextSync(): string {
     try {

@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution/src/signals.ts'
 import { reviewPrompt } from '@deepseek-ai/dsh-evolution/src/prompts.ts'
 import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
+import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
 
 export const name = 'evolution-review'
 export const inject = ['agents', 'tools']
@@ -106,13 +107,22 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const result = await run.result
       await run.dispose()
       if (!result.structured) return true
-      const actions = await executePlan(result.structured as EvolutionPlan, agent)
-      const plan = result.structured as EvolutionPlan
+      const policy = ctx.get('evolutionPolicy') as {
+        get(): { maxOpsPerPlan: number; protectedSkillNames: readonly string[]; memoryChars: number; skillContentChars: number }
+      } | undefined
+      const validation = validateEvolutionPlan(result.structured as EvolutionPlan, {
+        sessionSeq: session.seq - 1,
+        maxOpsPerPlan: policy?.get().maxOpsPerPlan ?? 32,
+        protectedSkillNames: new Set(policy?.get().protectedSkillNames ?? []),
+        maxMemoryChars: policy?.get().memoryChars ?? 2200,
+        maxSkillContentChars: policy?.get().skillContentChars ?? 100_000,
+      })
+      const actions = await executePlan(validation.accepted, agent)
       session.append('evolution/plan-applied', {
         planId: Math.random().toString(36).slice(2),
-        memoryApplied: (plan.memoryOps ?? []).filter(op => Array.isArray(op.evidence) && op.evidence.length > 0).length,
+        memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
         skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
-        rejectedOps: 0,
+        rejectedOps: validation.rejected.length,
       })
       if (actions.length > 0) {
         agent.inject(createUserMessage({
