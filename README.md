@@ -56,6 +56,8 @@ packages/
 
 ## Installation
 
+See [packages/INSTALL.md](packages/INSTALL.md) for layered, host-only, agent-only, one-click, and profile-override workflows.
+
 This repository is designed to be mounted into a DeepSeek Harness checkout as
 `packages/evolution`:
 

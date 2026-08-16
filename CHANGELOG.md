@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Phase 4 installer and docs
+
+- Added `scripts/install-layered.mjs` with host/agent/layered/oneclick modes and dry-run support.
+- Added `packages/INSTALL.md` with local, production, and profile-override workflows.
+- Added installer regression tests covering clean DSH_HOME install, one-click install, and dry-run.
+
 ## Unreleased — Phase 3 Anchored Standard smoke
 
 - Host patch now pins `evolution-review.reviewToolAllow` to `skill`, `skill_search`, and `skill_load`.

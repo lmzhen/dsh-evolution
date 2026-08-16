@@ -28,6 +28,11 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 
+## Installation
+
+See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
+compatibility flow, and profile override examples.
+
 ## Composition
 
 ### Layered install (recommended)
