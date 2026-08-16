@@ -90,12 +90,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const subagents = ctx.get('subagents') as SubagentLike | undefined
     if (!subagents) return false
     try {
+      const routingPolicy = ctx.get('evolutionPolicy') as {
+        get(): { memoryReviewModel: string; skillReviewModel: string }
+      } | undefined
+      const model = kind === 'memory'
+        ? routingPolicy?.get().memoryReviewModel ?? 'deepseek-v4-flash'
+        : routingPolicy?.get().skillReviewModel ?? 'deepseek-v4-pro'
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: buildReviewRequest(session, kind, signal as { toolCalls: number; userChars: number; assistantChars: number }) }],
         parent: agent,
         signal: AbortSignal.timeout(120_000),
         maxDepth: 0,
+        agentOptions: { provider: 'deepseek-official', model },
         persona: reviewPrompt(kind),
         toolFilter: { allow: ['skill'] },
         outputSchema: {

@@ -245,6 +245,16 @@ export class MemoryStore {
     return parts.join('\n\n')
   }
 
+  async snapshot(): Promise<{ memory: string[]; user: string[] }> {
+    const [memory, user] = await Promise.all([this.read('memory'), this.read('user')])
+    return { memory, user }
+  }
+
+  async restoreSnapshot(snapshot: { memory: string[]; user: string[] }): Promise<void> {
+    await this.write('memory', snapshot.memory)
+    await this.write('user', snapshot.user)
+  }
+
   async detectDrift(target: MemoryTarget): Promise<boolean> {
     try {
       const raw = await readFile(fileFor(this.root, target), 'utf8')

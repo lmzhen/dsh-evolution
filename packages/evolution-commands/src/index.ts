@@ -31,7 +31,18 @@ export function apply(ctx: Context): void {
           const result = approval ? await approval.reject(id) : { ok: false, message: 'approval service not mounted' }
           return { text: result.message }
         }
-        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending.' }
+        if (input === 'curator run') {
+          const curator = ctx.get('evolutionCurator') as { run(): Promise<{ stale: string[]; archived: string[] }> } | undefined
+          if (!curator) return { text: 'Curator service not mounted.' }
+          const result = await curator.run()
+          return { text: `Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived.` }
+        }
+        if (input.startsWith('restore ')) {
+          const curator = ctx.get('evolutionCurator') as { skills: { restoreLatestSnapshot(): Promise<{ ok: boolean; message: string }> } } | undefined
+          const result = curator ? await curator.skills.restoreLatestSnapshot() : { ok: false, message: 'Curator service not mounted.' }
+          return { text: result.message }
+        }
+        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | restore.' }
       },
     })
   })

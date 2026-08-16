@@ -73,6 +73,7 @@ export class EvolutionCurator extends Service {
       return { stale: [], archived: [], errors: [] }
     }
     const root = this.skills.root
+    await this.skills.snapshotAll('pre-curator-run')
     const usage: UsageMap = await loadUsage(root)
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: this.staleAfterDays,

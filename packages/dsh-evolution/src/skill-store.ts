@@ -7,7 +7,7 @@
  * move to `.archive/` — never a hard delete.
  */
 
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { randomBytes } from 'node:crypto'
@@ -316,5 +316,51 @@ export class SkillLibrary {
     if (!await exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
     await rm(target)
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
+  }
+
+
+  async snapshotAll(reason = 'pre-mutation'): Promise<string> {
+    const backupRoot = join(this.root, '.backups')
+    await mkdir(backupRoot, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const dest = join(backupRoot, `skills-${stamp}`)
+    await mkdir(dest, { recursive: true })
+    const names = await listNames(this.root)
+    for (const name of names) {
+      await cp(skillDir(this.root, name), join(dest, name), { recursive: true })
+    }
+    await writeFile(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names }, null, 2), 'utf8')
+    return dest
+  }
+
+  async listSnapshots(): Promise<Array<{ path: string; createdAt: string; reason: string }>> {
+    const backupRoot = join(this.root, '.backups')
+    let entries: string[]
+    try { entries = await readdir(backupRoot) } catch { return [] }
+    const out: Array<{ path: string; createdAt: string; reason: string }> = []
+    for (const name of entries.sort().reverse()) {
+      if (!name.startsWith('skills-')) continue
+      try {
+        const manifest = JSON.parse(await readFile(join(backupRoot, name, 'manifest.json'), 'utf8')) as { createdAt?: string; reason?: string }
+        out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt ?? '', reason: manifest.reason ?? '' })
+      } catch { /* skip */ }
+    }
+    return out
+  }
+
+  async restoreLatestSnapshot(): Promise<SkillActionResult> {
+    const snapshots = await this.listSnapshots()
+    const latest = snapshots[0]
+    if (!latest) return { ok: false, message: 'No skill snapshot available.' }
+    await this.snapshotAll('pre-rollback')
+    for (const name of await listNames(this.root)) {
+      await rm(skillDir(this.root, name), { recursive: true, force: true })
+    }
+    const entries = await readdir(latest.path)
+    for (const entry of entries) {
+      if (entry === 'manifest.json') continue
+      await cp(join(latest.path, entry), join(this.root, entry), { recursive: true })
+    }
+    return { ok: true, message: `Restored skill tree from ${latest.path}`, path: latest.path }
   }
 }

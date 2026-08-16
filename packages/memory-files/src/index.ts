@@ -13,6 +13,7 @@ export const name = 'memory-files'
 export const inject = ['memory']
 
 export interface Config {
+  providerName?: string
   memoryCharLimit?: number
   userCharLimit?: number
   addDatePrefix?: boolean
@@ -20,6 +21,7 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
+  providerName: z.string().default('files'),
   memoryCharLimit: z.number().default(2200),
   userCharLimit: z.number().default(1375),
   addDatePrefix: z.boolean().default(false),
@@ -35,7 +37,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     ...config.root ? { root: config.root } : {},
   })
   const provider: MemoryProvider = {
-    name: 'files',
+    name: config.providerName,
     read: (target, _signal) => store.read(target),
     applyBatch: async (target: MemoryTarget, operations: MemoryOperation[]) => {
       const normalized = operations.map(op => ({ action: op.action, facts: op.facts ?? op.content, old_text: op.old_text }))
