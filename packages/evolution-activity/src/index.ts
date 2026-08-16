@@ -4,6 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { z } from 'zod'
 
 export interface EvolutionActivityItem {
   planId: string
@@ -21,6 +22,17 @@ export interface EvolutionActivityProjection {
 interface State {
   items: EvolutionActivityItem[]
 }
+
+const activitySchema = z.object({
+  items: z.array(z.object({
+    planId: z.string(),
+    kind: z.string(),
+    memoryApplied: z.number().int().nonnegative(),
+    skillApplied: z.number().int().nonnegative(),
+    rejectedOps: z.number().int().nonnegative(),
+    at: z.number().nonnegative(),
+  })),
+})
 
 type SessionEventLike =
   | { type: 'evolution/plan-applied'; data: { planId: string; memoryApplied: number; skillApplied: number; rejectedOps: number }; time: number }
@@ -63,7 +75,7 @@ export function apply(ctx: Context): void {
     }).sessionProjections
     runtime.register({
       key: 'evolution-activity',
-      schema: null,
+      schema: activitySchema,
       init: () => ({ items: [] }),
       apply: (state, event) => applyState(state, event as SessionEventLike),
       view: state => ({ items: state.items }),
