@@ -5,3 +5,6 @@ lib/
 src/**/*.js
 src/**/*.d.ts
 src/**/*.map
+
+dist/
+packages/dist/
