@@ -18,10 +18,7 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../dsh-evolution"
-    },
-    {
-      "path": "../evolution-state"
+      "path": "../../storage/storage-domain"
     }
   ]
 }

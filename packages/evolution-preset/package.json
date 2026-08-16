@@ -1,0 +1,41 @@
+{
+  "name": "@deepseek-ai/dsh-evolution-preset",
+  "description": "Recommended composition bundle for the dsh-evolution plugin family",
+  "version": "0.1.0-rc.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmzhen/dsh-evolution.git",
+    "directory": "packages/evolution-preset"
+  },
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "cordis.patch.yml",
+    "package.json"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-memory": "workspace:^",
+    "@deepseek-ai/dsh-memory-files": "workspace:^",
+    "@deepseek-ai/dsh-tool-memory": "workspace:^",
+    "@deepseek-ai/dsh-skill-usage": "workspace:^",
+    "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
+    "@deepseek-ai/dsh-evolution-policy": "workspace:^",
+    "@deepseek-ai/dsh-evolution-plan-validator": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-evolution-approval": "workspace:^",
+    "@deepseek-ai/dsh-evolution-threat": "workspace:^",
+    "@deepseek-ai/dsh-evolution-review": "workspace:^",
+    "@deepseek-ai/dsh-evolution-curator": "workspace:^",
+    "@deepseek-ai/dsh-evolution-commands": "workspace:^",
+    "@deepseek-ai/dsh-evolution": "workspace:^"
+  }
+}

@@ -9,6 +9,7 @@ import type Schema from '@deepseek-ai/schemastery'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution/src/usage.ts'
 import { computeLifecycleTransitions } from '@deepseek-ai/dsh-evolution/src/curator.ts'
+import type {} from '@deepseek-ai/dsh-evolution-state'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -63,6 +64,14 @@ export class EvolutionCurator extends Service {
   }
 
   async run(): Promise<{ stale: string[]; archived: string[]; errors: string[] }> {
+    const stateService = this.ctx.get('evolutionState') as {
+      loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
+      saveCuratorState(record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }): Promise<void>
+    } | undefined
+    const persisted = await stateService?.loadCuratorState()
+    if (persisted && Date.now() - persisted.lastRunAt < this.intervalHours * 3_600_000) {
+      return { stale: [], archived: [], errors: [] }
+    }
     const root = this.skills.root
     const usage: UsageMap = await loadUsage(root)
     const result = computeLifecycleTransitions(usage, {
@@ -81,6 +90,12 @@ export class EvolutionCurator extends Service {
     }
     await saveUsage(root, usage)
     this.lastRun = Date.now()
+    await stateService?.saveCuratorState({
+      lastRunAt: this.lastRun,
+      runCount: (persisted?.runCount ?? 0) + 1,
+      lastSummary: `stale:${result.markStale.length} archived:${result.archive.length}`,
+      paused: false,
+    })
     return { stale: result.markStale, archived: result.archive, errors }
   }
 }

@@ -9,6 +9,7 @@ import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution/src/signals.ts'
+import type {} from '@deepseek-ai/dsh-evolution-state'
 import { reviewPrompt } from '@deepseek-ai/dsh-evolution/src/prompts.ts'
 import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
 import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
@@ -45,7 +46,6 @@ interface MemoryLike {
 
 export function apply(ctx: Context, rawConfig: Config): void {
   const config = rawConfig as Required<Config>
-  const states = new Map<SessionId, ReviewState>()
   const turnStarts = new Map<SessionId, number>()
 
   ctx.on('session/event', (session, event) => {
@@ -61,7 +61,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (!agent) return
     const signal = foldTurn(session, turnStarts.get(session.id) ?? Math.max(0, session.seq - 1))
     turnStarts.delete(session.id)
-    const state = states.get(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
+    const stateService = ctx.get('evolutionState') as {
+      loadReviewState(id: string): Promise<ReviewState | null>
+      saveReviewState(id: string, record: ReviewState): Promise<void>
+    } | undefined
+    const state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     const kind = advanceReview(state, event.data.turn, signal, {
       memoryInterval: config.memoryInterval,
       skillInterval: config.skillInterval,
@@ -69,7 +73,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       substantiveMinUserChars: 200,
       substantiveMinAgentChars: 500,
     })
-    states.set(session.id, state)
+    await stateService?.saveReviewState(session.id, state)
     if (!kind) return
 
     const started = await trySubagentReview(session, agent, kind, signal)
@@ -159,7 +163,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
 
   ctx.effect(() => () => {
-    states.clear()
     turnStarts.clear()
   }, 'dsh-evolution-review.cleanup')
 }

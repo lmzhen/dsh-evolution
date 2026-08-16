@@ -1,0 +1,32 @@
+# Recommended composition for the native dsh-evolution family.
+# The legacy facade keeps review/curator orchestration but disables its
+# built-in memory/skill tools; the native seam packages own those tools.
+- id: memory
+  name: '@deepseek-ai/dsh-memory'
+- id: memory-files
+  name: '@deepseek-ai/dsh-memory-files'
+- id: tool-memory
+  name: '@deepseek-ai/dsh-tool-memory'
+- id: skill-usage
+  name: '@deepseek-ai/dsh-skill-usage'
+- id: tool-skill-manage
+  name: '@deepseek-ai/dsh-tool-skill-manage'
+- id: evolution-approval
+  name: '@deepseek-ai/dsh-evolution-approval'
+  config:
+    enabled: false
+    stageForeground: true
+- id: evolution-threat
+  name: '@deepseek-ai/dsh-evolution-threat'
+- id: evolution-review
+  name: '@deepseek-ai/dsh-evolution-review'
+- id: evolution-curator
+  name: '@deepseek-ai/dsh-evolution-curator'
+- id: evolution-commands
+  name: '@deepseek-ai/dsh-evolution-commands'
+- id: dsh-evolution
+  name: '@deepseek-ai/dsh-evolution'
+  config:
+    memoryEnabled: false
+    skillManageEnabled: false
+    reviewEnabled: true

@@ -41,6 +41,8 @@ packages/
 ├── skill-usage/             # ctx.skillUsage telemetry
 ├── tool-skill-manage/       # model-facing skill_manage tool
 ├── evolution-policy/        # immutable control-plane policy
+├── evolution-state/          # storage-domain-backed durable state
+├── evolution-preset/         # recommended composition bundle
 ├── evolution-plan-validator/# deterministic plan validation
 ├── evolution-review/        # review signal gate + subagent orchestration
 ├── evolution-threat/        # tools/pre-execute threat guard
