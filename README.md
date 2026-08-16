@@ -1,5 +1,7 @@
 # dsh-evolution
 
+English | [中文](README.zh.md)
+
 > Hermes-inspired agent self-evolution for DeepSeek Harness, rebuilt around
 > DSH's plugin seams instead of being a straight port.
 >
@@ -9,6 +11,21 @@
 > storage-domain 和 agent presets 重新实现。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+## Contents
+
+- [What this plugin does](#what-this-plugin-does)
+- [Quick start](#quick-start)
+- [Why it is not just a port](#why-it-is-not-just-a-port)
+- [Installation](#installation)
+- [Usage scenarios](#usage-scenarios)
+- [How each piece works](#how-each-piece-works)
+- [Repository layout](#repository-layout)
+- [Compatibility](#compatibility)
+- [Configuration](#configuration)
+- [Development and tests](#development-and-tests)
+- [Safety model](#safety-model)
+- [Attribution](#attribution)
 
 ---
 
@@ -39,6 +56,25 @@ Everything else is control plane:
 | Usage telemetry | Per-skill `use/view/patch` sidecar compatible with Hermes-style lifecycle decisions |
 | Observability | Session projections, replay/A-B scoring, feedback quality scores, and a learning graph |
 | Capability governance | Validates Creator-mode capability packages and stages them for manual activation — code is never auto-executed |
+
+---
+
+## Quick start
+
+```bash
+# inside a DeepSeek Harness checkout
+node packages/evolution/scripts/install-layered.mjs \
+  --profile web \
+  --mode oneclick
+```
+
+After install, restart the DSH profile. The agent now has durable memory,
+`skill_manage`, background review, curator, approval, and threat checks.
+
+> [!WARNING]
+> Plugins run third-party code with your local permissions. Review this
+> repository before installing, and prefer a profile without production
+> credentials for a first test.
 
 ---
 
