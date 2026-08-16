@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Phase 3 Anchored Standard smoke
+
+- Host patch now pins `evolution-review.reviewToolAllow` to `skill`, `skill_search`, and `skill_load`.
+- Added an end-to-end review smoke against the real anchored `tool-bootstrap.mjs`: a session turn triggers a review subagent request whose `toolFilter` contains the anchored discovery pair.
+
 ## Unreleased — Phase 2 row and installation contracts
 
 - Added a shared `row-contract.ts` pinning host/agent/compat row ids and package names.
