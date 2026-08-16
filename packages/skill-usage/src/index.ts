@@ -63,7 +63,7 @@ export class SkillUsageRegistry extends Service {
   }
 
   async record(name: string, kind: 'use' | 'view' | 'patch', at = new Date()): Promise<void> {
-    await this.mutate(async map => {
+    await this.mutate(async (map) => {
       if (kind === 'use') bumpUse(map, name, at)
       else if (kind === 'view') bumpView(map, name, at)
       else bumpPatch(map, name, at)
@@ -71,12 +71,12 @@ export class SkillUsageRegistry extends Service {
     })
   }
 
-  async report(): Promise<UsageMap> {
-    return await this.mutate(async map => new Map(map))
+  report(): Promise<UsageMap> {
+    return this.mutate(map => Promise.resolve(new Map(map)))
   }
 
   async markAgentCreated(name: string): Promise<void> {
-    await this.mutate(async map => {
+    await this.mutate(async (map) => {
       const { markAgentCreated } = await import('@deepseek-ai/dsh-evolution/src/usage.ts')
       markAgentCreated(map, name)
       await this.flush()
@@ -85,7 +85,7 @@ export class SkillUsageRegistry extends Service {
 
   /** Write feedback-derived quality onto the usage sidecar; curator reads it. */
   async setQuality(name: string, score: number, warn: boolean): Promise<void> {
-    await this.mutate(async map => {
+    await this.mutate(async (map) => {
       const record = map.get(name)
       if (!record) return
       record.quality_score = score

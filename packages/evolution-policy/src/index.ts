@@ -133,7 +133,7 @@ export class EvolutionPolicy extends Service {
   isProtectedPath(path: unknown): boolean {
     if (typeof path !== 'string') return false
     const normalized = resolve(path)
-    return this.snapshot.protectedPaths.some(prefix => {
+    return this.snapshot.protectedPaths.some((prefix) => {
       const resolved = resolve(prefix)
       return normalized === resolved || normalized.startsWith(resolved + sep)
     })

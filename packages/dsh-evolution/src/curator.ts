@@ -118,7 +118,7 @@ export function computeLifecycleTransitions(
         result.transitions.push({ name, from: 'active', to: 'stale', reason })
         result.markStale.push(name)
       }
-    } else if (record.state === 'stale') {
+    } else {
       if (idle < staleAfterDays) {
         record.state = 'active'
         result.transitions.push({ name, from: 'stale', to: 'active', reason: `recent activity ${Math.round(idle)}d` })

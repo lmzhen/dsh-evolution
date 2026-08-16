@@ -32,4 +32,4 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+- `approve()` deduplicates concurrent approvals inside one process, and state providers resolve the pending record atomically. However, the replay runner executes **before** that atomic resolution, so two OS processes approving the same id can each perform the write once while only one process wins the audit transition. Run approvals from a single writer process, or make replay runners idempotent when multi-process approval is required.

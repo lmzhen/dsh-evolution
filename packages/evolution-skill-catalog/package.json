@@ -32,7 +32,9 @@
     "lib/types/invariant.d.ts"
   ],
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@deepseek-ai/schemastery": "workspace:^"
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",

@@ -53,8 +53,10 @@ export function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEI
 export function comparePlans(plans: ReplayPlan[], weights: ReplayWeights = DEFAULT_WEIGHTS): ReplayResult {
   if (plans.length === 0) return { winner: null, margin: 0, plans, report: 'No plans to compare.' }
   const scored = plans.map(plan => ({ plan, score: scorePlan(plan, weights) })).sort((a, b) => b.score - a.score)
-  const winner = scored[0]!
-  const margin = scored.length > 1 ? winner.score - scored[1]!.score : winner.score
+  const winner = scored[0]
+  if (!winner) return { winner: null, margin: 0, plans, report: 'No plans to compare.' }
+  const runnerUp = scored[1]
+  const margin = runnerUp ? winner.score - runnerUp.score : winner.score
   return {
     winner: winner.plan.policyId,
     margin,
@@ -74,12 +76,12 @@ export class EvolutionReplayDriver {
 
   record(event: {
     type: string
-    data: { planId: string; memoryApplied: number; skillApplied: number; rejectedOps: number }
+    data: { planId: string; policyFingerprint?: string; memoryApplied: number; skillApplied: number; rejectedOps: number }
   }): void {
     if (event.type !== 'evolution/plan-applied') return
     const data = event.data
     this.plans.push({
-      policyId: data.planId,
+      policyId: typeof data.policyFingerprint === 'string' ? data.policyFingerprint : data.planId,
       acceptedOps: data.memoryApplied + data.skillApplied,
       rejectedOps: data.rejectedOps,
       memoryOps: data.memoryApplied,
@@ -113,7 +115,7 @@ export function apply(ctx: Context): void {
       name: 'evolution replay',
       description: 'Compare recent evolution plan outcomes',
       recordInput: false,
-      handler: async () => ({ text: driver.compare().report }),
+      handler: () => ({ text: driver.compare().report }),
     })
   })
 }

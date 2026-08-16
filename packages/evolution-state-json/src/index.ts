@@ -54,6 +54,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
     return run
   }
 
+  // `pending.json` is the pre-split approval store name. Reads MERGE both
+  // files and the new `pending-state.json` wins on id conflicts, so creating
+  // a new pending record can never hide legacy records still awaiting
+  // approval. Mutations write back to `pending-state.json`; a resolved or
+  // deleted record therefore overrides the legacy copy on the next read.
+  async function loadPendingMap(): Promise<Record<string, PendingRecord>> {
+    const [current, legacy] = await Promise.all([
+      readJson<Record<string, PendingRecord>>('pending-state.json'),
+      readJson<Record<string, PendingRecord>>('pending.json'),
+    ])
+    return { ...legacy ?? {}, ...current ?? {} }
+  }
+
   const provider: EvolutionStateStorage = {
     name: 'json',
 
@@ -65,7 +78,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     },
 
     async saveReviewState(sessionId, record) {
-      return await mutate(async () => {
+      await mutate(async () => {
         const map = await readJson<Record<string, ReviewStateRecord>>('review-state.json') ?? {}
         map[sessionId] = record
         await writeJson('review-state.json', map)
@@ -80,7 +93,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     },
 
     async saveCuratorState(record) {
-      return await mutate(async () => {
+      await mutate(async () => {
         const map = await readJson<Record<string, CuratorStateRecord>>('curator-state.json') ?? {}
         map.primary = record
         await writeJson('curator-state.json', map)
@@ -89,33 +102,30 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async listPending(status: PendingStatus = 'pending') {
       return await mutate(async () => {
-        // `pending.json` is the pre-split approval store name; keep reading
-        // it so an upgrade never loses staged audit records.
-        const map = await readJson<Record<string, PendingRecord>>('pending-state.json')
-          ?? await readJson<Record<string, PendingRecord>>('pending.json')
-        return Object.values(map ?? {}).filter(record => record.status === status)
+        const map = await loadPendingMap()
+        return Object.values(map).filter(record => record.status === status)
       })
     },
 
     async savePending(record) {
-      return await mutate(async () => {
-        const map = await readJson<Record<string, PendingRecord>>('pending-state.json') ?? {}
+      await mutate(async () => {
+        const map = await loadPendingMap()
         map[record.id] = record
         await writeJson('pending-state.json', map)
       })
     },
 
     async deletePending(id) {
-      return await mutate(async () => {
-        const map = await readJson<Record<string, PendingRecord>>('pending-state.json') ?? {}
-        delete map[id]
+      await mutate(async () => {
+        const map = await loadPendingMap()
+        Reflect.deleteProperty(map, id)
         await writeJson('pending-state.json', map)
       })
     },
 
     async tryResolvePending(id, status): Promise<PendingResolution> {
       return await mutate(async () => {
-        const map = await readJson<Record<string, PendingRecord>>('pending-state.json') ?? {}
+        const map = await loadPendingMap()
         const record = map[id] ?? null
         if (record === null || record.status !== 'pending') return { record, applied: false }
         record.status = status

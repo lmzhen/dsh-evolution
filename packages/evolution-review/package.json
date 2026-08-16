@@ -43,7 +43,8 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-evolution": "workspace:^",
     "@deepseek-ai/dsh-evolution-plan-validator": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
@@ -53,6 +54,7 @@
     "@deepseek-ai/dsh-evolution": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-evolution-plan-validator": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^"
   }
 }

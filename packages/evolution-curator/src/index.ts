@@ -85,7 +85,11 @@ export class EvolutionCurator extends Service {
     this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? 7
     this.minIdleHours = config.minIdleHours ?? 0
     this.lastRun = Date.now()
-    this.ctx.effect(() => () => this.stop(), 'evolution-curator.stop')
+    this.ctx.effect(() => {
+      return () => {
+        this.stop()
+      }
+    }, 'evolution-curator.stop')
   }
 
   start(): void {
@@ -93,7 +97,7 @@ export class EvolutionCurator extends Service {
     this.timer = setInterval(() => {
       if (Date.now() - this.lastRun >= this.intervalHours * 3_600_000) void this.run()
     }, 60 * 60 * 1000)
-    if (this.timer.unref) this.timer.unref()
+    this.timer.unref()
   }
 
   stop(): void {
@@ -110,7 +114,13 @@ export class EvolutionCurator extends Service {
   async recommend(candidates: string[]): Promise<string[]> {
     if (candidates.length === 0) return []
     const llm = this.ctx.get('llm') as {
-      stream(options: { provider: string; model: string; messages: unknown[]; maxTokens: number; purpose?: string }): AsyncIterable<StreamChunk>
+      stream(options: {
+        provider: string
+        model: string
+        messages: unknown[]
+        maxTokens: number
+        purpose?: string
+      }): AsyncIterable<StreamChunk>
     } | undefined
     if (!llm) return []
     const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } } | undefined
@@ -135,12 +145,25 @@ export class EvolutionCurator extends Service {
       const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
       const names = new Set<string>()
       const section = text.slice(text.indexOf('prunings:'))
-      for (const match of section.matchAll(/^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/gm)) names.add(match[1]!)
+      for (const [, name] of section.matchAll(/^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/gm)) if (name) names.add(name)
       return [...names].filter(name => candidates.includes(name))
     } catch {
       // LLM curation is advisory. The deterministic scanner still owns the decision.
       return []
     }
+  }
+
+  private skippedReport(runId: string, startedAt: string): CuratorRunReport {
+    return buildCuratorRunReport({
+      runId,
+      startedAt,
+      finishedAt: startedAt,
+      staleCandidates: [],
+      llmNominations: [],
+      archiveCandidates: [],
+      archived: [],
+      failed: [],
+    })
   }
 
   async run(): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: CuratorRunReport; skipped?: string }> {
@@ -154,14 +177,14 @@ export class EvolutionCurator extends Service {
     if (persisted && Date.now() - persisted.lastRunAt < this.intervalHours * 3_600_000) {
       return {
         stale: [], archived: [], errors: [],
-        report: buildCuratorRunReport({ runId, startedAt, finishedAt: startedAt, staleCandidates: [], llmNominations: [], archiveCandidates: [], archived: [], failed: [] }),
+        report: this.skippedReport(runId, startedAt),
         skipped: 'interval',
       }
     }
     if (this.minIdleHours > 0 && this.recentSessionActive()) {
       return {
         stale: [], archived: [], errors: [],
-        report: buildCuratorRunReport({ runId, startedAt, finishedAt: startedAt, staleCandidates: [], llmNominations: [], archiveCandidates: [], archived: [], failed: [] }),
+        report: this.skippedReport(runId, startedAt),
         skipped: 'active-session',
       }
     }
@@ -199,7 +222,7 @@ export class EvolutionCurator extends Service {
       llmNominations,
       archiveCandidates,
       archived: archivedSkills,
-      failed: archiveCandidates.filter(name => errors.some(error => error.startsWith(`${name}:`))).map(name => {
+      failed: archiveCandidates.filter(name => errors.some(error => error.startsWith(`${name}:`))).map((name) => {
         const error = errors.find(item => item.startsWith(`${name}:`))
         return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
       }),
@@ -230,7 +253,7 @@ export class EvolutionCurator extends Service {
     let latest = 0
     for (const agent of agents.list()) {
       const events = agent.session.events
-      const last = events.length === 0 ? 0 : events[events.length - 1]!.time
+      const last = events.length === 0 ? 0 : events[events.length - 1]?.time ?? 0
       latest = Math.max(latest, last)
     }
     return latest > 0 && Date.now() - latest < this.minIdleHours * 3_600_000

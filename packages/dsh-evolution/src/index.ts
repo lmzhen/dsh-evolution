@@ -87,7 +87,17 @@ interface Evidence {
 
 interface StructuredPlan {
   memoryOps?: Array<{ target?: string; action?: string; facts?: string; content?: string; old_text?: string; evidence?: Evidence[] }>
-  skillOps?: Array<{ action?: string; name?: string; content?: string; old_string?: string; new_string?: string; file_path?: string; replace_all?: boolean; absorbed_into?: string; evidence?: Evidence[] }>
+  skillOps?: Array<{
+    action?: string
+    name?: string
+    content?: string
+    old_string?: string
+    new_string?: string
+    file_path?: string
+    replace_all?: boolean
+    absorbed_into?: string
+    evidence?: Evidence[]
+  }>
   summary?: string
 }
 
@@ -132,6 +142,23 @@ interface SubagentServiceLike {
   start(name: string, request: unknown): Promise<SubagentRunLike>
 }
 
+interface ToolMemoryResult {
+  ok: boolean
+  message: string
+  entries: string[]
+  chars: number
+  limit: number
+  pending_id?: string
+}
+
+interface ToolSkillResult {
+  ok: boolean
+  message: string
+  skills: Array<{ name: string; description: string }>
+  path?: string
+  pending_id?: string
+}
+
 function textOf(value: unknown): string {
   if (typeof value === 'string') return value
   return ''
@@ -161,9 +188,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
     addDatePrefix: config.memoryAddDatePrefix,
     ...evolutionIo ? { io: evolutionIo } : {},
   })
+  const skillsRootOverride = rawConfig.skillsRootOverride || skillsRoot()
   const skills = evolutionIo
-    ? new SkillLibrary(config.skillsRootOverride ?? skillsRoot(), evolutionIo)
-    : new SkillLibrary(config.skillsRootOverride ?? skillsRoot())
+    ? new SkillLibrary(skillsRootOverride, evolutionIo)
+    : new SkillLibrary(skillsRootOverride)
   let memoryContextText = ''
 
   // Phase 1: monotonic control-plane guard. Policy is plugin config/state,
@@ -243,7 +271,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
         render: (_args, value) => [{
           type: 'text',
           text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)`
-            + (value.ok || value.entries.length === 0 ? '' : '\nCurrent entries:\n' + value.entries.map((entry, index) => '  ' + (index + 1) + '. ' + entry).join('\n')),
+            + (value.ok || value.entries.length === 0
+              ? ''
+              : '\nCurrent entries:\n' + value.entries.map((entry, index) => `  ${index + 1}. ${entry}`).join('\n')),
         }],
       },
       isConcurrencySafe: () => false,
@@ -253,7 +283,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }))
   }
 
-  async function gateMemory(args: MemoryToolArgs): Promise<any> {
+  async function gateMemory(args: MemoryToolArgs): Promise<ToolMemoryResult> {
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     if (approval) {
       const decision = await approval.request({
@@ -283,7 +313,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }
   }
 
-  async function executeMemoryCore(args: MemoryToolArgs): Promise<{ ok: boolean; message: string; entries: string[]; chars: number; limit: number }> {
+  async function executeMemoryCore(args: MemoryToolArgs): Promise<ToolMemoryResult> {
     const target = args.target === 'user' ? 'user' : 'memory'
     let result
     if (Array.isArray(args.operations)) {
@@ -367,7 +397,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }))
   }
 
-  async function gateSkill(args: SkillToolArgs, origin: 'foreground' | 'background_review'): Promise<any> {
+  async function gateSkill(args: SkillToolArgs, origin: 'foreground' | 'background_review'): Promise<ToolSkillResult> {
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     if (approval && args.action !== 'list') {
       const decision = await approval.request({
@@ -383,7 +413,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     return executeSkillCore(args, origin)
   }
 
-  async function executeSkillCore(args: SkillToolArgs, origin: 'foreground' | 'background_review'): Promise<{ ok: boolean; message: string; skills: Array<{ name: string; description: string }>; path?: string; pending_id?: string }> {
+  async function executeSkillCore(args: SkillToolArgs, origin: 'foreground' | 'background_review'): Promise<ToolSkillResult> {
     const usage = await loadUsage(skills.root, evolutionIo)
     const action = args.action ?? ''
     if (action === 'list') {
@@ -471,7 +501,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       substantiveMinUserChars: 200,
       substantiveMinAgentChars: 500,
     })
-    reviewStates.update(value => { value[session.id] = state })
+    reviewStates.update((value) => { value[session.id] = state })
     void reviewStates.flush()
     if (!kind) return
 
@@ -498,7 +528,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const subagents = ctx.get('subagents') as SubagentServiceLike | undefined
     if (!subagents || !agent) return false
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
+    const timeout = setTimeout(() => {
+      controller.abort()
+    }, 120_000)
     try {
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
@@ -583,7 +615,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     paused: boolean
   }>('curator-state.json', { lastRunAt: 0, runCount: 0, lastSummary: '', paused: false })
   if (curatorState.get().lastRunAt === 0) {
-    curatorState.update(state => {
+    curatorState.update((state) => {
       state.lastRunAt = Date.now()
       state.lastSummary = 'deferred first run — curator seeded, will run after one interval'
     })
@@ -594,7 +626,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (Date.now() - curatorState.get().lastRunAt < config.curatorIntervalHours * 3_600_000) return
     void runCuratorOnce()
   }, 60 * 60 * 1000)
-  if (curatorTimer.unref) curatorTimer.unref()
+  curatorTimer.unref()
 
   async function runCuratorOnce(): Promise<void> {
     const usage = await loadUsage(skills.root, evolutionIo)
@@ -611,7 +643,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       }
     }
     await saveUsage(skills.root, usage, evolutionIo)
-    curatorState.update(state => {
+    curatorState.update((state) => {
       state.lastRunAt = Date.now()
       state.runCount += 1
       state.lastSummary = `stale:${result.markStale.length} archived:${result.archive.length}`

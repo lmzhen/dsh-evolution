@@ -57,7 +57,7 @@ const FORBIDDEN_KEYS = ['policy', 'threshold', 'prompt_hash', 'model_route', 'ev
 
 function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
   if (!Array.isArray(evidence) || evidence.length === 0) return false
-  return evidence.every(item => {
+  return evidence.every((item) => {
     if (!item || typeof item !== 'object') return false
     const record = item as Record<string, unknown>
     const seq = typeof record.event_seq === 'number'
@@ -70,7 +70,9 @@ function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
 export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationContext): ValidationResult {
   const maxOps = context.maxOpsPerPlan ?? 32
   const rejected: RejectedOp[] = []
-  const accepted: EvolutionPlan = { memoryOps: [], skillOps: [], ...plan.summary === undefined ? {} : { summary: plan.summary } }
+  const memoryOps: MemoryOp[] = []
+  const skillOps: SkillOp[] = []
+  const accepted: EvolutionPlan = { memoryOps, skillOps, ...plan.summary === undefined ? {} : { summary: plan.summary } }
 
   const allOps = (plan.memoryOps?.length ?? 0) + (plan.skillOps?.length ?? 0)
   if (allOps === 0) {
@@ -85,16 +87,16 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
   for (const [index, op] of (plan.memoryOps ?? []).entries()) {
     const reason = validateMemoryOp(op, context, index)
     if (reason) rejected.push({ index, kind: 'memory', reason })
-    else accepted.memoryOps!.push(op)
+    else memoryOps.push(op)
   }
 
   for (const [index, op] of (plan.skillOps ?? []).entries()) {
     const reason = validateSkillOp(op, context, index)
     if (reason) rejected.push({ index, kind: 'skill', reason })
-    else accepted.skillOps!.push(op)
+    else skillOps.push(op)
   }
 
-  return { accepted, rejected, ok: rejected.length === 0 && (accepted.memoryOps!.length + accepted.skillOps!.length > 0) }
+  return { accepted, rejected, ok: rejected.length === 0 && (memoryOps.length + skillOps.length > 0) }
 }
 
 function validateMemoryOp(op: MemoryOp, context: ValidationContext, index: number): string | null {

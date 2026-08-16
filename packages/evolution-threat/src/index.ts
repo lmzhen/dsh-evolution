@@ -26,8 +26,11 @@ function scanArgs(toolName: string, args: unknown): string | null {
     }
     if (Array.isArray(record.operations)) {
       for (const op of record.operations) {
-        const hit = scanMemoryThreats(String(asRecord(op).facts ?? asRecord(op).content ?? ''))
-        if (hit) return hit
+        const text = asRecord(op).facts ?? asRecord(op).content
+        if (typeof text === 'string') {
+          const hit = scanMemoryThreats(text)
+          if (hit) return hit
+        }
       }
     }
     return null

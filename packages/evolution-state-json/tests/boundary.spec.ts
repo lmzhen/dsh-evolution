@@ -41,6 +41,26 @@ describe('evolution-state-json boundaries', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('keeps legacy pending records visible when a new record is saved and can resolve them', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-legacy-merge-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending.json'), JSON.stringify({
+      legacy: { id: 'legacy', kind: 'memory', summary: 'legacy', args: {}, createdAt: 'old', status: 'pending' },
+    }))
+    await provider.savePending({ id: 'new', kind: 'skill', summary: 'new', args: {}, createdAt: 'now', status: 'pending' })
+    expect((await provider.listPending('pending')).map(record => record.id).sort()).toEqual(['legacy', 'new'])
+
+    const first = await provider.tryResolvePending('legacy', 'approved')
+    expect(first.applied).toBe(true)
+    const second = await provider.tryResolvePending('legacy', 'approved')
+    expect(second.applied).toBe(false)
+    expect(await provider.listPending('approved')).toHaveLength(1)
+    expect(await provider.listPending('pending')).toHaveLength(1)
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('serializes concurrent state writes without lost updates', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-concurrent-'))
     const ctx = await mount(root)

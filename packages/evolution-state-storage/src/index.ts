@@ -80,7 +80,7 @@ export class EvolutionStateStorageRegistry extends Service {
       if (provider) return provider
       throw new Error(`evolution state storage provider "${name}" is not registered`)
     }
-    const first = this.providers.values().next().value as EvolutionStateStorage | undefined
+    const first = this.providers.values().next().value
     if (!first) throw new Error('no evolution state storage provider registered; mount @deepseek-ai/dsh-evolution-state-json or @deepseek-ai/dsh-evolution-state-domain')
     return first
   }

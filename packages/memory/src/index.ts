@@ -60,7 +60,7 @@ export class MemoryRegistry extends Service {
   }
 
   private provider(): MemoryProvider {
-    const first = this.providers.values().next().value as MemoryProvider | undefined
+    const first = this.providers.values().next().value
     if (!first) throw new Error('memory: no provider registered')
     return first
   }

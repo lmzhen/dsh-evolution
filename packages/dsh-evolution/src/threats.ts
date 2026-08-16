@@ -59,7 +59,7 @@ const PATTERNS: ThreatPattern[] = [
   { label: 'known_c2_framework', category: 'c2_promptware', scope: 'context', regex: /\b(?:cobalt\s*strike|sliver|havoc|mythic|metasploit|brainworm)\b/i },
 
   // Hardcoded secrets.
-  { label: 'hardcoded_secret', category: 'hardcoded_secrets', scope: 'strict', regex: /(?:api[_-]?key|token|secret|password)\s*[=:]\s*["'][A-Za-z0-9+/=_-]{20,}["']/i },
+  { label: 'hardcoded_secret', category: 'hardcoded_secrets', scope: 'strict', regex: /(?:api[_-]?key|token|secret|password)\s*[=:]\s*["'][a-z0-9+/=_-]{20,}["']/i },
   { label: 'private_key_block', category: 'hardcoded_secrets', scope: 'all', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
 ]
 

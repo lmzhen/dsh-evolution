@@ -38,10 +38,12 @@
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-evolution": "workspace:^"
+    "@deepseek-ai/dsh-evolution": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-evolution": "workspace:^"
+    "@deepseek-ai/dsh-evolution": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
   }
 }

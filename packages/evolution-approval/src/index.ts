@@ -73,7 +73,7 @@ export class EvolutionApproval extends Service {
   }
 
   private state(): EvolutionStateLike {
-    return this.ctx.evolutionState as EvolutionStateLike
+    return this.ctx.evolutionState
   }
 
   /** Fail-closed capability adapters need to distinguish "allowed" from "enabled". */

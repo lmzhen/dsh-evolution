@@ -51,9 +51,10 @@ export class EvolutionFeedback {
   }
 
   async restore(io: IoLike): Promise<void> {
-    if (!this.path) return
+    const path = this.path
+    if (!path) return
     await this.mutate(async () => {
-      const raw = await io.readText(this.path!)
+      const raw = await io.readText(path)
       if (raw === null) return
       try {
         const parsed = JSON.parse(raw) as Partial<FeedbackState>
@@ -93,9 +94,10 @@ export class EvolutionFeedback {
   }
 
   async flush(io?: IoLike): Promise<void> {
-    if (!this.path || !io) return
+    const path = this.path
+    if (!path || !io) return
     await this.mutate(async () => {
-      await io.writeText(this.path!, JSON.stringify(this.state, null, 2))
+      await io.writeText(path, JSON.stringify(this.state, null, 2))
     })
   }
 }
@@ -113,7 +115,11 @@ export function apply(ctx: Context): void {
     writeText: (path: string, content: string) => ioRegistry.provider().writeText(path, content),
   } : undefined
   const feedback = new EvolutionFeedback(io)
-  if (io) void feedback.restore(io).catch(error => ctx.logger.warn(error))
+  if (io) {
+    void feedback.restore(io).catch((error: unknown) => {
+      ctx.logger.warn(error)
+    })
+  }
 
   // Make the service available first; restoration settles in the background.
   ctx.provide('evolutionFeedback', feedback)
@@ -121,11 +127,13 @@ export function apply(ctx: Context): void {
   const skillUsage = ctx.get('skillUsage') as SkillUsageLike | undefined
   if (skillUsage) {
     const original = feedback.record.bind(feedback)
-    feedback.record = (target, rating, note, kind = 'session', recordIo = io) => {
-      original(target, rating, note, kind, recordIo)
+    feedback.record = (target, rating, note, kind, recordIo) => {
+      original(target, rating, note, kind ?? 'session', recordIo ?? io)
       if (kind === 'skill') {
         const score = feedback.score(target, 'skill')
-        void skillUsage.setQuality(target, score, score < -0.25).catch(error => ctx.logger.warn(error))
+        void skillUsage.setQuality(target, score, score < -0.25).catch((error: unknown) => {
+          ctx.logger.warn(error)
+        })
       }
     }
   }

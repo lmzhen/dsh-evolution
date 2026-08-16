@@ -35,7 +35,9 @@ export function buildLearningGraph(
   const edges: GraphEdge[] = []
   const sorted = [...usage.keys()].sort()
   for (let i = 1; i < sorted.length; i += 1) {
-    edges.push({ from: sorted[i - 1]!, to: sorted[i]!, type: 'related' })
+    const from = sorted[i - 1]
+    const to = sorted[i]
+    if (from && to) edges.push({ from, to, type: 'related' })
   }
   memoryEntries.forEach((entry, index) => {
     const id = `memory:${index}`

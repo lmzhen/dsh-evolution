@@ -107,7 +107,11 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
 })
 
 export function verifyPromptBundle(bundle: PromptBundle = PROMPT_BUNDLE): boolean {
-  const canonical = JSON.stringify({ id: bundle.id, version: bundle.version, prompts: Object.fromEntries(Object.entries(bundle.prompts).sort()) })
+  const canonical = JSON.stringify({
+    id: bundle.id,
+    version: bundle.version,
+    prompts: Object.fromEntries(Object.entries(bundle.prompts).sort()),
+  })
   return bundle.sha256 === sha256(canonical)
 }
 

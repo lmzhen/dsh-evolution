@@ -57,7 +57,14 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     text: () => snapshotText,
   })
 
-  async function executeCore(normalized: MemoryWriteArgs): Promise<{ ok: boolean; message: string; entries: string[]; chars: number; limit: number; pending_id?: string }> {
+  async function executeCore(normalized: MemoryWriteArgs): Promise<{
+    ok: boolean
+    message: string
+    entries: string[]
+    chars: number
+    limit: number
+    pending_id?: string
+  }> {
     const result = normalized.operations
       ? await ctx.memory.applyBatch(normalized.target, normalized.operations)
       : await ctx.memory.applyBatch(normalized.target, [{ action: normalized.action ?? 'add', facts: normalized.facts, old_text: normalized.old_text }])
@@ -115,7 +122,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     async execute(args, exec: { agent?: { session: { header: { origin?: string } } } }) {
       const target = args.target === 'user' ? 'user' : 'memory'
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
-        ? { target, operations: args.operations as MemoryOperationLike[] }
+        ? { target, operations: args.operations }
         : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
       const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined

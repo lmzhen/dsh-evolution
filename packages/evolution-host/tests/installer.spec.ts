@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,10 +18,21 @@ async function runInstaller(home: string, mode: string, profile = 'evo-test', ex
 describe('layered installer', () => {
   it('installs host bundle + agent preset into a clean DSH_HOME', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-'))
-    await runInstaller(home, 'layered')
+    const { stdout } = await runInstaller(home, 'layered')
     const profileDir = join(home, 'profiles', 'evo-test')
     const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
     expect(manifest.dsh.profile.bundles).toContain('@deepseek-ai/dsh-evolution-host')
+
+    // Source installs without built lib/index.js must say so instead of
+    // silently producing a profile that cannot boot.
+    expect(stdout).toContain('unbuilt:')
+    const sourceTypes = fileURLToPath(new URL('../../../evolution-state-json/lib/types/index.d.ts', import.meta.url))
+    if (existsSync(sourceTypes)) {
+      await expect(readFile(
+        join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-state-json/lib/types/index.d.ts'),
+        'utf8',
+      )).resolves.toContain('evolution-state-json')
+    }
 
     const presetDir = join(home, '.agent-presets', 'evolution')
     expect(await readFile(join(presetDir, 'agent.cordis.yml'), 'utf8')).toContain('tool-memory')
@@ -29,7 +41,7 @@ describe('layered installer', () => {
     expect((patch[0]!.insert as any[]).map((row: any) => row.id)).toContain('evolution-review')
 
     await rm(home, { recursive: true, force: true })
-  })
+  }, 20_000)
 
   it('installs the compatibility one-click bundle', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-oneclick-'))

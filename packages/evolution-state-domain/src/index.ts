@@ -102,14 +102,14 @@ export function apply(ctx: Context): void {
     async tryResolvePending(id, status): Promise<PendingResolution> {
       const table = (await ensure()).table('pending')
       try {
-        let resolved: PendingRecord | null = null
-        const record = await table.update(id, current => {
+        const resolved = { record: null as PendingRecord | null }
+        const record = await table.update(id, (current) => {
           if (current.status !== 'pending') return current
-          resolved = { ...current, status, resolvedAt: new Date().toISOString() }
-          return resolved
+          resolved.record = { ...current, status, resolvedAt: new Date().toISOString() }
+          return resolved.record
         })
-        if (resolved === null) return { record: record.status === status ? record : null, applied: false }
-        return { record: resolved, applied: true }
+        if (resolved.record === null) return { record: record.status === status ? record : null, applied: false }
+        return { record: resolved.record, applied: true }
       } catch {
         return { record: null, applied: false }
       }

@@ -62,7 +62,10 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; b
   const frontmatter: Frontmatter = {}
   for (const line of block.split('\n')) {
     const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
-    if (match) frontmatter[match[1]!] = match[2]!.trim().replace(/^["']|["']$/g, '')
+    if (match) {
+      const [, key, value] = match
+      if (key && value !== undefined) frontmatter[key] = value.trim().replace(/^["']|["']$/g, '')
+    }
   }
   return { frontmatter, body }
 }
@@ -75,7 +78,7 @@ export function validateFrontmatter(content: string, expectedName?: string): str
   if (parsed.frontmatter.name.length > MAX_SKILL_NAME_LENGTH) return `Skill name exceeds ${MAX_SKILL_NAME_LENGTH} characters.`
   if (expectedName && parsed.frontmatter.name !== expectedName) return `Frontmatter name "${parsed.frontmatter.name}" does not match target skill "${expectedName}".`
   if (!parsed.frontmatter.description) return 'Frontmatter must include a description field.'
-  const description = String(parsed.frontmatter.description)
+  const description = parsed.frontmatter.description
   if (description.length > MAX_DESCRIPTION_LENGTH) return `Description exceeds ${MAX_DESCRIPTION_LENGTH} characters.`
   if (content.length > MAX_SKILL_CONTENT_CHARS) return `SKILL.md content exceeds ${MAX_SKILL_CONTENT_CHARS} characters.`
   return null
@@ -133,7 +136,7 @@ export class SkillLibrary {
       const managed = await this.io.exists(markerPath(dir, 'hermes-managed'))
       summaries.push({
         name,
-        description: parsed?.frontmatter.description ? String(parsed.frontmatter.description) : '',
+        description: parsed?.frontmatter.description ?? '',
         path: dir,
         protectedBy,
         managed,
@@ -179,7 +182,7 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     const dir = skillDir(this.root, normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
-        await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
+    await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
     if (origin === 'background_review') {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
@@ -247,7 +250,7 @@ export class SkillLibrary {
       if (!target) return { ok: false, message: `absorbed_into="${absorbedInto}" does not exist.` }
     }
     const archiveRoot = join(this.root, '.archive')
-        let dest = join(archiveRoot, name)
+    let dest = join(archiveRoot, name)
     if (await this.io.exists(dest)) {
       const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
       dest = join(archiveRoot, `${name}-${stamp}`)
@@ -275,7 +278,7 @@ export class SkillLibrary {
     if (Buffer.byteLength(content, 'utf8') > MAX_SKILL_FILE_BYTES) return { ok: false, message: `Support file exceeds ${MAX_SKILL_FILE_BYTES} bytes.` }
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
-      const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
+    const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     await this.io.writeText(target, content)
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
@@ -287,7 +290,7 @@ export class SkillLibrary {
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
-      const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
+    const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     if (!await this.io.exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
     await this.io.remove(target)
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
@@ -296,9 +299,9 @@ export class SkillLibrary {
 
   async snapshotAll(reason = 'pre-mutation'): Promise<string> {
     const backupRoot = join(this.root, '.backups')
-        const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const dest = join(backupRoot, `skills-${stamp}`)
-        const names = await listNames(this.root, this.io)
+    const names = await listNames(this.root, this.io)
     for (const name of names) {
       await this.io.copy(skillDir(this.root, name), join(dest, name))
     }

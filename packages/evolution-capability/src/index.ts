@@ -109,7 +109,16 @@ export class EvolutionCapability extends Service {
   }
 }
 
-export function validateCapabilityPackage(pkg: unknown, limits: { maxNameLength: number; maxPurposeLength: number; maxCodeChars: number } = { maxNameLength: 64, maxPurposeLength: 200, maxCodeChars: 65_536 }): CapabilityValidation {
+export interface CapabilityLimits {
+  maxNameLength: number
+  maxPurposeLength: number
+  maxCodeChars: number
+}
+
+export function validateCapabilityPackage(
+  pkg: unknown,
+  limits: CapabilityLimits = { maxNameLength: 64, maxPurposeLength: 200, maxCodeChars: 65_536 },
+): CapabilityValidation {
   const errors: string[] = []
   if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) {
     return { ok: false, errors: ['capability package must be an object'] }

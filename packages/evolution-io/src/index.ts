@@ -43,7 +43,7 @@ export class EvolutionIoRegistry extends Service {
       if (provider) return provider
       throw new Error(`evolution IO provider "${name}" is not registered`)
     }
-    const first = this.providers.values().next().value as EvolutionIo | undefined
+    const first = this.providers.values().next().value
     if (!first) throw new Error('no evolution IO provider registered')
     return first
   }

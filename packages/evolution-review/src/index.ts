@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
 import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
@@ -148,7 +148,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
       await run.dispose()
       if (!result.structured) return true
       const snapshot = policy()
-      const validation = validateEvolutionPlan(result.structured as EvolutionPlan, {
+      const plan: unknown = result.structured
+      const policyFingerprint = fingerprintPolicy(snapshot)
+      const validation = validateEvolutionPlan(plan as EvolutionPlan, {
         sessionSeq: session.seq - 1,
         maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? 32,
         protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
@@ -158,6 +160,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const actions = await executePlan(validation.accepted, agent)
       session.append('evolution/plan-applied', {
         planId: randomUUID(),
+        policyFingerprint,
         memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
         skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
         rejectedOps: validation.rejected.length,
@@ -221,7 +224,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }, 'dsh-evolution-review.cleanup')
 }
 
-function buildReviewRequest(session: Session, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }): string {
+function fingerprintPolicy(snapshot: unknown): string | undefined {
+  try {
+    return createHash('sha256').update(JSON.stringify(snapshot)).digest('hex').slice(0, 12)
+  } catch {
+    return undefined
+  }
+}
+
+function buildReviewRequest(
+  session: Session,
+  kind: ReviewKind,
+  signal: { toolCalls: number; userChars: number; assistantChars: number },
+): string {
   const messages: string[] = []
   const surface = session.deriveMessages()
   for (const message of surface.slice(-60)) {

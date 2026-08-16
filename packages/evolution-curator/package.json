@@ -39,11 +39,15 @@
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^"
+    "@deepseek-ai/dsh-evolution-io": "workspace:^",
+    "@deepseek-ai/dsh-evolution": "workspace:^",
+    "@deepseek-ai/dsh-llm": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^"
+    "@deepseek-ai/dsh-evolution-io": "workspace:^",
+    "@deepseek-ai/dsh-evolution": "workspace:^",
+    "@deepseek-ai/dsh-llm": "workspace:^"
   }
 }

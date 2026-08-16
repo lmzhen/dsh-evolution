@@ -28,12 +28,17 @@ Omit `--home` to use `$DSH_HOME` or `~/.dsh`.
 
 This performs:
 
-1. copies every evolution package into
+1. copies every evolution package (including a built `lib/` when present) into
    `<home>/profiles/<profile>/node_modules/@deepseek-ai/...`;
 2. adds `@deepseek-ai/dsh-evolution-host` to
    `<home>/profiles/<profile>/package.json` `dsh.profile.bundles`;
 3. copies the `Evolution` agent preset to
    `<home>/.agent-presets/evolution/`.
+
+The installer is source-layout aware: if a package's `lib/index.js` has not
+been built yet it prints an `unbuilt:` warning. Boot such a profile with the
+TS loader used by the source checkout, or build the evolution packages first.
+Published-bundle installs are unaffected.
 
 Dry run:
 
@@ -45,7 +50,7 @@ node packages/evolution/scripts/install-layered.mjs \
 Uninstall the layered layout while keeping user data:
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs   --profile web --mode layered --uninstall
+node packages/evolution/scripts/install-layered.mjs --profile web --mode layered --uninstall
 ```
 
 Only the profile rows, copied packages, and the agent preset directory are

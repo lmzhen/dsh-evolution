@@ -181,36 +181,36 @@ export class MemoryStore {
     }
     const entries = await this.read(target)
     const working = [...entries]
-    for (let i = 0; i < operations.length; i += 1) {
-      const op = operations[i]!
+    for (const [index, op] of operations.entries()) {
+      const position = index + 1
       if (op.action === 'add') {
         const body = (op.facts ?? '').trim()
-        if (!body) return { ok: false, message: `Operation ${i + 1} (add): facts is required. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (!body) return { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         const threat = scanMemoryThreats(body)
-        if (threat) return { ok: false, message: `Operation ${i + 1}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (threat) return { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         if (!working.some(entry => stripDatePrefix(entry) === body)) {
           working.push(this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body)
         }
         continue
       }
       const needle = (op.old_text ?? '').trim()
-      if (!needle) return { ok: false, message: `Operation ${i + 1} (${op.action}): old_text is required. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
-      const matches = working.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.includes(needle))
+      if (!needle) return { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+      const matches = working.map((entry, matchIndex) => ({ entry, matchIndex })).filter(({ entry }) => entry.includes(needle))
       if (matches.length === 0) {
-        return this.failure(target, `Operation ${i + 1}: no entry matching "${needle}" found. No operations were applied.`, entries)
+        return this.failure(target, `Operation ${position}: no entry matching "${needle}" found. No operations were applied.`, entries)
       }
       if (new Set(matches.map(m => m.entry)).size > 1) {
-        return { ok: false, message: `Operation ${i + 1}: "${needle}" matched multiple distinct entries. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        return { ok: false, message: `Operation ${position}: "${needle}" matched multiple distinct entries. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
       }
-      const index = matches[0]?.index ?? -1
+      const matchIndex = matches[0]?.matchIndex ?? -1
       if (op.action === 'remove') {
-        working.splice(index, 1)
+        working.splice(matchIndex, 1)
       } else {
         const body = (op.facts ?? '').trim()
-        if (!body) return { ok: false, message: `Operation ${i + 1} (replace): facts is required.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (!body) return { ok: false, message: `Operation ${position} (replace): facts is required.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         const threat = scanMemoryThreats(body)
-        if (threat) return { ok: false, message: `Operation ${i + 1}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
-        working[index] = body
+        if (threat) return { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        working[matchIndex] = body
       }
     }
     const total = working.join(ENTRY_DELIMITER).length

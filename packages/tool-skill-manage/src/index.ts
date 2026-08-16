@@ -126,7 +126,7 @@ export function apply(ctx: Context): void {
 
   ctx.inject(['evolutionApproval'], (approvalCtx) => {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
-    const dispose = approval.registerRunner('skill', args => {
+    const dispose = approval.registerRunner('skill', (args) => {
       const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; origin?: 'foreground' | 'background_review' }
       return executeCore(wrapped.operation ?? {}, wrapped.origin ?? 'background_review')
     })

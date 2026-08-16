@@ -15,7 +15,7 @@
  */
 
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -60,7 +60,6 @@ async function copyPackage(source, destination) {
     filter(sourcePath) {
       const base = sourcePath.slice(source.length + 1)
       return base !== 'node_modules'
-        && base !== 'lib'
         && !base.startsWith('tests')
         && !base.endsWith('.tsbuildinfo')
     },
@@ -112,6 +111,23 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
     if (!dryRun) await copyPackage(source, destination)
   }
   return copies
+}
+
+/** A source-tree install is only directly runnable when lib/index.js exists. */
+function missingEntrypoints(copies) {
+  return copies.filter(({ packageName, source, destination }) => {
+    const manifestPath = existsSync(join(destination, 'package.json'))
+      ? join(destination, 'package.json')
+      : join(source, 'package.json')
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      const main = typeof manifest.main === 'string' ? manifest.main : ''
+      if (!main.endsWith('.js')) return false
+      return !existsSync(join(destination, main)) && !existsSync(join(source, main))
+    } catch {
+      return false
+    }
+  }).map(({ packageName }) => packageName)
 }
 
 async function removeBundleFromProfile(profileDir, bundleName) {
@@ -182,7 +198,7 @@ export async function install(options = {}) {
   const dryRun = options.dryRun === true
   const force = options.force === true
   const profileDir = dryRun ? profileDirectory(home, profile) : await ensureProfile(home, profile)
-  const result = { mode, home, profile, profileDir, copied: [], bundle: null, agentPreset: null }
+  const result = { mode, home, profile, profileDir, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
 
   const needsHost = mode === 'host' || mode === 'layered'
   const needsAgent = mode === 'agent' || mode === 'layered'
@@ -193,6 +209,7 @@ export async function install(options = {}) {
     result.bundle = bundleName
     result.copied = await copyAllEvolutionPackages(profileDir, dryRun)
     if (!dryRun) await installBundlePackage(profileDir, bundleName)
+    result.missingEntrypoints = missingEntrypoints(result.copied)
   }
 
   if (needsAgent) {
@@ -235,6 +252,9 @@ if (isMain) {
     console.log(`profile:  ${result.profile} (${result.profileDir})`)
     if (result.bundle) console.log(`bundle:   ${result.bundle}`)
     console.log(`copied:   ${result.copied.length} evolution packages`)
+    if (result.missingEntrypoints.length > 0) {
+      console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
+    }
     if (result.agentPreset) {
       console.log(`preset:   ${result.agentPreset.destination}${result.agentPreset.installed ? '' : ` (${result.agentPreset.reason})`}`)
     }
