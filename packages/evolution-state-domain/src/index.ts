@@ -38,6 +38,8 @@ export const pendingSchema = z.object({
   createdAt: z.string(),
   status: z.union([z.literal('pending'), z.literal('approved'), z.literal('rejected')]),
   resolvedAt: z.string().optional(),
+  claimedBy: z.string().optional(),
+  claimedAt: z.string().optional(),
 })
 
 export const EVOLUTION_DOMAIN = defineDomain({
@@ -97,6 +99,37 @@ export function apply(ctx: Context): void {
 
     async deletePending(id) {
       await (await ensure()).table('pending').delete(id)
+    },
+
+    async claimPending(id, claimId) {
+      const table = (await ensure()).table('pending')
+      try {
+        const slot = { record: null as PendingRecord | null }
+        const now = Date.now()
+        await table.update(id, (current) => {
+          if (current.status !== 'pending') return current
+          const claimedAt = typeof current.claimedAt === 'string' ? Date.parse(current.claimedAt) : 0
+          if (current.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < 10 * 60_000) return current
+          slot.record = { ...current, claimedBy: claimId, claimedAt: new Date(now).toISOString() }
+          return slot.record
+        })
+        return slot.record
+      } catch {
+        return null
+      }
+    },
+
+    async releasePendingClaim(id, claimId) {
+      const table = (await ensure()).table('pending')
+      await table.update(id, (current) => {
+        if (current.status === 'pending' && current.claimedBy === claimId) {
+          const released = { ...current }
+          delete released.claimedBy
+          delete released.claimedAt
+          return released
+        }
+        return current
+      })
     },
 
     async tryResolvePending(id, status): Promise<PendingResolution> {

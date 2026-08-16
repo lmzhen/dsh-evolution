@@ -123,6 +123,33 @@ export function apply(ctx: Context, rawConfig: Config): void {
       })
     },
 
+    async claimPending(id, claimId) {
+      return await mutate(async () => {
+        const map = await loadPendingMap()
+        const record = map[id] ?? null
+        if (record === null || record.status !== 'pending') return null
+        const now = Date.now()
+        const claimedAt = typeof record.claimedAt === 'string' ? Date.parse(record.claimedAt) : 0
+        if (record.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < 10 * 60_000) return null
+        record.claimedBy = claimId
+        record.claimedAt = new Date(now).toISOString()
+        await writeJson('pending-state.json', map)
+        return { ...record }
+      })
+    },
+
+    async releasePendingClaim(id, claimId) {
+      await mutate(async () => {
+        const map = await loadPendingMap()
+        const record = map[id]
+        if (record && record.status === 'pending' && record.claimedBy === claimId) {
+          delete record.claimedBy
+          delete record.claimedAt
+          await writeJson('pending-state.json', map)
+        }
+      })
+    },
+
     async tryResolvePending(id, status): Promise<PendingResolution> {
       return await mutate(async () => {
         const map = await loadPendingMap()

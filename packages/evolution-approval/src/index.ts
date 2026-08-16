@@ -39,6 +39,8 @@ interface EvolutionStateLike {
   savePending(record: PendingRecord): Promise<void>
   deletePending(id: string): Promise<void>
   tryResolvePending(id: string, status: 'approved' | 'rejected'): Promise<{ record: PendingRecord | null; applied: boolean }>
+  claimPending(id: string, claimId: string): Promise<PendingRecord | null>
+  releasePendingClaim(id: string, claimId: string): Promise<void>
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -144,8 +146,9 @@ export class EvolutionApproval extends Service {
   }
 
   private async doApprove(id: string): Promise<{ ok: boolean; message: string }> {
-    const record = (await this.list('pending')).find(item => item.id === id)
-    if (!record) return { ok: false, message: `Pending write "${id}" not found.` }
+    const claimId = randomUUID()
+    const record = await this.state().claimPending(id, claimId)
+    if (!record) return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
     const runner = this.runners.get(record.kind)
     if (!runner) {
       if (record.kind === 'capability') {
@@ -153,15 +156,25 @@ export class EvolutionApproval extends Service {
         if (!resolution.applied) return { ok: false, message: `Pending write "${id}" was already resolved.` }
         return { ok: true, message: 'Capability approved for manual activation in Creator mode (no code was executed).' }
       }
+      await this.state().releasePendingClaim(id, claimId)
       return { ok: false, message: `No replay runner registered for kind "${record.kind}".` }
     }
-    const result = await runner(record.args)
-    if (!result.ok) return { ok: false, message: result.message }
+    try {
+      const result = await runner(record.args)
+      if (!result.ok) {
+        await this.state().releasePendingClaim(id, claimId)
+        return { ok: false, message: result.message }
+      }
+    } catch (error) {
+      await this.state().releasePendingClaim(id, claimId)
+      this.ctx.logger.warn(error)
+      return { ok: false, message: 'Replay runner failed; the pending write remains pending.' }
+    }
     const resolution = await this.state().tryResolvePending(id, 'approved')
     if (!resolution.applied) {
       return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
     }
-    return { ok: true, message: `Approved ${record.kind}: ${result.message}` }
+    return { ok: true, message: `Approved ${record.kind}` }
   }
 }
 

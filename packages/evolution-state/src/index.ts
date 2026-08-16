@@ -91,6 +91,14 @@ export class EvolutionState extends Service {
   tryResolvePending(id: string, status: 'approved' | 'rejected') {
     return this.storage().tryResolvePending(id, status)
   }
+
+  claimPending(id: string, claimId: string) {
+    return this.storage().claimPending(id, claimId)
+  }
+
+  releasePendingClaim(id: string, claimId: string) {
+    return this.storage().releasePendingClaim(id, claimId)
+  }
 }
 
 export default EvolutionState

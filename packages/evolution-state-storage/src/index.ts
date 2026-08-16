@@ -33,6 +33,8 @@ export interface PendingRecord {
   createdAt: string
   status: PendingStatus
   resolvedAt?: string | undefined
+  claimedBy?: string | undefined
+  claimedAt?: string | undefined
 }
 
 export interface PendingResolution {
@@ -51,6 +53,10 @@ export interface EvolutionStateStorage {
   deletePending(id: string): Promise<void>
   /** Atomically transition a pending record exactly once. */
   tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>): Promise<PendingResolution>
+  /** Atomically mark a pending record as claimed by one approver, or return null. */
+  claimPending(id: string, claimId: string): Promise<PendingRecord | null>
+  /** Release this claim when the replay runner cannot complete. */
+  releasePendingClaim(id: string, claimId: string): Promise<void>
 }
 
 declare module '@deepseek-ai/cordis' {
