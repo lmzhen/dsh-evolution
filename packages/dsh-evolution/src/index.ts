@@ -498,9 +498,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (config.reviewMode === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentServiceLike | undefined
     if (!subagents || !agent) return false
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120_000)
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 120_000)
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: buildReviewRequest(session, kind, signal) }],
@@ -520,7 +520,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
         },
       })
       const result = await run.result
-      clearTimeout(timeout)
       await run.dispose()
       const plan = isStructuredPlan(result.structured) ? result.structured : parsePlanFromText(textOf(result.output))
       const actions = await executePlan(plan)
@@ -533,6 +532,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return true
     } catch {
       return false
+    } finally {
+      clearTimeout(timeout)
     }
   }
 
