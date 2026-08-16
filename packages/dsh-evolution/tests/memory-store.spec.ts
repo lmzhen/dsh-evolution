@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MemoryStore } from '../src/memory-store.ts'
+import { MemoryStore } from '@deepseek-ai/dsh-evolution-core'
 
 it('memory add/replace/remove/batch', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-'))

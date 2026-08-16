@@ -21,7 +21,7 @@
       "path": "../memory"
     },
     {
-      "path": "../dsh-evolution"
+      "path": "../evolution-core"
     },
     {
       "path": "../evolution-io"

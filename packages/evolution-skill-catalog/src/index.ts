@@ -19,9 +19,8 @@ import type {
   SkillProviderControl,
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution/src/io.ts'
+import type {} from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'
@@ -33,12 +32,18 @@ export interface Config {
   modelInvocable?: boolean
   /** Whether catalog skills are advertised/loadable from user surfaces. */
   userInvocable?: boolean
+  /** Restrict the published catalog to these skill names (empty = all). */
+  includeSkillNames?: string[]
+  /** Hide these skill names from the published catalog. */
+  excludeSkillNames?: string[]
 }
 
 export const Config: z<Config> = z.object({
   root: z.string().default(''),
   modelInvocable: z.boolean().default(true),
   userInvocable: z.boolean().default(true),
+  includeSkillNames: z.array(z.string()).default([]),
+  excludeSkillNames: z.array(z.string()).default([]),
 })
 
 /** Below filesystem's user rank so the evolution-owned tree wins duplicates. */
@@ -49,17 +54,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     modelInvocable: rawConfig.modelInvocable ?? true,
     userInvocable: rawConfig.userInvocable ?? true,
   }
-  const resolveIo = () => ctx.evolutionIo.provider()
-  const io: EvolutionIoLike = {
-    readText: path => resolveIo().readText(path),
-    writeText: (path, content) => resolveIo().writeText(path, content),
-    remove: path => resolveIo().remove(path),
-    list: path => resolveIo().list(path),
-    exists: path => resolveIo().exists(path),
-    rename: (path, destination) => resolveIo().rename(path, destination),
-    copy: (path, destination) => resolveIo().copy(path, destination),
-  }
+  const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   const library = new SkillLibrary(rawConfig.root || undefined, io)
+  const included = new Set(rawConfig.includeSkillNames ?? [])
+  const excluded = new Set(rawConfig.excludeSkillNames ?? [])
+  const visible = (name: string) => (included.size === 0 || included.has(name)) && !excluded.has(name)
   let control: SkillProviderControl | undefined
 
   const provider: SkillProvider = {
@@ -67,7 +66,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async list(_options: SkillLookupOptions) {
       const summaries = await library.list()
-      return summaries.map(summary => ({
+      return summaries.filter(summary => visible(summary.name)).map(summary => ({
         name: summary.name,
         description: summary.description,
         invocation,
@@ -82,6 +81,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async get(candidate: SkillCandidate): Promise<SkillDefinition | undefined> {
       const name = candidate.name
+      if (!visible(name)) return undefined
       const content = await library.read(name)
       if (content === null) return undefined
       const summary = (await library.list()).find(item => item.name === name)

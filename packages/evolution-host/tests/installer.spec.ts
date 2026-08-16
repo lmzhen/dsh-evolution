@@ -24,9 +24,11 @@ describe('layered installer', () => {
     expect(manifest.dsh.profile.bundles).toContain('@deepseek-ai/dsh-evolution-host')
 
     // Source installs without built lib/index.js must say so instead of
-    // silently producing a profile that cannot boot.
-    expect(stdout).toContain('unbuilt:')
-    const sourceTypes = fileURLToPath(new URL('../../../evolution-state-json/lib/types/index.d.ts', import.meta.url))
+    // silently producing a profile that cannot boot; a built tree just boots.
+    const builtMarker = fileURLToPath(new URL('../../evolution-core/lib/index.js', import.meta.url))
+    if (existsSync(builtMarker)) expect(stdout).not.toContain('unbuilt:')
+    else expect(stdout).toContain('unbuilt:')
+    const sourceTypes = fileURLToPath(new URL('../../evolution-state-json/lib/types/index.d.ts', import.meta.url))
     if (existsSync(sourceTypes)) {
       await expect(readFile(
         join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-state-json/lib/types/index.d.ts'),

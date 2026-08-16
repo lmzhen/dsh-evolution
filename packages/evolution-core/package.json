@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-skill-usage",
-  "description": "Skill usage telemetry service",
+  "name": "@deepseek-ai/dsh-evolution-core",
+  "description": "Shared stores, prompts, signals and lifecycle logic for the dsh-evolution plugin family",
   "version": "0.1.0-rc.1",
   "publishConfig": {
     "access": "public"
@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lmzhen/dsh-evolution.git",
-    "directory": "packages/evolution/skill-usage"
+    "directory": "packages/evolution/evolution-core"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -32,18 +32,14 @@
     "lib/types/invariant.d.ts"
   ],
   "license": "MIT",
-  "dependencies": {
-    "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/schemastery": "workspace:^"
-  },
   "peerDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/dsh-session": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
   }
 }

@@ -5,7 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
-import { scanContentThreats, scanMemoryThreats } from '@deepseek-ai/dsh-evolution/src/threats.ts'
+import { scanContentThreats, scanMemoryThreats } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-threat'
 export const inject = ['tools']

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '../src/index.ts'
-import { evolutionHome } from '@deepseek-ai/dsh-evolution/src/state-store.ts'
+import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
 
 async function mount(_home: string, config: ConstructorParameters<typeof EvolutionCurator>[1] = {}) {
   const ctx = new Context()

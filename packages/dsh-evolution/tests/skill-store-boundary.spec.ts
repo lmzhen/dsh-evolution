@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SkillLibrary } from '../src/skill-store.ts'
-import type { EvolutionIoLike } from '../src/io.ts'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 function fakeIo(): EvolutionIoLike & { files: Map<string, string> } {
   const files = new Map<string, string>()

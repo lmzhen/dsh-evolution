@@ -12,6 +12,10 @@ export interface CuratorConfig {
   pruneBuiltins: boolean
   /** Shorter stale threshold for quality-warned skills; archive threshold never changes. */
   qualityWarnStaleAfterDays?: number
+  /** Explicit skill names never considered for lifecycle transitions. */
+  excludeSkillNames?: ReadonlySet<string>
+  /** When true, usage records without created_by='agent' also enter the lifecycle. */
+  manageUnmanaged?: boolean
 }
 
 export interface CuratorTransition {
@@ -92,7 +96,8 @@ export function computeLifecycleTransitions(
   const result: CuratorResult = { transitions: [], archive: [], reactivate: [], markStale: [] }
   for (const [name, record] of usage) {
     if (record.pinned) continue
-    if (record.created_by !== 'agent') continue
+    if (config.excludeSkillNames?.has(name)) continue
+    if (record.created_by !== 'agent' && config.manageUnmanaged !== true) continue
     if (PROTECTED_BUILTIN_SKILLS.has(name)) continue
     if (record.state === 'archived') continue
 

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { computeLifecycleTransitions } from '../src/curator.ts'
+import { computeLifecycleTransitions } from '@deepseek-ai/dsh-evolution-core'
 
 it('curator transitions active -> stale -> archived by idle time', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')

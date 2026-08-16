@@ -11,7 +11,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
+import type {} from '@deepseek-ai/dsh-evolution-core'
 
 export interface ReplayPlan {
   policyId: string

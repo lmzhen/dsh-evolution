@@ -27,7 +27,7 @@
       "path": "../../core/session"
     },
     {
-      "path": "../dsh-evolution"
+      "path": "../evolution-core"
     },
     {
       "path": "../../test-support/agent-loop-testkit"

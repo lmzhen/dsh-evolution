@@ -7,9 +7,9 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { skillsRoot } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
-import { bumpPatch, bumpUse, bumpView, loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution/src/usage.ts'
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution/src/io.ts'
+import { evolutionIoAdapter,  skillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { bumpPatch, bumpUse, bumpView, loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -35,15 +35,7 @@ export class SkillUsageRegistry extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'skillUsage')
     this.root = config.root ?? skillsRoot()
-    this.io = {
-      readText: path => ctx.evolutionIo.provider().readText(path),
-      writeText: (path, content) => ctx.evolutionIo.provider().writeText(path, content),
-      remove: path => ctx.evolutionIo.provider().remove(path),
-      list: path => ctx.evolutionIo.provider().list(path),
-      exists: path => ctx.evolutionIo.provider().exists(path),
-      rename: (path, destination) => ctx.evolutionIo.provider().rename(path, destination),
-      copy: (path, destination) => ctx.evolutionIo.provider().copy(path, destination),
-    }
+    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   }
 
   private async map(): Promise<UsageMap> {
@@ -77,7 +69,7 @@ export class SkillUsageRegistry extends Service {
 
   async markAgentCreated(name: string): Promise<void> {
     await this.mutate(async (map) => {
-      const { markAgentCreated } = await import('@deepseek-ai/dsh-evolution/src/usage.ts')
+      const { markAgentCreated } = await import('@deepseek-ai/dsh-evolution-core')
       markAgentCreated(map, name)
       await this.flush()
     })

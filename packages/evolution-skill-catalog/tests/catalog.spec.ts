@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
-import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
+import type {} from '@deepseek-ai/dsh-evolution-core'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as Catalog from '../src/index.ts'

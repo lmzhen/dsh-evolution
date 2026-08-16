@@ -12,9 +12,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution/src/io.ts'
-import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
+import { evolutionIoAdapter,  DEFAULT_SKILL_LIMITS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
 export const name = 'tool-skill-manage'
@@ -23,10 +22,18 @@ export const inject = ['tools', 'skillUsage', 'evolutionIo']
 export interface Config {
   /** Skill tree root; empty uses $DSH_HOME/skills. Align with skill-usage/catalog rows. */
   root?: string
+  maxSkillNameLength?: number
+  maxDescriptionLength?: number
+  maxSkillContentChars?: number
+  maxSkillFileBytes?: number
 }
 
 export const Config: z<Config> = z.object({
   root: z.string().default(''),
+  maxSkillNameLength: z.number().default(DEFAULT_SKILL_LIMITS.maxNameLength),
+  maxDescriptionLength: z.number().default(DEFAULT_SKILL_LIMITS.maxDescriptionLength),
+  maxSkillContentChars: z.number().default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+  maxSkillFileBytes: z.number().default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
 })
 
 interface ApprovalLike {
@@ -47,17 +54,13 @@ interface SkillWriteArgs {
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  const resolveIo = () => ctx.evolutionIo.provider()
-  const io: EvolutionIoLike = {
-    readText: path => resolveIo().readText(path),
-    writeText: (path, content) => resolveIo().writeText(path, content),
-    remove: path => resolveIo().remove(path),
-    list: path => resolveIo().list(path),
-    exists: path => resolveIo().exists(path),
-    rename: (path, destination) => resolveIo().rename(path, destination),
-    copy: (path, destination) => resolveIo().copy(path, destination),
-  }
-  const library = new SkillLibrary(rawConfig.root || undefined, io)
+  const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+  const library = new SkillLibrary(rawConfig.root || undefined, io, {
+    maxNameLength: rawConfig.maxSkillNameLength ?? DEFAULT_SKILL_LIMITS.maxNameLength,
+    maxDescriptionLength: rawConfig.maxDescriptionLength ?? DEFAULT_SKILL_LIMITS.maxDescriptionLength,
+    maxSkillContentChars: rawConfig.maxSkillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
+    maxSkillFileBytes: rawConfig.maxSkillFileBytes ?? DEFAULT_SKILL_LIMITS.maxSkillFileBytes,
+  })
 
   async function executeCore(args: SkillWriteArgs, origin: 'foreground' | 'background_review' = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
     const action = args.action

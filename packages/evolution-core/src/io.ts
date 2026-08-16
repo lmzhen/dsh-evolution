@@ -20,6 +20,19 @@ export interface EvolutionIoLike {
   copy(path: string, destination: string): Promise<void>
 }
 
+/** Lazy adapter over an IO provider registry, shared by every evolution consumer. */
+export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIoLike {
+  return {
+    readText: path => provider().readText(path),
+    writeText: (path, content) => provider().writeText(path, content),
+    remove: path => provider().remove(path),
+    list: path => provider().list(path),
+    exists: path => provider().exists(path),
+    rename: (path, destination) => provider().rename(path, destination),
+    copy: (path, destination) => provider().copy(path, destination),
+  }
+}
+
 export function nodeEvolutionIo(): EvolutionIoLike {
   return {
     async readText(path) {

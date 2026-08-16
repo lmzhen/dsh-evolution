@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary } from '../src/skill-store.ts'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing

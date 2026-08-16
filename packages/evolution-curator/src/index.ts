@@ -10,12 +10,12 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution/src/skill-store.ts'
-import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution/src/usage.ts'
-import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport } from '@deepseek-ai/dsh-evolution/src/curator.ts'
-import { evolutionHome } from '@deepseek-ai/dsh-evolution/src/state-store.ts'
-import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution/src/prompts.ts'
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution/src/io.ts'
+import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
+import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 
 declare module '@deepseek-ai/cordis' {
@@ -36,6 +36,10 @@ export interface Config {
   qualityWarnStaleAfterDays?: number
   /** Skip automatic runs while any session was active within this many hours (0 disables). */
   minIdleHours?: number
+  /** Skill names excluded from the automated lifecycle. */
+  excludeSkillNames?: string[]
+  /** Include usage records whose created_by is not 'agent' in lifecycle decisions. */
+  manageUnmanaged?: boolean
 }
 
 export class EvolutionCurator extends Service {
@@ -49,6 +53,8 @@ export class EvolutionCurator extends Service {
     curatorProvider: z.string().default('deepseek-official'),
     qualityWarnStaleAfterDays: z.number().default(7),
     minIdleHours: z.number().default(0),
+    excludeSkillNames: z.array(z.string()).default([]),
+    manageUnmanaged: z.boolean().default(false),
   })
 
   readonly skills: SkillLibrary
@@ -61,20 +67,14 @@ export class EvolutionCurator extends Service {
   private readonly curatorProvider: string
   private readonly qualityWarnStaleAfterDays: number
   private readonly minIdleHours: number
+  private readonly excludeSkillNames: ReadonlySet<string>
+  private readonly manageUnmanaged: boolean
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
-    this.io = {
-      readText: path => ctx.evolutionIo.provider().readText(path),
-      writeText: (path, content) => ctx.evolutionIo.provider().writeText(path, content),
-      remove: path => ctx.evolutionIo.provider().remove(path),
-      list: path => ctx.evolutionIo.provider().list(path),
-      exists: path => ctx.evolutionIo.provider().exists(path),
-      rename: (path, destination) => ctx.evolutionIo.provider().rename(path, destination),
-      copy: (path, destination) => ctx.evolutionIo.provider().copy(path, destination),
-    }
+    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     this.skills = new SkillLibrary(undefined, this.io)
     this.enabled = config.enabled ?? true
     this.intervalHours = config.intervalHours ?? 168
@@ -84,6 +84,8 @@ export class EvolutionCurator extends Service {
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
     this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? 7
     this.minIdleHours = config.minIdleHours ?? 0
+    this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
+    this.manageUnmanaged = config.manageUnmanaged ?? false
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
@@ -209,6 +211,8 @@ export class EvolutionCurator extends Service {
       archiveAfterDays: lifecycle.archiveAfterDays,
       pruneBuiltins: true,
       qualityWarnStaleAfterDays: this.qualityWarnStaleAfterDays,
+      excludeSkillNames: this.excludeSkillNames,
+      manageUnmanaged: this.manageUnmanaged,
     })
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []

@@ -20,15 +20,27 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import { MemoryStore, type MemoryOperation } from './memory-store.ts'
-import { JsonState } from './state-store.ts'
-import type {} from './events.ts'
-import { SkillLibrary, skillsRoot } from './skill-store.ts'
-import type { EvolutionIoLike } from './io.ts'
-import { bumpPatch, bumpUse, bumpView, loadUsage, markAgentCreated, saveUsage } from './usage.ts'
-import { computeLifecycleTransitions } from './curator.ts'
-import { reviewPrompt } from './prompts.ts'
-import { advanceReview, foldTurn, type ReviewKind, type ReviewState, type TurnSignals } from './signals.ts'
+import {
+  advanceReview,
+  bumpPatch,
+  bumpUse,
+  bumpView,
+  computeLifecycleTransitions,
+  foldTurn,
+  JsonState,
+  loadUsage,
+  markAgentCreated,
+  MemoryStore,
+  type EvolutionIoLike,
+  type MemoryOperation,
+  reviewPrompt,
+  saveUsage,
+  SkillLibrary,
+  skillsRoot,
+  type ReviewKind,
+  type ReviewState,
+  type TurnSignals,
+} from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'dsh-evolution'
 

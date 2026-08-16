@@ -33,22 +33,22 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-evolution-io": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
-    "@deepseek-ai/dsh-evolution": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^"
+    "@deepseek-ai/dsh-tools": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-skill-usage": "workspace:^",
-    "@deepseek-ai/dsh-evolution": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^"
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-io": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-skill-usage": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^"
   }
 }

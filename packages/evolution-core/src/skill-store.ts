@@ -17,6 +17,20 @@ export const MAX_SKILL_NAME_LENGTH = 64
 export const MAX_DESCRIPTION_LENGTH = 1024
 export const MAX_SKILL_CONTENT_CHARS = 100_000
 export const MAX_SKILL_FILE_BYTES = 1_048_576
+
+export interface SkillLimits {
+  maxNameLength: number
+  maxDescriptionLength: number
+  maxSkillContentChars: number
+  maxSkillFileBytes: number
+}
+
+export const DEFAULT_SKILL_LIMITS: SkillLimits = {
+  maxNameLength: MAX_SKILL_NAME_LENGTH,
+  maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
+  maxSkillContentChars: MAX_SKILL_CONTENT_CHARS,
+  maxSkillFileBytes: MAX_SKILL_FILE_BYTES,
+}
 export const SUPPORT_DIRS = ['references', 'templates', 'scripts', 'assets'] as const
 
 export interface SkillSummary {
@@ -70,17 +84,17 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; b
   return { frontmatter, body }
 }
 
-export function validateFrontmatter(content: string, expectedName?: string): string | null {
+export function validateFrontmatter(content: string, expectedName?: string, limits: SkillLimits = DEFAULT_SKILL_LIMITS): string | null {
   const parsed = parseFrontmatter(content)
   if (!parsed) return 'SKILL.md must start and end with YAML frontmatter and include a body.'
   if (!parsed.frontmatter.name) return 'Frontmatter must include a name field.'
   if (!/^[a-z0-9][a-z0-9-]*$/.test(parsed.frontmatter.name)) return `Invalid skill name "${parsed.frontmatter.name}" — use lowercase letters, digits, and hyphens.`
-  if (parsed.frontmatter.name.length > MAX_SKILL_NAME_LENGTH) return `Skill name exceeds ${MAX_SKILL_NAME_LENGTH} characters.`
+  if (parsed.frontmatter.name.length > limits.maxNameLength) return `Skill name exceeds ${limits.maxNameLength} characters.`
   if (expectedName && parsed.frontmatter.name !== expectedName) return `Frontmatter name "${parsed.frontmatter.name}" does not match target skill "${expectedName}".`
   if (!parsed.frontmatter.description) return 'Frontmatter must include a description field.'
   const description = parsed.frontmatter.description
-  if (description.length > MAX_DESCRIPTION_LENGTH) return `Description exceeds ${MAX_DESCRIPTION_LENGTH} characters.`
-  if (content.length > MAX_SKILL_CONTENT_CHARS) return `SKILL.md content exceeds ${MAX_SKILL_CONTENT_CHARS} characters.`
+  if (description.length > limits.maxDescriptionLength) return `Description exceeds ${limits.maxDescriptionLength} characters.`
+  if (content.length > limits.maxSkillContentChars) return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters.`
   return null
 }
 
@@ -118,11 +132,13 @@ function fuzzyPatch(content: string, oldString: string, newString: string, repla
 
 export class SkillLibrary {
   readonly root: string
+  readonly limits: SkillLimits
   private readonly io: EvolutionIoLike
 
-  constructor(root = skillsRoot(), io: EvolutionIoLike = nodeEvolutionIo()) {
+  constructor(root = skillsRoot(), io: EvolutionIoLike = nodeEvolutionIo(), limits: SkillLimits = DEFAULT_SKILL_LIMITS) {
     this.root = root
     this.io = io
+    this.limits = limits
   }
 
   async list(): Promise<SkillSummary[]> {
@@ -173,10 +189,10 @@ export class SkillLibrary {
 
   async create(name: string, content: string, origin: 'foreground' | 'background_review'): Promise<SkillActionResult> {
     const normalized = name.trim()
-    if (!SKILL_NAME_RE.test(normalized) || normalized.length > MAX_SKILL_NAME_LENGTH) {
-      return { ok: false, message: `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${MAX_SKILL_NAME_LENGTH}).` }
+    if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
+      return { ok: false, message: `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).` }
     }
-    const validation = validateFrontmatter(content, normalized)
+    const validation = validateFrontmatter(content, normalized, this.limits)
     if (validation) return { ok: false, message: validation }
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
@@ -195,7 +211,7 @@ export class SkillLibrary {
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
-    const validation = validateFrontmatter(content, name)
+    const validation = validateFrontmatter(content, name, this.limits)
     if (validation) return { ok: false, message: validation }
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
@@ -224,14 +240,14 @@ export class SkillLibrary {
     const patched = fuzzyPatch(md, oldString, newString, replaceAll)
     if (!patched) return { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }
     if (target === skillMd) {
-      const validation = validateFrontmatter(patched, name)
+      const validation = validateFrontmatter(patched, name, this.limits)
       if (validation) return { ok: false, message: `Patch rejected: ${validation}` }
     }
-    if (Buffer.byteLength(patched, 'utf8') > MAX_SKILL_FILE_BYTES && target !== skillMd) {
-      return { ok: false, message: `Patched file exceeds ${MAX_SKILL_FILE_BYTES} bytes.` }
+    if (Buffer.byteLength(patched, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
+      return { ok: false, message: `Patched file exceeds ${this.limits.maxSkillFileBytes} bytes.` }
     }
-    if (patched.length > MAX_SKILL_CONTENT_CHARS && target === skillMd) {
-      return { ok: false, message: `Patched content exceeds ${MAX_SKILL_CONTENT_CHARS} characters.` }
+    if (patched.length > this.limits.maxSkillContentChars && target === skillMd) {
+      return { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters.` }
     }
     const threat = scanContentThreats(patched)
     if (threat) return { ok: false, message: threat }
@@ -275,7 +291,7 @@ export class SkillLibrary {
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
-    if (Buffer.byteLength(content, 'utf8') > MAX_SKILL_FILE_BYTES) return { ok: false, message: `Support file exceeds ${MAX_SKILL_FILE_BYTES} bytes.` }
+    if (Buffer.byteLength(content, 'utf8') > this.limits.maxSkillFileBytes) return { ok: false, message: `Support file exceeds ${this.limits.maxSkillFileBytes} bytes.` }
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))

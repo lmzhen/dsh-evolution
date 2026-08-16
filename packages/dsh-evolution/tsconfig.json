@@ -8,6 +8,7 @@
     "src"
   ],
   "references": [
+    { "path": "../evolution-core" },
     {
       "path": "../../../vendor/cordis"
     },
