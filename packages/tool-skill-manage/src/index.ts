@@ -66,6 +66,11 @@ export function apply(ctx: Context): void {
     else result = { ok: false, message: `Unknown action "${action}".` }
 
     if (result.ok) {
+      // Lifecycle scope: curator only manages usage records created by the
+      // background review pipeline. Keep the native runner aligned with the
+      // legacy facade here, or review-created skills silently escape the
+      // stale/archive lifecycle.
+      if (name && action === 'create' && origin === 'background_review') await ctx.skillUsage.markAgentCreated(name)
       if (name && action !== 'list') await ctx.skillUsage.record(name, 'patch')
       ctx.emit('evolution/skill-mutated', {
         action: action ?? '?',
@@ -120,7 +125,7 @@ export function apply(ctx: Context): void {
           return { ok: true, message: decision.message, skills: [], pending_id: decision.pendingId ?? '' }
         }
       }
-      return await executeCore(args)
+      return await executeCore(args, origin)
     },
   }))
 
