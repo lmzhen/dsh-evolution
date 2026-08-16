@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-evolution-preset",
-  "description": "Compatibility one-click bundle for the dsh-evolution plugin family",
+  "name": "@deepseek-ai/dsh-evolution-host",
+  "description": "Host-plane self-evolution infrastructure bundle for DeepSeek Harness",
   "version": "0.1.0-rc.1",
   "publishConfig": {
     "access": "public"
@@ -8,12 +8,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lmzhen/dsh-evolution.git",
-    "directory": "packages/evolution/evolution-preset"
+    "directory": "packages/evolution/evolution-host"
   },
   "type": "module",
-  "main": "index.js",
   "files": [
-    "cordis.yml",
     "cordis.patch.yml",
     "package.json"
   ],
@@ -24,20 +22,16 @@
     }
   },
   "dependencies": {
+    "@deepseek-ai/dsh-evolution-policy": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
-    "@deepseek-ai/dsh-storage": "workspace:^",
-    "@deepseek-ai/dsh-storage-json": "workspace:^",
-    "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-json": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
     "@deepseek-ai/dsh-memory-files": "workspace:^",
-    "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
-    "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-policy": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-threat": "workspace:^",
     "@deepseek-ai/dsh-evolution-review": "workspace:^",
@@ -46,7 +40,6 @@
     "@deepseek-ai/dsh-evolution-activity": "workspace:^",
     "@deepseek-ai/dsh-evolution-feedback": "workspace:^",
     "@deepseek-ai/dsh-evolution-learning-graph": "workspace:^",
-    "@deepseek-ai/dsh-evolution-replay": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
+    "@deepseek-ai/dsh-evolution-replay": "workspace:^"
   }
 }

@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 const patch = loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))) as any[]
 const standalone = loadOverlayPatches('test', fileURLToPath(new URL('../cordis.yml', import.meta.url))) as any[]
+const hostPatch = loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-host/cordis.patch.yml', import.meta.url))) as any[]
+const agentRows = loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url))) as any[]
 
 describe('evolution-preset composition boundary', () => {
   it('uses the loader patch vocabulary for bundle patches', () => {
@@ -34,5 +36,14 @@ describe('evolution-preset composition boundary', () => {
   it('keeps the storage-domain row dormant when the host has no storage-domain facility', () => {
     const domain = patch[0]!.insert.find((row: any) => row.id === 'evolution-state-domain')
     expect(domain?.disabled).toBeDefined()
+  })
+
+  it('stays synchronized with the host and agent layer split', () => {
+    const hostIds = new Set((hostPatch[0]!.insert as any[]).map((row: any) => row.id))
+    const agentIds = new Set(agentRows
+      .filter((row: any) => ['@deepseek-ai/dsh-tool-memory', '@deepseek-ai/dsh-tool-skill-manage', '@deepseek-ai/dsh-evolution-skill-catalog'].includes(row.name))
+      .map((row: any) => row.id))
+    const presetIds = new Set((patch[0]!.insert as any[]).map((row: any) => row.id))
+    for (const id of [...hostIds, ...agentIds]) expect(presetIds.has(id)).toBe(true)
   })
 })

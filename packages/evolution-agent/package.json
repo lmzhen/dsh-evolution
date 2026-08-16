@@ -1,0 +1,25 @@
+{
+  "name": "@deepseek-ai/dsh-evolution-agent-preset",
+  "description": "Agent preset exposing memory and skill evolution tools to a session",
+  "version": "0.1.0-rc.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmzhen/dsh-evolution.git",
+    "directory": "packages/evolution/evolution-agent"
+  },
+  "type": "module",
+  "files": [
+    "agent.cordis.yml",
+    "preset.yml",
+    "package.json"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/dsh-tool-memory": "workspace:^",
+    "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
+  }
+}

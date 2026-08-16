@@ -48,7 +48,9 @@ packages/
 ├── evolution-curator/                           # lifecycle + LLM advisory + reports + min-idle
 ├── evolution-commands/ + evolution-learning-graph/
 ├── evolution-activity/ + evolution-feedback/ + evolution-replay/
-├── evolution-preset/                            # cordis.yml + patch composition
+├── evolution-host/                              # host-plane infrastructure bundle
+├── evolution-agent/                             # Evolution agent preset (standard + tools)
+├── evolution-preset/                            # one-click compatibility bundle
 └── dsh-evolution/                               # compatibility facade + shared modules
 ```
 

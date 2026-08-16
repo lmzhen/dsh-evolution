@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Phase 1 layered installation
+
+- Added `@deepseek-ai/dsh-evolution-host`: host-plane infrastructure bundle with registries, providers, policy, approval, review, curator, and observability — no model-facing tools.
+- Added `@deepseek-ai/dsh-evolution-agent-preset`: standard agent preset plus `memory`, `skill_manage`, and the native skill-catalog bridge.
+- Kept `@deepseek-ai/dsh-evolution-preset` as the one-click compatibility bundle, with composition tests asserting the three layers stay synchronized.
+
 ## Unreleased — Anchored Standard compatibility
 
 - Review subagent `toolFilter` now defaults to `skill`, `skill_search`, and

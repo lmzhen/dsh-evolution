@@ -24,12 +24,29 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | `/evolution pending|approve|reject|curator run|curator report|restore` |
-| `evolution-preset` | Recommended composition (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
+| `evolution-host` | Host-plane infrastructure bundle (no model tools) |
+| `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
+| `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 
 ## Composition
 
-Use the preset overlay on a standard DSH host. The host already owns the
-storage/approval/session stack; the preset only adds evolution providers.
+### Layered install (recommended)
+
+Install the host bundle into the profile:
+
+```yaml
+- id: dsh-evolution-host
+  name: '@deepseek-ai/dsh-evolution-host'
+```
+
+Then select the `Evolution` agent preset for sessions that should expose the
+`memory` / `skill_manage` tools. Sessions on other presets keep the shared
+automation (review, curator, approval, observability) without model-facing
+evolution tools.
+
+### One-click compatibility install
+
+Use the legacy preset overlay on a standard DSH host:
 
 ```yaml
 - id: dsh-evolution
