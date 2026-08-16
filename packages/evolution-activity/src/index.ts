@@ -19,7 +19,7 @@ export interface EvolutionActivityProjection {
   items: EvolutionActivityItem[]
 }
 
-interface State {
+export interface State {
   items: EvolutionActivityItem[]
 }
 

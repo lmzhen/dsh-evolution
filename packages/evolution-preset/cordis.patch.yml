@@ -1,7 +1,25 @@
-# Recommended native dsh-evolution composition.
-# The legacy facade disables its built-in tools; native seam packages own them.
+# Recommended native dsh-evolution composition (patch form).
+#
+# Same ordering guarantees as cordis.yml: IO seam first, storage-domain KV as
+# the primary evolution-state provider, then memory/skills, write-admission,
+# and the review/curator/observability layer. The legacy facade is not mounted.
 - id: evolution-policy
   name: '@deepseek-ai/dsh-evolution-policy'
+- id: evolution-io
+  name: '@deepseek-ai/dsh-evolution-io'
+- id: evolution-io-node
+  name: '@deepseek-ai/dsh-evolution-io-node'
+# NOTE: the storage stack (`storage`, `storage-json`, `storage-domain`) is
+# HOST-plane in DSH, exactly like session persistence and the native approval
+# stack. A preset must not own it. `evolution-state-domain` below joins the
+# host's storage-domain facility when present; `evolution-state-json` remains
+# the portable fallback and audit provider.
+- id: evolution-state-storage
+  name: '@deepseek-ai/dsh-evolution-state-storage'
+- id: evolution-state-domain
+  name: '@deepseek-ai/dsh-evolution-state-domain'
+- id: evolution-state-json
+  name: '@deepseek-ai/dsh-evolution-state-json'
 - id: evolution-state
   name: '@deepseek-ai/dsh-evolution-state'
 - id: memory
@@ -21,19 +39,17 @@
     stageForeground: true
 - id: evolution-threat
   name: '@deepseek-ai/dsh-evolution-threat'
-- id: evolution-activity
-  name: '@deepseek-ai/dsh-evolution-activity'
-- id: evolution-feedback
-  name: '@deepseek-ai/dsh-evolution-feedback'
 - id: evolution-review
   name: '@deepseek-ai/dsh-evolution-review'
 - id: evolution-curator
   name: '@deepseek-ai/dsh-evolution-curator'
 - id: evolution-commands
   name: '@deepseek-ai/dsh-evolution-commands'
-- id: dsh-evolution
-  name: '@deepseek-ai/dsh-evolution'
-  config:
-    memoryEnabled: false
-    skillManageEnabled: false
-    reviewEnabled: true
+- id: evolution-activity
+  name: '@deepseek-ai/dsh-evolution-activity'
+- id: evolution-feedback
+  name: '@deepseek-ai/dsh-evolution-feedback'
+- id: evolution-learning-graph
+  name: '@deepseek-ai/dsh-evolution-learning-graph'
+- id: evolution-replay
+  name: '@deepseek-ai/dsh-evolution-replay'

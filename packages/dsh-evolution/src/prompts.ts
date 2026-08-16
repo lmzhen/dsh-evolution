@@ -1,7 +1,16 @@
 /**
- * Review prompts adapted from Hermes Agent `agent/background_review.py`.
- * Tool names are the DSH-native names: `memory` and `skill_manage`.
+ * Review and curation prompts adapted from Hermes Agent
+ * `agent/background_review.py`, `agent/curator.py`, and
+ * `agent/learn_prompt.py`, with tool names translated to the DSH-native
+ * catalog (`memory`, `skill_manage`, `skill`, `bash`, `str_replace_editor`).
+ *
+ * Every prompt is pinned in a versioned bundle. Review workers verify the
+ * bundle digest before spending a model call, so a partially-patched
+ * deployment fails closed instead of silently running a truncated prompt.
  */
+import { createHash } from 'node:crypto'
+
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@1'
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -73,3 +82,62 @@ export function reviewPrompt(kind: 'memory' | 'skill' | 'combined'): string {
   if (kind === 'skill') return SKILL_REVIEW_PROMPT
   return COMBINED_REVIEW_PROMPT
 }
+
+export interface PromptBundle {
+  id: string
+  version: number
+  prompts: Readonly<Record<string, string>>
+  sha256: string
+}
+
+function sha256(text: string): string {
+  return createHash('sha256').update(text).digest('hex')
+}
+
+function createPromptBundle(prompts: Record<string, string>): PromptBundle {
+  const canonical = JSON.stringify({ id: PROMPT_BUNDLE_ID, version: 1, prompts: Object.fromEntries(Object.entries(prompts).sort()) })
+  return Object.freeze({ id: PROMPT_BUNDLE_ID, version: 1, prompts: Object.freeze({ ...prompts }), sha256: sha256(canonical) })
+}
+
+export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
+  memory: MEMORY_REVIEW_PROMPT,
+  skill: SKILL_REVIEW_PROMPT,
+  combined: COMBINED_REVIEW_PROMPT,
+  curator: CURATOR_PROMPT,
+})
+
+export function verifyPromptBundle(bundle: PromptBundle = PROMPT_BUNDLE): boolean {
+  const canonical = JSON.stringify({ id: bundle.id, version: bundle.version, prompts: Object.fromEntries(Object.entries(bundle.prompts).sort()) })
+  return bundle.sha256 === sha256(canonical)
+}
+
+export const DSH_AUTHORING_STANDARDS = `Follow the Hermes skill-authoring standards, translated to DSH tools.
+
+Frontmatter:
+- name: lowercase-hyphenated, <=64 chars, no spaces.
+- description: ONE sentence, <=60 characters, ends with a period. State the capability, not the implementation. No marketing words. Do NOT repeat the skill name. Count the characters before saving.
+- version: 0.1.0
+- author: always the literal value "Hermes". NEVER fill it from the environment, git config, or any identity you can probe.
+- platforms: declare [macos], [linux], and/or [windows] only when the skill is genuinely OS-bound; omit for portable skills.
+- metadata.hermes.tags: a few Capitalized, Relevant, Tags.
+
+Body section order (omit only when empty):
+1. "# <Human Title>" then a 2-3 sentence intro: what it does, what it does NOT do, key dependency stance.
+2. "## When to Use" — concrete trigger phrases.
+3. "## Prerequisites" — exact env vars, install steps, credentials.
+4. "## How to Run" — canonical invocation framed through DSH tools.
+5. "## Quick Reference" — flat command/endpoint list.
+6. "## Procedure" — numbered steps with copy-paste-exact commands.
+7. "## Pitfalls" — known limits and rate limits.
+8. "## Verification" — one check proving the skill worked.
+
+DSH-tool framing:
+- Reference DSH tools by name in backticks: \`bash\`, \`str_replace_editor\`, \`write\`, \`skill\`, \`skill_manage\`, \`memory\`.
+- Do not name wrapped shell utilities when a DSH tool already covers them.
+- Larger scripts belong under \`scripts/\` (written with \`skill_manage write_file\`) and are referenced from SKILL.md by relative path.
+
+Quality bar:
+- Prefer verbatim flags, paths, and APIs from the source. Never invent them.
+- Keep it tight: ~100 lines simple, ~200 complex.
+- No router/index/hub skills that only point at other skills.
+- References go in \`references/\`, templates in \`templates/\`.`

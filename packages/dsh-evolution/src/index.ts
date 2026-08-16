@@ -13,8 +13,6 @@
  * @module @deepseek-ai/dsh-evolution
  */
 
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -23,10 +21,10 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { MemoryStore, type MemoryOperation } from './memory-store.ts'
-import { scanMemoryThreats } from './threats.ts'
 import { JsonState } from './state-store.ts'
 import type {} from './events.ts'
 import { SkillLibrary, skillsRoot } from './skill-store.ts'
+import type { EvolutionIoLike } from './io.ts'
 import { bumpPatch, bumpUse, bumpView, loadUsage, markAgentCreated, saveUsage } from './usage.ts'
 import { computeLifecycleTransitions } from './curator.ts'
 import { reviewPrompt } from './prompts.ts'
@@ -144,13 +142,26 @@ function isStructuredPlan(value: unknown): value is StructuredPlan {
 
 export function apply(ctx: Context, rawConfig: Config): void {
   const config = rawConfig as Required<Config>
+  const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+  const evolutionIo = ioRegistry ? {
+    readText: (path: string) => ioRegistry.provider().readText(path),
+    writeText: (path: string, content: string) => ioRegistry.provider().writeText(path, content),
+    remove: (path: string) => ioRegistry.provider().remove(path),
+    list: (path: string) => ioRegistry.provider().list(path),
+    exists: (path: string) => ioRegistry.provider().exists(path),
+    rename: (path: string, destination: string) => ioRegistry.provider().rename(path, destination),
+    copy: (path: string, destination: string) => ioRegistry.provider().copy(path, destination),
+  } : undefined
   const memory = new MemoryStore({
     memoryCharLimit: config.memoryCharLimit,
     userCharLimit: config.userCharLimit,
     addDatePrefix: config.memoryAddDatePrefix,
+    ...evolutionIo ? { io: evolutionIo } : {},
   })
-  const skills = new SkillLibrary(config.skillsRootOverride ?? skillsRoot())
-  let memoryContextText = loadMemoryContextSync()
+  const skills = evolutionIo
+    ? new SkillLibrary(config.skillsRootOverride ?? skillsRoot(), evolutionIo)
+    : new SkillLibrary(config.skillsRootOverride ?? skillsRoot())
+  let memoryContextText = ''
 
   // Phase 1: monotonic control-plane guard. Policy is plugin config/state,
   // never model-writable data. The guard runs before every tool body and is
@@ -162,26 +173,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
     ctx.tools.guard(exec => policy.guardReason(exec.name, exec.arguments))
   }
 
-  /** File-backed memory preview for the DSH runtime-context projection. */
-  function loadMemoryContextSync(): string {
-    try {
-      const root = memory.root
-      const memoryText = readFileSync(join(root, 'MEMORY.md'), 'utf8')
-      const userText = readFileSync(join(root, 'USER.md'), 'utf8')
-      const blocks: string[] = []
-      for (const [label, text] of [['Memory', memoryText], ['User Profile', userText]] as const) {
-        const entries = text.split('\n§\n').map(e => e.trim()).filter(Boolean).filter(e => !scanMemoryThreats(e))
-        if (entries.length > 0) blocks.push(`## ${label} (${entries.length} entries)\n${entries.join('\n§\n')}`)
-      }
-      return blocks.join('\n\n')
-    } catch {
-      return ''
-    }
-  }
-
   async function refreshMemoryContext(): Promise<void> {
     memoryContextText = await memory.renderContext()
   }
+
+  void refreshMemoryContext()
 
   // ── Prompt layers: static guidance is cache-stable; memory is an
   //    append-only runtime-context snapshot that only changes on write.
@@ -362,7 +358,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       },
       isConcurrencySafe: () => false,
       async execute(args, exec) {
-        const origin = (exec.agent?.session.header.delegationDepth ?? 0) > 0 ? 'background_review' : 'foreground'
+        const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
         return gateSkill(args, origin)
       },
     }))
@@ -385,7 +381,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
 
   async function executeSkillCore(args: SkillToolArgs, origin: 'foreground' | 'background_review'): Promise<{ ok: boolean; message: string; skills: Array<{ name: string; description: string }>; path?: string; pending_id?: string }> {
-    const usage = await loadUsage(skills.root)
+    const usage = await loadUsage(skills.root, evolutionIo)
     const action = args.action ?? ''
     if (action === 'list') {
       const summaries = await skills.list()
@@ -411,7 +407,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
           record.archived_at = new Date().toISOString()
         }
       }
-      await saveUsage(skills.root, usage)
+      await saveUsage(skills.root, usage, evolutionIo)
     }
     return { ok: result.ok, message: result.message, ...result.path ? { path: result.path } : {}, skills: [] }
   }
@@ -432,14 +428,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (result.isError) return
     const skillName = extractSkillName(exec)
     if (!skillName) return
-    const usage = await loadUsage(skills.root)
+    const usage = await loadUsage(skills.root, evolutionIo)
     if (exec.name === 'skill') {
       bumpView(usage, skillName)
       bumpUse(usage, skillName)
     } else if (exec.name === 'skill_manage') {
       bumpPatch(usage, skillName)
     }
-    await saveUsage(skills.root, usage)
+    await saveUsage(skills.root, usage, evolutionIo)
 
   }
   // ── Review cadence state, keyed by live session ─────────────
@@ -459,7 +455,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
   async function onTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
     if (!config.reviewEnabled) return
     // A review/curator child must never schedule its own recursive review.
-    if (session.header.origin === 'subagent' || (session.header.delegationDepth ?? 0) > 0) return
+    if (session.header.origin === 'subagent') return
     const agent = ctx.agents.get(session.id)
     const fromSeq = turnStarts.get(session.id) ?? Math.max(0, session.seq - 1)
     turnStarts.delete(session.id)
@@ -598,7 +594,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
   if (curatorTimer.unref) curatorTimer.unref()
 
   async function runCuratorOnce(): Promise<void> {
-    const usage = await loadUsage(skills.root)
+    const usage = await loadUsage(skills.root, evolutionIo)
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: config.curatorStaleAfterDays,
       archiveAfterDays: config.curatorArchiveAfterDays,
@@ -611,7 +607,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         if (record) record.state = 'active'
       }
     }
-    await saveUsage(skills.root, usage)
+    await saveUsage(skills.root, usage, evolutionIo)
     curatorState.update(state => {
       state.lastRunAt = Date.now()
       state.runCount += 1

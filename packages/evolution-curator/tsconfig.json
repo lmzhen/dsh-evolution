@@ -22,6 +22,9 @@
     },
     {
       "path": "../evolution-state"
+    },
+    {
+      "path": "../evolution-io"
     }
   ]
 }

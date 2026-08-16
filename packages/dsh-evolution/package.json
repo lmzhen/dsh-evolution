@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lmzhen/dsh-evolution.git",
-    "directory": "packages/dsh-evolution"
+    "directory": "packages/evolution/dsh-evolution"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -41,10 +41,12 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-evolution-io": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-evolution-io": "workspace:^"
   }
 }

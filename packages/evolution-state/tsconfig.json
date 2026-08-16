@@ -18,7 +18,19 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../storage/storage-domain"
+      "path": "../evolution-state-storage"
+    },
+    {
+      "path": "../evolution-state-domain"
+    },
+    {
+      "path": "../evolution-io"
+    },
+    {
+      "path": "../evolution-io-node"
+    },
+    {
+      "path": "../evolution-state-json"
     }
   ]
 }

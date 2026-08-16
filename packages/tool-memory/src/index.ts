@@ -12,6 +12,28 @@ import type {} from '@deepseek-ai/dsh-memory'
 export const name = 'tool-memory'
 export const inject = ['tools', 'systemPrompt', 'memory']
 
+interface ApprovalLike {
+  request(input: { kind: 'memory'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  registerRunner(kind: 'memory', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
+}
+
+type MemoryAction = 'add' | 'replace' | 'remove'
+
+interface MemoryOperationLike {
+  action: MemoryAction
+  facts?: string | undefined
+  content?: string | undefined
+  old_text?: string | undefined
+}
+
+interface MemoryWriteArgs {
+  target: 'memory' | 'user'
+  action?: MemoryAction | undefined
+  facts?: string | undefined
+  old_text?: string | undefined
+  operations?: MemoryOperationLike[] | undefined
+}
+
 export interface Config {
   memoryEnabled?: boolean
 }
@@ -34,6 +56,20 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     order: 150,
     text: () => snapshotText,
   })
+
+  async function executeCore(normalized: MemoryWriteArgs): Promise<{ ok: boolean; message: string; entries: string[]; chars: number; limit: number; pending_id?: string }> {
+    const result = normalized.operations
+      ? await ctx.memory.applyBatch(normalized.target, normalized.operations)
+      : await ctx.memory.applyBatch(normalized.target, [{ action: normalized.action ?? 'add', facts: normalized.facts, old_text: normalized.old_text }])
+    if (result.ok) snapshotText = await ctx.memory.renderContext()
+    return {
+      ok: result.ok,
+      message: result.message,
+      entries: result.entries.map(entry => entry.slice(0, 200)),
+      chars: result.chars,
+      limit: result.limit,
+    }
+  }
 
   ctx.tools.register(defineTool({
     name: 'memory',
@@ -70,24 +106,37 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
           entries: { type: 'array', required: true, items: { type: 'string' } },
           chars: { type: 'integer', required: true },
           limit: { type: 'integer', required: true },
+          pending_id: { type: 'string' },
         },
       },
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
     },
     isConcurrencySafe: () => false,
-    async execute(args) {
+    async execute(args, exec: { agent?: { session: { header: { origin?: string } } } }) {
       const target = args.target === 'user' ? 'user' : 'memory'
-      const result = Array.isArray(args.operations)
-        ? await ctx.memory.applyBatch(target, args.operations)
-        : await ctx.memory.applyBatch(target, [{ action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }])
-      if (result.ok) snapshotText = await ctx.memory.renderContext()
-      return {
-        ok: result.ok,
-        message: result.message,
-        entries: result.entries.map(entry => entry.slice(0, 200)),
-        chars: result.chars,
-        limit: result.limit,
+      const normalized: MemoryWriteArgs = Array.isArray(args.operations)
+        ? { target, operations: args.operations as MemoryOperationLike[] }
+        : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
+      const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
+      const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+      if (approval) {
+        const decision = await approval.request({
+          kind: 'memory',
+          summary: `memory ${target} ${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
+          args: normalized,
+          origin,
+        })
+        if (decision.action === 'staged') {
+          return { ok: true, message: decision.message, entries: [], chars: 0, limit: 0, pending_id: decision.pendingId ?? '' }
+        }
       }
+      return await executeCore(normalized)
     },
   }))
+
+  ctx.inject(['evolutionApproval'], (approvalCtx) => {
+    const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
+    const dispose = approval.registerRunner('memory', args => executeCore(args as MemoryWriteArgs))
+    approvalCtx.effect(() => dispose, 'tool-memory.approval-runner')
+  })
 }

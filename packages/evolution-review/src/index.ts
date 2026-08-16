@@ -4,13 +4,14 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
 import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution/src/signals.ts'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { reviewPrompt } from '@deepseek-ai/dsh-evolution/src/prompts.ts'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution/src/prompts.ts'
 import type {} from '@deepseek-ai/dsh-evolution/src/events.ts'
 import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
 
@@ -44,9 +45,33 @@ interface MemoryLike {
   applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
 }
 
+interface ApprovalLike {
+  request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  run(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string }>
+}
+
+interface PolicyLike {
+  get(): {
+    reviewMemoryInterval: number
+    reviewSkillInterval: number
+    substantiveMinToolCalls: number
+    substantiveMinUserChars: number
+    substantiveMinAgentChars: number
+    reviewMode: 'subagent' | 'inject'
+    maxOpsPerPlan: number
+    protectedSkillNames: readonly string[]
+    memoryChars: number
+    skillContentChars: number
+  }
+}
+
 export function apply(ctx: Context, rawConfig: Config): void {
+  if (!verifyPromptBundle(PROMPT_BUNDLE)) {
+    throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
+  }
   const config = rawConfig as Required<Config>
   const turnStarts = new Map<SessionId, number>()
+  const policy = () => (ctx.get('evolutionPolicy') as PolicyLike | undefined)?.get()
 
   ctx.on('session/event', (session, event) => {
     if (event.type === 'turn/start') turnStarts.set(session.id, session.seq - 1)
@@ -56,7 +81,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
   async function onTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
     if (!config.reviewEnabled) return
-    if (session.header.origin === 'subagent' || (session.header.delegationDepth ?? 0) > 0) return
+    if (session.header.origin === 'subagent') return
     const agent = ctx.agents.get(session.id)
     if (!agent) return
     const signal = foldTurn(session, turnStarts.get(session.id) ?? Math.max(0, session.seq - 1))
@@ -66,12 +91,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
       saveReviewState(id: string, record: ReviewState): Promise<void>
     } | undefined
     const state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
+    const snapshot = policy()
     const kind = advanceReview(state, event.data.turn, signal, {
-      memoryInterval: config.memoryInterval,
-      skillInterval: config.skillInterval,
-      substantiveMinToolCalls: 3,
-      substantiveMinUserChars: 200,
-      substantiveMinAgentChars: 500,
+      memoryInterval: snapshot?.reviewMemoryInterval ?? config.memoryInterval,
+      skillInterval: snapshot?.reviewSkillInterval ?? config.skillInterval,
+      substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? 3,
+      substantiveMinUserChars: snapshot?.substantiveMinUserChars ?? 200,
+      substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
     })
     await stateService?.saveReviewState(session.id, state)
     if (!kind) return
@@ -86,7 +112,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
 
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean> {
-    if (config.reviewMode === 'inject') return false
+    if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentLike | undefined
     if (!subagents) return false
     try {
@@ -118,19 +144,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const result = await run.result
       await run.dispose()
       if (!result.structured) return true
-      const policy = ctx.get('evolutionPolicy') as {
-        get(): { maxOpsPerPlan: number; protectedSkillNames: readonly string[]; memoryChars: number; skillContentChars: number }
-      } | undefined
+      const snapshot = policy()
       const validation = validateEvolutionPlan(result.structured as EvolutionPlan, {
         sessionSeq: session.seq - 1,
-        maxOpsPerPlan: policy?.get().maxOpsPerPlan ?? 32,
-        protectedSkillNames: new Set(policy?.get().protectedSkillNames ?? []),
-        maxMemoryChars: policy?.get().memoryChars ?? 2200,
-        maxSkillContentChars: policy?.get().skillContentChars ?? 100_000,
+        maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? 32,
+        protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
+        maxMemoryChars: snapshot?.memoryChars ?? 2200,
+        maxSkillContentChars: snapshot?.skillContentChars ?? 100_000,
       })
       const actions = await executePlan(validation.accepted, agent)
       session.append('evolution/plan-applied', {
-        planId: Math.random().toString(36).slice(2),
+        planId: randomUUID(),
         memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
         skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
         rejectedOps: validation.rejected.length,
@@ -149,24 +173,44 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
   async function executePlan(plan: EvolutionPlan, parent: import('@deepseek-ai/dsh-agent').Agent): Promise<string[]> {
     const memory = ctx.get('memory') as MemoryLike | undefined
+    const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     const actions: string[] = []
     for (const op of plan.memoryOps ?? []) {
-      if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !memory) continue
-      const result = await memory.applyBatch(op.target === 'user' ? 'user' : 'memory', [op])
-      if (result.ok) actions.push('Memory updated')
+      if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
+      const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
+      const normalized = { target, action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text }
+      const result = approval
+        ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized)
+        : await memory?.applyBatch(normalized.target, [normalized])
+      if (result?.ok) actions.push('Memory updated')
     }
     for (const op of plan.skillOps ?? []) {
       if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
-      const result = await ctx.tools.execute({
-        callId: CallId(`evolution-${Math.random().toString(36).slice(2)}`),
-        name: 'skill_manage',
-        arguments: op,
-        agent: parent,
-        signal: AbortSignal.timeout(30_000),
-      })
-      if (!result.isError) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
+      const args = { ...op, evidence: op.evidence }
+      const result = approval
+        ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, { operation: args, origin: 'background_review' }, args)
+        : await executeSkillTool(parent, args)
+      if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
     }
     return actions
+
+    async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {
+      if (!approval) return undefined
+      const decision = await approval.request({ kind, summary, args: stored, origin: 'background_review' })
+      if (decision.action === 'staged') return { ok: false, message: decision.message }
+      return await approval.run(kind, runnerArgs)
+    }
+
+    async function executeSkillTool(agent: import('@deepseek-ai/dsh-agent').Agent, args: unknown): Promise<{ ok: boolean; message: string }> {
+      const result = await ctx.tools.execute({
+        callId: CallId(`evolution-${randomUUID()}`),
+        name: 'skill_manage',
+        arguments: args,
+        agent,
+        signal: AbortSignal.timeout(30_000),
+      })
+      return result.isError ? { ok: false, message: 'skill_manage execution failed' } : { ok: true, message: 'skill_manage executed' }
+    }
   }
 
   ctx.effect(() => () => {

@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lmzhen/dsh-evolution.git",
-    "directory": "packages/evolution-learning-graph"
+    "directory": "packages/evolution/evolution-learning-graph"
   },
   "type": "module",
   "main": "lib/index.js",

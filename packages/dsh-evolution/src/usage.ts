@@ -3,9 +3,8 @@
  * Format-compatible with Hermes Agent / hermes-claw core fields.
  */
 
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { randomBytes } from 'node:crypto'
+import { join } from 'node:path'
+import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 
 export type SkillState = 'active' | 'stale' | 'archived'
 
@@ -47,31 +46,30 @@ export function emptyRecord(): UsageRecord {
   }
 }
 
-export async function loadUsage(root: string): Promise<UsageMap> {
+export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<UsageMap> {
   const map: UsageMap = new Map()
-  try {
-    const raw = await readFile(usageFile(root), 'utf8')
-    const parsed = JSON.parse(raw) as Record<string, Partial<UsageRecord>>
-    for (const [name, record] of Object.entries(parsed)) {
-      const base = emptyRecord()
-      map.set(name, {
-        ...base,
-        ...record,
-        state: record.state === 'stale' || record.state === 'archived' ? record.state : 'active',
-      })
+  const raw = await io.readText(usageFile(root))
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, Partial<UsageRecord>>
+      for (const [name, record] of Object.entries(parsed)) {
+        const base = emptyRecord()
+        map.set(name, {
+          ...base,
+          ...record,
+          state: record.state === 'stale' || record.state === 'archived' ? record.state : 'active',
+        })
+      }
+    } catch {
+      // Malformed sidecar is treated as empty. Telemetry is best-effort.
     }
-  } catch {
-    // Missing or malformed sidecar is treated as empty. Telemetry is best-effort.
   }
   return map
 }
 
-export async function saveUsage(root: string, map: UsageMap): Promise<void> {
-  await mkdir(dirname(usageFile(root)), { recursive: true })
+export async function saveUsage(root: string, map: UsageMap, io: EvolutionIoLike = nodeEvolutionIo()): Promise<void> {
   const obj = Object.fromEntries(map.entries())
-  const tmp = `${usageFile(root)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
-  await writeFile(tmp, JSON.stringify(obj, null, 2), 'utf8')
-  await rename(tmp, usageFile(root))
+  await io.writeText(usageFile(root), JSON.stringify(obj, null, 2))
 }
 
 export function getRecord(map: UsageMap, name: string): UsageRecord {

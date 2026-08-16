@@ -7,11 +7,10 @@
  * move to `.archive/` — never a hard delete.
  */
 
-import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { randomBytes } from 'node:crypto'
 import { scanContentThreats } from './threats.ts'
+import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 
 export const SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 export const MAX_SKILL_NAME_LENGTH = 64
@@ -45,30 +44,6 @@ function skillDir(root: string, name: string): string {
 
 function markerPath(dir: string, marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed' | 'hermes-exempt'): string {
   return join(dir, `.${marker}`)
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function atomicWrite(file: string, content: string): Promise<void> {
-  await mkdir(dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
-  await writeFile(tmp, content, 'utf8')
-  await rename(tmp, file)
-}
-
-async function readText(file: string): Promise<string | null> {
-  try {
-    return await readFile(file, 'utf8')
-  } catch {
-    return null
-  }
 }
 
 export interface Frontmatter {
@@ -106,13 +81,12 @@ export function validateFrontmatter(content: string, expectedName?: string): str
   return null
 }
 
-async function listNames(root: string): Promise<string[]> {
-  await mkdir(root, { recursive: true })
-  const entries = await readdir(root, { withFileTypes: true })
+async function listNames(root: string, io: EvolutionIoLike): Promise<string[]> {
+  const entries = await io.list(root)
   const names: string[] = []
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue
-    if (await exists(join(root, entry.name, 'SKILL.md'))) names.push(entry.name)
+    if (entry.startsWith('.')) continue
+    if (await io.exists(join(root, entry, 'SKILL.md'))) names.push(entry)
   }
   return names.sort()
 }
@@ -141,20 +115,22 @@ function fuzzyPatch(content: string, oldString: string, newString: string, repla
 
 export class SkillLibrary {
   readonly root: string
+  private readonly io: EvolutionIoLike
 
-  constructor(root = skillsRoot()) {
+  constructor(root = skillsRoot(), io: EvolutionIoLike = nodeEvolutionIo()) {
     this.root = root
+    this.io = io
   }
 
   async list(): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
-    for (const name of await listNames(this.root)) {
+    for (const name of await listNames(this.root, this.io)) {
       const dir = skillDir(this.root, name)
-      const md = await readText(join(dir, 'SKILL.md'))
+      const md = await this.io.readText(join(dir, 'SKILL.md'))
       if (!md) continue
       const parsed = parseFrontmatter(md)
       const protectedBy = await this.deleteProtection(name)
-      const managed = await exists(markerPath(dir, 'hermes-managed'))
+      const managed = await this.io.exists(markerPath(dir, 'hermes-managed'))
       summaries.push({
         name,
         description: parsed?.frontmatter.description ? String(parsed.frontmatter.description) : '',
@@ -168,13 +144,13 @@ export class SkillLibrary {
   }
 
   async read(name: string): Promise<string | null> {
-    return readText(join(skillDir(this.root, name), 'SKILL.md'))
+    return this.io.readText(join(skillDir(this.root, name), 'SKILL.md'))
   }
 
   async writeProtection(name: string): Promise<string | null> {
     const dir = skillDir(this.root, name)
     for (const marker of ['bundled', 'hub-installed'] as const) {
-      if (await exists(markerPath(dir, marker))) return marker
+      if (await this.io.exists(markerPath(dir, marker))) return marker
     }
     return null
   }
@@ -182,14 +158,14 @@ export class SkillLibrary {
   async deleteProtection(name: string): Promise<string | null> {
     const dir = skillDir(this.root, name)
     for (const marker of ['bundled', 'hub-installed', 'pinned'] as const) {
-      if (await exists(markerPath(dir, marker))) return marker
+      if (await this.io.exists(markerPath(dir, marker))) return marker
     }
     return null
   }
 
   async isManaged(name: string): Promise<boolean> {
     const dir = skillDir(this.root, name)
-    return await exists(markerPath(dir, 'hermes-managed'))
+    return await this.io.exists(markerPath(dir, 'hermes-managed'))
   }
 
   async create(name: string, content: string, origin: 'foreground' | 'background_review'): Promise<SkillActionResult> {
@@ -202,18 +178,17 @@ export class SkillLibrary {
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
     const dir = skillDir(this.root, normalized)
-    if (await exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
-    await mkdir(dir, { recursive: true })
-    await atomicWrite(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
+    if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
+        await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
     if (origin === 'background_review') {
-      await writeFile(markerPath(dir, 'hermes-managed'), '', 'utf8')
+      await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir }
   }
 
   async update(name: string, content: string): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
-    const md = await readText(join(dir, 'SKILL.md'))
+    const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
@@ -221,14 +196,14 @@ export class SkillLibrary {
     if (validation) return { ok: false, message: validation }
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
-    await atomicWrite(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
+    await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
     return { ok: true, message: `Skill "${name}" updated.`, path: dir }
   }
 
   async patch(name: string, oldString: string, newString: string, filePath = '', replaceAll = false): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     const skillMd = join(dir, 'SKILL.md')
-    if (!await exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
+    if (!await this.io.exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
 
@@ -240,7 +215,7 @@ export class SkillLibrary {
       target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
       patchLabel = filePath
     }
-    const md = await readText(target)
+    const md = await this.io.readText(target)
     if (!md) return { ok: false, message: `File not found: ${patchLabel}` }
 
     const patched = fuzzyPatch(md, oldString, newString, replaceAll)
@@ -257,42 +232,42 @@ export class SkillLibrary {
     }
     const threat = scanContentThreats(patched)
     if (threat) return { ok: false, message: threat }
-    await atomicWrite(target, patched.trimEnd() + '\n')
+    await this.io.writeText(target, patched.trimEnd() + '\n')
     return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir }
   }
 
   async archive(name: string, absorbedInto = ''): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
-    const md = await readText(join(dir, 'SKILL.md'))
+    const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.deleteProtection(name)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     if (absorbedInto) {
-      const target = await readText(join(skillDir(this.root, absorbedInto), 'SKILL.md'))
+      const target = await this.io.readText(join(skillDir(this.root, absorbedInto), 'SKILL.md'))
       if (!target) return { ok: false, message: `absorbed_into="${absorbedInto}" does not exist.` }
     }
     const archiveRoot = join(this.root, '.archive')
-    await mkdir(archiveRoot, { recursive: true })
-    let dest = join(archiveRoot, name)
-    if (await exists(dest)) {
+        let dest = join(archiveRoot, name)
+    if (await this.io.exists(dest)) {
       const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
       dest = join(archiveRoot, `${name}-${stamp}`)
     }
     try {
-      await rename(dir, dest)
+      await this.io.rename(dir, dest)
     } catch {
-      await mkdir(dest, { recursive: true })
-      await writeFile(join(dest, 'SKILL.md'), md, 'utf8')
-      await rm(dir, { recursive: true, force: true })
+      // Some IO providers cannot rename across media. Copy the whole tree
+      // first so support files are never lost during archival fallback.
+      await this.io.copy(dir, dest)
+      await this.io.remove(dir)
     }
     const reason = absorbedInto ? `Consolidated into ${absorbedInto}` : 'Archived by self-evolution curator'
-    await writeFile(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`, 'utf8')
+    await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
     return { ok: true, message: `Skill "${name}" archived to .archive.`, path: dest }
   }
 
   async writeSupportFile(name: string, filePath: string, content: string): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
-    if (!await exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
+    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateSupportPath(filePath)
@@ -301,47 +276,47 @@ export class SkillLibrary {
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
       const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
-    await atomicWrite(target, content)
+    await this.io.writeText(target, content)
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
 
   async removeSupportFile(name: string, filePath: string): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
-    if (!await exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
+    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
       const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
-    if (!await exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
-    await rm(target)
+    if (!await this.io.exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
+    await this.io.remove(target)
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
   }
 
 
   async snapshotAll(reason = 'pre-mutation'): Promise<string> {
     const backupRoot = join(this.root, '.backups')
-    await mkdir(backupRoot, { recursive: true })
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const dest = join(backupRoot, `skills-${stamp}`)
-    await mkdir(dest, { recursive: true })
-    const names = await listNames(this.root)
+        const names = await listNames(this.root, this.io)
     for (const name of names) {
-      await cp(skillDir(this.root, name), join(dest, name), { recursive: true })
+      await this.io.copy(skillDir(this.root, name), join(dest, name))
     }
-    await writeFile(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names }, null, 2), 'utf8')
+    await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names }, null, 2))
     return dest
   }
 
   async listSnapshots(): Promise<Array<{ path: string; createdAt: string; reason: string }>> {
     const backupRoot = join(this.root, '.backups')
     let entries: string[]
-    try { entries = await readdir(backupRoot) } catch { return [] }
+    try { entries = await this.io.list(backupRoot) } catch { return [] }
     const out: Array<{ path: string; createdAt: string; reason: string }> = []
     for (const name of entries.sort().reverse()) {
       if (!name.startsWith('skills-')) continue
       try {
-        const manifest = JSON.parse(await readFile(join(backupRoot, name, 'manifest.json'), 'utf8')) as { createdAt?: string; reason?: string }
+        const raw = await this.io.readText(join(backupRoot, name, 'manifest.json'))
+        if (raw === null) continue
+        const manifest = JSON.parse(raw) as { createdAt?: string; reason?: string }
         out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt ?? '', reason: manifest.reason ?? '' })
       } catch { /* skip */ }
     }
@@ -353,13 +328,13 @@ export class SkillLibrary {
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
     await this.snapshotAll('pre-rollback')
-    for (const name of await listNames(this.root)) {
-      await rm(skillDir(this.root, name), { recursive: true, force: true })
+    for (const name of await listNames(this.root, this.io)) {
+      await this.io.remove(skillDir(this.root, name))
     }
-    const entries = await readdir(latest.path)
+    const entries = await this.io.list(latest.path)
     for (const entry of entries) {
       if (entry === 'manifest.json') continue
-      await cp(join(latest.path, entry), join(this.root, entry), { recursive: true })
+      await this.io.copy(join(latest.path, entry), join(this.root, entry))
     }
     return { ok: true, message: `Restored skill tree from ${latest.path}`, path: latest.path }
   }

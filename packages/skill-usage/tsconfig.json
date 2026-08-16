@@ -19,6 +19,9 @@
     },
     {
       "path": "../dsh-evolution"
+    },
+    {
+      "path": "../evolution-io"
     }
   ]
 }

@@ -28,6 +28,9 @@
     },
     {
       "path": "../../test-support/agent-loop-testkit"
+    },
+    {
+      "path": "../evolution-io"
     }
   ]
 }

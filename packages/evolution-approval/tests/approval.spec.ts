@@ -3,37 +3,46 @@ import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
+import EvolutionState from '@deepseek-ai/dsh-evolution-state'
 import EvolutionApproval from '../src/index.ts'
 
-describe('EvolutionApproval service', () => {
-  it('stages background writes and replays them through a registered runner', async () => {
+describe('evolution-approval', () => {
+  it('stages background writes, keeps audit records and replays through a registered runner', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
     const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
 
-    let executed = false
-    ctx.evolutionApproval.registerRunner('memory', async () => {
-      executed = true
-      return { ok: true, message: 'memory applied' }
+    let applied = 0
+    ctx.evolutionApproval.registerRunner('memory', async args => {
+      applied += 1
+      return { ok: true, message: `memory ${JSON.stringify(args)}` }
     })
 
     const decision = await ctx.evolutionApproval.request({
       kind: 'memory',
-      summary: 'add memory',
-      args: { action: 'add', target: 'memory', facts: 'user prefers concise' },
+      summary: 'remember user name',
+      args: { action: 'add', facts: 'name: Ada' },
       origin: 'background_review',
     })
     expect(decision.action).toBe('staged')
-    expect(decision.pendingId).toBeDefined()
 
-    const approved = await ctx.evolutionApproval.approve(decision.pendingId!)
-    expect(approved.ok).toBe(true)
-    expect(executed).toBe(true)
+    const pending = await ctx.evolutionApproval.list('pending')
+    expect(pending).toHaveLength(1)
+    const approve = await ctx.evolutionApproval.approve(pending[0]!.id)
+    expect(approve.ok).toBe(true)
+    expect(applied).toBe(1)
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
+    expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
 
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
   })
 })

@@ -16,12 +16,12 @@ agent the ability to improve itself across sessions:
 
 | Capability | Hermes concept | DSH-native implementation |
 |---|---|---|
-| Durable memory | `MEMORY.md` / `USER.md` + `memory` tool | `ctx.memory` seam + `memory-files` provider + `tool-memory` |
-| Skill sedimentation | `skill_manage` | `ctx.skills` + `tool-skill-manage` + `skill-usage` |
+| Durable memory | `MEMORY.md` / `USER.md` + `memory` tool | `ctx.memory` seam + `ctx.evolutionIo` provider + `tool-memory` |
+| Skill sedimentation | `skill_manage` | `ctx.evolutionIo` skill library + `tool-skill-manage` + `skill-usage` |
 | Background review | post-turn forked review agent | `turn/end` signal gate + `ctx.subagents` one-shot review + deterministic plan validator |
 | Skill curator | active → stale → archived | `evolution-curator` service + persistent state |
 | Usage telemetry | `.usage.json` | `ctx.skillUsage` |
-| Write approval | stage / approve / reject | `ctx.evolutionApproval` + pending store |
+| Write approval | stage / approve / reject | `ctx.evolutionApproval` over pluggable `ctx.evolutionState` providers |
 | Threat scanning | prompt-injection / exfiltration guard | `tools/pre-execute` guard |
 | Learning graph | learned skills + memory nodes | pure graph builder over `ctx.skillUsage` / `ctx.memory` |
 
@@ -35,25 +35,21 @@ instead of daemon threads, subagents instead of forked AIAgent instances.
 
 ```text
 packages/
-├── memory/                  # ctx.memory service definition
-├── memory-files/            # local memory provider
-├── tool-memory/             # model-facing memory tool
-├── skill-usage/             # ctx.skillUsage telemetry
-├── tool-skill-manage/       # model-facing skill_manage tool
-├── evolution-policy/        # immutable control-plane policy
-├── evolution-state/          # storage-domain-backed durable state
-├── evolution-preset/         # recommended composition bundle
-├── evolution-replay/         # replay/A-B evaluation primitives
-├── evolution-activity/       # session projection for evolution activity
-├── evolution-feedback/       # feedback-to-quality scoring
-├── evolution-plan-validator/# deterministic plan validation
-├── evolution-review/        # review signal gate + subagent orchestration
-├── evolution-threat/        # tools/pre-execute threat guard
-├── evolution-curator/       # deterministic lifecycle + archive
-├── evolution-approval/      # staged write approval service
-├── evolution-commands/      # /evolution commands
-├── evolution-learning-graph/# learning graph builder
-└── dsh-evolution/           # compatibility facade + shared domain modules
+├── memory/ + memory-files/ + tool-memory/       # memory seam, provider, tool
+├── skill-usage/ + tool-skill-manage/            # telemetry + skill_manage
+├── evolution-io/ + evolution-io-node/           # file-tree IO seam + atomic node provider
+├── evolution-policy/                            # immutable control plane + tools.guard
+├── evolution-plan-validator/                    # deterministic plan validation
+├── evolution-state-storage/ + -domain/ + -json/ # pluggable durable state providers
+├── evolution-state/                             # state consumer
+├── evolution-approval/                          # staged write approval service
+├── evolution-threat/                            # tools/pre-execute threat guard
+├── evolution-review/                            # signal gate + subagent review
+├── evolution-curator/                           # 30/90-day lifecycle + LLM advisory pass
+├── evolution-commands/ + evolution-learning-graph/
+├── evolution-activity/ + evolution-feedback/ + evolution-replay/
+├── evolution-preset/                            # cordis.yml + patch composition
+└── dsh-evolution/                               # compatibility facade + shared modules
 ```
 
 ## Installation
@@ -70,32 +66,21 @@ or copy the packages into the monorepo. Then add the plugins to a DSH
 composition:
 
 ```yaml
-- id: memory
-  name: '@deepseek-ai/dsh-memory'
-- id: memory-files
-  name: '@deepseek-ai/dsh-memory-files'
-- id: tool-memory
-  name: '@deepseek-ai/dsh-tool-memory'
-- id: skill-usage
-  name: '@deepseek-ai/dsh-skill-usage'
-- id: tool-skill-manage
-  name: '@deepseek-ai/dsh-tool-skill-manage'
-- id: evolution-approval
-  name: '@deepseek-ai/dsh-evolution-approval'
-- id: evolution-threat
-  name: '@deepseek-ai/dsh-evolution-threat'
-- id: evolution-review
-  name: '@deepseek-ai/dsh-evolution-review'
-- id: evolution-curator
-  name: '@deepseek-ai/dsh-evolution-curator'
-- id: evolution-commands
-  name: '@deepseek-ai/dsh-evolution-commands'
+- id: dsh-evolution
+  name: '@deepseek-ai/dsh-evolution-preset'
 ```
+
+The standalone composition lives in
+`packages/evolution-preset/cordis.yml`; the host overlay (recommended on a
+standard DSH host, which already owns the storage/session/approval stack) is
+`packages/evolution-preset/cordis.patch.yml`.
 
 ## DSH-specific adaptations
 
-- **Seams over files**: memory/skill/telemetry/approval are independent plugins
-  connected through `ctx` services.
+- **Seams over files**: memory, skills, telemetry, and state are independent
+  plugins connected through `ctx` services (`ctx.memory`, `ctx.evolutionIo`,
+  `ctx.evolutionStateStorage`). Native packages perform no node:fs IO of their
+  own.
 - **Event sourcing**: review scheduling and plan application emit durable
   session events.
 - **Subagent review**: background review runs in an isolated one-shot
@@ -103,8 +88,9 @@ composition:
 - **Cache awareness**: memory is injected as a runtime-context snapshot;
   stable guidance lives in `systemPrompt.section`; review input uses the
   folded session surface. DeepSeek prefix-cache shape is preserved.
-- **Policy pipeline**: threat and approval policy sit in `tools/pre-execute`,
-  reusable by future evolution tools.
+- **Policy pipeline**: threat policy sits in `tools/pre-execute`; immutable
+  evolution policy is enforced by the monotonic `tools.guard`; approval is a
+  staged, replayable service over the state seam.
 
 ## Attribution
 

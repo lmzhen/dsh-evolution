@@ -7,12 +7,12 @@ describe('evolution-threat', () => {
   it('denies injection text through tools/pre-execute', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ctx.plugin(ThreatGuard, {})
+    await ctx.plugin(ThreatGuard)
     let denied: string | undefined
-    ctx.on('tools/pre-execute', (exec, next) => {
+    ctx.on('tools/pre-execute', async (exec, next) => {
       const hit = scanForTest(exec.name, exec.arguments)
       if (hit) { denied = hit; return { kind: 'deny', reason: hit } }
-      return next()
+      return await next()
     })
     // The production guard is installed before this listener; this test only
     // verifies the package exports a plugin shape and imports cleanly.

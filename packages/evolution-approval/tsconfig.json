@@ -16,6 +16,21 @@
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../evolution-state-storage"
+    },
+    {
+      "path": "../evolution-state"
+    },
+    {
+      "path": "../evolution-io"
+    },
+    {
+      "path": "../evolution-io-node"
+    },
+    {
+      "path": "../evolution-state-json"
     }
   ]
 }

@@ -92,6 +92,14 @@ export class EvolutionPolicy extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionPolicy')
+    // DSH-native monotonic guard: policy denials run after the extensible
+    // pre-execute waterfall and cannot be overridden by later listeners.
+    ctx.inject(['tools'], (toolCtx) => {
+      const tools = toolCtx.get('tools') as {
+        guard(guard: (exec: { name: string; arguments: unknown }) => string | undefined): () => void
+      }
+      toolCtx.effect(() => tools.guard(exec => this.guardReason(exec.name, exec.arguments)), 'evolution-policy.tools-guard')
+    })
     const homePolicyPath = resolve(join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'evolution', 'policy.json'))
     this.snapshot = Object.freeze({
       version: 1 as const,

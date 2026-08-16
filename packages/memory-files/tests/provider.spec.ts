@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import MemoryRegistry from '@deepseek-ai/dsh-memory'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as MemoryFiles from '../src/index.ts'
 
 describe('memory-files', () => {
   it('registers a provider on ctx.memory', async () => {
     const ctx = new Context()
     await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
     await ctx.plugin(MemoryFiles, { root: await makeTmp() })
     expect((await ctx.memory.read('memory')).length).toBeGreaterThanOrEqual(0)
     const result = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'user prefers terse' }])

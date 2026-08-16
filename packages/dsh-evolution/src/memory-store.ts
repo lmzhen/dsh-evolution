@@ -3,10 +3,9 @@
  * Stores are MEMORY.md and USER.md under $DSH_HOME/memories (~/.dsh/memories).
  */
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { randomBytes } from 'node:crypto'
+import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { scanMemoryThreats } from './threats.ts'
 
 export const ENTRY_DELIMITER = '\n§\n'
@@ -47,20 +46,16 @@ function stripDatePrefix(entry: string): string {
   return entry.replace(/^## \d{4}-\d{2}-\d{2}\n/, '')
 }
 
-async function atomicWrite(file: string, content: string): Promise<void> {
-  await mkdir(dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
-  await writeFile(tmp, content, 'utf8')
-  await rename(tmp, file)
-}
-
 export interface MemoryStoreOptions {
   memoryCharLimit?: number
   userCharLimit?: number
   addDatePrefix?: boolean
   root?: string
   maxConsolidationFailures?: number
+  io?: EvolutionIoLike
 }
+
+export type { EvolutionIoLike }
 
 export class MemoryStore {
   readonly memoryLimit: number
@@ -68,9 +63,11 @@ export class MemoryStore {
   readonly addDatePrefix: boolean
   readonly root: string
   private readonly maxFailures: number
+  private readonly io: EvolutionIoLike
   private failureCount = 0
 
   constructor(options: MemoryStoreOptions = {}) {
+    this.io = options.io ?? nodeEvolutionIo()
     this.memoryLimit = options.memoryCharLimit ?? 2200
     this.userLimit = options.userCharLimit ?? 1375
     this.addDatePrefix = options.addDatePrefix ?? false
@@ -83,17 +80,12 @@ export class MemoryStore {
   }
 
   async read(target: MemoryTarget): Promise<string[]> {
-    await mkdir(this.root, { recursive: true })
-    try {
-      const raw = await readFile(fileFor(this.root, target), 'utf8')
-      return [...new Set(normalizeEntries(raw))]
-    } catch {
-      return []
-    }
+    const raw = await this.io.readText(fileFor(this.root, target))
+    return raw === null ? [] : [...new Set(normalizeEntries(raw))]
   }
 
   async write(target: MemoryTarget, entries: string[]): Promise<void> {
-    await atomicWrite(fileFor(this.root, target), render(entries))
+    await this.io.writeText(fileFor(this.root, target), render(entries))
   }
 
   resetFailures(): void {
@@ -256,11 +248,8 @@ export class MemoryStore {
   }
 
   async detectDrift(target: MemoryTarget): Promise<boolean> {
-    try {
-      const raw = await readFile(fileFor(this.root, target), 'utf8')
-      return normalizeEntries(raw).join(ENTRY_DELIMITER) !== raw.trim()
-    } catch {
-      return false
-    }
+    const raw = await this.io.readText(fileFor(this.root, target))
+    if (raw === null) return false
+    return normalizeEntries(raw).join(ENTRY_DELIMITER) !== raw.trim()
   }
 }

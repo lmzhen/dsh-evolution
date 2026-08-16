@@ -18,7 +18,7 @@ export function apply(ctx: Context): void {
         const input = invocation.rawInput?.trim() ?? ''
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         if (input === 'pending') {
-          const pending = approval?.list('pending') ?? []
+          const pending = approval ? await approval.list('pending') : []
           return { text: pending.length === 0 ? 'No pending evolution writes.' : pending.map(p => `${p.id}  ${p.kind}  ${p.summary}`).join('\n') }
         }
         if (input.startsWith('approve ')) {
@@ -53,7 +53,7 @@ interface CommandRuntimeLike {
 }
 
 interface ApprovalLike {
-  list(status: 'pending' | 'approved' | 'rejected'): Array<{ id: string; kind: string; summary: string }>
+  list(status: 'pending' | 'approved' | 'rejected'): Promise<Array<{ id: string; kind: string; summary: string }>>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>
 }
