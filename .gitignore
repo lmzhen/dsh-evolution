@@ -2,3 +2,6 @@ node_modules/
 lib/
 *.tsbuildinfo
 .DS_Store
+src/**/*.js
+src/**/*.d.ts
+src/**/*.map
