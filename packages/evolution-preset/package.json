@@ -11,13 +11,15 @@
     "directory": "packages/evolution/evolution-preset"
   },
   "type": "module",
-  "main": "index.js",
+  "main": "lib/index.js",
   "files": [
     "cordis.yml",
     "cordis.patch.yml",
     "package.json",
     "lib/invariant.js",
-    "lib/types/invariant.d.ts"
+    "lib/types/invariant.d.ts",
+    "lib/index.js",
+    "lib/types/index.d.ts"
   ],
   "license": "MIT",
   "dsh": {
@@ -56,12 +58,21 @@
     "./invariant": {
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
-    }
+    },
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.yml": "./cordis.yml",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^"
-  }
+  },
+  "types": "lib/types/index.d.ts"
 }

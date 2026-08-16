@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — publish-shape alignment
+
+- Bundle/preset packages now carry the same runtime package shape as dsh-base: `src/index.ts`, root/invariant exports, main/types, and publish files.
+- Root README gained a contents table, quick start, install warning, and a Chinese translation.
+
 ## Unreleased — DSH package compliance
 
 - Every evolution package now owns `./invariant`, `src/invariant.ts`, tsconfig invariant reference, and `lib/invariant.js` publication entries.
