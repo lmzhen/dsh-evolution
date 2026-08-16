@@ -13,6 +13,8 @@ export const name = 'dsh-evolution-invariant'
 /** Service required before the companion can reserve package ownership. */
 export const inject = ['invariants']
 
+// No runtime invariant: this package owns no process-level invariant; its
+// contract is covered by unit, composition, and boundary tests.
 const install: InvariantInstaller = () => {}
 
 export const apply = (ctx: Context): Promise<() => void> =>

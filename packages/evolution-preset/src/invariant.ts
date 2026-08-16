@@ -1,13 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-memory'
+const PACKAGE_NAME = '@deepseek-ai/dsh-evolution-preset'
 
-export const name = 'memory-invariant'
+export const name = 'dsh-evolution-preset-invariant'
 export const inject = ['invariants']
 
-// No runtime invariant: this package owns no process-level invariant; its
-// contract is covered by unit, composition, and boundary tests.
+// No runtime invariant: this package is a composition/configuration package
+// whose contracts are enforced by its composition and installer tests.
 const install: InvariantInstaller = () => {}
 
 export const apply = (ctx: Context): Promise<() => void> =>

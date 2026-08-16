@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — DSH package compliance
+
+- Every evolution package now owns `./invariant`, `src/invariant.ts`, tsconfig invariant reference, and `lib/invariant.js` publication entries.
+- Every package README now carries the required Model Experience and Known Limitations sections; all DSH doc gates pass.
+
 ## Unreleased — Phase 5 and final hardening
 
 - Added `@deepseek-ai/dsh-evolution-capability`: validates Creator-mode capability packages and stages them through the existing approval audit without executing code.

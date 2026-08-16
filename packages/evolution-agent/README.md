@@ -1,6 +1,7 @@
-# @deepseek-ai/dsh-skill-usage
+# @deepseek-ai/dsh-evolution-agent-preset
 
-Skill usage telemetry service
+Agent preset exposing memory and skill evolution tools to a session
+
 
 ## Model Experience
 
@@ -8,7 +9,7 @@ Skill usage telemetry service
 
 #### What the model sees
 
-`@deepseek-ai/dsh-skill-usage` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
+`@deepseek-ai/dsh-evolution-agent-preset` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
 
 #### Token effect
 
@@ -22,3 +23,4 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+

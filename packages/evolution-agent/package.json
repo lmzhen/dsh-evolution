@@ -14,12 +14,26 @@
   "files": [
     "agent.cordis.yml",
     "preset.yml",
-    "package.json"
+    "package.json",
+    "lib/invariant.js",
+    "lib/types/invariant.d.ts"
   ],
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
+  },
+  "exports": {
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^"
   }
 }
