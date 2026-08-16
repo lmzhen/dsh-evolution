@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Phase 2 row and installation contracts
+
+- Added a shared `row-contract.ts` pinning host/agent/compat row ids and package names.
+- Added row-contract and dependency-contract suites for `evolution-host` and `evolution-agent`.
+- Added a runtime installation matrix: host-only services have no model tools; host+agent exposes them.
+- Compatibility preset test now verifies containment of every contracted layer row.
+
 ## Unreleased — Phase 1 layered installation
 
 - Added `@deepseek-ai/dsh-evolution-host`: host-plane infrastructure bundle with registries, providers, policy, approval, review, curator, and observability — no model-facing tools.

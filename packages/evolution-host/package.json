@@ -41,5 +41,12 @@
     "@deepseek-ai/dsh-evolution-feedback": "workspace:^",
     "@deepseek-ai/dsh-evolution-learning-graph": "workspace:^",
     "@deepseek-ai/dsh-evolution-replay": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
+    "@deepseek-ai/dsh-skill": "workspace:^",
+    "@deepseek-ai/dsh-tool-memory": "workspace:^",
+    "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
   }
 }
