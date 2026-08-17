@@ -88,8 +88,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: evolution-tarballs
-          path: upstream/packages/evolution/dist/*.tgz
+          name: evolution-dist
+          path: upstream/packages/evolution/dist
           retention-days: 14
 
   publish:
@@ -104,8 +104,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: evolution-tarballs
-          path: dist
+          name: evolution-dist
+          path: packages/evolution/dist
 
       - uses: actions/setup-node@v4
         with:
