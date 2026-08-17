@@ -46,6 +46,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p upstream/packages/evolution
+          cp tsconfig.base.json upstream/tsconfig.base.json
+          cp tsconfig.host.json upstream/tsconfig.host.json
           cp -r packages/. upstream/packages/evolution/
           rm -rf upstream/packages/evolution/node_modules \
                  upstream/packages/evolution/lib \
