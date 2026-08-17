@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
+import { insertedRows, rowIds } from '../../test-support/cordis-rows.ts'
 
 const run = promisify(execFile)
 const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
@@ -20,8 +21,8 @@ describe('layered installer', () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-'))
     const { stdout } = await runInstaller(home, 'layered')
     const profileDir = join(home, 'profiles', 'evo-test')
-    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-    expect(manifest.dsh.profile.bundles).toContain('@deepseek-ai/dsh-evolution-host')
+    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
+    expect(manifest.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-host')
 
     // Source installs without built lib/index.js must say so instead of
     // silently producing a profile that cannot boot; a built tree just boots.
@@ -39,8 +40,8 @@ describe('layered installer', () => {
     const presetDir = join(home, '.agent-presets', 'evolution')
     expect(await readFile(join(presetDir, 'agent.cordis.yml'), 'utf8')).toContain('tool-memory')
 
-    const patch = loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')) as any[]
-    expect((patch[0]!.insert as any[]).map((row: any) => row.id)).toContain('evolution-review')
+    const patchRows = insertedRows(loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')))
+    expect(rowIds(patchRows)).toContain('evolution-review')
 
     await rm(home, { recursive: true, force: true })
   }, 20_000)
@@ -48,8 +49,8 @@ describe('layered installer', () => {
   it('installs the compatibility one-click bundle', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-oneclick-'))
     await runInstaller(home, 'oneclick', 'web')
-    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8'))
-    expect(manifest.dsh.profile.bundles).toContain('@deepseek-ai/dsh-evolution-preset')
+    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
+    expect(manifest.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-preset')
     await rm(home, { recursive: true, force: true })
   })
 
@@ -57,8 +58,8 @@ describe('layered installer', () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-uninstall-'))
     await runInstaller(home, 'layered')
     await runInstaller(home, 'layered', 'evo-test', ['--uninstall'])
-    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'evo-test', 'package.json'), 'utf8'))
-    expect(manifest.dsh.profile.bundles).toEqual([])
+    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'evo-test', 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
+    expect(manifest.dsh?.profile?.bundles).toEqual([])
     const { readdir } = await import('node:fs/promises')
     expect(await readdir(join(home, 'profiles', 'evo-test', 'node_modules/@deepseek-ai'))).toHaveLength(0)
     await rm(home, { recursive: true, force: true })

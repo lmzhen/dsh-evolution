@@ -21,6 +21,8 @@ export interface EvolutionPlanAppliedEvent {
   memoryApplied: number
   skillApplied: number
   rejectedOps: number
+  evidenceQuotes?: number | undefined
+  estimatedInputChars?: number | undefined
 }
 
 export interface EvolutionSkillMutatedEvent {

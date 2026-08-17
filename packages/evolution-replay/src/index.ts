@@ -99,7 +99,15 @@ export class EvolutionReplayDriver {
 
   record(event: {
     type: string
-    data: { planId: string; policyFingerprint?: string | undefined; memoryApplied: number; skillApplied: number; rejectedOps: number }
+    data: {
+      planId: string
+      policyFingerprint?: string | undefined
+      memoryApplied: number
+      skillApplied: number
+      rejectedOps: number
+      evidenceQuotes?: number | undefined
+      estimatedInputChars?: number | undefined
+    }
   }): void {
     if (event.type !== 'evolution/plan-applied') return
     const data = event.data
@@ -109,8 +117,8 @@ export class EvolutionReplayDriver {
       rejectedOps: data.rejectedOps,
       memoryOps: data.memoryApplied,
       skillOps: data.skillApplied,
-      evidenceQuotes: data.memoryApplied + data.skillApplied,
-      estimatedInputChars: 0,
+      evidenceQuotes: typeof data.evidenceQuotes === 'number' ? data.evidenceQuotes : data.memoryApplied + data.skillApplied,
+      estimatedInputChars: typeof data.estimatedInputChars === 'number' ? data.estimatedInputChars : 0,
     })
     if (this.plans.length > this.maxPlans) this.plans.shift()
   }

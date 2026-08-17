@@ -2,24 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { cordisRows, rowId, rowName } from '../../test-support/cordis-rows.ts'
 
-const rows = loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))) as any[]
-const upstream = loadOverlayPatches('test', fileURLToPath(new URL('../../../../apps/cli/config/agent-presets/standard/agent.cordis.yml', import.meta.url))) as any[]
+const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))))
+const upstream = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../../../../apps/cli/config/agent-presets/standard/agent.cordis.yml', import.meta.url))))
 const preset = readFileSync(fileURLToPath(new URL('../preset.yml', import.meta.url)), 'utf8')
 
 describe('evolution-agent composition', () => {
   it('is an agent entry list, not a patch', () => {
     expect(Array.isArray(rows)).toBe(true)
-    expect(rows.some((row: any) => 'insert' in row)).toBe(false)
+    expect(rows.some(row => 'insert' in row)).toBe(false)
   })
 
   it('adds exactly the evolution model tools to the standard preset', () => {
-    const evolution = rows.filter((row: any) => [
+    const evolution = rows.filter(row => [
       '@deepseek-ai/dsh-tool-memory',
       '@deepseek-ai/dsh-tool-skill-manage',
       '@deepseek-ai/dsh-evolution-skill-catalog',
-    ].includes(row.name))
-    expect(evolution.map((row: any) => row.id)).toEqual([
+    ].includes(rowName(row)))
+    expect(evolution.map(rowId)).toEqual([
       'tool-memory',
       'tool-skill-manage',
       'evolution-skill-catalog',
@@ -27,7 +28,7 @@ describe('evolution-agent composition', () => {
   })
 
   it('does not publish host-plane services from the agent layer', () => {
-    const names = rows.map((row: any) => row.name)
+    const names = rows.map(rowName)
     expect(names).not.toContain('@deepseek-ai/dsh-memory')
     expect(names).not.toContain('@deepseek-ai/dsh-memory-files')
     expect(names).not.toContain('@deepseek-ai/dsh-skill-usage')
@@ -36,16 +37,16 @@ describe('evolution-agent composition', () => {
   })
 
   it('keeps every upstream standard row byte-for-byte', () => {
-    const upstreamById = new Map(upstream.map((row: any) => [row.id, JSON.stringify(row)]))
+    const upstreamById = new Map(upstream.map(row => [rowId(row), JSON.stringify(row)]))
     const evolutionNames = new Set([
       '@deepseek-ai/dsh-tool-memory',
       '@deepseek-ai/dsh-tool-skill-manage',
       '@deepseek-ai/dsh-evolution-skill-catalog',
     ])
-    const standardRows = rows.filter((row: any) => !evolutionNames.has(row.name))
+    const standardRows = rows.filter(row => !evolutionNames.has(rowName(row)))
     expect(standardRows).toHaveLength(upstream.length)
     for (const row of standardRows) {
-      expect(upstreamById.get(row.id)).toBe(JSON.stringify(row))
+      expect(upstreamById.get(rowId(row))).toBe(JSON.stringify(row))
     }
   })
 

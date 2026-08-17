@@ -22,7 +22,7 @@ describe('evolution-approval', () => {
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
 
     let applied = 0
-    ctx.evolutionApproval.registerRunner('memory', async args => {
+    ctx.evolutionApproval.registerRunner('memory', async (args) => {
       applied += 1
       return { ok: true, message: `memory ${JSON.stringify(args)}` }
     })

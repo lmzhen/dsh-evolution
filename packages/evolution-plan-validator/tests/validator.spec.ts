@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { MemoryOp } from '../src/index.ts'
 import { validateEvolutionPlan } from '../src/index.ts'
 
 describe('evolution-plan-validator', () => {
@@ -14,7 +15,7 @@ describe('evolution-plan-validator', () => {
 
   it('rejects forbidden policy fields and invalid evidence', () => {
     const result = validateEvolutionPlan({
-      memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 999 }] } as unknown as import('../src/index.ts').MemoryOp],
+      memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 999 }] } satisfies MemoryOp],
     }, { sessionSeq: 10 })
     expect(result.ok).toBe(false)
     expect(result.rejected[0]?.reason).toMatch(/forbidden|evidence/)

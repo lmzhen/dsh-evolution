@@ -3,9 +3,14 @@ import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { AGENT_EVOLUTION_ROW_NAMES } from '../../test-support/row-contract.ts'
+import { cordisRows, rowIds } from '../../test-support/cordis-rows.ts'
 
-const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
-const rows = loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))) as any[]
+const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as {
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  dsh?: { bundle?: { patch?: string } }
+}
+const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))))
 const declared = new Set([
   ...Object.keys(manifest.dependencies ?? {}),
   ...Object.keys(manifest.devDependencies ?? {}),
@@ -31,7 +36,7 @@ describe('evolution-agent dependency contract', () => {
   })
 
   it('keeps every row id unique in the full preset', () => {
-    const ids = rows.map((row: any) => row.id)
+    const ids = rowIds(rows)
     expect(new Set(ids).size).toBe(ids.length)
   })
 })

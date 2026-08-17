@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import MemoryRegistry from '@deepseek-ai/dsh-memory'
@@ -15,9 +16,9 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const anchorEntry = fileURLToPath(new URL('../../test-support/anchored-standard/tool-bootstrap.mjs', import.meta.url))
-const Anchored = await import(pathToFileURL(anchorEntry).href)
+const Anchored = await import(pathToFileURL(anchorEntry).href) as { apply(ctx: Context, config?: unknown): Promise<void> | void }
 
-function agent(events: any[] = []) {
+function agent(events: Array<Record<string, unknown>> = []) {
   return { session: { id: `session-${events.length}-${Math.random()}`, events } }
 }
 
@@ -56,7 +57,7 @@ describe('anchored-standard compatibility', () => {
   it('hides evolution tools during the bootstrap phase', async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-anchored-boot-'))
     const ctx = await mount(root)
-    const assembly = await ctx.systemPrompt.assemble({ agent: agent() } as any)
+    const assembly = await ctx.systemPrompt.assemble({ agent: agent() as unknown as Agent })
     const names = assembly.tools.map(tool => tool.name)
     expect(names).toContain('bash')
     expect(names).toContain('str_replace_editor')
@@ -69,8 +70,8 @@ describe('anchored-standard compatibility', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-anchored-promoted-'))
     const ctx = await mount(root)
     const assembly = await ctx.systemPrompt.assemble({
-      agent: agent([{ type: 'assistant/message', seq: 1, time: 1, data: {} }]),
-    } as any)
+      agent: agent([{ type: 'assistant/message', seq: 1, time: 1, data: {} }]) as unknown as Agent,
+    })
     const names = assembly.tools.map(tool => tool.name)
     expect(names).not.toContain('memory')
     expect(names).not.toContain('skill_manage')
@@ -86,8 +87,8 @@ describe('anchored-standard compatibility', () => {
         seq: 1,
         time: 1,
         data: { name: 'dev_tool_search', arguments: JSON.stringify({ toolNames: ['memory'] }) },
-      }]),
-    } as any)
+      }]) as unknown as Agent,
+    })
     const names = assembly.tools.map(tool => tool.name)
     expect(names).toContain('memory')
     expect(names).not.toContain('skill_manage')

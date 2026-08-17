@@ -6,7 +6,7 @@ describe('evolution-replay', () => {
     const driver = new EvolutionReplayDriver()
     driver.record({
       type: 'evolution/plan-applied',
-      data: { planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 },
+      data: { planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, evidenceQuotes: 2, estimatedInputChars: 1500 },
     })
     driver.record({
       type: 'evolution/plan-applied',
@@ -16,7 +16,9 @@ describe('evolution-replay', () => {
       type: 'evolution/plan-applied',
       data: { planId: 'run-3', memoryApplied: 0, skillApplied: 0, rejectedOps: 1 },
     })
-    expect(driver.plansSnapshot().map(plan => plan.policyId)).toEqual(['policy-a', 'policy-a', 'run-3'])
+    const plans = driver.plansSnapshot()
+    expect(plans.map(plan => plan.policyId)).toEqual(['policy-a', 'policy-a', 'run-3'])
+    expect(plans[0]).toMatchObject({ evidenceQuotes: 2, estimatedInputChars: 1500 })
   })
 
   it('selects the plan with better accepted/evidence and lower cost', () => {

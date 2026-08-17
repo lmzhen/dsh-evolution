@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Normalize manifests after copying the upstream packages/evolution tree into
- * this flat mirror:
- *   - repository URL points at this public repository
+ * the flat public mirror (D:/claw/dsh-evolution):
+ *   - repository URL points at the public mirror
  *   - repository.directory points at the flat package directory
  *   - package and root versions stay aligned at 0.1.0-rc.1
  */
@@ -17,8 +17,8 @@ const VERSION = '0.1.0-rc.1'
 for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue
   const manifestPath = join(packagesRoot, entry.name, 'package.json')
-  if (!readFileSync(manifestPath, 'utf8').trim()) continue
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  let manifest
+  try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch { continue }
   manifest.version = VERSION
   manifest.repository = {
     type: 'git',
@@ -28,7 +28,8 @@ for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
 }
 
-const rootManifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
+const rootManifestPath = join(repoRoot, 'package.json')
+const rootManifest = JSON.parse(readFileSync(rootManifestPath, 'utf8'))
 rootManifest.version = VERSION
-writeFileSync(join(repoRoot, 'package.json'), JSON.stringify(rootManifest, null, 2) + '\n')
+writeFileSync(rootManifestPath, JSON.stringify(rootManifest, null, 2) + '\n')
 console.log('normalized mirror manifests')

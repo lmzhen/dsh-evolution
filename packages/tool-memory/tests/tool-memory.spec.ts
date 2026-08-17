@@ -21,8 +21,8 @@ describe('tool-memory', () => {
 })
 
 async function makeTmp(): Promise<string> {
-  const { mkdtemp } = await import('node:fs/promises')
-  const { tmpdir } = await import('node:os')
-  const { join } = await import('node:path')
-  return mkdtemp(join(tmpdir(), 'dsh-tool-memory-'))
+  const fs = await import('node:fs/promises')
+  const os = await import('node:os')
+  const path = await import('node:path')
+  return fs.mkdtemp(path.join(os.tmpdir(), 'dsh-evolution-tmp-'))
 }

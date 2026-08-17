@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import * as Review from '../src/index.ts'
 
 const anchoredEntry = fileURLToPath(new URL('../../test-support/anchored-standard/tool-bootstrap.mjs', import.meta.url))
-const Anchored = await import(pathToFileURL(anchoredEntry).href)
+const Anchored = await import(pathToFileURL(anchoredEntry).href) as { apply(ctx: Context, config?: unknown): Promise<void> | void }
 
 describe('anchored-standard review smoke', () => {
   it('starts a review subagent with the anchored discovery tool set', async () => {
@@ -21,7 +21,7 @@ describe('anchored-standard review smoke', () => {
       suppressedContextSources: ['agent-instructions', 'skill-catalog'],
     })
 
-    let capturedRequest: any
+    let capturedRequest: unknown
     ctx.provide('subagents', {
       start: async (_name: string, request: unknown) => {
         capturedRequest = request
@@ -48,18 +48,19 @@ describe('anchored-standard review smoke', () => {
     } as unknown as Agent
     ctx.agents.register(agent)
 
-    ;(session as any).append('turn/start', { turn: 1 })
-    ;(session as any).append('user/message', createUserMessage({
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
       content: [{
         type: 'text',
         text: 'I prefer concise answers and want you to remember that preference. '.repeat(6),
       }],
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
-    ;(session as any).append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(capturedRequest).toBeDefined()
-    expect(capturedRequest.toolFilter).toEqual({ allow: ['skill', 'skill_search', 'skill_load'] })
+    const request = capturedRequest as Record<string, unknown> | undefined
+    expect(request?.toolFilter).toEqual({ allow: ['skill', 'skill_search', 'skill_load'] })
   })
 })

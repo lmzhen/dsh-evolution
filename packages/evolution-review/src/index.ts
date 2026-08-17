@@ -136,9 +136,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const model = kind === 'memory'
         ? routingPolicy?.get().memoryReviewModel ?? 'deepseek-v4-flash'
         : routingPolicy?.get().skillReviewModel ?? 'deepseek-v4-pro'
+      const reviewText = buildReviewRequest(
+        session,
+        kind,
+        signal as { toolCalls: number; userChars: number; assistantChars: number },
+        config.reviewContextMessages,
+        config.reviewMessageChars,
+      )
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
-        prompt: [{ type: 'text', text: buildReviewRequest(session, kind, signal as { toolCalls: number; userChars: number; assistantChars: number }, config.reviewContextMessages, config.reviewMessageChars) }],
+        prompt: [{ type: 'text', text: reviewText }],
         parent: agent,
         signal: AbortSignal.timeout(config.reviewTimeoutMs),
         maxDepth: config.reviewMaxDepth,
@@ -170,12 +177,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
         maxSkillContentChars: snapshot?.skillContentChars ?? 100_000,
       })
       const actions = await executePlan(validation.accepted, agent)
+      const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...validation.accepted.skillOps ?? []]
+        .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
       session.append('evolution/plan-applied', {
         planId: randomUUID(),
         policyFingerprint,
         memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
         skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
         rejectedOps: validation.rejected.length,
+        evidenceQuotes,
+        estimatedInputChars: reviewText.length,
       })
       if (actions.length > 0) {
         agent.inject(createUserMessage({

@@ -6,23 +6,25 @@ import {
   AGENT_EVOLUTION_ROW_NAMES,
   HOST_ROW_IDS,
 } from '../../test-support/row-contract.ts'
+import { cordisRows, rowId, rowIds, rowName } from '../../test-support/cordis-rows.ts'
 
-const rows = loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))) as any[]
+const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))))
 
 describe('evolution-agent row contract', () => {
   it('adds exactly the stable model-tool rows to the standard preset', () => {
-    const evolution = rows.filter((row: any) => Object.values(AGENT_EVOLUTION_ROW_NAMES).includes(row.name))
-    expect(evolution.map((row: any) => row.id)).toEqual([...AGENT_EVOLUTION_ROW_IDS])
+    const evolutionNames = new Set<string>(Object.values(AGENT_EVOLUTION_ROW_NAMES))
+    const evolution = rows.filter(row => evolutionNames.has(rowName(row)))
+    expect(evolution.map(rowId)).toEqual([...AGENT_EVOLUTION_ROW_IDS])
   })
 
   it('maps stable model-tool ids to their published names', () => {
     for (const id of AGENT_EVOLUTION_ROW_IDS) {
-      expect(rows.find((row: any) => row.id === id)?.name).toBe(AGENT_EVOLUTION_ROW_NAMES[id])
+      expect(rows.find(row => rowId(row) === id)?.name).toBe(AGENT_EVOLUTION_ROW_NAMES[id])
     }
   })
 
   it('owns no host service rows', () => {
-    const ids = new Set(rows.map((row: any) => row.id))
+    const ids = new Set(rowIds(rows))
     for (const id of HOST_ROW_IDS) expect(ids.has(id)).toBe(false)
   })
 })
