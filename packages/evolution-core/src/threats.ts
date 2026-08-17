@@ -71,7 +71,7 @@ const SCOPE_ORDER: Record<ThreatScope, number> = { all: 1, context: 2, strict: 3
 /**
  * Scan text at `scope`. Patterns are cumulative: `strict` includes all scopes.
  */
-export function scanThreats(text: string, scope: ThreatScope = 'strict'): ThreatFinding[] {
+export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536): ThreatFinding[] {
   const findings: ThreatFinding[] = []
   if (ZERO_WIDTH_CHARS.test(text)) {
     findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope })
@@ -79,7 +79,7 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict'): Threat
   if (BIDI_CHARS.test(text)) {
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope })
   }
-  const normalized = text.normalize('NFKC').slice(0, 65_536)
+  const normalized = text.normalize('NFKC').slice(0, maxScanChars)
   for (const pattern of PATTERNS) {
     if (SCOPE_ORDER[pattern.scope] > SCOPE_ORDER[scope]) continue
     if (pattern.regex.test(normalized)) findings.push({
@@ -92,14 +92,14 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict'): Threat
 }
 
 /** Blocking policy: any hit blocks. `severity` is deliberately not a gate. */
-export function evaluateThreat(text: string, scope: ThreatScope = 'strict'): { blocked: boolean; findings: ThreatFinding[] } {
-  const findings = scanThreats(text, scope)
+export function evaluateThreat(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536): { blocked: boolean; findings: ThreatFinding[] } {
+  const findings = scanThreats(text, scope, maxScanChars)
   return { blocked: findings.length > 0, findings }
 }
 
 /** User-facing block message for memory writes. */
-export function scanMemoryThreats(text: string): string | null {
-  const { blocked, findings } = evaluateThreat(text, 'strict')
+export function scanMemoryThreats(text: string, maxScanChars = 65_536): string | null {
+  const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars)
   if (!blocked) return null
   const pattern = findings.find(f => f.category !== 'unicode_obfuscation')
   if (pattern) return `Blocked by security scan (${pattern.label}). Rephrase without instruction-like language.`
@@ -107,8 +107,8 @@ export function scanMemoryThreats(text: string): string | null {
 }
 
 /** User-facing block message for skill content writes. */
-export function scanContentThreats(text: string): string | null {
-  const { blocked, findings } = evaluateThreat(text, 'strict')
+export function scanContentThreats(text: string, maxScanChars = 65_536): string | null {
+  const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars)
   if (!blocked) return null
   return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions.`
 }

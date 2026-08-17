@@ -50,7 +50,6 @@ export interface EvolutionStateStorage {
   saveCuratorState(record: CuratorStateRecord): Promise<void>
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
-  deletePending(id: string): Promise<void>
   /** Atomically transition a pending record exactly once. */
   tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>): Promise<PendingResolution>
   /** Atomically mark a pending record as claimed by one approver, or return null. */

@@ -36,10 +36,13 @@ interface MemoryWriteArgs {
 
 export interface Config {
   memoryEnabled?: boolean
+  /** Maximum characters of each memory entry echoed back in tool results. */
+  entryPreviewChars?: number
 }
 
 export const Config: z<Config> = z.object({
   memoryEnabled: z.boolean().default(true),
+  entryPreviewChars: z.number().default(200),
 })
 
 export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
@@ -72,7 +75,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     return {
       ok: result.ok,
       message: result.message,
-      entries: result.entries.map(entry => entry.slice(0, 200)),
+      entries: result.entries.map(entry => entry.slice(0, rawConfig.entryPreviewChars ?? 200)),
       chars: result.chars,
       limit: result.limit,
     }

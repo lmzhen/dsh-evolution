@@ -10,7 +10,6 @@ const provider = (name: string) => ({
   saveCuratorState: async () => {},
   listPending: async () => [],
   savePending: async () => {},
-  deletePending: async () => {},
   tryResolvePending: async () => ({ record: null, applied: false }),
   claimPending: async () => null,
   releasePendingClaim: async () => {},

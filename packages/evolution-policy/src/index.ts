@@ -36,8 +36,6 @@ export interface PolicySnapshot {
   archiveAfterDays: number
   protectedSkillNames: readonly string[]
   protectedPaths: readonly string[]
-  promptHashes: Readonly<Record<string, string>>
-  features: Readonly<Record<string, boolean>>
 }
 
 export interface Config {
@@ -59,8 +57,6 @@ export interface Config {
   archiveAfterDays?: number
   protectedSkillNames?: string[]
   protectedPaths?: string[]
-  promptHashes?: Record<string, string>
-  features?: Record<string, boolean>
 }
 
 export const Config: Schema<Config> = z.object({
@@ -82,8 +78,6 @@ export const Config: Schema<Config> = z.object({
   archiveAfterDays: z.number().default(90),
   protectedSkillNames: z.array(z.string()).default([]),
   protectedPaths: z.array(z.string()).default([]),
-  promptHashes: z.dict(z.string()).default({}),
-  features: z.dict(z.boolean()).default({}),
 })
 
 export class EvolutionPolicy extends Service {
@@ -121,8 +115,6 @@ export class EvolutionPolicy extends Service {
       archiveAfterDays: config.archiveAfterDays ?? 90,
       protectedSkillNames: Object.freeze([...new Set(['plan', ...(config.protectedSkillNames ?? [])])]),
       protectedPaths: Object.freeze([...(config.protectedPaths ?? []), homePolicyPath]),
-      promptHashes: Object.freeze({ ...config.promptHashes }),
-      features: Object.freeze({ ...config.features }),
     })
   }
 

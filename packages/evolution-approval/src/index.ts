@@ -37,7 +37,6 @@ export interface ApprovalDecision {
 interface EvolutionStateLike {
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
-  deletePending(id: string): Promise<void>
   tryResolvePending(id: string, status: 'approved' | 'rejected'): Promise<{ record: PendingRecord | null; applied: boolean }>
   claimPending(id: string, claimId: string): Promise<PendingRecord | null>
   releasePendingClaim(id: string, claimId: string): Promise<void>

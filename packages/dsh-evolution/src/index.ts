@@ -64,6 +64,8 @@ export interface Config {
   skillsRootOverride?: string
   /** Tools the one-shot review subagent may use (Anchored Standard defaults). */
   reviewToolAllow?: string[]
+  /** Maximum characters of each memory entry echoed back in tool results. */
+  entryPreviewChars?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -82,6 +84,7 @@ export const Config: z<Config> = z.object({
   curatorArchiveAfterDays: z.number().default(90),
   skillsRootOverride: z.string().default(''),
   reviewToolAllow: z.array(z.string()).default(['skill', 'skill_search', 'skill_load']),
+  entryPreviewChars: z.number().default(200),
 })
 
 const STATIC_GUIDANCE = `## Hermes Evolution
@@ -319,7 +322,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     return {
       ok: result.ok,
       message: result.message,
-      entries: result.entries.map(entry => entry.slice(0, 200)),
+      entries: result.entries.map(entry => entry.slice(0, config.entryPreviewChars)),
       chars: result.chars,
       limit: result.limit,
     }
@@ -645,7 +648,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: config.curatorStaleAfterDays,
       archiveAfterDays: config.curatorArchiveAfterDays,
-      pruneBuiltins: true,
     })
     for (const skillName of result.archive) {
       const archived = await skills.archive(skillName, 'Lifecycle: reached archive threshold')

@@ -40,6 +40,8 @@ export interface Config {
   excludeSkillNames?: string[]
   /** Include usage records whose created_by is not 'agent' in lifecycle decisions. */
   manageUnmanaged?: boolean
+  /** Max tokens for the optional LLM nomination pass. */
+  curatorReviewMaxTokens?: number
 }
 
 export class EvolutionCurator extends Service {
@@ -55,6 +57,7 @@ export class EvolutionCurator extends Service {
     minIdleHours: z.number().default(0),
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
+    curatorReviewMaxTokens: z.number().default(2048),
   })
 
   readonly skills: SkillLibrary
@@ -69,6 +72,7 @@ export class EvolutionCurator extends Service {
   private readonly minIdleHours: number
   private readonly excludeSkillNames: ReadonlySet<string>
   private readonly manageUnmanaged: boolean
+  private readonly curatorReviewMaxTokens: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
 
@@ -86,6 +90,7 @@ export class EvolutionCurator extends Service {
     this.minIdleHours = config.minIdleHours ?? 0
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
+    this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
@@ -153,7 +158,7 @@ export class EvolutionCurator extends Service {
         provider: this.curatorProvider,
         model,
         messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-evolution-curator', form: 'notice', summary: 'curator review' } })],
-        maxTokens: 2048,
+        maxTokens: this.curatorReviewMaxTokens,
         purpose: 'evolution-curator',
       })) assembler.push(chunk)
       const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
@@ -209,7 +214,6 @@ export class EvolutionCurator extends Service {
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: lifecycle.staleAfterDays,
       archiveAfterDays: lifecycle.archiveAfterDays,
-      pruneBuiltins: true,
       qualityWarnStaleAfterDays: this.qualityWarnStaleAfterDays,
       excludeSkillNames: this.excludeSkillNames,
       manageUnmanaged: this.manageUnmanaged,

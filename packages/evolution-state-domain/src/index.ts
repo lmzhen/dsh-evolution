@@ -97,10 +97,6 @@ export function apply(ctx: Context): void {
       await (await ensure()).table('pending').put(record.id, record)
     },
 
-    async deletePending(id) {
-      await (await ensure()).table('pending').delete(id)
-    },
-
     async claimPending(id, claimId) {
       const table = (await ensure()).table('pending')
       try {

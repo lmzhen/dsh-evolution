@@ -9,7 +9,6 @@ import { latestActivityAt } from './usage.ts'
 export interface CuratorConfig {
   staleAfterDays: number
   archiveAfterDays: number
-  pruneBuiltins: boolean
   /** Shorter stale threshold for quality-warned skills; archive threshold never changes. */
   qualityWarnStaleAfterDays?: number
   /** Explicit skill names never considered for lifecycle transitions. */

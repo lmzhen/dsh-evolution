@@ -84,10 +84,6 @@ export class EvolutionState extends Service {
     return this.storage().savePending(record)
   }
 
-  deletePending(id: string): Promise<void> {
-    return this.storage().deletePending(id)
-  }
-
   tryResolvePending(id: string, status: 'approved' | 'rejected') {
     return this.storage().tryResolvePending(id, status)
   }

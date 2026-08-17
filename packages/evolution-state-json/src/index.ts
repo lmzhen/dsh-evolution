@@ -115,14 +115,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
       })
     },
 
-    async deletePending(id) {
-      await mutate(async () => {
-        const map = await loadPendingMap()
-        Reflect.deleteProperty(map, id)
-        await writeJson('pending-state.json', map)
-      })
-    },
-
     async claimPending(id, claimId) {
       return await mutate(async () => {
         const map = await loadPendingMap()
