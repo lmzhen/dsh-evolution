@@ -31,9 +31,13 @@ const onlyNames = argv.includes('--only') ? argv[argv.indexOf('--only') + 1].spl
 
 function npm(args, options = {}) {
   if (process.platform === 'win32') {
-    return execFileSync('cmd.exe', ['/c', 'npm', ...args], { encoding: 'utf8', ...options })
+    return execFileSync('cmd.exe', ['/c', 'npm', ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...options,
+    })
   }
-  return execFileSync('npm', args, { encoding: 'utf8', ...options })
+  return execFileSync('npm', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options })
 }
 
 function integrityOf(tarball) {
@@ -52,7 +56,8 @@ function viewIntegrity(name, version) {
 function publish(tarball) {
   const args = ['publish', tarball, '--access', 'public', '--tag', tag]
   if (provenance) args.push('--provenance')
-  npm(args, { stdio: 'inherit' })
+  const output = npm(args)
+  console.log(output.trim())
 }
 
 function sleep(ms) {
