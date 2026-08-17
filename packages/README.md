@@ -4,6 +4,10 @@ Hermes-style self-evolution for DeepSeek Harness, implemented as composable
 Cordis plugins. The model may only propose and write **memory** and **skills**;
 policy, prompts, routing, state, and audit history are control-plane data.
 
+> Community-published packages under `@lmzhen` are maintained by the
+> dsh-evolution community and are not official DeepSeek releases.
+
+
 ## Package map
 
 | Package | Role |

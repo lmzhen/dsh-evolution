@@ -5,6 +5,11 @@
  * Changing one requires a deliberate contract update and a preset release,
  * never an incidental row rename.
  */
+function scoped(name: string): string {
+  const scope = process.env.EVOLUTION_SCOPE?.trim()
+  if (!scope) return name
+  return `${scope}/${name.slice('@deepseek-ai/'.length)}`
+}
 
 export const HOST_ROW_IDS = [
   'evolution-policy',
@@ -30,26 +35,26 @@ export const HOST_ROW_IDS = [
 ] as const
 
 export const HOST_ROW_NAMES = {
-  'evolution-policy': '@deepseek-ai/dsh-evolution-policy',
-  'evolution-io': '@deepseek-ai/dsh-evolution-io',
-  'evolution-io-node': '@deepseek-ai/dsh-evolution-io-node',
-  'evolution-state-storage': '@deepseek-ai/dsh-evolution-state-storage',
-  'evolution-state-domain': '@deepseek-ai/dsh-evolution-state-domain',
-  'evolution-state-json': '@deepseek-ai/dsh-evolution-state-json',
-  'evolution-state': '@deepseek-ai/dsh-evolution-state',
-  memory: '@deepseek-ai/dsh-memory',
-  'memory-files': '@deepseek-ai/dsh-memory-files',
-  'skill-usage': '@deepseek-ai/dsh-skill-usage',
-  'evolution-approval': '@deepseek-ai/dsh-evolution-approval',
-  'evolution-capability': '@deepseek-ai/dsh-evolution-capability',
-  'evolution-threat': '@deepseek-ai/dsh-evolution-threat',
-  'evolution-review': '@deepseek-ai/dsh-evolution-review',
-  'evolution-curator': '@deepseek-ai/dsh-evolution-curator',
-  'evolution-commands': '@deepseek-ai/dsh-evolution-commands',
-  'evolution-activity': '@deepseek-ai/dsh-evolution-activity',
-  'evolution-feedback': '@deepseek-ai/dsh-evolution-feedback',
-  'evolution-learning-graph': '@deepseek-ai/dsh-evolution-learning-graph',
-  'evolution-replay': '@deepseek-ai/dsh-evolution-replay',
+  'evolution-policy': scoped('@deepseek-ai/dsh-evolution-policy'),
+  'evolution-io': scoped('@deepseek-ai/dsh-evolution-io'),
+  'evolution-io-node': scoped('@deepseek-ai/dsh-evolution-io-node'),
+  'evolution-state-storage': scoped('@deepseek-ai/dsh-evolution-state-storage'),
+  'evolution-state-domain': scoped('@deepseek-ai/dsh-evolution-state-domain'),
+  'evolution-state-json': scoped('@deepseek-ai/dsh-evolution-state-json'),
+  'evolution-state': scoped('@deepseek-ai/dsh-evolution-state'),
+  memory: scoped('@deepseek-ai/dsh-memory'),
+  'memory-files': scoped('@deepseek-ai/dsh-memory-files'),
+  'skill-usage': scoped('@deepseek-ai/dsh-skill-usage'),
+  'evolution-approval': scoped('@deepseek-ai/dsh-evolution-approval'),
+  'evolution-capability': scoped('@deepseek-ai/dsh-evolution-capability'),
+  'evolution-threat': scoped('@deepseek-ai/dsh-evolution-threat'),
+  'evolution-review': scoped('@deepseek-ai/dsh-evolution-review'),
+  'evolution-curator': scoped('@deepseek-ai/dsh-evolution-curator'),
+  'evolution-commands': scoped('@deepseek-ai/dsh-evolution-commands'),
+  'evolution-activity': scoped('@deepseek-ai/dsh-evolution-activity'),
+  'evolution-feedback': scoped('@deepseek-ai/dsh-evolution-feedback'),
+  'evolution-learning-graph': scoped('@deepseek-ai/dsh-evolution-learning-graph'),
+  'evolution-replay': scoped('@deepseek-ai/dsh-evolution-replay'),
 } as const
 
 export const AGENT_EVOLUTION_ROW_IDS = [
@@ -59,9 +64,9 @@ export const AGENT_EVOLUTION_ROW_IDS = [
 ] as const
 
 export const AGENT_EVOLUTION_ROW_NAMES = {
-  'tool-memory': '@deepseek-ai/dsh-tool-memory',
-  'tool-skill-manage': '@deepseek-ai/dsh-tool-skill-manage',
-  'evolution-skill-catalog': '@deepseek-ai/dsh-evolution-skill-catalog',
+  'tool-memory': scoped('@deepseek-ai/dsh-tool-memory'),
+  'tool-skill-manage': scoped('@deepseek-ai/dsh-tool-skill-manage'),
+  'evolution-skill-catalog': scoped('@deepseek-ai/dsh-evolution-skill-catalog'),
 } as const
 
 /** Model-facing tools that the host bundle must never register. */

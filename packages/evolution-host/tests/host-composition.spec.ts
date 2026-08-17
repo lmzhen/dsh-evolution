@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { fileURLToPath } from 'node:url'
-import { HOST_ROW_IDS } from '../../test-support/row-contract.ts'
+import { HOST_ROW_IDS, MODEL_TOOL_NAMES } from '../../test-support/row-contract.ts'
 import { insertedRows, rowId, rowIds, rowName } from '../../test-support/cordis-rows.ts'
 
 const patch = loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url)))
@@ -13,10 +13,8 @@ describe('evolution-host composition', () => {
   })
 
   it('registers no model-facing tools', () => {
-    const names = rows.map(rowName)
-    expect(names).not.toContain('@deepseek-ai/dsh-tool-memory')
-    expect(names).not.toContain('@deepseek-ai/dsh-tool-skill-manage')
-    expect(names).not.toContain('@deepseek-ai/dsh-evolution-skill-catalog')
+    const names = new Set(rows.map(rowName))
+    for (const name of MODEL_TOOL_NAMES) expect(names.has(name)).toBe(false)
   })
 
   it('keeps the storage-domain row dormant without a host storage-domain facility', () => {

@@ -67,6 +67,11 @@ Everything else is control plane:
 
 ## Quick start
 
+> Community npm packages are published under `@lmzhen` only. For a published
+> install use `pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-host`
+> or `@lmzhen/dsh-evolution-preset`.
+
+
 ```bash
 # inside a DeepSeek Harness checkout
 node packages/evolution/scripts/install-layered.mjs \

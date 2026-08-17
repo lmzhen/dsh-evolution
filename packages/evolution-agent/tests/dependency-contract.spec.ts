@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { AGENT_EVOLUTION_ROW_NAMES } from '../../test-support/row-contract.ts'
+import { AGENT_EVOLUTION_ROW_NAMES, HOST_ROW_NAMES } from '../../test-support/row-contract.ts'
 import { cordisRows, rowIds } from '../../test-support/cordis-rows.ts'
 
 const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as {
@@ -25,11 +25,11 @@ describe('evolution-agent dependency contract', () => {
 
   it('does not declare host-plane packages as runtime dependencies', () => {
     for (const name of [
-      '@deepseek-ai/dsh-memory',
-      '@deepseek-ai/dsh-memory-files',
-      '@deepseek-ai/dsh-skill-usage',
-      '@deepseek-ai/dsh-evolution-state',
-      '@deepseek-ai/dsh-evolution-approval',
+      HOST_ROW_NAMES.memory,
+      HOST_ROW_NAMES['memory-files'],
+      HOST_ROW_NAMES['skill-usage'],
+      HOST_ROW_NAMES['evolution-state'],
+      HOST_ROW_NAMES['evolution-approval'],
     ]) {
       expect(manifest.dependencies?.[name]).toBeUndefined()
     }

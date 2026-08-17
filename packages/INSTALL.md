@@ -87,11 +87,21 @@ Equivalent to the legacy `dsh-evolution-preset` profile bundle.
 
 ## 5. Production install
 
-When bundles are published:
+Official upstream bundles, when published by DeepSeek:
 
 ```bash
 dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
 ```
+
+Community bundles under the personal scope `@lmzhen`:
+
+```bash
+pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-host
+pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-preset
+```
+
+> Community-published `@lmzhen/*` packages are not official DeepSeek
+> releases.
 
 Then copy `packages/evolution/evolution-agent/` to:
 

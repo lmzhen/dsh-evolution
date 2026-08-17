@@ -3,6 +3,7 @@ import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { cordisRows, rowId, rowName } from '../../test-support/cordis-rows.ts'
+import { AGENT_EVOLUTION_ROW_NAMES } from '../../test-support/row-contract.ts'
 
 const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))))
 const upstream = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../../../../apps/cli/config/agent-presets/standard/agent.cordis.yml', import.meta.url))))
@@ -15,11 +16,7 @@ describe('evolution-agent composition', () => {
   })
 
   it('adds exactly the evolution model tools to the standard preset', () => {
-    const evolution = rows.filter(row => [
-      '@deepseek-ai/dsh-tool-memory',
-      '@deepseek-ai/dsh-tool-skill-manage',
-      '@deepseek-ai/dsh-evolution-skill-catalog',
-    ].includes(rowName(row)))
+    const evolution = rows.filter(row => Object.values(AGENT_EVOLUTION_ROW_NAMES).includes(rowName(row)))
     expect(evolution.map(rowId)).toEqual([
       'tool-memory',
       'tool-skill-manage',
@@ -38,11 +35,7 @@ describe('evolution-agent composition', () => {
 
   it('keeps every upstream standard row byte-for-byte', () => {
     const upstreamById = new Map(upstream.map(row => [rowId(row), JSON.stringify(row)]))
-    const evolutionNames = new Set([
-      '@deepseek-ai/dsh-tool-memory',
-      '@deepseek-ai/dsh-tool-skill-manage',
-      '@deepseek-ai/dsh-evolution-skill-catalog',
-    ])
+    const evolutionNames = new Set<string>(Object.values(AGENT_EVOLUTION_ROW_NAMES))
     const standardRows = rows.filter(row => !evolutionNames.has(rowName(row)))
     expect(standardRows).toHaveLength(upstream.length)
     for (const row of standardRows) {

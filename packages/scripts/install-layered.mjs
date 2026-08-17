@@ -21,12 +21,27 @@ import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 
 const MODES = new Set(['host', 'agent', 'layered', 'oneclick'])
-const EVOLUTION_PREFIXES = ['dsh-evolution', 'dsh-memory', 'dsh-memory-files', 'dsh-skill-usage', 'dsh-tool-memory', 'dsh-tool-skill-manage']
+const EVOLUTION_PREFIXES = [
+  'dsh-evolution',
+  'dsh-evolution-',
+  'dsh-memory',
+  'dsh-memory-files',
+  'dsh-skill-usage',
+  'dsh-tool-memory',
+  'dsh-tool-skill-manage',
+]
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
-const EVOLUTION_SCOPE = '@deepseek-ai'
+const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
 const BUNDLES = {
-  host: '@deepseek-ai/dsh-evolution-host',
-  oneclick: '@deepseek-ai/dsh-evolution-preset',
+  host: `${EVOLUTION_SCOPE}/dsh-evolution-host`,
+  oneclick: `${EVOLUTION_SCOPE}/dsh-evolution-preset`,
+}
+const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
+
+function packageSourceRoot() {
+  if (EVOLUTION_SCOPE === '@deepseek-ai') return PACKAGES_DIR
+  if (existsSync(STAGING_DIR)) return STAGING_DIR
+  throw new Error(`scoped installer requires ${STAGING_DIR}; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} first`)
 }
 
 export function resolveHome(env = process.env) {
@@ -101,9 +116,10 @@ async function installBundlePackage(profileDir, bundleName) {
 
 async function copyAllEvolutionPackages(profileDir, dryRun) {
   const copies = []
-  for (const entry of await readdir(PACKAGES_DIR, { withFileTypes: true })) {
+  const sourceRoot = packageSourceRoot()
+  for (const entry of await readdir(sourceRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    const source = join(PACKAGES_DIR, entry.name)
+    const source = join(sourceRoot, entry.name)
     if (!existsSync(join(source, 'package.json'))) continue
     const packageName = await readPackageName(source)
     const destination = join(profileDir, 'node_modules', EVOLUTION_SCOPE, scopedName(packageName))
@@ -147,7 +163,7 @@ async function removeCopiedEvolutionPackages(profileDir) {
   let removed = 0
   for (const entry of await readdir(scopeDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    if (!EVOLUTION_PREFIXES.some(prefix => entry.name === prefix || entry.name.startsWith(`${prefix}-`))) continue
+    if (!EVOLUTION_PREFIXES.some(prefix => entry.name === prefix || entry.name.startsWith(`${prefix}`))) continue
     await rm(join(scopeDir, entry.name), { recursive: true, force: true })
     removed += 1
   }
@@ -162,7 +178,7 @@ async function installAgentPreset(home, dryRun, force) {
     }
     await mkdir(destination, { recursive: true })
     for (const file of ['agent.cordis.yml', 'preset.yml']) {
-      await cp(join(PACKAGES_DIR, 'evolution-agent', file), join(destination, file), { force })
+      await cp(join(packageSourceRoot(), 'evolution-agent', file), join(destination, file), { force })
     }
   }
   return { destination, installed: true }
@@ -248,6 +264,7 @@ if (isMain) {
       if (options.dryRun) console.log('dry-run:  no files were written')
     } else {
       const result = await install(options)
+    console.log(`scope:    ${EVOLUTION_SCOPE}`)
     console.log(`mode:     ${result.mode}`)
     console.log(`profile:  ${result.profile} (${result.profileDir})`)
     if (result.bundle) console.log(`bundle:   ${result.bundle}`)
