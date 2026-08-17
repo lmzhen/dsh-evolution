@@ -29,6 +29,7 @@ const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')
 const groupLimit = argv.includes('--groups') ? Number(argv[argv.indexOf('--groups') + 1]) : undefined
 const onlyNames = argv.includes('--only') ? argv[argv.indexOf('--only') + 1].split(',').map(name => name.trim()).filter(Boolean) : []
+const otp = argv.includes('--otp') ? argv[argv.indexOf('--otp') + 1] : ''
 
 function npm(args, options = {}) {
   if (process.platform === 'win32') {
@@ -56,6 +57,7 @@ function viewIntegrity(name, version) {
 
 function publish(tarball) {
   const args = ['publish', tarball, '--access', 'public', '--tag', tag]
+  if (otp) args.push('--otp', otp)
   if (provenance) args.push('--provenance')
   if (interactive) {
     execFileSync(process.platform === 'win32' ? 'cmd.exe' : 'npm', process.platform === 'win32' ? ['/c', 'npm', ...args] : args, { stdio: 'inherit' })
