@@ -26,6 +26,7 @@ function hasFlag(name) { return argv.includes(name) }
 const tag = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
+const interactive = hasFlag('--interactive')
 const groupLimit = argv.includes('--groups') ? Number(argv[argv.indexOf('--groups') + 1]) : undefined
 const onlyNames = argv.includes('--only') ? argv[argv.indexOf('--only') + 1].split(',').map(name => name.trim()).filter(Boolean) : []
 
@@ -56,6 +57,10 @@ function viewIntegrity(name, version) {
 function publish(tarball) {
   const args = ['publish', tarball, '--access', 'public', '--tag', tag]
   if (provenance) args.push('--provenance')
+  if (interactive) {
+    execFileSync(process.platform === 'win32' ? 'cmd.exe' : 'npm', process.platform === 'win32' ? ['/c', 'npm', ...args] : args, { stdio: 'inherit' })
+    return
+  }
   const output = npm(args)
   console.log(output.trim())
 }
