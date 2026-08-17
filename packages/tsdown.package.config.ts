@@ -1,5 +1,4 @@
 import { defineConfig } from 'tsdown'
-import { typertPlugin } from '../../packages/typert/generator/lib/types/tsdown-plugin.js'
 
 export default defineConfig(() => ({
   workspace: false,
@@ -12,5 +11,4 @@ export default defineConfig(() => ({
   fixedExtension: false,
   dts: false,
   clean: false,
-  plugins: [typertPlugin({ mode: 'package', faces: ['host'] })],
 }))
