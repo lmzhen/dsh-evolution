@@ -12,3 +12,9 @@ The Hermes Agent MIT license text is reproduced in LICENSE for compliance.
 dsh-evolution is not affiliated with or endorsed by Nous Research. It is a
 separate implementation, re-architected for DeepSeek Harness and its Cordis
 plugin/service model.
+
+Community npm releases are published under the `@lmzhen` scope only.
+`@deepseek-ai/*` package names and DeepSeek branding are not used by these
+community releases. The community build is not affiliated with or endorsed by
+DeepSeek.
+

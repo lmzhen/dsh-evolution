@@ -12,6 +12,12 @@ English | [中文](README.zh.md)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+> [!IMPORTANT]
+> Community-published packages under `@lmzhen` are maintained by the
+> dsh-evolution community. They are not official DeepSeek releases and are
+> not endorsed by DeepSeek.
+
+
 ## Contents
 
 - [What this plugin does](#what-this-plugin-does)
