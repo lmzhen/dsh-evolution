@@ -26,6 +26,8 @@ function hasFlag(name) { return argv.includes(name) }
 const tag = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
+const groupLimit = argv.includes('--groups') ? Number(argv[argv.indexOf('--groups') + 1]) : undefined
+const onlyNames = argv.includes('--only') ? argv[argv.indexOf('--only') + 1].split(',').map(name => name.trim()).filter(Boolean) : []
 
 function npm(args, options = {}) {
   if (process.platform === 'win32') {
@@ -69,8 +71,10 @@ if (JSON.stringify(expected) !== JSON.stringify(listed)) {
   throw new Error('manifest and publish-order disagree on the package set')
 }
 
-for (const group of order) {
+const publishOrder = groupLimit === undefined ? order : order.slice(0, groupLimit)
+for (const group of publishOrder) {
   for (const name of group) {
+    if (onlyNames.length > 0 && !onlyNames.includes(name)) continue
     const file = manifest[name]
     if (!file) throw new Error(`missing tarball for ${name}`)
     const tarball = join(distRoot, file)

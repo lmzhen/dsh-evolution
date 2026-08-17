@@ -107,6 +107,23 @@ function rewriteScopedText(text, names) {
   return out
 }
 
+function rewriteScopedJs(stagedDir, names) {
+  if (!scope) return
+  const libRoot = join(stagedDir, 'lib')
+  if (!existsSync(libRoot)) return
+  const stack = [libRoot]
+  while (stack.length > 0) {
+    const current = stack.pop()
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) stack.push(path)
+      else if (entry.isFile() && path.endsWith('.js')) {
+        writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names))
+      }
+    }
+  }
+}
+
 rmSync(distRoot, { recursive: true, force: true })
 mkdirSync(distRoot, { recursive: true })
 const staging = join(evolutionRoot, '.release-staging')
@@ -145,6 +162,7 @@ for (const dir of sourceDirs) {
     const path = join(staged, file)
     if (existsSync(path)) writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names.keys()))
   }
+  rewriteScopedJs(staged, names.keys())
   let packed
   try {
     packed = JSON.parse(npmPack(staged))[0]
@@ -167,8 +185,16 @@ for (const item of tarballs) {
     failures.push(`${item.name}: packed ${manifest.main} is missing`)
   }
   const entry = join(staged, 'lib', 'index.js')
-  if (existsSync(entry) && readFileSync(entry, 'utf8').includes('@deepseek-ai/dsh-evolution/src/')) {
-    failures.push(`${item.name}: lib/index.js still imports a dsh-evolution source subpath`)
+  if (existsSync(entry)) {
+    const entryText = readFileSync(entry, 'utf8')
+    if (entryText.includes('@deepseek-ai/dsh-evolution/src/')) {
+      failures.push(`${item.name}: lib/index.js still imports a dsh-evolution source subpath`)
+    }
+    for (const originalName of names.keys()) {
+      if (entryText.includes(originalName)) {
+        failures.push(`${item.name}: lib/index.js still imports ${originalName}`)
+      }
+    }
   }
   for (const [name, target] of Object.entries(manifest.exports ?? {})) {
     if (typeof target === 'string' && !existsSync(join(staged, target))) {
@@ -202,9 +228,8 @@ writeFileSync(join(distRoot, 'publish-order.json'), JSON.stringify(publishGroups
 
 const smokeDeps = {}
 for (const item of tarballs) smokeDeps[item.name] = `file:${distRoot.split(String.fromCharCode(92)).join('/')}/${item.file}`
-for (const [name, version] of Object.entries(publishedVersions)) {
-  if (version) smokeDeps[name] = version.startsWith('^') ? version : `^${version}`
-}
+const ourNameSet = new Set(names.keys())
+for (const name of externalNames) smokeDeps[name] = releaseSpec(name, ourNameSet, publishedVersions)
 writeFileSync(join(distRoot, 'smoke-package.json'), JSON.stringify({
   name: 'evo-release-smoke',
   private: true,
