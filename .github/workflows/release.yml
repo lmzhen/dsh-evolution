@@ -1,0 +1,121 @@
+name: release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NPM_SCOPE: '@lmzhen'
+  UPSTREAM_VERSION: 0.1.0-rc.6
+  UPSTREAM_REPO: deepseek-ai/deepseek-harness
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read pinned upstream SHA
+        id: upstream
+        shell: bash
+        run: |
+          SHA="$(tr -d '[:space:]' < UPSTREAM_SHA)"
+          test -n "$SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: ${{ steps.upstream.outputs.sha }}
+          path: upstream
+          persist-credentials: false
+
+      - name: Overlay mirror packages into upstream
+        shell: bash
+        run: |
+          mkdir -p upstream/packages/evolution
+          cp -r packages/. upstream/packages/evolution/
+          rm -rf upstream/packages/evolution/node_modules \
+                 upstream/packages/evolution/lib \
+                 upstream/packages/evolution/dist
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: upstream/pnpm-lock.yaml
+
+      - name: Install immutable dependencies
+        working-directory: upstream
+        run: pnpm install --frozen-lockfile
+
+      - name: Build, test and lint
+        working-directory: upstream
+        run: |
+          node packages/evolution/scripts/build-lib.mjs
+          node node_modules/vitest/vitest.mjs run packages/evolution
+          node node_modules/oxlint/bin/oxlint packages/evolution
+
+      - name: Pack scoped release
+        working-directory: upstream
+        run: |
+          node packages/evolution/scripts/prepare-release.mjs \
+            --scope "$NPM_SCOPE" \
+            --version "${GITHUB_REF_NAME#v}" \
+            --upstream-version "$UPSTREAM_VERSION"
+
+      - name: Publish dry-run
+        working-directory: upstream
+        run: |
+          node packages/evolution/scripts/publish-scoped.mjs \
+            --tag next \
+            --no-provenance \
+            --dry-run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evolution-tarballs
+          path: upstream/packages/evolution/dist/*.tgz
+          retention-days: 14
+
+  publish:
+    name: publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: evolution-tarballs
+          path: dist
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish validated tarballs
+        shell: bash
+        run: |
+          mkdir -p packages/evolution/dist
+          cp dist/*.tgz packages/evolution/dist/
+          node packages/evolution/scripts/publish-scoped.mjs \
+            --tag next
