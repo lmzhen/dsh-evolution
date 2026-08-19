@@ -61,3 +61,14 @@ Allowed action: npm publish
 不要在未截图前点击保存；不要修改包的其他 access、token 或 2FA 设置。
 ```
 
+
+## Execution log
+
+- 2026-08-19: configured Trusted Publishing for all 29 packages through the
+  DSH browser session (owner `lmzhen`, repo `dsh-evolution`, workflow
+  `release.yml`, environment `npm-publish`, action `npm publish`).
+- 2026-08-19: pushed `v0.1.0-rc.2`; GitHub Actions OIDC publish succeeded for
+  all 29 packages (`next` dist-tag). Run:
+  https://github.com/lmzhen/dsh-evolution/actions/runs/32256858588
+- 2026-08-19: deprecated `@lmzhen/dsh-evolution` (legacy facade) through the
+  npm package access page.
