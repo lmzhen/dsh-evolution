@@ -120,6 +120,5 @@ jobs:
         shell: bash
         run: |
           mkdir -p packages/evolution/dist
-          cp dist/*.tgz packages/evolution/dist/
           node packages/evolution/scripts/publish-scoped.mjs \
             --tag next
