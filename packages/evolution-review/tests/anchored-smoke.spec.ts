@@ -62,5 +62,9 @@ describe('anchored-standard review smoke', () => {
     expect(capturedRequest).toBeDefined()
     const request = capturedRequest as Record<string, unknown> | undefined
     expect(request?.toolFilter).toEqual({ allow: ['skill', 'skill_search', 'skill_load'] })
+    // No reviewProvider config: the subagent inherits the deployment default
+    // route instead of a hardcoded provider name.
+    expect((request?.agentOptions as Record<string, unknown> | undefined)?.provider).toBeUndefined()
+    expect(typeof (request?.agentOptions as Record<string, unknown> | undefined)?.model).toBe('string')
   })
 })

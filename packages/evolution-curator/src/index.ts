@@ -12,7 +12,7 @@ import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -288,6 +288,41 @@ export class EvolutionCurator extends Service {
     const raw = await this.io.readText(join(reportsRoot, latest))
     if (raw === null) return null
     try { return JSON.parse(raw) as CuratorRunReport } catch { return null }
+  }
+
+  /**
+   * Control-plane consolidation: merge source skill bodies into `target`,
+   * archive the sources with an absorbed-into marker, and fold their usage
+   * records into `archived` state. Snapshot-then-mutate, never a hard delete.
+   */
+  async consolidate(target: string, sources: string[]): Promise<SkillActionResult> {
+    const blocked = [...this.excludeSkillNames].filter(name => name === target || sources.includes(name))
+    if (blocked.length > 0) return { ok: false, message: `Skill(s) excluded from lifecycle management: ${blocked.join(', ')}` }
+    await this.skills.snapshotAll('pre-consolidate')
+    const result = await this.skills.consolidate(target, sources)
+    if (!result.ok) return result
+    const usage: UsageMap = await loadUsage(this.skills.root, this.io)
+    for (const source of sources) {
+      const record = usage.get(source)
+      if (record) record.state = 'archived'
+    }
+    await saveUsage(this.skills.root, usage, this.io)
+    return result
+  }
+
+  /**
+   * Control-plane restore: bring one archived skill back to the active root
+   * and reset its usage state, keeping the recoverable-archive invariant.
+   */
+  async restore(name: string): Promise<SkillActionResult> {
+    await this.skills.snapshotAll('pre-restore')
+    const result = await this.skills.restoreFromArchive(name)
+    if (!result.ok) return result
+    const usage: UsageMap = await loadUsage(this.skills.root, this.io)
+    const record = usage.get(name)
+    if (record) record.state = 'active'
+    await saveUsage(this.skills.root, usage, this.io)
+    return result
   }
 }
 

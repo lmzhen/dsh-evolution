@@ -14,6 +14,7 @@ import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
+import { redactReviewSecrets } from './redact.ts'
 
 export const name = 'evolution-review'
 export const inject = ['agents', 'tools']
@@ -30,6 +31,8 @@ export interface Config {
   reviewContextMessages?: number
   reviewMessageChars?: number
   reviewMaxDepth?: number
+  /** LLM provider for review subagents. Omit to inherit the deployment default route. */
+  reviewProvider?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -43,6 +46,7 @@ export const Config: z<Config> = z.object({
   reviewContextMessages: z.number().default(60),
   reviewMessageChars: z.number().default(2000),
   reviewMaxDepth: z.number().default(0),
+  reviewProvider: z.string(),
 })
 
 interface SubagentLike {
@@ -136,20 +140,22 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const model = kind === 'memory'
         ? routingPolicy?.get().memoryReviewModel ?? 'deepseek-v4-flash'
         : routingPolicy?.get().skillReviewModel ?? 'deepseek-v4-pro'
-      const reviewText = buildReviewRequest(
+      const reviewText = redactReviewSecrets(buildReviewRequest(
         session,
         kind,
         signal as { toolCalls: number; userChars: number; assistantChars: number },
         config.reviewContextMessages,
         config.reviewMessageChars,
-      )
+      ))
+      const agentOptions: Record<string, string> = { model }
+      if (config.reviewProvider) agentOptions.provider = config.reviewProvider
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: reviewText }],
         parent: agent,
         signal: AbortSignal.timeout(config.reviewTimeoutMs),
         maxDepth: config.reviewMaxDepth,
-        agentOptions: { provider: 'deepseek-official', model },
+        agentOptions,
         persona: reviewPrompt(kind),
         toolFilter: { allow: [...config.reviewToolAllow] },
         outputSchema: {

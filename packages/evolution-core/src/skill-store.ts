@@ -284,6 +284,75 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" archived to .archive.`, path: dest }
   }
 
+  /**
+   * Merge the bodies of `sources` into `target` and archive the sources with
+   * an absorbed-into marker. Hermes-style consolidation: overlapping skills
+   * collapse into one, and the originals stay recoverable under `.archive/`.
+   */
+  async consolidate(target: string, sources: string[]): Promise<SkillActionResult> {
+    const normalizedSources = [...new Set(sources)].filter(name => name !== target)
+    if (normalizedSources.length === 0) return { ok: false, message: 'Consolidation requires at least one distinct source skill.' }
+    for (const name of [target, ...normalizedSources]) {
+      if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
+    }
+    const targetDir = skillDir(this.root, target)
+    const targetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
+    if (!targetMd) return { ok: false, message: `Skill "${target}" not found.` }
+    const targetProtection = await this.writeProtection(target)
+    if (targetProtection) return { ok: false, message: `Skill "${target}" is protected (${targetProtection}).` }
+    const parts: string[] = []
+    for (const source of normalizedSources) {
+      const protection = await this.deleteProtection(source)
+      if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
+      const sourceMd = await this.io.readText(join(skillDir(this.root, source), 'SKILL.md'))
+      if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
+      const parsed = parseFrontmatter(sourceMd)
+      if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
+      parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
+    }
+    const merged = targetMd.trimEnd() + parts.join('\n') + '\n'
+    const validation = validateFrontmatter(merged, target, this.limits)
+    if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+    const threat = scanContentThreats(merged)
+    if (threat) return { ok: false, message: threat }
+    await this.io.writeText(join(targetDir, 'SKILL.md'), merged)
+    for (const source of normalizedSources) {
+      const archived = await this.archive(source, target)
+      if (!archived.ok) return archived
+    }
+    return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${target}".`, path: targetDir }
+  }
+
+  /**
+   * Restore one skill from `.archive/` back to the active root. Hermes-style
+   * recoverability: archival never deletes, and this is the control-plane
+   * path back. The `.archive-reason` marker is dropped on restore.
+   */
+  async restoreFromArchive(name: string): Promise<SkillActionResult> {
+    if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
+    if (await this.io.exists(join(skillDir(this.root, name), 'SKILL.md'))) {
+      return { ok: false, message: `Skill "${name}" already exists in the active root; refusing to overwrite.` }
+    }
+    const archiveRoot = join(this.root, '.archive')
+    let entries: string[]
+    try { entries = await this.io.list(archiveRoot) } catch { return { ok: false, message: 'No skill archive available.' } }
+    const candidates = entries.filter(entry => entry === name || entry.startsWith(`${name}-`)).sort().reverse()
+    const chosen = candidates[0]
+    if (!chosen) return { ok: false, message: `Skill "${name}" is not in .archive.` }
+    const source = join(archiveRoot, chosen)
+    const dest = skillDir(this.root, name)
+    try {
+      await this.io.rename(source, dest)
+    } catch {
+      await this.io.copy(source, dest)
+      await this.io.remove(source)
+    }
+    if (await this.io.exists(join(dest, '.archive-reason'))) {
+      await this.io.remove(join(dest, '.archive-reason'))
+    }
+    return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
+  }
+
   async writeSupportFile(name: string, filePath: string, content: string): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }

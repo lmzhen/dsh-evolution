@@ -21,4 +21,11 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - LLM nomination pass is advisory and disabled by default; deterministic lifecycle remains authoritative.
+- LLM nomination pass is advisory and disabled by default; deterministic lifecycle remains authoritative.
+- Consolidation is control-plane only (`/evolution consolidate <target> <source...>`): no LLM pass proposes merge groups yet, and merged source bodies are appended verbatim rather than rewritten into a synthesized skill.
+
+## Recovery and consolidation
+
+- `archive` never deletes: skills move to `.archive/` with a `.archive-reason` marker.
+- `restore(name)` (service) / `/evolution skill restore <name>` brings one archived skill back to the active root and resets its usage state.
+- `consolidate(target, sources)` (service) / `/evolution consolidate` merges source bodies into the target, archives the sources with an absorbed-into marker, and folds their usage records into `archived` state. Both operations snapshot the skill tree first (`pre-consolidate` / `pre-restore`).

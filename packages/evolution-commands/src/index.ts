@@ -55,7 +55,22 @@ export function apply(ctx: Context): void {
           const result = curator ? await curator.skills.restoreLatestSnapshot() : { ok: false, message: 'Curator service not mounted.' }
           return { text: result.message }
         }
-        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | restore.' }
+        if (input.startsWith('consolidate ')) {
+          const names = input.slice(12).trim().split(/\s+/).filter(Boolean)
+          const [target, ...sources] = names
+          if (!target || sources.length === 0) return { text: 'Usage: /evolution consolidate <target> <source...>' }
+          const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
+          const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: 'Curator service not mounted.' }
+          return { text: result.message }
+        }
+        if (input.startsWith('skill restore ')) {
+          const name = input.slice(14).trim()
+          if (!name) return { text: 'Usage: /evolution skill restore <name>' }
+          const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
+          const result = curator ? await curator.restore(name) : { ok: false, message: 'Curator service not mounted.' }
+          return { text: result.message }
+        }
+        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | restore | consolidate <target> <source...> | skill restore <name>.' }
       },
     })
   })
