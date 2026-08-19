@@ -7,34 +7,34 @@ Allowed action: `npm publish`
 
 Configure each package under its npmjs.com package settings.
 
-- [ ] @lmzhen/dsh-evolution
-- [ ] @lmzhen/dsh-evolution-activity
-- [ ] @lmzhen/dsh-evolution-agent-preset
-- [ ] @lmzhen/dsh-evolution-approval
-- [ ] @lmzhen/dsh-evolution-capability
-- [ ] @lmzhen/dsh-evolution-commands
-- [ ] @lmzhen/dsh-evolution-core
-- [ ] @lmzhen/dsh-evolution-curator
-- [ ] @lmzhen/dsh-evolution-feedback
-- [ ] @lmzhen/dsh-evolution-host
-- [ ] @lmzhen/dsh-evolution-io
-- [ ] @lmzhen/dsh-evolution-io-node
-- [ ] @lmzhen/dsh-evolution-learning-graph
-- [ ] @lmzhen/dsh-evolution-plan-validator
-- [ ] @lmzhen/dsh-evolution-policy
-- [ ] @lmzhen/dsh-evolution-preset
-- [ ] @lmzhen/dsh-evolution-replay
-- [ ] @lmzhen/dsh-evolution-review
-- [ ] @lmzhen/dsh-evolution-skill-catalog
-- [ ] @lmzhen/dsh-evolution-state
-- [ ] @lmzhen/dsh-evolution-state-domain
-- [ ] @lmzhen/dsh-evolution-state-json
-- [ ] @lmzhen/dsh-evolution-state-storage
-- [ ] @lmzhen/dsh-evolution-threat
-- [ ] @lmzhen/dsh-memory
-- [ ] @lmzhen/dsh-memory-files
-- [ ] @lmzhen/dsh-skill-usage
-- [ ] @lmzhen/dsh-tool-memory
-- [ ] @lmzhen/dsh-tool-skill-manage
+- [x] @lmzhen/dsh-evolution
+- [x] @lmzhen/dsh-evolution-activity
+- [x] @lmzhen/dsh-evolution-agent-preset
+- [x] @lmzhen/dsh-evolution-approval
+- [x] @lmzhen/dsh-evolution-capability
+- [x] @lmzhen/dsh-evolution-commands
+- [x] @lmzhen/dsh-evolution-core
+- [x] @lmzhen/dsh-evolution-curator
+- [x] @lmzhen/dsh-evolution-feedback
+- [x] @lmzhen/dsh-evolution-host
+- [x] @lmzhen/dsh-evolution-io
+- [x] @lmzhen/dsh-evolution-io-node
+- [x] @lmzhen/dsh-evolution-learning-graph
+- [x] @lmzhen/dsh-evolution-plan-validator
+- [x] @lmzhen/dsh-evolution-policy
+- [x] @lmzhen/dsh-evolution-preset
+- [x] @lmzhen/dsh-evolution-replay
+- [x] @lmzhen/dsh-evolution-review
+- [x] @lmzhen/dsh-evolution-skill-catalog
+- [x] @lmzhen/dsh-evolution-state
+- [x] @lmzhen/dsh-evolution-state-domain
+- [x] @lmzhen/dsh-evolution-state-json
+- [x] @lmzhen/dsh-evolution-state-storage
+- [x] @lmzhen/dsh-evolution-threat
+- [x] @lmzhen/dsh-memory
+- [x] @lmzhen/dsh-memory-files
+- [x] @lmzhen/dsh-skill-usage
+- [x] @lmzhen/dsh-tool-memory
+- [x] @lmzhen/dsh-tool-skill-manage
 
 Total: 29 packages.
