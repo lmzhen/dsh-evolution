@@ -96,6 +96,12 @@ jobs:
           path: upstream/packages/evolution/dist
           retention-days: 14
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evolution-scripts
+          path: upstream/packages/evolution/scripts
+          retention-days: 14
+
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')
@@ -110,6 +116,11 @@ jobs:
         with:
           name: evolution-dist
           path: packages/evolution/dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: evolution-scripts
+          path: packages/evolution/scripts
 
       - uses: actions/setup-node@v4
         with:
