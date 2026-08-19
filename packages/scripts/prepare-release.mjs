@@ -76,6 +76,7 @@ function releaseSpec(name, ourNames, publishedVersions) {
 }
 
 function rewritePackage(pkg, ourNames, publishedVersions) {
+  pkg.version = releaseVersion
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
       let rewritten = name
