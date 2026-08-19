@@ -7,7 +7,10 @@ Allowed action: `npm publish`
 
 Configure each package under its npmjs.com package settings.
 
-- [x] @lmzhen/dsh-evolution
+> The legacy `@lmzhen/dsh-evolution` facade is NOT in this list: it is
+> excluded from publishing (`PUBLISH_EXCLUDE` in `prepare-release.mjs`) and
+> every published version is deprecated on npm.
+
 - [x] @lmzhen/dsh-evolution-activity
 - [x] @lmzhen/dsh-evolution-agent-preset
 - [x] @lmzhen/dsh-evolution-approval
@@ -37,4 +40,4 @@ Configure each package under its npmjs.com package settings.
 - [x] @lmzhen/dsh-tool-memory
 - [x] @lmzhen/dsh-tool-skill-manage
 
-Total: 29 packages.
+Total: 28 packages.
