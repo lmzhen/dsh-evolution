@@ -17,6 +17,9 @@ env:
   NPM_SCOPE: '@lmzhen'
   UPSTREAM_VERSION: 0.1.0-rc.6
   UPSTREAM_REPO: deepseek-ai/deepseek-harness
+  # Tags publish as their own semver; non-tag pushes (main) pack with a
+  # semver-safe dev placeholder so the publish dry-run can parse the version.
+  RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && format('{0}', github.ref_name) || '0.0.0-main' }}
 
 jobs:
   validate:

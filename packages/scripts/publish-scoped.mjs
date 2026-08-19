@@ -91,9 +91,9 @@ for (const group of publishOrder) {
     if (!file) throw new Error(`missing tarball for ${name}`)
     const tarball = join(distRoot, file)
     if (!existsSync(tarball)) throw new Error(`missing tarball file ${file}`)
-    const match = file.match(/-(0\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)\.tgz$/)
+    const match = file.match(/-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)\.tgz$/)
     const releaseVersion = match?.[1] ?? ''
-    if (!releaseVersion) throw new Error(`cannot parse version from ${file}`)
+    if (!releaseVersion) throw new Error(`cannot parse a semver from ${file}; non-tag builds must pack with a semver-safe version (e.g. 0.0.0-main)`)
 
     const local = integrityOf(tarball)
     const remote = viewIntegrity(name, releaseVersion)
