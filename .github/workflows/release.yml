@@ -82,7 +82,7 @@ jobs:
         run: |
           node packages/evolution/scripts/prepare-release.mjs \
             --scope "$NPM_SCOPE" \
-            --version "${GITHUB_REF_NAME#v}" \
+            --version "${RELEASE_VERSION#v}" \
             --upstream-version "$UPSTREAM_VERSION"
 
       - name: Publish dry-run
