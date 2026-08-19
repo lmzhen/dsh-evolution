@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — legacy facade retired from publishing
+
+- `prepare-release.mjs` now skips `dsh-evolution` (`PUBLISH_EXCLUDE`): the legacy facade stays in the tree as source of record and keeps its tests, but new releases no longer publish it — every published version on npm is deprecated and must not be revived.
+- Dropped the unused `@deepseek-ai/dsh-evolution` devDependency from `evolution-feedback`.
+
 ## Unreleased — projection schema contract fix
 
 - `evolution-activity` now builds its session-projection schema with zod instead of schemastery: `dsh-session-projection` reads every projection through `def.schema.parse(...)`, and schemastery schemas expose `resolve()` rather than `parse()`, breaking session-history loads at runtime.

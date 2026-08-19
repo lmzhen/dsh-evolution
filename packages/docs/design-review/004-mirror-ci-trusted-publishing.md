@@ -64,7 +64,7 @@ CI/release path that validates changes and publishes community packages under
 - Prereleases publish with `--tag next`.
 - A publish order manifest is generated from directory->package mapping.
 
-## Publishing order (29 packages, including legacy facade)
+## Publishing order (28 packages)
 
 ```text
 evolution-core
@@ -75,12 +75,16 @@ memory, memory-files, skill-usage
 evolution-policy, evolution-approval, evolution-threat
 evolution-plan-validator
 tool-memory, tool-skill-manage
-dsh-evolution
 evolution-review, evolution-curator, evolution-commands
 evolution-activity, evolution-feedback, evolution-learning-graph,
 evolution-replay, evolution-skill-catalog, evolution-capability
 evolution-host, evolution-preset, evolution-agent-preset
 ```
+
+> Update: the legacy `dsh-evolution` facade is excluded from publishing
+> (`PUBLISH_EXCLUDE` in `prepare-release.mjs`). It stays in the tree as source
+> of record and remains covered by tests, but every published version is
+> deprecated on npm and new releases must not revive it.
 
 ## Security requirements
 

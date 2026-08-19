@@ -34,9 +34,18 @@ const scope = arg('--scope')
 const releaseVersion = arg('--version', '0.1.0-rc.1')
 const upstreamVersion = arg('--upstream-version', '0.1.0-rc.6')
 
+/**
+ * Packages kept in the tree as source of record and still covered by tests,
+ * but retired from npm publishing. The legacy `dsh-evolution` facade is
+ * superseded by the host bundle + Evolution agent preset; all published
+ * versions are deprecated and a fresh release must not revive it.
+ */
+const PUBLISH_EXCLUDE = new Set(['dsh-evolution'])
+
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
   .map(entry => entry.name)
+  .filter(dir => !PUBLISH_EXCLUDE.has(dir))
   .sort()
 
 function readJson(path) {
@@ -220,7 +229,6 @@ const publishGroups = [
   ['evolution-policy', 'evolution-approval', 'evolution-threat'],
   ['evolution-plan-validator'],
   ['tool-memory', 'tool-skill-manage'],
-  ['dsh-evolution'],
   ['evolution-review', 'evolution-curator', 'evolution-commands'],
   ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog', 'evolution-capability'],
   ['evolution-host', 'evolution-preset', 'evolution-agent'],

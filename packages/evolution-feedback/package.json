@@ -45,7 +45,6 @@
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
-    "@deepseek-ai/dsh-skill-usage": "workspace:^",
-    "@deepseek-ai/dsh-evolution": "workspace:^"
+    "@deepseek-ai/dsh-skill-usage": "workspace:^"
   }
 }
