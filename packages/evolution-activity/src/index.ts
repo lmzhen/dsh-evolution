@@ -5,6 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { z as zod } from 'zod'
 
 export interface EvolutionActivityItem {
   planId: string
@@ -23,14 +24,18 @@ export interface State {
   items: EvolutionActivityItem[]
 }
 
-const activitySchema = z.object({
-  items: z.array(z.object({
-    planId: z.string(),
-    kind: z.string(),
-    memoryApplied: z.number().min(0),
-    skillApplied: z.number().min(0),
-    rejectedOps: z.number().min(0),
-    at: z.number().min(0),
+// Projection schemas belong to `dsh-session-projection`, which reads them by
+// calling `def.schema.parse(...)`. That contract requires zod: schemastery
+// schemas expose `resolve()` instead of `parse()` and break session-history
+// loads at runtime. Plugin `Config`, by contrast, stays schemastery.
+const activitySchema = zod.object({
+  items: zod.array(zod.object({
+    planId: zod.string(),
+    kind: zod.string(),
+    memoryApplied: zod.number().min(0),
+    skillApplied: zod.number().min(0),
+    rejectedOps: zod.number().min(0),
+    at: zod.number().min(0),
   })),
 })
 

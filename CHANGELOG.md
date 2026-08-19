@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — projection schema contract fix
+
+- `evolution-activity` now builds its session-projection schema with zod instead of schemastery: `dsh-session-projection` reads every projection through `def.schema.parse(...)`, and schemastery schemas expose `resolve()` rather than `parse()`, breaking session-history loads at runtime.
+- Plugin `Config` stays schemastery; only the projection schema moved to zod (`^4.4.3`, matching `dsh-session-projection`).
+- Added a regression test that captures the registered projection definition and asserts its schema is callable through `.parse` and rejects invalid rows.
+
 ## Unreleased — publish-shape alignment
 
 - Bundle/preset packages now carry the same runtime package shape as dsh-base: `src/index.ts`, root/invariant exports, main/types, and publish files.
