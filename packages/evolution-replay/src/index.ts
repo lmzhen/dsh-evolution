@@ -151,4 +151,3 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   })
 }
 
-export default EvolutionReplayDriver

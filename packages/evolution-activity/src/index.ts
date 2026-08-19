@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { z } from 'zod'
+import z from '@deepseek-ai/schemastery'
 
 export interface EvolutionActivityItem {
   planId: string
@@ -27,10 +27,10 @@ const activitySchema = z.object({
   items: z.array(z.object({
     planId: z.string(),
     kind: z.string(),
-    memoryApplied: z.number().int().nonnegative(),
-    skillApplied: z.number().int().nonnegative(),
-    rejectedOps: z.number().int().nonnegative(),
-    at: z.number().nonnegative(),
+    memoryApplied: z.number().min(0),
+    skillApplied: z.number().min(0),
+    rejectedOps: z.number().min(0),
+    at: z.number().min(0),
   })),
 })
 
@@ -63,7 +63,7 @@ export interface Config {
   maxItems?: number
 }
 
-export const Config = z.object({
+export const Config: z<Config> = z.object({
   maxItems: z.number().default(20),
 })
 

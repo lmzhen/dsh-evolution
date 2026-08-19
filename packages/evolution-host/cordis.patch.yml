@@ -22,10 +22,11 @@
       name: '@deepseek-ai/dsh-evolution-state-storage'
     - id: evolution-state-domain
       name: '@deepseek-ai/dsh-evolution-state-domain'
-      # The storage-domain facility is host-plane. On hosts that do not mount
-      # it, keep this row dormant so the JSON provider remains the active
-      # state backend instead of turning the whole tree into a pending entry.
-      disabled: !!js ctx.get('storageDomain') === undefined
+      # The storage-domain provider is opt-in. It is disabled by default so a
+      # profile without the host storage-domain facility boots deterministically
+      # and evolution-state-json remains the active portable backend. Enable it
+      # explicitly in a profile overlay only when storage-domain is mounted.
+      disabled: true
     - id: evolution-state-json
       name: '@deepseek-ai/dsh-evolution-state-json'
     - id: evolution-state
