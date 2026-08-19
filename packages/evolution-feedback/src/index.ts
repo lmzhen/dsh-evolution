@@ -156,5 +156,3 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (io) void feedback.flush(io)
   }, 'evolution-feedback.flush')
 }
-
-export default EvolutionFeedback

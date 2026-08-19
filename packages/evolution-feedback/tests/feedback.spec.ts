@@ -9,6 +9,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 describe('evolution-feedback', () => {
+  it('exports the function-plugin namespace without a default export', () => {
+    // The Loader's unwrapExports prefers `.default` and discards the rest of
+    // the namespace: a stray `export default` makes the row load the bare
+    // class instead of the plugin and the evolutionFeedback service never
+    // activates. `ctx.plugin(namespace)` hides the bug, so assert the shape.
+    expect('default' in Feedback).toBe(false)
+    expect(typeof Feedback.apply).toBe('function')
+    expect(typeof Feedback.name).toBe('string')
+    expect(Feedback.Config).toBeDefined()
+  })
+
   it('computes quality score from positive and negative feedback', async () => {
     const ctx = new Context()
     await ctx.plugin(Feedback)
