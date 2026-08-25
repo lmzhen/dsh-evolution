@@ -77,23 +77,36 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     const runtime = (projectionCtx as unknown as {
       sessionProjections: {
-        register(definition: {
-          key: string
-          schema: unknown
-          init(): State
-          apply(state: State, event: unknown): State
-          view(state: State): EvolutionActivityProjection
-          stateVersion: number
-        }): () => void
+        register(definition: ProjectionDefinitionLike): () => void
       }
     }).sessionProjections
+    const init = (): State => ({ items: [] })
+    const apply = (state: State, event: unknown): State => applyState(state, event as SessionEventLike, maxItems)
+    const view = (state: State): EvolutionActivityProjection => ({ items: state.items })
+    // Dual-contract registration: DSH 0.1.1+ drives projections through
+    // `stateSchema` and `wire.viewSchema` (and reads cold checkpoints with
+    // `stateSchema.parse`), while 0.1.0-rc.6-era hosts read `schema` +
+    // `view`. Each registry ignores the fields it does not know.
     runtime.register({
       key: 'evolution-activity',
+      stateSchema: activitySchema,
       schema: activitySchema,
-      init: () => ({ items: [] }),
-      apply: (state, event) => applyState(state, event as SessionEventLike, maxItems),
-      view: state => ({ items: state.items }),
+      init,
+      apply,
+      wire: { viewSchema: activitySchema, view },
+      view,
       stateVersion: 1,
     })
   })
+}
+
+interface ProjectionDefinitionLike {
+  key: string
+  stateSchema?: unknown
+  schema?: unknown
+  init(): State
+  apply(state: State, event: unknown): State
+  view?(state: State): EvolutionActivityProjection
+  wire?: { viewSchema?: unknown; view?(state: State): EvolutionActivityProjection }
+  stateVersion: number
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — DSH 0.1.1 projection-contract adaptation
+
+- `evolution-activity` now registers its projection with BOTH contract generations: `stateSchema` + `wire.viewSchema` (the 0.1.1+ session-projection contract, where cold reads call `stateSchema.parse` on checkpointed rows) and the legacy `schema` + `view` fields (0.1.0-rc.6 era). Each registry ignores the fields it does not know, so one build serves both host lines. The new half is load-bearing: without `stateSchema` a 0.1.1+ cold read throws.
+- The projection regression test now asserts both contract shapes are parse-callable.
+
 ## Unreleased — Hermes-alignment: review hardening and curator consolidation
 
 - `evolution-review`: review subagents no longer hardcode `deepseek-official`; the new `reviewProvider` config selects the provider and, when omitted, the subagent inherits the deployment default route (model routing stays on the policy).
