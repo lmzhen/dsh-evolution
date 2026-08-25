@@ -14,7 +14,7 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
   ['slack token', /xox[baprs]-[A-Za-z0-9-]{10,}/g],
   ['jwt', /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g],
   ['bearer credential', /Bearer [A-Za-z0-9._~+/=\-]{16,}/g],
-  ['inline assignment', /(\b(?:token|api[_-]?key|secret|password|passwd)\b[\s]*[:=][\s]*["']?)([A-Za-z0-9._~+/=\-]{12,})/gi],
+  ['inline assignment', /(\b(?:token|api[_-]?key|secret|password|passwd)\b[\s]*[:=][\s]*[\"\x27]?)([A-Z0-9._~+/=\-]{12,})/gi],
 ]
 
 /**
