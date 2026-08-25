@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter,  DEFAULT_SKILL_LIMITS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -98,7 +98,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     name: 'skill_manage',
     description:
       'Manage reusable skills. create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive. '
-      + 'Protected bundled/hub skills reject mutation; pinned skills reject delete only. Prefer patching an umbrella over creating narrow skills.',
+      + 'Protected bundled/hub skills reject mutation; pinned skills reject delete only. Prefer patching an umbrella over creating narrow skills. '
+      + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
       action: { type: 'string', required: true, enum: ['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'list'] },
       name: { type: 'string' },
