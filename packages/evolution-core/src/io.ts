@@ -7,7 +7,7 @@
  */
 
 import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
 export interface EvolutionIoLike {
@@ -62,9 +62,4 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       await cp(path, destination, { recursive: true, force: true })
     },
   }
-}
-
-/** Absolute path helper kept separate so stores stay platform-correct. */
-export function childPath(parent: string, ...parts: string[]): string {
-  return join(parent, ...parts)
 }
