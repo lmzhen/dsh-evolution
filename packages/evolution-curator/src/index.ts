@@ -231,14 +231,7 @@ export class EvolutionCurator extends Service {
     const snapshotPath = await this.skills.snapshotAll('pre-curator-run')
     const usage: UsageMap = await loadUsage(root, this.io)
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
-    // Seed baseline records for tree skills the sidecar has not seen yet, so
-    // their inactivity clock starts now (first-sight defer) and bundled skills
-    // become known candidates only when prune-builtins opts them in.
-    const bundledNames = new Set<string>()
-    for (const summary of await this.skills.list()) {
-      if (!usage.has(summary.name)) usage.set(summary.name, emptyRecord())
-      if (await this.skills.isBundled(summary.name)) bundledNames.add(summary.name)
-    }
+    const bundledNames = await this.seedBaseline(usage)
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: lifecycle.staleAfterDays,
       archiveAfterDays: lifecycle.archiveAfterDays,
@@ -268,7 +261,15 @@ export class EvolutionCurator extends Service {
         }
       }
     }
-    if (suppressedChanged) await saveSuppressedNames(root, suppressedNames, this.io)
+    if (suppressedChanged) {
+      try {
+        await saveSuppressedNames(root, suppressedNames, this.io)
+      } catch {
+        // Best-effort like the report write: a transient disk failure must not
+        // make a run that already archived skills throw after the fact.
+        this.ctx.logger.warn('evolution-curator: failed to persist suppressed names; archived built-ins may re-enter the lifecycle')
+      }
+    }
     await saveUsage(root, usage, this.io)
     this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
@@ -301,6 +302,20 @@ export class EvolutionCurator extends Service {
       paused: false,
     })
     return { stale: result.markStale, archived: archivedSkills.map(item => item.name), errors, report }
+  }
+
+  /**
+   * Seed baseline records for tree skills the sidecar has not seen yet, so
+   * their inactivity clock starts now (first-sight defer) and bundled skills
+   * become known candidates only when prune-builtins opts them in.
+   */
+  private async seedBaseline(usage: UsageMap): Promise<Set<string>> {
+    const bundledNames = new Set<string>()
+    for (const summary of await this.skills.list()) {
+      if (!usage.has(summary.name)) usage.set(summary.name, emptyRecord())
+      if (await this.skills.isBundled(summary.name)) bundledNames.add(summary.name)
+    }
+    return bundledNames
   }
 
   private recentSessionActive(): boolean {
@@ -360,7 +375,14 @@ export class EvolutionCurator extends Service {
     if (record) record.state = 'active'
     await saveUsage(this.skills.root, usage, this.io)
     const suppressed = new Set(await loadSuppressedNames(this.skills.root, this.io))
-    if (suppressed.delete(name)) await saveSuppressedNames(this.skills.root, suppressed, this.io)
+    if (suppressed.delete(name)) {
+      try {
+        await saveSuppressedNames(this.skills.root, suppressed, this.io)
+      } catch {
+        // The restore itself already landed; suppression cleanup is best-effort.
+        this.ctx.logger.warn(`evolution-curator: failed to persist suppressed names after restoring ${name}`)
+      }
+    }
     return result
   }
 }
