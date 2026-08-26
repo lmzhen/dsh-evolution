@@ -55,6 +55,25 @@ it('memory detects external file drift before mutation', async () => {
   await rm(root, { recursive: true, force: true })
 })
 
+it('memory detectDrift flags structural drift but not canonical content', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-drift2-'))
+  const store = new MemoryStore({ root })
+  // Canonical single+multi content written by the store is NOT flagged.
+  await store.add('memory', 'fact A')
+  await store.add('memory', 'fact B')
+  const { writeFile, readFile } = await import('node:fs/promises')
+  const canonical = await readFile(join(root, 'MEMORY.md'), 'utf8')
+  expect(canonical).toBe('fact A\n§\nfact B\n')
+  expect(await store.detectDrift('memory')).toBe(false)
+  // A stray empty entry between delimiters is outside the canonical form and IS flagged.
+  await writeFile(join(root, 'MEMORY.md'), 'fact A\n§\n\n§\nfact B\n', 'utf8')
+  expect(await store.detectDrift('memory')).toBe(true)
+  // Trailing extra blank line is likewise flagged.
+  await writeFile(join(root, 'MEMORY.md'), 'fact A\n§\nfact B\n\n', 'utf8')
+  expect(await store.detectDrift('memory')).toBe(true)
+  await rm(root, { recursive: true, force: true })
+})
+
 it('memory blocks threats and refuses ambiguous matches', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-'))
   const store = new MemoryStore({ root })

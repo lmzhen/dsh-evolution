@@ -247,9 +247,19 @@ export class MemoryStore {
     await this.write('user', snapshot.user)
   }
 
+  /**
+   * Detect on-disk drift: true when the file is not in the canonical
+   * `render(normalizeEntries(raw))` form. This catches structural anomalies
+   * the writer would quietly normalize away (empty/`§`-only entries, stray
+   * blank lines, leading/trailing delimiters) that indicate the file was
+   * edited outside MemoryStore. Purely single-canonical content reaches the
+   * same serialization and returns false, so a normal write is never flagged.
+   */
   async detectDrift(target: MemoryTarget): Promise<boolean> {
     const raw = await this.io.readText(fileFor(this.root, target))
     if (raw === null) return false
-    return normalizeEntries(raw).join(ENTRY_DELIMITER) !== raw.trim()
+    // Canonicalize by normalizing (split + trim + drop empties) then re-rendering.
+    // If the on-disk bytes differ from that canonical form, the file drifted.
+    return render(normalizeEntries(raw)) !== raw
   }
 }

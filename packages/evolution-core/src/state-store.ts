@@ -26,11 +26,34 @@ export class JsonState<T> {
     this.value = this.loadSync()
   }
 
+  /**
+   * Deep-merge persisted state over the initial defaults. Nested plain
+   * objects merge recursively (so a new default field added under an existing
+   * object is preserved), while arrays and primitives take the on-disk value
+   * wholesale. Keeps forward-compatible defaults across schema additions.
+   */
+  private static mergeDeep<T>(initial: T, persisted: unknown): T {
+    const isRecord = (v: unknown): v is Record<string, unknown> =>
+      typeof v === 'object' && v !== null && !Array.isArray(v)
+    if (!isRecord(initial) || !isRecord(persisted)) {
+      // Single values: the persisted value wins when present, otherwise the
+      // initial default stands. Arrays are treated as opaque values.
+      return (isRecord(persisted) ? persisted : (persisted == null ? initial : persisted)) as T
+    }
+    const out: Record<string, unknown> = { ...initial }
+    for (const [key, value] of Object.entries(persisted)) {
+      out[key] = key in initial
+        ? JsonState.mergeDeep((initial as Record<string, unknown>)[key], value)
+        : value
+    }
+    return out as T
+  }
+
   private loadSync(): T {
     try {
       const raw = readFileSync(this.path, 'utf8')
       const parsed = JSON.parse(raw) as T
-      return { ...this.initial, ...parsed }
+      return JsonState.mergeDeep(this.initial, parsed)
     } catch {
       return { ...this.initial }
     }
@@ -59,7 +82,7 @@ export class JsonState<T> {
   async reload(): Promise<void> {
     try {
       const raw = await readFile(this.path, 'utf8')
-      this.value = { ...this.initial, ...JSON.parse(raw) as T }
+      this.value = JsonState.mergeDeep(this.initial, JSON.parse(raw) as T)
     } catch {
       this.value = { ...this.initial }
     }

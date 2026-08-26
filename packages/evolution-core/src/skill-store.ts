@@ -315,10 +315,27 @@ export class SkillLibrary {
     if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
     const threat = scanContentThreats(merged)
     if (threat) return { ok: false, message: threat }
-    await this.io.writeText(join(targetDir, 'SKILL.md'), merged)
-    for (const source of normalizedSources) {
-      const archived = await this.archive(source, target)
-      if (!archived.ok) return archived
+    // Two-phase commit so a failure partway never leaves the tree inconsistent:
+    // (1) archive every source first — a source that cannot be archived aborts
+    //     before target is touched; (2) only when all sources are safely in
+    //     .archive do we write the merged target. If the target write itself
+    //     fails, roll the archived sources back so nothing was consumed.
+    const archived: string[] = []
+    try {
+      for (const source of normalizedSources) {
+        const result = await this.archive(source, target)
+        if (!result.ok) return result
+        archived.push(source)
+      }
+      await this.io.writeText(join(targetDir, 'SKILL.md'), merged)
+    } catch (error) {
+      // Restore the target that we may have (partially) overwritten.
+      await this.io.writeText(join(targetDir, 'SKILL.md'), targetMd).catch(() => {})
+      // Bring back any source we already archived so the merge is fully undone.
+      for (const source of archived.reverse()) {
+        await this.restoreFromArchive(source).catch(() => {})
+      }
+      return { ok: false, message: `Consolidation failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
     }
     return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${target}".`, path: targetDir }
   }

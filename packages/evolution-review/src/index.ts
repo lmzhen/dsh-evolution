@@ -201,7 +201,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
         }))
       }
       return true
-    } catch {
+    } catch (error) {
+      // A review pipeline failure must not crash the turn, but it should be
+      // visible. Log the reason so a silent "review never fires" is debuggable,
+      // and fall through to the synchronous inject path (caller returns false).
+      ctx.logger.warn(`dsh-evolution-review: subagent review failed: ${error instanceof Error ? error.message : String(error)}`)
       return false
     }
   }

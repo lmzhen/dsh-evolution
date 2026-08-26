@@ -69,9 +69,24 @@ const BIDI_CHARS = /[\u202a-\u202e\u2066-\u2069]/
 const SCOPE_ORDER: Record<ThreatScope, number> = { all: 1, context: 2, strict: 3 }
 
 /**
- * Scan text at `scope`. Patterns are cumulative: `strict` includes all scopes.
+ * Optional scan controls. Default behavior (`options` omitted) is unchanged:
+ * every in-scope pattern blocks. Adapters that need to tolerate a specific
+ * benign phrasing (e.g. a skill that legitimately opens with "You are now a ...")
+ * can exclude that label by name here. This is opt-in and never widens strict
+ * scope; it only permits callers to drop a known-innocent match.
  */
-export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536): ThreatFinding[] {
+export interface ScanOptions {
+  /** Pattern labels to skip during this scan. */
+  excludeLabels?: readonly string[]
+}
+
+const NO_SCAN_OPTIONS: ScanOptions = {}
+
+/**
+ * Scan text at `scope`. Patterns are cumulative: `strict` includes all scopes.
+ * `options.excludeLabels` removes matching patterns without changing `scope`.
+ */
+export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): ThreatFinding[] {
   const findings: ThreatFinding[] = []
   if (ZERO_WIDTH_CHARS.test(text)) {
     findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope })
@@ -80,8 +95,10 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope })
   }
   const normalized = text.normalize('NFKC').slice(0, maxScanChars)
+  const excluded = new Set(options.excludeLabels ?? [])
   for (const pattern of PATTERNS) {
     if (SCOPE_ORDER[pattern.scope] > SCOPE_ORDER[scope]) continue
+    if (excluded.has(pattern.label)) continue
     if (pattern.regex.test(normalized)) findings.push({
       label: pattern.label,
       category: pattern.category,
@@ -92,14 +109,14 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
 }
 
 /** Blocking policy: any hit blocks. `severity` is deliberately not a gate. */
-export function evaluateThreat(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536): { blocked: boolean; findings: ThreatFinding[] } {
-  const findings = scanThreats(text, scope, maxScanChars)
+export function evaluateThreat(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): { blocked: boolean; findings: ThreatFinding[] } {
+  const findings = scanThreats(text, scope, maxScanChars, options)
   return { blocked: findings.length > 0, findings }
 }
 
 /** User-facing block message for memory writes. */
-export function scanMemoryThreats(text: string, maxScanChars = 65_536): string | null {
-  const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars)
+export function scanMemoryThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
+  const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
   const pattern = findings.find(f => f.category !== 'unicode_obfuscation')
   if (pattern) return `Blocked by security scan (${pattern.label}). Rephrase without instruction-like language.`
@@ -107,8 +124,8 @@ export function scanMemoryThreats(text: string, maxScanChars = 65_536): string |
 }
 
 /** User-facing block message for skill content writes. */
-export function scanContentThreats(text: string, maxScanChars = 65_536): string | null {
-  const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars)
+export function scanContentThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
+  const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
   return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions.`
 }
