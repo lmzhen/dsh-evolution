@@ -12,6 +12,55 @@ import type {} from '@deepseek-ai/dsh-memory'
 export const name = 'tool-memory'
 export const inject = ['tools', 'systemPrompt', 'memory']
 
+/**
+ * System-prompt memory guidance, aligned with Hermes `MEMORY_GUIDANCE`.
+ * Reached by the model every turn, so it is the place to steer behavior: what
+ * to save durably, what not to save, and how to phrase an entry. The tool
+ * schema description (`MEMORY_TOOL_DESCRIPTION`) carries the complementary
+ * operation-level guidance (add/replace/remove, batch, targets, when).
+ */
+export const MEMORY_GUIDANCE =
+  'You have durable memory across sessions. Save stable user preferences, '
+  + 'environment facts, conventions, and tool quirks with the `memory` tool. '
+  + 'The most valuable memory is one that stops the user correcting or reminding '
+  + 'you again, so user preferences and recurring corrections outrank procedural '
+  + 'task details.\n'
+  + 'Write entries as declarative facts, not instructions to yourself: '
+  + '"User prefers concise responses" (good); "Always respond concisely" (bad). '
+  + 'Imperative phrasing is re-read as a directive in later sessions and can '
+  + 'override the user\u2019s current request.\n'
+  + 'Do NOT save task progress, session outcomes, completed-work logs, PR/issue '
+  + 'numbers, commit SHAs, or anything stale within a week — use `session_search` '
+  + 'to recall past sessions instead. Reusable procedures belong in a skill, not '
+  + 'memory.'
+
+/**
+ * Tool-schema description for `memory`, aligned with Hermes `MEMORY_SCHEMA`.
+ * Carries the operation-level guidance: how to batch, when to save, the
+ * priority order, the target semantics, and what to skip. Reached only when
+ * the model is choosing/using the tool, so it complements the always-on
+ * `MEMORY_GUIDANCE` system prompt.
+ */
+export const MEMORY_TOOL_DESCRIPTION =
+  'Save durable facts to persistent memory that survive across sessions. '
+  + 'Memory is injected into future turns, so keep entries compact and high-signal.\n\n'
+  + 'HOW: make all changes in ONE call via an `operations` array (each item '
+  + '{action, content?, old_text?}). The batch applies atomically and the char '
+  + 'limit is checked on the final result — so one call can remove/replace stale '
+  + 'entries to free room AND add new ones. Use bare action/content/old_text '
+  + 'only for a single lone change.\n\n'
+  + 'WHEN: save proactively when the user states a preference, correction, or '
+  + 'personal detail, or you learn a stable fact about their environment, '
+  + 'conventions, or workflow. Priority: user preferences & corrections > '
+  + 'environment facts > procedures. The best memory stops the user repeating '
+  + 'themselves.\n\n'
+  + 'TARGETS: "user" = who the user is (name, role, preferences, style). '
+  + '"memory" = your notes (environment, conventions, tool quirks, lessons).\n\n'
+  + 'SKIP: trivial/obvious info, easily re-discovered facts, task progress, '
+  + 'completed-work logs, temporary TODO state. To recall a past session use '
+  + '`session_search`, not memory. Reusable procedures belong in a skill, not '
+  + 'memory.'
+
 interface ApprovalLike {
   request(input: { kind: 'memory'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   registerRunner(kind: 'memory', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
@@ -52,7 +101,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
   ctx.systemPrompt.section({
     name: 'evolution:memory-guidance',
     order: 150,
-    text: 'You have durable memory. Save stable user preferences and environment facts with the `memory` tool. Prefer one atomic `operations` batch.',
+    text: MEMORY_GUIDANCE,
   })
   ctx.systemPrompt.context({
     name: 'evolution:memory-snapshot',
@@ -83,9 +132,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
 
   ctx.tools.register(defineTool({
     name: 'memory',
-    description:
-      'Save durable facts to persistent memory. target "user" = who the user is; target "memory" = your notes. '
-      + 'Use operations for atomic add/replace/remove. Save proactively; do not save task progress or one-off narratives.',
+    description: MEMORY_TOOL_DESCRIPTION,
     parameters: {
       target: { type: 'string', enum: ['memory', 'user'], required: true },
       action: { type: 'string', enum: ['add', 'replace', 'remove'] },

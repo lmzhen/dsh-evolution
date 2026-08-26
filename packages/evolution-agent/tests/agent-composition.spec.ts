@@ -20,6 +20,7 @@ describe('evolution-agent composition', () => {
     expect(evolution.map(rowId)).toEqual([
       'tool-memory',
       'tool-skill-manage',
+      'tool-session-query',
       'evolution-skill-catalog',
     ])
   })

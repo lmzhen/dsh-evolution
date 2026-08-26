@@ -24,6 +24,7 @@
   "dependencies": {
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
+    "@deepseek-ai/dsh-tool-session-query": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
   },
   "exports": {

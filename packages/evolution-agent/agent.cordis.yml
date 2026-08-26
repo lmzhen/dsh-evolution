@@ -95,6 +95,13 @@
 - id: tool-skill-manage
   name: '@deepseek-ai/dsh-tool-skill-manage'
 
+# Cross-session recall. The memory guidance tells the model to use
+# `session_search` instead of saving task progress, so the tool must be
+# mounted for that guidance to be actionable. The backing index is enabled
+# by evolution-host's `session-query-sqlite` row (see its openAt/path config).
+- id: tool-session-query
+  name: '@deepseek-ai/dsh-tool-session-query'
+
 - id: evolution-skill-catalog
   name: '@deepseek-ai/dsh-evolution-skill-catalog'
 

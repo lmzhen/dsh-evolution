@@ -10,7 +10,10 @@ const insert = insertedRows(patch)
 
 describe('evolution-preset composition boundary', () => {
   it('uses the loader patch vocabulary for bundle patches', () => {
-    expect(patch).toHaveLength(1)
+    // patch is `[insert 块, ...顶层覆盖条目]` — the first entry must be the
+    // `- insert:` block; additional non-insert entries (e.g. the
+    // session-query-sqlite config override) are allowed.
+    expect(patch.length).toBeGreaterThan(0)
     expect(patch[0]?.insert).toBeDefined()
     for (const row of insert) {
       expect(typeof row.id).toBe('string')

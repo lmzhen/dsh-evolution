@@ -48,6 +48,8 @@
       name: '@deepseek-ai/dsh-skill-usage'
     - id: tool-skill-manage
       name: '@deepseek-ai/dsh-tool-skill-manage'
+    - id: tool-session-query
+      name: '@deepseek-ai/dsh-tool-session-query'
     - id: evolution-skill-catalog
       name: '@deepseek-ai/dsh-evolution-skill-catalog'
 
@@ -77,3 +79,12 @@
       name: '@deepseek-ai/dsh-evolution-learning-graph'
     - id: evolution-replay
       name: '@deepseek-ai/dsh-evolution-replay'
+
+# ── cross-session recall: enable the native session-query index ─────────────
+# Mirrors evolution-host: this is an OVERRIDE of the base `session-query-sqlite`
+# row (never an insert) so it sits OUTSIDE the `- insert:` block. Parameterized
+# via dsh `!!js` runtime env evaluation; profile overlays may still override.
+- id: session-query-sqlite
+  config:
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? ((process.env.DSH_HOME ?? process.env.USERPROFILE ?? '.') + '/evolution/session-query.db'))
+    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY ?? 'startup'

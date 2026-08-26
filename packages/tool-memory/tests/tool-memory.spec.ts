@@ -5,6 +5,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as MemoryFiles from '@deepseek-ai/dsh-memory-files'
 import * as ToolMemory from '../src/index.ts'
+import { MEMORY_GUIDANCE, MEMORY_TOOL_DESCRIPTION } from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 describe('tool-memory', () => {
@@ -17,6 +18,25 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryFiles, { root: await makeTmp() })
     await ctx.plugin(ToolMemory, {})
     expect(ctx.tools.get('memory')).toBeDefined()
+  })
+
+  it('memory guidance carries durable-fact triggers and the do-not-save list', () => {
+    // Guard against future edits dropping the signals that make the model
+    // save proactively. These are the load-bearing parts of the guidance.
+    expect(MEMORY_GUIDANCE).toMatch(/user preferences/i)
+    expect(MEMORY_GUIDANCE).toMatch(/recurring corrections/i)
+    expect(MEMORY_GUIDANCE).toMatch(/task progress/i)
+    expect(MEMORY_GUIDANCE).toMatch(/session_search/)
+    expect(MEMORY_GUIDANCE).toMatch(/User prefers concise responses/)
+    expect(MEMORY_GUIDANCE).toMatch(/Always respond concisely/)
+  })
+
+  it('tool description carries when/priority/targets and the skip list', () => {
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/save proactively/i)
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/user preferences & corrections/i)
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/"user" = who the user is/)
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/session_search/)
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/belong in a skill/)
   })
 })
 

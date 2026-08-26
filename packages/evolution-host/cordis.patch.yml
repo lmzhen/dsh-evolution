@@ -73,3 +73,20 @@
       name: '@deepseek-ai/dsh-evolution-learning-graph'
     - id: evolution-replay
       name: '@deepseek-ai/dsh-evolution-replay'
+
+# ── cross-session recall: enable the native session-query index ─────────────
+# `tool-session-query` (agent preset) exposes `session_search`; this overlay
+# enables the backing SQLite full-text index so that search actually works.
+# It is a configuration OVERRIDE of the base `session-query-sqlite` row (never
+# an insert — base already provides it), so it must sit OUTSIDE the `- insert:`
+# block above. Both fields are parameterized via environment variables (dsh
+# `!!js` runtime evaluation), and any profile cordis.patch.yml overlay may still
+# override them later. `openAt` defaults to `startup` so the index is ready for
+# cross-session recall; set `DSH_EVOLUTION_SESSION_QUERY=never` to disable, or
+# `first-search` to build it lazily. A durable `path` (not `:memory:`) lets the
+# index survive restarts. Note: `config` values replace the base entry's config
+# wholesale, so both path and openAt are set here.
+- id: session-query-sqlite
+  config:
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? ((process.env.DSH_HOME ?? process.env.USERPROFILE ?? '.') + '/evolution/session-query.db'))
+    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY ?? 'startup'

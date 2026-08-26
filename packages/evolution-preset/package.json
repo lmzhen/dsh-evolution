@@ -41,6 +41,7 @@
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
+    "@deepseek-ai/dsh-tool-session-query": "workspace:^",
     "@deepseek-ai/dsh-evolution-policy": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-threat": "workspace:^",
