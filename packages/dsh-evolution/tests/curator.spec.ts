@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { computeLifecycleTransitions } from '@deepseek-ai/dsh-evolution-core'
+import { computeLifecycleTransitions, parseCuratorNominations } from '@deepseek-ai/dsh-evolution-core'
 
 it('curator transitions active -> stale -> archived by idle time', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
@@ -53,4 +53,42 @@ it('suppressed names and bundled eligibility follow pruneBuiltins (F8)', () => {
     suppressedNames: new Set(['suppressed-old']),
   }, now)
   expect(result.archive).toEqual(['builtin-old'])
+})
+
+it('referenced skill names are never auto-transitioned (F3)', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const old = new Date(now.getTime() - 200 * 86_400_000)
+  const usage = new Map()
+  usage.set('scheduled-skill', { created_by: 'agent', created_at: old.toISOString(), use_count: 1, view_count: 0, patch_count: 0, last_used_at: old.toISOString(), last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null })
+  const result = computeLifecycleTransitions(usage, {
+    staleAfterDays: 30,
+    archiveAfterDays: 90,
+    referencedSkillNames: new Set(['scheduled-skill']),
+  }, now)
+  expect(result.transitions.length).toBe(0)
+  // Same lifecycle without the reference set: normal transitions apply.
+  const active = computeLifecycleTransitions(usage, { staleAfterDays: 30, archiveAfterDays: 90 }, now)
+  expect(active.archive).toEqual(['scheduled-skill'])
+})
+
+it('parseCuratorNominations reads both YAML sections defensively', () => {
+  const text = [
+    'consolidations:',
+    '  - from: narrow-a',
+    '    into: umbrella',
+    '    reason: merge',
+    '  - from: narrow-b',
+    '    into: umbrella',
+    'prunings:',
+    '  - name: stale-skill',
+    '    reason: obsolete',
+    '  - name: invalid NAME',
+  ].join('\n')
+  const nominations = parseCuratorNominations(text)
+  expect(nominations.consolidations).toEqual([
+    { from: 'narrow-a', into: 'umbrella' },
+    { from: 'narrow-b', into: 'umbrella' },
+  ])
+  expect(nominations.prunings).toEqual(['stale-skill'])
+  expect(nominations.prunings).not.toContain('invalid NAME')
 })

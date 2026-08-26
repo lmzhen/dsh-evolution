@@ -11,7 +11,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactReviewSecrets } from './redact.ts'
@@ -33,6 +33,10 @@ export interface Config {
   reviewMaxDepth?: number
   /** LLM provider for review subagents. Omit to inherit the deployment default route. */
   reviewProvider?: string
+  /** Skill-review trigger: cadence (interval) | completion (once after a proven-long task) | both. */
+  skillReviewTrigger?: string
+  /** Cumulative session tool calls before a session counts as proven-long for the completion channel. */
+  skillReviewCompletionMinToolCalls?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -47,6 +51,8 @@ export const Config: z<Config> = z.object({
   reviewMessageChars: z.number().default(2000),
   reviewMaxDepth: z.number().default(0),
   reviewProvider: z.string(),
+  skillReviewTrigger: z.string().default(DEFAULT_SKILL_REVIEW_TRIGGER),
+  skillReviewCompletionMinToolCalls: z.number().default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
 })
 
 interface SubagentLike {
@@ -89,6 +95,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
   const config = rawConfig as Required<Config>
   const turnStarts = new Map<SessionId, number>()
+  const cumulativeToolCalls = new Map<SessionId, number>()
+  const completionInjected = new Set<SessionId>()
   const policy = () => (ctx.get('evolutionPolicy') as PolicyLike | undefined)?.get()
 
   ctx.on('session/event', (session, event) => {
@@ -118,15 +126,30 @@ export function apply(ctx: Context, rawConfig: Config): void {
       substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
     })
     await stateService?.saveReviewState(session.id, state)
-    if (!kind) return
-
-    const started = await trySubagentReview(session, agent, kind, signal)
-    if (!started) {
-      agent.inject(createUserMessage({
-        content: [{ type: 'text', text: reviewPrompt(kind) }],
-        source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-      }))
+    if (kind) {
+      const started = await trySubagentReview(session, agent, kind, signal)
+      if (!started) {
+        agent.inject(createUserMessage({
+          content: [{ type: 'text', text: reviewPrompt(kind) }],
+          source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
+        }))
+      }
+      return
     }
+    // Cadence waited; the completion channel fires once per session after a
+    // task the conversation has proven long (cumulative tool-call threshold),
+    // so short conversations are never adapted to at the cost of long ones.
+    const trigger = config.skillReviewTrigger
+    if (trigger !== 'completion' && trigger !== 'both') return
+    if (completionInjected.has(session.id)) return
+    const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
+    cumulativeToolCalls.set(session.id, cumulative)
+    if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
+    completionInjected.add(session.id)
+    agent.inject(createUserMessage({
+      content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
+      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },
+    }))
   }
 
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean> {
@@ -182,15 +205,20 @@ export function apply(ctx: Context, rawConfig: Config): void {
         maxUserChars: snapshot?.userChars ?? 1375,
         maxSkillContentChars: snapshot?.skillContentChars ?? 100_000,
       })
+      // F19: the background review may only patch skills it read this session
+      // (read-before-write, matching the original Hermes background guard).
+      const acceptedSkillOps = validation.accepted.skillOps ?? []
+      const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, collectReadSkillNames(session))
+      validation.accepted.skillOps = acceptedSkillOps
       const actions = await executePlan(validation.accepted, agent)
-      const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...validation.accepted.skillOps ?? []]
+      const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
         .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
       session.append('evolution/plan-applied', {
         planId: randomUUID(),
         policyFingerprint,
         memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
         skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
-        rejectedOps: validation.rejected.length,
+        rejectedOps: validation.rejected.length + skippedUnread,
         evidenceQuotes,
         estimatedInputChars: reviewText.length,
       })
@@ -226,8 +254,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
     for (const op of plan.skillOps ?? []) {
       if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
       const args = { ...op, evidence: op.evidence }
+      // The registered skill runner expects the { operation, origin } wrapper;
+      // passing it on both the pending record and the replay keeps the
+      // background_review origin in the approval-disabled (default) path too.
+      const runnerArgs = { operation: args, origin: 'background_review' as const }
       const result = approval
-        ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, { operation: args, origin: 'background_review' }, args)
+        ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
         : await executeSkillTool(parent, args)
       if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
     }
@@ -254,7 +286,51 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
   ctx.effect(() => () => {
     turnStarts.clear()
+    cumulativeToolCalls.clear()
+    completionInjected.clear()
   }, 'dsh-evolution-review.cleanup')
+}
+
+/** Completion-channel decision: task finished normally AND the session is proven long. */
+export function shouldCompletionReview(reason: { kind?: string } | undefined, sessionToolCalls: number, minToolCalls: number): boolean {
+  return reason?.kind === 'completed' && sessionToolCalls >= minToolCalls
+}
+
+/** Skill names this session loaded (read-before-write source for the background review). */
+export function collectReadSkillNames(session: Session): Set<string> {
+  const names = new Set<string>()
+  for (const event of session.events) {
+    if (event.type !== 'tool/call') continue
+    if (event.data.name !== 'skill' && event.data.name !== 'skill_load') continue
+    const raw = (event.data as unknown as { arguments?: string | Record<string, unknown> }).arguments
+    let parsed: Record<string, unknown> = {}
+    if (typeof raw === 'string') {
+      try { parsed = JSON.parse(raw) as Record<string, unknown> } catch { continue }
+    } else {
+      parsed = raw ?? {}
+    }
+    const name = typeof parsed.name === 'string' ? parsed.name : typeof parsed.skill === 'string' ? parsed.skill : ''
+    if (name) names.add(name)
+  }
+  return names
+}
+
+/**
+ * Drop patch/update ops whose target was not read this session, in place.
+ * Create is exempt (no read required to author a new skill). Returns the count
+ * of dropped ops so the plan event can report them as rejected.
+ */
+export function filterUnreadSkillOps(ops: Array<{ action?: string; name?: string }>, readNames: ReadonlySet<string>): number {
+  let dropped = 0
+  for (let index = ops.length - 1; index >= 0; index -= 1) {
+    const op = ops[index]
+    if (!op) continue
+    if ((op.action === 'patch' || op.action === 'update') && op.name && !readNames.has(op.name)) {
+      ops.splice(index, 1)
+      dropped += 1
+    }
+  }
+  return dropped
 }
 
 function fingerprintPolicy(snapshot: unknown): string | undefined {

@@ -24,6 +24,8 @@ export interface CuratorConfig {
   bundledNames?: ReadonlySet<string>
   /** Skill names the curator archived once and must not fight across re-seeds. */
   suppressedNames?: ReadonlySet<string>
+  /** Skills referenced by scheduled/automated jobs: never auto-transitioned (idle clocks mislead for rarely-firing tasks). */
+  referencedSkillNames?: ReadonlySet<string>
 }
 
 export interface CuratorTransition {
@@ -89,6 +91,60 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
   }
 }
 
+/** One LLM-nominated consolidation: `from` merges into the umbrella `into`. */
+export interface CuratorConsolidation {
+  from: string
+  into: string
+}
+
+/** Structured result of the optional curator LLM nomination pass. */
+export interface CuratorNominations {
+  prunings: string[]
+  consolidations: CuratorConsolidation[]
+}
+
+const NOMINATION_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+
+/**
+ * Parse the curator LLM's YAML nomination block (consolidations + prunings).
+ * Line-oriented and lenient by design: the LLM output is advisory, every name
+ * is re-validated against the tree before any file move happens downstream.
+ */
+export function parseCuratorNominations(text: string): CuratorNominations {
+  const prunings: string[] = []
+  const consolidations: CuratorConsolidation[] = []
+  let section: 'consolidations' | 'prunings' | null = null
+  let currentFrom = ''
+  for (const line of text.split('\n')) {
+    const consolidated = /^\s*-\s*from:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
+    if (consolidated) {
+      section = 'consolidations'
+      currentFrom = consolidated[1] ?? ''
+      continue
+    }
+    const into = /^\s*into:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
+    if (into) {
+      const intoName = into[1] ?? ''
+      if (section === 'consolidations' && currentFrom !== '' && currentFrom !== intoName) {
+        consolidations.push({ from: currentFrom, into: intoName })
+      }
+      currentFrom = ''
+      continue
+    }
+    const pruned = /^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
+    if (pruned) {
+      section = 'prunings'
+      const name = pruned[1]
+      if (name) prunings.push(name)
+    }
+  }
+  const valid = (name: string) => NOMINATION_NAME_RE.test(name)
+  return {
+    prunings: prunings.filter(valid),
+    consolidations: consolidations.filter(item => valid(item.from) && valid(item.into)),
+  }
+}
+
 function daysSince(iso: string | null, created: string, now: number): number {
   const anchor = iso ?? created
   return (now - new Date(anchor).getTime()) / 86_400_000
@@ -104,6 +160,7 @@ export function computeLifecycleTransitions(
     if (record.pinned) continue
     if (config.excludeSkillNames?.has(name)) continue
     if (config.suppressedNames?.has(name)) continue
+    if (config.referencedSkillNames?.has(name)) continue
     const bundled = config.bundledNames?.has(name) === true
     const managed = record.created_by === 'agent' || config.manageUnmanaged === true
     if (!managed && !(config.pruneBuiltins === true && bundled)) continue

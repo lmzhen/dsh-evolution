@@ -13,9 +13,9 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, parseCuratorNominations, type CuratorNominations, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
-import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution-core'
+import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 
@@ -43,6 +43,10 @@ export interface Config {
   manageUnmanaged?: boolean
   /** Archive long-unused bundled skills too (with suppression against re-seeds). */
   pruneBuiltins?: boolean
+  /** Static scheduled-task skill references; such skills never auto-transition. */
+  referencedSkillNames?: string[]
+  /** Start the interval timer on context ready (auto-curation). Default true. */
+  autoStart?: boolean
   /** Max tokens for the optional LLM nomination pass. */
   curatorReviewMaxTokens?: number
 }
@@ -54,6 +58,8 @@ export interface CuratorRunOutcome {
   errors: string[]
   report: CuratorRunReport
   skipped?: string
+  /** LLM nominations when the optional review pass is enabled (audit visibility). */
+  nominations?: CuratorNominations
 }
 
 export class EvolutionCurator extends Service {
@@ -70,6 +76,8 @@ export class EvolutionCurator extends Service {
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
     pruneBuiltins: z.boolean().default(false),
+    referencedSkillNames: z.array(z.string()).default([]),
+    autoStart: z.boolean().default(true),
     curatorReviewMaxTokens: z.number().default(2048),
   })
 
@@ -86,6 +94,7 @@ export class EvolutionCurator extends Service {
   private readonly excludeSkillNames: ReadonlySet<string>
   private readonly manageUnmanaged: boolean
   private readonly pruneBuiltins: boolean
+  private readonly referencedSkillNames: ReadonlySet<string>
   private readonly curatorReviewMaxTokens: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
@@ -105,6 +114,7 @@ export class EvolutionCurator extends Service {
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
+    this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
     this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
     this.lastRun = Date.now()
     this.ctx.effect(() => {
@@ -112,6 +122,9 @@ export class EvolutionCurator extends Service {
         this.stop()
       }
     }, 'evolution-curator.stop')
+    // F2: auto-curation starts with the plugin; the interval gate plus
+    // first-run deferral keep a fresh install quiet until the first pass.
+    if (config.autoStart ?? true) this.start()
   }
 
   private lifecycle(): { intervalHours: number; staleAfterDays: number; archiveAfterDays: number } {
@@ -140,13 +153,14 @@ export class EvolutionCurator extends Service {
   }
 
   /**
-   * Optional Hermes-curator LLM pass. The model may only NOMINATE pruning
-   * candidates; archive/restore remains a control-plane operation and every
-   * nominated name is still checked against lifecycle thresholds and
-   * protected markers before any file move.
+   * Optional Hermes-curator LLM pass. The model may only NOMINATE pruning and
+   * consolidation; every move stays a control-plane operation and each
+   * nomination is re-validated against the tree and protected markers before
+   * any file move. `dryRun` prepends the report-only banner.
    */
-  async recommend(candidates: string[]): Promise<string[]> {
-    if (candidates.length === 0) return []
+  async recommend(candidates: string[], options: { dryRun?: boolean } = {}): Promise<CuratorNominations> {
+    const empty: CuratorNominations = { prunings: [], consolidations: [] }
+    if (candidates.length === 0) return empty
     const llm = this.ctx.get('llm') as {
       stream(options: {
         provider: string
@@ -156,16 +170,17 @@ export class EvolutionCurator extends Service {
         purpose?: string
       }): AsyncIterable<StreamChunk>
     } | undefined
-    if (!llm) return []
+    if (!llm) return empty
     const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } } | undefined
     const model = policy?.get().curatorModel ?? 'deepseek-v4-pro'
     const prompt = [
+      options.dryRun ? CURATOR_DRY_RUN_BANNER : '',
       CURATOR_PROMPT,
       '',
-      'Stale candidates observed by the deterministic lifecycle scanner:',
+      `Stale candidates observed by the deterministic lifecycle scanner:${candidates.length === 0 ? ' (none)' : ''}`,
       ...candidates.map(name => `- ${name}`),
       '',
-      'Return a YAML summary with a prunings list. Nominate only candidates whose archival is clearly safe.',
+      'Return a YAML summary with consolidations and prunings lists. Nominate only actions whose archival/merge is clearly safe.',
     ].join('\n')
     try {
       const assembler = new BlockAssembler()
@@ -177,13 +192,14 @@ export class EvolutionCurator extends Service {
         purpose: 'evolution-curator',
       })) assembler.push(chunk)
       const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
-      const names = new Set<string>()
-      const section = text.slice(text.indexOf('prunings:'))
-      for (const [, name] of section.matchAll(/^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/gm)) if (name) names.add(name)
-      return [...names].filter(name => candidates.includes(name))
+      const parsed = parseCuratorNominations(text)
+      return {
+        prunings: parsed.prunings.filter(name => candidates.includes(name)),
+        consolidations: parsed.consolidations,
+      }
     } catch {
       // LLM curation is advisory. The deterministic scanner still owns the decision.
-      return []
+      return empty
     }
   }
 
@@ -202,9 +218,12 @@ export class EvolutionCurator extends Service {
 
   /**
    * Run one curator pass. `ignoreGates` skips the interval and idle gates so an
-   * explicit `/evolution curator run` always executes (manual-run semantics).
+   * explicit `/evolution curator run` always executes (manual-run semantics):
+   * `dryRun` computes the lifecycle and the LLM nominations but performs no
+   * mutation, reports what WOULD happen, and does not push out the next run.
    */
-  async run(options: { ignoreGates?: boolean } = {}): Promise<CuratorRunOutcome> {
+  async run(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
+    const { ignoreGates = false, dryRun = false } = options
     const startedAt = new Date().toISOString()
     const runId = randomUUID()
     const stateService = this.ctx.get('evolutionState') as {
@@ -213,14 +232,14 @@ export class EvolutionCurator extends Service {
     } | undefined
     const lifecycle = this.lifecycle()
     const persisted = await stateService?.loadCuratorState()
-    if (!options.ignoreGates && persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
+    if (!ignoreGates && persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport(runId, startedAt),
         skipped: 'interval',
       }
     }
-    if (!options.ignoreGates && this.minIdleHours > 0 && this.recentSessionActive()) {
+    if (!ignoreGates && this.minIdleHours > 0 && this.recentSessionActive()) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport(runId, startedAt),
@@ -228,10 +247,12 @@ export class EvolutionCurator extends Service {
       }
     }
     const root = this.skills.root
-    const snapshotPath = await this.skills.snapshotAll('pre-curator-run')
-    const usage: UsageMap = await loadUsage(root, this.io)
+    const rawUsage: UsageMap = await loadUsage(root, this.io)
+    // Dry-run computes on clones so the persisted lifecycle state is untouched.
+    const usage: UsageMap = dryRun ? new Map([...rawUsage].map(([name, record]) => [name, { ...record }])) : rawUsage
+    const snapshotPath = dryRun ? undefined : await this.skills.snapshotAll('pre-curator-run')
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
-    const bundledNames = await this.seedBaseline(usage)
+    const { bundledNames, treeNames } = await this.seedBaseline(usage)
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: lifecycle.staleAfterDays,
       archiveAfterDays: lifecycle.archiveAfterDays,
@@ -241,37 +262,61 @@ export class EvolutionCurator extends Service {
       pruneBuiltins: this.pruneBuiltins,
       bundledNames,
       suppressedNames,
+      referencedSkillNames: this.referencedSkillNames,
     })
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
-    const llmNominations = this.llmReview ? await this.recommend(result.markStale) : []
+    const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
+    const llmNominations = nominations.prunings
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
     let suppressedChanged = false
-    for (const name of archiveCandidates) {
-      const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
-      if (!archived.ok) {
-        const record = usage.get(name)
-        if (record) record.state = 'active'
-        errors.push(`${name}: ${archived.message}`)
-      } else {
-        archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
-        if (bundledNames.has(name)) {
-          suppressedNames.add(name)
-          suppressedChanged = true
+    if (!dryRun) {
+      for (const name of archiveCandidates) {
+        const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
+        if (!archived.ok) {
+          const record = usage.get(name)
+          if (record) record.state = 'active'
+          errors.push(`${name}: ${archived.message}`)
+        } else {
+          archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
+          if (bundledNames.has(name)) {
+            suppressedNames.add(name)
+            suppressedChanged = true
+          }
         }
       }
-    }
-    if (suppressedChanged) {
-      try {
-        await saveSuppressedNames(root, suppressedNames, this.io)
-      } catch {
-        // Best-effort like the report write: a transient disk failure must not
-        // make a run that already archived skills throw after the fact.
-        this.ctx.logger.warn('evolution-curator: failed to persist suppressed names; archived built-ins may re-enter the lifecycle')
+      const alreadyArchived = new Set(archiveCandidates)
+      for (const nomination of nominations.consolidations) {
+        if (alreadyArchived.has(nomination.from)) continue
+        if (!treeNames.has(nomination.from) || !treeNames.has(nomination.into)) {
+          errors.push(`${nomination.from}: consolidation target or source missing from the skill tree`)
+          continue
+        }
+        const consolidated = await this.skills.consolidate(nomination.into, [nomination.from], 'background_review')
+        if (!consolidated.ok) {
+          errors.push(`${nomination.from}: ${consolidated.message}`)
+          continue
+        }
+        const record = usage.get(nomination.from)
+        if (record) {
+          record.state = 'archived'
+          record.archived_at = new Date().toISOString()
+        }
+        alreadyArchived.add(nomination.from)
+        archivedSkills.push({ name: nomination.from, path: consolidated.path ?? '', reason: `Consolidated into ${nomination.into}` })
       }
+      if (suppressedChanged) {
+        try {
+          await saveSuppressedNames(root, suppressedNames, this.io)
+        } catch {
+          // Best-effort like the report write: a transient disk failure must not
+          // make a run that already archived skills throw after the fact.
+          this.ctx.logger.warn('evolution-curator: failed to persist suppressed names; archived built-ins may re-enter the lifecycle')
+        }
+      }
+      await saveUsage(root, usage, this.io)
     }
-    await saveUsage(root, usage, this.io)
-    this.lastRun = Date.now()
+    if (!dryRun) this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
     const report = buildCuratorRunReport({
       runId,
@@ -285,7 +330,7 @@ export class EvolutionCurator extends Service {
         const error = errors.find(item => item.startsWith(`${name}:`))
         return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
       }),
-      snapshotPath,
+      ...snapshotPath === undefined ? {} : { snapshotPath },
     })
     const reportsRoot = join(evolutionHome(), 'reports')
     try {
@@ -295,27 +340,38 @@ export class EvolutionCurator extends Service {
       this.ctx.logger.warn(`evolution-curator: failed to persist report ${runId}`)
       this.ctx.logger.warn(error)
     }
+    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${nominations.consolidations.length}`
     await stateService?.saveCuratorState({
-      lastRunAt: this.lastRun,
-      runCount: (persisted?.runCount ?? 0) + 1,
-      lastSummary: `stale:${result.markStale.length} archived:${archivedSkills.length}`,
+      // A dry-run is a preview: it must not push the next scheduled pass out.
+      lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : this.lastRun,
+      runCount: dryRun ? (persisted?.runCount ?? 0) : (persisted?.runCount ?? 0) + 1,
+      lastSummary: summary,
       paused: false,
     })
-    return { stale: result.markStale, archived: archivedSkills.map(item => item.name), errors, report }
+    return {
+      stale: result.markStale,
+      archived: archivedSkills.map(item => item.name),
+      errors,
+      report,
+      ...this.llmReview ? { nominations } : {},
+    }
   }
 
   /**
    * Seed baseline records for tree skills the sidecar has not seen yet, so
    * their inactivity clock starts now (first-sight defer) and bundled skills
-   * become known candidates only when prune-builtins opts them in.
+   * become known candidates only when prune-builtins opts them in. Also
+   * returns the full active tree names for nomination validation.
    */
-  private async seedBaseline(usage: UsageMap): Promise<Set<string>> {
+  private async seedBaseline(usage: UsageMap): Promise<{ bundledNames: Set<string>; treeNames: Set<string> }> {
     const bundledNames = new Set<string>()
+    const treeNames = new Set<string>()
     for (const summary of await this.skills.list()) {
+      treeNames.add(summary.name)
       if (!usage.has(summary.name)) usage.set(summary.name, emptyRecord())
       if (await this.skills.isBundled(summary.name)) bundledNames.add(summary.name)
     }
-    return bundledNames
+    return { bundledNames, treeNames }
   }
 
   private recentSessionActive(): boolean {

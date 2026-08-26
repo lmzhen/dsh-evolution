@@ -125,4 +125,39 @@ describe('evolution-curator', () => {
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
   })
+
+  it('dry-run reports what WOULD happen without mutating or pushing out the next run', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-dryrun-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+    await skills.create('ancient-skill', body('ancient-skill', 'Ancient body.'), 'background_review')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['ancient-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    const stateService = ctx.get('evolutionState') as { loadCuratorState(): Promise<{ lastRunAt: number } | null> } | undefined
+    const before = await stateService?.loadCuratorState()
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
+    // The skill stays in the active tree and the report records the would-be move.
+    expect(result.archived).toEqual([])
+    expect((await skills.list()).some(s => s.name === 'ancient-skill')).toBe(true)
+    expect(result.report.archiveCandidates).toContain('ancient-skill')
+    expect(result.report.runId).toBeTruthy()
+    const after = await stateService?.loadCuratorState()
+    // A dry-run must not push the next scheduled pass out (lastRunAt/runCount unchanged).
+    if (before && after) {
+      expect(after.lastRunAt).toBe(before.lastRunAt)
+    }
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
 })

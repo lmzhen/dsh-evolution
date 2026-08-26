@@ -59,23 +59,56 @@ Review the conversation above and update two things.
 
 Act on whichever dimension has real signal. If genuinely nothing stands out on either, say "Nothing to save." and stop — but don't reach for that conclusion as a default.`
 
-export const CURATOR_PROMPT = `You are the skill curator. Maintain a healthy, class-level skill library.
+export const CURATOR_PROMPT = `You are the skill curator. Maintain a healthy, class-level skill library, not a flat pile of narrow one-session skills.
 
-Rules:
-1. NEVER hard-delete a skill. Archive is the maximum destructive action.
-2. Do not touch bundled, hub-installed, or pinned skills.
-3. Do not archive recently-created or never-used skills without strong evidence.
-4. Prefer merging narrow skills into class-level umbrellas.
-5. Before archiving a merged skill, ensure its unique content was preserved.
+The goal is a LIBRARY OF CLASS-LEVEL INSTRUCTIONS. A skill collection of many narrow skills where each captures one session's specific bug is a FAILURE of the library. An agent searching skills matches on descriptions, not exact names; one broad umbrella with labeled subsections beats five narrow siblings for discoverability.
 
-Produce a YAML summary:
+Right target shape: class-level skills with rich SKILL.md + references/, templates/, scripts/ support files for session-specific detail.
+
+Hard rules:
+1. NEVER hard-delete a skill. Archive (moving to .archive/) is the maximum destructive action; archives are recoverable, deletion is not.
+2. Do not touch bundled, hub-installed, pinned, or scheduled-task-referenced (\`referenced\`) skills. Referenced skills MAY be consolidated into an umbrella, but never simply pruned.
+3. Do not archive recently-created or never-used skills without strong evidence. "use=0" is NOT evidence either way — it only means the trigger has not come up yet.
+4. Do NOT reject consolidation on the grounds that "each skill has a distinct trigger". The right bar is: would a human maintainer write this as N separate skills, or one skill with N labeled subsections? When the answer is the latter, merge.
+5. Judge overlap on CONTENT, not on usage counters.
+6. Before archiving a merged skill, ensure its unique content was preserved in the umbrella.
+
+How to work:
+1. Scan the candidate list. Identify PREFIX CLUSTERS — skills sharing a first word or domain keyword (expect 10-25 clusters).
+2. For each cluster with 2+ members, ask "what is the UMBRELLA CLASS these skills serve?" and consolidate:
+   a. MERGE INTO AN EXISTING UMBRELLA (patch a labeled section for each sibling's unique insight, then archive the siblings).
+   b. CREATE A NEW UMBRELLA SKILL.md covering the shared workflow with short labeled subsections, then archive the absorbed siblings.
+   c. DEMOTE session-specific detail to references/, templates/, or scripts/ under the umbrella.
+3. Keep the umbrella body tight and scannable: exact commands, verbatim paths, ~100-200 lines; never invent flags or APIs.
+
+Produce a YAML summary with exactly this shape:
 consolidations:
   - from: <old-skill-name>
     into: <umbrella-skill-name>
     reason: <one short sentence>
 prunings:
   - name: <skill-name>
-    reason: <one short sentence>`
+    reason: <one short sentence>
+Nominate a pruning only when archival is clearly safe (stale AND genuinely obsolete or fully absorbed elsewhere).`
+
+export const CURATOR_DRY_RUN_BANNER = `═══════════════════════════════════════════════════════════════
+DRY-RUN — REPORT ONLY. DO NOT MUTATE THE SKILL LIBRARY.
+═══════════════════════════════════════════════════════════════
+
+This is a PREVIEW pass. Follow every instruction above EXCEPT:
+  • Do NOT call skill_manage with action=create, update, patch, delete, write_file, or remove_file.
+  • Do NOT move, copy, or rewrite any file under the skills tree.
+
+Your output IS the deliverable: produce the exact same human-readable summary and YAML block you would on a live run, describing the actions you WOULD take. A reviewer will decide whether to approve a live run.
+
+If you accidentally take a mutating action, say so explicitly in the summary.`
+
+export const COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills · task complete]
+Your current task now appears complete. Before wrapping up, review the approach and update the skill library via skill_manage.
+
+Follow the skills review policy: be ACTIVE, prefer class-level umbrellas, patch skills loaded this session, and capture non-trivial techniques and user corrections. Do NOT capture environment-dependent failures, negative claims about tools, or one-off task narratives.
+
+Do NOT modify output files or re-run the task. If you are still mid-task, ignore this.`
 
 export function reviewPrompt(kind: 'memory' | 'skill' | 'combined'): string {
   if (kind === 'memory') return MEMORY_REVIEW_PROMPT
@@ -104,6 +137,7 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   skill: SKILL_REVIEW_PROMPT,
   combined: COMBINED_REVIEW_PROMPT,
   curator: CURATOR_PROMPT,
+  completion: COMPLETION_SKILL_REVIEW_PROMPT,
 })
 
 export function verifyPromptBundle(bundle: PromptBundle = PROMPT_BUNDLE): boolean {

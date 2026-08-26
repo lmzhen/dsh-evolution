@@ -50,6 +50,10 @@ export const MAX_SKILL_FILE_BYTES = 1_048_576
 
 export const DEFAULT_REVIEW_MEMORY_INTERVAL = 10
 export const DEFAULT_REVIEW_SKILL_INTERVAL = 10
+/** Skill-review completion channel trigger mode: 'cadence' | 'completion' | 'both'. */
+export const DEFAULT_SKILL_REVIEW_TRIGGER = 'both' as const
+/** Cumulative session tool calls before a session counts as "proven long" for the completion channel. */
+export const DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS = 20
 export const DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS = 3
 export const DEFAULT_SUBSTANTIVE_MIN_USER_CHARS = 200
 export const DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS = 500
