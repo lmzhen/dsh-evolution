@@ -37,8 +37,15 @@ export function apply(ctx: Context): void {
           const result = await curator.run({ ignoreGates: true })
           return { text: `Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}` }
         }
-        if (input === 'curator report') {
-          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
+        if (input === 'mutations') {
+          const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
+          if (!curator) return { text: 'Curator service not mounted.' }
+          const records = await curator.skills.listMutations()
+          if (records.length === 0) return { text: 'No mutation records yet.' }
+          const recent = records.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
+          return { text: `Mutations: ${records.length} recorded (recent 5):\n${recent.join('\n')}` }
+        }
+        if (input === 'curator report') {          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
           if (!curator) return { text: 'Curator service not mounted.' }
           const report = await curator.latestReport()
           if (!report) return { text: 'No curator report available.' }

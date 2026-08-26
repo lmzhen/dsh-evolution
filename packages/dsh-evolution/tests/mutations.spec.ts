@@ -1,0 +1,40 @@
+import { expect, it } from 'vitest'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { SkillLibrary, loadMutations, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
+
+const USABLE = (name: string) => `---
+name: ${name}
+description: A usable skill for mutation tests.
+---
+
+# ${name}
+
+Body of ${name}.
+`
+
+it('recordMutation appends and trims to the cap', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mutations-'))
+  const io = nodeEvolutionIo()
+  for (let index = 0; index < 5; index += 1) {
+    await recordMutation(root, io, { skillName: `s${index}`, action: 'update', summary: 'x', at: new Date().toISOString() }, 3)
+  }
+  const records = await loadMutations(root, io)
+  expect(records.length).toBe(3)
+  expect(records.map(record => record.skillName)).toEqual(['s2', 's3', 's4'])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('SkillLibrary mutations write audit records with before/after hashes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mutations-lib-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('audited-skill', USABLE('audited-skill'), 'foreground')
+  await lib.update('audited-skill', USABLE('audited-skill').replace('Body of audited-skill.', 'Updated body.'))
+  const records = await lib.listMutations()
+  expect(records.map(record => record.action)).toEqual(['create', 'update'])
+  expect(records[1]?.beforeHash).toBeTruthy()
+  expect(records[1]?.afterHash).toBeTruthy()
+  expect(records[1]?.beforeHash).not.toBe(records[1]?.afterHash)
+  await rm(root, { recursive: true, force: true })
+})

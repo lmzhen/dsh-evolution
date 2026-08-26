@@ -127,6 +127,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
     })
     await stateService?.saveReviewState(session.id, state)
     if (kind) {
+      session.append('evolution/review-scheduled', {
+        kind,
+        toolCalls: signal.toolCalls,
+        userChars: signal.userChars,
+        assistantChars: signal.assistantChars,
+      })
       const started = await trySubagentReview(session, agent, kind, signal)
       if (!started) {
         agent.inject(createUserMessage({
@@ -146,6 +152,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
     cumulativeToolCalls.set(session.id, cumulative)
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
+    session.append('evolution/review-scheduled', {
+      kind: 'skill',
+      toolCalls: signal.toolCalls,
+      userChars: signal.userChars,
+      assistantChars: signal.assistantChars,
+    })
     agent.inject(createUserMessage({
       content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
       source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },

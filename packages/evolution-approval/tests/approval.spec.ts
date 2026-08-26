@@ -95,4 +95,32 @@ describe('evolution-approval', () => {
 
     await rm(home, { recursive: true, force: true })
   })
+
+  it('normalizes approval summaries: truncation, batch label and archive warning', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-summary-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+
+    await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'x'.repeat(300), args: { action: 'add', facts: 'a' }, origin: 'background_review',
+    })
+    await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'memory batch', args: { operations: [{ action: 'add' }, { action: 'add' }, { action: 'remove' }], target: 'user' }, origin: 'background_review',
+    })
+    await ctx.evolutionApproval.request({
+      kind: 'skill', summary: 'skill delete old-skill', args: { operation: { action: 'delete' }, origin: 'background_review' }, origin: 'background_review',
+    })
+    const pending = await ctx.evolutionApproval.list('pending')
+    const bySummary = (suffix: string) => pending.find(item => item.summary.endsWith(suffix))?.summary
+    expect(bySummary('...')).toHaveLength(120)
+    expect(pending.some(item => item.summary === 'memory user batch of 3 operations')).toBe(true)
+    expect(pending.some(item => item.summary === 'skill delete old-skill (warning: archive)')).toBe(true)
+
+    await rm(home, { recursive: true, force: true })
+  })
 })

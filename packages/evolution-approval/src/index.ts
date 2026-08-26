@@ -98,12 +98,13 @@ export class EvolutionApproval extends Service {
 
   /** Evaluate one mutation. Returns allow, or stores the write and returns staged. */
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
+    const summary = normalizeSummary(input)
     if (!this.enabled) return { action: 'allow', message: 'Approval disabled.' }
     if (input.origin === 'background_review' || this.stageForeground) {
       const record: PendingRecord = {
         id: randomUUID(),
         kind: input.kind,
-        summary: input.summary,
+        summary,
         args: input.args,
         createdAt: new Date().toISOString(),
         status: 'pending',
@@ -178,3 +179,16 @@ export class EvolutionApproval extends Service {
 }
 
 export default EvolutionApproval
+
+/** Compact, batch-aware approval summary so pending lists stay scannable. */
+function normalizeSummary(input: { kind: PendingKind; summary: string; args: unknown }): string {
+  const trimmed = input.summary.length > 120 ? `${input.summary.slice(0, 117)}...` : input.summary
+  if (input.kind === 'memory') {
+    const candidate = input.args as { operations?: unknown[]; target?: string } | undefined
+    if (Array.isArray(candidate?.operations) && candidate.operations.length > 1) {
+      return `memory ${candidate.target ?? 'memory'} batch of ${candidate.operations.length} operations`
+    }
+  }
+  if (input.kind === 'skill' && /^skill delete /.test(trimmed)) return `${trimmed} (warning: archive)`
+  return trimmed
+}

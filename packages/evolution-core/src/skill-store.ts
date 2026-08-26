@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
+import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 export interface SkillLimits {
@@ -206,6 +207,46 @@ export class SkillLibrary {
     return await this.io.exists(markerPath(dir, 'bundled'))
   }
 
+  /** Count non-empty support subdirectories (richness input for quality scoring). */
+  async countSupportDirs(name: string): Promise<number> {
+    const dir = skillDir(this.root, name)
+    let entries: string[]
+    try { entries = await this.io.list(dir) } catch { return 0 }
+    let count = 0
+    for (const subdir of SUPPORT_DIRS) {
+      if (!entries.includes(subdir)) continue
+      try {
+        const files = await this.io.list(join(dir, subdir))
+        if (files.some(file => file !== '.gitkeep')) count += 1
+      } catch {
+        // Unknown support dir entry; not counted.
+      }
+    }
+    return count
+  }
+
+  /** Best-effort audit trail entry; never blocks the mutation. */
+  private async audit(skillName: string, action: string, before: string | null, after: string | null, summary: string): Promise<void> {
+    try {
+      await recordMutation(this.root, this.io, {
+        skillName,
+        action,
+        ...before === null ? {} : { beforeHash: contentHash(before) },
+        ...after === null ? {} : { afterHash: contentHash(after) },
+        summary,
+        at: new Date().toISOString(),
+      })
+    } catch {
+      // Auditing is best-effort; a transient disk failure must not surface
+      // after the mutation already landed.
+    }
+  }
+
+  /** Recent mutation audit records (read-only inspection surface). */
+  async listMutations(): Promise<MutationRecord[]> {
+    return await loadMutations(this.root, this.io)
+  }
+
   async create(name: string, content: string, origin: 'foreground' | 'background_review'): Promise<SkillActionResult> {
     const normalized = name.trim()
     if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
@@ -221,6 +262,7 @@ export class SkillLibrary {
     if (origin === 'background_review') {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
+    await this.audit(normalized, 'create', null, content, 'created')
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir }
   }
 
@@ -235,6 +277,7 @@ export class SkillLibrary {
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
     await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
+    await this.audit(name, 'update', md, content, 'updated')
     return { ok: true, message: `Skill "${name}" updated.`, path: dir }
   }
 
@@ -271,6 +314,7 @@ export class SkillLibrary {
     const threat = scanContentThreats(patched)
     if (threat) return { ok: false, message: threat }
     await this.io.writeText(target, patched.trimEnd() + '\n')
+    await this.audit(name, 'patch', md, patched, `patched ${patchLabel}`)
     return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir }
   }
 
@@ -300,6 +344,7 @@ export class SkillLibrary {
     }
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
     await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
+    await this.audit(name, 'archive', md, null, reason)
     return { ok: true, message: `Skill "${name}" archived to .archive.`, path: dest }
   }
 
@@ -400,7 +445,9 @@ export class SkillLibrary {
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
+    const existing = await this.io.readText(target).catch(() => null)
     await this.io.writeText(target, content)
+    await this.audit(name, 'write_file', existing, content, `wrote ${filePath}`)
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
 
@@ -413,7 +460,9 @@ export class SkillLibrary {
     if (validation) return { ok: false, message: validation }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     if (!await this.io.exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
+    const before = await this.io.readText(target).catch(() => null)
     await this.io.remove(target)
+    await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
   }
 

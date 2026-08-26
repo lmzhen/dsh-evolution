@@ -65,6 +65,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function executeCore(args: SkillWriteArgs, origin: 'foreground' | 'background_review' = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
     const action = args.action
     const name = args.name ?? ''
+    if (action === 'review') return { ok: true, message: await buildSkillReviewText(), skills: [] }
+    if (action === 'skip') return { ok: true, message: 'Skipped; no skill changes this pass.', skills: [] }
     if (action === 'list') {
       const list = await library.list()
       return { ok: true, message: `Listed ${list.length} skills.`, skills: list.map(s => s.name) }
@@ -82,27 +84,47 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // Lifecycle scope: curator only manages usage records created by the
       // background review pipeline. Keep the native runner aligned with the
       // legacy facade here, or review-created skills silently escape the
-      // stale/archive lifecycle.
+      // stale/archive lifecycle. Read-only actions (list/review/skip) must
+      // never bump counters or emit mutation events.
+      const mutating = action !== 'list' && action !== 'review' && action !== 'skip'
       if (name && action === 'create' && origin === 'background_review') await ctx.skillUsage.markAgentCreated(name)
-      if (name && action !== 'list') await ctx.skillUsage.record(name, 'patch')
-      ctx.emit('evolution/skill-mutated', {
-        action: action ?? '?',
-        name,
-        ...result.path && action === 'delete' ? { archivedPath: result.path } : result.path ? { filePath: result.path } : {},
-      })
+      if (name && mutating) await ctx.skillUsage.record(name, 'patch')
+      if (mutating) {
+        ctx.emit('evolution/skill-mutated', {
+          action: action ?? '?',
+          name,
+          ...result.path && action === 'delete' ? { archivedPath: result.path } : result.path ? { filePath: result.path } : {},
+        })
+      }
     }
     return { ok: result.ok, message: result.message, skills: [] }
+  }
+
+  async function buildSkillReviewText(): Promise<string> {
+    const list = await library.list()
+    const report = await ctx.skillUsage.report()
+    const lines = list.map((summary) => {
+      const record = report.get(summary.name)
+      const quality = record?.quality_score !== undefined
+        ? ` quality:${record.quality_score.toFixed(2)}${record.quality_warn ? '⚠' : ''}`
+        : ''
+      return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${summary.protectedBy ? ` [${summary.protectedBy}]` : ''}`
+    })
+    const header = list.length === 0
+      ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
+      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.`
+    return [header, '', ...lines].join('\n')
   }
 
   ctx.tools.register(defineTool({
     name: 'skill_manage',
     description:
-      'Manage reusable skills. create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive. '
-      + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review. '
+      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive. '
+      + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'list'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'skip'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -153,3 +175,4 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })
 }
+

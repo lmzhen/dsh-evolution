@@ -68,4 +68,37 @@ describe('tool-skill-manage', () => {
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
   })
+
+  it('review and skip are read-only: no counters, no mutation events', async () => {
+    const { ctx, root, previousHome } = await setup()
+    let mutationEvents = 0
+    ctx.on('evolution/skill-mutated', () => { mutationEvents += 1 })
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`review-skip-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    const created = await execute({ action: 'create', name: 'audit-skill', content: SKILL.replace('boundary-skill', 'audit-skill') })
+    expect(created.isError).toBe(false)
+    expect(mutationEvents).toBe(1)
+    const review = await execute({ action: 'review' })
+    expect(review.isError).toBe(false)
+    expect((review.value as { message?: string } | undefined)?.message ?? '').toContain('Skills:')
+    const patchesBefore = (await ctx.skillUsage.report()).get('audit-skill')?.patch_count ?? 0
+    const skip = await execute({ action: 'skip' })
+    expect(skip.isError).toBe(false)
+    // Read-only actions neither bump counters nor emit mutation events. The
+    // usage sidecar may be shared across fixtures, so assert on the delta.
+    expect(mutationEvents).toBe(1)
+    const usage = await ctx.skillUsage.report()
+    expect(usage.get('audit-skill')?.patch_count).toBe(patchesBefore)
+    expect(usage.get('audit-skill')?.use_count).toBe(0)
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
 })
+
+

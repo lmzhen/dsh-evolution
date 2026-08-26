@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, parseCuratorNominations, type CuratorNominations, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, parseCuratorNominations, type CuratorNominations, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -264,6 +264,18 @@ export class EvolutionCurator extends Service {
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
     })
+    // Quality scoring: F13 six-factor model (reference counts are graph-fed
+    // later; richness comes from the support subdirectories seen here).
+    const supportDirs = new Map<string, number>()
+    for (const name of treeNames) supportDirs.set(name, await this.skills.countSupportDirs(name))
+    const quality = computeQualityScores({ usage, supportDirs })
+    for (const [name, score] of quality) {
+      const record = usage.get(name)
+      if (record) {
+        record.quality_score = score.score
+        record.quality_warn = score.warn
+      }
+    }
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
     const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
