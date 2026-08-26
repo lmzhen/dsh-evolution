@@ -438,11 +438,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const skillName = (args.name ?? '').trim()
     let result
     if (action === 'create') result = await skills.create(skillName, args.content ?? '', origin)
-    else if (action === 'edit' || action === 'update') result = await skills.update(skillName, args.content ?? '')
-    else if (action === 'patch') result = await skills.patch(skillName, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true)
-    else if (action === 'delete') result = await skills.archive(skillName, args.absorbed_into ?? '')
-    else if (action === 'write_file') result = await skills.writeSupportFile(skillName, args.file_path ?? '', args.file_content ?? '')
-    else if (action === 'remove_file') result = await skills.removeSupportFile(skillName, args.file_path ?? '')
+    else if (action === 'edit' || action === 'update') result = await skills.update(skillName, args.content ?? '', origin)
+    else if (action === 'patch') result = await skills.patch(skillName, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
+    else if (action === 'delete') result = await skills.archive(skillName, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
+    else if (action === 'write_file') result = await skills.writeSupportFile(skillName, args.file_path ?? '', args.file_content ?? '', origin)
+    else if (action === 'remove_file') result = await skills.removeSupportFile(skillName, args.file_path ?? '', origin)
     else result = { ok: false, message: `Unknown action "${action}".` }
 
     if (result.ok) {
@@ -613,9 +613,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
       if (!skillName) continue
       let result
       if (action === 'create') result = await skills.create(skillName, op.content ?? '', 'background_review')
-      else if (action === 'update' || action === 'edit') result = await skills.update(skillName, op.content ?? '')
-      else if (action === 'patch') result = await skills.patch(skillName, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', op.replace_all === true)
-      else if (action === 'archive') result = await skills.archive(skillName, op.absorbed_into ?? '')
+      else if (action === 'update' || action === 'edit') result = await skills.update(skillName, op.content ?? '', 'background_review')
+      else if (action === 'patch') result = await skills.patch(skillName, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', op.replace_all === true, 'background_review')
+      else if (action === 'archive') result = await skills.archive(skillName, op.absorbed_into ? { absorbedInto: op.absorbed_into } : {})
       else continue
       if (result.ok) actions.push(`Skill ${skillName} ${action}`)
     }
@@ -650,7 +650,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       archiveAfterDays: config.curatorArchiveAfterDays,
     })
     for (const skillName of result.archive) {
-      const archived = await skills.archive(skillName, 'Lifecycle: reached archive threshold')
+      const archived = await skills.archive(skillName, { reason: 'Lifecycle: reached archive threshold' })
       if (!archived.ok) {
         const record = usage.get(skillName)
         if (record) record.state = 'active'

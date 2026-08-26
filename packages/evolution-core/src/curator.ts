@@ -18,6 +18,12 @@ export interface CuratorConfig {
   excludeSkillNames?: ReadonlySet<string>
   /** When true, usage records without created_by='agent' also enter the lifecycle. */
   manageUnmanaged?: boolean
+  /** When true, bundled skills (in `bundledNames`) are curation candidates like agent-created ones. */
+  pruneBuiltins?: boolean
+  /** Skill names carrying the bundled marker; only read when `pruneBuiltins` is true. */
+  bundledNames?: ReadonlySet<string>
+  /** Skill names the curator archived once and must not fight across re-seeds. */
+  suppressedNames?: ReadonlySet<string>
 }
 
 export interface CuratorTransition {
@@ -97,7 +103,10 @@ export function computeLifecycleTransitions(
   for (const [name, record] of usage) {
     if (record.pinned) continue
     if (config.excludeSkillNames?.has(name)) continue
-    if (record.created_by !== 'agent' && config.manageUnmanaged !== true) continue
+    if (config.suppressedNames?.has(name)) continue
+    const bundled = config.bundledNames?.has(name) === true
+    const managed = record.created_by === 'agent' || config.manageUnmanaged === true
+    if (!managed && !(config.pruneBuiltins === true && bundled)) continue
     if (PROTECTED_BUILTIN_SKILLS.has(name)) continue
     if (record.state === 'archived') continue
 

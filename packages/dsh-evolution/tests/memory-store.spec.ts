@@ -52,7 +52,29 @@ it('memory detects external file drift before mutation', async () => {
   const result = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
   expect(result.ok).toBe(false)
   expect(result.message).toContain('drift')
+  // F9: the drifted on-disk content is preserved as a .bak sidecar before the
+  // refusal, so an external edit stays recoverable.
+  expect(result.message).toMatch(/backup was saved/)
+  const { readdir, readFile } = await import('node:fs/promises')
+  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak.'))
+  expect(backups.length).toBe(1)
+  expect(await readFile(join(root, backups[0]!), 'utf8')).toContain('alpha')
   await rm(root, { recursive: true, force: true })
+})
+
+it('memory warns at 80% storage so the model consolidates before overflow', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-warn-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 100 })
+  const result = await store.add('memory', 'x'.repeat(85))
+  expect(result.ok).toBe(true)
+  expect(result.message).toContain('Storage at 85%')
+  // Below the 80% watermark the success message stays quiet.
+  const quietRoot = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-warn2-'))
+  const quiet = new MemoryStore({ root: quietRoot, memoryCharLimit: 100 })
+  const quietResult = await quiet.add('memory', 'y'.repeat(50))
+  expect(quietResult.message).not.toContain('Storage at')
+  await rm(root, { recursive: true, force: true })
+  await rm(quietRoot, { recursive: true, force: true })
 })
 
 it('memory detectDrift flags structural drift but not canonical content', async () => {

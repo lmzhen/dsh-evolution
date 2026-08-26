@@ -109,3 +109,33 @@ export function latestActivityAt(record: UsageRecord): string | null {
   if (values.length === 0) return null
   return values.sort().reverse()[0] ?? null
 }
+
+/**
+ * Curator suppression sidecar: built-in skills the curator has archived stay
+ * suppressed across re-seeds, so the lifecycle never fights a re-created
+ * bundled skill. Best-effort load/save, mirroring the usage sidecar posture.
+ */
+export function suppressedFile(root: string): string {
+  return join(root, '.curator-suppressed.json')
+}
+
+export async function loadSuppressedNames(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<ReadonlySet<string>> {
+  const raw = await io.readText(suppressedFile(root))
+  if (raw === null) return new Set()
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((entry): entry is string => typeof entry === 'string'))
+  } catch {
+    // Malformed sidecar is treated as empty. Suppression is best-effort.
+    return new Set()
+  }
+}
+
+export async function saveSuppressedNames(
+  root: string,
+  names: ReadonlySet<string>,
+  io: EvolutionIoLike = nodeEvolutionIo(),
+): Promise<void> {
+  await io.writeText(suppressedFile(root), JSON.stringify([...names].sort(), null, 2))
+}

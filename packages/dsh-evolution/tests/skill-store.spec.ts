@@ -90,3 +90,51 @@ it('skill consolidate is atomic: a protected source aborts before any mutation',
   expect((await lib.list()).some(s => s.name === 'src-pinned')).toBe(true)
   await rm(root, { recursive: true, force: true })
 })
+
+it('archive options: a reason string is never validated as absorbedInto (F1 regression)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('stale-skill', USABLE('stale-skill'), 'background_review')
+  // rc.12 bug: the curator passed 'Lifecycle: reached archive threshold' as the
+  // absorbed-into skill name, so every auto-archive failed with
+  // 'absorbed_into="Lifecycle: ..." does not exist'. A reason never validates.
+  const archived = await lib.archive('stale-skill', { reason: 'Lifecycle: reached archive threshold' })
+  expect(archived.ok).toBe(true)
+  // Absorbed-into validation still applies on consolidation semantics.
+  await lib.restoreFromArchive('stale-skill')
+  const absorbed = await lib.archive('stale-skill', { absorbedInto: 'no-such-umbrella' })
+  expect(absorbed.ok).toBe(false)
+  expect(absorbed.message).toMatch(/absorbed_into/)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('pinned skills are read-only to the background review but writable in the foreground', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('pinned-skill', USABLE('pinned-skill'), 'foreground')
+  await writeFile(join(root, 'pinned-skill', '.pinned'), '', 'utf8')
+  expect((await lib.update('pinned-skill', USABLE('pinned-skill'), 'background_review')).ok).toBe(false)
+  expect((await lib.patch('pinned-skill', 'Body of pinned-skill.', 'Post-review body.', '', false, 'background_review')).ok).toBe(false)
+  expect((await lib.writeSupportFile('pinned-skill', 'references/detail.md', '# Detail', 'background_review')).ok).toBe(false)
+  // Foreground (user-directed) writes stay allowed: pin blocks the lifecycle,
+  // not user improvements.
+  expect((await lib.patch('pinned-skill', 'Body of pinned-skill.', 'Foreground body.')).ok).toBe(true)
+  expect((await lib.writeSupportFile('pinned-skill', 'references/detail.md', '# Detail')).ok).toBe(true)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('bundled detection and allowBundled archival (F8 prune-builtins precondition)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('builtin-skill', USABLE('builtin-skill'), 'foreground')
+  await writeFile(join(root, 'builtin-skill', '.bundled'), '', 'utf8')
+  await lib.create('hub-skill', USABLE('hub-skill'), 'foreground')
+  await writeFile(join(root, 'hub-skill', '.hub-installed'), '', 'utf8')
+  expect(await lib.isBundled('builtin-skill')).toBe(true)
+  expect(await lib.isBundled('hub-skill')).toBe(false)
+  expect((await lib.archive('builtin-skill')).ok).toBe(false)
+  expect((await lib.archive('builtin-skill', { allowBundled: true })).ok).toBe(true)
+  // Hub-installed stays protected even with allowBundled (only bundled yields).
+  expect((await lib.archive('hub-skill', { allowBundled: true })).ok).toBe(false)
+  await rm(root, { recursive: true, force: true })
+})

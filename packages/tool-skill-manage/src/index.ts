@@ -71,11 +71,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     let result
     if (action === 'create') result = await library.create(name, args.content ?? '', origin)
-    else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '')
-    else if (action === 'patch') result = await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true)
-    else if (action === 'delete') result = await library.archive(name, args.absorbed_into ?? '')
-    else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '')
-    else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '')
+    else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin)
+    else if (action === 'patch') result = await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
+    else if (action === 'delete') result = await library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
+    else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin)
+    else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin)
     else result = { ok: false, message: `Unknown action "${action}".` }
 
     if (result.ok) {
@@ -98,7 +98,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     name: 'skill_manage',
     description:
       'Manage reusable skills. create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive. '
-      + 'Protected bundled/hub skills reject mutation; pinned skills reject delete only. Prefer patching an umbrella over creating narrow skills. '
+      + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review. '
+      + 'Prefer patching an umbrella over creating narrow skills. '
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
       action: { type: 'string', required: true, enum: ['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'list'] },

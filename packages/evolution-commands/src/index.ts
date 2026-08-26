@@ -32,9 +32,9 @@ export function apply(ctx: Context): void {
           return { text: result.message }
         }
         if (input === 'curator run') {
-          const curator = ctx.get('evolutionCurator') as { run(): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: { runId: string; snapshotPath?: string } }> } | undefined
+          const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: { runId: string; snapshotPath?: string } }> } | undefined
           if (!curator) return { text: 'Curator service not mounted.' }
-          const result = await curator.run()
+          const result = await curator.run({ ignoreGates: true })
           return { text: `Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}` }
         }
         if (input === 'curator report') {

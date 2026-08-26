@@ -3,7 +3,7 @@
  * Stores are MEMORY.md and USER.md under $DSH_HOME/memories (~/.dsh/memories).
  */
 
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { scanMemoryThreats } from './threats.ts'
@@ -106,6 +106,32 @@ export class MemoryStore {
     return { ok: false, message, entries, chars, limit: this.limitFor(target) }
   }
 
+  /** Percent-based storage hint appended to success message once the target is ≥80% full. */
+  private storageHint(target: MemoryTarget, chars: number): string {
+    const limit = this.limitFor(target)
+    if (limit <= 0) return ''
+    const percent = Math.floor((chars * 100) / limit)
+    return percent >= 80 ? ` ⚠️ Storage at ${percent}% (${chars}/${limit} chars).` : ''
+  }
+
+  /**
+   * Best-effort copy of the drifted on-disk file to `<file>.bak.<stamp>` before
+   * refusing the write, so an external edit stays recoverable. Failure to back
+   * up does not change the refusal semantics.
+   */
+  private async backupDrift(target: MemoryTarget): Promise<string | null> {
+    const path = fileFor(this.root, target)
+    const raw = await this.io.readText(path)
+    if (raw === null) return null
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    try {
+      await this.io.writeText(`${path}.bak.${stamp}`, raw)
+      return `${path}.bak.${stamp}`
+    } catch {
+      return null
+    }
+  }
+
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
     const content = facts.trim()
     if (!content) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
@@ -116,7 +142,7 @@ export class MemoryStore {
     if (entries.some(entry => stripDatePrefix(entry) === content)) {
       this.resetFailures()
       return {
-        ok: true, message: 'Entry already exists (no duplicate added).', entries,
+        ok: true, message: `Entry already exists (no duplicate added).${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries,
         chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target),
       }
     }
@@ -127,7 +153,7 @@ export class MemoryStore {
     }
     await this.write(target, next)
     this.resetFailures()
-    return { ok: true, message: 'Entry added.', entries: next, chars: total, limit: this.limitFor(target) }
+    return { ok: true, message: `Entry added.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }
   }
 
   async replace(target: MemoryTarget, oldText: string, facts: string): Promise<MemoryApplyResult> {
@@ -149,7 +175,9 @@ export class MemoryStore {
     }
 
     if (await this.detectDrift(target)) {
-      return { ok: false, message: 'External drift detected in memory file. Resolve the drift before retrying.', entries: [], chars: 0, limit: this.limitFor(target) }
+      const backup = await this.backupDrift(target)
+      const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
+      return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
     }
     const entries = await this.read(target)
     const matches = entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.includes(needle))
@@ -169,7 +197,7 @@ export class MemoryStore {
     if (total > this.limitFor(target)) return this.failure(target, `Resulting memory would exceed the ${this.limitFor(target)} char limit.`, entries)
     await this.write(target, next)
     this.resetFailures()
-    return { ok: true, message: `Entry ${action === 'remove' ? 'removed' : 'replaced'}.`, entries: next, chars: total, limit: this.limitFor(target) }
+    return { ok: true, message: `Entry ${action === 'remove' ? 'removed' : 'replaced'}.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }
   }
 
 
@@ -178,7 +206,9 @@ export class MemoryStore {
       return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     }
     if (await this.detectDrift(target)) {
-      return { ok: false, message: 'External drift detected in memory file. Resolve the drift before retrying.', entries: [], chars: 0, limit: this.limitFor(target) }
+      const backup = await this.backupDrift(target)
+      const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
+      return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
     }
     const entries = await this.read(target)
     const working = [...entries]
@@ -220,7 +250,7 @@ export class MemoryStore {
     }
     await this.write(target, working)
     this.resetFailures()
-    return { ok: true, message: `Applied ${operations.length} operation(s).`, entries: working, chars: total, limit: this.limitFor(target) }
+    return { ok: true, message: `Applied ${operations.length} operation(s).${this.storageHint(target, total)}`, entries: working, chars: total, limit: this.limitFor(target) }
   }
 
   async renderContext(): Promise<string> {

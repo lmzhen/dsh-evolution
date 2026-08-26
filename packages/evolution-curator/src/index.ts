@@ -12,8 +12,9 @@ import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
@@ -40,8 +41,19 @@ export interface Config {
   excludeSkillNames?: string[]
   /** Include usage records whose created_by is not 'agent' in lifecycle decisions. */
   manageUnmanaged?: boolean
+  /** Archive long-unused bundled skills too (with suppression against re-seeds). */
+  pruneBuiltins?: boolean
   /** Max tokens for the optional LLM nomination pass. */
   curatorReviewMaxTokens?: number
+}
+
+/** Outcome of one curator run pass. */
+export interface CuratorRunOutcome {
+  stale: string[]
+  archived: string[]
+  errors: string[]
+  report: CuratorRunReport
+  skipped?: string
 }
 
 export class EvolutionCurator extends Service {
@@ -54,9 +66,10 @@ export class EvolutionCurator extends Service {
     llmReview: z.boolean().default(false),
     curatorProvider: z.string().default('deepseek-official'),
     qualityWarnStaleAfterDays: z.number().default(7),
-    minIdleHours: z.number().default(0),
+    minIdleHours: z.number().default(DEFAULT_MIN_IDLE_HOURS),
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
+    pruneBuiltins: z.boolean().default(false),
     curatorReviewMaxTokens: z.number().default(2048),
   })
 
@@ -72,6 +85,7 @@ export class EvolutionCurator extends Service {
   private readonly minIdleHours: number
   private readonly excludeSkillNames: ReadonlySet<string>
   private readonly manageUnmanaged: boolean
+  private readonly pruneBuiltins: boolean
   private readonly curatorReviewMaxTokens: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
@@ -87,9 +101,10 @@ export class EvolutionCurator extends Service {
     this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
     this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? 7
-    this.minIdleHours = config.minIdleHours ?? 0
+    this.minIdleHours = config.minIdleHours ?? DEFAULT_MIN_IDLE_HOURS
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
+    this.pruneBuiltins = config.pruneBuiltins ?? false
     this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
     this.lastRun = Date.now()
     this.ctx.effect(() => {
@@ -185,7 +200,11 @@ export class EvolutionCurator extends Service {
     })
   }
 
-  async run(): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: CuratorRunReport; skipped?: string }> {
+  /**
+   * Run one curator pass. `ignoreGates` skips the interval and idle gates so an
+   * explicit `/evolution curator run` always executes (manual-run semantics).
+   */
+  async run(options: { ignoreGates?: boolean } = {}): Promise<CuratorRunOutcome> {
     const startedAt = new Date().toISOString()
     const runId = randomUUID()
     const stateService = this.ctx.get('evolutionState') as {
@@ -194,14 +213,14 @@ export class EvolutionCurator extends Service {
     } | undefined
     const lifecycle = this.lifecycle()
     const persisted = await stateService?.loadCuratorState()
-    if (persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
+    if (!options.ignoreGates && persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport(runId, startedAt),
         skipped: 'interval',
       }
     }
-    if (this.minIdleHours > 0 && this.recentSessionActive()) {
+    if (!options.ignoreGates && this.minIdleHours > 0 && this.recentSessionActive()) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport(runId, startedAt),
@@ -211,27 +230,45 @@ export class EvolutionCurator extends Service {
     const root = this.skills.root
     const snapshotPath = await this.skills.snapshotAll('pre-curator-run')
     const usage: UsageMap = await loadUsage(root, this.io)
+    const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
+    // Seed baseline records for tree skills the sidecar has not seen yet, so
+    // their inactivity clock starts now (first-sight defer) and bundled skills
+    // become known candidates only when prune-builtins opts them in.
+    const bundledNames = new Set<string>()
+    for (const summary of await this.skills.list()) {
+      if (!usage.has(summary.name)) usage.set(summary.name, emptyRecord())
+      if (await this.skills.isBundled(summary.name)) bundledNames.add(summary.name)
+    }
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: lifecycle.staleAfterDays,
       archiveAfterDays: lifecycle.archiveAfterDays,
       qualityWarnStaleAfterDays: this.qualityWarnStaleAfterDays,
       excludeSkillNames: this.excludeSkillNames,
       manageUnmanaged: this.manageUnmanaged,
+      pruneBuiltins: this.pruneBuiltins,
+      bundledNames,
+      suppressedNames,
     })
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
     const llmNominations = this.llmReview ? await this.recommend(result.markStale) : []
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
+    let suppressedChanged = false
     for (const name of archiveCandidates) {
-      const archived = await this.skills.archive(name, 'Lifecycle: reached archive threshold')
+      const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
         const record = usage.get(name)
         if (record) record.state = 'active'
         errors.push(`${name}: ${archived.message}`)
       } else {
         archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
+        if (bundledNames.has(name)) {
+          suppressedNames.add(name)
+          suppressedChanged = true
+        }
       }
     }
+    if (suppressedChanged) await saveSuppressedNames(root, suppressedNames, this.io)
     await saveUsage(root, usage, this.io)
     this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
@@ -322,6 +359,8 @@ export class EvolutionCurator extends Service {
     const record = usage.get(name)
     if (record) record.state = 'active'
     await saveUsage(this.skills.root, usage, this.io)
+    const suppressed = new Set(await loadSuppressedNames(this.skills.root, this.io))
+    if (suppressed.delete(name)) await saveSuppressedNames(this.skills.root, suppressed, this.io)
     return result
   }
 }

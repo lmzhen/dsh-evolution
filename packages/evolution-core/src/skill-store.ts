@@ -42,6 +42,19 @@ export interface SkillActionResult {
   path?: string
 }
 
+/** Who is writing: a foreground user-directed tool call, or the autonomous review/curator pipeline. */
+export type WriteOrigin = 'foreground' | 'background_review'
+
+/** Options for `SkillLibrary.archive`. The absorbed-into name and the archival reason are distinct fields. */
+export interface ArchiveOptions {
+  /** Umbrella skill this one was consolidated into; when set it must exist (consolidate semantics). */
+  absorbedInto?: string
+  /** Human-readable reason written to `.archive-reason`; default derives from `absorbedInto`. */
+  reason?: string
+  /** Permit archiving a bundled skill (curator prune-builtins only; hub-installed and pinned stay protected). */
+  allowBundled?: boolean
+}
+
 export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
   return join(env.DSH_HOME ?? join(homedir(), '.dsh'), 'skills')
 }
@@ -160,17 +173,23 @@ export class SkillLibrary {
     return this.io.readText(join(skillDir(this.root, name), 'SKILL.md'))
   }
 
-  async writeProtection(name: string): Promise<string | null> {
+  async writeProtection(name: string, origin: WriteOrigin = 'foreground'): Promise<string | null> {
     const dir = skillDir(this.root, name)
     for (const marker of ['bundled', 'hub-installed'] as const) {
       if (await this.io.exists(markerPath(dir, marker))) return marker
     }
+    // Pinned means "user froze this skill": foreground writes may still patch
+    // it, but the autonomous review/curator pipeline must not rewrite it.
+    if (origin === 'background_review' && await this.io.exists(markerPath(dir, 'pinned'))) return 'pinned'
     return null
   }
 
-  async deleteProtection(name: string): Promise<string | null> {
+  async deleteProtection(name: string, options: { allowBundled?: boolean } = {}): Promise<string | null> {
     const dir = skillDir(this.root, name)
-    for (const marker of ['bundled', 'hub-installed', 'pinned'] as const) {
+    const markers: ReadonlyArray<'bundled' | 'hub-installed' | 'pinned'> = options.allowBundled
+      ? ['hub-installed', 'pinned']
+      : ['bundled', 'hub-installed', 'pinned']
+    for (const marker of markers) {
       if (await this.io.exists(markerPath(dir, marker))) return marker
     }
     return null
@@ -179,6 +198,12 @@ export class SkillLibrary {
   async isManaged(name: string): Promise<boolean> {
     const dir = skillDir(this.root, name)
     return await this.io.exists(markerPath(dir, 'hermes-managed'))
+  }
+
+  /** Whether the skill carries the bundled marker (curator prune-builtins eligibility). */
+  async isBundled(name: string): Promise<boolean> {
+    const dir = skillDir(this.root, name)
+    return await this.io.exists(markerPath(dir, 'bundled'))
   }
 
   async create(name: string, content: string, origin: 'foreground' | 'background_review'): Promise<SkillActionResult> {
@@ -199,11 +224,11 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir }
   }
 
-  async update(name: string, content: string): Promise<SkillActionResult> {
+  async update(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.writeProtection(name)
+    const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateFrontmatter(content, name, this.limits)
     if (validation) return { ok: false, message: validation }
@@ -213,11 +238,11 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" updated.`, path: dir }
   }
 
-  async patch(name: string, oldString: string, newString: string, filePath = '', replaceAll = false): Promise<SkillActionResult> {
+  async patch(name: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     const skillMd = join(dir, 'SKILL.md')
     if (!await this.io.exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.writeProtection(name)
+    const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
 
     let target = skillMd
@@ -249,15 +274,15 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir }
   }
 
-  async archive(name: string, absorbedInto = ''): Promise<SkillActionResult> {
+  async archive(name: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.deleteProtection(name)
+    const protection = await this.deleteProtection(name, options.allowBundled === undefined ? {} : { allowBundled: options.allowBundled })
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
-    if (absorbedInto) {
-      const target = await this.io.readText(join(skillDir(this.root, absorbedInto), 'SKILL.md'))
-      if (!target) return { ok: false, message: `absorbed_into="${absorbedInto}" does not exist.` }
+    if (options.absorbedInto) {
+      const target = await this.io.readText(join(skillDir(this.root, options.absorbedInto), 'SKILL.md'))
+      if (!target) return { ok: false, message: `absorbed_into="${options.absorbedInto}" does not exist.` }
     }
     const archiveRoot = join(this.root, '.archive')
     let dest = join(archiveRoot, name)
@@ -273,7 +298,7 @@ export class SkillLibrary {
       await this.io.copy(dir, dest)
       await this.io.remove(dir)
     }
-    const reason = absorbedInto ? `Consolidated into ${absorbedInto}` : 'Archived by self-evolution curator'
+    const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
     await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
     return { ok: true, message: `Skill "${name}" archived to .archive.`, path: dest }
   }
@@ -283,7 +308,7 @@ export class SkillLibrary {
    * an absorbed-into marker. Hermes-style consolidation: overlapping skills
    * collapse into one, and the originals stay recoverable under `.archive/`.
    */
-  async consolidate(target: string, sources: string[]): Promise<SkillActionResult> {
+  async consolidate(target: string, sources: string[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const normalizedSources = [...new Set(sources)].filter(name => name !== target)
     if (normalizedSources.length === 0) return { ok: false, message: 'Consolidation requires at least one distinct source skill.' }
     for (const name of [target, ...normalizedSources]) {
@@ -292,7 +317,7 @@ export class SkillLibrary {
     const targetDir = skillDir(this.root, target)
     const targetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
     if (!targetMd) return { ok: false, message: `Skill "${target}" not found.` }
-    const targetProtection = await this.writeProtection(target)
+    const targetProtection = await this.writeProtection(target, origin)
     if (targetProtection) return { ok: false, message: `Skill "${target}" is protected (${targetProtection}).` }
     const parts: string[] = []
     for (const source of normalizedSources) {
@@ -317,7 +342,7 @@ export class SkillLibrary {
     const archived: string[] = []
     try {
       for (const source of normalizedSources) {
-        const result = await this.archive(source, target)
+        const result = await this.archive(source, { absorbedInto: target })
         if (!result.ok) return result
         archived.push(source)
       }
@@ -364,10 +389,10 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
 
-  async writeSupportFile(name: string, filePath: string, content: string): Promise<SkillActionResult> {
+  async writeSupportFile(name: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.writeProtection(name)
+    const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
@@ -379,10 +404,10 @@ export class SkillLibrary {
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
 
-  async removeSupportFile(name: string, filePath: string): Promise<SkillActionResult> {
+  async removeSupportFile(name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const dir = skillDir(this.root, name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.writeProtection(name)
+    const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
