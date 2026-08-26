@@ -9,6 +9,20 @@ import { resolve, sep, join } from 'node:path'
 import { homedir } from 'node:os'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
+import {
+  DEFAULT_REVIEW_MEMORY_INTERVAL,
+  DEFAULT_REVIEW_SKILL_INTERVAL,
+  DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS,
+  DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
+  DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
+  DEFAULT_MAX_OPS_PER_PLAN,
+  DEFAULT_CURATOR_INTERVAL_HOURS,
+  DEFAULT_STALE_AFTER_DAYS,
+  DEFAULT_ARCHIVE_AFTER_DAYS,
+  DEFAULT_MEMORY_CHAR_LIMIT,
+  DEFAULT_USER_CHAR_LIMIT,
+  DEFAULT_SKILL_CONTENT_CHARS,
+} from '@deepseek-ai/dsh-evolution-core'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -60,22 +74,22 @@ export interface Config {
 }
 
 export const Config: Schema<Config> = z.object({
-  reviewMemoryInterval: z.number().default(10),
-  reviewSkillInterval: z.number().default(10),
-  substantiveMinToolCalls: z.number().default(3),
-  substantiveMinUserChars: z.number().default(200),
-  substantiveMinAgentChars: z.number().default(500),
+  reviewMemoryInterval: z.number().default(DEFAULT_REVIEW_MEMORY_INTERVAL),
+  reviewSkillInterval: z.number().default(DEFAULT_REVIEW_SKILL_INTERVAL),
+  substantiveMinToolCalls: z.number().default(DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS),
+  substantiveMinUserChars: z.number().default(DEFAULT_SUBSTANTIVE_MIN_USER_CHARS),
+  substantiveMinAgentChars: z.number().default(DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS),
   reviewMode: z.string().default('subagent'),
   memoryReviewModel: z.string().default('deepseek-v4-flash'),
   skillReviewModel: z.string().default('deepseek-v4-pro'),
   curatorModel: z.string().default('deepseek-v4-pro'),
-  memoryChars: z.number().default(2200),
-  userChars: z.number().default(1375),
-  skillContentChars: z.number().default(100_000),
-  maxOpsPerPlan: z.number().default(32),
-  curatorIntervalHours: z.number().default(168),
-  staleAfterDays: z.number().default(30),
-  archiveAfterDays: z.number().default(90),
+  memoryChars: z.number().default(DEFAULT_MEMORY_CHAR_LIMIT),
+  userChars: z.number().default(DEFAULT_USER_CHAR_LIMIT),
+  skillContentChars: z.number().default(DEFAULT_SKILL_CONTENT_CHARS),
+  maxOpsPerPlan: z.number().default(DEFAULT_MAX_OPS_PER_PLAN),
+  curatorIntervalHours: z.number().default(DEFAULT_CURATOR_INTERVAL_HOURS),
+  staleAfterDays: z.number().default(DEFAULT_STALE_AFTER_DAYS),
+  archiveAfterDays: z.number().default(DEFAULT_ARCHIVE_AFTER_DAYS),
   protectedSkillNames: z.array(z.string()).default([]),
   protectedPaths: z.array(z.string()).default([]),
 })
@@ -97,22 +111,22 @@ export class EvolutionPolicy extends Service {
     const homePolicyPath = resolve(join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'evolution', 'policy.json'))
     this.snapshot = Object.freeze({
       version: 1 as const,
-      reviewMemoryInterval: config.reviewMemoryInterval ?? 10,
-      reviewSkillInterval: config.reviewSkillInterval ?? 10,
-      substantiveMinToolCalls: config.substantiveMinToolCalls ?? 3,
-      substantiveMinUserChars: config.substantiveMinUserChars ?? 200,
-      substantiveMinAgentChars: config.substantiveMinAgentChars ?? 500,
+      reviewMemoryInterval: config.reviewMemoryInterval ?? DEFAULT_REVIEW_MEMORY_INTERVAL,
+      reviewSkillInterval: config.reviewSkillInterval ?? DEFAULT_REVIEW_SKILL_INTERVAL,
+      substantiveMinToolCalls: config.substantiveMinToolCalls ?? DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS,
+      substantiveMinUserChars: config.substantiveMinUserChars ?? DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
+      substantiveMinAgentChars: config.substantiveMinAgentChars ?? DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
       reviewMode: config.reviewMode === 'inject' ? 'inject' : 'subagent',
       memoryReviewModel: config.memoryReviewModel ?? 'deepseek-v4-flash',
       skillReviewModel: config.skillReviewModel ?? 'deepseek-v4-pro',
       curatorModel: config.curatorModel ?? 'deepseek-v4-pro',
-      memoryChars: config.memoryChars ?? 2200,
-      userChars: config.userChars ?? 1375,
-      skillContentChars: config.skillContentChars ?? 100_000,
-      maxOpsPerPlan: config.maxOpsPerPlan ?? 32,
-      curatorIntervalHours: config.curatorIntervalHours ?? 168,
-      staleAfterDays: config.staleAfterDays ?? 30,
-      archiveAfterDays: config.archiveAfterDays ?? 90,
+      memoryChars: config.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
+      userChars: config.userChars ?? DEFAULT_USER_CHAR_LIMIT,
+      skillContentChars: config.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
+      maxOpsPerPlan: config.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
+      curatorIntervalHours: config.curatorIntervalHours ?? DEFAULT_CURATOR_INTERVAL_HOURS,
+      staleAfterDays: config.staleAfterDays ?? DEFAULT_STALE_AFTER_DAYS,
+      archiveAfterDays: config.archiveAfterDays ?? DEFAULT_ARCHIVE_AFTER_DAYS,
       protectedSkillNames: Object.freeze([...new Set(['plan', ...(config.protectedSkillNames ?? [])])]),
       protectedPaths: Object.freeze([...(config.protectedPaths ?? []), homePolicyPath]),
     })

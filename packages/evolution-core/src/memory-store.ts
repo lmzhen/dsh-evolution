@@ -7,8 +7,9 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { scanMemoryThreats } from './threats.ts'
+import { ENTRY_DELIMITER } from './constants.ts'
 
-export const ENTRY_DELIMITER = '\n§\n'
+export { ENTRY_DELIMITER } from './constants.ts'
 
 export type MemoryTarget = 'memory' | 'user'
 

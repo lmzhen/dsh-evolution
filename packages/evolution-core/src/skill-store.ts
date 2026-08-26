@@ -11,12 +11,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
-
-export const SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
-export const MAX_SKILL_NAME_LENGTH = 64
-export const MAX_DESCRIPTION_LENGTH = 1024
-export const MAX_SKILL_CONTENT_CHARS = 100_000
-export const MAX_SKILL_FILE_BYTES = 1_048_576
+import { MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 export interface SkillLimits {
   maxNameLength: number
@@ -31,7 +26,6 @@ export const DEFAULT_SKILL_LIMITS: SkillLimits = {
   maxSkillContentChars: MAX_SKILL_CONTENT_CHARS,
   maxSkillFileBytes: MAX_SKILL_FILE_BYTES,
 }
-export const SUPPORT_DIRS = ['references', 'templates', 'scripts', 'assets'] as const
 
 export interface SkillSummary {
   name: string

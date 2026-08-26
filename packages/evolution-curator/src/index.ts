@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { buildCuratorRunReport, computeLifecycleTransitions, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
@@ -48,9 +48,9 @@ export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
     enabled: z.boolean().default(true),
-    intervalHours: z.number().default(168),
-    staleAfterDays: z.number().default(30),
-    archiveAfterDays: z.number().default(90),
+    intervalHours: z.number().default(DEFAULT_CURATOR_INTERVAL_HOURS),
+    staleAfterDays: z.number().default(DEFAULT_STALE_AFTER_DAYS),
+    archiveAfterDays: z.number().default(DEFAULT_ARCHIVE_AFTER_DAYS),
     llmReview: z.boolean().default(false),
     curatorProvider: z.string().default('deepseek-official'),
     qualityWarnStaleAfterDays: z.number().default(7),

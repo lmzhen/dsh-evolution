@@ -11,7 +11,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactReviewSecrets } from './redact.ts'
@@ -38,8 +38,8 @@ export interface Config {
 export const Config: z<Config> = z.object({
   reviewEnabled: z.boolean().default(true),
   reviewMode: z.string().default('subagent'),
-  memoryInterval: z.number().default(10),
-  skillInterval: z.number().default(10),
+  memoryInterval: z.number().default(DEFAULT_REVIEW_MEMORY_INTERVAL),
+  skillInterval: z.number().default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill', 'skill_search', 'skill_load']),
   reviewTimeoutMs: z.number().default(120_000),
   executionTimeoutMs: z.number().default(30_000),

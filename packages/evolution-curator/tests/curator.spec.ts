@@ -38,9 +38,9 @@ describe('evolution-curator', () => {
     await ctx.plugin(EvolutionCurator)
     const skills = ctx.evolutionCurator.skills
     const skill = (name: string, description: string, body: string) => `---\nname: ${name}\ndescription: ${description}\n---\n${body}\n`
-    await skills.create('target-skill', skill('target-skill', 't', 'Target body.'))
-    await skills.create('source-a', skill('source-a', 'a', 'Body A.'))
-    await skills.create('source-b', skill('source-b', 'b', 'Body B.'))
+    await skills.create('target-skill', skill('target-skill', 't', 'Target body.'), 'foreground')
+    await skills.create('source-a', skill('source-a', 'a', 'Body A.'), 'foreground')
+    await skills.create('source-b', skill('source-b', 'b', 'Body B.'), 'foreground')
     const result = await ctx.evolutionCurator.consolidate('target-skill', ['source-a', 'source-b'])
     expect(result.ok).toBe(true)
     const merged = await skills.read('target-skill')

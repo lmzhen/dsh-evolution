@@ -5,6 +5,9 @@
 
 import type { UsageMap } from './usage.ts'
 import { latestActivityAt } from './usage.ts'
+import { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
+
+export { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
 export interface CuratorConfig {
   staleAfterDays: number
@@ -30,8 +33,6 @@ export interface CuratorResult {
   reactivate: string[]
   markStale: string[]
 }
-
-export const PROTECTED_BUILTIN_SKILLS: ReadonlySet<string> = new Set(['plan'])
 
 export interface CuratorArchivedSkill {
   name: string
