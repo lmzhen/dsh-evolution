@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, computeDedupGroups, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -37,7 +37,7 @@ export const Config: z<Config> = z.object({
 })
 
 interface ApprovalLike {
-  request(input: { kind: 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  request(input: { kind: 'skill'; summary: string; args: unknown; origin: WriteOrigin }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   registerRunner(kind: 'skill', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
 }
 
@@ -62,7 +62,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     maxSkillFileBytes: rawConfig.maxSkillFileBytes ?? DEFAULT_SKILL_LIMITS.maxSkillFileBytes,
   })
 
-  async function executeCore(args: SkillWriteArgs, origin: 'foreground' | 'background_review' = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
+  async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
     const action = args.action
     const name = args.name ?? ''
     if (action === 'review') return { ok: true, message: await buildSkillReviewText(), skills: [] }
@@ -110,10 +110,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         : ''
       return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${summary.protectedBy ? ` [${summary.protectedBy}]` : ''}`
     })
+    const groups = computeDedupGroups({ contents: new Map(await Promise.all(list.map(async summary => [summary.name, (await library.read(summary.name)) ?? ''] as const))) })
+    const dedupLines = groups.slice(0, 3).map(group => `- ${group.join(' ~ ')}`)
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
-      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.`
-    return [header, '', ...lines].join('\n')
+      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
+    return [header, '', ...lines, ...dedupLines].join('\n')
   }
 
   ctx.tools.register(defineTool({

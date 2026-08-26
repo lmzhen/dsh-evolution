@@ -326,7 +326,13 @@ export class EvolutionCurator extends Service {
           this.ctx.logger.warn('evolution-curator: failed to persist suppressed names; archived built-ins may re-enter the lifecycle')
         }
       }
-      await saveUsage(root, usage, this.io)
+      try {
+        await saveUsage(root, usage, this.io)
+      } catch {
+        // Best-effort: curation decisions already landed; a failed usage flush
+        // must not surface as a run error after the fact.
+        this.ctx.logger.warn('evolution-curator: failed to persist usage sidecar')
+      }
     }
     if (!dryRun) this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
@@ -338,10 +344,12 @@ export class EvolutionCurator extends Service {
       llmNominations,
       archiveCandidates,
       archived: archivedSkills,
-      failed: archiveCandidates.filter(name => errors.some(error => error.startsWith(`${name}:`))).map((name) => {
-        const error = errors.find(item => item.startsWith(`${name}:`))
-        return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
-      }),
+      failed: [...new Set([...archiveCandidates, ...nominations.consolidations.map(item => item.from)])]
+        .filter(name => errors.some(error => error.startsWith(`${name}:`)))
+        .map((name) => {
+          const error = errors.find(item => item.startsWith(`${name}:`))
+          return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
+        }),
       ...snapshotPath === undefined ? {} : { snapshotPath },
     })
     const reportsRoot = join(evolutionHome(), 'reports')

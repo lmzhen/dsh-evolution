@@ -60,12 +60,12 @@ export function apply(ctx: Context): void {
       description: 'Show the current learning graph',
       recordInput: false,
       handler: async () => {
-        const usage = ctx.get('skillUsage') as { report(): Promise<Map<string, unknown>> } | undefined
+        const usage = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
         const memory = ctx.get('memory') as { read(target: 'memory' | 'user'): Promise<string[]> } | undefined
         if (!usage || !memory) return { text: 'skill-usage or memory service is not mounted.' }
         const usageMap = await usage.report()
         const memoryEntries = await memory.read('memory')
-        const graph = buildLearningGraph(usageMap as unknown as Map<string, { use_count?: number; pinned?: boolean }>, memoryEntries)
+        const graph = buildLearningGraph(usageMap, memoryEntries)
         const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
         const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
         return { text: lines.join('\n') + '\n\n' + edges.join('\n') }

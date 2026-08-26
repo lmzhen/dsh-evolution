@@ -36,6 +36,7 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
 export function nodeEvolutionIo(): EvolutionIoLike {
   return {
     async readText(path) {
+      // Swallowed: the file may not exist or be unreadable; null is the "missing" signal.
       try { return await readFile(path, 'utf8') } catch { return null }
     },
     async writeText(path, content) {
@@ -48,9 +49,11 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       await rm(path, { recursive: true, force: true })
     },
     async list(path) {
+      // Swallowed: an absent or unreadable directory reads as empty.
       try { return await readdir(path) } catch { return [] }
     },
     async exists(path) {
+      // Swallowed: any stat failure means "not there".
       try { await stat(path); return true } catch { return false }
     },
     async rename(path, destination) {
