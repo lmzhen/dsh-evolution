@@ -35,12 +35,11 @@ const releaseVersion = arg('--version', '0.1.0-rc.1')
 const upstreamVersion = arg('--upstream-version', '0.1.0-rc.6')
 
 /**
- * Packages kept in the tree as source of record and still covered by tests,
- * but retired from npm publishing. The legacy `dsh-evolution` facade is
- * superseded by the host bundle + Evolution agent preset; all published
- * versions are deprecated and a fresh release must not revive it.
+ * Packages kept in the tree as source of record but retired from npm
+ * publishing. The legacy `dsh-evolution` facade was deleted at rc.18
+ * (superseded by the host bundle + Evolution agent preset).
  */
-const PUBLISH_EXCLUDE = new Set(['dsh-evolution'])
+const PUBLISH_EXCLUDE = new Set<string>()
 
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
@@ -197,9 +196,6 @@ for (const item of tarballs) {
   const entry = join(staged, 'lib', 'index.js')
   if (existsSync(entry)) {
     const entryText = readFileSync(entry, 'utf8')
-    if (entryText.includes('@deepseek-ai/dsh-evolution/src/')) {
-      failures.push(`${item.name}: lib/index.js still imports a dsh-evolution source subpath`)
-    }
     for (const originalName of names.keys()) {
       if (entryText.includes(originalName)) {
         failures.push(`${item.name}: lib/index.js still imports ${originalName}`)

@@ -10,7 +10,13 @@
  */
 import { createHash } from 'node:crypto'
 
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@1'
+/**
+ * Prompt bundle identity. Bump both id and version whenever a prompt's text
+ * changes semantically: the bundle digest is the fail-closed signal for
+ * review workers, so a stale id across deployments must be distinguishable.
+ */
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@2'
+export const PROMPT_BUNDLE_VERSION = 2
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -128,8 +134,17 @@ function sha256(text: string): string {
 }
 
 function createPromptBundle(prompts: Record<string, string>): PromptBundle {
-  const canonical = JSON.stringify({ id: PROMPT_BUNDLE_ID, version: 1, prompts: Object.fromEntries(Object.entries(prompts).sort()) })
-  return Object.freeze({ id: PROMPT_BUNDLE_ID, version: 1, prompts: Object.freeze({ ...prompts }), sha256: sha256(canonical) })
+  const canonical = JSON.stringify({
+    id: PROMPT_BUNDLE_ID,
+    version: PROMPT_BUNDLE_VERSION,
+    prompts: Object.fromEntries(Object.entries(prompts).sort()),
+  })
+  return Object.freeze({
+    id: PROMPT_BUNDLE_ID,
+    version: PROMPT_BUNDLE_VERSION,
+    prompts: Object.freeze({ ...prompts }),
+    sha256: sha256(canonical),
+  })
 }
 
 export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({

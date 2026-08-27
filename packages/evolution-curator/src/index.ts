@@ -264,76 +264,20 @@ export class EvolutionCurator extends Service {
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
     })
-    // Quality scoring: F13 six-factor model (reference counts are graph-fed
-    // later; richness comes from the support subdirectories seen here).
-    const supportDirs = new Map<string, number>()
-    for (const name of treeNames) supportDirs.set(name, await this.skills.countSupportDirs(name))
-    const quality = computeQualityScores({ usage, supportDirs })
-    for (const [name, score] of quality) {
-      const record = usage.get(name)
-      if (record) {
-        record.quality_score = score.score
-        record.quality_warn = score.warn
-      }
-    }
-    const errors: string[] = []
-    const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
+    await this.scoreTree(usage, treeNames)
     const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
     const llmNominations = nominations.prunings
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
-    let suppressedChanged = false
-    if (!dryRun) {
-      for (const name of archiveCandidates) {
-        const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
-        if (!archived.ok) {
-          const record = usage.get(name)
-          if (record) record.state = 'active'
-          errors.push(`${name}: ${archived.message}`)
-        } else {
-          archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
-          if (bundledNames.has(name)) {
-            suppressedNames.add(name)
-            suppressedChanged = true
-          }
-        }
-      }
-      const alreadyArchived = new Set(archiveCandidates)
-      for (const nomination of nominations.consolidations) {
-        if (alreadyArchived.has(nomination.from)) continue
-        if (!treeNames.has(nomination.from) || !treeNames.has(nomination.into)) {
-          errors.push(`${nomination.from}: consolidation target or source missing from the skill tree`)
-          continue
-        }
-        const consolidated = await this.skills.consolidate(nomination.into, [nomination.from], 'background_review')
-        if (!consolidated.ok) {
-          errors.push(`${nomination.from}: ${consolidated.message}`)
-          continue
-        }
-        const record = usage.get(nomination.from)
-        if (record) {
-          record.state = 'archived'
-          record.archived_at = new Date().toISOString()
-        }
-        alreadyArchived.add(nomination.from)
-        archivedSkills.push({ name: nomination.from, path: consolidated.path ?? '', reason: `Consolidated into ${nomination.into}` })
-      }
-      if (suppressedChanged) {
-        try {
-          await saveSuppressedNames(root, suppressedNames, this.io)
-        } catch {
-          // Best-effort like the report write: a transient disk failure must not
-          // make a run that already archived skills throw after the fact.
-          this.ctx.logger.warn('evolution-curator: failed to persist suppressed names; archived built-ins may re-enter the lifecycle')
-        }
-      }
-      try {
-        await saveUsage(root, usage, this.io)
-      } catch {
-        // Best-effort: curation decisions already landed; a failed usage flush
-        // must not surface as a run error after the fact.
-        this.ctx.logger.warn('evolution-curator: failed to persist usage sidecar')
-      }
-    }
+    const { archivedSkills, errors } = await this.applyMutations({
+      dryRun,
+      archiveCandidates,
+      nominations,
+      treeNames,
+      usage,
+      bundledNames,
+      suppressedNames,
+      root,
+    })
     if (!dryRun) this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
     const report = buildCuratorRunReport({
@@ -392,6 +336,95 @@ export class EvolutionCurator extends Service {
       if (await this.skills.isBundled(summary.name)) bundledNames.add(summary.name)
     }
     return { bundledNames, treeNames }
+  }
+
+  /**
+   * F13 six-factor quality scoring, persisted onto the usage records.
+   */
+  private async scoreTree(usage: UsageMap, treeNames: Set<string>): Promise<void> {
+    const supportDirs = new Map<string, number>()
+    for (const name of treeNames) supportDirs.set(name, await this.skills.countSupportDirs(name))
+    const quality = computeQualityScores({ usage, supportDirs })
+    for (const [name, score] of quality) {
+      const record = usage.get(name)
+      if (record) {
+        record.quality_score = score.score
+        record.quality_warn = score.warn
+      }
+    }
+  }
+
+  /**
+   * Execute lifecycle archives and consolidation nominations, then persist the
+   * suppression and usage sidecars best-effort. A dry-run short-circuits: no
+   * file moves and no state persistence — the caller still writes the report.
+   */
+  private async applyMutations(input: {
+    dryRun: boolean
+    archiveCandidates: string[]
+    nominations: CuratorNominations
+    treeNames: Set<string>
+    usage: UsageMap
+    bundledNames: Set<string>
+    suppressedNames: Set<string>
+    root: string
+  }): Promise<{ archivedSkills: Array<{ name: string; path: string; reason: string }>; errors: string[]; suppressedChanged: boolean }> {
+    if (input.dryRun) return { archivedSkills: [], errors: [], suppressedChanged: false }
+    const { archiveCandidates, nominations, treeNames, usage, bundledNames, suppressedNames, root } = input
+    const errors: string[] = []
+    const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
+    let suppressedChanged = false
+    for (const name of archiveCandidates) {
+      const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
+      if (!archived.ok) {
+        const record = usage.get(name)
+        if (record) record.state = 'active'
+        errors.push(`${name}: ${archived.message}`)
+      } else {
+        archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
+        if (bundledNames.has(name)) {
+          suppressedNames.add(name)
+          suppressedChanged = true
+        }
+      }
+    }
+    const alreadyArchived = new Set(archiveCandidates)
+    for (const nomination of nominations.consolidations) {
+      if (alreadyArchived.has(nomination.from)) continue
+      if (!treeNames.has(nomination.from) || !treeNames.has(nomination.into)) {
+        errors.push(`${nomination.from}: consolidation target or source missing from the skill tree`)
+        continue
+      }
+      const consolidated = await this.skills.consolidate(nomination.into, [nomination.from], 'background_review')
+      if (!consolidated.ok) {
+        errors.push(`${nomination.from}: ${consolidated.message}`)
+        continue
+      }
+      const record = usage.get(nomination.from)
+      if (record) {
+        record.state = 'archived'
+        record.archived_at = new Date().toISOString()
+      }
+      alreadyArchived.add(nomination.from)
+      archivedSkills.push({ name: nomination.from, path: consolidated.path ?? '', reason: `Consolidated into ${nomination.into}` })
+    }
+    if (suppressedChanged) {
+      try {
+        await saveSuppressedNames(root, suppressedNames, this.io)
+      } catch {
+        // Best-effort like the report write: a transient disk failure must not
+        // make a run that already archived skills throw after the fact.
+        this.ctx.logger.warn('evolution-curator: failed to persist suppressed names; archived built-ins may re-enter the lifecycle')
+      }
+    }
+    try {
+      await saveUsage(root, usage, this.io)
+    } catch {
+      // Best-effort: curation decisions already landed; a failed usage flush
+      // must not surface as a run error after the fact.
+      this.ctx.logger.warn('evolution-curator: failed to persist usage sidecar')
+    }
+    return { archivedSkills, errors, suppressedChanged }
   }
 
   private recentSessionActive(): boolean {

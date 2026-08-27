@@ -5,9 +5,8 @@
 #   ctx.evolutionStateStorage  -> storage-domain KV provider, with a JSON
 #                                provider mounted as fallback/portable audit
 #
-# The legacy `@deepseek-ai/dsh-evolution` facade is NOT mounted here. It stays
-# available as a one-row compatibility plugin; this composition uses the
-# smaller native packages instead.
+# The legacy `@deepseek-ai/dsh-evolution` facade was retired at rc.18; this
+# composition uses the smaller native packages instead.
 
 # ── control plane (immutable policy, deterministic plan validation) ────────
 - id: evolution-policy

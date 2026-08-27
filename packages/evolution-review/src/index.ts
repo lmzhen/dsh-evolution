@@ -11,7 +11,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactReviewSecrets } from './redact.ts'
@@ -69,7 +69,7 @@ interface MemoryLike {
 }
 
 interface ApprovalLike {
-  request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: WriteOrigin }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   run(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string }>
 }
 

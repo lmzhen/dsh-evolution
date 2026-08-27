@@ -22,7 +22,6 @@ import { homedir } from 'node:os'
 
 const MODES = new Set(['host', 'agent', 'layered', 'oneclick'])
 const EVOLUTION_PREFIXES = [
-  'dsh-evolution',
   'dsh-evolution-',
   'dsh-memory',
   'dsh-memory-files',
