@@ -56,7 +56,6 @@
       "@deepseek-ai/dsh-evolution-core/invariant": ["./packages/evolution/evolution-core/src/invariant.ts"],
       "@deepseek-ai/dsh-evolution/src/*": ["./packages/evolution/dsh-evolution/src/*"],
       "@deepseek-ai/dsh-evolution-approval": ["./packages/evolution/evolution-approval/src/index.ts"],
-      "@deepseek-ai/dsh-evolution": ["./packages/evolution/dsh-evolution/src/index.ts"],
       "@deepseek-ai/dsh-evolution/invariant": ["./packages/evolution/dsh-evolution/src/invariant.ts"],
       "@deepseek-ai/cordis": ["./vendor/cordis/src"],
       "@deepseek-ai/cosmokit": ["./vendor/cosmokit/src"],
@@ -184,7 +183,7 @@
       // dir names are unique across groups, so first-on-disk-wins resolution is
       // unambiguous; adding a package under an existing group needs no edit
       // here. The aggregates' project references (tsconfig.host.json /
-      // tsconfig.client.json) stay explicit — TS project references have no
+      // tsconfig.client.json) stay explicit 鈥?TS project references have no
       // wildcard form.
       "@deepseek-ai/dsh-host-apiproxy": ["./packages/host/apiproxy/src"],
       "@deepseek-ai/dsh-host-directory-picker": ["./packages/host/directory-picker/src"],
@@ -307,3 +306,4 @@
     }
   }
 }
+
