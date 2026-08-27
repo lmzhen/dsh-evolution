@@ -7,7 +7,7 @@
  * move to `.archive/` — never a hard delete.
  */
 
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
@@ -626,8 +626,9 @@ export class SkillLibrary {
     const sidecars: string[] = []
     for (const sidecar of [usageFile(this.root), suppressedFile(this.root)]) {
       if (await this.io.exists(sidecar)) {
-        await this.io.copy(sidecar, join(dest, sidecar.split('/').pop() ?? sidecar))
-        sidecars.push(sidecar.split('/').pop() ?? sidecar)
+        const name = basename(sidecar)
+        await this.io.copy(sidecar, join(dest, name))
+        sidecars.push(name)
       }
     }
     await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names, sidecars }, null, 2))

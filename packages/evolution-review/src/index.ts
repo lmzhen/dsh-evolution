@@ -337,7 +337,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const op = skillArgs
       const name = op.name ?? ''
       const origin: WriteOrigin = 'background_review'
-      if (op.action === 'create') return await library.create(name, op.content ?? '', origin)
+      if (op.action === 'create') {
+        // The direct path (approval-disabled deployments) must keep the same
+        // lifecycle entry as the runner: an agent-created record so the
+        // curator actually manages the skill.
+        const created = await library.create(name, op.content ?? '', origin)
+        if (created.ok) {
+          const usageRegistry = ctx.get('skillUsage') as { markAgentCreated?(name: string): Promise<void> } | undefined
+          await usageRegistry?.markAgentCreated?.(name)
+        }
+        return created
+      }
       if (op.action === 'edit' || op.action === 'update') return await library.update(name, op.content ?? '', origin)
       if (op.action === 'patch') return await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', false, origin)
       if (op.action === 'delete') {

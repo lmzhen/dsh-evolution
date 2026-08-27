@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, loadSuppressedNames, loadUsage, nodeEvolutionIo, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -35,8 +35,7 @@ it('setPinned writes the marker, audits it, and refuses the background review', 
   await rm(root, { recursive: true, force: true })
 })
 
-it('invalid skill names cannot escape the skills root (path traversal guard)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-traversal-'))
+it('invalid skill names cannot escape the skills root (path traversal guard)', async () => {  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-traversal-'))
   const lib = new SkillLibrary(root)
   await lib.create('safe-skill', SKILL.replace('python-testing', 'safe-skill'), 'background_review')
   const evil = '../outside'
@@ -202,5 +201,26 @@ it('fuzzy patch tolerates whitespace drift without rewriting surrounding bytes (
   const escaped = await lib.patch('ws-skill', 'Run tests with double spaces. (final)\nIndented    columns stay.', 'Run tests with double spaces. (final)\nIndented    columns changed.')
   expect(escaped.ok).toBe(true)
   expect(await lib.read('ws-skill') ?? '').toContain('Indented    columns changed.')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('snapshot co-copies usage/suppression sidecars and restore returns them', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-sidecars-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('keeper-skill', SKILL.replace('python-testing', 'keeper-skill'), 'foreground')
+  await saveUsage(root, new Map([['keeper-skill', {
+    created_by: 'agent', created_at: new Date().toISOString(), use_count: 1, view_count: 0, patch_count: 0,
+    last_used_at: new Date().toISOString(), last_viewed_at: null, last_patched_at: null,
+    state: 'active', pinned: false, archived_at: null,
+  }]]), nodeEvolutionIo())
+  await saveSuppressedNames(root, new Set(['sup-skill']), nodeEvolutionIo())
+  await lib.snapshotAll('pre-test')
+  // Mutilate both sidecars after the snapshot.
+  await saveUsage(root, new Map(), nodeEvolutionIo())
+  await saveSuppressedNames(root, new Set(), nodeEvolutionIo())
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(true)
+  expect((await loadUsage(root, nodeEvolutionIo())).get('keeper-skill')?.state).toBe('active')
+  expect((await loadSuppressedNames(root, nodeEvolutionIo())).has('sup-skill')).toBe(true)
   await rm(root, { recursive: true, force: true })
 })
