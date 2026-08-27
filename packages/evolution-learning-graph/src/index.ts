@@ -1,9 +1,14 @@
 /**
- * Learning graph over skills and memory.
+ * Learning graph over skills and memory, plus node-level commands
+ * (`/evolution graph [detail|edit|delete] <nodeId>`) aligned with the Hermes
+ * journey surface: a skill node is its name, a memory node is
+ * `memory:<source>:<index>` (source = memory|user, index = position in that
+ * file's entries).
  * @module @deepseek-ai/dsh-evolution-learning-graph
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { SKILL_NAME_RE, evolutionIoAdapter, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -50,6 +55,44 @@ export function buildLearningGraph(
   return { nodes, edges }
 }
 
+export type GraphNodeId =
+  | { kind: 'skill'; name: string }
+  | { kind: 'memory'; source: 'memory' | 'user'; index: number }
+
+/** Parse a graph node id: skill names pass through; `memory:<source>:<index>` becomes a memory node. */
+export function parseGraphNodeId(id: string): GraphNodeId | null {
+  const memory = /^memory:(memory|user):(\d+)$/.exec(id)
+  if (memory) return { kind: 'memory', source: memory[1] as 'memory' | 'user', index: Number(memory[2]) }
+  if (SKILL_NAME_RE.test(id)) return { kind: 'skill', name: id }
+  return null
+}
+
+/** Resolve a parsed node to its current content (read-only). */
+export async function resolveGraphNode(
+  parsed: GraphNodeId,
+  repository: {
+    readSkill(name: string): Promise<string | null>
+    readMemory(target: 'memory' | 'user'): Promise<string[]>
+  },
+): Promise<{ ok: boolean; message: string }> {
+  if (parsed.kind === 'skill') {
+    const content = await repository.readSkill(parsed.name)
+    return content === null
+      ? { ok: false, message: `Skill "${parsed.name}" not found.` }
+      : { ok: true, message: content }
+  }
+  const entries = await repository.readMemory(parsed.source)
+  const entry = entries[parsed.index]
+  return entry === undefined
+    ? { ok: false, message: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
+    : { ok: true, message: entry }
+}
+
+interface MemoryLike {
+  read(target: 'memory' | 'user'): Promise<string[]>
+  applyBatch(target: 'memory' | 'user', operations: Array<{ action: 'replace' | 'remove'; old_text: string; facts?: string }>): Promise<{ ok: boolean; message: string }>
+}
+
 export const name = 'evolution-learning-graph'
 
 export function apply(ctx: Context): void {
@@ -57,18 +100,78 @@ export function apply(ctx: Context): void {
     const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
     commands.register({
       name: 'evolution graph',
-      description: 'Show the current learning graph',
+      description: 'Show the learning graph, or act on a node: evolution graph [detail|edit|delete] <nodeId>',
       recordInput: false,
-      handler: async () => {
-        const usage = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
-        const memory = ctx.get('memory') as { read(target: 'memory' | 'user'): Promise<string[]> } | undefined
-        if (!usage || !memory) return { text: 'skill-usage or memory service is not mounted.' }
-        const usageMap = await usage.report()
-        const memoryEntries = await memory.read('memory')
-        const graph = buildLearningGraph(usageMap, memoryEntries)
-        const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
-        const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
-        return { text: lines.join('\n') + '\n\n' + edges.join('\n') }
+      handler: async (invocation: { rawInput?: string }) => {
+        const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
+        const memoryService = ctx.get('memory') as MemoryLike | undefined
+        const ioService = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+        if (!usageService || !memoryService || !ioService) return { text: 'skill-usage, memory or evolution-io service is not mounted.' }
+        const usage = usageService
+        const memory = memoryService
+        const io = ioService
+        const directory = await renderGraph()
+
+        const input = (invocation.rawInput ?? '').trim()
+        const detail = /^detail\s+(\S+)$/.exec(input)
+        if (detail && detail[1]) return await nodeDetail(detail[1])
+        const edit = /^edit\s+(\S+)\s+([\s\S]+)$/.exec(input)
+        if (edit && edit[1] && edit[2] !== undefined) return await nodeEdit(edit[1], edit[2])
+        const remove = /^delete\s+(\S+)$/.exec(input)
+        if (remove && remove[1]) return await nodeDelete(remove[1])
+        if (input !== '') return { text: `Unknown graph subcommand "${input.split(' ')[0]}". ${directory}` }
+        return { text: directory }
+
+        async function renderGraph(): Promise<string> {
+          const usageMap = await usage.report()
+          const memoryEntries = await memory.read('memory')
+          const graph = buildLearningGraph(usageMap, memoryEntries)
+          const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
+          const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
+          return lines.join('\n') + '\n\n' + edges.join('\n')
+        }
+
+        function withSkills(): SkillLibrary {
+          return new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()))
+        }
+
+        async function nodeDetail(id: string): Promise<{ text: string }> {
+          const parsed = parseGraphNodeId(id)
+          if (parsed === null) return { text: `Invalid node id "${id}". Skill names or memory:<source>:<index> expected.` }
+          const resolved = await resolveGraphNode(parsed, {
+            readSkill: (name: string) => withSkills().read(name),
+            readMemory: (target: 'memory' | 'user') => memory.read(target),
+          })
+          return { text: resolved.message }
+        }
+
+        async function nodeEdit(id: string, content: string): Promise<{ text: string }> {
+          const parsed = parseGraphNodeId(id)
+          if (parsed === null) return { text: `Invalid node id "${id}". Skill names or memory:<source>:<index> expected.` }
+          if (parsed.kind === 'skill') {
+            const result = await withSkills().update(parsed.name, content, 'foreground')
+            return { text: result.message }
+          }
+          const entries = await memory.read(parsed.source)
+          const entry = entries[parsed.index]
+          if (entry === undefined) return { text: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
+          const result = await memory.applyBatch(parsed.source, [{ action: 'replace', old_text: entry, facts: content }])
+          return { text: result.message }
+        }
+
+        async function nodeDelete(id: string): Promise<{ text: string }> {
+          const parsed = parseGraphNodeId(id)
+          if (parsed === null) return { text: `Invalid node id "${id}". Skill names or memory:<source>:<index> expected.` }
+          if (parsed.kind === 'skill') {
+            const result = await withSkills().archive(parsed.name)
+            return { text: result.message }
+          }
+          const entries = await memory.read(parsed.source)
+          const entry = entries[parsed.index]
+          if (entry === undefined) return { text: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
+          const result = await memory.applyBatch(parsed.source, [{ action: 'remove', old_text: entry }])
+          return { text: result.message }
+        }
       },
     })
   })
