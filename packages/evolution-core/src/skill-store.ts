@@ -12,6 +12,7 @@ import { homedir } from 'node:os'
 import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
+import { suppressedFile, usageFile } from './usage.ts'
 import { MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 export interface SkillLimits {
@@ -619,7 +620,17 @@ export class SkillLibrary {
     for (const name of names) {
       await this.io.copy(skillDir(this.root, name), join(dest, name))
     }
-    await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names }, null, 2))
+    // Sidecar co-snapshot: a rollback that restores the tree but leaves the
+    // post-archival usage/suppression state behind would immediately let the
+    // curator re-decide on stale records (rollback integrity).
+    const sidecars: string[] = []
+    for (const sidecar of [usageFile(this.root), suppressedFile(this.root)]) {
+      if (await this.io.exists(sidecar)) {
+        await this.io.copy(sidecar, join(dest, sidecar.split('/').pop() ?? sidecar))
+        sidecars.push(sidecar.split('/').pop() ?? sidecar)
+      }
+    }
+    await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names, sidecars }, null, 2))
     return dest
   }
 
@@ -651,6 +662,8 @@ export class SkillLibrary {
     const entries = await this.io.list(latest.path)
     for (const entry of entries) {
       if (entry === 'manifest.json') continue
+      // Sidecars (usage/suppression) live in the snapshot root alongside the
+      // skill dirs, so this loop restores them too.
       await this.io.copy(join(latest.path, entry), join(this.root, entry))
     }
     return { ok: true, message: `Restored skill tree from ${latest.path}`, path: latest.path }

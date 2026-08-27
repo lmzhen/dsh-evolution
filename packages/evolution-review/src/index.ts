@@ -80,6 +80,7 @@ interface MemoryLike {
 interface ApprovalLike {
   request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: WriteOrigin }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   run(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string }>
+  isEnabled?: boolean
 }
 
 interface PolicyLike {
@@ -299,7 +300,27 @@ export function apply(ctx: Context, rawConfig: Config): void {
       if (!approval) return undefined
       const decision = await approval.request({ kind, summary, args: stored, origin: 'background_review' })
       if (decision.action === 'staged') return { ok: false, message: decision.message }
+      // The staged service is mounted but DISABLED (the default deployment),
+      // and host-only compositions mount no tool runners — replaying would
+      // return "No replay runner registered" for every op. Execute directly
+      // with the explicit background_review origin instead.
+      if (approval.isEnabled === false) return await runnerDirect(kind, runnerArgs)
       return await approval.run(kind, runnerArgs)
+    }
+
+    /** Direct execution for the approval-disabled case (parallel to executeSkillDirect). */
+    async function runnerDirect(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string } | undefined> {
+      if (kind === 'memory') {
+        const memory = ctx.get('memory') as { applyBatch?(target: 'memory' | 'user', ops: unknown[]): Promise<{ ok: boolean; message: string }> } | undefined
+        const op = args as { target?: string; action?: string; facts?: string; content?: string; old_text?: string }
+        if (!memory?.applyBatch) return undefined
+        return await memory.applyBatch(op.target === 'user' ? 'user' : 'memory', [
+          { action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text },
+        ])
+      }
+      const wrapped = (args ?? {}) as { operation?: SkillOp }
+      if (!wrapped.operation) return undefined
+      return await executeSkillDirect(wrapped.operation)
     }
 
     /**
