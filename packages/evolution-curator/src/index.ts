@@ -62,6 +62,15 @@ export interface CuratorRunOutcome {
   nominations?: CuratorNominations
 }
 
+/** Persisted curator-state record shape (schemaVersion optional for legacy reads). */
+export interface CuratorStateRecordShape {
+  schemaVersion?: number
+  lastRunAt: number
+  runCount: number
+  lastSummary: string
+  paused: boolean
+}
+
 export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
@@ -228,7 +237,7 @@ export class EvolutionCurator extends Service {
     const runId = randomUUID()
     const stateService = this.ctx.get('evolutionState') as {
       loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
-      saveCuratorState(record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }): Promise<void>
+      saveCuratorState(record: CuratorStateRecordShape): Promise<void>
     } | undefined
     const lifecycle = this.lifecycle()
     const persisted = await stateService?.loadCuratorState()
@@ -306,6 +315,7 @@ export class EvolutionCurator extends Service {
     }
     const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${nominations.consolidations.length}`
     await stateService?.saveCuratorState({
+      schemaVersion: 1,
       // A dry-run is a preview: it must not push the next scheduled pass out.
       lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : this.lastRun,
       runCount: dryRun ? (persisted?.runCount ?? 0) : (persisted?.runCount ?? 0) + 1,

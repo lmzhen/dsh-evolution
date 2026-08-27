@@ -54,6 +54,8 @@ export interface CuratorFailedSkill {
 }
 
 export interface CuratorRunReport {
+  /** Report shape version; readers may ignore unknown fields on later versions. */
+  schemaVersion: 1
   runId: string
   startedAt: string
   finishedAt: string
@@ -79,6 +81,7 @@ export interface CuratorReportInput {
 
 export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunReport {
   return {
+    schemaVersion: 1,
     runId: input.runId,
     startedAt: input.startedAt,
     finishedAt: input.finishedAt,

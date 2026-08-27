@@ -19,6 +19,8 @@ export interface MutationRecord {
 }
 
 export const DEFAULT_MUTATION_CAP = 500
+/** Version of the `.mutations.json` file shape; writers always emit the current one. */
+export const MUTATIONS_FILE_VERSION = 1
 
 export function mutationsFile(root: string): string {
   return join(root, '.mutations.json')
@@ -33,8 +35,13 @@ export async function loadMutations(root: string, io: EvolutionIoLike = nodeEvol
   if (raw === null) return []
   try {
     const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((entry): entry is MutationRecord =>
+    // Versioned shape ({ version, records }) with legacy plain-array compat.
+    const records = Array.isArray(parsed)
+      ? parsed
+      : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { records?: unknown }).records)
+        ? (parsed as { records: unknown[] }).records
+        : []
+    return records.filter((entry): entry is MutationRecord =>
       typeof entry === 'object' && entry !== null && typeof (entry as MutationRecord).skillName === 'string'
       && typeof (entry as MutationRecord).action === 'string')
   } catch {
@@ -43,7 +50,7 @@ export async function loadMutations(root: string, io: EvolutionIoLike = nodeEvol
   }
 }
 
-/** Append one record, trim to `cap`, and write atomically. */
+/** Append one record, trim to `cap`, and write atomically (versioned shape). */
 export async function recordMutation(
   root: string,
   io: EvolutionIoLike,
@@ -53,5 +60,5 @@ export async function recordMutation(
   const existing = await loadMutations(root, io)
   existing.push(record)
   const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing
-  await io.writeText(mutationsFile(root), JSON.stringify(trimmed, null, 2))
+  await io.writeText(mutationsFile(root), JSON.stringify({ version: MUTATIONS_FILE_VERSION, records: trimmed }, null, 2))
 }

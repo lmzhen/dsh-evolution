@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary, loadMutations, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, loadMutations, loadSuppressedNames, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
 
 const USABLE = (name: string) => `---
 name: ${name}
@@ -23,6 +23,21 @@ it('recordMutation appends and trims to the cap', async () => {
   const records = await loadMutations(root, io)
   expect(records.length).toBe(3)
   expect(records.map(record => record.skillName)).toEqual(['s2', 's3', 's4'])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('legacy plain-array sidecars stay readable (B2 read compat)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-sidecar-compat-'))
+  const io = nodeEvolutionIo()
+  await writeFile(join(root, '.mutations.json'), JSON.stringify([
+    { skillName: 'old-skill', action: 'update', summary: 'legacy', at: '2026-08-01T00:00:00.000Z' },
+  ]), 'utf8')
+  await writeFile(join(root, '.curator-suppressed.json'), JSON.stringify(['builtin-a', 'builtin-b']), 'utf8')
+  const records = await loadMutations(root, io)
+  expect(records).toHaveLength(1)
+  expect(records[0]?.skillName).toBe('old-skill')
+  const suppressed = await loadSuppressedNames(root, io)
+  expect([...suppressed]).toEqual(['builtin-a', 'builtin-b'])
   await rm(root, { recursive: true, force: true })
 })
 

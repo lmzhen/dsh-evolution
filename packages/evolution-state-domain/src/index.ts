@@ -24,6 +24,8 @@ export const reviewStateSchema = z.object({
 })
 
 export const curatorStateSchema = z.object({
+  /** Optional record-shape version; legacy records without it stay compatible. */
+  schemaVersion: z.number().int().nonnegative().optional(),
   lastRunAt: z.number().nonnegative(),
   runCount: z.number().int().nonnegative(),
   lastSummary: z.string(),

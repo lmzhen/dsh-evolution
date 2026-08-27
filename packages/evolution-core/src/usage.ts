@@ -114,7 +114,10 @@ export function latestActivityAt(record: UsageRecord): string | null {
  * Curator suppression sidecar: built-in skills the curator has archived stay
  * suppressed across re-seeds, so the lifecycle never fights a re-created
  * bundled skill. Best-effort load/save, mirroring the usage sidecar posture.
+ * Versioned shape ({ version, names }) with legacy plain-array compat.
  */
+export const SUPPRESSED_FILE_VERSION = 1
+
 export function suppressedFile(root: string): string {
   return join(root, '.curator-suppressed.json')
 }
@@ -124,8 +127,12 @@ export async function loadSuppressedNames(root: string, io: EvolutionIoLike = no
   if (raw === null) return new Set()
   try {
     const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return new Set()
-    return new Set(parsed.filter((entry): entry is string => typeof entry === 'string'))
+    const names = Array.isArray(parsed)
+      ? parsed
+      : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { names?: unknown }).names)
+        ? (parsed as { names: unknown[] }).names
+        : []
+    return new Set(names.filter((entry): entry is string => typeof entry === 'string'))
   } catch {
     // Malformed sidecar is treated as empty. Suppression is best-effort.
     return new Set()
@@ -137,5 +144,5 @@ export async function saveSuppressedNames(
   names: ReadonlySet<string>,
   io: EvolutionIoLike = nodeEvolutionIo(),
 ): Promise<void> {
-  await io.writeText(suppressedFile(root), JSON.stringify([...names].sort(), null, 2))
+  await io.writeText(suppressedFile(root), JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2))
 }
