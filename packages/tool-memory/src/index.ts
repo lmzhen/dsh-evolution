@@ -187,6 +187,19 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     },
     isConcurrencySafe: () => false,
     async execute(args, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
+      // facts and content are the same field under two names; a differing pair
+      // is ambiguous input, so fail loud instead of silently dropping one.
+      const conflict = (a: { facts?: string; content?: string }): boolean => {
+        if (a.facts === undefined || a.content === undefined) return false
+        return a.facts !== a.content
+      }
+      if (Array.isArray(args.operations)) {
+        for (const op of args.operations) {
+          if (conflict(op)) return { ok: false, message: 'Provide only one of facts or content per operation (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+        }
+      } else if (conflict(args)) {
+        return { ok: false, message: 'Provide only one of facts or content (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+      }
       const target = args.target === 'user' ? 'user' : 'memory'
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
         ? { target, operations: args.operations }

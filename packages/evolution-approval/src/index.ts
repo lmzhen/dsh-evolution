@@ -137,11 +137,18 @@ export class EvolutionApproval extends Service {
   }
 
   async approve(id: string): Promise<{ ok: boolean; message: string }> {
-    return await this.dedupe(id, () => this.doApprove(id))
+    return await this.dedupe(`approve:${id}`, () => this.doApprove(id))
   }
 
   async reject(id: string): Promise<{ ok: boolean; message: string }> {
-    return await this.dedupe(id, async () => {
+    return await this.dedupe(`reject:${id}`, async () => {
+      // Reject claims the record like approve does, so it can never race an
+      // in-flight approve runner: the claim table is the single resolution gate.
+      const claimId = randomUUID()
+      const record = await this.state().claimPending(id, claimId)
+      if (!record) {
+        return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
+      }
       const resolution = await this.state().tryResolvePending(id, 'rejected')
       if (!resolution.applied || !resolution.record) {
         return { ok: false, message: `Pending write "${id}" is not pending (already resolved or missing).` }

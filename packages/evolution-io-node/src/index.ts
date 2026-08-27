@@ -13,10 +13,19 @@ export const name = 'evolution-io-node'
 export const inject = ['evolutionIo']
 
 export function apply(ctx: Context): void {
+  const isMissing = (error: unknown): boolean => {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    return code === 'ENOENT' || code === 'ENOTDIR'
+  }
   const provider: EvolutionIo = {
     name: 'node',
     async readText(path) {
-      try { return await readFile(path, 'utf8') } catch { return null }
+      try { return await readFile(path, 'utf8') } catch (error) {
+        // Only "missing" maps to null; any other read failure surfaces so a
+        // caller never mistakes an unreadable store for an empty one.
+        if (isMissing(error)) return null
+        throw error
+      }
     },
     async writeText(path, content) {
       await mkdir(dirname(path), { recursive: true })
@@ -31,8 +40,12 @@ export function apply(ctx: Context): void {
     async exists(path) {
       // stat, not readFile: directories must report true (readFile on a
       // directory throws EISDIR, which used to make .archive/<name> look
-      // absent and let re-archives overwrite older archives).
-      try { await stat(path); return true } catch { return false }
+      // absent and let re-archives overwrite older archives). Non-missing
+      // stat failures surface instead of hiding as "not there".
+      try { await stat(path); return true } catch (error) {
+        if (isMissing(error)) return false
+        throw error
+      }
     },
     async rename(path, destination) {
       await mkdir(dirname(destination), { recursive: true })
@@ -43,8 +56,10 @@ export function apply(ctx: Context): void {
       await cp(path, destination, { recursive: true, force: true })
     },
     async size(path) {
-      // Swallowed: a missing or unreadable file reports "unknown size".
-      try { return (await stat(path)).size } catch { return null }
+      try { return (await stat(path)).size } catch (error) {
+        if (isMissing(error)) return null
+        throw error
+      }
     },
   }
   ctx.effect(() => ctx.evolutionIo.registerProvider(provider), 'evolution-io-node.provider')

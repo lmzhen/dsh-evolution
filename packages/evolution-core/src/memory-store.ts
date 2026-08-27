@@ -131,11 +131,15 @@ export class MemoryStore {
     return { ok: false, message, entries, chars, limit: this.limitFor(target) }
   }
 
-  /** Percent-based storage hint appended to success message once the target is ≥80% full. */
+  /**
+   * StorageHint percentage must clamp at 100 like the render header: a drifted
+   * entry can push chars past the limit, and "Storage at 125%" contradicts the
+   * clamped usage indicator.
+   */
   private storageHint(target: MemoryTarget, chars: number): string {
     const limit = this.limitFor(target)
     if (limit <= 0) return ''
-    const percent = Math.floor((chars * 100) / limit)
+    const percent = Math.min(100, Math.floor((chars * 100) / limit))
     return percent >= 80 ? ` ⚠️ Storage at ${percent}% (${chars}/${limit} chars).` : ''
   }
 
@@ -149,9 +153,10 @@ export class MemoryStore {
   private async backupFile(target: MemoryTarget): Promise<string | null> {
     const path = fileFor(this.root, target)
     const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    const unique = `${stamp}-${Math.random().toString(36).slice(2, 8)}`
     try {
-      await this.io.copy(path, `${path}.bak.${stamp}`)
-      return `${path}.bak.${stamp}`
+      await this.io.copy(path, `${path}.bak.${unique}`)
+      return `${path}.bak.${unique}`
     } catch {
       return null
     }
@@ -179,6 +184,13 @@ export class MemoryStore {
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
     const refusal = await this.oversizedRefusal(target)
     if (refusal) return refusal
+    // Symmetric with mutate/applyBatch: never silently normalize an
+    // externally modified file on the single-add path either.
+    if (await this.detectDrift(target)) {
+      const backup = await this.backupFile(target)
+      const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
+      return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
+    }
     const content = facts.trim()
     if (!content) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const threat = scanMemoryThreats(content)
@@ -194,8 +206,9 @@ export class MemoryStore {
     }
     const next = [...entries, this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${content}` : content]
     const total = next.join(ENTRY_DELIMITER).length
-    if (total > this.limitFor(target)) {
-      return this.failure(target, `Adding this entry would exceed the ${this.limitFor(target)} char limit. Consolidate or remove stale entries, then retry.`, entries)
+    const addLimit = this.limitFor(target)
+    if (addLimit > 0 && total > addLimit) {
+      return this.failure(target, `Adding this entry would exceed the ${addLimit} char limit. Consolidate or remove stale entries, then retry.`, entries)
     }
     await this.write(target, next)
     this.resetFailures()
@@ -242,7 +255,8 @@ export class MemoryStore {
     if (action === 'remove') next.splice(index, 1)
     else next[index] = content
     const total = next.join(ENTRY_DELIMITER).length
-    if (total > this.limitFor(target)) return this.failure(target, `Resulting memory would exceed the ${this.limitFor(target)} char limit.`, entries)
+    const mutateLimit = this.limitFor(target)
+    if (mutateLimit > 0 && total > mutateLimit) return this.failure(target, `Resulting memory would exceed the ${mutateLimit} char limit.`, entries)
     await this.write(target, next)
     this.resetFailures()
     return { ok: true, message: `Entry ${action === 'remove' ? 'removed' : 'replaced'}.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }
@@ -295,8 +309,9 @@ export class MemoryStore {
       }
     }
     const total = working.join(ENTRY_DELIMITER).length
-    if (total > this.limitFor(target)) {
-      return this.failure(target, `Batch result (${total} chars) exceeds the ${this.limitFor(target)} limit. Remove or shorten more entries in the same batch.`, entries)
+    const batchLimit = this.limitFor(target)
+    if (batchLimit > 0 && total > batchLimit) {
+      return this.failure(target, `Batch result (${total} chars) exceeds the ${batchLimit} limit. Remove or shorten more entries in the same batch.`, entries)
     }
     await this.write(target, working)
     this.resetFailures()
@@ -353,12 +368,13 @@ export class MemoryStore {
     const raw = await this.io.readText(fileFor(this.root, target))
     if (raw === null) return false
     const entries = normalizeEntries(raw)
+    const limit = this.limitFor(target)
     // Second drift signal (Hermes parity, `_detect_external_drift` signal #2):
     // one parsed entry larger than the store's whole-file limit means an
     // external writer appended free-form content — a tool-written entry can
     // never exceed the whole-store budget. Refusing (with backup) instead of
-    // letting a flush truncate it.
-    if (entries.some(entry => entry.length > this.limitFor(target))) return true
+    // letting a flush truncate it. A zero/negative limit means "unbounded".
+    if (limit > 0 && entries.some(entry => entry.length > limit)) return true
     // Canonicalize by normalizing (split + trim + drop empties) then re-rendering.
     // If the on-disk bytes differ from that canonical form, the file drifted.
     return render(entries) !== raw

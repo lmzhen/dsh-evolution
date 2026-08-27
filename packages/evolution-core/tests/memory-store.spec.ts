@@ -147,10 +147,12 @@ it('memory read guard is off when the IO backend has no size probe', async () =>
   // independent of the size probe and still flags it (Hermes signal #2).
   expect(await store.read('memory')).toEqual(['x'.repeat(5000)])
   expect(await store.detectDrift('memory')).toBe(true)
-  // The write path falls back to the ordinary char-limit check through add().
+  // The write path now refuses through the drift guard (add() is symmetric
+  // with mutate/applyBatch), backing up instead of silently truncating.
   const result = await store.add('memory', 'gamma')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('exceed')
+  expect(result.message).toContain('drift')
+  expect(result.message).toMatch(/backup was saved/)
   await rm(root, { recursive: true, force: true })
 })
 

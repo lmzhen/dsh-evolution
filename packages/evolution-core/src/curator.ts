@@ -188,20 +188,22 @@ export interface ScopeView {
 /**
  * Read-only scope classification, derived from the SAME gate the transition
  * engine uses (`lifecycleCandidate`), so the view always predicts what a
- * curator pass may touch.
+ * curator pass may touch. `protectedNames` carries the marker info the usage
+ * records lack (bundled / hub-installed / pinned from `SkillLibrary.list()`).
  */
-export function computeScopeView(usage: UsageMap, config: CuratorConfig): ScopeView {
+export function computeScopeView(usage: UsageMap, config: CuratorConfig, protectedNames?: ReadonlyMap<string, string>): ScopeView {
   const managed: string[] = []
   const watched: string[] = []
   const exempted: string[] = []
-  const protectedNames: string[] = []
+  const protectedSet = new Set<string>()
   for (const [name, record] of usage) {
     if (config.excludeSkillNames?.has(name) || config.referencedSkillNames?.has(name)) {
       exempted.push(name)
       continue
     }
     const bundled = config.bundledNames?.has(name) === true
-    if (record.pinned || bundled || (config.suppressedNames?.has(name) === true)) protectedNames.push(name)
+    const suppressed = config.suppressedNames?.has(name) === true
+    if (record.pinned || bundled || suppressed || protectedNames?.has(name) === true) protectedSet.add(name)
     if (lifecycleCandidate(name, record, config, bundled)) {
       managed.push(name)
       if (record.state === 'stale' || record.quality_warn === true) watched.push(name)
@@ -211,7 +213,7 @@ export function computeScopeView(usage: UsageMap, config: CuratorConfig): ScopeV
     managed: managed.sort(),
     watched: watched.sort(),
     exempted: exempted.sort(),
-    protected: protectedNames.sort(),
+    protected: [...protectedSet].sort(),
   }
 }
 

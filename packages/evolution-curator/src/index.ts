@@ -330,6 +330,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       bundledNames,
       suppressedNames,
       root,
+      failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
     })
     if (!dryRun) this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
@@ -457,17 +458,23 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     bundledNames: Set<string>
     suppressedNames: Set<string>
     root: string
+    /** Pre-transition state per archive candidate (for failed-archive rollback). */
+    failedFrom?: Map<string, 'active' | 'stale'>
   }): Promise<{ archivedSkills: Array<{ name: string; path: string; reason: string }>; errors: string[]; suppressedChanged: boolean }> {
     if (input.dryRun) return { archivedSkills: [], errors: [], suppressedChanged: false }
-    const { archiveCandidates, nominations, treeNames, usage, bundledNames, suppressedNames, root } = input
+    const { archiveCandidates, nominations, treeNames, usage, bundledNames, suppressedNames, root, failedFrom } = input
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
     let suppressedChanged = false
     for (const name of archiveCandidates) {
       const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
+        // A failed archive must roll back to the pre-transition state: a
+        // stale->archived failure that left state='archived' would silently
+        // drop the stale flag and cause a stale->active->stale oscillation.
         const record = usage.get(name)
-        if (record) record.state = 'active'
+        const from = failedFrom?.get(name)
+        if (record && (from === 'stale' || from === 'active')) record.state = from
         errors.push(`${name}: ${archived.message}`)
       } else {
         archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
@@ -495,7 +502,10 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         record.archived_at = new Date().toISOString()
       }
       alreadyArchived.add(nomination.from)
-      archivedSkills.push({ name: nomination.from, path: consolidated.path ?? '', reason: `Consolidated into ${nomination.into}` })
+      // Approximate recovered location: the exact archive dir may carry a
+      // stamp suffix, but consolidated.path points at the TARGET, not the
+      // archived source, so it must not be reported as the source's path.
+      archivedSkills.push({ name: nomination.from, path: join(this.skills.root, '.archive', nomination.from), reason: `Consolidated into ${nomination.into}` })
     }
     if (suppressedChanged) {
       try {
@@ -559,7 +569,16 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       manageUnmanaged: this.manageUnmanaged,
       pruneBuiltins: this.pruneBuiltins,
       bundledNames,
-    })
+    }, await this.protectedNameMap())
+  }
+
+  /** marker info (pinned/bundled/hub-installed) per skill, from the library list. */
+  private async protectedNameMap(): Promise<Map<string, string>> {
+    const map = new Map<string, string>()
+    for (const summary of await this.skills.list()) {
+      if (summary.protectedBy !== null) map.set(summary.name, summary.protectedBy)
+    }
+    return map
   }
 
   /**
@@ -577,6 +596,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     for (const source of sources) {
       const record = usage.get(source)
       if (record) record.state = 'archived'
+      if (record) record.archived_at = new Date().toISOString()
     }
     await saveUsage(this.skills.root, usage, this.io)
     return result
@@ -593,6 +613,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const usage: UsageMap = await loadUsage(this.skills.root, this.io)
     const record = usage.get(name)
     if (record) record.state = 'active'
+    if (record) record.archived_at = null
     await saveUsage(this.skills.root, usage, this.io)
     const suppressed = new Set(await loadSuppressedNames(this.skills.root, this.io))
     if (suppressed.delete(name)) {

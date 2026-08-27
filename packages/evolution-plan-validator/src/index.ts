@@ -17,6 +17,8 @@ export interface SkillOp {
   action?: string
   name?: string
   content?: string
+  /** write_file payload (the tool reads `file_content`, not `content`). */
+  file_content?: string
   old_string?: string
   new_string?: string
   file_path?: string
@@ -126,6 +128,8 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
     return `skill op ${index}: ${action} requires content`
   }
   if (action === 'patch' && !(op.old_string ?? '')) return `skill op ${index}: patch requires old_string`
-  if ((op.content ?? '').length > (context.maxSkillContentChars ?? 100_000)) return `skill op ${index}: content exceeds skill budget`
+  const writeContent = op.file_content ?? op.content ?? ''
+  if (action === 'write_file' && !writeContent.trim()) return `skill op ${index}: write_file requires file_content`
+  if (writeContent.length > (context.maxSkillContentChars ?? 100_000)) return `skill op ${index}: content exceeds skill budget`
   return null
 }

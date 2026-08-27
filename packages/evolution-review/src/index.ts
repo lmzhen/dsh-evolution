@@ -6,14 +6,14 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createHash, randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
-import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, foldTurn, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, evolutionIoAdapter, foldTurn, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { validateEvolutionPlan } from '@deepseek-ai/dsh-evolution-plan-validator'
+import { validateEvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactReviewSecrets } from './redact.ts'
 
 export const name = 'evolution-review'
@@ -126,6 +126,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
       substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
     })
     await stateService?.saveReviewState(session.id, state)
+    // Cumulative tool-call counter updates on EVERY turn/end — including turns
+    // that fired a cadence review — so the completion channel's long-session
+    // gate reflects the whole conversation, not only cadence-free turns.
+    const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
+    cumulativeToolCalls.set(session.id, cumulative)
     if (kind) {
       session.append('evolution/review-scheduled', {
         kind,
@@ -148,8 +153,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const trigger = config.skillReviewTrigger
     if (trigger !== 'completion' && trigger !== 'both') return
     if (completionInjected.has(session.id)) return
-    const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
-    cumulativeToolCalls.set(session.id, cumulative)
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
     session.append('evolution/review-scheduled', {
@@ -222,7 +225,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const acceptedSkillOps = validation.accepted.skillOps ?? []
       const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, collectReadSkillNames(session))
       validation.accepted.skillOps = acceptedSkillOps
-      const actions = await executePlan(validation.accepted, agent)
+      const actions = await executePlan(validation.accepted)
       const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
         .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
       session.append('evolution/plan-applied', {
@@ -250,7 +253,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }
   }
 
-  async function executePlan(plan: EvolutionPlan, parent: import('@deepseek-ai/dsh-agent').Agent): Promise<string[]> {
+  async function executePlan(plan: EvolutionPlan): Promise<string[]> {
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     const actions: string[] = []
@@ -272,7 +275,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const runnerArgs = { operation: args, origin: 'background_review' as const }
       const result = approval
         ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
-        : await executeSkillTool(parent, args)
+        : await executeSkillDirect(args)
       if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
     }
     return actions
@@ -284,15 +287,27 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return await approval.run(kind, runnerArgs)
     }
 
-    async function executeSkillTool(agent: import('@deepseek-ai/dsh-agent').Agent, args: unknown): Promise<{ ok: boolean; message: string }> {
-      const result = await ctx.tools.execute({
-        callId: CallId(`evolution-${randomUUID()}`),
-        name: 'skill_manage',
-        arguments: args,
-        agent,
-        signal: AbortSignal.timeout(config.executionTimeoutMs),
-      })
-      return result.isError ? { ok: false, message: 'skill_manage execution failed' } : { ok: true, message: 'skill_manage executed' }
+    /**
+     * Approval-disabled path: execute the skill op through SkillLibrary with an
+     * EXPLICIT background_review origin. Going through ctx.tools.execute would
+     * make tool-skill-manage infer origin from the parent agent's header
+     * (not 'subagent'), silently escaping the .hermes-managed marker and the
+     * pinned write guard.
+     */
+    async function executeSkillDirect(skillArgs: SkillOp): Promise<{ ok: boolean; message: string }> {
+      const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+      if (!io) return { ok: false, message: 'evolution-io service not mounted' }
+      const library = new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()))
+      const op = skillArgs
+      const name = op.name ?? ''
+      const origin: WriteOrigin = 'background_review'
+      if (op.action === 'create') return await library.create(name, op.content ?? '', origin)
+      if (op.action === 'edit' || op.action === 'update') return await library.update(name, op.content ?? '', origin)
+      if (op.action === 'patch') return await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', false, origin)
+      if (op.action === 'delete') return await library.archive(name, op.absorbed_into ? { absorbedInto: op.absorbed_into } : {})
+      if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? op.content ?? '', origin)
+      if (op.action === 'remove_file') return await library.removeSupportFile(name, op.file_path ?? '', origin)
+      return { ok: false, message: `Unknown skill action "${op.action ?? ''}"` }
     }
   }
 
@@ -336,7 +351,7 @@ export function collectReadSkillNames(session: Session): Set<string> {
  * them as rejected.
  */
 export function filterUnreadSkillOps(ops: Array<{ action?: string; name?: string }>, readNames: ReadonlySet<string>): number {
-  const READ_REQUIRED = ['edit', 'update', 'patch', 'write_file', 'remove_file']
+  const READ_REQUIRED = ['edit', 'update', 'patch', 'delete', 'write_file', 'remove_file']
   let dropped = 0
   for (let index = ops.length - 1; index >= 0; index -= 1) {
     const op = ops[index]

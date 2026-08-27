@@ -46,10 +46,19 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
 }
 
 export function nodeEvolutionIo(): EvolutionIoLike {
+  const isMissing = (error: unknown): boolean => {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    return code === 'ENOENT' || code === 'ENOTDIR'
+  }
   return {
     async readText(path) {
-      // Swallowed: the file may not exist or be unreadable; null is the "missing" signal.
-      try { return await readFile(path, 'utf8') } catch { return null }
+      try { return await readFile(path, 'utf8') } catch (error) {
+        // Only "missing" maps to null (the "not there" signal); any other
+        // read failure (EACCES/EIO/EMFILE) surfaces so a caller never
+        // mistakes an unreadable store for an empty one and overwrites it.
+        if (isMissing(error)) return null
+        throw error
+      }
     },
     async writeText(path, content) {
       await mkdir(dirname(path), { recursive: true })
@@ -65,8 +74,10 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       try { return await readdir(path) } catch { return [] }
     },
     async exists(path) {
-      // Swallowed: any stat failure means "not there".
-      try { await stat(path); return true } catch { return false }
+      try { await stat(path); return true } catch (error) {
+        if (isMissing(error)) return false
+        throw error
+      }
     },
     async rename(path, destination) {
       await mkdir(dirname(destination), { recursive: true })
@@ -77,8 +88,10 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       await cp(path, destination, { recursive: true, force: true })
     },
     async size(path) {
-      // Swallowed: a missing or unreadable file reports "unknown size".
-      try { return (await stat(path)).size } catch { return null }
+      try { return (await stat(path)).size } catch (error) {
+        if (isMissing(error)) return null
+        throw error
+      }
     },
   }
 }

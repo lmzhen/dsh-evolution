@@ -156,9 +156,13 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
 })
 
 export function verifyPromptBundle(bundle: PromptBundle = PROMPT_BUNDLE): boolean {
+  // Verify against the PINNED constants, not the bundle's own id/version:
+  // otherwise a bundle that drifted off the deployment's pinned version
+  // recomputes a self-consistent hash and passes trivially.
+  if (bundle.id !== PROMPT_BUNDLE_ID || bundle.version !== PROMPT_BUNDLE_VERSION) return false
   const canonical = JSON.stringify({
-    id: bundle.id,
-    version: bundle.version,
+    id: PROMPT_BUNDLE_ID,
+    version: PROMPT_BUNDLE_VERSION,
     prompts: Object.fromEntries(Object.entries(bundle.prompts).sort()),
   })
   return bundle.sha256 === sha256(canonical)

@@ -37,6 +37,15 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // The IO provider is resolved lazily so `memory-files` does not depend on
   // row order: the first write happens only after the preset has fully mounted.
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+  // In-process write serialization: applyBatch is read-modify-write, so two
+  // concurrent callers (multi-session host) can otherwise compute on the same
+  // old entries and the last rename wins, silently dropping the other's ops.
+  let writeChain: Promise<unknown> = Promise.resolve()
+  const serializedWrite = <T>(task: () => Promise<T>): Promise<T> => {
+    const run = writeChain.then(task, task)
+    writeChain = run.then(() => undefined, () => undefined)
+    return run
+  }
   const store = new MemoryStore({
     memoryCharLimit: config.memoryCharLimit,
     userCharLimit: config.userCharLimit,
@@ -50,7 +59,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     read: (target, _signal) => store.read(target),
     applyBatch: async (target: MemoryTarget, operations: MemoryOperation[]) => {
       const normalized = operations.map(op => ({ action: op.action, facts: op.facts ?? op.content, old_text: op.old_text }))
-      return store.applyBatch(target, normalized)
+      return await serializedWrite(() => store.applyBatch(target, normalized))
     },
     snapshot: async (): Promise<MemorySnapshot> => {
       const [memory, user] = await Promise.all([store.read('memory'), store.read('user')])
