@@ -16,6 +16,9 @@ describe('evolution-io-node', () => {
     await io.writeText(join(root, 'nested', 'a.txt'), 'hello')
     expect(await io.readText(join(root, 'nested', 'a.txt'))).toBe('hello')
     expect(await io.exists(join(root, 'nested', 'a.txt'))).toBe(true)
+    // The node provider always ships the optional size probe.
+    expect(await io.size!(join(root, 'nested', 'a.txt'))).toBe(5)
+    expect(await io.size!(join(root, 'nested', 'missing.txt'))).toBe(null)
     await io.copy(join(root, 'nested'), join(root, 'copy'))
     expect(await io.readText(join(root, 'copy', 'a.txt'))).toBe('hello')
     await io.rename(join(root, 'copy', 'a.txt'), join(root, 'renamed.txt'))

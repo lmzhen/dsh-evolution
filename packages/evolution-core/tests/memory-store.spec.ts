@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MemoryStore } from '@deepseek-ai/dsh-evolution-core'
+import { MemoryStore, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 
 it('memory add/replace/remove/batch', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-'))
@@ -103,5 +103,67 @@ it('memory blocks threats and refuses ambiguous matches', async () => {
   await store.add('memory', 'Alpha uses git.')
   await store.add('memory', 'Beta uses git.')
   expect((await store.remove('memory', 'git')).ok).toBe(false)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('memory read guard skips oversized files and refuses writes with a byte-exact backup', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-guard-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 400 })
+  const { writeFile, readdir, readFile } = await import('node:fs/promises')
+  await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(5000), 'utf8')
+  // Read side: the oversized file is never loaded (treat as empty), and drift
+  // reports true so write paths cannot bypass the guard via detectDrift.
+  expect(await store.read('memory')).toEqual([])
+  expect(await store.detectDrift('memory')).toBe(true)
+  // Write side: refused with a clear message and the file backed up by raw copy.
+  const refused = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
+  expect(refused.ok).toBe(false)
+  expect(refused.message).toContain('5000 bytes (limit 4000)')
+  expect(refused.message).toContain('skipping read')
+  expect(refused.message).toMatch(/backup was saved/)
+  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak.'))
+  expect(backups.length).toBe(1)
+  expect((await readFile(join(root, backups[0]!), 'utf8')).length).toBe(5000)
+  // Injection side: the skipped block announces itself instead of vanishing.
+  const context = await store.renderContext()
+  expect(context).toContain('## Memory — file skipped: 5000 bytes (limit 4000); not read')
+  // The guard does not count as a consolidation failure: the refusal message
+  // stays the fix-it instruction rather than the stop-retrying backoff.
+  const refusedAgain = await store.add('memory', 'gamma')
+  expect(refusedAgain.ok).toBe(false)
+  expect(refusedAgain.message).toContain('Fix the file manually')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('memory read guard is off when the IO backend has no size probe', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-noguard-'))
+  const io = { ...nodeEvolutionIo() }
+  delete (io as { size?: unknown }).size
+  const store = new MemoryStore({ root, memoryCharLimit: 400, io })
+  const { writeFile } = await import('node:fs/promises')
+  // Canonical single-entry form (trailing newline) so only the guard, not
+  // structural drift, is in play.
+  await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(5000) + '\n', 'utf8')
+  // Backward-compatible: a backend without `size` gets no guard, so the file is
+  // read and the write path falls back to the ordinary char-limit check.
+  expect(await store.read('memory')).toEqual(['x'.repeat(5000)])
+  expect(await store.detectDrift('memory')).toBe(false)
+  const result = await store.add('memory', 'gamma')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('exceed')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('memory renderContext carries a usage-indicator header clamped at 100%', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-pct-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 200, userCharLimit: 100 })
+  const { writeFile } = await import('node:fs/promises')
+  // On-disk content already over the store limit (canonical form, under the
+  // read guard): the indicator must clamp to 100% like Hermes `_render_block`.
+  await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(250) + '\n', 'utf8')
+  await store.add('user', 'u'.repeat(30))
+  const context = await store.renderContext()
+  expect(context).toContain('## Memory (1 entries) [100% — 250/200 chars]')
+  expect(context).toContain('## User Profile (1 entries) [30% — 30/100 chars]')
   await rm(root, { recursive: true, force: true })
 })

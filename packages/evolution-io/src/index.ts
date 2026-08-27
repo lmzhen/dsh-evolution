@@ -14,6 +14,12 @@ export interface EvolutionIo {
   exists(path: string): Promise<boolean>
   rename(path: string, destination: string): Promise<void>
   copy(path: string, destination: string): Promise<void>
+  /**
+   * Optional byte-size probe for the read guard. Return the file's size in
+   * bytes, or `null` when unknown (unsupported backend, missing file, stat
+   * failure). An implementation without this probe gets no read guard.
+   */
+  size?(path: string, signal?: AbortSignal): Promise<number | null>
 }
 
 declare module '@deepseek-ai/cordis' {

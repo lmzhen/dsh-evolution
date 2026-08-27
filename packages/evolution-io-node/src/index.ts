@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
@@ -38,6 +38,10 @@ export function apply(ctx: Context): void {
     async copy(path, destination) {
       await mkdir(dirname(destination), { recursive: true })
       await cp(path, destination, { recursive: true, force: true })
+    },
+    async size(path) {
+      // Swallowed: a missing or unreadable file reports "unknown size".
+      try { return (await stat(path)).size } catch { return null }
     },
   }
   ctx.effect(() => ctx.evolutionIo.registerProvider(provider), 'evolution-io-node.provider')

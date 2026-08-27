@@ -11,6 +11,14 @@ import { ENTRY_DELIMITER } from './constants.ts'
 
 export { ENTRY_DELIMITER } from './constants.ts'
 
+/**
+ * Read-guard factor: a memory file larger than this multiple of its target's
+ * char limit is treated as externally corrupted and skipped instead of being
+ * read whole (aligned with claw `tools/memory.ts` size guard, which uses the
+ * same 10× bound around a file that should never exceed the store limit).
+ */
+const READ_GUARD_FACTOR = 10
+
 export type MemoryTarget = 'memory' | 'user'
 
 export interface MemoryOperation {
@@ -80,7 +88,24 @@ export class MemoryStore {
     return target === 'memory' ? this.memoryLimit : this.userLimit
   }
 
+  /**
+   * Read-guard probe: `{ size, limit }` when the on-disk file exceeds
+   * `limit * READ_GUARD_FACTOR` bytes, `null` when it is absent, unknown
+   * (backend without a size probe), under the bound, or the target has no
+   * limit configured.
+   */
+  private async oversizedFile(target: MemoryTarget): Promise<{ size: number; limit: number } | null> {
+    const size = await this.io.size?.(fileFor(this.root, target))
+    if (size === null || size === undefined) return null
+    const limit = this.limitFor(target)
+    if (limit <= 0) return null
+    return size > limit * READ_GUARD_FACTOR ? { size, limit } : null
+  }
+
   async read(target: MemoryTarget): Promise<string[]> {
+    // Oversized files are skipped whole (claw alignment); a later write to the
+    // same target is refused via `oversizedRefusal` instead of overwriting.
+    if (await this.oversizedFile(target)) return []
     const raw = await this.io.readText(fileFor(this.root, target))
     return raw === null ? [] : [...new Set(normalizeEntries(raw))]
   }
@@ -115,24 +140,45 @@ export class MemoryStore {
   }
 
   /**
-   * Best-effort copy of the drifted on-disk file to `<file>.bak.<stamp>` before
-   * refusing the write, so an external edit stays recoverable. Failure to back
-   * up does not change the refusal semantics.
+   * Best-effort raw-copy backup of the on-disk file to `<file>.bak.<stamp>`
+   * before a refusal, so an externally modified (or oversized) file stays
+   * recoverable. Copies bytes instead of reading them so a pathologically
+   * large file is never loaded just to back it up. Failure to back up does
+   * not change the refusal semantics.
    */
-  private async backupDrift(target: MemoryTarget): Promise<string | null> {
+  private async backupFile(target: MemoryTarget): Promise<string | null> {
     const path = fileFor(this.root, target)
-    const raw = await this.io.readText(path)
-    if (raw === null) return null
     const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
     try {
-      await this.io.writeText(`${path}.bak.${stamp}`, raw)
+      await this.io.copy(path, `${path}.bak.${stamp}`)
       return `${path}.bak.${stamp}`
     } catch {
       return null
     }
   }
 
+  /**
+   * Read-guard refusal for write paths. Returns the refusal result when the
+   * target file is oversized, `null` otherwise. The file is skipped for
+   * reading (never loaded), backed up by raw copy, and the model is told to
+   * fix it manually — mirroring the drift refusal so corrupted state is never
+   * silently overwritten.
+   */
+  private async oversizedRefusal(target: MemoryTarget): Promise<MemoryApplyResult | null> {
+    const oversized = await this.oversizedFile(target)
+    if (!oversized) return null
+    const backup = await this.backupFile(target)
+    const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
+    return {
+      ok: false,
+      message: `Memory file is ${oversized.size} bytes (limit ${oversized.limit * READ_GUARD_FACTOR}) — skipping read.${suffix} Fix the file manually, then retry.`,
+      entries: [], chars: 0, limit: this.limitFor(target),
+    }
+  }
+
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
+    const refusal = await this.oversizedRefusal(target)
+    if (refusal) return refusal
     const content = facts.trim()
     if (!content) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const threat = scanMemoryThreats(content)
@@ -167,6 +213,8 @@ export class MemoryStore {
   private async mutate(target: MemoryTarget, oldText: string, action: 'replace' | 'remove', facts?: string): Promise<MemoryApplyResult> {
     const needle = oldText.trim()
     if (!needle) return { ok: false, message: 'old_text cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    const refusal = await this.oversizedRefusal(target)
+    if (refusal) return refusal
     const content = action === 'replace' ? (facts ?? '').trim() : ''
     if (action === 'replace' && !content) return { ok: false, message: 'facts is required for replace; use remove to delete.', entries: [], chars: 0, limit: this.limitFor(target) }
     if (action === 'replace') {
@@ -175,7 +223,7 @@ export class MemoryStore {
     }
 
     if (await this.detectDrift(target)) {
-      const backup = await this.backupDrift(target)
+      const backup = await this.backupFile(target)
       const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
       return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
     }
@@ -205,8 +253,10 @@ export class MemoryStore {
     if (operations.length === 0) {
       return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     }
+    const refusal = await this.oversizedRefusal(target)
+    if (refusal) return refusal
     if (await this.detectDrift(target)) {
-      const backup = await this.backupDrift(target)
+      const backup = await this.backupFile(target)
       const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
       return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
     }
@@ -257,12 +307,22 @@ export class MemoryStore {
     const memory = await this.read('memory')
     const user = await this.read('user')
     const parts: string[] = []
-    for (const [target, entries] of [['Memory', memory], ['User Profile', user]] as const) {
+    for (const [target, label, entries] of [['memory', 'Memory', memory], ['user', 'User Profile', user]] as const) {
+      // An oversized file read as empty; probe once more here so the injected
+      // context states the skip instead of silently dropping the block.
+      const oversized = entries.length === 0 ? await this.oversizedFile(target) : null
+      if (oversized) {
+        parts.push(`## ${label} — file skipped: ${oversized.size} bytes (limit ${oversized.limit * READ_GUARD_FACTOR}); not read`)
+        continue
+      }
       const safe = entries.filter(entry => !scanMemoryThreats(entry))
       if (safe.length > 0) {
         const body = safe.join(ENTRY_DELIMITER)
+        const limit = this.limitFor(target)
+        // Usage indicator aligned with Hermes `_render_block`: floor percentage clamped at 100.
+        const pct = limit > 0 ? Math.min(100, Math.floor((body.length * 100) / limit)) : 0
         const note = safe.length === entries.length ? '' : ` (${entries.length - safe.length} threat-matched entries filtered)`
-        parts.push(`## ${target} (${safe.length} entries)${note}\n${body}`)
+        parts.push(`## ${label} (${safe.length} entries) [${pct}% — ${body.length}/${limit} chars]${note}\n${body}`)
       }
     }
     return parts.join('\n\n')
@@ -287,6 +347,9 @@ export class MemoryStore {
    * same serialization and returns false, so a normal write is never flagged.
    */
   async detectDrift(target: MemoryTarget): Promise<boolean> {
+    // Oversized files are an external-modification signal by the read guard;
+    // report drift so a write followed by a read never loads them.
+    if (await this.oversizedFile(target)) return true
     const raw = await this.io.readText(fileFor(this.root, target))
     if (raw === null) return false
     // Canonicalize by normalizing (split + trim + drop empties) then re-rendering.
