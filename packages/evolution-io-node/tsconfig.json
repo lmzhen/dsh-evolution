@@ -18,6 +18,9 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
+      "path": "../evolution-core"
+    },
+    {
       "path": "../evolution-io"
     }
   ]

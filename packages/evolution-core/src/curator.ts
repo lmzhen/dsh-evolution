@@ -1,6 +1,9 @@
 /**
  * Deterministic skill curator: active → stale → archived transitions.
- * Pure function; file moves are performed by SkillLibrary.
+ * Pure function with one deliberate side effect: records in the passed
+ * `usage` map are MUTATED (state/archived_at) to carry the transition — the
+ * caller owns the map and decides whether to clone first (dry-run) or persist
+ * after. File moves are performed by SkillLibrary.
  */
 
 import type { UsageMap, UsageRecord } from './usage.ts'

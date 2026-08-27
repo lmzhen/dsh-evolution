@@ -4,6 +4,8 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT } from '@deepseek-ai/dsh-evolution-core'
+
 export interface MemoryOp {
   target?: string
   action?: string
@@ -71,7 +73,7 @@ function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
 }
 
 export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationContext): ValidationResult {
-  const maxOps = context.maxOpsPerPlan ?? 32
+  const maxOps = context.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN
   const rejected: RejectedOp[] = []
   const memoryOps: MemoryOp[] = []
   const skillOps: SkillOp[] = []
@@ -111,7 +113,7 @@ function validateMemoryOp(op: MemoryOp, context: ValidationContext, index: numbe
   const text = (op.facts ?? op.content ?? '').trim()
   if (action !== 'remove' && text.length === 0) return `memory op ${index}: ${action} requires facts/content`
   if (action !== 'add' && !(op.old_text ?? '').trim()) return `memory op ${index}: ${action} requires old_text`
-  const budget = op.target === 'user' ? (context.maxUserChars ?? 1375) : (context.maxMemoryChars ?? 2200)
+  const budget = op.target === 'user' ? (context.maxUserChars ?? DEFAULT_USER_CHAR_LIMIT) : (context.maxMemoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT)
   if (text.length > budget) return `memory op ${index}: content exceeds ${op.target === 'user' ? 'user' : 'memory'} budget`
   return null
 }
@@ -130,6 +132,6 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   if (action === 'patch' && !(op.old_string ?? '')) return `skill op ${index}: patch requires old_string`
   const writeContent = op.file_content ?? op.content ?? ''
   if (action === 'write_file' && !writeContent.trim()) return `skill op ${index}: write_file requires file_content`
-  if (writeContent.length > (context.maxSkillContentChars ?? 100_000)) return `skill op ${index}: content exceeds skill budget`
+  if (writeContent.length > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
   return null
 }

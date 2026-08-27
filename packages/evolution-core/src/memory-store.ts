@@ -7,7 +7,7 @@ import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { scanMemoryThreats } from './threats.ts'
-import { ENTRY_DELIMITER } from './constants.ts'
+import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT } from './constants.ts'
 
 export { ENTRY_DELIMITER } from './constants.ts'
 
@@ -77,8 +77,8 @@ export class MemoryStore {
 
   constructor(options: MemoryStoreOptions = {}) {
     this.io = options.io ?? nodeEvolutionIo()
-    this.memoryLimit = options.memoryCharLimit ?? 2200
-    this.userLimit = options.userCharLimit ?? 1375
+    this.memoryLimit = options.memoryCharLimit ?? DEFAULT_MEMORY_CHAR_LIMIT
+    this.userLimit = options.userCharLimit ?? DEFAULT_USER_CHAR_LIMIT
     this.addDatePrefix = options.addDatePrefix ?? false
     this.root = options.root ?? memoryRoot()
     this.maxFailures = options.maxConsolidationFailures ?? 3
@@ -341,16 +341,6 @@ export class MemoryStore {
       }
     }
     return parts.join('\n\n')
-  }
-
-  async snapshot(): Promise<{ memory: string[]; user: string[] }> {
-    const [memory, user] = await Promise.all([this.read('memory'), this.read('user')])
-    return { memory, user }
-  }
-
-  async restoreSnapshot(snapshot: { memory: string[]; user: string[] }): Promise<void> {
-    await this.write('memory', snapshot.memory)
-    await this.write('user', snapshot.user)
   }
 
   /**

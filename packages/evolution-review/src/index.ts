@@ -11,7 +11,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, evolutionIoAdapter, foldTurn, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactReviewSecrets } from './redact.ts'
@@ -214,11 +214,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const policyFingerprint = fingerprintPolicy(snapshot)
       const validation = validateEvolutionPlan(plan as EvolutionPlan, {
         sessionSeq: session.seq - 1,
-        maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? 32,
+        maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
         protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
-        maxMemoryChars: snapshot?.memoryChars ?? 2200,
-        maxUserChars: snapshot?.userChars ?? 1375,
-        maxSkillContentChars: snapshot?.skillContentChars ?? 100_000,
+        maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
+        maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
+        maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
       })
       // F19: the background review may only patch skills it read this session
       // (read-before-write, matching the original Hermes background guard).

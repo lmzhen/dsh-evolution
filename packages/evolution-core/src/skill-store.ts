@@ -64,7 +64,7 @@ function skillDir(root: string, name: string): string {
   return join(root, name)
 }
 
-function markerPath(dir: string, marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed' | 'hermes-exempt'): string {
+function markerPath(dir: string, marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
   return join(dir, `.${marker}`)
 }
 
@@ -130,11 +130,13 @@ function validateSupportPath(filePath: string): string | null {
 /**
  * Index of `pattern` inside `content`, treating whitespace runs (spaces/tabs)
  * as flexible and literal escape sequences (`\n`, `\t`, `\r`) as their real
- * characters: a whitespace run on either side matches a run of any length on
- * the other, and a backslash-escaped char in the pattern matches the real char
- * in the content (model-copy drift). Returns the [start, end) range in the
- * ORIGINAL content so a patch can replace exactly the matched span and keep
- * every other byte intact. Returns null when no fuzzy match exists.
+ * characters: a PATTERN whitespace run matches any content run of any length
+ * (even empty), while extra whitespace that only exists in the content is not
+ * skipped — the flexibility is one-sided on the pattern, and a backslash-
+ * escaped char in the pattern matches the real char in the content
+ * (model-copy drift). Returns the [start, end) range in the ORIGINAL content
+ * so a patch can replace exactly the matched span and keep every other byte
+ * intact. Returns null when no fuzzy match exists.
  */
 function fuzzyIndexOf(content: string, pattern: string): [number, number] | null {
   const isSpace = (char: string | undefined) => char !== undefined && /[ \t]/.test(char)

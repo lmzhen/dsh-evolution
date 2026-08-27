@@ -1,8 +1,8 @@
 /**
- * @deepseek-ai/dsh-evolution-agent — composition package.
+ * @deepseek-ai/dsh-evolution-agent-preset — composition package.
  * The package's substance is its YAML composition files declared through the
  * package manifest; this module carries no runtime API.
- * @module @deepseek-ai/dsh-evolution-agent
+ * @module @deepseek-ai/dsh-evolution-agent-preset
  */
 
 export {}

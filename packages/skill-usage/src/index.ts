@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  skillsRoot } from '@deepseek-ai/dsh-evolution-core'
-import { bumpPatch, bumpUse, bumpView, loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { bumpPatch, bumpUse, bumpView, loadUsage, markAgentCreated, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 declare module '@deepseek-ai/cordis' {
@@ -69,7 +69,6 @@ export class SkillUsageRegistry extends Service {
 
   async markAgentCreated(name: string): Promise<void> {
     await this.mutate(async (map) => {
-      const { markAgentCreated } = await import('@deepseek-ai/dsh-evolution-core')
       markAgentCreated(map, name)
       await this.flush()
     })

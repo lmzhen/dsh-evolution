@@ -128,9 +128,9 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     this.skills = new SkillLibrary(undefined, this.io)
     this.enabled = config.enabled ?? true
-    this.intervalHours = config.intervalHours ?? 168
-    this.staleAfterDays = config.staleAfterDays ?? 30
-    this.archiveAfterDays = config.archiveAfterDays ?? 90
+    this.intervalHours = config.intervalHours ?? DEFAULT_CURATOR_INTERVAL_HOURS
+    this.staleAfterDays = config.staleAfterDays ?? DEFAULT_STALE_AFTER_DAYS
+    this.archiveAfterDays = config.archiveAfterDays ?? DEFAULT_ARCHIVE_AFTER_DAYS
     this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
     this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? 7

@@ -15,6 +15,9 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../../packages/evolution/evolution-core"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]
