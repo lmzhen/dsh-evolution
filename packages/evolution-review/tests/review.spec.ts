@@ -7,7 +7,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 describe('evolution-review', () => {
   it('defaults review subagent tools to the Anchored Standard discovery pair', () => {
     const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { reviewToolAllow: string[] } } } })['~standard'].validate({}).value
-    expect(value.reviewToolAllow).toEqual(['skill', 'skill_search', 'skill_load'])
+    expect(value.reviewToolAllow).toEqual(['skill'])
   })
 
   it('loads with review disabled', async () => {

@@ -24,7 +24,11 @@ export interface Config {
   reviewMode?: string
   memoryInterval?: number
   skillInterval?: number
-  /** Tools the one-shot review subagent may use. Defaults include the Anchored Standard discovery pair. */
+  /**
+   * Tools the one-shot review subagent may use. Only actually-existing tools
+   * may be listed (the DSH tool catalog has `skill`; the `skill_search` /
+   * `skill_load` discovery pair does not exist on this platform).
+   */
   reviewToolAllow?: string[]
   reviewTimeoutMs?: number
   executionTimeoutMs?: number
@@ -44,7 +48,7 @@ export const Config: z<Config> = z.object({
   reviewMode: z.string().default('subagent'),
   memoryInterval: z.number().default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().default(DEFAULT_REVIEW_SKILL_INTERVAL),
-  reviewToolAllow: z.array(z.string()).default(['skill', 'skill_search', 'skill_load']),
+  reviewToolAllow: z.array(z.string()).default(['skill']),
   reviewTimeoutMs: z.number().default(120_000),
   executionTimeoutMs: z.number().default(30_000),
   reviewContextMessages: z.number().default(60),

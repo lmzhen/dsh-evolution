@@ -57,10 +57,11 @@
     - id: evolution-review
       name: '@deepseek-ai/dsh-evolution-review'
       config:
-        # Anchored Standard hides the plain `skill` tool behind discovery
-        # tools; allow all three so review subagents can still find and load
-        # skills under that preset family.
-        reviewToolAllow: [skill, skill_search, skill_load]
+        # The DSH tool catalog exposes the plain `skill` tool only — the
+        # `skill_search`/`skill_load` discovery pair does not exist here, so
+        # listing it would be dead configuration. Allow `skill` so review
+        # subagents can load skills under the Anchored Standard preset family.
+        reviewToolAllow: [skill]
     - id: evolution-curator
       name: '@deepseek-ai/dsh-evolution-curator'
     - id: evolution-commands

@@ -61,7 +61,9 @@ describe('anchored-standard review smoke', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(capturedRequest).toBeDefined()
     const request = capturedRequest as Record<string, unknown> | undefined
-    expect(request?.toolFilter).toEqual({ allow: ['skill', 'skill_search', 'skill_load'] })
+    // The DSH tool catalog exposes `skill` only — discovery tools don't exist,
+    // so the default allow list is exactly the real tool set.
+    expect(request?.toolFilter).toEqual({ allow: ['skill'] })
     // No reviewProvider config: the subagent inherits the deployment default
     // route instead of a hardcoded provider name.
     expect((request?.agentOptions as Record<string, unknown> | undefined)?.provider).toBeUndefined()

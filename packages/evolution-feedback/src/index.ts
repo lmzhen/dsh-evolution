@@ -59,9 +59,11 @@ export class EvolutionFeedback {
       if (raw === null) return
       try {
         const parsed = JSON.parse(raw) as Partial<FeedbackState>
+        // MERGE instead of replace: records written before the (background)
+        // restore settled must not be clobbered by a stale disk snapshot.
         this.state = {
-          skills: { ...parsed.skills },
-          sessions: { ...parsed.sessions },
+          skills: { ...parsed.skills, ...this.state.skills },
+          sessions: { ...parsed.sessions, ...this.state.sessions },
         }
       } catch {
         // Malformed feedback is non-fatal; start with an empty state.

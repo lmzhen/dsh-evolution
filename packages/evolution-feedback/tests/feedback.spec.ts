@@ -59,6 +59,31 @@ describe('evolution-feedback', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('a record made before restore settles survives the restore (merge, not replace)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-race-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const path = join(home, 'evolution', 'feedback.json')
+    // Pre-existing disk state: one old positive.
+    await io.writeText(path, JSON.stringify({ skills: { 'old-skill': { positive: 1, negative: 0 } }, sessions: {} }))
+    const feedback = new Feedback.EvolutionFeedback(io, home)
+    // Simulate the startup race: restore is already in flight when a record lands.
+    const restoring = feedback.restore(io)
+    feedback.record('new-skill', 'positive', undefined, 'skill', io)
+    await restoring
+    await new Promise(resolve => setTimeout(resolve, 20))
+    const snapshot = feedback.snapshot()
+    expect(snapshot.skills['new-skill']).toBeDefined()
+    expect(snapshot.skills['old-skill']?.positive).toBe(1)
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('ignores a malformed feedback file and stays functional', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-bad-'))
     const previous = process.env.DSH_HOME
