@@ -176,6 +176,10 @@ export function apply(ctx: Context): void {
           if (parsed === null) return err(`Invalid node id "${id}". Skill names or memory:<source>:<index> expected.`)
           if (parsed.kind === 'skill') {
             const result = await withSkills().archive(parsed.name)
+            if (result.ok) {
+              const usageRegistry = usageService as unknown as { markArchived?(name: string): Promise<void> } | undefined
+              await usageRegistry?.markArchived?.(parsed.name)
+            }
             return result.ok ? ok(result.message) : err(result.message)
           }
           const entries = await memory.read(parsed.source)

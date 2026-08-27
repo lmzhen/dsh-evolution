@@ -74,6 +74,32 @@ export class SkillUsageRegistry extends Service {
     })
   }
 
+  /**
+   * Mark a skill's usage record as archived (delete / curator archive paths).
+   * Unlike `record('patch')` this never bumps the patch counter — archiving is
+   * a state transition, not a content mutation.
+   */
+  async markArchived(name: string, at = new Date()): Promise<void> {
+    await this.mutate(async (map) => {
+      const record = map.get(name)
+      if (record) {
+        record.state = 'archived'
+        record.archived_at = at.toISOString()
+      }
+      await this.flush()
+    })
+  }
+
+  /**
+   * Drop the in-memory cache once queued work drains, so the next `map()` reads
+   * the file again. The curator writes the sidecar directly; without this, the
+   * next tool telemetry flush would re-cover its quality/state/pinned writes.
+   */
+  async invalidate(): Promise<void> {
+    await this.chain
+    this.usage = null
+  }
+
   /** Write feedback-derived quality onto the usage sidecar; curator reads it. */
   async setQuality(name: string, score: number, warn: boolean): Promise<void> {
     await this.mutate(async (map) => {

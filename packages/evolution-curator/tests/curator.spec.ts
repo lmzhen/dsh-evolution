@@ -187,6 +187,12 @@ describe('evolution-curator', () => {
     const result = await ctx.evolutionCurator.run({ ignoreGates: true })
     expect(result.archived).toContain('ancient-skill')
     expect(result.errors).toEqual([])
+    // The archived state must be persisted on the usage record, or the next
+    // run treats the missing directory as a candidate again (B/D regression).
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    const record = usage.get('ancient-skill')
+    expect(record?.state).toBe('archived')
+    expect(record?.archived_at).toBeTruthy()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })

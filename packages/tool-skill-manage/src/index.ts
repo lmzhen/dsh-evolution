@@ -107,7 +107,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // never bump counters or emit mutation events.
       const mutating = action !== 'list' && action !== 'review' && action !== 'skip' && action !== 'pin' && action !== 'unpin'
       if (name && action === 'create' && origin === 'background_review') await ctx.skillUsage.markAgentCreated(name)
-      if (name && mutating) await ctx.skillUsage.record(name, 'patch')
+      if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
+      else if (name && mutating) await ctx.skillUsage.record(name, 'patch')
       if (mutating) {
         ctx.emit('evolution/skill-mutated', {
           action: action ?? '?',

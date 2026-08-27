@@ -477,6 +477,15 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         if (record && (from === 'stale' || from === 'active')) record.state = from
         errors.push(`${name}: ${archived.message}`)
       } else {
+        // Uniform state transition for EVERY successful archive — deterministic
+        // candidates were pre-set by computeLifecycleTransitions, but LLM
+        // nominations were not; without this the next run re-archives a missing
+        // directory and errors forever.
+        const record = usage.get(name)
+        if (record) {
+          record.state = 'archived'
+          record.archived_at = new Date().toISOString()
+        }
         archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
         if (bundledNames.has(name)) {
           suppressedNames.add(name)
@@ -522,6 +531,15 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       // Best-effort: curation decisions already landed; a failed usage flush
       // must not surface as a run error after the fact.
       this.ctx.logger.warn('evolution-curator: failed to persist usage sidecar')
+    }
+    // The registry caches the sidecar in-process; the curator wrote it directly
+    // above, so the next tool telemetry flush must re-read instead of re-covering
+    // the quality/state/pinned changes with its stale cache.
+    const usageRegistry = this.ctx.get('skillUsage') as { invalidate?(): Promise<void> } | undefined
+    try {
+      await usageRegistry?.invalidate?.()
+    } catch {
+      // Best-effort like the flush above.
     }
     return { archivedSkills, errors, suppressedChanged }
   }
