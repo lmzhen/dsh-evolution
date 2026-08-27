@@ -11,6 +11,7 @@
 export * from './curator.ts'
 export * from './events.ts'
 export * from './io.ts'
+export * from './learn-prompt.ts'
 export * from './memory-store.ts'
 export * from './mutations.ts'
 export * from './prompts.ts'

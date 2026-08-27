@@ -38,4 +38,24 @@ describe('evolution-commands', () => {
     expect(restoreResult.text).toContain('restored from .archive.')
     expect(calls).toEqual(['consolidate:target-a:source-b,source-c', 'restore:source-b'])
   })
+
+  it('learn returns the standards-guided skill distillation prompt', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    await ctx.plugin(Commands)
+    const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>' })
+    expect(withRequest.text).toContain('THE REQUEST:')
+    expect(withRequest.text).toContain('distill the auth flow from <url>')
+    expect(withRequest.text).toContain('skill-authoring standards')
+    expect(withRequest.text).toContain('skill_manage')
+    // Empty argument falls back to the "what we just did" guidance.
+    const empty = await captured!.handler({ rawInput: 'learn' })
+    expect(empty.text).toContain('the workflow we just went through')
+  })
 })

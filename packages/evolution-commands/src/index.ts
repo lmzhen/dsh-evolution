@@ -1,9 +1,10 @@
 /**
- * Human commands for the evolution family: /evolution status|pending.
+ * Human commands for the evolution family: /evolution learn|pending|curator|restore|consolidate.
  * @module @deepseek-ai/dsh-evolution-commands
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { buildLearnPrompt } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-commands'
 
@@ -77,7 +78,11 @@ export function apply(ctx: Context): void {
           const result = curator ? await curator.restore(name) : { ok: false, message: 'Curator service not mounted.' }
           return { text: result.message }
         }
-        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | restore | consolidate <target> <source...> | skill restore <name>.' }
+        if (input === 'learn' || input.startsWith('learn ')) {
+          const request = input === 'learn' ? '' : input.slice(6).trim()
+          return { text: buildLearnPrompt(request) }
+        }
+        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | restore | consolidate <target> <source...> | skill restore <name> | learn [request].' }
       },
     })
   })
