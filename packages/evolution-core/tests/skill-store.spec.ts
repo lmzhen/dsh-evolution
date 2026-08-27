@@ -138,3 +138,30 @@ it('bundled detection and allowBundled archival (F8 prune-builtins precondition)
   expect((await lib.archive('hub-skill', { allowBundled: true })).ok).toBe(false)
   await rm(root, { recursive: true, force: true })
 })
+
+it('fuzzy patch tolerates whitespace drift without rewriting surrounding bytes (D8 re-check)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('ws-skill', '---\nname: ws-skill\ndescription: whitespace drift test\n---\n\nRun tests with  double  spaces.\nIndented    columns stay.\n', 'foreground')
+  // The model cites a line whose spacing collapsed to single spaces; the
+  // patch lands on the real span and every untouched byte (including the
+  // double spaces elsewhere and the later line) survives verbatim.
+  const patched = await lib.patch('ws-skill', 'Run tests with double spaces.', 'Run tests with double spaces. (fixed)')
+  expect(patched.ok).toBe(true)
+  const content = await lib.read('ws-skill') ?? ''
+  expect(content).toContain('Indented    columns stay.')
+  expect(content).toContain('Run tests with double spaces. (fixed)')
+  // A genuinely different target must reject cleanly instead of corrupting.
+  expect((await lib.patch('ws-skill', 'Totally different text', 'x')).ok).toBe(false)
+  // Boundary trim: the model cites the line with its leading indent included;
+  // the span lands on the real text and other bytes survive.
+  const boundary = await lib.patch('ws-skill', '  Run tests with double spaces. (fixed)', '  Run tests with double spaces. (final)')
+  expect(boundary.ok).toBe(true)
+  expect(await lib.read('ws-skill') ?? '').toContain('Indented    columns stay.')
+  // Escape literals: pattern cites real newlines as \n — matches and replaces
+  // only the quoted span.
+  const escaped = await lib.patch('ws-skill', 'Run tests with double spaces. (final)\nIndented    columns stay.', 'Run tests with double spaces. (final)\nIndented    columns changed.')
+  expect(escaped.ok).toBe(true)
+  expect(await lib.read('ws-skill') ?? '').toContain('Indented    columns changed.')
+  await rm(root, { recursive: true, force: true })
+})

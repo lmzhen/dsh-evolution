@@ -127,14 +127,92 @@ function validateSupportPath(filePath: string): string | null {
   return null
 }
 
+/**
+ * Index of `pattern` inside `content`, treating whitespace runs (spaces/tabs)
+ * as flexible and literal escape sequences (`\n`, `\t`, `\r`) as their real
+ * characters: a whitespace run on either side matches a run of any length on
+ * the other, and a backslash-escaped char in the pattern matches the real char
+ * in the content (model-copy drift). Returns the [start, end) range in the
+ * ORIGINAL content so a patch can replace exactly the matched span and keep
+ * every other byte intact. Returns null when no fuzzy match exists.
+ */
+function fuzzyIndexOf(content: string, pattern: string): [number, number] | null {
+  const isSpace = (char: string | undefined) => char !== undefined && /[ \t]/.test(char)
+  const escaped = (char: string | undefined): string | null => {
+    if (char === 'n') return '\n'
+    if (char === 't') return '\t'
+    if (char === 'r') return '\r'
+    return null
+  }
+  for (let start = 0; start < content.length; start += 1) {
+    let contentIndex = start
+    let patternIndex = 0
+    while (patternIndex < pattern.length && contentIndex < content.length) {
+      const patternChar = pattern[patternIndex]
+      const contentChar = content[contentIndex]
+      if (isSpace(patternChar)) {
+        // A pattern whitespace run consumes its full run plus any content run
+        // (even a shorter or empty one) before matching the next non-space.
+        while (patternIndex < pattern.length && isSpace(pattern[patternIndex])) patternIndex += 1
+        while (contentIndex < content.length && isSpace(content[contentIndex])) contentIndex += 1
+        continue
+      }
+      const escapedChar = patternChar === '\\' ? escaped(pattern[patternIndex + 1]) : null
+      if (escapedChar !== null && contentChar === escapedChar) {
+        patternIndex += 2
+        contentIndex += 1
+        continue
+      }
+      if (patternChar === contentChar) {
+        contentIndex += 1
+        patternIndex += 1
+        continue
+      }
+      break
+    }
+    if (patternIndex === pattern.length) return [start, contentIndex]
+  }
+  return null
+}
+
+/** Trim leading whitespace of the first line and trailing whitespace of the last line. */
+function trimPatternBoundaries(pattern: string): string {
+  const from = pattern.search(/\S/)
+  const trimmed = from < 0 ? pattern : pattern.slice(from)
+  const trailing = trimmed.search(/\s+$/)
+  return trailing < 0 ? trimmed : trimmed.slice(0, trailing)
+}
+
+/** Replace only the fuzzy-matched span, preserving all surrounding bytes. */
+function fuzzyReplace(content: string, oldString: string, newString: string, replaceAll: boolean): string {
+  const match = fuzzyIndexOf(content, oldString)
+  if (match === null) return content
+  const [start, end] = match
+  const patched = content.slice(0, start) + newString + content.slice(end)
+  return replaceAll ? fuzzyReplace(patched, oldString, newString, true) : patched
+}
+
 function fuzzyPatch(content: string, oldString: string, newString: string, replaceAll = false): string | null {
   if (content.includes(oldString)) {
     return replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
   }
-  const trimmed = content.replaceAll(/[ 	]+$/gm, '')
-  if (trimmed.includes(oldString)) return trimmed.replace(oldString, newString)
-  const whitespace = content.replaceAll(/[ 	]+/g, ' ')
-  if (whitespace.includes(oldString)) return whitespace.replace(oldString, newString)
+  // Stage 1: boundary trim — the model often cites a line with its leading
+  // indent (or a trailing space); trimming only the pattern's first/last line
+  // keeps the replacement span on the real text without touching other bytes.
+  const boundary = trimPatternBoundaries(oldString)
+  if (boundary !== oldString) {
+    if (fuzzyIndexOf(content, boundary) !== null) {
+      const patched = fuzzyReplace(content, boundary, newString, replaceAll)
+      return patched === content ? null : patched
+    }
+  }
+  // Stage 2: whitespace-plus-escape tolerance (pattern `\n`/`\t`/`\r` literals
+  // match real characters, runs match runs); replacement lands on the span
+  // only, so file indentation/formatting survives.
+  if (fuzzyIndexOf(content, oldString) !== null) {
+    const patched = fuzzyReplace(content, oldString, newString, replaceAll)
+    return patched === content ? null : patched
+  }
   return null
 }
 

@@ -26,7 +26,9 @@ async function setup() {
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(SkillUsageRegistry)
+    // Explicit root keeps the usage sidecar local to this fixture instead of
+    // sharing a registry-level default across tests (B7).
+    await ctx.plugin(SkillUsageRegistry, { root })
     await ctx.plugin(ToolSkillManage)
     return { ctx, root, previousHome }
   } catch (error) {
