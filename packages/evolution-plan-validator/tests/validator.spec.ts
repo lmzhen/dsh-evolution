@@ -20,4 +20,17 @@ describe('evolution-plan-validator', () => {
     expect(result.ok).toBe(false)
     expect(result.rejected[0]?.reason).toMatch(/forbidden|evidence/)
   })
+
+  it('rejects a background delete without absorbed_into (Hermes fail-closed guard)', () => {
+    const result = validateEvolutionPlan({
+      skillOps: [{ action: 'delete', name: 'narrow-skill', evidence: [{ event_seq: 4 }] }],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected.some(r => r.kind === 'skill' && r.reason.includes('absorbed_into'))).toBe(true)
+    // With an absorbed_into target the delete is accepted.
+    const accepted = validateEvolutionPlan({
+      skillOps: [{ action: 'delete', name: 'narrow-skill', absorbed_into: 'umbrella', evidence: [{ event_seq: 4 }] }],
+    }, { sessionSeq: 10 })
+    expect(accepted.ok).toBe(true)
+  })
 })

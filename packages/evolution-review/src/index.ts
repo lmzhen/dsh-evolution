@@ -60,7 +60,12 @@ export const Config: z<Config> = z.object({
 })
 
 interface SubagentLike {
-  start(name: string, request: unknown): Promise<{ result: Promise<{ structured?: unknown }>; dispose(): Promise<void> }>
+  start(name: string, request: unknown): Promise<{
+    result: Promise<{ structured?: unknown }>
+    dispose(): Promise<void>
+    /** The published in-process child when the provider runs locally (own session). */
+    localAgent?: { session: Session }
+  }>
 }
 
 interface EvolutionPlan {
@@ -210,6 +215,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
           },
         },
       })
+      // Read-before-write must see what the REVIEW subagent itself loaded: it
+      // runs in its own session, and the parent session's events never contain
+      // its `skill` calls. Capture the child session before dispose.
+      const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
       const result = await run.result
       await run.dispose()
       if (!result.structured) return true
@@ -226,8 +235,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
       })
       // F19: the background review may only patch skills it read this session
       // (read-before-write, matching the original Hermes background guard).
+      // Union of the PARENT session's reads and the review SUBAGENT's own reads.
       const acceptedSkillOps = validation.accepted.skillOps ?? []
-      const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, collectReadSkillNames(session))
+      const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
+      const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
       validation.accepted.skillOps = acceptedSkillOps
       const actions = await executePlan(validation.accepted)
       const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
@@ -308,7 +319,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
       if (op.action === 'create') return await library.create(name, op.content ?? '', origin)
       if (op.action === 'edit' || op.action === 'update') return await library.update(name, op.content ?? '', origin)
       if (op.action === 'patch') return await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', false, origin)
-      if (op.action === 'delete') return await library.archive(name, op.absorbed_into ? { absorbedInto: op.absorbed_into } : {})
+      if (op.action === 'delete') {
+        const into = (op.absorbed_into ?? '').trim()
+        if (!into || !(await library.read(into))) {
+          return { ok: false, message: 'delete requires an existing absorbed_into target' }
+        }
+        return await library.archive(name, { absorbedInto: into })
+      }
       if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? op.content ?? '', origin)
       if (op.action === 'remove_file') return await library.removeSupportFile(name, op.file_path ?? '', origin)
       return { ok: false, message: `Unknown skill action "${op.action ?? ''}"` }

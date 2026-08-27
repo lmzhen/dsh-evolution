@@ -130,6 +130,10 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
     return `skill op ${index}: ${action} requires content`
   }
   if (action === 'patch' && !(op.old_string ?? '')) return `skill op ${index}: patch requires old_string`
+  // Hermes background guard: a review pass may only DELETE into an explicit
+  // absorbed_into umbrella target — a bare delete is reserved for the
+  // deterministic curator channel and the user's foreground path.
+  if (action === 'delete' && !(op.absorbed_into ?? '').trim()) return `skill op ${index}: delete requires absorbed_into`
   const writeContent = op.file_content ?? op.content ?? ''
   if (action === 'write_file' && !writeContent.trim()) return `skill op ${index}: write_file requires file_content`
   if (writeContent.length > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
