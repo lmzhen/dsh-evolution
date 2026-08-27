@@ -62,8 +62,25 @@ export const MEMORY_TOOL_DESCRIPTION =
   + 'memory.'
 
 interface ApprovalLike {
-  request(input: { kind: 'memory'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  request(input: { kind: 'memory'; summary: string; args: unknown; origin: 'foreground' | 'background_review'; sessionPolicy?: 'ask' | 'never' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   registerRunner(kind: 'memory', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
+}
+
+interface ApprovalPolicyLike {
+  overrideOf(session: unknown): 'ask' | 'never' | undefined
+  config: { policy?: 'ask' | 'never' }
+}
+
+/**
+ * The requesting session's effective approval policy, mirroring
+ * `dsh-user-approval` (override ?? configured default). Returns undefined when
+ * the approval service is not mounted or no session is available — callers
+ * keep their previous behavior.
+ */
+function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 'never' | undefined {
+  const approval = ctx.get('approval') as ApprovalPolicyLike | undefined
+  if (!approval || session === undefined) return undefined
+  return approval.overrideOf(session) ?? approval.config.policy ?? 'ask'
 }
 
 type MemoryAction = 'add' | 'replace' | 'remove'
@@ -169,12 +186,13 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
     },
     isConcurrencySafe: () => false,
-    async execute(args, exec: { agent?: { session: { header: { origin?: string } } } }) {
+    async execute(args, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
       const target = args.target === 'user' ? 'user' : 'memory'
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
         ? { target, operations: args.operations }
         : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
       const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
+      const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval) {
         const decision = await approval.request({
@@ -182,6 +200,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
           summary: `memory ${target} ${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
           args: normalized,
           origin,
+          ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {
           return { ok: true, message: decision.message, entries: [], chars: 0, limit: 0, pending_id: decision.pendingId ?? '' }

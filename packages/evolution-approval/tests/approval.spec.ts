@@ -96,6 +96,32 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('allows writes without staging when the session policy is never', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-never-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+
+    const decision = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'unattended write', args: { action: 'add', facts: 'x' }, origin: 'foreground', sessionPolicy: 'never',
+    })
+    expect(decision.action).toBe('allow')
+    expect(decision.message).toContain('never')
+    // Nothing was staged for an unattended session: no unanswerable tail.
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
+    // Default behavior stays: 'ask' still stages.
+    const askDecision = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'interactive write', args: { action: 'add', facts: 'y' }, origin: 'foreground', sessionPolicy: 'ask',
+    })
+    expect(askDecision.action).toBe('staged')
+
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('normalizes approval summaries: truncation, batch label and archive warning', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-summary-'))
     const ctx = new Context()

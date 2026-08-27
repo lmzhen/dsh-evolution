@@ -38,6 +38,35 @@ describe('tool-memory', () => {
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/session_search/)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/belong in a skill/)
   })
+
+  it('passes the session approval policy to the staged-approval request', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    let captured: { sessionPolicy?: string } | undefined
+    ctx.provide('approval', {
+      overrideOf: () => 'never',
+      config: { policy: 'ask' },
+    })
+    ctx.provide('evolutionApproval', {
+      request: async (input: { sessionPolicy?: string }) => {
+        captured = input
+        return { action: 'allow', message: 'ok' }
+      },
+      registerRunner: () => () => {},
+    })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: { session: { header: { version: 0, id: 's1', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    await tool.execute(
+      { target: 'memory', action: 'add', facts: 'remember x' },
+      execArg,
+    )
+    expect(captured?.sessionPolicy).toBe('never')
+  })
 })
 
 async function makeTmp(): Promise<string> {

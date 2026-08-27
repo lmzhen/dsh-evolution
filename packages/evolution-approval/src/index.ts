@@ -26,6 +26,15 @@ export interface ApprovalRequest {
   summary: string
   args: unknown
   origin: 'foreground' | 'background_review'
+  /**
+   * The requesting session's effective approval policy (platform vocabulary:
+   * 'ask' | 'never' — see `dsh-user-approval`). When 'never', the session has
+   * declared the deterministic unattended stance (CI, cron, automated runs),
+   * so the write is allowed instead of staging an unanswerable pending record
+   * (claw alignment: "skip approval for non-interactive contexts"). Absent
+   * (no session / no approval service) keeps the previous behavior.
+   */
+  sessionPolicy?: 'ask' | 'never'
 }
 
 export interface ApprovalDecision {
@@ -100,6 +109,10 @@ export class EvolutionApproval extends Service {
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
     const summary = normalizeSummary(input)
     if (!this.enabled) return { action: 'allow', message: 'Approval disabled.' }
+    // The session declared the deterministic unattended stance ('never' — CI,
+    // cron, isolated runs): no human answers a staged queue there, so allow
+    // instead of piling up unanswerable pending writes.
+    if (input.sessionPolicy === 'never') return { action: 'allow', message: 'Session approval policy is "never"; write allowed without staging.' }
     if (input.origin === 'background_review' || this.stageForeground) {
       const record: PendingRecord = {
         id: randomUUID(),

@@ -37,8 +37,25 @@ export const Config: z<Config> = z.object({
 })
 
 interface ApprovalLike {
-  request(input: { kind: 'skill'; summary: string; args: unknown; origin: WriteOrigin }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  request(input: { kind: 'skill'; summary: string; args: unknown; origin: WriteOrigin; sessionPolicy?: 'ask' | 'never' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   registerRunner(kind: 'skill', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
+}
+
+interface ApprovalPolicyLike {
+  overrideOf(session: unknown): 'ask' | 'never' | undefined
+  config: { policy?: 'ask' | 'never' }
+}
+
+/**
+ * The requesting session's effective approval policy, mirroring
+ * `dsh-user-approval` (override ?? configured default). Returns undefined when
+ * the approval service is not mounted or no session is available — callers
+ * keep their previous behavior.
+ */
+function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 'never' | undefined {
+  const approval = ctx.get('approval') as ApprovalPolicyLike | undefined
+  if (!approval || session === undefined) return undefined
+  return approval.overrideOf(session) ?? approval.config.policy ?? 'ask'
 }
 
 interface SkillWriteArgs {
@@ -150,8 +167,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],
     },
     isConcurrencySafe: () => false,
-    async execute(args: SkillWriteArgs, exec: { agent?: { session: { header: { origin?: string } } } }) {
+    async execute(args: SkillWriteArgs, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
       const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
+      const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list') {
         const decision = await approval.request({
@@ -159,6 +177,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           summary: `skill ${args.action ?? '?'} ${args.name ?? ''}`.trim(),
           args: { operation: args, origin },
           origin,
+          ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {
           return { ok: true, message: decision.message, skills: [], pending_id: decision.pendingId ?? '' }
