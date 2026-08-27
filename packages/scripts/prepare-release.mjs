@@ -39,7 +39,7 @@ const upstreamVersion = arg('--upstream-version', '0.1.0-rc.6')
  * publishing. The legacy `dsh-evolution` facade was deleted at rc.18
  * (superseded by the host bundle + Evolution agent preset).
  */
-const PUBLISH_EXCLUDE = new Set<string>()
+const PUBLISH_EXCLUDE = new Set()
 
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
