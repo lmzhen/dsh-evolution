@@ -352,8 +352,15 @@ export class MemoryStore {
     if (await this.oversizedFile(target)) return true
     const raw = await this.io.readText(fileFor(this.root, target))
     if (raw === null) return false
+    const entries = normalizeEntries(raw)
+    // Second drift signal (Hermes parity, `_detect_external_drift` signal #2):
+    // one parsed entry larger than the store's whole-file limit means an
+    // external writer appended free-form content — a tool-written entry can
+    // never exceed the whole-store budget. Refusing (with backup) instead of
+    // letting a flush truncate it.
+    if (entries.some(entry => entry.length > this.limitFor(target))) return true
     // Canonicalize by normalizing (split + trim + drop empties) then re-rendering.
     // If the on-disk bytes differ from that canonical form, the file drifted.
-    return render(normalizeEntries(raw)) !== raw
+    return render(entries) !== raw
   }
 }

@@ -65,6 +65,8 @@ export interface CuratorRunReport {
   archived: CuratorArchivedSkill[]
   failed: CuratorFailedSkill[]
   snapshotPath?: string
+  /** Whether the LLM nomination pass was enabled for this run (decision visibility). */
+  llmReviewEnabled?: boolean
 }
 
 export interface CuratorReportInput {
@@ -77,6 +79,7 @@ export interface CuratorReportInput {
   archived: readonly CuratorArchivedSkill[]
   failed: readonly CuratorFailedSkill[]
   snapshotPath?: string
+  llmReviewEnabled?: boolean
 }
 
 export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunReport {
@@ -91,6 +94,7 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
     archived: [...input.archived],
     failed: [...input.failed],
     ...input.snapshotPath === undefined ? {} : { snapshotPath: input.snapshotPath },
+    ...input.llmReviewEnabled === undefined ? {} : { llmReviewEnabled: input.llmReviewEnabled },
   }
 }
 

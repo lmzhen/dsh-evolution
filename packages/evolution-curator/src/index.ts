@@ -222,6 +222,7 @@ export class EvolutionCurator extends Service {
       archiveCandidates: [],
       archived: [],
       failed: [],
+      llmReviewEnabled: this.llmReview,
     })
   }
 
@@ -304,6 +305,7 @@ export class EvolutionCurator extends Service {
           return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
         }),
       ...snapshotPath === undefined ? {} : { snapshotPath },
+      llmReviewEnabled: this.llmReview,
     })
     const reportsRoot = join(evolutionHome(), 'reports')
     try {
@@ -313,7 +315,13 @@ export class EvolutionCurator extends Service {
       this.ctx.logger.warn(`evolution-curator: failed to persist report ${runId}`)
       this.ctx.logger.warn(error)
     }
-    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${nominations.consolidations.length}`
+    // Decision visibility: when the LLM merge channel is off and candidates
+    // exist, say so in the state summary instead of hiding the default-choice
+    // consequences (deterministic archive only).
+    const llmHint = !this.llmReview && result.markStale.length > 0
+      ? ' (llmReview: off - deterministic archive only; set llmReview: true for the LLM merge channel)'
+      : ''
+    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${nominations.consolidations.length}${llmHint}`
     await stateService?.saveCuratorState({
       schemaVersion: 1,
       // A dry-run is a preview: it must not push the next scheduled pass out.

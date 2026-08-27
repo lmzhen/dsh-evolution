@@ -22,11 +22,31 @@ describe('evolution-curator', () => {
     expect(Array.isArray(result.stale)).toBe(true)
     expect(Array.isArray(result.archived)).toBe(true)
     expect(result.report.runId).toBeTruthy()
+    // Decision visibility: the default (llmReview off) is recorded on every report.
+    expect(result.report.llmReviewEnabled).toBe(false)
     expect(await ctx.evolutionCurator.latestReport()).toMatchObject({ runId: result.report.runId })
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  })
+
+  it('records llmReview: true on the run report when the LLM channel is enabled', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-llm-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    // No `llm` service mounted: recommend() degrades to empty nominations,
+    // but the report still states the channel was enabled.
+    expect(result.report.llmReviewEnabled).toBe(true)
+    expect(result.nominations).toBeDefined()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
   })
 
   it('consolidates sources into a target, then restores one from the archive', async () => {

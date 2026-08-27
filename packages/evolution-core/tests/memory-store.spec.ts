@@ -141,16 +141,33 @@ it('memory read guard is off when the IO backend has no size probe', async () =>
   delete (io as { size?: unknown }).size
   const store = new MemoryStore({ root, memoryCharLimit: 400, io })
   const { writeFile } = await import('node:fs/promises')
-  // Canonical single-entry form (trailing newline) so only the guard, not
-  // structural drift, is in play.
   await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(5000) + '\n', 'utf8')
-  // Backward-compatible: a backend without `size` gets no guard, so the file is
-  // read and the write path falls back to the ordinary char-limit check.
+  // Backward-compatible: a backend without `size` gets no 10x read guard, so
+  // the file is read whole... but the single-entry-over-limit drift signal is
+  // independent of the size probe and still flags it (Hermes signal #2).
   expect(await store.read('memory')).toEqual(['x'.repeat(5000)])
-  expect(await store.detectDrift('memory')).toBe(false)
+  expect(await store.detectDrift('memory')).toBe(true)
+  // The write path falls back to the ordinary char-limit check through add().
   const result = await store.add('memory', 'gamma')
   expect(result.ok).toBe(false)
   expect(result.message).toContain('exceed')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('memory drift flags a single entry above the store limit', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-entryoverflow-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 100 })
+  const { writeFile, readdir } = await import('node:fs/promises')
+  // Structurally canonical single entry, larger than the whole-store limit:
+  // Hermes parity signal #2 — an external writer appended free-form content.
+  await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(150) + '\n', 'utf8')
+  expect(await store.detectDrift('memory')).toBe(true)
+  const denied = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
+  expect(denied.ok).toBe(false)
+  expect(denied.message).toContain('drift')
+  expect(denied.message).toMatch(/backup was saved/)
+  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak.'))
+  expect(backups.length).toBe(1)
   await rm(root, { recursive: true, force: true })
 })
 
