@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '../src/index.ts'
-import { nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
@@ -44,6 +44,27 @@ describe('evolution-curator', () => {
     // but the report still states the channel was enabled.
     expect(result.report.llmReviewEnabled).toBe(true)
     expect(result.nominations).toBeDefined()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('references factor: related_skills frontmatter raises the hub skill score', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-references-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator)
+    const skills = ctx.evolutionCurator.skills
+    const skill = (name: string, description: string, extra = '') => `---\nname: ${name}\ndescription: ${description}${extra}\n---\nBody of ${name}.\n`
+    await skills.create('hub-skill', skill('hub-skill', 'h', '\nrelated_skills: [leaf-skill]'), 'foreground')
+    await skills.create('leaf-skill', skill('leaf-skill', 'l'), 'foreground')
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    // The referenced skill (leaf) takes the in-degree boost, not its referrer.
+    expect(usage.get('leaf-skill')?.quality_score).toBeGreaterThan(usage.get('hub-skill')?.quality_score ?? 0)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })

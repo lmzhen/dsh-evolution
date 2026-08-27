@@ -328,16 +328,20 @@ export function collectReadSkillNames(session: Session): Set<string> {
 }
 
 /**
- * Drop patch/update ops whose target was not read this session, in place.
- * Create is exempt (no read required to author a new skill). Returns the count
- * of dropped ops so the plan event can report them as rejected.
+ * Drop mutating ops whose target was not read this session, in place.
+ * Create is exempt (no read required to author a new skill). Covers the same
+ * mutating surface Hermes guards (edit/patch/write_file/remove_file), so a
+ * background review cannot blind-touch support files or edits of skills it
+ * never loaded. Returns the count of dropped ops so the plan event can report
+ * them as rejected.
  */
 export function filterUnreadSkillOps(ops: Array<{ action?: string; name?: string }>, readNames: ReadonlySet<string>): number {
+  const READ_REQUIRED = ['edit', 'update', 'patch', 'write_file', 'remove_file']
   let dropped = 0
   for (let index = ops.length - 1; index >= 0; index -= 1) {
     const op = ops[index]
     if (!op) continue
-    if ((op.action === 'patch' || op.action === 'update') && op.name && !readNames.has(op.name)) {
+    if (op.action !== undefined && READ_REQUIRED.includes(op.action) && op.name && !readNames.has(op.name)) {
       ops.splice(index, 1)
       dropped += 1
     }

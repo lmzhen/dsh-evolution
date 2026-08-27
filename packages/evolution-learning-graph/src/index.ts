@@ -27,10 +27,16 @@ export interface LearningGraph {
   edges: GraphEdge[]
 }
 
-/** Build a small deterministic graph from usage records and memory entries. */
+/**
+ * Build a small deterministic graph from usage records and memory entries.
+ * Memory node ids follow `memory:<source>:<index>` (source = memory|user,
+ * index = position in that file's entries) — the SAME rule the parser
+ * `parseGraphNodeId` accepts, so graph detail/edit/delete round-trips.
+ */
 export function buildLearningGraph(
   usage: ReadonlyMap<string, { use_count?: number; pinned?: boolean }>,
   memoryEntries: readonly string[],
+  userEntries: readonly string[] = [],
 ): LearningGraph {
   const nodes: GraphNode[] = [...usage.keys()].map(name => ({
     id: name,
@@ -44,14 +50,18 @@ export function buildLearningGraph(
     const to = sorted[i]
     if (from && to) edges.push({ from, to, type: 'related' })
   }
-  memoryEntries.forEach((entry, index) => {
-    const id = `memory:${index}`
-    nodes.push({ id, kind: 'memory', label: entry.split('\n')[0]?.slice(0, 80) ?? id })
-    const token = entry.toLowerCase()
-    for (const name of sorted) {
-      if (name && token.includes(name.toLowerCase())) edges.push({ from: id, to: name, type: 'memory_skill' })
-    }
-  })
+  const appendMemory = (source: 'memory' | 'user', entries: readonly string[]): void => {
+    entries.forEach((entry, index) => {
+      const id = `memory:${source}:${index}`
+      nodes.push({ id, kind: 'memory', label: entry.split('\n')[0]?.slice(0, 80) ?? id })
+      const token = entry.toLowerCase()
+      for (const name of sorted) {
+        if (name && token.includes(name.toLowerCase())) edges.push({ from: id, to: name, type: 'memory_skill' })
+      }
+    })
+  }
+  appendMemory('memory', memoryEntries)
+  appendMemory('user', userEntries)
   return { nodes, edges }
 }
 
@@ -125,7 +135,8 @@ export function apply(ctx: Context): void {
         async function renderGraph(): Promise<string> {
           const usageMap = await usage.report()
           const memoryEntries = await memory.read('memory')
-          const graph = buildLearningGraph(usageMap, memoryEntries)
+          const userEntries = await memory.read('user')
+          const graph = buildLearningGraph(usageMap, memoryEntries, userEntries)
           const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
           const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
           return lines.join('\n') + '\n\n' + edges.join('\n')

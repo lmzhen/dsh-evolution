@@ -33,16 +33,19 @@ describe('evolution-review', () => {
     expect(Review.shouldCompletionReview(undefined, 99, 20)).toBe(false)
   })
 
-  it('read-mark keeps unread patch targets out of the background review', () => {
+  it('read-mark keeps unread mutating targets out of the background review', () => {
     const ops = [
       { action: 'patch', name: 'unread-skill' },
       { action: 'patch', name: 'read-skill' },
       { action: 'update', name: 'unread-skill' },
+      { action: 'write_file', name: 'unread-skill' },
+      { action: 'remove_file', name: 'unread-skill' },
+      { action: 'edit', name: 'unread-skill' },
       { action: 'create', name: 'brand-new-skill' },
       { action: 'patch' },
     ]
     const dropped = Review.filterUnreadSkillOps(ops, new Set(['read-skill']))
-    expect(dropped).toBe(2)
+    expect(dropped).toBe(5)
     expect(ops.map(op => op.name).filter(Boolean)).toEqual(['read-skill', 'brand-new-skill'])
   })
 })

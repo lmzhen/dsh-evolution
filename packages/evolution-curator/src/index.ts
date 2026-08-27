@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, parseCuratorNominations, type CuratorNominations, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, parseCuratorNominations, parseFrontmatter, SKILL_NAME_RE, type CuratorNominations, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -256,6 +256,23 @@ export class EvolutionCurator extends Service {
         skipped: 'active-session',
       }
     }
+    // First-sight defer (Hermes `should_run_now` parity): a fresh install with
+    // no persisted state seeds the clock and defers instead of running — the
+    // interval baseline must start now, not at process construction.
+    if (!ignoreGates && persisted === null) {
+      await stateService?.saveCuratorState({
+        schemaVersion: 1,
+        lastRunAt: Date.now(),
+        runCount: 0,
+        lastSummary: 'first-run-deferred',
+        paused: false,
+      })
+      return {
+        stale: [], archived: [], errors: [],
+        report: this.skippedReport(runId, startedAt),
+        skipped: 'first-run-deferred',
+      }
+    }
     const root = this.skills.root
     const rawUsage: UsageMap = await loadUsage(root, this.io)
     // Dry-run computes on clones so the persisted lifecycle state is untouched.
@@ -362,7 +379,7 @@ export class EvolutionCurator extends Service {
   private async scoreTree(usage: UsageMap, treeNames: Set<string>): Promise<void> {
     const supportDirs = new Map<string, number>()
     for (const name of treeNames) supportDirs.set(name, await this.skills.countSupportDirs(name))
-    const quality = computeQualityScores({ usage, supportDirs })
+    const quality = computeQualityScores({ usage, supportDirs, referenceCounts: await this.referenceCounts(treeNames) })
     for (const [name, score] of quality) {
       const record = usage.get(name)
       if (record) {
@@ -370,6 +387,29 @@ export class EvolutionCurator extends Service {
         record.quality_warn = score.warn
       }
     }
+  }
+
+  /**
+   * In-degree over explicit `related_skills` frontmatter references (the DSH
+   * equivalent of the graph-in-degree references factor): a skill listing
+   * other skill names counts as one reference to each of them, so hub skills
+   * that are explicitly named by peers get a non-zero references factor.
+   */
+  private async referenceCounts(treeNames: Set<string>): Promise<Map<string, number>> {
+    const counts = new Map<string, number>()
+    for (const name of treeNames) {
+      const content = await this.skills.read(name)
+      if (!content) continue
+      const parsed = parseFrontmatter(content)
+      if (!parsed) continue
+      const raw = parsed.frontmatter['related_skills']
+      if (typeof raw !== 'string') continue
+      for (const match of Array.from(raw.matchAll(/[a-z0-9][a-z0-9-]*/g))) {
+        const target = match[0]
+        if (target && SKILL_NAME_RE.test(target) && target !== name) counts.set(target, (counts.get(target) ?? 0) + 1)
+      }
+    }
+    return counts
   }
 
   /**

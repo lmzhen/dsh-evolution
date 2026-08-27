@@ -173,6 +173,7 @@ Frontmatter:
 - author: always the literal value "Hermes". NEVER fill it from the environment, git config, or any identity you can probe.
 - platforms: declare [macos], [linux], and/or [windows] only when the skill is genuinely OS-bound; omit for portable skills.
 - metadata.hermes.tags: a few Capitalized, Relevant, Tags.
+- metadata.hermes.related_skills: [a, b] — name sibling skills this one builds on or is referenced by (optional; feeds the quality references factor).
 
 Body section order (omit only when empty):
 1. "# <Human Title>" then a 2-3 sentence intro: what it does, what it does NOT do, key dependency stance.

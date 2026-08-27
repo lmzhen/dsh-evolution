@@ -8,6 +8,18 @@ describe('learning graph', () => {
     expect(graph.edges.some(e => e.type === 'memory_skill' && e.to === 'python-testing')).toBe(true)
   })
 
+  it('memory nodes use the memory:<source>:<index> id rule for both targets (F15 parity)', () => {
+    const usage = new Map([['python-testing', {}]])
+    const graph = buildLearningGraph(usage, ['memory fact A'], ['user fact B'])
+    expect(graph.nodes.some(node => node.id === 'memory:memory:0')).toBe(true)
+    expect(graph.nodes.some(node => node.id === 'memory:user:0' && node.label === 'user fact B')).toBe(true)
+    // Every generated id must round-trip through the parser (fixes the
+    // builder/parser mismatch where `graph detail memory:0` failed).
+    for (const node of graph.nodes) {
+      if (node.kind === 'memory') expect(parseGraphNodeId(node.id)).not.toBeNull()
+    }
+  })
+
   it('parses node ids: skill names and memory:<source>:<index>', () => {
     expect(parseGraphNodeId('python-testing')).toEqual({ kind: 'skill', name: 'python-testing' })
     expect(parseGraphNodeId('memory:user:3')).toEqual({ kind: 'memory', source: 'user', index: 3 })
