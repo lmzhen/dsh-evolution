@@ -181,7 +181,6 @@
     { "path": "./packages/interaction/permission-presets" },
     { "path": "./packages/core/tools" },
     { "path": "./packages/evolution/evolution-core" },
-    { "path": "./packages/evolution/dsh-evolution" },
     { "path": "./packages/evolution/memory" },
     { "path": "./packages/evolution/memory-files" },
     { "path": "./packages/evolution/tool-memory" },
