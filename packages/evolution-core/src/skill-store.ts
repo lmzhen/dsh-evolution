@@ -285,6 +285,12 @@ export class SkillLibrary {
     return await this.io.exists(markerPath(dir, 'bundled'))
   }
 
+  /** Whether the skill carries the pinned marker (the marker is the factual source; usage.pinned mirrors it). */
+  async isPinned(name: string): Promise<boolean> {
+    const dir = skillDir(this.root, name)
+    return await this.io.exists(markerPath(dir, 'pinned'))
+  }
+
   /** Count non-empty support subdirectories (richness input for quality scoring). */
   async countSupportDirs(name: string): Promise<number> {
     const dir = skillDir(this.root, name)
@@ -323,6 +329,40 @@ export class SkillLibrary {
   /** Recent mutation audit records (read-only inspection surface). */
   async listMutations(): Promise<MutationRecord[]> {
     return await loadMutations(this.root, this.io)
+  }
+
+  /**
+   * Pin or unpin a skill (`.pinned` marker). Pinned skills are protected from
+   * deletion, from background-review writes, and from the lifecycle — a
+   * protective mutation, so the autonomous pipeline may never call it. The
+   * marker write is the only state change; content is untouched.
+   */
+  async setPinned(name: string, pinned: boolean, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    const normalized = name.trim()
+    if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
+      return { ok: false, message: `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).` }
+    }
+    if (origin === 'background_review') {
+      return { ok: false, message: 'Only the foreground (user or the main agent) may pin or unpin skills.' }
+    }
+    const dir = skillDir(this.root, normalized)
+    const marker = markerPath(dir, 'pinned')
+    const existing = await this.io.exists(marker)
+    if (pinned && existing) return { ok: true, message: `Skill "${normalized}" is already pinned.`, path: dir }
+    if (!pinned && !existing) return { ok: true, message: `Skill "${normalized}" is not pinned; nothing to do.`, path: dir }
+    if (!await this.io.exists(join(dir, 'SKILL.md'))) {
+      return { ok: false, message: `Skill "${normalized}" not found.` }
+    }
+    if (pinned) await this.io.writeText(marker, '')
+    else await this.io.remove(marker)
+    await this.audit(normalized, pinned ? 'pin' : 'unpin', null, null, pinned ? 'pinned' : 'unpinned')
+    return {
+      ok: true,
+      message: pinned
+        ? `Skill "${normalized}" pinned: protected from deletion, background review, and the lifecycle.`
+        : `Skill "${normalized}" unpinned.`,
+      path: dir,
+    }
   }
 
   async create(name: string, content: string, origin: 'foreground' | 'background_review'): Promise<SkillActionResult> {

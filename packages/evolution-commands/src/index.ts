@@ -46,6 +46,21 @@ export function apply(ctx: Context): void {
           const recent = records.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
           return { text: `Mutations: ${records.length} recorded (recent 5):\n${recent.join('\n')}` }
         }
+        if (input === 'curator scope') {
+          const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; exempted: string[]; protected: string[] }> } | undefined
+          if (!curator) return { text: 'Curator service not mounted.' }
+          const view = await curator.scopeView()
+          const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
+          return {
+            text: [
+              `Lifecycle scope at ${new Date().toISOString().slice(0, 10)}`,
+              line('Managed (may transition)', view.managed),
+              line('Watched (stale / quality-warned)', view.watched),
+              line('Exempted (exclude / referenced)', view.exempted),
+              line('Protected (pinned / bundled / hub)', view.protected),
+            ].join('\n'),
+          }
+        }
         if (input === 'curator report') {          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
           if (!curator) return { text: 'Curator service not mounted.' }
           const report = await curator.latestReport()
@@ -82,7 +97,7 @@ export function apply(ctx: Context): void {
           const request = input === 'learn' ? '' : input.slice(6).trim()
           return { text: buildLearnPrompt(request) }
         }
-        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | restore | consolidate <target> <source...> | skill restore <name> | learn [request].' }
+        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request].' }
       },
     })
   })

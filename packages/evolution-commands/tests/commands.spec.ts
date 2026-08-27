@@ -39,8 +39,7 @@ describe('evolution-commands', () => {
     expect(calls).toEqual(['consolidate:target-a:source-b,source-c', 'restore:source-b'])
   })
 
-  it('learn returns the standards-guided skill distillation prompt', async () => {
-    const ctx = new Context()
+  it('learn returns the standards-guided skill distillation prompt', async () => {    const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {
@@ -57,5 +56,26 @@ describe('evolution-commands', () => {
     // Empty argument falls back to the "what we just did" guidance.
     const empty = await captured!.handler({ rawInput: 'learn' })
     expect(empty.text).toContain('the workflow we just went through')
+  })
+
+  it('curator scope renders the four lifecycle lists', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    ctx.provide('evolutionCurator', {
+      scopeView: async () => ({ managed: ['hub-skill'], watched: ['stale-skill'], exempted: ['scheduled'], protected: ['pinned-skill'] }),
+    })
+    await ctx.plugin(Commands)
+    const result = await captured!.handler({ rawInput: 'curator scope' })
+    expect(result.text).toContain('Managed (may transition): 1')
+    expect(result.text).toContain('hub-skill')
+    expect(result.text).toContain('Exempted (exclude / referenced): 1')
+    expect(result.text).toContain('scheduled')
+    expect(result.text).toContain('Protected (pinned / bundled / hub): 1')
   })
 })

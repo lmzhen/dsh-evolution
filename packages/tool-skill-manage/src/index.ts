@@ -95,6 +95,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     else if (action === 'delete') result = await library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
     else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin)
     else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin)
+    else if (action === 'pin') result = await library.setPinned(name, true, origin)
+    else if (action === 'unpin') result = await library.setPinned(name, false, origin)
     else result = { ok: false, message: `Unknown action "${action}".` }
 
     if (result.ok) {
@@ -103,7 +105,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // legacy facade here, or review-created skills silently escape the
       // stale/archive lifecycle. Read-only actions (list/review/skip) must
       // never bump counters or emit mutation events.
-      const mutating = action !== 'list' && action !== 'review' && action !== 'skip'
+      const mutating = action !== 'list' && action !== 'review' && action !== 'skip' && action !== 'pin' && action !== 'unpin'
       if (name && action === 'create' && origin === 'background_review') await ctx.skillUsage.markAgentCreated(name)
       if (name && mutating) await ctx.skillUsage.record(name, 'patch')
       if (mutating) {
@@ -138,12 +140,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.tools.register(defineTool({
     name: 'skill_manage',
     description:
-      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive. '
+      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin work only from the foreground — never from a background review). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'skip'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'skip', 'pin', 'unpin'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -171,7 +173,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
-      if (approval && args.action !== 'list') {
+      if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'skip' && args.action !== 'pin' && args.action !== 'unpin') {
         const decision = await approval.request({
           kind: 'skill',
           summary: `skill ${args.action ?? '?'} ${args.name ?? ''}`.trim(),

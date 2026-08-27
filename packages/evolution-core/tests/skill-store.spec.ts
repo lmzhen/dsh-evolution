@@ -14,6 +14,28 @@ description: Run and debug Python tests.
 Run tests with pytest.
 `
 
+it('setPinned writes the marker, audits it, and refuses the background review', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-pin-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('pin-target', SKILL.replace('python-testing', 'pin-target'), 'background_review')
+  const pinned = await lib.setPinned('pin-target', true, 'foreground')
+  expect(pinned.ok).toBe(true)
+  expect(await lib.isPinned('pin-target')).toBe(true)
+  // Enforcement: background writes rejected, foreground writes still allowed.
+  expect((await lib.update('pin-target', SKILL.replace('python-testing', 'pin-target'), 'background_review')).ok).toBe(false)
+  expect((await lib.update('pin-target', SKILL.replace('python-testing', 'pin-target'), 'foreground')).ok).toBe(true)
+  // The autonomous pipeline may never pin/unpin (self-freezing would escape the lifecycle).
+  expect((await lib.setPinned('pin-target', false, 'background_review')).ok).toBe(false)
+  // Idempotency + audit trail + clean unpin.
+  expect((await lib.setPinned('pin-target', true, 'foreground')).message).toContain('already pinned')
+  const mutations = await lib.listMutations()
+  expect(mutations.some(m => m.action === 'pin' && m.skillName === 'pin-target')).toBe(true)
+  const unpinned = await lib.setPinned('pin-target', false, 'foreground')
+  expect(unpinned.ok).toBe(true)
+  expect(await lib.isPinned('pin-target')).toBe(false)
+  await rm(root, { recursive: true, force: true })
+})
+
 it('skill create/update/patch/archive are recoverable', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
   const lib = new SkillLibrary(root)

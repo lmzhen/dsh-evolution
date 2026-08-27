@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { computeLifecycleTransitions, parseCuratorNominations } from '@deepseek-ai/dsh-evolution-core'
+import { computeLifecycleTransitions, computeScopeView, lifecycleCandidate, parseCuratorNominations, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
 it('curator transitions active -> stale -> archived by idle time', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
@@ -91,4 +91,46 @@ it('parseCuratorNominations reads both YAML sections defensively', () => {
   ])
   expect(nominations.prunings).toEqual(['stale-skill'])
   expect(nominations.prunings).not.toContain('invalid NAME')
+})
+
+it('computeScopeView classifies managed/watched/exempted/protected like the transition gates', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const age = new Date(now.getTime() - 200 * 86_400_000)
+  const record = (over: Partial<UsageRecord> = {}): UsageRecord => ({
+    created_by: 'agent', created_at: age.toISOString(), use_count: 1, view_count: 0, patch_count: 0,
+    last_used_at: age.toISOString(), last_viewed_at: null, last_patched_at: null,
+    state: 'active', pinned: false, archived_at: null, ...over,
+  })
+  const usage = new Map<string, UsageRecord>()
+  usage.set('in-candidate', record())
+  usage.set('watched-stale', record({ state: 'stale' }))
+  usage.set('watched-quality', record({ quality_warn: true }))
+  usage.set('excluded', record({ created_by: null })) // unmanaged
+  usage.set('referenced', record())
+  usage.set('pinned-skill', record({ pinned: true }))
+  const config = {
+    staleAfterDays: 30, archiveAfterDays: 90,
+    excludeSkillNames: new Set(['excluded']),
+    referencedSkillNames: new Set(['referenced']),
+  }
+  const view = computeScopeView(usage, config)
+  expect(view.managed).toEqual(['in-candidate', 'watched-quality', 'watched-stale'])
+  expect(view.watched).toEqual(['watched-quality', 'watched-stale'])
+  expect(view.exempted).toEqual(['excluded', 'referenced'])
+  expect(view.protected).toEqual(['pinned-skill'])
+  // Parity: the transition engine never touches anything the view classifies
+  // as exempted or protected (same shared gate by construction).
+  const transitions = computeLifecycleTransitions(usage, config, now)
+  const touched = [...transitions.markStale, ...transitions.archive, ...transitions.reactivate]
+  expect(touched.filter(name => ['excluded', 'referenced', 'pinned-skill'].includes(name))).toEqual([])
+})
+
+it('lifecycleCandidate mirrors the transition gate for a bundled-prune mix', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const old = new Date(now.getTime() - 200 * 86_400_000)
+  const record: UsageRecord = { created_by: null, created_at: old.toISOString(), use_count: 0, view_count: 0, patch_count: 0, last_used_at: old.toISOString(), last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null }
+  const config = { staleAfterDays: 30, archiveAfterDays: 90, pruneBuiltins: true, bundledNames: new Set(['b']) }
+  // Non-agent, non-bundled: not a candidate; bundled with pruneBuiltins: candidate.
+  expect(lifecycleCandidate('manual', record, config, false)).toBe(false)
+  expect(lifecycleCandidate('b', record, config, true)).toBe(true)
 })

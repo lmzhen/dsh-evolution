@@ -3,7 +3,7 @@
  * Pure function; file moves are performed by SkillLibrary.
  */
 
-import type { UsageMap } from './usage.ts'
+import type { UsageMap, UsageRecord } from './usage.ts'
 import { latestActivityAt } from './usage.ts'
 import { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
@@ -152,6 +152,69 @@ export function parseCuratorNominations(text: string): CuratorNominations {
   }
 }
 
+/**
+ * The lifecycle-candidate gate, shared by the transition engine and the scope
+ * view so the two can never disagree: records failing ANY of these gates are
+ * outside the managed scope.
+ */
+export function lifecycleCandidate(
+  name: string,
+  record: UsageRecord,
+  config: CuratorConfig,
+  bundled: boolean,
+): boolean {
+  if (record.pinned) return false
+  if (config.excludeSkillNames?.has(name)) return false
+  if (config.suppressedNames?.has(name)) return false
+  if (config.referencedSkillNames?.has(name)) return false
+  const managed = record.created_by === 'agent' || config.manageUnmanaged === true
+  if (!managed && !(config.pruneBuiltins === true && bundled)) return false
+  if (PROTECTED_BUILTIN_SKILLS.has(name)) return false
+  if (record.state === 'archived') return false
+  return true
+}
+
+export interface ScopeView {
+  /** Skills inside the lifecycle scope right now (candidate gate + active state). */
+  managed: string[]
+  /** Managed skills already flagged stale or quality-warned — the ones to watch. */
+  watched: string[]
+  /** Explicitly exempted by excludeSkillNames / referencedSkillNames. */
+  exempted: string[]
+  /** Carrying a protection marker (pinned / bundled / hub-installed). */
+  protected: string[]
+}
+
+/**
+ * Read-only scope classification, derived from the SAME gate the transition
+ * engine uses (`lifecycleCandidate`), so the view always predicts what a
+ * curator pass may touch.
+ */
+export function computeScopeView(usage: UsageMap, config: CuratorConfig): ScopeView {
+  const managed: string[] = []
+  const watched: string[] = []
+  const exempted: string[] = []
+  const protectedNames: string[] = []
+  for (const [name, record] of usage) {
+    if (config.excludeSkillNames?.has(name) || config.referencedSkillNames?.has(name)) {
+      exempted.push(name)
+      continue
+    }
+    const bundled = config.bundledNames?.has(name) === true
+    if (record.pinned || bundled || (config.suppressedNames?.has(name) === true)) protectedNames.push(name)
+    if (lifecycleCandidate(name, record, config, bundled)) {
+      managed.push(name)
+      if (record.state === 'stale' || record.quality_warn === true) watched.push(name)
+    }
+  }
+  return {
+    managed: managed.sort(),
+    watched: watched.sort(),
+    exempted: exempted.sort(),
+    protected: protectedNames.sort(),
+  }
+}
+
 function daysSince(iso: string | null, created: string, now: number): number {
   const anchor = iso ?? created
   return (now - new Date(anchor).getTime()) / 86_400_000
@@ -164,15 +227,8 @@ export function computeLifecycleTransitions(
 ): CuratorResult {
   const result: CuratorResult = { transitions: [], archive: [], reactivate: [], markStale: [] }
   for (const [name, record] of usage) {
-    if (record.pinned) continue
-    if (config.excludeSkillNames?.has(name)) continue
-    if (config.suppressedNames?.has(name)) continue
-    if (config.referencedSkillNames?.has(name)) continue
     const bundled = config.bundledNames?.has(name) === true
-    const managed = record.created_by === 'agent' || config.manageUnmanaged === true
-    if (!managed && !(config.pruneBuiltins === true && bundled)) continue
-    if (PROTECTED_BUILTIN_SKILLS.has(name)) continue
-    if (record.state === 'archived') continue
+    if (!lifecycleCandidate(name, record, config, bundled)) continue
 
     const age = daysSince(null, record.created_at, now.getTime())
     if (record.use_count === 0 && age < config.staleAfterDays) continue

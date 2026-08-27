@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, parseCuratorNominations, parseFrontmatter, SKILL_NAME_RE, type CuratorNominations, type CuratorRunReport, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, SKILL_NAME_RE, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -369,6 +369,11 @@ export class EvolutionCurator extends Service {
       treeNames.add(summary.name)
       if (!usage.has(summary.name)) usage.set(summary.name, emptyRecord())
       if (await this.skills.isBundled(summary.name)) bundledNames.add(summary.name)
+      // The marker is the factual source for pinning; mirror it BOTH ways onto
+      // the usage record before the lifecycle gate reads it (a marker or a
+      // stale mirrored `pinned: true` used to diverge from the gate).
+      const record = usage.get(summary.name)
+      if (record) record.pinned = await this.skills.isPinned(summary.name)
     }
     return { bundledNames, treeNames }
   }
@@ -507,6 +512,28 @@ export class EvolutionCurator extends Service {
     const raw = await this.io.readText(join(reportsRoot, latest))
     if (raw === null) return null
     try { return JSON.parse(raw) as CuratorRunReport } catch { return null }
+  }
+
+  /**
+   * Read-only lifecycle scope classification: which skills are in scope,
+   * watched (stale/quality-warned), exempted, or protected. Uses the same
+   * candidate gate as `run()` (`computeScopeView` / `lifecycleCandidate`),
+   * so the view always predicts what a curator pass may touch.
+   */
+  async scopeView(): Promise<ScopeView> {
+    const root = this.skills.root
+    const usage: UsageMap = await loadUsage(root, this.io)
+    const { bundledNames } = await this.seedBaseline(usage)
+    return computeScopeView(usage, {
+      staleAfterDays: this.lifecycle().staleAfterDays,
+      archiveAfterDays: this.lifecycle().archiveAfterDays,
+      excludeSkillNames: this.excludeSkillNames,
+      referencedSkillNames: this.referencedSkillNames,
+      suppressedNames: new Set(await loadSuppressedNames(root, this.io)),
+      manageUnmanaged: this.manageUnmanaged,
+      pruneBuiltins: this.pruneBuiltins,
+      bundledNames,
+    })
   }
 
   /**

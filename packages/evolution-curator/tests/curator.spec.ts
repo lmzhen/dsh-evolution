@@ -70,6 +70,38 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('pins through the marker keep an old skill out of the lifecycle run', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-pin-gate-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator)
+    const skills = ctx.evolutionCurator.skills
+    const skill = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\nBody of ${name}.\n`
+    await skills.create('precious-skill', skill('precious-skill', 'p'), 'background_review')
+    const old = new Date(Date.now() - 200 * 86_400_000)
+    await saveUsage(skills.root, new Map([['precious-skill', {
+      created_by: 'agent', created_at: old.toISOString(), use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old.toISOString(), last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    // Pin via the store marker (what the tool calls): the marker alone must
+    // keep the lifecycle away (regression for the marker->usage mirror gap).
+    await skills.setPinned('precious-skill', true, 'foreground')
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(result.archived).toEqual([])
+    expect((await skills.list()).some(s => s.name === 'precious-skill')).toBe(true)
+    // Unpin: the same record now archives as expected.
+    await skills.setPinned('precious-skill', false, 'foreground')
+    const again = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(again.archived).toEqual(['precious-skill'])
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('consolidates sources into a target, then restores one from the archive', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-consolidate-'))
     const previous = process.env.DSH_HOME
