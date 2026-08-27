@@ -17,87 +17,87 @@ export function apply(ctx: Context): void {
       recordInput: false,
       async handler(invocation: { rawInput?: string }) {
         const input = invocation.rawInput?.trim() ?? ''
+        const ok = (text: string) => ({ kind: 'success' as const, text })
+        const err = (text: string) => ({ kind: 'error' as const, text })
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         if (input === 'pending') {
           const pending = approval ? await approval.list('pending') : []
-          return { text: pending.length === 0 ? 'No pending evolution writes.' : pending.map(p => `${p.id}  ${p.kind}  ${p.summary}`).join('\n') }
+          return ok(pending.length === 0 ? 'No pending evolution writes.' : pending.map(p => `${p.id}  ${p.kind}  ${p.summary}`).join('\n'))
         }
         if (input.startsWith('approve ')) {
           const id = input.slice(8).trim()
           const result = approval ? await approval.approve(id) : { ok: false, message: 'approval service not mounted' }
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('reject ')) {
           const id = input.slice(7).trim()
           const result = approval ? await approval.reject(id) : { ok: false, message: 'approval service not mounted' }
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: { runId: string; snapshotPath?: string } }> } | undefined
-          if (!curator) return { text: 'Curator service not mounted.' }
+          if (!curator) return err('Curator service not mounted.')
           const result = await curator.run({ ignoreGates: true })
-          return { text: `Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}` }
+          return ok(`Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
         }
         if (input === 'mutations') {
           const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
-          if (!curator) return { text: 'Curator service not mounted.' }
+          if (!curator) return err('Curator service not mounted.')
           const records = await curator.skills.listMutations()
-          if (records.length === 0) return { text: 'No mutation records yet.' }
+          if (records.length === 0) return ok('No mutation records yet.')
           const recent = records.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
-          return { text: `Mutations: ${records.length} recorded (recent 5):\n${recent.join('\n')}` }
+          return ok(`Mutations: ${records.length} recorded (recent 5):\n${recent.join('\n')}`)
         }
         if (input === 'curator scope') {
           const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; exempted: string[]; protected: string[] }> } | undefined
-          if (!curator) return { text: 'Curator service not mounted.' }
+          if (!curator) return err('Curator service not mounted.')
           const view = await curator.scopeView()
           const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
-          return {
-            text: [
-              `Lifecycle scope at ${new Date().toISOString().slice(0, 10)}`,
-              line('Managed (may transition)', view.managed),
-              line('Watched (stale / quality-warned)', view.watched),
-              line('Exempted (exclude / referenced)', view.exempted),
-              line('Protected (pinned / bundled / hub)', view.protected),
-            ].join('\n'),
-          }
+          return ok([
+            `Lifecycle scope at ${new Date().toISOString().slice(0, 10)}`,
+            line('Managed (may transition)', view.managed),
+            line('Watched (stale / quality-warned)', view.watched),
+            line('Exempted (exclude / referenced)', view.exempted),
+            line('Protected (pinned / bundled / hub)', view.protected),
+          ].join('\n'))
         }
         if (input === 'curator report') {          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
-          if (!curator) return { text: 'Curator service not mounted.' }
+          if (!curator) return err('Curator service not mounted.')
           const report = await curator.latestReport()
-          if (!report) return { text: 'No curator report available.' }
+          if (!report) return ok('No curator report available.')
           const lines = [
             `runId=${report.runId}`,
             `startedAt=${report.startedAt}`,
             `archived=${report.archived.map(item => item.name).join(', ') || '(none)'}`,
             `failed=${report.failed.map(item => `${item.name}: ${item.reason}`).join(', ') || '(none)'}`,
           ]
-          return { text: lines.join('\n') }
+          return ok(lines.join('\n'))
         }
         if (input.startsWith('restore ')) {
           const curator = ctx.get('evolutionCurator') as { skills: { restoreLatestSnapshot(): Promise<{ ok: boolean; message: string }> } } | undefined
           const result = curator ? await curator.skills.restoreLatestSnapshot() : { ok: false, message: 'Curator service not mounted.' }
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('consolidate ')) {
           const names = input.slice(12).trim().split(/\s+/).filter(Boolean)
           const [target, ...sources] = names
-          if (!target || sources.length === 0) return { text: 'Usage: /evolution consolidate <target> <source...>' }
+          if (!target || sources.length === 0) return err('Usage: /evolution consolidate <target> <source...>')
           const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: 'Curator service not mounted.' }
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('skill restore ')) {
           const name = input.slice(14).trim()
-          if (!name) return { text: 'Usage: /evolution skill restore <name>' }
+          if (!name) return err('Usage: /evolution skill restore <name>')
           const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.restore(name) : { ok: false, message: 'Curator service not mounted.' }
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'learn' || input.startsWith('learn ')) {
           const request = input === 'learn' ? '' : input.slice(6).trim()
-          return { text: buildLearnPrompt(request) }
+          return ok(buildLearnPrompt(request))
         }
-        return { text: 'Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request].' }
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request].')
       },
     })
   })

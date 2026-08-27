@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
-import EvolutionCurator from '../src/index.ts'
+import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { nodeEvolutionIo, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-curator', () => {
@@ -100,6 +100,21 @@ describe('evolution-curator', () => {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
+  })
+
+  it('gateConsolidations blocks automated merges that touch gated names', () => {
+    const nominations = [
+      { from: 'narrow-a', into: 'umbrella' },
+      { from: 'scheduled-skill', into: 'umbrella' },
+      { from: 'narrow-b', into: 'excluded-target' },
+      { from: 'narrow-c', into: 'suppressed-target' },
+    ]
+    const gated = gateConsolidations(nominations, {
+      exclude: new Set(['excluded-target']),
+      referenced: new Set(['scheduled-skill']),
+      suppressed: new Set(['suppressed-target']),
+    })
+    expect(gated).toEqual([{ from: 'narrow-a', into: 'umbrella' }])
   })
 
   it('consolidates sources into a target, then restores one from the archive', async () => {

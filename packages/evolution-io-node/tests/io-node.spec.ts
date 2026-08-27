@@ -21,6 +21,10 @@ describe('evolution-io-node', () => {
     expect(await io.size!(join(root, 'nested', 'missing.txt'))).toBe(null)
     await io.copy(join(root, 'nested'), join(root, 'copy'))
     expect(await io.readText(join(root, 'copy', 'a.txt'))).toBe('hello')
+    // Directories exist too: readFile-based probing used to report false
+    // (EISDIR swallowed), which made .archive/<name> re-archives overwrite.
+    expect(await io.exists(join(root, 'nested'))).toBe(true)
+    expect(await io.exists(join(root, 'missing'))).toBe(false)
     await io.rename(join(root, 'copy', 'a.txt'), join(root, 'renamed.txt'))
     expect(await io.readText(join(root, 'renamed.txt'))).toBe('hello')
     expect(await io.list(root)).toContain('renamed.txt')

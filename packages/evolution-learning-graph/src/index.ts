@@ -109,19 +109,19 @@ export function apply(ctx: Context): void {
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
     commands.register({
-      name: 'evolution graph',
-      description: 'Show the learning graph, or act on a node: evolution graph [detail|edit|delete] <nodeId>',
+      name: 'graph',
+      description: 'Show the learning graph, or act on a node: graph [detail|edit|delete] <nodeId>',
       recordInput: false,
       handler: async (invocation: { rawInput?: string }) => {
+        const ok = (text: string) => ({ kind: 'success' as const, text })
+        const err = (text: string) => ({ kind: 'error' as const, text })
         const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
         const memoryService = ctx.get('memory') as MemoryLike | undefined
         const ioService = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-        if (!usageService || !memoryService || !ioService) return { text: 'skill-usage, memory or evolution-io service is not mounted.' }
+        if (!usageService || !memoryService || !ioService) return err('skill-usage, memory or evolution-io service is not mounted.')
         const usage = usageService
         const memory = memoryService
         const io = ioService
-        const directory = await renderGraph()
-
         const input = (invocation.rawInput ?? '').trim()
         const detail = /^detail\s+(\S+)$/.exec(input)
         if (detail && detail[1]) return await nodeDetail(detail[1])
@@ -129,8 +129,9 @@ export function apply(ctx: Context): void {
         if (edit && edit[1] && edit[2] !== undefined) return await nodeEdit(edit[1], edit[2])
         const remove = /^delete\s+(\S+)$/.exec(input)
         if (remove && remove[1]) return await nodeDelete(remove[1])
-        if (input !== '') return { text: `Unknown graph subcommand "${input.split(' ')[0]}". ${directory}` }
-        return { text: directory }
+        const directory = await renderGraph()
+        if (input !== '') return err(`Unknown graph subcommand "${input.split(' ')[0]}". ${directory}`)
+        return ok(directory)
 
         async function renderGraph(): Promise<string> {
           const usageMap = await usage.report()
@@ -146,42 +147,42 @@ export function apply(ctx: Context): void {
           return new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()))
         }
 
-        async function nodeDetail(id: string): Promise<{ text: string }> {
+        async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {
           const parsed = parseGraphNodeId(id)
-          if (parsed === null) return { text: `Invalid node id "${id}". Skill names or memory:<source>:<index> expected.` }
+          if (parsed === null) return err(`Invalid node id "${id}". Skill names or memory:<source>:<index> expected.`)
           const resolved = await resolveGraphNode(parsed, {
             readSkill: (name: string) => withSkills().read(name),
             readMemory: (target: 'memory' | 'user') => memory.read(target),
           })
-          return { text: resolved.message }
+          return resolved.ok ? ok(resolved.message) : err(resolved.message)
         }
 
-        async function nodeEdit(id: string, content: string): Promise<{ text: string }> {
+        async function nodeEdit(id: string, content: string): Promise<{ kind: 'success' | 'error'; text: string }> {
           const parsed = parseGraphNodeId(id)
-          if (parsed === null) return { text: `Invalid node id "${id}". Skill names or memory:<source>:<index> expected.` }
+          if (parsed === null) return err(`Invalid node id "${id}". Skill names or memory:<source>:<index> expected.`)
           if (parsed.kind === 'skill') {
             const result = await withSkills().update(parsed.name, content, 'foreground')
-            return { text: result.message }
+            return result.ok ? ok(result.message) : err(result.message)
           }
           const entries = await memory.read(parsed.source)
           const entry = entries[parsed.index]
-          if (entry === undefined) return { text: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
+          if (entry === undefined) return err(`Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).`)
           const result = await memory.applyBatch(parsed.source, [{ action: 'replace', old_text: entry, facts: content }])
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
 
-        async function nodeDelete(id: string): Promise<{ text: string }> {
+        async function nodeDelete(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {
           const parsed = parseGraphNodeId(id)
-          if (parsed === null) return { text: `Invalid node id "${id}". Skill names or memory:<source>:<index> expected.` }
+          if (parsed === null) return err(`Invalid node id "${id}". Skill names or memory:<source>:<index> expected.`)
           if (parsed.kind === 'skill') {
             const result = await withSkills().archive(parsed.name)
-            return { text: result.message }
+            return result.ok ? ok(result.message) : err(result.message)
           }
           const entries = await memory.read(parsed.source)
           const entry = entries[parsed.index]
-          if (entry === undefined) return { text: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
+          if (entry === undefined) return err(`Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).`)
           const result = await memory.applyBatch(parsed.source, [{ action: 'remove', old_text: entry }])
-          return { text: result.message }
+          return result.ok ? ok(result.message) : err(result.message)
         }
       },
     })

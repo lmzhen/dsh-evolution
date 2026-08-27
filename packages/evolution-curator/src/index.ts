@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, SKILL_NAME_RE, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, SKILL_NAME_RE, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -71,8 +71,23 @@ export interface CuratorStateRecordShape {
   paused: boolean
 }
 
-export class EvolutionCurator extends Service {
-  static inject = ['evolutionIo']
+/**
+ * Block LLM-nominated consolidations that would touch a gate-protected name:
+ * exclude / referenced / suppressed skills must never merge (neither as the
+ * source being archived nor as the umbrella being edited). Mirrors the control
+ * plane's `consolidate()` guard; automatic nominations must pass the same gate.
+ */
+export function gateConsolidations(
+  consolidations: CuratorConsolidation[],
+  gates: { exclude?: ReadonlySet<string>; referenced?: ReadonlySet<string>; suppressed?: ReadonlySet<string> },
+): CuratorConsolidation[] {
+  const blocked = (name: string): boolean => gates.exclude?.has(name) === true
+    || gates.referenced?.has(name) === true
+    || gates.suppressed?.has(name) === true
+  return consolidations.filter(n => !blocked(n.from) && !blocked(n.into))
+}
+
+export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
     enabled: z.boolean().default(true),
     intervalHours: z.number().default(DEFAULT_CURATOR_INTERVAL_HOURS),
@@ -293,12 +308,23 @@ export class EvolutionCurator extends Service {
     })
     await this.scoreTree(usage, treeNames)
     const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
-    const llmNominations = nominations.prunings
+    // Automatic merge nominations must pass the same gates as the control
+    // plane: excluded/referenced/suppressed skills are never merged (source
+    // or target), even when the LLM nominates them.
+    const gatedNominations = {
+      ...nominations,
+      consolidations: gateConsolidations(nominations.consolidations, {
+        exclude: this.excludeSkillNames,
+        referenced: this.referencedSkillNames,
+        suppressed: suppressedNames,
+      }),
+    }
+    const llmNominations = gatedNominations.prunings
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
     const { archivedSkills, errors } = await this.applyMutations({
       dryRun,
       archiveCandidates,
-      nominations,
+      nominations: gatedNominations,
       treeNames,
       usage,
       bundledNames,
@@ -315,7 +341,7 @@ export class EvolutionCurator extends Service {
       llmNominations,
       archiveCandidates,
       archived: archivedSkills,
-      failed: [...new Set([...archiveCandidates, ...nominations.consolidations.map(item => item.from)])]
+      failed: [...new Set([...archiveCandidates, ...gatedNominations.consolidations.map(item => item.from)])]
         .filter(name => errors.some(error => error.startsWith(`${name}:`)))
         .map((name) => {
           const error = errors.find(item => item.startsWith(`${name}:`))
@@ -338,7 +364,7 @@ export class EvolutionCurator extends Service {
     const llmHint = !this.llmReview && result.markStale.length > 0
       ? ' (llmReview: off - deterministic archive only; set llmReview: true for the LLM merge channel)'
       : ''
-    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${nominations.consolidations.length}${llmHint}`
+    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${gatedNominations.consolidations.length}${llmHint}`
     await stateService?.saveCuratorState({
       schemaVersion: 1,
       // A dry-run is a preview: it must not push the next scheduled pass out.
@@ -352,7 +378,7 @@ export class EvolutionCurator extends Service {
       archived: archivedSkills.map(item => item.name),
       errors,
       report,
-      ...this.llmReview ? { nominations } : {},
+      ...this.llmReview ? { nominations: gatedNominations } : {},
     }
   }
 

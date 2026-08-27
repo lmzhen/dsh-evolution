@@ -29,7 +29,10 @@ export function apply(ctx: Context): void {
       try { return await readdir(path) } catch { return [] }
     },
     async exists(path) {
-      try { await readFile(path); return true } catch { return false }
+      // stat, not readFile: directories must report true (readFile on a
+      // directory throws EISDIR, which used to make .archive/<name> look
+      // absent and let re-archives overwrite older archives).
+      try { await stat(path); return true } catch { return false }
     },
     async rename(path, destination) {
       await mkdir(dirname(destination), { recursive: true })

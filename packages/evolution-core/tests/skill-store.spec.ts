@@ -14,8 +14,7 @@ description: Run and debug Python tests.
 Run tests with pytest.
 `
 
-it('setPinned writes the marker, audits it, and refuses the background review', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-pin-'))
+it('setPinned writes the marker, audits it, and refuses the background review', async () => {  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-pin-'))
   const lib = new SkillLibrary(root)
   await lib.create('pin-target', SKILL.replace('python-testing', 'pin-target'), 'background_review')
   const pinned = await lib.setPinned('pin-target', true, 'foreground')
@@ -34,6 +33,24 @@ it('setPinned writes the marker, audits it, and refuses the background review', 
   expect(unpinned.ok).toBe(true)
   expect(await lib.isPinned('pin-target')).toBe(false)
   await rm(root, { recursive: true, force: true })
+})
+
+it('invalid skill names cannot escape the skills root (path traversal guard)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-traversal-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('safe-skill', SKILL.replace('python-testing', 'safe-skill'), 'background_review')
+  const evil = '../outside'
+  expect((await lib.update(evil, SKILL, 'foreground')).ok).toBe(false)
+  expect((await lib.patch(evil, 'x', 'y')).ok).toBe(false)
+  expect((await lib.archive(evil)).ok).toBe(false)
+  expect((await lib.writeSupportFile(evil, 'references/a.md', '# x')).ok).toBe(false)
+  expect((await lib.removeSupportFile(evil, 'references/a.md')).ok).toBe(false)
+  expect(await lib.read('../outside')).toBeNull()
+  expect(await lib.isPinned(evil)).toBe(false)
+  expect(await lib.isBundled(evil)).toBe(false)
+  expect(await lib.countSupportDirs(evil)).toBe(0)
+  await rm(root, { recursive: true, force: true })
+  await rm(join(root, '..', 'outside'), { recursive: true, force: true })
 })
 
 it('skill create/update/patch/archive are recoverable', async () => {

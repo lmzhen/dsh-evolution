@@ -249,7 +249,18 @@ export class SkillLibrary {
   }
 
   async read(name: string): Promise<string | null> {
+    // Defensive: an invalid name must never escape the skills root via join().
+    if (this.badName(name) !== null) return null
     return this.io.readText(join(skillDir(this.root, name), 'SKILL.md'))
+  }
+
+  /** Name-format guard shared by every path-building mutator/reader. */
+  private badName(name: string): string | null {
+    const normalized = name.trim()
+    if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
+      return `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).`
+    }
+    return null
   }
 
   async writeProtection(name: string, origin: WriteOrigin = 'foreground'): Promise<string | null> {
@@ -281,18 +292,21 @@ export class SkillLibrary {
 
   /** Whether the skill carries the bundled marker (curator prune-builtins eligibility). */
   async isBundled(name: string): Promise<boolean> {
+    if (this.badName(name) !== null) return false
     const dir = skillDir(this.root, name)
     return await this.io.exists(markerPath(dir, 'bundled'))
   }
 
   /** Whether the skill carries the pinned marker (the marker is the factual source; usage.pinned mirrors it). */
   async isPinned(name: string): Promise<boolean> {
+    if (this.badName(name) !== null) return false
     const dir = skillDir(this.root, name)
     return await this.io.exists(markerPath(dir, 'pinned'))
   }
 
   /** Count non-empty support subdirectories (richness input for quality scoring). */
   async countSupportDirs(name: string): Promise<number> {
+    if (this.badName(name) !== null) return 0
     const dir = skillDir(this.root, name)
     let entries: string[]
     try { entries = await this.io.list(dir) } catch { return 0 }
@@ -385,6 +399,8 @@ export class SkillLibrary {
   }
 
   async update(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
     const dir = skillDir(this.root, name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
@@ -400,6 +416,8 @@ export class SkillLibrary {
   }
 
   async patch(name: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
     const dir = skillDir(this.root, name)
     const skillMd = join(dir, 'SKILL.md')
     if (!await this.io.exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
@@ -437,6 +455,8 @@ export class SkillLibrary {
   }
 
   async archive(name: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
     const dir = skillDir(this.root, name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
@@ -553,6 +573,8 @@ export class SkillLibrary {
   }
 
   async writeSupportFile(name: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
     const dir = skillDir(this.root, name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
@@ -570,6 +592,8 @@ export class SkillLibrary {
   }
 
   async removeSupportFile(name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
     const dir = skillDir(this.root, name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)

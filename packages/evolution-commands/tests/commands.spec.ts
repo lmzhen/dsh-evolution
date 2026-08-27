@@ -11,7 +11,7 @@ describe('evolution-commands', () => {
 
   it('dispatches consolidate and skill restore to the curator service', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {
         captured = definition as typeof captured
@@ -37,10 +37,15 @@ describe('evolution-commands', () => {
     const restoreResult = await captured!.handler({ rawInput: 'skill restore source-b' })
     expect(restoreResult.text).toContain('restored from .archive.')
     expect(calls).toEqual(['consolidate:target-a:source-b,source-c', 'restore:source-b'])
+    // Commands runtime contract: handlers must return a CommandResult with kind.
+    expect(result.kind).toBe('success')
+    expect(restoreResult.kind).toBe('success')
+    const missing = await captured!.handler({ rawInput: 'approve some-id' })
+    expect(missing.kind).toBe('error')
   })
 
   it('learn returns the standards-guided skill distillation prompt', async () => {    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {
         captured = definition as typeof captured
@@ -60,7 +65,7 @@ describe('evolution-commands', () => {
 
   it('curator scope renders the four lifecycle lists', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {
         captured = definition as typeof captured
