@@ -162,7 +162,7 @@ function validateSupportPath(filePath: string): string | null {
  * so a patch can replace exactly the matched span and keep every other byte
  * intact. Returns null when no fuzzy match exists.
  */
-function fuzzyIndexOf(content: string, pattern: string): [number, number] | null {
+function fuzzyIndexOf(content: string, pattern: string, from = 0): [number, number] | null {
   const isSpace = (char: string | undefined) => char !== undefined && /[ \t]/.test(char)
   const escaped = (char: string | undefined): string | null => {
     if (char === 'n') return '\n'
@@ -170,7 +170,7 @@ function fuzzyIndexOf(content: string, pattern: string): [number, number] | null
     if (char === 'r') return '\r'
     return null
   }
-  for (let start = 0; start < content.length; start += 1) {
+  for (let start = from; start < content.length; start += 1) {
     let contentIndex = start
     let patternIndex = 0
     while (patternIndex < pattern.length && contentIndex < content.length) {
@@ -211,21 +211,35 @@ function trimPatternBoundaries(pattern: string): string {
 
 /** Replace only the fuzzy-matched span, preserving all surrounding bytes. */
 function fuzzyReplace(content: string, oldString: string, newString: string, replaceAll: boolean): string {
-  const match = fuzzyIndexOf(content, oldString)
-  if (match === null) return content
-  const [start, end] = match
-  const patched = content.slice(0, start) + newString + content.slice(end)
-  return replaceAll ? fuzzyReplace(patched, oldString, newString, true) : patched
+  let current = content
+  let scanFrom = 0
+  for (;;) {
+    const match = fuzzyIndexOf(current, oldString, scanFrom)
+    if (match === null) return current
+    const [start, end] = match
+    const next = current.slice(0, start) + newString + current.slice(end)
+    if (!replaceAll) return next
+    current = next
+    // Resume scanning after the inserted span: a self-containing newString must
+    // not be re-matched (mirrors String.replaceAll and guarantees termination).
+    scanFrom = start + newString.length
+  }
 }
 
 function fuzzyPatch(content: string, oldString: string, newString: string, replaceAll = false): string | null {
+  // An empty oldString would `includes('')` trivially and splice newString
+  // between every character; refuse it at the boundary (P0-5).
+  if (oldString === '') return null
   if (content.includes(oldString)) {
     return replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
   }
+  const boundary = trimPatternBoundaries(oldString)
+  // A whitespace-only pattern has no non-whitespace footprint; matching it
+  // would hit an empty span and splice content without consuming anything.
+  if (boundary === '') return null
   // Stage 1: boundary trim — the model often cites a line with its leading
   // indent (or a trailing space); trimming only the pattern's first/last line
   // keeps the replacement span on the real text without touching other bytes.
-  const boundary = trimPatternBoundaries(oldString)
   if (boundary !== oldString) {
     if (fuzzyIndexOf(content, boundary) !== null) {
       const patched = fuzzyReplace(content, boundary, newString, replaceAll)
@@ -466,7 +480,8 @@ export class SkillLibrary {
     if (!md) return { ok: false, message: `File not found: ${patchLabel}` }
 
     const patched = fuzzyPatch(md, oldString, newString, replaceAll)
-    if (!patched) return { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }
+    // `null` means "no match"; an empty string is a legitimate replacement.
+    if (patched === null) return { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }
     if (target === skillMd) {
       const validation = validateFrontmatter(patched, name, this.limits)
       if (validation) return { ok: false, message: `Patch rejected: ${validation}` }

@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '../src/index.ts'
-import { loadUsage, saveUsage, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { loadUsage, saveUsage, nodeEvolutionIo, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -55,5 +55,14 @@ describe('skill-usage', () => {
     expect(seen?.quality_score).toBe(0.9)
     expect(seen?.view_count).toBe(1)
     await rm(root, { recursive: true, force: true })
+  })
+
+  it('falls back to skillsRoot() when root is unset or empty (P0-3)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // No `{ root }`: schemastery's default('') must not win over the real path.
+    await ctx.plugin(SkillUsageRegistry)
+    expect(ctx.skillUsage.root).toBe(skillsRoot())
   })
 })

@@ -98,7 +98,12 @@ export function apply(ctx: Context): void {
           const request = input === 'learn' ? '' : input.slice(6).trim()
           return ok(buildLearnPrompt(request))
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request].')
+        if (input === 'replay') {
+          const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
+          if (!replay) return err('Replay service not mounted.')
+          return ok(replay.compare().report)
+        }
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request] | replay.')
       },
     })
   })

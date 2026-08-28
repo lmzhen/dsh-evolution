@@ -223,7 +223,6 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         model: string
         messages: unknown[]
         maxTokens: number
-        purpose?: string
       }): AsyncIterable<StreamChunk>
     } | undefined
     if (!llm) return empty
@@ -245,7 +244,6 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         model,
         messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-evolution-curator', form: 'notice', summary: 'curator review' } })],
         maxTokens: this.curatorReviewMaxTokens,
-        purpose: 'evolution-curator',
       })) assembler.push(chunk)
       const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
       const parsed = parseCuratorNominations(text)

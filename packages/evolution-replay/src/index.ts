@@ -140,14 +140,5 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.on('session/event', (_session, event) => {
     if (event.type === 'evolution/plan-applied') driver.record(event)
   })
-  ctx.inject(['commands'], (commandCtx) => {
-    const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
-    commands.register({
-      name: 'evolution replay',
-      description: 'Compare recent evolution plan outcomes',
-      recordInput: false,
-      handler: () => ({ text: driver.compare().report }),
-    })
-  })
 }
 

@@ -34,7 +34,9 @@ export class SkillUsageRegistry extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'skillUsage')
-    this.root = config.root ?? skillsRoot()
+    // `||` not `??`: schemastery's `default('')` yields '' which is NOT nullish,
+    // so a config-driven '' must fall back to the real default path (P0-3).
+    this.root = config.root || skillsRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   }
 
