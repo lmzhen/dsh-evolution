@@ -10,6 +10,9 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
 
 export const name = 'tool-memory'
+
+/** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
+const DEFAULT_ENTRY_PREVIEW_CHARS = 200
 export const inject = ['tools', 'systemPrompt', 'memory']
 
 /**
@@ -108,7 +111,7 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   memoryEnabled: z.boolean().default(true),
-  entryPreviewChars: z.number().default(200),
+  entryPreviewChars: z.number().default(DEFAULT_ENTRY_PREVIEW_CHARS),
 })
 
 export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
@@ -141,7 +144,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     return {
       ok: result.ok,
       message: result.message,
-      entries: result.entries.map(entry => entry.slice(0, rawConfig.entryPreviewChars ?? 200)),
+      entries: result.entries.map(entry => entry.slice(0, rawConfig.entryPreviewChars ?? DEFAULT_ENTRY_PREVIEW_CHARS)),
       chars: result.chars,
       limit: result.limit,
     }

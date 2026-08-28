@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -185,4 +185,47 @@ it('memory renderContext carries a usage-indicator header clamped at 100%', asyn
   expect(context).toContain('## Memory (1 entries) [100% — 250/200 chars]')
   expect(context).toContain('## User Profile (1 entries) [30% — 30/100 chars]')
   await rm(root, { recursive: true, force: true })
+})
+
+it('memory adopts an empty or whitespace-only file instead of flagging drift (P1-6)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-empty-'))
+  const store = new MemoryStore({ root })
+  // Never-written (touch) and whitespace-only files parse to zero entries:
+  // the canonical trailing newline can never byte-match them, so flagging
+  // drift here used to permanently refuse every write, including the repairs.
+  await nodeEvolutionIo().writeText(join(root, 'MEMORY.md'), '')
+  expect(await store.detectDrift('memory')).toBe(false)
+  const added = await store.add('memory', 'User prefers concise replies.')
+  expect(added.ok).toBe(true)
+  expect(await store.read('memory')).toEqual(['User prefers concise replies.'])
+  // Whitespace-only, on the OTHER target (the memory file now holds an entry).
+  await nodeEvolutionIo().writeText(join(root, 'USER.md'), '   ')
+  expect(await store.detectDrift('user')).toBe(false)
+  const second = await store.add('user', 'Second entry.')
+  expect(second.ok).toBe(true)
+  expect(await store.read('user')).toEqual(['Second entry.'])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('failure backoff decays after the window so a later turn retries normally (P2-1)', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  try {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-window-'))
+    const store = new MemoryStore({ root, memoryCharLimit: 20 })
+    await store.add('memory', '12345678901234567890')
+    await store.add('memory', 'x')
+    await store.add('memory', 'x')
+    await store.add('memory', 'x')
+    const capped = await store.add('memory', 'x')
+    expect(capped.message).toContain('Stop retrying memory calls')
+    // Beyond the window the counter restarts: the plain budget message is
+    // back instead of the sticky "stop retrying" steering.
+    vi.setSystemTime(Date.now() + 11 * 60_000)
+    const later = await store.add('memory', 'x')
+    expect(later.message).not.toContain('Stop retrying memory calls')
+    expect(later.message).toContain('exceed')
+    await rm(root, { recursive: true, force: true })
+  } finally {
+    vi.useRealTimers()
+  }
 })

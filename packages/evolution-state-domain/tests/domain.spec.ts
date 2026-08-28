@@ -24,4 +24,44 @@ describe('evolution-state-domain', () => {
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     await rm(home, { recursive: true, force: true })
   })
+  it('retries a transiently failing open and recovers (P1-4)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    let attempts = 0
+    ctx.provide('storageDomain', {
+      open: async () => {
+        attempts += 1
+        if (attempts <= 2) throw new Error(`simulated busy #${attempts}`)
+        return {
+          table: () => ({ get: async () => null, put: async () => {}, entries: () => [], update: async () => null }),
+          close: async () => {},
+        } as never
+      },
+    })
+    await ctx.plugin(DomainState)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    // Two transient failures then success, inside one ensure() budget.
+    expect(await provider.loadCuratorState()).toBeNull()
+    expect(attempts).toBe(3)
+  })
+
+  it('a permanently failing open clears the poisoned promise so later calls retry (P1-4)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    let attempts = 0
+    ctx.provide('storageDomain', {
+      open: async () => {
+        attempts += 1
+        throw new Error(`simulated down #${attempts}`)
+      },
+    })
+    await ctx.plugin(DomainState)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    await expect(provider.loadCuratorState()).rejects.toThrow('simulated down #3')
+    // The rejected opening must be cleared: the next call starts a FRESH
+    // retry budget instead of re-awaiting the poisoned promise.
+    await expect(provider.loadCuratorState()).rejects.toThrow('simulated down #6')
+    expect(attempts).toBe(6)
+  })
+
 })

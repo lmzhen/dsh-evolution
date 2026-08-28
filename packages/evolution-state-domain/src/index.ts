@@ -58,15 +58,43 @@ interface StorageDomainLike {
   open(spec: typeof EVOLUTION_DOMAIN): Promise<Domain<typeof EVOLUTION_DOMAIN>>
 }
 
+/**
+ * Bounded open() retry (rc.42 audit P1-4, package-private): a rejected open
+ * used to poison the shared `opening` promise forever, so one transient
+ * backend failure (lock, busy) took the provider down until process restart.
+ * Transient failures now recover within the budget; deterministic failures
+ * (corrupt domain version) surface after it, and the cleared promise lets a
+ * later call start a fresh budget.
+ */
+const OPEN_MAX_ATTEMPTS = 3
+const OPEN_RETRY_BASE_MS = 100
+
 export function apply(ctx: Context): void {
   let domain: Domain<typeof EVOLUTION_DOMAIN> | null = null
   let opening: Promise<Domain<typeof EVOLUTION_DOMAIN>> | null = null
 
   async function ensure(): Promise<Domain<typeof EVOLUTION_DOMAIN>> {
     if (domain) return domain
-    const facility = ctx.get('storageDomain') as StorageDomainLike | undefined
-    if (!facility) throw new Error('evolution-state-domain requires @deepseek-ai/dsh-storage-domain')
-    opening ??= facility.open(EVOLUTION_DOMAIN)
+    if (!opening) {
+      opening = (async () => {
+        const facility = ctx.get('storageDomain') as StorageDomainLike | undefined
+        if (!facility) throw new Error('evolution-state-domain requires @deepseek-ai/dsh-storage-domain')
+        let lastError: unknown
+        for (let attempt = 1; attempt <= OPEN_MAX_ATTEMPTS; attempt += 1) {
+          try {
+            return await facility.open(EVOLUTION_DOMAIN)
+          } catch (error) {
+            lastError = error
+            if (attempt < OPEN_MAX_ATTEMPTS) {
+              await new Promise(resolve => setTimeout(resolve, OPEN_RETRY_BASE_MS * 2 ** (attempt - 1)))
+            }
+          }
+        }
+        throw lastError
+      })()
+      // Clear on rejection so the next provider call starts a fresh budget.
+      void opening.catch(() => { opening = null })
+    }
     domain = await opening
     return domain
   }

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary, loadMutations, loadSuppressedNames, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, loadMutations, loadSuppressedNames, mutationsFile, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
 
 const USABLE = (name: string) => `---
 name: ${name}
@@ -51,5 +51,21 @@ it('SkillLibrary mutations write audit records with before/after hashes', async 
   expect(records[1]?.beforeHash).toBeTruthy()
   expect(records[1]?.afterHash).toBeTruthy()
   expect(records[1]?.beforeHash).not.toBe(records[1]?.afterHash)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('drops mutation records without a string timestamp (P2-3)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mutations-at-'))
+  await nodeEvolutionIo().writeText(mutationsFile(root), JSON.stringify({
+    version: 1,
+    records: [
+      { skillName: 'broken', action: 'create', at: 5 },
+      { skillName: 'kept', action: 'create', at: '2026-01-01T00:00:00.000Z' },
+    ],
+  }))
+  const records = await loadMutations(root, nodeEvolutionIo())
+  // `at` feeds .slice() in the command surfaces: a non-string timestamp drops
+  // the record instead of throwing later.
+  expect(records.map(record => record.skillName)).toEqual(['kept'])
   await rm(root, { recursive: true, force: true })
 })

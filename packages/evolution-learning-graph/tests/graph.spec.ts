@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLearningGraph, parseGraphNodeId, resolveGraphNode } from '../src/index.ts'
+import { buildLearningGraph, graphDensity, parseGraphNodeId, resolveGraphNode } from '../src/index.ts'
 
 describe('learning graph', () => {
   it('links memory entries to skills by token overlap', () => {
@@ -43,4 +43,68 @@ describe('learning graph', () => {
     const outOfRange = await resolveGraphNode({ kind: 'memory', source: 'memory', index: 9 }, repository)
     expect(outOfRange.ok).toBe(false)
   })
+  it('builds semantic skill-skill edges from related, dropping noise (G3)', () => {
+
+    const usage = new Map([['alpha', {}], ['beta', {}], ['gamma', {}]])
+
+    const related = new Map<string, string[]>([
+
+      ['alpha', ['beta', 'alpha', 'ghost']],
+
+      ['beta', ['alpha']],
+
+      ['gamma', []],
+
+    ])
+
+    const graph = buildLearningGraph(usage, [], [], related)
+
+    // Self-edges and missing endpoints never connect; the beta->alpha entry
+
+    // collapses into the alpha->beta pair (undirected dedupe). The former
+
+    // alphabet-order chain is gone — unrelated neighbors are not related.
+
+    expect(graph.edges.filter(edge => edge.type === 'related')).toEqual([
+
+      { from: 'alpha', to: 'beta', type: 'related' },
+
+    ])
+
+    // Memory edges are unaffected by the semantic pass.
+
+    const memoryGraph = buildLearningGraph(usage, ['Project uses alpha heavily'], [], related)
+
+    expect(memoryGraph.edges.some(edge => edge.type === 'memory_skill' && edge.to === 'alpha')).toBe(true)
+
+  })
+
+
+
+  it('omits skill-skill edges entirely when related is not provided (G3)', () => {
+
+    const usage = new Map([['a-skill', {}], ['b-skill', {}]])
+
+    const graph = buildLearningGraph(usage, [], [])
+
+    expect(graph.edges.filter(edge => edge.type === 'related')).toEqual([])
+
+  })
+
+
+
+  it('density summarizes the skill subgraph (G3)', () => {
+
+    const usage = new Map([['alpha', {}], ['beta', {}], ['gamma', {}]])
+
+    const related = new Map<string, string[]>([['alpha', ['beta']]])
+
+    const graph = buildLearningGraph(usage, [], [], related)
+
+    expect(graphDensity(graph)).toEqual({ skillNodes: 3, relatedEdges: 1, edgesPerNode: 0.33, isolatedPct: 33 })
+
+    expect(graphDensity(buildLearningGraph(new Map(), [], []))).toEqual({ skillNodes: 0, relatedEdges: 0, edgesPerNode: 0, isolatedPct: 0 })
+
+  })
+
 })

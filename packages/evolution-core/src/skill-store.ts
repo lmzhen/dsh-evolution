@@ -116,6 +116,27 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; b
   return { frontmatter, body }
 }
 
+/**
+ * Skill names referenced by a SKILL.md's `related_skills` frontmatter
+ * (B-line G3, rc.44): the single parsing source for the quality references
+ * factor and the learning-graph edges. The DSH frontmatter parser keeps the
+ * YAML value as a string (`"[a, b]"`), so names are scanned out of it; each
+ * must satisfy the skill-name shape and the referencing skill itself is
+ * excluded. Pure and deduplicated.
+ */
+export function relatedSkillNames(content: string, exclude?: string): string[] {
+  const parsed = parseFrontmatter(content)
+  if (!parsed) return []
+  const raw = parsed.frontmatter['related_skills']
+  if (typeof raw !== 'string') return []
+  const names = new Set<string>()
+  for (const match of Array.from(raw.matchAll(/[a-z0-9][a-z0-9-]*/g))) {
+    const target = match[0]
+    if (target && SKILL_NAME_RE.test(target) && target !== exclude) names.add(target)
+  }
+  return [...names]
+}
+
 export function validateFrontmatter(content: string, expectedName?: string, limits: SkillLimits = DEFAULT_SKILL_LIMITS): string | null {
   const parsed = parseFrontmatter(content)
   if (!parsed) return 'SKILL.md must start and end with YAML frontmatter and include a body.'
@@ -270,7 +291,7 @@ export class SkillLibrary {
   async list(): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
     for (const name of await listNames(this.root, this.io)) {
-      const dir = skillDir(this.root, name)
+      const dir = this.dirOf(name)
       const md = await this.io.readText(join(dir, 'SKILL.md'))
       if (!md) continue
       const parsed = parseFrontmatter(md)
@@ -288,11 +309,35 @@ export class SkillLibrary {
     return summaries
   }
 
-  async read(name: string): Promise<string | null> {
+  async read(rawName: string): Promise<string | null> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     // Defensive: an invalid name must never escape the skills root via join().
     if (this.badName(name) !== null) return null
-    return this.io.readText(join(skillDir(this.root, name), 'SKILL.md'))
+    return this.io.readText(join(this.dirOf(name), 'SKILL.md'))
   }
+
+  /**
+
+   * Single path-building choke point (rc.42 audit P2-5): every directory path
+
+   * is built from the TRIMMED name, so a name that passes `badName` (which
+
+   * trims before validating) can never mint a second, whitespace-padded
+
+   * directory next to the real one. Callers keep passing raw user input.
+
+   */
+
+  private dirOf(name: string): string {
+
+    return skillDir(this.root, name.trim())
+
+  }
+
+
 
   /** Name-format guard shared by every path-building mutator/reader. */
   private badName(name: string): string | null {
@@ -303,8 +348,12 @@ export class SkillLibrary {
     return null
   }
 
-  async writeProtection(name: string, origin: WriteOrigin = 'foreground'): Promise<string | null> {
-    const dir = skillDir(this.root, name)
+  async writeProtection(rawName: string, origin: WriteOrigin = 'foreground'): Promise<string | null> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
+    const dir = this.dirOf(name)
     for (const marker of ['bundled', 'hub-installed'] as const) {
       if (await this.io.exists(markerPath(dir, marker))) return marker
     }
@@ -316,8 +365,12 @@ export class SkillLibrary {
     return null
   }
 
-  async deleteProtection(name: string, options: { allowBundled?: boolean } = {}): Promise<string | null> {
-    const dir = skillDir(this.root, name)
+  async deleteProtection(rawName: string, options: { allowBundled?: boolean } = {}): Promise<string | null> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
+    const dir = this.dirOf(name)
     const markers: ReadonlyArray<'bundled' | 'hub-installed' | 'pinned'> = options.allowBundled
       ? ['hub-installed', 'pinned']
       : ['bundled', 'hub-installed', 'pinned']
@@ -327,29 +380,45 @@ export class SkillLibrary {
     return null
   }
 
-  async isManaged(name: string): Promise<boolean> {
-    const dir = skillDir(this.root, name)
+  async isManaged(rawName: string): Promise<boolean> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
+    const dir = this.dirOf(name)
     return await this.io.exists(markerPath(dir, 'hermes-managed'))
   }
 
   /** Whether the skill carries the bundled marker (curator prune-builtins eligibility). */
-  async isBundled(name: string): Promise<boolean> {
+  async isBundled(rawName: string): Promise<boolean> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     if (this.badName(name) !== null) return false
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     return await this.io.exists(markerPath(dir, 'bundled'))
   }
 
   /** Whether the skill carries the pinned marker (the marker is the factual source; usage.pinned mirrors it). */
-  async isPinned(name: string): Promise<boolean> {
+  async isPinned(rawName: string): Promise<boolean> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     if (this.badName(name) !== null) return false
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     return await this.io.exists(markerPath(dir, 'pinned'))
   }
 
   /** Count non-empty support subdirectories (richness input for quality scoring). */
-  async countSupportDirs(name: string): Promise<number> {
+  async countSupportDirs(rawName: string): Promise<number> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     if (this.badName(name) !== null) return 0
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     let entries: string[]
     try { entries = await this.io.list(dir) } catch { return 0 }
     let count = 0
@@ -401,7 +470,7 @@ export class SkillLibrary {
     if (origin === 'background_review') {
       return { ok: false, message: 'Only the foreground (user or the main agent) may pin or unpin skills.' }
     }
-    const dir = skillDir(this.root, normalized)
+    const dir = this.dirOf(normalized)
     const marker = markerPath(dir, 'pinned')
     const existing = await this.io.exists(marker)
     if (pinned && existing) return { ok: true, message: `Skill "${normalized}" is already pinned.`, path: dir }
@@ -430,7 +499,7 @@ export class SkillLibrary {
     if (validation) return { ok: false, message: validation }
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
-    const dir = skillDir(this.root, normalized)
+    const dir = this.dirOf(normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
     await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
     // Any non-foreground writer (review channel OR delegated subagent) is an
@@ -442,10 +511,14 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir }
   }
 
-  async update(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async update(rawName: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
@@ -459,10 +532,14 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" updated.`, path: dir }
   }
 
-  async patch(name: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     const skillMd = join(dir, 'SKILL.md')
     if (!await this.io.exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
@@ -499,23 +576,27 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir }
   }
 
-  async archive(name: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
+  async archive(rawName: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.deleteProtection(name, options.allowBundled === undefined ? {} : { allowBundled: options.allowBundled })
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     if (options.absorbedInto) {
-      const target = await this.io.readText(join(skillDir(this.root, options.absorbedInto), 'SKILL.md'))
+      const target = await this.io.readText(join(this.dirOf(options.absorbedInto), 'SKILL.md'))
       if (!target) return { ok: false, message: `absorbed_into="${options.absorbedInto}" does not exist.` }
     }
     const archiveRoot = join(this.root, '.archive')
-    let dest = join(archiveRoot, name)
+    let dest = join(archiveRoot, name.trim())
     if (await this.io.exists(dest)) {
       const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
-      dest = join(archiveRoot, `${name}-${stamp}`)
+      dest = join(archiveRoot, `${name.trim()}-${stamp}`)
     }
     try {
       await this.io.rename(dir, dest)
@@ -537,28 +618,28 @@ export class SkillLibrary {
    * collapse into one, and the originals stay recoverable under `.archive/`.
    */
   async consolidate(target: string, sources: string[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
-    const normalizedSources = [...new Set(sources)].filter(name => name !== target)
+    // Names normalize before validation (rc.42 audit P2-5): the trimmed form    // is what every path-building call below resolves to, so validation and    // IO can never disagree about which skill is meant.    const targetName = target.trim()    const normalizedSources = [...new Set(sources.map(name => name.trim()))].filter(name => name !== targetName)
     if (normalizedSources.length === 0) return { ok: false, message: 'Consolidation requires at least one distinct source skill.' }
-    for (const name of [target, ...normalizedSources]) {
+    for (const name of [targetName, ...normalizedSources]) {
       if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
     }
-    const targetDir = skillDir(this.root, target)
+    const targetDir = this.dirOf(targetName)
     const targetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
-    if (!targetMd) return { ok: false, message: `Skill "${target}" not found.` }
-    const targetProtection = await this.writeProtection(target, origin)
-    if (targetProtection) return { ok: false, message: `Skill "${target}" is protected (${targetProtection}).` }
+    if (!targetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
+    const targetProtection = await this.writeProtection(targetName, origin)
+    if (targetProtection) return { ok: false, message: `Skill "${targetName}" is protected (${targetProtection}).` }
     const parts: string[] = []
     for (const source of normalizedSources) {
       const protection = await this.deleteProtection(source)
       if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
-      const sourceMd = await this.io.readText(join(skillDir(this.root, source), 'SKILL.md'))
+      const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
       if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
       const parsed = parseFrontmatter(sourceMd)
       if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
       parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
     }
     const merged = targetMd.trimEnd() + parts.join('\n') + '\n'
-    const validation = validateFrontmatter(merged, target, this.limits)
+    const validation = validateFrontmatter(merged, targetName, this.limits)
     if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
     const threat = scanContentThreats(merged)
     if (threat) return { ok: false, message: threat }
@@ -573,7 +654,7 @@ export class SkillLibrary {
     const archived: string[] = []
     try {
       for (const source of normalizedSources) {
-        const result = await this.archive(source, { absorbedInto: target })
+        const result = await this.archive(source, { absorbedInto: targetName })
         if (!result.ok) throw new Error(result.message)
         archived.push(source)
       }
@@ -587,7 +668,7 @@ export class SkillLibrary {
       }
       return { ok: false, message: `Consolidation failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
     }
-    return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${target}".`, path: targetDir }
+    return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
   }
 
   /**
@@ -595,9 +676,10 @@ export class SkillLibrary {
    * recoverability: archival never deletes, and this is the control-plane
    * path back. The `.archive-reason` marker is dropped on restore.
    */
-  async restoreFromArchive(name: string): Promise<SkillActionResult> {
+  async restoreFromArchive(rawName: string): Promise<SkillActionResult> {
+    const name = rawName.trim()
     if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
-    if (await this.io.exists(join(skillDir(this.root, name), 'SKILL.md'))) {
+    if (await this.io.exists(join(this.dirOf(name), 'SKILL.md'))) {
       return { ok: false, message: `Skill "${name}" already exists in the active root; refusing to overwrite.` }
     }
     const archiveRoot = join(this.root, '.archive')
@@ -607,7 +689,7 @@ export class SkillLibrary {
     const chosen = candidates[0]
     if (!chosen) return { ok: false, message: `Skill "${name}" is not in .archive.` }
     const source = join(archiveRoot, chosen)
-    const dest = skillDir(this.root, name)
+    const dest = this.dirOf(name)
     try {
       await this.io.rename(source, dest)
     } catch {
@@ -620,10 +702,14 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
 
-  async writeSupportFile(name: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
@@ -639,10 +725,14 @@ export class SkillLibrary {
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
 
-  async removeSupportFile(name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+
+    // One trim per entry: paths (dirOf), validation and messages all see the same name.
+    const name = rawName.trim()
+
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = skillDir(this.root, name)
+    const dir = this.dirOf(name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
@@ -677,7 +767,7 @@ export class SkillLibrary {
     }
     const names = await listNames(this.root, this.io)
     for (const name of names) {
-      await this.io.copy(skillDir(this.root, name), join(dest, name))
+      await this.io.copy(this.dirOf(name), join(dest, name))
     }
     // Sidecar co-snapshot: a rollback that restores the tree but leaves the
     // post-archival usage/suppression state behind would immediately let the
@@ -792,7 +882,7 @@ export class SkillLibrary {
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
     await this.snapshotAll('pre-rollback', extras)
     for (const name of await listNames(this.root, this.io)) {
-      await this.io.remove(skillDir(this.root, name))
+      await this.io.remove(this.dirOf(name))
     }
     const manifest = await this.readSnapshotManifest(latest.path)
     if (manifest === null) {

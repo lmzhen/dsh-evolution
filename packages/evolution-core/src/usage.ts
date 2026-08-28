@@ -20,8 +20,8 @@ export interface UsageRecord {
   state: SkillState
   pinned: boolean
   archived_at: string | null
-  quality_score?: number
-  quality_warn?: boolean
+  quality_score?: number | undefined
+  quality_warn?: boolean | undefined
 }
 
 export type UsageMap = Map<string, UsageRecord>
@@ -46,19 +46,52 @@ export function emptyRecord(): UsageRecord {
   }
 }
 
+const isTimestamp = (value: unknown): value is string | null => value === null || typeof value === 'string'
+
+/**
+ * Field-level normalization for one sidecar record (rc.42 audit P2-3): the
+ * spread used to copy any junk through verbatim, so a corrupted file could
+ * carry `use_count: "3"` into the quality math and lifecycle comparisons as
+ * NaN. Every field falls back to its `emptyRecord()` baseline unless it has
+ * exactly the declared type; an invalid `created_at` anchors the age clock at
+ * now (first-sight defer semantics for a record whose age is unknowable).
+ * Pure — exported for unit tests; `loadUsage` is the production caller.
+ */
+export function normalizeUsageRecord(record: unknown): UsageRecord {
+  const base = emptyRecord()
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return base
+  const raw = record as Record<string, unknown>
+  const num = (value: unknown, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  const bool = (value: unknown, fallback: boolean): boolean =>
+    typeof value === 'boolean' ? value : fallback
+  return {
+    created_by: typeof raw.created_by === 'string' ? raw.created_by : null,
+    use_count: num(raw.use_count, base.use_count),
+    view_count: num(raw.view_count, base.view_count),
+    patch_count: num(raw.patch_count, base.patch_count),
+    last_used_at: isTimestamp(raw.last_used_at) ? raw.last_used_at : base.last_used_at,
+    last_viewed_at: isTimestamp(raw.last_viewed_at) ? raw.last_viewed_at : base.last_viewed_at,
+    last_patched_at: isTimestamp(raw.last_patched_at) ? raw.last_patched_at : base.last_patched_at,
+    // An unknowable age anchors at now: the record's inactivity clock starts
+    // today instead of counting from epoch.
+    created_at: typeof raw.created_at === 'string' ? raw.created_at : base.created_at,
+    state: raw.state === 'stale' || raw.state === 'archived' ? raw.state : 'active',
+    pinned: bool(raw.pinned, base.pinned),
+    archived_at: isTimestamp(raw.archived_at) ? raw.archived_at : base.archived_at,
+    quality_score: typeof raw.quality_score === 'number' && Number.isFinite(raw.quality_score) ? raw.quality_score : undefined,
+    quality_warn: typeof raw.quality_warn === 'boolean' ? raw.quality_warn : undefined,
+  }
+}
+
 export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<UsageMap> {
   const map: UsageMap = new Map()
   const raw = await io.readText(usageFile(root))
   if (raw !== null) {
     try {
-      const parsed = JSON.parse(raw) as Record<string, Partial<UsageRecord>>
+      const parsed = JSON.parse(raw) as Record<string, unknown>
       for (const [name, record] of Object.entries(parsed)) {
-        const base = emptyRecord()
-        map.set(name, {
-          ...base,
-          ...record,
-          state: record.state === 'stale' || record.state === 'archived' ? record.state : 'active',
-        })
+        map.set(name, normalizeUsageRecord(record))
       }
     } catch {
       // Malformed sidecar is treated as empty. Telemetry is best-effort.

@@ -7,7 +7,7 @@ import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { scanMemoryThreats } from './threats.ts'
-import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT } from './constants.ts'
+import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
 export { ENTRY_DELIMITER } from './constants.ts'
 
@@ -18,6 +18,16 @@ export { ENTRY_DELIMITER } from './constants.ts'
  * same 10× bound around a file that should never exceed the store limit).
  */
 const READ_GUARD_FACTOR = 10
+
+/**
+ * Consolidation-failure backoff window (package-private, rc.42 audit P2-1):
+ * only failures inside the window count toward `maxConsolidationFailures`.
+ * The store cannot observe turn boundaries, so the model-facing "this turn"
+ * phrasing is approximated with ten minutes — generous enough to cover one
+ * turn's retry loop, short enough that a failure yesterday never makes today's
+ * first refusal say "stop retrying".
+ */
+const FAILURE_WINDOW_MS = 10 * 60_000
 
 export type MemoryTarget = 'memory' | 'user'
 
@@ -74,6 +84,7 @@ export class MemoryStore {
   private readonly maxFailures: number
   private readonly io: EvolutionIoLike
   private failureCount = 0
+  private lastFailureAt = 0
 
   constructor(options: MemoryStoreOptions = {}) {
     this.io = options.io ?? nodeEvolutionIo()
@@ -81,7 +92,7 @@ export class MemoryStore {
     this.userLimit = options.userCharLimit ?? DEFAULT_USER_CHAR_LIMIT
     this.addDatePrefix = options.addDatePrefix ?? false
     this.root = options.root ?? memoryRoot()
-    this.maxFailures = options.maxConsolidationFailures ?? 3
+    this.maxFailures = options.maxConsolidationFailures ?? DEFAULT_CONSOLIDATION_FAILURES
   }
 
   limitFor(target: MemoryTarget): number {
@@ -119,6 +130,14 @@ export class MemoryStore {
   }
 
   private failure(target: MemoryTarget, message: string, entries: string[]): MemoryApplyResult {
+    // Rolling-window decay (rc.42 audit P2-1): the backoff counter used to be
+    // process-lifetime, so three failures EVER — across turns and sessions —
+    // made every later failure say "stop retrying" even though the model had
+    // moved on. The store cannot see turn boundaries, so "this turn" is
+    // approximated with a window: failures older than it stop counting and
+    // the counter restarts from one.
+    if (Date.now() - this.lastFailureAt > FAILURE_WINDOW_MS) this.failureCount = 0
+    this.lastFailureAt = Date.now()
     this.failureCount += 1
     const chars = entries.join(ENTRY_DELIMITER).length
     if (this.failureCount > this.maxFailures) {
@@ -350,13 +369,19 @@ export class MemoryStore {
    * blank lines, leading/trailing delimiters) that indicate the file was
    * edited outside MemoryStore. Purely single-canonical content reaches the
    * same serialization and returns false, so a normal write is never flagged.
+   *
+   * An absent, empty, or whitespace-only file is the "never written" state
+   * (rc.42 audit P1-6): it parses to zero entries, so the canonical form
+   * `'\n'` can never byte-match it and every write path was permanently
+   * refused with "External drift detected" — including the repairs the model
+   * would need to make. Such files are adopted instead of flagged.
    */
   async detectDrift(target: MemoryTarget): Promise<boolean> {
     // Oversized files are an external-modification signal by the read guard;
     // report drift so a write followed by a read never loads them.
     if (await this.oversizedFile(target)) return true
     const raw = await this.io.readText(fileFor(this.root, target))
-    if (raw === null) return false
+    if (raw === null || raw.trim() === '') return false
     const entries = normalizeEntries(raw)
     const limit = this.limitFor(target)
     // Second drift signal (Hermes parity, `_detect_external_drift` signal #2):

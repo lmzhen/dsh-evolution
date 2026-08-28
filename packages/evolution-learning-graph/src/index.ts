@@ -8,7 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { SKILL_NAME_RE, evolutionIoAdapter, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -28,15 +28,55 @@ export interface LearningGraph {
 }
 
 /**
+ * Structural summary of the skill subgraph (Hermes `learning_graph` density
+ * parity): edges per skill node and the share of skills no edge touches.
+ * Memory nodes are excluded — they carry token-matched edges by construction,
+ * which would dilute the isolation signal the statistic exists to expose.
+ */
+export interface GraphDensity {
+  skillNodes: number
+  relatedEdges: number
+  edgesPerNode: number
+  isolatedPct: number
+}
+
+export function graphDensity(graph: LearningGraph): GraphDensity {
+  const linked = new Set<string>()
+  let relatedEdges = 0
+  for (const edge of graph.edges) {
+    if (edge.type !== 'related') continue
+    relatedEdges += 1
+    linked.add(edge.from)
+    linked.add(edge.to)
+  }
+  const skillNodes = graph.nodes.filter(node => node.kind === 'skill').length
+  const isolated = graph.nodes.filter(node => node.kind === 'skill' && !linked.has(node.id)).length
+  return {
+    skillNodes,
+    relatedEdges,
+    edgesPerNode: skillNodes === 0 ? 0 : Math.round((relatedEdges / skillNodes) * 100) / 100,
+    isolatedPct: skillNodes === 0 ? 0 : Math.round((isolated / skillNodes) * 100),
+  }
+}
+
+/**
  * Build a small deterministic graph from usage records and memory entries.
  * Memory node ids follow `memory:<source>:<index>` (source = memory|user,
  * index = position in that file's entries) — the SAME rule the parser
  * `parseGraphNodeId` accepts, so graph detail/edit/delete round-trips.
+ *
+ * Skill-skill edges are semantic only (B-line G3): each entry of `related`
+ * (skill name -> names its frontmatter references, from
+ * `relatedSkillNames`) becomes an edge when BOTH endpoints exist in the
+ * usage set, self-edges are dropped and undirected duplicates collapse. An
+ * omitted `related` yields no skill-skill edges — the former alphabet-order
+ * chain was a placeholder that connected unrelated neighbors.
  */
 export function buildLearningGraph(
   usage: ReadonlyMap<string, { use_count?: number; pinned?: boolean }>,
   memoryEntries: readonly string[],
   userEntries: readonly string[] = [],
+  related?: ReadonlyMap<string, readonly string[]>,
 ): LearningGraph {
   const nodes: GraphNode[] = [...usage.keys()].map(name => ({
     id: name,
@@ -45,10 +85,16 @@ export function buildLearningGraph(
   }))
   const edges: GraphEdge[] = []
   const sorted = [...usage.keys()].sort()
-  for (let i = 1; i < sorted.length; i += 1) {
-    const from = sorted[i - 1]
-    const to = sorted[i]
-    if (from && to) edges.push({ from, to, type: 'related' })
+  const seenPairs = new Set<string>()
+  for (const [from, targets] of related ?? []) {
+    if (!usage.has(from)) continue
+    for (const to of targets) {
+      if (to === from || !usage.has(to)) continue
+      const pairKey = [from, to].sort().join('->')
+      if (seenPairs.has(pairKey)) continue
+      seenPairs.add(pairKey)
+      edges.push({ from, to, type: 'related' })
+    }
   }
   const appendMemory = (source: 'memory' | 'user', entries: readonly string[]): void => {
     entries.forEach((entry, index) => {
@@ -137,10 +183,22 @@ export function apply(ctx: Context): void {
           const usageMap = await usage.report()
           const memoryEntries = await memory.read('memory')
           const userEntries = await memory.read('user')
-          const graph = buildLearningGraph(usageMap, memoryEntries, userEntries)
+          // Semantic skill-skill edges (B-line G3): read each usage-known
+          // skill and collect its related_skills through the shared parser —
+          // the same source the quality references factor uses.
+          const skills = withSkills()
+          const related = new Map<string, string[]>()
+          for (const name of usageMap.keys()) {
+            const content = await skills.read(name)
+            if (content === null) continue
+            related.set(name, relatedSkillNames(content, name))
+          }
+          const graph = buildLearningGraph(usageMap, memoryEntries, userEntries, related)
           const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
           const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
-          return lines.join('\n') + '\n\n' + edges.join('\n')
+          const density = graphDensity(graph)
+          const densityLine = `\n\nSkills: ${density.skillNodes} · related edges: ${density.relatedEdges} (${density.edgesPerNode}/node) · isolated: ${density.isolatedPct}%`
+          return lines.join('\n') + '\n\n' + edges.join('\n') + densityLine
         }
 
         function withSkills(): SkillLibrary {

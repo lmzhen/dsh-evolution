@@ -10,14 +10,20 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, SKILL_NAME_RE, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
+
+
+/** Quality-warned skills may turn stale after this many idle days (package-private tunable, P2-8). */
+
+const DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS = 7
+
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -97,7 +103,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     archiveAfterDays: z.number().default(DEFAULT_ARCHIVE_AFTER_DAYS),
     llmReview: z.boolean().default(false),
     curatorProvider: z.string().default('deepseek-official'),
-    qualityWarnStaleAfterDays: z.number().default(7),
+    qualityWarnStaleAfterDays: z.number().default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
     minIdleHours: z.number().default(DEFAULT_MIN_IDLE_HOURS),
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
@@ -139,7 +145,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     this.archiveAfterDays = config.archiveAfterDays ?? DEFAULT_ARCHIVE_AFTER_DAYS
     this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
-    this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? 7
+    this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS
     this.minIdleHours = config.minIdleHours ?? DEFAULT_MIN_IDLE_HOURS
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
@@ -580,13 +586,11 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     for (const name of treeNames) {
       const content = await this.skills.read(name)
       if (!content) continue
-      const parsed = parseFrontmatter(content)
-      if (!parsed) continue
-      const raw = parsed.frontmatter['related_skills']
-      if (typeof raw !== 'string') continue
-      for (const match of Array.from(raw.matchAll(/[a-z0-9][a-z0-9-]*/g))) {
-        const target = match[0]
-        if (target && SKILL_NAME_RE.test(target) && target !== name) counts.set(target, (counts.get(target) ?? 0) + 1)
+      // Single-source parsing (G3): identical semantics to the former inline
+      // scan, plus dedupe — one referrer counts once per target no matter how
+      // often it repeats in the list.
+      for (const target of relatedSkillNames(content, name)) {
+        counts.set(target, (counts.get(target) ?? 0) + 1)
       }
     }
     return counts

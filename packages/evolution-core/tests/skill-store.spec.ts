@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary, loadSuppressedNames, loadUsage, nodeEvolutionIo, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -296,4 +296,40 @@ it('snapshot extras are manifest-declared and only declared names are read back'
   expect(restored.extras).toEqual([{ name: 'curator-state.json', content: '{"lastRunAt":1}' }])
   expect((await lib.list()).map(s => s.name)).toEqual(['keeper-skill'])
   await rm(root, { recursive: true, force: true })
+})
+
+it('names normalize at the path choke point so padded aliases cannot fork a skill (P2-5)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-dir-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('spaced ', SKILL.replace('python-testing', 'spaced'), 'foreground')
+  expect((await lib.list()).map(s => s.name)).toEqual(['spaced'])
+  // A padded reference resolves to the same directory instead of ghosting a
+  // second, whitespace-padded one.
+  const updated = await lib.update(' spaced ', SKILL.replace('python-testing', 'spaced').replace('Run tests with pytest.', 'Run tests with pytest v2.'), 'foreground')
+  expect(updated.ok).toBe(true)
+  expect(await lib.read('spaced')).toContain('v2')
+  expect((await lib.list()).map(s => s.name)).toEqual(['spaced'])
+  const archived = await lib.archive(' spaced ')
+  expect(archived.ok).toBe(true)
+  const restored = await lib.restoreFromArchive(' spaced ')
+  expect(restored.ok).toBe(true)
+  expect((await lib.list()).map(s => s.name)).toEqual(['spaced'])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('relatedSkillNames is the single related_skills parser (G3)', () => {
+  const md = (related: string) => `---
+name: hub
+related_skills: ${related}
+---
+Body.
+`
+  // List syntax and bare value both scan; order preserved.
+  expect(relatedSkillNames(md('[alpha-skill, beta-skill]'))).toEqual(['alpha-skill', 'beta-skill'])
+  expect(relatedSkillNames(md('alpha-skill'))).toEqual(['alpha-skill'])
+  // Dedupe and self-exclusion: one referrer counts once per target.
+  expect(relatedSkillNames(md('[hub, hub, alpha-skill, hub]'), 'hub')).toEqual(['alpha-skill'])
+  // No frontmatter or no field yields no references.
+  expect(relatedSkillNames('no frontmatter here')).toEqual([])
+  expect(relatedSkillNames(md(''))).toEqual([])
 })

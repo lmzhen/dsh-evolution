@@ -41,9 +41,13 @@ export async function loadMutations(root: string, io: EvolutionIoLike = nodeEvol
       : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { records?: unknown }).records)
         ? (parsed as { records: unknown[] }).records
         : []
+    // Field-level guard (rc.42 audit P2-3): `at` feeds `.slice()` in the
+    // command surfaces, so a record without a string timestamp is dropped —
+    // same posture as the skillName/action checks, never a throw.
     return records.filter((entry): entry is MutationRecord =>
       typeof entry === 'object' && entry !== null && typeof (entry as MutationRecord).skillName === 'string'
-      && typeof (entry as MutationRecord).action === 'string')
+      && typeof (entry as MutationRecord).action === 'string'
+      && typeof (entry as MutationRecord).at === 'string')
   } catch {
     // Malformed audit is treated as empty; auditing is best-effort.
     return []

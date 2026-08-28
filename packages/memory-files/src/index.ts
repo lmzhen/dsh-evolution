@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
-import { evolutionIoAdapter,  MemoryStore } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, MemoryStore } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
 
@@ -25,11 +25,11 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   providerName: z.string().default('files'),
-  memoryCharLimit: z.number().default(2200),
-  userCharLimit: z.number().default(1375),
+  memoryCharLimit: z.number().default(DEFAULT_MEMORY_CHAR_LIMIT),
+  userCharLimit: z.number().default(DEFAULT_USER_CHAR_LIMIT),
   addDatePrefix: z.boolean().default(false),
   root: z.string().default(''),
-  maxConsolidationFailures: z.number().default(3),
+  maxConsolidationFailures: z.number().default(DEFAULT_CONSOLIDATION_FAILURES),
 })
 
 export function apply(ctx: Context, rawConfig: Config): void {

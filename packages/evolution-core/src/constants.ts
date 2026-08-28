@@ -64,4 +64,6 @@ export const DEFAULT_STALE_AFTER_DAYS = 30
 export const DEFAULT_ARCHIVE_AFTER_DAYS = 90
 export const DEFAULT_MEMORY_CHAR_LIMIT = 2200
 export const DEFAULT_USER_CHAR_LIMIT = 1375
+/** Consolidation-failure backoff cap, shared by MemoryStore and memory-files' Config default. */
+export const DEFAULT_CONSOLIDATION_FAILURES = 3
 export const DEFAULT_SKILL_CONTENT_CHARS = 100_000
