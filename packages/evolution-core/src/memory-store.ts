@@ -29,6 +29,26 @@ const READ_GUARD_FACTOR = 10
  */
 const FAILURE_WINDOW_MS = 10 * 60_000
 
+/**
+ * Recoverable-error preview bounds (B-line G5, Hermes `_previews` parity):
+ * failed replace/remove/batch calls echo the current entries so the model can
+ * self-recover without re-reading the store. Bounded to five entries of eighty
+ * characters each; package-private because it is an error-message shape, not a
+ * behavior switch.
+ */
+const ERROR_PREVIEW_ENTRIES = 5
+const ERROR_PREVIEW_WIDTH = 80
+
+function previewEntries(entries: string[]): string {
+  if (entries.length === 0) return ''
+  const shown = entries.slice(0, ERROR_PREVIEW_ENTRIES).map((entry) => {
+    const text = entry.length > ERROR_PREVIEW_WIDTH ? `${entry.slice(0, ERROR_PREVIEW_WIDTH)}…` : entry
+    return `- ${text}`
+  })
+  const more = entries.length > ERROR_PREVIEW_ENTRIES ? `\n  (+${entries.length - ERROR_PREVIEW_ENTRIES} more)` : ''
+  return `\n\nCurrent entries (preview):\n${shown.join('\n')}${more}`
+}
+
 export type MemoryTarget = 'memory' | 'user'
 
 export interface MemoryOperation {
@@ -143,11 +163,11 @@ export class MemoryStore {
     if (this.failureCount > this.maxFailures) {
       return {
         ok: false,
-        message: `Memory consolidation failed ${this.failureCount} times this turn. Stop retrying memory calls and continue with the user's task.`,
+        message: `Memory consolidation failed ${this.failureCount} times this turn. Stop retrying memory calls and continue with the user's task.${previewEntries(entries)}`,
         entries, chars, limit: this.limitFor(target),
       }
     }
-    return { ok: false, message, entries, chars, limit: this.limitFor(target) }
+    return { ok: false, message: `${message}${previewEntries(entries)}`, entries, chars, limit: this.limitFor(target) }
   }
 
   /**
@@ -244,7 +264,12 @@ export class MemoryStore {
 
   private async mutate(target: MemoryTarget, oldText: string, action: 'replace' | 'remove', facts?: string): Promise<MemoryApplyResult> {
     const needle = oldText.trim()
-    if (!needle) return { ok: false, message: 'old_text cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    if (!needle) {
+      // Recoverable-error preview (B-line G5): echo the current entries so
+      // the model can self-recover without a separate read.
+      const current = await this.read(target)
+      return { ok: false, message: `old_text cannot be empty.${previewEntries(current)}`, entries: current, chars: current.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+    }
     const refusal = await this.oversizedRefusal(target)
     if (refusal) return refusal
     const content = action === 'replace' ? (facts ?? '').trim() : ''
@@ -299,7 +324,7 @@ export class MemoryStore {
       const position = index + 1
       if (op.action === 'add') {
         const body = (op.facts ?? '').trim()
-        if (!body) return { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (!body) return { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         const threat = scanMemoryThreats(body)
         if (threat) return { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         if (!working.some(entry => stripDatePrefix(entry) === body)) {
@@ -308,20 +333,20 @@ export class MemoryStore {
         continue
       }
       const needle = (op.old_text ?? '').trim()
-      if (!needle) return { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+      if (!needle) return { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
       const matches = working.map((entry, matchIndex) => ({ entry, matchIndex })).filter(({ entry }) => entry.includes(needle))
       if (matches.length === 0) {
         return this.failure(target, `Operation ${position}: no entry matching "${needle}" found. No operations were applied.`, entries)
       }
       if (new Set(matches.map(m => m.entry)).size > 1) {
-        return { ok: false, message: `Operation ${position}: "${needle}" matched multiple distinct entries. No operations were applied.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        return { ok: false, message: `Operation ${position}: "${needle}" matched multiple distinct entries. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
       }
       const matchIndex = matches[0]?.matchIndex ?? -1
       if (op.action === 'remove') {
         working.splice(matchIndex, 1)
       } else {
         const body = (op.facts ?? '').trim()
-        if (!body) return { ok: false, message: `Operation ${position} (replace): facts is required.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (!body) return { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         const threat = scanMemoryThreats(body)
         if (threat) return { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
         working[matchIndex] = body

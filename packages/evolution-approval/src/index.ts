@@ -98,6 +98,17 @@ export class EvolutionApproval extends Service {
     }
   }
 
+  /**
+   * Whether a replay runner is registered for `kind` (rc.42 audit P1-9
+   * pre-check surface): callers that can execute a write directly (the review
+   * pipeline) use it to avoid staging a pending record that no runner could
+   * ever replay. `capability` records are answerable without a runner by
+   * design, so they are exempt from the staging pre-check.
+   */
+  hasRunner(kind: PendingKind): boolean {
+    return this.runners.has(kind)
+  }
+
   /** Trusted plan-executor entry point: replay a write through the registered runner exactly once. */
   async run(kind: PendingKind, args: unknown): Promise<{ ok: boolean; message: string }> {
     const runner = this.runners.get(kind)
@@ -114,6 +125,13 @@ export class EvolutionApproval extends Service {
     // instead of piling up unanswerable pending writes.
     if (input.sessionPolicy === 'never') return { action: 'allow', message: 'Session approval policy is "never"; write allowed without staging.' }
     if (input.origin === 'background_review' || this.stageForeground) {
+      // Observability for the P1-9 trap (rc.42 audit): staging a memory/skill
+      // write with no registered runner creates a pending record that no
+      // approver could ever replay. Callers with a direct executor pre-check
+      // `hasRunner`; this warn keeps any other caller's mistake visible.
+      if (input.kind !== 'capability' && !this.runners.has(input.kind)) {
+        this.ctx.logger.warn(`evolution-approval: staging "${input.kind}" write with no replay runner registered - it will not be approvable`)
+      }
       const record: PendingRecord = {
         id: randomUUID(),
         kind: input.kind,

@@ -229,3 +229,28 @@ it('failure backoff decays after the window so a later turn retries normally (P2
     vi.useRealTimers()
   }
 })
+
+it('memory recoverable errors carry a bounded current-entries preview (G5)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-preview-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 5000 })
+  await store.add('memory', 'alpha entry about python testing')
+  await store.add('memory', `${'x'.repeat(200)} long entry`)
+  for (let i = 0; i < 4; i += 1) await store.add('memory', `filler entry ${i}`)
+  // Missed match: the failed call echoes the current entries so the model can
+  // self-recover without a separate read (Hermes memory_tool.py:927-958 parity).
+  const missing = await store.remove('memory', 'not-present-anywhere')
+  expect(missing.ok).toBe(false)
+  expect(missing.message).toContain('Current entries (preview):')
+  expect(missing.message).toContain('alpha entry about python testing')
+  // Bounded: at most 5 entries of 80 chars each, long ones truncated.
+  const previewLines = missing.message.split('\n').filter(line => line.startsWith('- '))
+  expect(previewLines.length).toBe(5)
+  expect(previewLines.some(line => line.endsWith('…'))).toBe(true)
+  expect(missing.message).toContain('(+1 more)')
+  // Missing old_text in a batch: same recovery affordance.
+  const batch = await store.applyBatch('memory', [{ action: 'remove', old_text: '' }])
+  expect(batch.ok).toBe(false)
+  expect(batch.message).toContain('old_text is required')
+  expect(batch.message).toContain('Current entries (preview):')
+  await rm(root, { recursive: true, force: true })
+})

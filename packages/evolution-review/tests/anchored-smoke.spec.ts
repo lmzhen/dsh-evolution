@@ -77,6 +77,18 @@ describe('anchored-standard review smoke', () => {
     // route instead of a hardcoded provider name.
     expect((request?.agentOptions as Record<string, unknown> | undefined)?.provider).toBeUndefined()
     expect(typeof (request?.agentOptions as Record<string, unknown> | undefined)?.model).toBe('string')
+    // P2-9 contract pins (verified against dsh-v0.1.1-rc.2 source): maxDepth 0
+    // is a legal non-negative safe integer (blocks further spawns), and the
+    // structured-output schema is an object whose array items use the DSL's
+    // lossless 'json' node type.
+    expect(request?.maxDepth).toBe(0)
+    const outputSchema = request?.outputSchema as {
+      type?: string
+      properties?: Record<string, { items?: { type?: string } }>
+    } | undefined
+    expect(outputSchema?.type).toBe('object')
+    expect(outputSchema?.properties?.memoryOps?.items?.type).toBe('json')
+    expect(outputSchema?.properties?.skillOps?.items?.type).toBe('json')
   })
 
   it('direct delete path marks the usage record archived (G1, rc.39 audit §4-A)', async () => {

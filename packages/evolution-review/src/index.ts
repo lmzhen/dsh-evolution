@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, evolutionIoAdapter, foldTurn, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -80,6 +80,8 @@ interface MemoryLike {
 interface ApprovalLike {
   request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: WriteOrigin }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   run(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string }>
+  /** P1-9 pre-check surface: can this kind be replayed at all? */
+  hasRunner(kind: 'memory' | 'skill'): boolean
   isEnabled?: boolean
 }
 
@@ -306,6 +308,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
   async function executePlan(plan: EvolutionPlan): Promise<string[]> {
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+    // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
+    const origins = resolveOrigins(undefined, true)
     const actions: string[] = []
     for (const op of plan.memoryOps ?? []) {
       if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
@@ -322,7 +326,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // The registered skill runner expects the { operation, origin } wrapper;
       // passing it on both the pending record and the replay keeps the
       // background_review origin in the approval-disabled (default) path too.
-      const runnerArgs = { operation: args, origin: 'background_review' as const }
+      const runnerArgs = { operation: args, origin: origins.library }
       const result = approval
         ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
         : await executeSkillDirect(args)
@@ -332,7 +336,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {
       if (!approval) return undefined
-      const decision = await approval.request({ kind, summary, args: stored, origin: 'background_review' })
+      // P1-9 pre-check: with approval ENABLED but no registered runner for
+      // this kind (host-only compositions mount no tool runners), staging
+      // would create a pending record that no approver could ever replay.
+      // The trusted direct executor below is the only way the write can land,
+      // so it is used instead of staging. (`capability` is exempt by design,
+      // but the review never issues that kind.)
+      if (approval.isEnabled === true && !approval.hasRunner(kind)) {
+        return await runnerDirect(kind, runnerArgs)
+      }
+      const decision = await approval.request({ kind, summary, args: stored, origin: origins.approval })
       if (decision.action === 'staged') return { ok: false, message: decision.message }
       // The staged service is mounted but DISABLED (the default deployment),
       // and host-only compositions mount no tool runners — replaying would
@@ -370,7 +383,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const library = new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()))
       const op = skillArgs
       const name = op.name ?? ''
-      const origin: WriteOrigin = 'background_review'
+      const origin: WriteOrigin = origins.library
       if (op.action === 'create') {
         // The direct path (approval-disabled deployments) must keep the same
         // lifecycle entry as the runner: an agent-created record so the

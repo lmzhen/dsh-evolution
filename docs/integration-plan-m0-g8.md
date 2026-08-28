@@ -225,6 +225,8 @@ opening 修复）同批——防止两 provider 语义漂移。
 - 包私有常量 `ERROR_PREVIEW_ENTRIES=5`、宽度 80；
 - mutate 缺 old_text / 未命中 / 多义匹配 / applyBatch 失败消息附条目预览（有界）。
 
+**P1-5 / 决策 C 裁决记录（rc.47 执行本步时落定）**：决策 C 拍板为终态——技能写事件的发射点下沉 `SkillLibrary` 变更方法内部（构造注入 emit 回调 / core 定义 `SkillMutationListener` seam），catalog 失效覆盖 curator 归档/合并/restore/graph 删除全路径；本批**不实施**（避免与下一批的下沉重构返工，见 rc.48 条目）。验收口径同步定稿：任何写路径（工具 / curator / 图谱 / restore）完成后，原生 `ctx.skills` 目录立即可见同一状态。**P2-9 核实结论（上游 dsh-v0.1.1-rc.2 源码引证）**：① `toolFilter: { allow: [...] }` 与 `ToolRestriction`（tools/src/index.ts:680-684）精确匹配；② `outputSchema.items: { type: 'json' }` 是 dsh-tools DSL 的合法 `JsonValueSchemaSpec` 节点（tools/src/schema.ts:74-77，"author-only unconstrained lossless JSON node"）；③ `maxDepth: 0` 为合法非负安全整数（subagent/src/depth.ts:42-50，语义 = 禁止评审子代理再派生）。三项均正确，已以 smoke 断言固化。
+
 **同层说明**：P1-5/C 是 L3 写通道，G5 是 L0 错误面——不同层，但都是"把状态/错误
 传达到正确出口"的收尾项；P2-9 的"上游核实"与 G4（rc.45 已升 prompt bundle）错开一批，
 避免同一发布里"改了基线又核基线"。
