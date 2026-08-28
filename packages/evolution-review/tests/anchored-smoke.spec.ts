@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -151,6 +151,9 @@ describe('anchored-standard review smoke', () => {
       // The parent session READ doomed-skill this session (read-before-write
       // mark for the background review guard).
       session.append('tool/call', {
+        turn: 1,
+        step: 0,
+        callId: CallId('read-doomed-skill'),
         name: 'skill',
         arguments: JSON.stringify({ name: 'doomed-skill' }),
       })
