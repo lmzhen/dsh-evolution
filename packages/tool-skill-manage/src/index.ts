@@ -106,7 +106,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // stale/archive lifecycle. Read-only actions (list/review/skip) must
       // never bump counters or emit mutation events.
       const mutating = action !== 'list' && action !== 'review' && action !== 'skip' && action !== 'pin' && action !== 'unpin'
-      if (name && action === 'create' && origin === 'background_review') await ctx.skillUsage.markAgentCreated(name)
+      // Any non-foreground writer (review channel OR delegated subagent) is an
+      // agent-authored skill and must enter the lifecycle as such.
+      if (name && action === 'create' && origin !== 'foreground') await ctx.skillUsage.markAgentCreated(name)
       if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
       else if (name && mutating) await ctx.skillUsage.record(name, 'patch')
       if (mutating) {
@@ -171,22 +173,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     },
     isConcurrencySafe: () => false,
     async execute(args: SkillWriteArgs, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
-      const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
+      const isSubagent = exec.agent?.session.header.origin === 'subagent'
+      const reviewOrigin = isSubagent ? 'background_review' : 'foreground'
+      // Library-facing origin keeps the Hermes distinction: a delegated
+      // subagent write is an agent-authored change (not the review channel),
+      // so the pinned background guard does not block it — while the approval
+      // surface still treats subagent writes as autonomous (background_review).
+      const libraryOrigin: WriteOrigin = isSubagent ? 'subagent' : 'foreground'
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'skip' && args.action !== 'pin' && args.action !== 'unpin') {
         const decision = await approval.request({
           kind: 'skill',
           summary: `skill ${args.action ?? '?'} ${args.name ?? ''}`.trim(),
-          args: { operation: args, origin },
-          origin,
+          args: { operation: args, origin: reviewOrigin },
+          origin: reviewOrigin,
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {
           return { ok: true, message: decision.message, skills: [], pending_id: decision.pendingId ?? '' }
         }
       }
-      return await executeCore(args, origin)
+      return await executeCore(args, libraryOrigin)
     },
   }))
 

@@ -50,6 +50,40 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     const code = (error as NodeJS.ErrnoException | undefined)?.code
     return code === 'ENOENT' || code === 'ENOTDIR'
   }
+  /**
+   * Cross-process write lock (claw `withFileLock` parity): an O_EXCL lock file
+   * guards the atomic write; a >5s-old lock is treated as stale and taken
+   * over. After the retry budget the write proceeds unlocked — the lock is a
+   * best-effort accommodation for multi-process deployments, never a read of
+   * availability.
+   */
+  const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
+    const lock = `${path}.lock`
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        await writeFile(lock, String(process.pid), { flag: 'wx' })
+        try {
+          return await task()
+        } finally {
+          await rm(lock, { force: true }).catch(() => {})
+        }
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException | undefined)?.code
+        if (code !== 'EEXIST') throw error
+        try {
+          const st = await stat(lock)
+          if (Date.now() - st.mtimeMs > 5000) {
+            try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
+            continue
+          }
+        } catch {
+          continue // the lock vanished between fails
+        }
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+    }
+    return await task()
+  }
   return {
     async readText(path) {
       try { return await readFile(path, 'utf8') } catch (error) {
@@ -62,9 +96,11 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     },
     async writeText(path, content) {
       await mkdir(dirname(path), { recursive: true })
-      const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
-      await writeFile(tmp, content, 'utf8')
-      await rename(tmp, path)
+      await withWriteLock(path, async () => {
+        const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
+        await writeFile(tmp, content, 'utf8')
+        await rename(tmp, path)
+      })
     },
     async remove(path) {
       await rm(path, { recursive: true, force: true })

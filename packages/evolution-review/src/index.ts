@@ -439,9 +439,30 @@ function buildReviewRequest(
       if (text) messages.push(`${message.role.toUpperCase()}: ${text.slice(0, maxMessageChars)}`)
     }
   }
+  // Tool evidence — the review subagent cannot verify a plan against command
+  // output it never saw, so append recent tool calls and results as structured
+  // lines (budgeted: truncated per event, and capped to the last 12 events).
+  const toolLines: string[] = []
+  const events = session.events
+  for (let index = events.length - 1; index >= 0 && toolLines.length < 12; index -= 1) {
+    const event = events[index] as { type?: string; data?: unknown } | undefined
+    if (event?.type === 'tool/call') {
+      const data = event.data as { name?: string; arguments?: string | Record<string, unknown> } | undefined
+      const argsRaw = typeof data?.arguments === 'string' ? data.arguments : JSON.stringify(data?.arguments ?? {})
+      toolLines.push(`[call] ${data?.name ?? '?'} ${argsRaw.slice(0, 500)}`)
+    } else if (event?.type === 'tool/result') {
+      const data = event.data as { error?: unknown; output?: string } | undefined
+      const output = typeof data?.output === 'string' ? data.output : ''
+      const failure = data?.error ? ' [ERROR]' : ''
+      toolLines.push(`[result]${failure} ${output.slice(0, 500)}`)
+    }
+  }
+  toolLines.reverse()
   return [
     `Review kind: ${kind}`,
     `Signals: ${signal.toolCalls} tool calls, ${signal.userChars} user chars, ${signal.assistantChars} assistant chars.`,
+    `Recent tool activity (${toolLines.length}):`,
+    ...toolLines,
     'Return ONLY the structured JSON plan. Evidence is mandatory for every op.',
     '',
     ...messages,

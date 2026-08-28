@@ -154,6 +154,10 @@ it('pinned skills are read-only to the background review but writable in the for
   expect((await lib.update('pinned-skill', USABLE('pinned-skill'), 'background_review')).ok).toBe(false)
   expect((await lib.patch('pinned-skill', 'Body of pinned-skill.', 'Post-review body.', '', false, 'background_review')).ok).toBe(false)
   expect((await lib.writeSupportFile('pinned-skill', 'references/detail.md', '# Detail', 'background_review')).ok).toBe(false)
+  // A delegated subagent write is NOT the review channel: the pinned guard
+  // only blocks background_review, so an agent-authored change still lands
+  // (Hermes: the background guard applies to the review fork only).
+  expect((await lib.update('pinned-skill', USABLE('pinned-skill'), 'subagent')).ok).toBe(true)
   // Foreground (user-directed) writes stay allowed: pin blocks the lifecycle,
   // not user improvements.
   expect((await lib.patch('pinned-skill', 'Body of pinned-skill.', 'Foreground body.')).ok).toBe(true)

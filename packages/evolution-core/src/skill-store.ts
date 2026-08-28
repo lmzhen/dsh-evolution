@@ -45,7 +45,7 @@ export interface SkillActionResult {
 }
 
 /** Who is writing: a foreground user-directed tool call, or the autonomous review/curator pipeline. */
-export type WriteOrigin = 'foreground' | 'background_review'
+export type WriteOrigin = 'foreground' | 'subagent' | 'background_review'
 
 /** Options for `SkillLibrary.archive`. The absorbed-into name and the archival reason are distinct fields. */
 export interface ArchiveOptions {
@@ -271,8 +271,10 @@ export class SkillLibrary {
     for (const marker of ['bundled', 'hub-installed'] as const) {
       if (await this.io.exists(markerPath(dir, marker))) return marker
     }
-    // Pinned means "user froze this skill": foreground writes may still patch
-    // it, but the autonomous review/curator pipeline must not rewrite it.
+    // Pinned means "user froze this skill": the autonomous REVIEW pipeline may
+    // not rewrite it. A delegated subagent write (origin 'subagent') is an
+    // agent-authored change, not the review channel — it keeps the Hermes
+    // distinction where only the review fork is subject to the background guard.
     if (origin === 'background_review' && await this.io.exists(markerPath(dir, 'pinned'))) return 'pinned'
     return null
   }
@@ -382,7 +384,7 @@ export class SkillLibrary {
     }
   }
 
-  async create(name: string, content: string, origin: 'foreground' | 'background_review'): Promise<SkillActionResult> {
+  async create(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const normalized = name.trim()
     if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
       return { ok: false, message: `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).` }
@@ -394,7 +396,9 @@ export class SkillLibrary {
     const dir = skillDir(this.root, normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
     await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
-    if (origin === 'background_review') {
+    // Any non-foreground writer (review channel OR delegated subagent) is an
+    // agent-authored skill: mark it managed so the lifecycle owns it.
+    if (origin !== 'foreground') {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
     await this.audit(normalized, 'create', null, content, 'created')
@@ -632,7 +636,20 @@ export class SkillLibrary {
       }
     }
     await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names, sidecars }, null, 2))
+    await this.retainSnapshots(5)
     return dest
+  }
+
+  /** Keep only the newest N snapshots (Hermes keep=5 parity); oldest folded into .backups history. */
+  private async retainSnapshots(keep: number): Promise<void> {
+    const snapshots = await this.listSnapshots()
+    for (const snapshot of snapshots.slice(keep)) {
+      try {
+        await this.io.remove(snapshot.path)
+      } catch {
+        // Best-effort pruning: a failed removal must not fail the snapshot itself.
+      }
+    }
   }
 
   async listSnapshots(): Promise<Array<{ path: string; createdAt: string; reason: string }>> {
