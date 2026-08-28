@@ -191,7 +191,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     },
     isConcurrencySafe: () => false,
     async execute(args: SkillWriteArgs, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
-            // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
+      // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
       // every delegated subagent as the review channel, while the LIBRARY
       // surface keeps the Hermes distinction - a delegated subagent write is
       // agent-authored ('subagent', pinned guard does not block it) and only

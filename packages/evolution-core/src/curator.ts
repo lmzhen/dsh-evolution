@@ -197,7 +197,12 @@ export interface ScopeView {
  * curator pass may touch. `protectedNames` carries the marker info the usage
  * records lack (bundled / hub-installed / pinned from `SkillLibrary.list()`).
  */
-export function computeScopeView(usage: UsageMap, config: CuratorConfig, protectedNames?: ReadonlyMap<string, string>, gates?: EvolutionGateSet): ScopeView {
+export function computeScopeView(
+  usage: UsageMap,
+  config: CuratorConfig,
+  protectedNames?: ReadonlyMap<string, string>,
+  gates?: EvolutionGateSet,
+): ScopeView {
   const managed: string[] = []
   const watched: string[] = []
   const qualityWarned: string[] = []
