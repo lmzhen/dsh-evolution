@@ -60,7 +60,7 @@ Everything else is control plane:
 | Staged approval | Background writes can be staged, reviewed, approved, or rejected with audit history |
 | Threat guard | Prompt-injection, exfiltration, secret, and obfuscation patterns checked before writes |
 | Usage telemetry | Per-skill `use/view/patch` sidecar compatible with Hermes-style lifecycle decisions |
-| Observability | Session projections, replay/A-B scoring, feedback quality scores, and a learning graph |
+| Observability | Durable activity store, replay/A-B scoring, feedback quality scores, and a learning graph |
 | Capability governance | Validates Creator-mode capability packages and stages them for manual activation — code is never auto-executed |
 
 ---
@@ -228,7 +228,7 @@ turn/end
   -> one-shot subagent produces a structured plan
   -> plan validator checks evidence and forbidden fields
   -> trusted executor applies accepted operations
-  -> session event + projection record the outcome
+  -> process event + activity store record the outcome
 ```
 
 The review subagent is allowed `skill`, `skill_search`, and `skill_load` by

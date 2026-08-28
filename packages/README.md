@@ -23,7 +23,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-threat` | `tools/pre-execute` content threat guard |
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
-| `evolution-activity` | Session projection over `evolution/plan-applied` |
+| `evolution-activity` | Durable activity store (`$DSH_HOME/evolution/activity.json`) over the `evolution/plan-applied` process event |
 | `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
@@ -124,6 +124,10 @@ Or compose manually — order matters because provider rows declare `inject`:
    and every curator run snapshots the full skill tree first.
 4. Review plans require event-sequence evidence bounded by the session seq;
    invalid ops are dropped while valid ops still apply.
+5. Evolution events (`review-scheduled`, `plan-applied`) are cordis process
+   events, never session-log events: a session log carrying a type outside the
+   host's persistence whitelist is refused wholesale at resume, so plan
+   durability lives in the activity sidecar instead.
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media
    decisions out of policy code; native packages perform no node:fs IO of
    their own.

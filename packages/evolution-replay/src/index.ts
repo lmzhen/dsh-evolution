@@ -2,16 +2,18 @@
  * Replay/A-B evaluation for evolution plans.
  *
  * The pure scoring functions remain deterministic and runtime-free. The DSH
- * driver records every `evolution/plan-applied` session event into an
- * in-memory leaderboard and exposes `/evolution replay` for comparison, so a
- * human can A/B review policy/prompt changes against real plan outcomes.
+ * driver records every `evolution/plan-applied` process event (payload v2,
+ * with sessionId) into an in-memory leaderboard and exposes `/evolution
+ * replay` (via the `/evolution` command family) for comparison, so a human can
+ * A/B review policy/prompt changes against real plan outcomes. Durability
+ * across restarts is the evolution-activity store's job; this leaderboard is
+ * deliberately in-memory.
  * @module @deepseek-ai/dsh-evolution-replay
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
 
 export interface ReplayPlan {
   policyId: string
@@ -97,28 +99,15 @@ export class EvolutionReplayDriver {
     this.weights = config.weights ?? DEFAULT_WEIGHTS
   }
 
-  record(event: {
-    type: string
-    data: {
-      planId: string
-      policyFingerprint?: string | undefined
-      memoryApplied: number
-      skillApplied: number
-      rejectedOps: number
-      evidenceQuotes?: number | undefined
-      estimatedInputChars?: number | undefined
-    }
-  }): void {
-    if (event.type !== 'evolution/plan-applied') return
-    const data = event.data
+  record(plan: EvolutionPlanAppliedEvent): void {
     this.plans.push({
-      policyId: typeof data.policyFingerprint === 'string' ? data.policyFingerprint : data.planId,
-      acceptedOps: data.memoryApplied + data.skillApplied,
-      rejectedOps: data.rejectedOps,
-      memoryOps: data.memoryApplied,
-      skillOps: data.skillApplied,
-      evidenceQuotes: typeof data.evidenceQuotes === 'number' ? data.evidenceQuotes : data.memoryApplied + data.skillApplied,
-      estimatedInputChars: typeof data.estimatedInputChars === 'number' ? data.estimatedInputChars : 0,
+      policyId: typeof plan.policyFingerprint === 'string' ? plan.policyFingerprint : plan.planId,
+      acceptedOps: plan.memoryApplied + plan.skillApplied,
+      rejectedOps: plan.rejectedOps,
+      memoryOps: plan.memoryApplied,
+      skillOps: plan.skillApplied,
+      evidenceQuotes: typeof plan.evidenceQuotes === 'number' ? plan.evidenceQuotes : plan.memoryApplied + plan.skillApplied,
+      estimatedInputChars: typeof plan.estimatedInputChars === 'number' ? plan.estimatedInputChars : 0,
     })
     if (this.plans.length > this.maxPlans) this.plans.shift()
   }
@@ -137,8 +126,8 @@ export const name = 'evolution-replay'
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const driver = new EvolutionReplayDriver(rawConfig)
   ctx.provide('evolutionReplay', driver)
-  ctx.on('session/event', (_session, event) => {
-    if (event.type === 'evolution/plan-applied') driver.record(event)
+  ctx.on('evolution/plan-applied', (event) => {
+    driver.record(event)
   })
 }
 

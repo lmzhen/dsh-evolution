@@ -4,18 +4,11 @@ import { comparePlans, EvolutionReplayDriver } from '../src/index.ts'
 describe('evolution-replay', () => {
   it('groups recorded plans by policy fingerprint instead of the random plan id', () => {
     const driver = new EvolutionReplayDriver()
-    driver.record({
-      type: 'evolution/plan-applied',
-      data: { planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, evidenceQuotes: 2, estimatedInputChars: 1500 },
-    })
-    driver.record({
-      type: 'evolution/plan-applied',
-      data: { planId: 'run-2', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 1, rejectedOps: 0 },
-    })
-    driver.record({
-      type: 'evolution/plan-applied',
-      data: { planId: 'run-3', memoryApplied: 0, skillApplied: 0, rejectedOps: 1 },
-    })
+    // rc.42 payload v2: record() takes the process-event payload directly
+    // (the {type, data} session-event envelope is gone with A1).
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, evidenceQuotes: 2, estimatedInputChars: 1500 })
+    driver.record({ sessionId: 's1', planId: 'run-2', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 1, rejectedOps: 0 })
+    driver.record({ sessionId: 's2', planId: 'run-3', memoryApplied: 0, skillApplied: 0, rejectedOps: 1 })
     const plans = driver.plansSnapshot()
     expect(plans.map(plan => plan.policyId)).toEqual(['policy-a', 'policy-a', 'run-3'])
     expect(plans[0]).toMatchObject({ evidenceQuotes: 2, estimatedInputChars: 1500 })

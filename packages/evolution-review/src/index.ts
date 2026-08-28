@@ -142,7 +142,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
     cumulativeToolCalls.set(session.id, cumulative)
     if (kind) {
-      session.append('evolution/review-scheduled', {
+      // Process event, payload v2 (sessionId) — never session.append: a
+      // session log carrying evolution/* types is refused wholesale at resume
+      // (assertEventsSupported; see core/events.ts for the full rationale).
+      ctx.emit('evolution/review-scheduled', {
+        sessionId: session.id,
         kind,
         toolCalls: signal.toolCalls,
         userChars: signal.userChars,
@@ -165,7 +169,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
-    session.append('evolution/review-scheduled', {
+    ctx.emit('evolution/review-scheduled', {
+      sessionId: session.id,
       kind: 'skill',
       toolCalls: signal.toolCalls,
       userChars: signal.userChars,
@@ -244,7 +249,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const actions = await executePlan(validation.accepted)
       const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
         .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
-      session.append('evolution/plan-applied', {
+      // Process event, payload v2 (sessionId) — plan-outcome durability is the
+      // evolution-activity store's job; the session log stays native-only.
+      ctx.emit('evolution/plan-applied', {
+        sessionId: session.id,
         planId: randomUUID(),
         policyFingerprint,
         memoryApplied: actions.filter(action => action.startsWith('Memory')).length,

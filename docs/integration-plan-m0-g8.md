@@ -105,6 +105,24 @@
 计划要求 rc.41/42 同周内连发；若调度不允许，改为给 rc.41 加临时止血（feature flag 关闭
 session.append），宁可暂时无 review 事件也不续写坏日志。
 
+**裁决结果（rc.42 已实施，本块为落地记录）**：
+- **A1 落地**：`evolution/review-scheduled`、`evolution/plan-applied` 全部迁至 cordis 进程事件
+  （payload v2 补 `sessionId`，`evolution-core/src/events.ts` 从 SessionEventMap 扩充整体撤出、
+  改声明 cordis Events）。验收：带持久化的 resume e2e（`evolution-review/tests/persistence-resume.spec.ts`，
+  真实 JSONL 后端写盘 → dispose flush → 新 Context 重载，断言 resume 成功且日志零 `evolution/*`）；
+  负例控制证明直接 append `evolution/*` 仍被 `assertEventsSupported` 拒载（防回归护栏）。
+- **P1-11 随 A1 消解**：evolution-activity 的会话投影注册（双契约）整体退役；替代读路径 =
+  `$DSH_HOME/evolution/activity.json` 侧车（io seam、load→fold→save 进程内串行、version 2、
+  maxItems 默认 200、跨重启 merge）。storage-domain 活动表**延后**：domain 版本门语义为
+  "媒体 stamp 不同即拒 open"，加表不是免费 schema 变更；io 侧车有 feedback.json / curator
+  报告两个同构先例，待出现 domain 路由的真实消费方再立项。
+- **replay** 订阅切换至进程事件（`record()` 直收 payload）；排行榜保持内存——重启不丢归
+  rc.47（决策 C 批次）。
+- **旧日志迁移说明**：rc.41 及之前产生的含 `evolution/*` 会话日志在 0.1.1-rc.2 上 resume 会被
+  `SessionFormatUnsupportedError` 拒绝（错误消息带 seq 定位）；如需保留内容，在升级前的旧版本
+  进程内导出，或接受该部分历史会话不可 resume。
+- **记数迁移**：按评审结论确认降级为可选加固，与 rc.43 P1-10 一并处理。
+
 ---
 
 ## 第三步（rc.43 · A线 M1 核心 + B线 G2）
