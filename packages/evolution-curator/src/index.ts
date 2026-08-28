@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
@@ -87,12 +87,12 @@ export interface CuratorStateRecordShape {
  */
 export function gateConsolidations(
   consolidations: CuratorConsolidation[],
-  gates: { exclude?: ReadonlySet<string>; referenced?: ReadonlySet<string>; suppressed?: ReadonlySet<string> },
+  gates: EvolutionGateSet | { exclude?: ReadonlySet<string>; referenced?: ReadonlySet<string>; suppressed?: ReadonlySet<string> },
 ): CuratorConsolidation[] {
-  const blocked = (name: string): boolean => gates.exclude?.has(name) === true
-    || gates.referenced?.has(name) === true
-    || gates.suppressed?.has(name) === true
-  return consolidations.filter(n => !blocked(n.from) && !blocked(n.into))
+  // Decision B: the same GateSet the lifecycle engine reads - and it now also
+  // blocks protected builtins (e.g. `plan`) that the name-set check missed.
+  const gateSet = gates instanceof EvolutionGateSet ? gates : new EvolutionGateSet(gates)
+  return consolidations.filter(n => !gateSet.isBlocked(n.from) && !gateSet.isBlocked(n.into))
 }
 
 export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
@@ -443,6 +443,13 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const usage: UsageMap = dryRun ? new Map([...rawUsage].map(([name, record]) => [name, { ...record }])) : rawUsage
     const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
+    // One GateSet instance per run (decision B) shared by the lifecycle
+    // engine and the merge-nomination gate below.
+    const gates = new EvolutionGateSet({
+      exclude: this.excludeSkillNames,
+      referenced: this.referencedSkillNames,
+      suppressed: suppressedNames,
+    })
     const { bundledNames, treeNames } = await this.seedBaseline(usage)
     // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
     // engine reads `quality_warn` to apply the shorter quality-warn stale
@@ -460,18 +467,14 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       bundledNames,
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
-    })
+    }, new Date(), gates)
     const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
     // Automatic merge nominations must pass the same gates as the control
     // plane: excluded/referenced/suppressed skills are never merged (source
     // or target), even when the LLM nominates them.
     const gatedNominations = {
       ...nominations,
-      consolidations: gateConsolidations(nominations.consolidations, {
-        exclude: this.excludeSkillNames,
-        referenced: this.referencedSkillNames,
-        suppressed: suppressedNames,
-      }),
+      consolidations: gateConsolidations(nominations.consolidations, gates),
     }
     const llmNominations = gatedNominations.prunings
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
@@ -736,16 +739,21 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const root = this.skills.root
     const usage: UsageMap = await loadUsage(root, this.io)
     const { bundledNames } = await this.seedBaseline(usage)
+    const gates = new EvolutionGateSet({
+      exclude: this.excludeSkillNames,
+      referenced: this.referencedSkillNames,
+      suppressed: new Set(await loadSuppressedNames(root, this.io)),
+    })
     return computeScopeView(usage, {
       staleAfterDays: this.lifecycle().staleAfterDays,
       archiveAfterDays: this.lifecycle().archiveAfterDays,
       excludeSkillNames: this.excludeSkillNames,
       referencedSkillNames: this.referencedSkillNames,
-      suppressedNames: new Set(await loadSuppressedNames(root, this.io)),
+      suppressedNames: new Set(gates.suppressed),
       manageUnmanaged: this.manageUnmanaged,
       pruneBuiltins: this.pruneBuiltins,
       bundledNames,
-    }, await this.protectedNameMap())
+    }, await this.protectedNameMap(), gates)
   }
 
   /** marker info (pinned/bundled/hub-installed) per skill, from the library list. */
@@ -763,8 +771,20 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
    * records into `archived` state. Snapshot-then-mutate, never a hard delete.
    */
   async consolidate(target: string, sources: string[]): Promise<SkillActionResult> {
-    const blocked = [...this.excludeSkillNames].filter(name => name === target || sources.includes(name))
-    if (blocked.length > 0) return { ok: false, message: `Skill(s) excluded from lifecycle management: ${blocked.join(', ')}` }
+    // Control-plane gate (rc.42 audit P1-8): the manual path once checked
+    // only excludeSkillNames, bypassing the referenced/suppressed/protected
+    // protections the automated nomination gate enforces. The same GateSet
+    // answers for both directions now.
+    const suppressedNames = new Set(await loadSuppressedNames(this.skills.root, this.io))
+    const gates = new EvolutionGateSet({
+      exclude: this.excludeSkillNames,
+      referenced: this.referencedSkillNames,
+      suppressed: suppressedNames,
+    })
+    const blocked = [...new Set([target, ...sources])].filter(name => gates.isBlocked(name))
+    if (blocked.length > 0) {
+      return { ok: false, message: `Skill(s) protected from consolidation (excluded / referenced / suppressed / protected builtin): ${blocked.join(', ')}` }
+    }
     await this.snapshotFull('pre-consolidate')
     const result = await this.skills.consolidate(target, sources)
     if (!result.ok) return result

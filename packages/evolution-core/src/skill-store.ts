@@ -84,6 +84,25 @@ export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
   return join(env.DSH_HOME ?? join(homedir(), '.dsh'), 'skills')
 }
 
+/**
+ * Map a requesting session onto the two origin surfaces (rc.44 plan M2-2.3):
+ * the APPROVAL surface treats every delegated subagent as the autonomous
+ * review channel, while the LIBRARY surface keeps the Hermes distinction -
+ * the review fork is 'background_review' (the pinned guard blocks its
+ * writes) and any other subagent is 'subagent' (agent-authored, not
+ * review-channel). `isReview` marks the caller as the background review
+ * pipeline itself. Single source: the two tools and the review executor all
+ * read this table instead of re-deriving it.
+ */
+export function resolveOrigins(
+  headerOrigin: string | undefined,
+  isReview = false,
+): { approval: 'foreground' | 'background_review'; library: WriteOrigin } {
+  if (isReview) return { approval: 'background_review', library: 'background_review' }
+  if (headerOrigin === 'subagent') return { approval: 'background_review', library: 'subagent' }
+  return { approval: 'foreground', library: 'foreground' }
+}
+
 function skillDir(root: string, name: string): string {
   return join(root, name)
 }

@@ -5,8 +5,6 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import { resolve, sep, join } from 'node:path'
-import { homedir } from 'node:os'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import {
@@ -49,7 +47,6 @@ export interface PolicySnapshot {
   staleAfterDays: number
   archiveAfterDays: number
   protectedSkillNames: readonly string[]
-  protectedPaths: readonly string[]
 }
 
 export interface Config {
@@ -70,7 +67,6 @@ export interface Config {
   staleAfterDays?: number
   archiveAfterDays?: number
   protectedSkillNames?: string[]
-  protectedPaths?: string[]
 }
 
 export const Config: Schema<Config> = z.object({
@@ -91,7 +87,6 @@ export const Config: Schema<Config> = z.object({
   staleAfterDays: z.number().default(DEFAULT_STALE_AFTER_DAYS),
   archiveAfterDays: z.number().default(DEFAULT_ARCHIVE_AFTER_DAYS),
   protectedSkillNames: z.array(z.string()).default([]),
-  protectedPaths: z.array(z.string()).default([]),
 })
 
 export class EvolutionPolicy extends Service {
@@ -108,7 +103,6 @@ export class EvolutionPolicy extends Service {
       }
       toolCtx.effect(() => tools.guard(exec => this.guardReason(exec.name, exec.arguments)), 'evolution-policy.tools-guard')
     })
-    const homePolicyPath = resolve(join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'evolution', 'policy.json'))
     this.snapshot = Object.freeze({
       version: 1 as const,
       reviewMemoryInterval: config.reviewMemoryInterval ?? DEFAULT_REVIEW_MEMORY_INTERVAL,
@@ -128,7 +122,6 @@ export class EvolutionPolicy extends Service {
       staleAfterDays: config.staleAfterDays ?? DEFAULT_STALE_AFTER_DAYS,
       archiveAfterDays: config.archiveAfterDays ?? DEFAULT_ARCHIVE_AFTER_DAYS,
       protectedSkillNames: Object.freeze([...new Set(['plan', ...(config.protectedSkillNames ?? [])])]),
-      protectedPaths: Object.freeze([...(config.protectedPaths ?? []), homePolicyPath]),
     })
   }
 
@@ -136,21 +129,7 @@ export class EvolutionPolicy extends Service {
     return this.snapshot
   }
 
-  isProtectedPath(path: unknown): boolean {
-    if (typeof path !== 'string') return false
-    const normalized = resolve(path)
-    return this.snapshot.protectedPaths.some((prefix) => {
-      const resolved = resolve(prefix)
-      return normalized === resolved || normalized.startsWith(resolved + sep)
-    })
-  }
-
   guardReason(toolName: string, args: unknown): string | undefined {
-    if (toolName === 'write' || toolName === 'edit' || toolName === 'patch' || toolName === 'str_replace_editor') {
-      const record = asRecord(args)
-      const target = record.path ?? record.file_path ?? record.filePath
-      if (this.isProtectedPath(target)) return `evolution-policy: refusing to modify protected policy path ${String(target)}`
-    }
     if (toolName === 'memory' || toolName === 'skill_manage') {
       const record = asRecord(args)
       for (const forbidden of ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config']) {

@@ -4,13 +4,16 @@ import EvolutionPolicy from '../src/index.ts'
 import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-policy', () => {
-  it('is immutable to model-shaped mutation fields and protects policy paths', async () => {
+  it('is immutable to model-shaped mutation fields (P2-11: the ghost policy.json defense is gone)', async () => {
     const ctx = new Context()
-    await ctx.plugin(EvolutionPolicy, { protectedPaths: ['/tmp/evo-policy'] })
+    await ctx.plugin(EvolutionPolicy)
     expect(ctx.evolutionPolicy.get().memoryChars).toBe(2200)
-    expect(ctx.evolutionPolicy.isProtectedPath('/tmp/evo-policy/x.json')).toBe(true)
+    // The real defense: governance keys are refused on the evolution tools.
     expect(ctx.evolutionPolicy.guardReason('memory', { action: 'add', policy: 'x' })).toContain('policy')
-    expect(ctx.evolutionPolicy.guardReason('write', { path: '/tmp/evo-policy/x.json' })).toContain('protected')
+    expect(ctx.evolutionPolicy.guardReason('skill_manage', { action: 'create', name: 'a', evolution_config: 1 })).toContain('evolution_config')
+    // P2-11: the never-read policy.json path defense is deleted outright.
+    expect(ctx.evolutionPolicy.get()).not.toHaveProperty('protectedPaths')
+    expect((ctx.evolutionPolicy as unknown as Record<string, unknown>).isProtectedPath).toBeUndefined()
   })
 
   it('keeps snapshot defaults in sync with the shared core constants', async () => {

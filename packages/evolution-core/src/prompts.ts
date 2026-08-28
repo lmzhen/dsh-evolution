@@ -15,8 +15,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@2'
-export const PROMPT_BUNDLE_VERSION = 2
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@3'
+export const PROMPT_BUNDLE_VERSION = 3
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -38,13 +38,15 @@ Signals that warrant action:
 - A non-trivial technique, fix, workaround, or debugging path emerged.
 - A loaded skill turned out wrong, missing, or outdated — patch it now.
 
+Only update skills you loaded or read in THIS session; never touch skills you have not read.
+
 Preference order:
 1. Patch a skill that was loaded or read this session.
 2. Patch an existing umbrella skill.
 3. Add references/, templates/, or scripts/ support under an existing skill.
 4. Create a new class-level umbrella skill only when nothing fits.
 
-Protected skills (bundled/hub-installed) must not be edited. Pinned skills may be patched but not archived.
+Protected skills (bundled/hub-installed) must not be edited. Pinned skills are read-only to the background review: the pinned write guard refuses background changes, so only the foreground may update or archive them.
 
 Do NOT capture:
 - Environment-dependent failures (missing binaries, unconfigured credentials).
@@ -61,7 +63,7 @@ Review the conversation above and update two things.
 
 **Memory**: who the user is. Save durable user preferences, personal details, and expectations with the memory tool.
 
-**Skills**: how to do this class of task. Be ACTIVE. Follow the same class-level umbrella policy, preference order, protected-skill rules, and do-not-capture list as a skill review.
+**Skills**: how to do this class of task. Be ACTIVE. Only update skills you loaded or read in THIS session. Follow the same class-level umbrella policy, preference order, protected-skill rules, and do-not-capture list as a skill review.
 
 Act on whichever dimension has real signal. If genuinely nothing stands out on either, say "Nothing to save." and stop — but don't reach for that conclusion as a default.`
 
@@ -112,7 +114,7 @@ If you accidentally take a mutating action, say so explicitly in the summary.`
 export const COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills · task complete]
 Your current task now appears complete. Before wrapping up, review the approach and update the skill library via skill_manage.
 
-Follow the skills review policy: be ACTIVE, prefer class-level umbrellas, patch skills loaded this session, and capture non-trivial techniques and user corrections. Do NOT capture environment-dependent failures, negative claims about tools, or one-off task narratives.
+Follow the skills review policy: be ACTIVE, prefer class-level umbrellas, patch ONLY skills loaded or read this session, and capture non-trivial techniques and user corrections. Do NOT capture environment-dependent failures, negative claims about tools, or one-off task narratives.
 
 Do NOT modify output files or re-run the task. If you are still mid-task, ignore this.`
 

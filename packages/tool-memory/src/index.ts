@@ -8,6 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
+import { resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -207,7 +208,9 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
         ? { target, operations: args.operations }
         : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
-      const origin = exec.agent?.session.header.origin === 'subagent' ? 'background_review' : 'foreground'
+      // Single-source origin table (rc.44 M2-2.3): the approval surface reads
+      // the delegated-subagent-as-review-channel mapping from core.
+      const origin = resolveOrigins(exec.agent?.session.header.origin).approval
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval) {

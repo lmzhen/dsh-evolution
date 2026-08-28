@@ -88,7 +88,10 @@ describe('tool-skill-manage', () => {
     const review = await execute({ action: 'review' })
     expect(review.isError).toBe(false)
     expect((review.value as { message?: string } | undefined)?.message ?? '').toContain('Skills:')
+    // Create is authorship, not a patch (rc.44 M3-3.3): the counter stays 0
+    // so mutation maturity is not inflated by mere creation.
     const patchesBefore = (await ctx.skillUsage.report()).get('audit-skill')?.patch_count ?? 0
+    expect(patchesBefore).toBe(0)
     const skip = await execute({ action: 'skip' })
     expect(skip.isError).toBe(false)
     // Read-only actions neither bump counters nor emit mutation events. The

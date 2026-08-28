@@ -244,6 +244,13 @@ usage telemetry
   -> JSON run report
 ```
 
+Lifecycle scope: only skills the review pipeline (or curator) created are
+marked agent-authored and enter the deterministic lifecycle; skills created
+by the model in a foreground session keep `created_by` unset and stay outside
+it — matching Hermes, where the review fork is the only authorship marker.
+Set `manageUnmanaged: true` to bring foreground creations in, or pin/exclude
+specific skills to keep them protected.
+
 ### Governance
 
 ```text

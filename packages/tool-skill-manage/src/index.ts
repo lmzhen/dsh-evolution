@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, computeDedupGroups, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, computeDedupGroups, resolveOrigins, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -110,7 +110,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // agent-authored skill and must enter the lifecycle as such.
       if (name && action === 'create' && origin !== 'foreground') await ctx.skillUsage.markAgentCreated(name)
       if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
-      else if (name && mutating) await ctx.skillUsage.record(name, 'patch')
+      // Create is authorship, not a content patch (rc.44 M3-3.3): it must not
+      // inflate patch_count (and through it the mutation-maturity factor).
+      else if (name && mutating && action !== 'create') await ctx.skillUsage.record(name, 'patch')
       if (mutating) {
         ctx.emit('evolution/skill-mutated', {
           action: action ?? '?',
@@ -182,13 +184,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     },
     isConcurrencySafe: () => false,
     async execute(args: SkillWriteArgs, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
-      const isSubagent = exec.agent?.session.header.origin === 'subagent'
-      const reviewOrigin = isSubagent ? 'background_review' : 'foreground'
-      // Library-facing origin keeps the Hermes distinction: a delegated
-      // subagent write is an agent-authored change (not the review channel),
-      // so the pinned background guard does not block it — while the approval
-      // surface still treats subagent writes as autonomous (background_review).
-      const libraryOrigin: WriteOrigin = isSubagent ? 'subagent' : 'foreground'
+            // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
+      // every delegated subagent as the review channel, while the LIBRARY
+      // surface keeps the Hermes distinction - a delegated subagent write is
+      // agent-authored ('subagent', pinned guard does not block it) and only
+      // the review fork is 'background_review'.
+      const origins = resolveOrigins(exec.agent?.session.header.origin)
+      const reviewOrigin = origins.approval
+      const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'skip' && args.action !== 'pin' && args.action !== 'unpin') {

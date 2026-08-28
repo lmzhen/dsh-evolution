@@ -8,7 +8,7 @@
 
 import type { UsageMap, UsageRecord } from './usage.ts'
 import { latestActivityAt } from './usage.ts'
-import { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
+import { EvolutionGateSet, createGateSet } from './gates.ts'
 
 export { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
@@ -165,14 +165,15 @@ export function lifecycleCandidate(
   record: UsageRecord,
   config: CuratorConfig,
   bundled: boolean,
+  gates: EvolutionGateSet = createGateSet(config),
 ): boolean {
   if (record.pinned) return false
-  if (config.excludeSkillNames?.has(name)) return false
-  if (config.suppressedNames?.has(name)) return false
-  if (config.referencedSkillNames?.has(name)) return false
+  // One shared GateSet answers exclude / referenced / suppressed and the
+  // protected-builtin list (decision B) - identical verdicts to the former
+  // three inline set checks plus the builtin check.
+  if (gates.isBlocked(name)) return false
   const managed = record.created_by === 'agent' || config.manageUnmanaged === true
   if (!managed && !(config.pruneBuiltins === true && bundled)) return false
-  if (PROTECTED_BUILTIN_SKILLS.has(name)) return false
   if (record.state === 'archived') return false
   return true
 }
@@ -196,21 +197,25 @@ export interface ScopeView {
  * curator pass may touch. `protectedNames` carries the marker info the usage
  * records lack (bundled / hub-installed / pinned from `SkillLibrary.list()`).
  */
-export function computeScopeView(usage: UsageMap, config: CuratorConfig, protectedNames?: ReadonlyMap<string, string>): ScopeView {
+export function computeScopeView(usage: UsageMap, config: CuratorConfig, protectedNames?: ReadonlyMap<string, string>, gates?: EvolutionGateSet): ScopeView {
   const managed: string[] = []
   const watched: string[] = []
   const qualityWarned: string[] = []
   const exempted: string[] = []
   const protectedSet = new Set<string>()
+  const gateSet = gates ?? createGateSet(config)
   for (const [name, record] of usage) {
-    if (config.excludeSkillNames?.has(name) || config.referencedSkillNames?.has(name)) {
+    // Bucket semantics are view-specific and unchanged: exclude/referenced
+    // read as exempted, suppressed as protected (decision B shares the SETS,
+    // not the presentation).
+    if (gateSet.exclude.has(name) || gateSet.referenced.has(name)) {
       exempted.push(name)
       continue
     }
     const bundled = config.bundledNames?.has(name) === true
-    const suppressed = config.suppressedNames?.has(name) === true
+    const suppressed = gateSet.suppressed.has(name)
     if (record.pinned || bundled || suppressed || protectedNames?.has(name) === true) protectedSet.add(name)
-    if (lifecycleCandidate(name, record, config, bundled)) {
+    if (lifecycleCandidate(name, record, config, bundled, gateSet)) {
       managed.push(name)
       if (record.state === 'stale' || record.quality_warn === true) watched.push(name)
       if (record.quality_warn === true) qualityWarned.push(name)
@@ -234,11 +239,15 @@ export function computeLifecycleTransitions(
   usage: UsageMap,
   config: CuratorConfig,
   now = new Date(),
+  gates?: EvolutionGateSet,
 ): CuratorResult {
   const result: CuratorResult = { transitions: [], archive: [], reactivate: [], markStale: [] }
+  // One GateSet per run (decision B): callers holding a shared instance pass
+  // it in so the lifecycle engine and the merge gates can never disagree.
+  const gateSet = gates ?? createGateSet(config)
   for (const [name, record] of usage) {
     const bundled = config.bundledNames?.has(name) === true
-    if (!lifecycleCandidate(name, record, config, bundled)) continue
+    if (!lifecycleCandidate(name, record, config, bundled, gateSet)) continue
 
     const age = daysSince(null, record.created_at, now.getTime())
     if (record.use_count === 0 && age < config.staleAfterDays) continue
