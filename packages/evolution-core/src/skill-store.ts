@@ -565,13 +565,16 @@ export class SkillLibrary {
     // Two-phase commit so a failure partway never leaves the tree inconsistent:
     // (1) archive every source first — a source that cannot be archived aborts
     //     before target is touched; (2) only when all sources are safely in
-    //     .archive do we write the merged target. If the target write itself
-    //     fails, roll the archived sources back so nothing was consumed.
+    //     .archive do we write the merged target. Any failure — including a
+    //     refused archive mid-loop (rc.42 audit P1-1: an early `return` here
+    //     skipped the rollback and left earlier sources consumed) — goes
+    //     through the catch, which restores the target and un-archives every
+    //     already-moved source.
     const archived: string[] = []
     try {
       for (const source of normalizedSources) {
         const result = await this.archive(source, { absorbedInto: target })
-        if (!result.ok) return result
+        if (!result.ok) throw new Error(result.message)
         archived.push(source)
       }
       await this.io.writeText(join(targetDir, 'SKILL.md'), merged)
@@ -663,7 +666,15 @@ export class SkillLibrary {
   async snapshotAll(reason = 'pre-mutation', extras: SnapshotExtra[] = []): Promise<string> {
     const backupRoot = join(this.root, '.backups')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const dest = join(backupRoot, `skills-${stamp}`)
+    let dest = join(backupRoot, `skills-${stamp}`)
+    // Same-millisecond collision guard: two snapshots in one ms (e.g.
+    // restoreLatestSnapshot's pre-rollback snapshot racing the snapshot it is
+    // about to restore from) used to share one directory, and the later copy
+    // overwrote the earlier manifest — a restore then read the WRONG tree
+    // (rc.42-audit-adjacent, flaked the boundary snapshot/restore test).
+    while (await this.io.exists(dest)) {
+      dest = join(backupRoot, `skills-${stamp}-${Math.random().toString(36).slice(2, 8)}`)
+    }
     const names = await listNames(this.root, this.io)
     for (const name of names) {
       await this.io.copy(skillDir(this.root, name), join(dest, name))

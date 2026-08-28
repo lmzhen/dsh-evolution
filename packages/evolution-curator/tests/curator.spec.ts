@@ -16,6 +16,13 @@ describe('evolution-curator', () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
+    // A persisted state older than the interval lets the gated run() proceed
+    // (with no state service at all the P1-7 normalization defers first sight).
+    let saved = { lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+    })
     await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
     ctx.evolutionCurator.start()
     const result = await ctx.evolutionCurator.run()
@@ -356,4 +363,129 @@ describe('evolution-curator', () => {
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
   })
+  it('defers on first sight even without a state service (P1-7)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-nostate-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // No evolutionState mounted: `persisted` used to stay undefined, the
+    // first-run defer never fired (`persisted === null`) and the interval gate
+    // compared NaN — the curator ran immediately on a fresh install. The
+    // normalization makes undefined behave exactly like "no state yet".
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    const result = await ctx.evolutionCurator.run()
+    expect(result.skipped).toBe('first-run-deferred')
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('quality-warn scoring drives the SAME run stale window (P1-2)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-score-order-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('aging-skill', `---
+name: aging-skill
+description: Aging body.
+---
+Aging body.
+`, 'background_review')
+    // Old activity (quality score low -> warn) but idle only 12 days: under
+    // the plain staleAfterDays=30 window this is NOT stale. The fix makes the
+    // freshly computed quality_warn (score ~0.28 < 0.3: stability 0 from the
+    // patch, recency 1) apply the shorter qualityWarnStaleAfterDays=7 window
+    // within the SAME run.
+    const created = new Date(Date.now() - 300 * 86_400_000).toISOString()
+    const lastUsed = new Date(Date.now() - 12 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['aging-skill', {
+      created_by: 'agent', created_at: created, use_count: 1, view_count: 0, patch_count: 1,
+      last_used_at: lastUsed, last_viewed_at: null, last_patched_at: lastUsed,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(result.stale).toContain('aging-skill')
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('aging-skill')?.quality_warn).toBe(true)
+    expect(usage.get('aging-skill')?.state).toBe('stale')
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('paused gate skips automatic passes; manual run and resume still work (G2)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-paused-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved = { lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: true }
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('ancient-skill', `---
+name: ancient-skill
+description: Ancient body.
+---
+Ancient body.
+`, 'background_review')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['ancient-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    // Automatic pass: the paused gate fires before every other gate.
+    const gated = await ctx.evolutionCurator.run()
+    expect(gated.skipped).toBe('paused')
+    // Manual semantics (ignoreGates) bypass the pause, as designed.
+    const manual = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(manual.archived).toContain('ancient-skill')
+    // Resume persists through the same record.
+    await ctx.evolutionCurator.setPaused(false)
+    expect(saved.paused).toBe(false)
+    expect(await ctx.evolutionCurator.status()).toMatchObject({ paused: false })
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('setPaused seeds state when none exists; status() exposes it (G2)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-setpaused-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null = null
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    expect(await ctx.evolutionCurator.status()).toBeNull()
+    await ctx.evolutionCurator.setPaused(true)
+    // Seeded from nothing: lastRunAt anchors NOW so a later resume re-enters
+    // through the interval gate instead of firing immediately.
+    expect(saved).toMatchObject({ runCount: 0, lastSummary: 'paused', paused: true })
+    expect(Date.now() - saved!.lastRunAt).toBeLessThan(60_000)
+    expect(await ctx.evolutionCurator.status()).toMatchObject({ paused: true })
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
 })

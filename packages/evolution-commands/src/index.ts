@@ -40,6 +40,27 @@ export function apply(ctx: Context): void {
           const result = await curator.run({ ignoreGates: true })
           return ok(`Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
         }
+        if (input === 'curator pause' || input === 'curator resume') {
+          const curator = ctx.get('evolutionCurator') as { setPaused(paused: boolean): Promise<void> } | undefined
+          if (!curator) return err('Curator service not mounted.')
+          const paused = input === 'curator pause'
+          await curator.setPaused(paused)
+          return ok(paused
+            ? 'Curator automatic curation paused. Manual /evolution curator run is unaffected; resume with /evolution curator resume.'
+            : 'Curator automatic curation resumed. The next scheduled pass waits one interval (first-run defer semantics).')
+        }
+        if (input === 'curator status') {
+          const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
+          if (!curator) return err('Curator service not mounted.')
+          const state = await curator.status()
+          if (!state) return ok('No curator state yet: the first automatic pass is deferred until the interval elapses.')
+          return ok([
+            `paused=${state.paused}`,
+            `runs=${state.runCount}`,
+            `lastRun=${new Date(state.lastRunAt).toISOString()}`,
+            `summary=${state.lastSummary}`,
+          ].join('\n'))
+        }
         if (input === 'mutations') {
           const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
           if (!curator) return err('Curator service not mounted.')
@@ -103,7 +124,7 @@ export function apply(ctx: Context): void {
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | curator run | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request] | replay.')
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request] | replay.')
       },
     })
   })

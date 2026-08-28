@@ -129,6 +129,39 @@ it('skill consolidate is atomic: a protected source aborts before any mutation',
   await rm(root, { recursive: true, force: true })
 })
 
+it('skill consolidate rolls back earlier sources when a mid-loop archive fails (P1-1)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const real = nodeEvolutionIo()
+  // The pre-loop protection guard cannot catch media/race failures INSIDE the
+  // archive loop: make the second source's move fail at the IO layer after the
+  // first source is already in .archive. The old `return` bypassed the
+  // rollback and left src-a consumed; the fix routes the failure through the
+  // two-phase catch.
+  const failing = (path: string): boolean => path.replace(/\\/g, '/').endsWith('/src-b')
+  const lib = new SkillLibrary(root, {
+    ...real,
+    rename: async (from, to) => {
+      if (failing(from)) throw new Error('simulated media failure')
+      await real.rename(from, to)
+    },
+    copy: async (from, to) => {
+      if (failing(from)) throw new Error('simulated media failure')
+      await real.copy(from, to)
+    },
+  })
+  await lib.create('target-skill', USABLE('target-skill'), 'foreground')
+  await lib.create('src-a', USABLE('src-a'), 'foreground')
+  await lib.create('src-b', USABLE('src-b'), 'foreground')
+  const result = await lib.consolidate('target-skill', ['src-a', 'src-b'])
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('rolled back')
+  // src-a was archived by the loop and MUST be back in the active tree.
+  expect((await lib.list()).map(s => s.name)).toEqual(['src-a', 'src-b', 'target-skill'])
+  // The target never received the merged body.
+  expect(await lib.read('target-skill') ?? '').not.toMatch(/consolidated from/)
+  await rm(root, { recursive: true, force: true })
+})
+
 it('archive options: a reason string is never validated as absorbedInto (F1 regression)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
   const lib = new SkillLibrary(root)

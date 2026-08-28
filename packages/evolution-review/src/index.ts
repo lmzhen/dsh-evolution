@@ -112,6 +112,20 @@ export function apply(ctx: Context, rawConfig: Config): void {
   ctx.on('session/event', (session, event) => {
     if (event.type === 'turn/start') turnStarts.set(session.id, session.seq - 1)
     if (event.type !== 'turn/end') return
+    // Counter sweep (rc.42 audit P1-10): the per-session maps grow with every
+    // session that ever emitted a turn event, and the platform has no
+    // in-process session-end hook to prune against (skill §15). Under size
+    // pressure, drop entries whose agent is gone — they can never be read
+    // again; live sessions keep their counters.
+    const sweepDue = turnStarts.size >= COUNTER_SWEEP_THRESHOLD
+      || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
+      || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
+    if (sweepDue) {
+      const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
+      sweepDeadSessionEntries(turnStarts, isAlive)
+      sweepDeadSessionEntries(cumulativeToolCalls, isAlive)
+      sweepDeadSessionEntries(completionInjected, isAlive)
+    }
     void onTurnEnd(session, event)
   })
 
@@ -224,50 +238,62 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // Read-before-write must see what the REVIEW subagent itself loaded: it
       // runs in its own session, and the parent session's events never contain
       // its `skill` calls. Capture the child session before dispose.
-      const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
-      const result = await run.result
-      await run.dispose()
-      if (!result.structured) return true
-      const snapshot = policy()
-      const plan: unknown = result.structured
-      const policyFingerprint = fingerprintPolicy(snapshot)
-      const validation = validateEvolutionPlan(plan as EvolutionPlan, {
-        sessionSeq: session.seq - 1,
-        maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
-        protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
-        maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
-        maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
-        maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
-      })
-      // F19: the background review may only patch skills it read this session
-      // (read-before-write, matching the original Hermes background guard).
-      // Union of the PARENT session's reads and the review SUBAGENT's own reads.
-      const acceptedSkillOps = validation.accepted.skillOps ?? []
-      const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
-      const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-      validation.accepted.skillOps = acceptedSkillOps
-      const actions = await executePlan(validation.accepted)
-      const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
-        .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
-      // Process event, payload v2 (sessionId) — plan-outcome durability is the
-      // evolution-activity store's job; the session log stays native-only.
-      ctx.emit('evolution/plan-applied', {
-        sessionId: session.id,
-        planId: randomUUID(),
-        policyFingerprint,
-        memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
-        skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
-        rejectedOps: validation.rejected.length + skippedUnread,
-        evidenceQuotes,
-        estimatedInputChars: reviewText.length,
-      })
-      if (actions.length > 0) {
-        agent.inject(createUserMessage({
-          content: [{ type: 'text', text: `💾 Self-improvement review: ${actions.join(' · ')}` }],
-          source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
-        }))
+      // Everything after start() sits in a try/finally so the child run is
+      // disposed on every exit path (success, timeout, validation throw).
+      try {
+        const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
+        const result = await run.result
+        if (!result.structured) return true
+        const snapshot = policy()
+        const plan: unknown = result.structured
+        const policyFingerprint = fingerprintPolicy(snapshot)
+        const validation = validateEvolutionPlan(plan as EvolutionPlan, {
+          sessionSeq: session.seq - 1,
+          maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
+          protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
+          maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
+          maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
+          maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
+        })
+        // F19: the background review may only patch skills it read this session
+        // (read-before-write, matching the original Hermes background guard).
+        // Union of the PARENT session's reads and the review SUBAGENT's own reads.
+        const acceptedSkillOps = validation.accepted.skillOps ?? []
+        const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
+        const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
+        const actions = await executePlan(validation.accepted)
+        const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
+          .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
+        // Process event, payload v2 (sessionId) — plan-outcome durability is the
+        // evolution-activity store's job; the session log stays native-only.
+        ctx.emit('evolution/plan-applied', {
+          sessionId: session.id,
+          planId: randomUUID(),
+          policyFingerprint,
+          memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
+          skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
+          rejectedOps: validation.rejected.length + skippedUnread,
+          evidenceQuotes,
+          estimatedInputChars: reviewText.length,
+        })
+        if (actions.length > 0) {
+          agent.inject(createUserMessage({
+            content: [{ type: 'text', text: `💾 Self-improvement review: ${actions.join(' · ')}` }],
+            source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
+          }))
+        }
+        return true
+      } finally {
+        // Dispose on EVERY exit (rc.42 audit P1-3): a timed-out / aborted run
+        // (result rejects via the start signal) previously skipped dispose and
+        // leaked the child session. Dispose failures stay observable without
+        // masking the pipeline error that caused the exit.
+        try {
+          await run.dispose()
+        } catch (disposeError) {
+          ctx.logger.warn(`dsh-evolution-review: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
+        }
       }
-      return true
     } catch (error) {
       // A review pipeline failure must not crash the turn, but it should be
       // visible. Log the reason so a silent "review never fires" is debuggable,
@@ -410,6 +436,27 @@ export function collectReadSkillNames(session: Session): Set<string> {
     if (name) names.add(name)
   }
   return names
+}
+
+/** Map/set size that triggers a dead-session counter sweep (bounded, not a hard cap). */
+export const COUNTER_SWEEP_THRESHOLD = 128
+
+/**
+ * Remove every entry whose session is no longer live (rc.42 audit P1-10):
+ * `turnStarts` / `cumulativeToolCalls` / `completionInjected` are keyed by
+ * SessionId with no platform session-end hook to prune against, so they grew
+ * unbounded over a long-lived host. Works for maps and sets; returns the
+ * number of removed entries.
+ */
+export function sweepDeadSessionEntries<K>(entries: Map<K, unknown> | Set<K>, isAlive: (id: K) => boolean): number {
+  let removed = 0
+  for (const id of [...entries.keys()]) {
+    if (!isAlive(id)) {
+      entries.delete(id)
+      removed += 1
+    }
+  }
+  return removed
 }
 
 /**

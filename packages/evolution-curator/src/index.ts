@@ -194,6 +194,36 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   }
 
   /**
+   * Pause or resume automatic curation (B-line G2, Hermes `set_paused`
+   * parity): the flag is persisted on the curator state record and the
+   * `run()` paused gate skips automatic passes while it holds. Manual runs
+   * (`ignoreGates`) are unaffected — pause is a soft stop for the scheduler,
+   * not a lock on the operator.
+   *
+   * Pausing on a state-less curator state seeds the record with `lastRunAt:
+   * now`, so a later resume re-enters through the interval gate and defers a
+   * full cycle instead of firing immediately (first-run defer interaction,
+   * kept deliberately: an unattended resume must not auto-run mid-boot).
+   */
+  async setPaused(paused: boolean): Promise<void> {
+    const stateService = this.curatorStateService()
+    const persisted = (await stateService?.loadCuratorState()) ?? null
+    await stateService?.saveCuratorState({
+      schemaVersion: 1,
+      lastRunAt: persisted?.lastRunAt ?? Date.now(),
+      runCount: persisted?.runCount ?? 0,
+      lastSummary: persisted?.lastSummary ?? (paused ? 'paused' : 'resumed'),
+      paused,
+    })
+  }
+
+  /** Current persisted curator state (read-only view for /evolution curator status). */
+  async status(): Promise<CuratorStateRecordShape | null> {
+    const service = this.curatorStateService()
+    return (await service?.loadCuratorState()) ?? null
+  }
+
+  /**
    * One automatic schedule check: run a pass when the persisted curator state
    * (falling back to the in-memory clock for state-less compositions) is at
    * least one interval old. All gates — interval, idle, first-run defer,
@@ -355,7 +385,21 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const runId = randomUUID()
     const stateService = this.curatorStateService()
     const lifecycle = this.lifecycle()
-    const persisted = await stateService?.loadCuratorState()
+    // Normalize "no state service" onto "no persisted state" (rc.42 audit
+    // P1-7): with the service missing, `persisted` used to stay undefined, the
+    // first-run defer never fired (`persisted === null`) and the interval gate
+    // compared NaN — the curator ran immediately on a fresh install.
+    const persisted = (await stateService?.loadCuratorState()) ?? null
+    // Paused gate (B-line G2, Hermes `should_run_now` order: enabled → paused →
+    // interval): an operator pause is a soft stop for AUTOMATIC passes only —
+    // `ignoreGates` (the manual /evolution curator run semantics) still executes.
+    if (!ignoreGates && persisted?.paused === true) {
+      return {
+        stale: [], archived: [], errors: [],
+        report: this.skippedReport(runId, startedAt),
+        skipped: 'paused',
+      }
+    }
     if (!ignoreGates && persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
       return {
         stale: [], archived: [], errors: [],
@@ -394,6 +438,12 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
     const { bundledNames, treeNames } = await this.seedBaseline(usage)
+    // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
+    // engine reads `quality_warn` to apply the shorter quality-warn stale
+    // window, so it must see THIS run's freshly computed scores — the old
+    // order (transitions → scoring) applied last run's warn state and delayed
+    // the quality-warn stale path by a full curator cycle.
+    await this.scoreTree(usage, treeNames)
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: lifecycle.staleAfterDays,
       archiveAfterDays: lifecycle.archiveAfterDays,
@@ -405,7 +455,6 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
     })
-    await this.scoreTree(usage, treeNames)
     const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
     // Automatic merge nominations must pass the same gates as the control
     // plane: excluded/referenced/suppressed skills are never merged (source

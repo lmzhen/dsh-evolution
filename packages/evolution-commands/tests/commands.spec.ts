@@ -109,4 +109,42 @@ describe('evolution-commands', () => {
     expect(result.text).toContain('Restored skill tree from /path')
     expect(calls).toEqual(['restoreSnapshot'])
   })
+  it('dispatches curator pause/resume/status to the curator service (G2)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    const calls: Array<{ paused: boolean }> = []
+    let state: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null = {
+      lastRunAt: Date.now() - 3_600_000, runCount: 2, lastSummary: 'auto: stale:0 archived:0', paused: false,
+    }
+    ctx.provide('evolutionCurator', {
+      setPaused: async (paused: boolean) => {
+        calls.push({ paused })
+        state = { ...state!, paused }
+      },
+      status: async () => state,
+    })
+    await ctx.plugin(Commands)
+    const pause = await captured!.handler({ rawInput: 'curator pause' })
+    expect(pause.kind).toBe('success')
+    expect(pause.text).toContain('paused')
+    expect(calls).toEqual([{ paused: true }])
+    const status = await captured!.handler({ rawInput: 'curator status' })
+    expect(status.kind).toBe('success')
+    expect(status.text).toContain('paused=true')
+    expect(status.text).toContain('runs=2')
+    const resume = await captured!.handler({ rawInput: 'curator resume' })
+    expect(resume.text).toContain('resumed')
+    expect(calls).toEqual([{ paused: true }, { paused: false }])
+    // Without persisted state the status command degrades gracefully.
+    state = null
+    const empty = await captured!.handler({ rawInput: 'curator status' })
+    expect(empty.text).toContain('No curator state yet')
+  })
+
 })
