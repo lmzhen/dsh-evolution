@@ -134,10 +134,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     })
     const groups = computeDedupGroups({ contents: new Map(await Promise.all(list.map(async summary => [summary.name, (await library.read(summary.name)) ?? ''] as const))) })
     const dedupLines = groups.slice(0, 3).map(group => `- ${group.join(' ~ ')}`)
+    const warned = list
+      .filter(summary => report.get(summary.name)?.quality_warn === true)
+      .map(summary => summary.name)
+    // Aggregate quality guidance: one line for the whole library instead of
+    // per-turn injection — the 60-char catalog contract and prefix-cache
+    // stability of the per-turn prompt stay untouched.
+    const warningLine = warned.length === 0
+      ? ''
+      : `\nWarning skills (${warned.length}): ${warned.join(', ')} — low quality; consider consolidating them before authoring new skills.`
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
       : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
-    return [header, '', ...lines, ...dedupLines].join('\n')
+    return [header, '', ...lines, ...dedupLines, warningLine].join('\n')
   }
 
   ctx.tools.register(defineTool({

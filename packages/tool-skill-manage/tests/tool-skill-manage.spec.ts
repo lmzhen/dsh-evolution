@@ -101,6 +101,27 @@ describe('tool-skill-manage', () => {
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
   })
+
+  it('review text aggregates quality-warned skills into one guidance line', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`quality-warn-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    await execute({ action: 'create', name: 'warned-skill', content: SKILL.replace('boundary-skill', 'warned-skill') })
+    await ctx.skillUsage.setQuality('warned-skill', 0.1, true)
+    const review = await execute({ action: 'review' })
+    expect(review.isError).toBe(false)
+    const message = (review.value as { message?: string } | undefined)?.message ?? ''
+    expect(message).toContain('Warning skills (1): warned-skill')
+    expect(message).toContain('consider consolidating')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
 })
 
 

@@ -102,6 +102,55 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('reentrant run() is skipped with an explicit already-running outcome', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-reentrancy-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator)
+    const [first, second] = await Promise.all([
+      ctx.evolutionCurator.run({ ignoreGates: true }),
+      ctx.evolutionCurator.run({ ignoreGates: true }),
+    ])
+    const skipped = [first, second].filter(result => result.skipped === 'already-running')
+    expect(skipped.length).toBe(1)
+    expect([first, second].some(result => result.skipped === undefined)).toBe(true)
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('snapshotFull captures curator state and restoreSnapshot rewinds tree + state', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-full-restore-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved = { lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false }
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+    })
+    await ctx.plugin(EvolutionCurator)
+    const skills = ctx.evolutionCurator.skills
+    const skill = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\nBody of ${name}.\n`
+    await skills.create('pre-skill', skill('pre-skill', 'p'), 'foreground')
+    await ctx.evolutionCurator.snapshotFull('pre-test')
+    // Mutate AFTER the snapshot: archive the skill and bump curator state.
+    await skills.archive('pre-skill')
+    saved = { lastRunAt: 99, runCount: 7, lastSummary: 'post', paused: true }
+    const restored = await ctx.evolutionCurator.restoreSnapshot()
+    expect(restored.ok).toBe(true)
+    expect((await skills.list()).map(item => item.name)).toContain('pre-skill')
+    expect(saved).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('gateConsolidations blocks automated merges that touch gated names', () => {
     const nominations = [
       { from: 'narrow-a', into: 'umbrella' },

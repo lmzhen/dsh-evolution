@@ -49,7 +49,7 @@ export function apply(ctx: Context): void {
           return ok(`Mutations: ${records.length} recorded (recent 5):\n${recent.join('\n')}`)
         }
         if (input === 'curator scope') {
-          const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; exempted: string[]; protected: string[] }> } | undefined
+          const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
           if (!curator) return err('Curator service not mounted.')
           const view = await curator.scopeView()
           const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
@@ -57,6 +57,7 @@ export function apply(ctx: Context): void {
             `Lifecycle scope at ${new Date().toISOString().slice(0, 10)}`,
             line('Managed (may transition)', view.managed),
             line('Watched (stale / quality-warned)', view.watched),
+            line('Quality-warned', view.qualityWarned),
             line('Exempted (exclude / referenced)', view.exempted),
             line('Protected (pinned / bundled / hub)', view.protected),
           ].join('\n'))
@@ -74,8 +75,8 @@ export function apply(ctx: Context): void {
           return ok(lines.join('\n'))
         }
         if (input.startsWith('restore ')) {
-          const curator = ctx.get('evolutionCurator') as { skills: { restoreLatestSnapshot(): Promise<{ ok: boolean; message: string }> } } | undefined
-          const result = curator ? await curator.skills.restoreLatestSnapshot() : { ok: false, message: 'Curator service not mounted.' }
+          const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
+          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'Curator service not mounted.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('consolidate ')) {

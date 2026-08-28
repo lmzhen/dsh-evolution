@@ -116,6 +116,7 @@ it('computeScopeView classifies managed/watched/exempted/protected like the tran
   const view = computeScopeView(usage, config)
   expect(view.managed).toEqual(['in-candidate', 'watched-quality', 'watched-stale'])
   expect(view.watched).toEqual(['watched-quality', 'watched-stale'])
+  expect(view.qualityWarned).toEqual(['watched-quality'])
   expect(view.exempted).toEqual(['excluded', 'referenced'])
   expect(view.protected).toEqual(['pinned-skill'])
   // Parity: the transition engine never touches anything the view classifies

@@ -122,6 +122,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   private readonly curatorReviewMaxTokens: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
+  private running = false
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
@@ -227,6 +228,60 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     }
   }
 
+  /** Optional curator-state service (evolution-state-json / storage-domain). */
+  private curatorStateService(): {
+    loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
+    saveCuratorState(record: CuratorStateRecordShape): Promise<void>
+  } | undefined {
+    const service = this.ctx.get('evolutionState') as {
+      loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
+      saveCuratorState(record: CuratorStateRecordShape): Promise<void>
+    } | undefined
+    return service
+  }
+
+  /**
+   * Full-state snapshot: the skills tree plus the current curator state as an
+   * `extras/curator-state.json` side file. Every pre-mutation snapshot in the
+   * curator goes through here so a later `restoreSnapshot()` can rewind both
+   * the tree and the state (Hermes curator_backup backs up `.curator_state`).
+   */
+  async snapshotFull(reason = 'pre-mutation'): Promise<string> {
+    const stateService = this.curatorStateService()
+    const state = await stateService?.loadCuratorState()
+    const extras = state === null || state === undefined
+      ? []
+      : [{ name: 'curator-state.json', content: JSON.stringify(state, null, 2) }]
+    return await this.skills.snapshotAll(reason, extras)
+  }
+
+  /**
+   * Full-state rollback: restore the latest snapshot's tree/sidecars/archive
+   * AND the curator state it carried. The pre-rollback safety snapshot keeps
+   * the current tree plus current state (as extras), so the rollback itself
+   * is reversible.
+   */
+  async restoreSnapshot(): Promise<SkillActionResult & { extras?: Array<{ name: string; content: string }> }> {
+    const stateService = this.curatorStateService()
+    const currentState = await stateService?.loadCuratorState()
+    const extras = currentState === null || currentState === undefined
+      ? []
+      : [{ name: 'curator-state.json', content: JSON.stringify(currentState, null, 2) }]
+    const result = await this.skills.restoreLatestSnapshot(extras)
+    if (!result.ok) return result
+    const stateExtra = result.extras?.find(extra => extra.name === 'curator-state.json')
+    if (stateExtra && stateService) {
+      try {
+        await stateService.saveCuratorState(JSON.parse(stateExtra.content) as CuratorStateRecordShape)
+      } catch (error) {
+        // The tree restore already landed; a failed state write must not turn
+        // a completed rollback into an error — but it is observable.
+        this.ctx.logger.warn(`evolution-curator: failed to restore curator state: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    return result
+  }
+
   private skippedReport(runId: string, startedAt: string): CuratorRunReport {
     return buildCuratorRunReport({
       runId,
@@ -246,15 +301,30 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
    * explicit `/evolution curator run` always executes (manual-run semantics):
    * `dryRun` computes the lifecycle and the LLM nominations but performs no
    * mutation, reports what WOULD happen, and does not push out the next run.
+   * Reentrant calls (autoStart timer + manual command at the same instant) are
+   * skipped with an explicit `already-running` outcome.
    */
   async run(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
+    if (this.running) {
+      return {
+        stale: [], archived: [], errors: [],
+        report: this.skippedReport('already-running', new Date().toISOString()),
+        skipped: 'already-running',
+      }
+    }
+    this.running = true
+    try {
+      return await this.runCore(options)
+    } finally {
+      this.running = false
+    }
+  }
+
+  private async runCore(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
     const { ignoreGates = false, dryRun = false } = options
     const startedAt = new Date().toISOString()
     const runId = randomUUID()
-    const stateService = this.ctx.get('evolutionState') as {
-      loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
-      saveCuratorState(record: CuratorStateRecordShape): Promise<void>
-    } | undefined
+    const stateService = this.curatorStateService()
     const lifecycle = this.lifecycle()
     const persisted = await stateService?.loadCuratorState()
     if (!ignoreGates && persisted && Date.now() - persisted.lastRunAt < lifecycle.intervalHours * 3_600_000) {
@@ -292,7 +362,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const rawUsage: UsageMap = await loadUsage(root, this.io)
     // Dry-run computes on clones so the persisted lifecycle state is untouched.
     const usage: UsageMap = dryRun ? new Map([...rawUsage].map(([name, record]) => [name, { ...record }])) : rawUsage
-    const snapshotPath = dryRun ? undefined : await this.skills.snapshotAll('pre-curator-run')
+    const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
     const { bundledNames, treeNames } = await this.seedBaseline(usage)
     const result = computeLifecycleTransitions(usage, {
@@ -607,7 +677,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   async consolidate(target: string, sources: string[]): Promise<SkillActionResult> {
     const blocked = [...this.excludeSkillNames].filter(name => name === target || sources.includes(name))
     if (blocked.length > 0) return { ok: false, message: `Skill(s) excluded from lifecycle management: ${blocked.join(', ')}` }
-    await this.skills.snapshotAll('pre-consolidate')
+    await this.snapshotFull('pre-consolidate')
     const result = await this.skills.consolidate(target, sources)
     if (!result.ok) return result
     const usage: UsageMap = await loadUsage(this.skills.root, this.io)
@@ -625,7 +695,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
    * and reset its usage state, keeping the recoverable-archive invariant.
    */
   async restore(name: string): Promise<SkillActionResult> {
-    await this.skills.snapshotAll('pre-restore')
+    await this.snapshotFull('pre-restore')
     const result = await this.skills.restoreFromArchive(name)
     if (!result.ok) return result
     const usage: UsageMap = await loadUsage(this.skills.root, this.io)

@@ -228,3 +228,39 @@ it('snapshot co-copies usage/suppression sidecars and restore returns them', asy
   expect((await loadSuppressedNames(root, nodeEvolutionIo())).has('sup-skill')).toBe(true)
   await rm(root, { recursive: true, force: true })
 })
+
+it('snapshot co-copies .archive and restore replaces it with the snapshot state', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-archive-snap-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('keeper-skill', USABLE('keeper-skill'), 'foreground')
+  await lib.create('pre-archived', USABLE('pre-archived'), 'foreground')
+  await lib.archive('pre-archived')
+  await lib.snapshotAll('pre-test')
+  // Archive something AFTER the snapshot: the rollback must drop it again.
+  await lib.archive('keeper-skill')
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(true)
+  expect((await lib.list()).map(s => s.name)).toEqual(['keeper-skill'])
+  expect(await nodeEvolutionIo().list(join(root, '.archive'))).toEqual(['pre-archived'])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('snapshot extras are manifest-declared and only declared names are read back', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-extras-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('keeper-skill', USABLE('keeper-skill'), 'foreground')
+  const dest = await lib.snapshotAll('pre-test', [{ name: 'curator-state.json', content: '{"lastRunAt":1}' }])
+  const manifest = await lib.readSnapshotManifest(dest)
+  expect(manifest?.extras).toEqual(['curator-state.json'])
+  // A file dropped straight into extras/ WITHOUT a manifest declaration is
+  // never read back (extras are not a directory-listing surface).
+  await writeFile(join(dest, 'extras', 'rogue.json'), '{"evil":true}', 'utf8')
+  expect((await lib.readSnapshotExtras(dest)).map(extra => extra.name)).toEqual(['curator-state.json'])
+  // Restore returns the declared extras so the caller can re-apply its state.
+  await lib.archive('keeper-skill')
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(true)
+  expect(restored.extras).toEqual([{ name: 'curator-state.json', content: '{"lastRunAt":1}' }])
+  expect((await lib.list()).map(s => s.name)).toEqual(['keeper-skill'])
+  await rm(root, { recursive: true, force: true })
+})

@@ -44,6 +44,29 @@ export interface SkillActionResult {
   path?: string
 }
 
+/** Extra file name carried inside a snapshot's `extras/` directory. */
+export const SNAPSHOT_EXTRA_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
+
+/** An opaque side file stored under a snapshot's `extras/` (curator state etc.). */
+export interface SnapshotExtra {
+  name: string
+  content: string
+}
+
+/** Normalized manifest of a skills snapshot. */
+export interface SnapshotManifest {
+  reason: string
+  createdAt: string
+  /** Active skill names at snapshot time. */
+  skills: string[]
+  /** Co-copied sidecar file names (usage/suppression). */
+  sidecars: string[]
+  /** Whether `.archive/` was co-copied; absent on legacy manifests (do not touch archive on restore). */
+  hasArchive?: boolean
+  /** Extras declared under `extras/`; only these names are ever read back. */
+  extras: string[]
+}
+
 /** Who is writing: a foreground user-directed tool call, or the autonomous review/curator pipeline. */
 export type WriteOrigin = 'foreground' | 'subagent' | 'background_review'
 
@@ -616,7 +639,13 @@ export class SkillLibrary {
   }
 
 
-  async snapshotAll(reason = 'pre-mutation'): Promise<string> {
+  /**
+   * Snapshot the recoverable skills state: active tree, usage/suppression
+   * sidecars, `.archive/` and caller-supplied extras. `extras` are opaque
+   * side files the Snapshot owner cares about (curator state); they are
+   * listed in the manifest and only those names are ever read back.
+   */
+  async snapshotAll(reason = 'pre-mutation', extras: SnapshotExtra[] = []): Promise<string> {
     const backupRoot = join(this.root, '.backups')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const dest = join(backupRoot, `skills-${stamp}`)
@@ -635,9 +664,51 @@ export class SkillLibrary {
         sidecars.push(name)
       }
     }
-    await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({ reason, createdAt: new Date().toISOString(), skills: names, sidecars }, null, 2))
+    // Archive co-snapshot: rollback must restore what was archived at snapshot
+    // time too — archived skills are the recoverable history, and a restore
+    // that leaves a post-run `.archive/` behind breaks the archive invariant
+    // (Hermes curator_backup backs up `.archive/` as well).
+    const archiveRoot = join(this.root, '.archive')
+    let hasArchive = false
+    if (await this.io.exists(archiveRoot)) {
+      await this.io.copy(archiveRoot, join(dest, '.archive'))
+      hasArchive = true
+    }
+    const extraNames: string[] = []
+    for (const extra of extras) {
+      if (!SNAPSHOT_EXTRA_NAME_RE.test(extra.name)) continue
+      await this.io.writeText(join(dest, 'extras', extra.name), extra.content)
+      extraNames.push(extra.name)
+    }
+    await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({
+      reason,
+      createdAt: new Date().toISOString(),
+      skills: names,
+      sidecars,
+      hasArchive,
+      extras: extraNames,
+    }, null, 2))
     await this.retainSnapshots(5)
     return dest
+  }
+
+  /** Read and normalize a snapshot manifest; null when the file is missing or unparsable. */
+  async readSnapshotManifest(path: string): Promise<SnapshotManifest | null> {
+    const raw = await this.io.readText(join(path, 'manifest.json'))
+    if (raw === null) return null
+    try {
+      const manifest = JSON.parse(raw) as Partial<SnapshotManifest>
+      return {
+        reason: typeof manifest.reason === 'string' ? manifest.reason : '',
+        createdAt: typeof manifest.createdAt === 'string' ? manifest.createdAt : '',
+        skills: Array.isArray(manifest.skills) ? manifest.skills : [],
+        sidecars: Array.isArray(manifest.sidecars) ? manifest.sidecars : [],
+        ...typeof manifest.hasArchive === 'boolean' ? { hasArchive: manifest.hasArchive } : {},
+        extras: Array.isArray(manifest.extras) ? manifest.extras : [],
+      }
+    } catch {
+      return null
+    }
   }
 
   /** Keep only the newest N snapshots (Hermes keep=5 parity); oldest folded into .backups history. */
@@ -659,31 +730,79 @@ export class SkillLibrary {
     const out: Array<{ path: string; createdAt: string; reason: string }> = []
     for (const name of entries.sort().reverse()) {
       if (!name.startsWith('skills-')) continue
-      try {
-        const raw = await this.io.readText(join(backupRoot, name, 'manifest.json'))
-        if (raw === null) continue
-        const manifest = JSON.parse(raw) as { createdAt?: string; reason?: string }
-        out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt ?? '', reason: manifest.reason ?? '' })
-      } catch { /* skip */ }
+      const manifest = await this.readSnapshotManifest(join(backupRoot, name))
+      if (manifest === null) continue
+      out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt, reason: manifest.reason })
     }
     return out
   }
 
-  async restoreLatestSnapshot(): Promise<SkillActionResult> {
+  /**
+   * Read the extras of a snapshot, restricted to the names declared in the
+   * manifest — an `extras/` directory is never listed directly, so unknown
+   * files cannot leak back as state on the next restore.
+   */
+  async readSnapshotExtras(path: string): Promise<SnapshotExtra[]> {
+    const manifest = await this.readSnapshotManifest(path)
+    if (manifest === null) return []
+    const extras: SnapshotExtra[] = []
+    for (const name of manifest.extras) {
+      if (!SNAPSHOT_EXTRA_NAME_RE.test(name)) continue
+      const content = await this.io.readText(join(path, 'extras', name))
+      if (content !== null) extras.push({ name, content })
+    }
+    return extras
+  }
+
+  /**
+   * Manifest-driven restore of the latest snapshot: active tree, sidecars,
+   * `.archive/` and (for full-state snapshots) the extras read back by the
+   * caller. `extras` are additionally written into the pre-rollback safety
+   * snapshot so the rollback itself is undoable with the same state.
+   */
+  async restoreLatestSnapshot(extras: SnapshotExtra[] = []): Promise<SkillActionResult & { extras?: SnapshotExtra[] }> {
     const snapshots = await this.listSnapshots()
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
-    await this.snapshotAll('pre-rollback')
+    await this.snapshotAll('pre-rollback', extras)
     for (const name of await listNames(this.root, this.io)) {
       await this.io.remove(skillDir(this.root, name))
     }
-    const entries = await this.io.list(latest.path)
-    for (const entry of entries) {
-      if (entry === 'manifest.json') continue
-      // Sidecars (usage/suppression) live in the snapshot root alongside the
-      // skill dirs, so this loop restores them too.
-      await this.io.copy(join(latest.path, entry), join(this.root, entry))
+    const manifest = await this.readSnapshotManifest(latest.path)
+    if (manifest === null) {
+      // Legacy snapshot without a readable manifest: restore every entry
+      // except the manifest and extras (extras are owner state, never
+      // skills-root content).
+      for (const entry of await this.io.list(latest.path)) {
+        if (entry === 'manifest.json' || entry === 'extras') continue
+        await this.io.copy(join(latest.path, entry), join(this.root, entry))
+      }
+    } else {
+      for (const name of manifest.skills) {
+        await this.io.copy(join(latest.path, name), join(this.root, name))
+      }
+      for (const sidecar of manifest.sidecars) {
+        await this.io.copy(join(latest.path, sidecar), join(this.root, sidecar))
+      }
+      // Archive is part of the whole-state rollback: a snapshot that carried
+      // `.archive/` replaces the current one; a snapshot with no archive
+      // means the archive content post-dates it, so it is rolled away too
+      // (the pre-rollback snapshot above preserved it). Legacy manifests
+      // without the field leave `.archive` untouched.
+      const archiveRoot = join(this.root, '.archive')
+      if (manifest.hasArchive === true) {
+        await this.io.remove(archiveRoot)
+        await this.io.copy(join(latest.path, '.archive'), archiveRoot)
+      } else if (manifest.hasArchive === false) {
+        await this.io.remove(archiveRoot)
+      }
     }
-    return { ok: true, message: `Restored skill tree from ${latest.path}`, path: latest.path }
+    const snapshotExtras = await this.readSnapshotExtras(latest.path)
+    return {
+      ok: true,
+      message: `Restored skill tree from ${latest.path}`,
+      path: latest.path,
+      ...snapshotExtras.length === 0 ? {} : { extras: snapshotExtras },
+    }
   }
 }

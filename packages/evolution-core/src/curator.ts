@@ -182,6 +182,8 @@ export interface ScopeView {
   managed: string[]
   /** Managed skills already flagged stale or quality-warned — the ones to watch. */
   watched: string[]
+  /** Managed skills flagged low quality (subset of `watched`) — consolidation candidates. */
+  qualityWarned: string[]
   /** Explicitly exempted by excludeSkillNames / referencedSkillNames. */
   exempted: string[]
   /** Carrying a protection marker (pinned / bundled / hub-installed). */
@@ -197,6 +199,7 @@ export interface ScopeView {
 export function computeScopeView(usage: UsageMap, config: CuratorConfig, protectedNames?: ReadonlyMap<string, string>): ScopeView {
   const managed: string[] = []
   const watched: string[] = []
+  const qualityWarned: string[] = []
   const exempted: string[] = []
   const protectedSet = new Set<string>()
   for (const [name, record] of usage) {
@@ -210,11 +213,13 @@ export function computeScopeView(usage: UsageMap, config: CuratorConfig, protect
     if (lifecycleCandidate(name, record, config, bundled)) {
       managed.push(name)
       if (record.state === 'stale' || record.quality_warn === true) watched.push(name)
+      if (record.quality_warn === true) qualityWarned.push(name)
     }
   }
   return {
     managed: managed.sort(),
     watched: watched.sort(),
+    qualityWarned: qualityWarned.sort(),
     exempted: exempted.sort(),
     protected: [...protectedSet].sort(),
   }
