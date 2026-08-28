@@ -134,7 +134,10 @@ describe('evolution-curator', () => {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
     })
-    await ctx.plugin(EvolutionCurator)
+    // This fake state is anchored at epoch — DUE — so the auto-start boot
+    // check must be off: this test own the snapshot/restore flow, not the
+    // scheduler (a due autoCheck would run a pass against a stale env).
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
     const skills = ctx.evolutionCurator.skills
     const skill = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\nBody of ${name}.\n`
     await skills.create('pre-skill', skill('pre-skill', 'p'), 'foreground')
@@ -146,6 +149,56 @@ describe('evolution-curator', () => {
     expect(restored.ok).toBe(true)
     expect((await skills.list()).map(item => item.name)).toContain('pre-skill')
     expect(saved).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('auto-start boot check catches up a due persisted state after a restart', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-boot-catchup-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved = { lastRunAt: Date.now() - 30 * 86_400_000, runCount: 0, lastSummary: 'seed', paused: false }
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+    })
+    await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, intervalHours: 24 })
+    // The boot check is deferred (never synchronous with the half-built host);
+    // poll until the persisted state shows the catch-up pass landed.
+    const deadline = Date.now() + 2000
+    while (saved.runCount === 0 && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    expect(saved.runCount).toBe(1)
+    expect(saved.lastSummary).toMatch(/^auto:/)
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('auto-start boot check stays quiet when the persisted state is not due', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-boot-quiet-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved = { lastRunAt: Date.now() - 86_400_000, runCount: 3, lastSummary: 'seed', paused: false }
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+    })
+    // intervalHours = 336: a 1-day-old run is NOT due → no pass may fire.
+    await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, intervalHours: 336 })
+    await new Promise(resolve => setTimeout(resolve, 300))
+    expect(saved.runCount).toBe(3)
+    expect(saved.lastSummary).toBe('seed')
+    ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })

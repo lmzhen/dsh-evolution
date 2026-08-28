@@ -47,6 +47,8 @@ export interface Config {
   referencedSkillNames?: string[]
   /** Start the interval timer on context ready (auto-curation). Default true. */
   autoStart?: boolean
+  /** Seconds between host boot and the first automatic schedule check (restart catch-up). */
+  bootGraceSeconds?: number
   /** Max tokens for the optional LLM nomination pass. */
   curatorReviewMaxTokens?: number
 }
@@ -102,6 +104,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     pruneBuiltins: z.boolean().default(false),
     referencedSkillNames: z.array(z.string()).default([]),
     autoStart: z.boolean().default(true),
+    bootGraceSeconds: z.number().default(10),
     curatorReviewMaxTokens: z.number().default(2048),
   })
 
@@ -119,9 +122,11 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   private readonly manageUnmanaged: boolean
   private readonly pruneBuiltins: boolean
   private readonly referencedSkillNames: ReadonlySet<string>
+  private readonly bootGraceSeconds: number
   private readonly curatorReviewMaxTokens: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
+  private bootCheck: NodeJS.Timeout | undefined
   private running = false
 
   constructor(ctx: Context, config: Config = {}) {
@@ -140,6 +145,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
+    this.bootGraceSeconds = config.bootGraceSeconds ?? 10
     this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
     this.lastRun = Date.now()
     this.ctx.effect(() => {
@@ -166,15 +172,40 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
 
   start(): void {
     if (!this.enabled || this.timer) return
-    this.timer = setInterval(() => {
-      if (Date.now() - this.lastRun >= this.lifecycle().intervalHours * 3_600_000) void this.run()
-    }, 60 * 60 * 1000)
+    // Catch-up check after the boot grace (restart with a due persisted state
+    // must not wait a full interval; services mounting during boot must not
+    // see a half-built host). The regular hourly tick keeps the schedule
+    // running afterwards. Both fire autoCheck, which decides due-ness from
+    // the persisted lastRunAt — the single durable truth across restarts.
+    this.bootCheck = setTimeout(() => {
+      this.bootCheck = undefined
+      void this.autoCheck()
+    }, this.bootGraceSeconds * 1000)
+    this.bootCheck.unref()
+    this.timer = setInterval(() => void this.autoCheck(), 60 * 60 * 1000)
     this.timer.unref()
   }
 
   stop(): void {
     if (this.timer) clearInterval(this.timer)
     this.timer = undefined
+    if (this.bootCheck) clearTimeout(this.bootCheck)
+    this.bootCheck = undefined
+  }
+
+  /**
+   * One automatic schedule check: run a pass when the persisted curator state
+   * (falling back to the in-memory clock for state-less compositions) is at
+   * least one interval old. All gates — interval, idle, first-run defer,
+   * reentrancy — stay inside `run()`, so this method only decides whether to
+   * wake it, and never duplicates gate logic.
+   */
+  private async autoCheck(): Promise<void> {
+    const persisted = await this.curatorStateService()?.loadCuratorState()
+    const last = persisted?.lastRunAt ?? this.lastRun
+    if (Date.now() - last >= this.lifecycle().intervalHours * 3_600_000) {
+      await this.run()
+    }
   }
 
   /**
