@@ -108,7 +108,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const mutating = action !== 'list' && action !== 'review' && action !== 'skip' && action !== 'pin' && action !== 'unpin'
       // Any non-foreground writer (review channel OR delegated subagent) is an
       // agent-authored skill and must enter the lifecycle as such.
-      if (name && action === 'create' && origin !== 'foreground') await ctx.skillUsage.markAgentCreated(name)
+      if (name && action === 'create') {
+        // Authorship, not a content patch (rc.44 M3-3.3): the record must
+        // EXIST from birth (created_at anchors now, quality surfaces read it)
+        // but patch_count stays 0. Agent-authored creations additionally mark
+        // created_by so the curator owns them.
+        await ctx.skillUsage.ensureRecord(name)
+        if (origin !== 'foreground') await ctx.skillUsage.markAgentCreated(name)
+      }
       if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
       // Create is authorship, not a content patch (rc.44 M3-3.3): it must not
       // inflate patch_count (and through it the mutation-maturity factor).

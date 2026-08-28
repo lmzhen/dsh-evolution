@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  skillsRoot } from '@deepseek-ai/dsh-evolution-core'
-import { bumpPatch, bumpUse, bumpView, loadUsage, markAgentCreated, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 declare module '@deepseek-ai/cordis' {
@@ -72,6 +72,19 @@ export class SkillUsageRegistry extends Service {
   async markAgentCreated(name: string): Promise<void> {
     await this.mutate(async (map) => {
       markAgentCreated(map, name)
+      await this.flush()
+    })
+  }
+
+  /**
+   * Ensure a usage record exists for `name` without bumping any counter
+   * (rc.46 M3-3.3 companion): skill creation is authorship — the record must
+   * exist from birth (created_at anchors now) but `patch_count` stays 0 so
+   * mutation maturity is not inflated by mere creation.
+   */
+  async ensureRecord(name: string): Promise<void> {
+    await this.mutate(async (map) => {
+      getRecord(map, name)
       await this.flush()
     })
   }
