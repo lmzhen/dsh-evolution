@@ -520,13 +520,19 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       ? ' (llmReview: off - deterministic archive only; set llmReview: true for the LLM merge channel)'
       : ''
     const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${gatedNominations.consolidations.length}${llmHint}`
+    // Preserve an operator pause (rc.43 G2 regression fix): the paused gate
+    // read `persisted` at run start, but the operator may pause while this
+    // pass is in flight — and a manual run is ALLOWED while paused. Either
+    // way the run's bookkeeping write must not clear the flag, so the current
+    // value is re-read at save time instead of the stale run-start snapshot.
+    const pausedNow = (await stateService?.loadCuratorState())?.paused ?? false
     await stateService?.saveCuratorState({
       schemaVersion: 1,
       // A dry-run is a preview: it must not push the next scheduled pass out.
       lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : this.lastRun,
       runCount: dryRun ? (persisted?.runCount ?? 0) : (persisted?.runCount ?? 0) + 1,
       lastSummary: summary,
-      paused: false,
+      paused: pausedNow,
     })
     return {
       stale: result.markStale,

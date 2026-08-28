@@ -54,10 +54,15 @@ export function apply(ctx: Context): void {
           if (!curator) return err('Curator service not mounted.')
           const state = await curator.status()
           if (!state) return ok('No curator state yet: the first automatic pass is deferred until the interval elapses.')
+          // A corrupt state record must not crash the command surface with a
+          // RangeError from `Invalid Date`.toISOString().
+          const lastRun = typeof state.lastRunAt === 'number' && Number.isFinite(state.lastRunAt) && state.lastRunAt > 0
+            ? new Date(state.lastRunAt).toISOString()
+            : 'unknown'
           return ok([
             `paused=${state.paused}`,
             `runs=${state.runCount}`,
-            `lastRun=${new Date(state.lastRunAt).toISOString()}`,
+            `lastRun=${lastRun}`,
             `summary=${state.lastSummary}`,
           ].join('\n'))
         }

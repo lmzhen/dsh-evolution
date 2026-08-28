@@ -147,4 +147,40 @@ describe('evolution-commands', () => {
     expect(empty.text).toContain('No curator state yet')
   })
 
+  it('curator status survives a corrupt lastRunAt (rc.43 regression)', async () => {
+
+    const ctx = new Context()
+
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+
+    ctx.provide('commands', {
+
+      register: (definition: unknown) => {
+
+        captured = definition as typeof captured
+
+        return () => {}
+
+      },
+
+    })
+
+    ctx.provide('evolutionCurator', {
+
+      status: async () => ({ lastRunAt: Number.NaN, runCount: 2, lastSummary: 'corrupt', paused: false }),
+
+    })
+
+    await ctx.plugin(Commands)
+
+    const result = await captured!.handler({ rawInput: 'curator status' })
+
+    // Invalid Date().toISOString() used to throw a RangeError out of the handler.
+
+    expect(result.kind).toBe('success')
+
+    expect(result.text).toContain('lastRun=unknown')
+
+  })
+
 })

@@ -66,7 +66,10 @@ export function applyActivityEvent(
     estimatedInputChars: event.estimatedInputChars,
     at,
   }
-  return [...items, record].slice(-maxItems)
+  // A non-positive cap would disable the window entirely (`slice(-0)` keeps
+  // everything), so it clamps to at least one record (rc.42 regression guard).
+  const cap = Math.max(1, maxItems)
+  return [...items, record].slice(-cap)
 }
 
 export async function loadActivity(root: string, io: ActivityIoLike): Promise<EvolutionActivityRecord[]> {

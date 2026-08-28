@@ -488,4 +488,84 @@ Ancient body.
     await rm(home, { recursive: true, force: true })
   })
 
+  it('a manual run while paused does not clear the operator pause (rc.43 regression)', async () => {
+
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-pause-keep-'))
+
+    const previous = process.env.DSH_HOME
+
+    process.env.DSH_HOME = home
+
+    const ctx = new Context()
+
+    await ctx.plugin(EvolutionIoRegistry)
+
+    await ctx.plugin(NodeIo)
+
+    let saved = { lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: true }
+
+    ctx.provide('evolutionState', {
+
+      loadCuratorState: async () => saved,
+
+      saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+
+    })
+
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+
+    const skills = ctx.evolutionCurator.skills
+
+    await skills.create('ancient-skill', `---
+
+name: ancient-skill
+
+description: Ancient body.
+
+---
+
+Ancient body.
+
+`, 'background_review')
+
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+
+    await saveUsage(skills.root, new Map([['ancient-skill', {
+
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+
+      state: 'active', pinned: false, archived_at: null,
+
+    }]]), nodeEvolutionIo())
+
+    // Manual semantics are ALLOWED while paused - but the run's bookkeeping
+
+    // write must not silently un-pause the curator afterwards.
+
+    const manual = await ctx.evolutionCurator.run({ ignoreGates: true })
+
+    expect(manual.archived).toContain('ancient-skill')
+
+    expect(saved.paused).toBe(true)
+
+    // The dry-run preview path must preserve the flag the same way.
+
+    await ctx.evolutionCurator.setPaused(true)
+
+    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
+
+    expect(saved.paused).toBe(true)
+
+    ctx.evolutionCurator.stop()
+
+    if (previous === undefined) delete process.env.DSH_HOME
+
+    else process.env.DSH_HOME = previous
+
+    await rm(home, { recursive: true, force: true })
+
+  })
+
 })

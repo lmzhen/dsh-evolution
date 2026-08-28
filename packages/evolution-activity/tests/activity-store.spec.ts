@@ -127,4 +127,18 @@ describe('evolution-activity store', () => {
     await new Promise(resolve => setTimeout(resolve, 10))
     await ctx.fiber.dispose()
   })
+  it('clamps a non-positive maxItems so the sidecar stays bounded (rc.42 regression)', () => {
+
+    // slice(-0) keeps EVERYTHING: a zero cap used to disable the window.
+
+    let items: EvolutionActivityRecord[] = []
+
+    items = applyActivityEvent(items, payload({ planId: 'p1' }), 0, 100)
+
+    items = applyActivityEvent(items, payload({ planId: 'p2' }), 0, 200)
+
+    expect(items.map(item => item.planId)).toEqual(['p2'])
+
+  })
+
 })
