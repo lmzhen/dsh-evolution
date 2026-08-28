@@ -355,7 +355,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
         if (!into || !(await library.read(into))) {
           return { ok: false, message: 'delete requires an existing absorbed_into target' }
         }
-        return await library.archive(name, { absorbedInto: into })
+        const archived = await library.archive(name, { absorbedInto: into })
+        if (archived.ok) {
+          // The direct path (approval-disabled deployments) must keep the same
+          // lifecycle state as the runner: archiving is a state transition,
+          // and without markArchived the usage record stays active/stale so
+          // every later curator run treats the missing directory as a
+          // candidate and errors forever (rc.39 audit §4-A).
+          const usageRegistry = ctx.get('skillUsage') as { markArchived?(name: string): Promise<void> } | undefined
+          await usageRegistry?.markArchived?.(name)
+        }
+        return archived
       }
       if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? op.content ?? '', origin)
       if (op.action === 'remove_file') return await library.removeSupportFile(name, op.file_path ?? '', origin)
