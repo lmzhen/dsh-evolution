@@ -6,18 +6,21 @@
  *   - workspace:^ is converted to real semver ranges
  *   - --scope renames our packages, YAML rows, repository metadata and
  *     removes unpublished ./src/* export shims
- *   - --version and --upstream-version pin the release and upstream family
+ *   - --version pins the release version; --platform-version pins the
+ *     published upstream platform the dsh-* ranges target (N-2 single
+ *     source: one workflow variable drives both the compat gate's
+ *     upstream_ref and this metadata)
  *   - tarballs are validated before manifest/smoke artifacts are written
  *
  * Version single-source (M4 §5.3): the release workflow's environment is the
- * only place that pins `RELEASE_VERSION` / `UPSTREAM_VERSION`; this script
+ * only place that pins `RELEASE_VERSION` / `PLATFORM_VERSION`; this script
  * requires them rather than carrying its own defaults, so a version can never
  * silently drift between the workflow and the pack step.
  *
  * Usage:
  *   node packages/evolution/scripts/build-lib.mjs
  *   node packages/evolution/scripts/prepare-release.mjs \
- *     --scope @lmzhen --version 0.1.0-rc.NN --upstream-version 0.1.0-rc.NN
+ *     --scope @lmzhen --version 0.1.0-rc.NN --platform-version 0.1.1-rc.NN
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -42,7 +45,7 @@ function requireArg(name) {
 
 const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
-const upstreamVersion = requireArg('--upstream-version')
+const platformVersion = requireArg('--platform-version')
 
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
@@ -79,7 +82,10 @@ function releaseSpec(name, ourNames, publishedVersions) {
   if (ourNames.has(name)) return `^${releaseVersion}`
   if (name === '@deepseek-ai/cordis') return '^4.0.1'
   if (name === '@deepseek-ai/schemastery') return '^3.18.1'
-  if (name.startsWith('@deepseek-ai/dsh-')) return `^${upstreamVersion}`
+  // Platform packages range against the published upstream version, NOT the
+  // development baseline — CI guards manifest parity with the compat anchor
+  // (verify-platform-ranges.mjs, N-2).
+  if (name.startsWith('@deepseek-ai/dsh-')) return `^${platformVersion}`
   const published = publishedVersions[name]
   if (published) return published.startsWith('^') ? published : `^${published}`
   return `^${releaseVersion}`

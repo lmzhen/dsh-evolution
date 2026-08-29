@@ -302,7 +302,14 @@ packages/
 
 ## Compatibility
 
-- Developed against DeepSeek Harness `0.1.0-rc.5`.
+- Developed against DeepSeek Harness `0.1.1-rc.2` — the released upstream
+  the CI compat gate validates against (the CI `validate` job additionally
+  pins a development baseline commit via `UPSTREAM_SHA`).
+- Published family versions declare every `@deepseek-ai/dsh-*` range as
+  `^<platform-version>` (e.g. `^0.1.1-rc.2`), same as the compat anchor.
+  Under semver prerelease rules `^0.1.1-rc.2` matches `0.1.1-rc.N` and does
+  NOT match `0.1.0.x` (any other major/minor/patch row): a release carrying
+  an older row (e.g. `^0.1.0-rc.6`) is a publishing defect CI now catches.
 - Compatible with `standard`, `minimal`, `code`
 , and Creator presets at the service level.
 - Explicitly tested against the real Anchored Standard bootstrap plugin:

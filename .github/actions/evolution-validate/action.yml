@@ -12,6 +12,14 @@ inputs:
   upstream_ref:
     description: Upstream commit or tag to validate against
     required: true
+  platform_version:
+    description: >-
+      PLATFORM_VERSION the family targets (npm version of the released
+      upstream, e.g. 0.1.1-rc.2). ONE definition point: the pack step rewrites
+      every @deepseek-ai/dsh-* range to ^<this> and the N-2 guard asserts the
+      staged manifests actually carry it (N-2). The compat job calls it with
+      the same version as its upstream_ref (`dsh-v<platform_version>`).
+    required: true
   artifact_suffix:
     description: Suffix for the uploaded artifacts (baseline / released)
     required: false
@@ -77,7 +85,15 @@ runs:
         node packages/evolution/scripts/prepare-release.mjs \
           --scope "$NPM_SCOPE" \
           --version "${RELEASE_VERSION#v}" \
-          --upstream-version "$UPSTREAM_VERSION"
+          --platform-version "${{ inputs.platform_version }}"
+
+    - name: Verify platform version ranges (N-2 guard)
+      shell: bash
+      working-directory: upstream
+      run: |
+        node packages/evolution/scripts/verify-platform-ranges.mjs \
+          --platform-version "${{ inputs.platform_version }}" \
+          --manifest-dir packages/evolution/dist
 
     - name: Publish dry-run
       shell: bash

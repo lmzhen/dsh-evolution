@@ -15,7 +15,15 @@ concurrency:
 
 env:
   NPM_SCOPE: '@lmzhen'
-  UPSTREAM_VERSION: 0.1.0-rc.6
+  # ONE platform-version definition (N-2): the compat gate validates against
+  # the released upstream tag `dsh-v<PLATFORM_VERSION>` and the publish
+  # metadata rewrites every @deepseek-ai/dsh-* range to ^<PLATFORM_VERSION>.
+  # Both derive from this single variable, so the declared support range can
+  # never drift from the validated anchor again (the rc.54 defect: metadata
+  # said ^0.1.0-rc.6 while the compat gate validated 0.1.1-rc.2). The pinned
+  # development baseline (UPSTREAM_SHA) stays a validate-only dev anchor and
+  # must never feed release metadata.
+  PLATFORM_VERSION: 0.1.1-rc.2
   UPSTREAM_REPO: deepseek-ai/deepseek-harness
   # Tags publish as their own semver; non-tag pushes (main) pack with a
   # semver-safe dev placeholder so the publish dry-run can parse the version.
@@ -42,6 +50,7 @@ jobs:
         with:
           upstream_repo: ${{ env.UPSTREAM_REPO }}
           upstream_ref: ${{ steps.upstream.outputs.sha }}
+          platform_version: ${{ env.PLATFORM_VERSION }}
           artifact_suffix: baseline
           copy_host_tsconfig: 'true'
 
@@ -66,7 +75,8 @@ jobs:
       - uses: ./.github/actions/evolution-validate
         with:
           upstream_repo: ${{ env.UPSTREAM_REPO }}
-          upstream_ref: dsh-v0.1.1-rc.2
+          upstream_ref: dsh-v${{ env.PLATFORM_VERSION }}
+          platform_version: ${{ env.PLATFORM_VERSION }}
           artifact_suffix: released
           copy_host_tsconfig: 'false'
 
