@@ -131,7 +131,6 @@ jobs:
         run: |
           mkdir -p upstream/packages/evolution
           cp tsconfig.base.json upstream/tsconfig.base.json
-          cp tsconfig.host.json upstream/tsconfig.host.json
           cp -r packages/. upstream/packages/evolution/
           rm -rf upstream/packages/evolution/node_modules \
                  upstream/packages/evolution/lib \
@@ -151,13 +150,12 @@ jobs:
         working-directory: upstream
         run: pnpm install --no-frozen-lockfile
 
-      - name: Type-check against the released upstream (tsc host graph)
-        working-directory: upstream
-        run: node node_modules/typescript/bin/tsc -b tsconfig.host.json
-
-      - name: Build and smoke-load the published artifacts
+      - name: Build against the released upstream and smoke-load the artifacts
         working-directory: upstream
         run: |
+          # Per-package tsconfig builds (extends the overlaid base) hold with
+          # the released tree's layout; the host project graph is
+          # baseline-specific and intentionally NOT overlaid here.
           node packages/evolution/scripts/build-lib.mjs
           node -e "
             (async () => {
