@@ -101,6 +101,35 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
   }
 }
 
+/**
+ * Render a curator run report as a compact human-readable markdown digest
+ * (G6): run metadata first, then the notable sections (archived / failed /
+ * stale candidates / LLM nominations).
+ */
+export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
+  const lines = [
+    `# Curator run ${report.runId}`,
+    '',
+    `- **Started** ${report.startedAt}`,
+    `- **Finished** ${report.finishedAt}`,
+    `- **Stale candidates**: ${report.staleCandidates.length}`,
+    `- **LLM nominations**: ${report.llmNominations.length}`,
+    `- **Archived**: ${report.archived.length}`,
+    `- **Failed**: ${report.failed.length}`,
+    ...report.snapshotPath === undefined ? [] : [`- **Snapshot**: ${report.snapshotPath}`],
+    ...report.llmReviewEnabled === undefined ? [] : [`- **llmReview**: ${report.llmReviewEnabled}`],
+  ]
+  const section = (title: string, items: string[]): string[] => items.length === 0 ? [] : ['', `## ${title}`, '', ...items.map(item => `- ${item}`)]
+  return [
+    ...lines,
+    ...section('Archived', report.archived.map(item => `${item.name} (${item.reason})`)),
+    ...section('Failed', report.failed.map(item => `${item.name}: ${item.reason}`)),
+    ...section('Stale candidates', report.staleCandidates),
+    ...section('LLM nominations', report.llmNominations),
+    '',
+  ].join('\n')
+}
+
 /** One LLM-nominated consolidation: `from` merges into the umbrella `into`. */
 export interface CuratorConsolidation {
   from: string

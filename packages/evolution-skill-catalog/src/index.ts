@@ -82,10 +82,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async get(candidate: SkillCandidate): Promise<SkillDefinition | undefined> {
       const name = candidate.name
       if (!visible(name)) return undefined
+      // One list per call, shared by lookup and metadata (P2-6): the summary
+      // set is fetched once and re-used instead of a second full scan.
+      const summaries = await library.list()
+      const summary = summaries.find(item => item.name === name)
+      if (!summary) return undefined
       const content = await library.read(name)
       if (content === null) return undefined
-      const summary = (await library.list()).find(item => item.name === name)
-      if (!summary) return undefined
       return {
         name,
         description: summary.description,

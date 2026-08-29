@@ -77,7 +77,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     maxDescriptionLength: rawConfig.maxDescriptionLength ?? DEFAULT_SKILL_LIMITS.maxDescriptionLength,
     maxSkillContentChars: rawConfig.maxSkillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
     maxSkillFileBytes: rawConfig.maxSkillFileBytes ?? DEFAULT_SKILL_LIMITS.maxSkillFileBytes,
-  })
+  }, (event) => { ctx.emit('evolution/skill-mutated', event) })
 
   async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
     const action = args.action
@@ -120,13 +120,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // Create is authorship, not a content patch (rc.44 M3-3.3): it must not
       // inflate patch_count (and through it the mutation-maturity factor).
       else if (name && mutating && action !== 'create') await ctx.skillUsage.record(name, 'patch')
-      if (mutating) {
-        ctx.emit('evolution/skill-mutated', {
-          action: action ?? '?',
-          name,
-          ...result.path && action === 'delete' ? { archivedPath: result.path } : result.path ? { filePath: result.path } : {},
-        })
-      }
+      // The mutation event is emitted by SkillLibrary itself (decision C):
+      // every write path — tool, curator, graph, restore — now covers the
+      // catalog invalidation from a single sink.
     }
     return { ok: result.ok, message: result.message, skills: [] }
   }

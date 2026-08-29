@@ -14,6 +14,7 @@ import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+import type { EvolutionSkillMutatedEvent } from './events.ts'
 
 export interface SkillLimits {
   maxNameLength: number
@@ -300,11 +301,28 @@ export class SkillLibrary {
   readonly root: string
   readonly limits: SkillLimits
   private readonly io: EvolutionIoLike
+  private readonly onMutation: ((event: EvolutionSkillMutatedEvent) => void) | undefined
 
-  constructor(root = skillsRoot(), io: EvolutionIoLike = nodeEvolutionIo(), limits: SkillLimits = DEFAULT_SKILL_LIMITS) {
+  constructor(
+    root = skillsRoot(),
+    io: EvolutionIoLike = nodeEvolutionIo(),
+    limits: SkillLimits = DEFAULT_SKILL_LIMITS,
+    onMutation?: (event: EvolutionSkillMutatedEvent) => void,
+  ) {
     this.root = root
     this.io = io
     this.limits = limits
+    this.onMutation = onMutation
+  }
+
+  /** Notify the mutation observer after a successful write; observers must never fail the mutation. */
+  private notifyMutation(event: EvolutionSkillMutatedEvent): void {
+    try {
+      this.onMutation?.(event)
+    } catch {
+      // Observers (catalog invalidation) are advisory; a throwing listener must
+      // not surface after the mutation already landed.
+    }
   }
 
   async list(): Promise<SkillSummary[]> {
@@ -314,14 +332,22 @@ export class SkillLibrary {
       const md = await this.io.readText(join(dir, 'SKILL.md'))
       if (!md) continue
       const parsed = parseFrontmatter(md)
-      const protectedBy = await this.deleteProtection(name)
-      const managed = await this.io.exists(markerPath(dir, 'hermes-managed'))
+      // One directory listing replaces the per-marker exists() probes (P2-6
+      // N+1 convergence); the marker set matches deleteProtection().
+      let entries: string[] = []
+      try {
+        entries = await this.io.list(dir)
+      } catch {
+        // A listing failure must not hide the skill; markers report absent.
+      }
+      const has = (marker: string) => entries.includes(marker)
+      const protectedBy = has('bundled') ? 'bundled' : has('hub-installed') ? 'hub-installed' : has('pinned') ? 'pinned' : null
       summaries.push({
         name,
         description: parsed?.frontmatter.description ?? '',
         path: dir,
         protectedBy,
-        managed,
+        managed: has('hermes-managed'),
         archived: false,
       })
     }
@@ -527,6 +553,7 @@ export class SkillLibrary {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
     await this.audit(normalized, 'create', null, content, 'created')
+    this.notifyMutation({ action: 'create', name: normalized, filePath: dir })
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir }
   }
 
@@ -548,6 +575,7 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
     await this.audit(name, 'update', md, content, 'updated')
+    this.notifyMutation({ action: 'update', name, filePath: dir })
     return { ok: true, message: `Skill "${name}" updated.`, path: dir }
   }
 
@@ -592,6 +620,7 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     await this.io.writeText(target, patched.trimEnd() + '\n')
     await this.audit(name, 'patch', md, patched, `patched ${patchLabel}`)
+    this.notifyMutation({ action: 'patch', name, filePath: dir })
     return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir }
   }
 
@@ -628,6 +657,7 @@ export class SkillLibrary {
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
     await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
     await this.audit(name, 'archive', md, null, reason)
+    this.notifyMutation({ action: 'archive', name, archivedPath: dest })
     return { ok: true, message: `Skill "${name}" archived to .archive.`, path: dest }
   }
 
@@ -687,6 +717,7 @@ export class SkillLibrary {
       }
       return { ok: false, message: `Consolidation failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
     }
+    this.notifyMutation({ action: 'consolidate', name: targetName, filePath: targetDir })
     return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
   }
 
@@ -718,6 +749,7 @@ export class SkillLibrary {
     if (await this.io.exists(join(dest, '.archive-reason'))) {
       await this.io.remove(join(dest, '.archive-reason'))
     }
+    this.notifyMutation({ action: 'restore', name, filePath: dest })
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
 
@@ -741,6 +773,7 @@ export class SkillLibrary {
     const existing = await this.io.readText(target).catch(() => null)
     await this.io.writeText(target, content)
     await this.audit(name, 'write_file', existing, content, `wrote ${filePath}`)
+    this.notifyMutation({ action: 'write_file', name, filePath: target })
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
 
@@ -762,6 +795,7 @@ export class SkillLibrary {
     const before = await this.io.readText(target).catch(() => null)
     await this.io.remove(target)
     await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
+    this.notifyMutation({ action: 'remove_file', name, filePath: target })
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
   }
 
@@ -785,9 +819,11 @@ export class SkillLibrary {
       dest = join(backupRoot, `skills-${stamp}-${Math.random().toString(36).slice(2, 8)}`)
     }
     const names = await listNames(this.root, this.io)
-    for (const name of names) {
+    // Parallel copies: snapshot backups touch disjoint directories, and the
+    // per-path write locks never contend (P2-6).
+    await Promise.all(names.map(async (name) => {
       await this.io.copy(this.dirOf(name), join(dest, name))
-    }
+    }))
     // Sidecar co-snapshot: a rollback that restores the tree but leaves the
     // post-archival usage/suppression state behind would immediately let the
     // curator re-decide on stale records (rollback integrity).
@@ -809,12 +845,11 @@ export class SkillLibrary {
       await this.io.copy(archiveRoot, join(dest, '.archive'))
       hasArchive = true
     }
-    const extraNames: string[] = []
-    for (const extra of extras) {
-      if (!SNAPSHOT_EXTRA_NAME_RE.test(extra.name)) continue
+    const validExtras = extras.filter(extra => SNAPSHOT_EXTRA_NAME_RE.test(extra.name))
+    const extraNames = validExtras.map(extra => extra.name)
+    await Promise.all(validExtras.map(async (extra) => {
       await this.io.writeText(join(dest, 'extras', extra.name), extra.content)
-      extraNames.push(extra.name)
-    }
+    }))
     await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({
       reason,
       createdAt: new Date().toISOString(),
@@ -933,6 +968,9 @@ export class SkillLibrary {
       }
     }
     const snapshotExtras = await this.readSnapshotExtras(latest.path)
+    // Whole-tree replacement: a single synthetic event invalidates the catalog
+    // regardless of how many skills the restore touched (decision C).
+    this.notifyMutation({ action: 'restore', name: 'snapshot' })
     return {
       ok: true,
       message: `Restored skill tree from ${latest.path}`,

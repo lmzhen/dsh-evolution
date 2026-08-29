@@ -382,7 +382,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async function executeSkillDirect(skillArgs: SkillOp): Promise<{ ok: boolean; message: string }> {
       const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
       if (!io) return { ok: false, message: 'evolution-io service not mounted' }
-      const library = new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()))
+      const library = new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
       const op = skillArgs
       const name = op.name ?? ''
       const origin: WriteOrigin = origins.library

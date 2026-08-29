@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { nodeEvolutionIo, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
@@ -566,6 +566,150 @@ Ancient body.
 
     await rm(home, { recursive: true, force: true })
 
+  })
+
+  it('control-plane consolidate enforces the full gate set (P1-8)', async () => {
+
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-consolidate-gate-'))
+
+    const previous = process.env.DSH_HOME
+
+    process.env.DSH_HOME = home
+
+    const ctx = new Context()
+
+    await ctx.plugin(EvolutionIoRegistry)
+
+    await ctx.plugin(NodeIo)
+
+    await ctx.plugin(EvolutionCurator, {
+
+      enabled: true,
+
+      excludeSkillNames: ['excluded-source'],
+
+      referencedSkillNames: ['referenced-source'],
+
+    })
+
+    const skills = ctx.evolutionCurator.skills
+
+    const body = (name: string) => `---
+
+name: ${name}
+
+description: ${name}
+
+---
+
+Body of ${name}.
+
+`
+
+    for (const name of ['target-skill', 'excluded-source', 'referenced-source', 'suppressed-source', 'plan']) {
+
+      await skills.create(name, body(name), 'foreground')
+
+    }
+
+    // The suppression sidecar is the third gate channel.
+
+    await saveSuppressedNames(skills.root, new Set(['suppressed-source']), nodeEvolutionIo())
+
+    // Each protected direction is refused with the gate message.
+
+    const viaExclude = await ctx.evolutionCurator.consolidate('target-skill', ['excluded-source'])
+
+    expect(viaExclude.ok).toBe(false)
+
+    expect(viaExclude.message).toContain('protected from consolidation')
+
+    const viaReferenced = await ctx.evolutionCurator.consolidate('target-skill', ['referenced-source'])
+
+    expect(viaReferenced.ok).toBe(false)
+
+    const viaSuppressed = await ctx.evolutionCurator.consolidate('target-skill', ['suppressed-source'])
+
+    expect(viaSuppressed.ok).toBe(false)
+
+    // Protected builtins are blocked as target AND as source.
+
+    const builtinTarget = await ctx.evolutionCurator.consolidate('plan', ['target-skill'])
+
+    expect(builtinTarget.ok).toBe(false)
+
+    const builtinSource = await ctx.evolutionCurator.consolidate('target-skill', ['plan'])
+
+    expect(builtinSource.ok).toBe(false)
+
+    // Nothing was consumed: the whole tree is intact.
+
+    expect((await skills.list()).map(s => s.name).sort()).toEqual([
+
+      'excluded-source', 'plan', 'referenced-source', 'suppressed-source', 'target-skill',
+
+    ])
+
+    if (previous === undefined) delete process.env.DSH_HOME
+
+    else process.env.DSH_HOME = previous
+
+    await rm(home, { recursive: true, force: true })
+
+  })
+
+  it('retains only the newest 20 reports by startedAt and prunes their digests (G6)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-g6-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+
+    const reportsRoot = join(home, 'evolution', 'reports')
+    await mkdir(reportsRoot, { recursive: true })
+    for (let i = 0; i < 25; i += 1) {
+      const startedAt = new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()
+      const report = {
+        schemaVersion: 1,
+        runId: `seed-${i}`,
+        startedAt,
+        finishedAt: startedAt,
+        staleCandidates: [],
+        llmNominations: [],
+        archiveCandidates: [],
+        archived: [],
+        failed: [],
+      }
+      await writeFile(join(reportsRoot, `curator-seed-${i}.json`), JSON.stringify(report))
+    }
+    // An unclassifiable report must never be pruned (we cannot order it).
+    await writeFile(join(reportsRoot, 'curator-corrupt.json'), '{not json')
+
+    // One real run (dry-run: reports are persisted, no tree mutation).
+    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
+
+    const names = await readdir(reportsRoot)
+    const jsons = names.filter(name => name.endsWith('.json')).sort()
+    // 20 kept + the corrupt one that retention refuses to classify/delete.
+    expect(jsons).toHaveLength(21)
+    expect(jsons).toContain('curator-corrupt.json')
+    expect(jsons).not.toContain('curator-seed-0.json')
+    expect(jsons).not.toContain('curator-seed-5.json')
+    expect(jsons).toContain('curator-seed-24.json')
+    const digests = names.filter(name => name.endsWith('.md'))
+    // The run's own digest is written; seed digests were never created.
+    expect(digests).toHaveLength(1)
+
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
   })
 
 })

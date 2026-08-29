@@ -202,7 +202,7 @@ export function apply(ctx: Context): void {
         }
 
         function withSkills(): SkillLibrary {
-          return new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()))
+          return new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
         }
 
         async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {

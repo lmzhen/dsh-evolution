@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -138,7 +138,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    this.skills = new SkillLibrary(undefined, this.io)
+    this.skills = new SkillLibrary(undefined, this.io, undefined, (event) => { this.ctx.emit('evolution/skill-mutated', event) })
     this.enabled = config.enabled ?? true
     this.intervalHours = config.intervalHours ?? DEFAULT_CURATOR_INTERVAL_HOURS
     this.staleAfterDays = config.staleAfterDays ?? DEFAULT_STALE_AFTER_DAYS
@@ -511,6 +511,10 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const reportsRoot = join(evolutionHome(), 'reports')
     try {
       await this.io.writeText(join(reportsRoot, `curator-${runId}.json`), JSON.stringify(report, null, 2))
+      // Human-readable digest alongside the JSON (G6); pruned with the same
+      // retention pass below.
+      await this.io.writeText(join(reportsRoot, `curator-${runId}.md`), renderCuratorReportMarkdown(report))
+      await this.retainReports(20)
     } catch (error) {
       // Report persistence is best-effort; curation decisions already landed.
       this.ctx.logger.warn(`evolution-curator: failed to persist report ${runId}`)
@@ -717,6 +721,48 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       latest = Math.max(latest, last)
     }
     return latest > 0 && Date.now() - latest < this.minIdleHours * 3_600_000
+  }
+
+  /**
+   * Keep only the newest N curator reports, ordered by the report's own
+   * `startedAt` (the runId is a UUID and cannot order history). Best-effort
+   * like `retainSnapshots`: a failed removal must not fail the run that just
+   * persisted its report. The paired `.md` digest is pruned with its JSON.
+   */
+  private async retainReports(keep: number): Promise<void> {
+    const reportsRoot = join(evolutionHome(), 'reports')
+    let entries: string[]
+    try {
+      entries = await this.io.list(reportsRoot)
+    } catch {
+      return
+    }
+    const dated: Array<{ name: string; startedAt: number }> = []
+    for (const name of entries.filter(entry => entry.startsWith('curator-') && entry.endsWith('.json'))) {
+      try {
+        const raw = await this.io.readText(join(reportsRoot, name))
+        if (raw === null) continue
+        const parsed = JSON.parse(raw) as { startedAt?: string }
+        const startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN
+        if (Number.isFinite(startedAt)) dated.push({ name, startedAt })
+      } catch {
+        // Unclassifiable report: keep it — never delete what we cannot order.
+      }
+    }
+    dated.sort((a, b) => b.startedAt - a.startedAt)
+    for (const oldReport of dated.slice(keep)) {
+      const stem = oldReport.name.replace(/\.json$/, '')
+      try {
+        await this.io.remove(join(reportsRoot, oldReport.name))
+      } catch {
+        // Best-effort pruning.
+      }
+      try {
+        await this.io.remove(join(reportsRoot, `${stem}.md`))
+      } catch {
+        // The digest may already be gone (or never existed); keep going.
+      }
+    }
   }
 
   async latestReport(): Promise<CuratorRunReport | null> {
