@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { nodeEvolutionIo, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { computeLifecycleTransitions, emptyRecord, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
@@ -743,6 +743,28 @@ Body of ${name}.
       else process.env.DSH_HOME = previous
       await rm(home, { recursive: true, force: true })
     }
+  })
+
+  it('garbage activity timestamps fall back to created_at and still transition (N-3)', () => {
+    const now = new Date('2026-08-01T00:00:00.000Z')
+    const dirty = {
+      ...emptyRecord(),
+      created_by: 'agent',
+      created_at: new Date(now.getTime() - 400 * 86_400_000).toISOString(),
+      use_count: 1,
+      last_used_at: 'not-a-date',
+    }
+    const normalized = normalizeUsageRecord(dirty)
+    // A garbage last_used_at is treated as "never" (null), so the idle clock
+    // falls back to the (old, valid) created_at instead of computing NaN and
+    // silently dropping the record from every transition decision.
+    expect(normalized.last_used_at).toBeNull()
+    const result = computeLifecycleTransitions(
+      new Map([['dirty-skill', normalized]]),
+      { staleAfterDays: 30, archiveAfterDays: 90, manageUnmanaged: false },
+      now,
+    )
+    expect(result.archive).toContain('dirty-skill')
   })
 
 })

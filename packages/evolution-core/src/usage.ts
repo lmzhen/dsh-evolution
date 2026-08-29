@@ -46,7 +46,11 @@ export function emptyRecord(): UsageRecord {
   }
 }
 
-const isTimestamp = (value: unknown): value is string | null => value === null || typeof value === 'string'
+/** A timestamp passes only when `Date.parse` yields a finite epoch (N-3): a bare
+ * string check let garbage like "not-a-date" propagate as Invalid Date → NaN
+ * into quality math and lifecycle comparisons. */
+const validTimestamp = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value))
+const nullableTimestamp = (value: unknown): value is string | null => value === null || validTimestamp(value)
 
 /**
  * Field-level normalization for one sidecar record (rc.42 audit P2-3): the
@@ -55,6 +59,8 @@ const isTimestamp = (value: unknown): value is string | null => value === null |
  * NaN. Every field falls back to its `emptyRecord()` baseline unless it has
  * exactly the declared type; an invalid `created_at` anchors the age clock at
  * now (first-sight defer semantics for a record whose age is unknowable).
+ * Timestamps additionally require a parseable date (N-3): `"not-a-date"`
+ * would otherwise survive the type check as Invalid Date.
  * Pure — exported for unit tests; `loadUsage` is the production caller.
  */
 export function normalizeUsageRecord(record: unknown): UsageRecord {
@@ -70,15 +76,15 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
     use_count: num(raw.use_count, base.use_count),
     view_count: num(raw.view_count, base.view_count),
     patch_count: num(raw.patch_count, base.patch_count),
-    last_used_at: isTimestamp(raw.last_used_at) ? raw.last_used_at : base.last_used_at,
-    last_viewed_at: isTimestamp(raw.last_viewed_at) ? raw.last_viewed_at : base.last_viewed_at,
-    last_patched_at: isTimestamp(raw.last_patched_at) ? raw.last_patched_at : base.last_patched_at,
+    last_used_at: nullableTimestamp(raw.last_used_at) ? raw.last_used_at : base.last_used_at,
+    last_viewed_at: nullableTimestamp(raw.last_viewed_at) ? raw.last_viewed_at : base.last_viewed_at,
+    last_patched_at: nullableTimestamp(raw.last_patched_at) ? raw.last_patched_at : base.last_patched_at,
     // An unknowable age anchors at now: the record's inactivity clock starts
     // today instead of counting from epoch.
-    created_at: typeof raw.created_at === 'string' ? raw.created_at : base.created_at,
+    created_at: validTimestamp(raw.created_at) ? raw.created_at : base.created_at,
     state: raw.state === 'stale' || raw.state === 'archived' ? raw.state : 'active',
     pinned: bool(raw.pinned, base.pinned),
-    archived_at: isTimestamp(raw.archived_at) ? raw.archived_at : base.archived_at,
+    archived_at: nullableTimestamp(raw.archived_at) ? raw.archived_at : base.archived_at,
     quality_score: typeof raw.quality_score === 'number' && Number.isFinite(raw.quality_score) ? raw.quality_score : undefined,
     quality_warn: typeof raw.quality_warn === 'boolean' ? raw.quality_warn : undefined,
   }

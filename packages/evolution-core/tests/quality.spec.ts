@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
-import { computeQualityScores, computeDedupGroups } from '@deepseek-ai/dsh-evolution-core'
+import { computeQualityScores, computeDedupGroups, normalizeUsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
-function record(name: string, now: Date, overrides: Partial<{
+function record(now: Date, overrides: Partial<{
   created_at: string
   use_count: number
   patch_count: number
@@ -24,7 +24,7 @@ function record(name: string, now: Date, overrides: Partial<{
 
 it('computes the six quality factors with weighted score', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
-  const usage = new Map([['active-skill', record('active-skill', now, {
+  const usage = new Map([['active-skill', record(now, {
     use_count: 30,
     patch_count: 10,
     last_used_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
@@ -41,7 +41,7 @@ it('computes the six quality factors with weighted score', () => {
 
 it('flags a long-idle, never-used skill as low quality', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
-  const usage = new Map([['zombie', record('zombie', now, {
+  const usage = new Map([['zombie', record(now, {
     created_at: new Date(now.getTime() - 300 * 86_400_000).toISOString(),
     last_used_at: new Date(now.getTime() - 300 * 86_400_000).toISOString(),
   })]])
@@ -51,6 +51,32 @@ it('flags a long-idle, never-used skill as low quality', () => {
   expect(score.factors.mutationMaturity).toBe(0.3)
   expect(score.score).toBeLessThan(0.3)
   expect(score.warn).toBe(true)
+})
+
+it('a garbage created_at normalizes to a finite score instead of NaN (N-3)', () => {
+  // Normalization anchors the garbage created_at at the REAL now; use the
+  // same instant for the quality computation so the record reads as fresh.
+  const now = new Date()
+  const dirty = {
+    created_by: 'agent',
+    created_at: 'not-a-date',
+    use_count: 3,
+    view_count: 0,
+    patch_count: 1,
+    last_used_at: 'not-a-date',
+    last_viewed_at: null,
+    last_patched_at: null,
+    state: 'active',
+    pinned: false,
+    archived_at: null,
+  }
+  const normalized = normalizeUsageRecord(dirty)
+  const score = computeQualityScores({ usage: new Map([['dirty-skill', normalized]]), now }).get('dirty-skill')!
+  expect(Number.isFinite(Date.parse(normalized.created_at))).toBe(true)
+  expect(Number.isFinite(score.score)).toBe(true)
+  expect(score.warn).toBe(false)
+  // Anchored at now: the record reads as brand new, so it is not low quality.
+  expect(score.factors.recency).toBe(1)
 })
 
 it('dedup clusters exact copies and token-neighbors, skipping size-ratio outliers', () => {
@@ -64,3 +90,4 @@ it('dedup clusters exact copies and token-neighbors, skipping size-ratio outlier
   expect(cluster).toContain('b')
   expect(groups.some(group => group.includes('huge'))).toBe(false)
 })
+

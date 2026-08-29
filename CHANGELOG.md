@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — rc.57: L0 data hygiene (N-3 timestamps + N-6 archive snapshots)
+
+- `normalizeUsageRecord` now validates timestamps by `Date.parse` finiteness, not just `typeof string`: a corrupted sidecar carrying `"not-a-date"` / `"2026-13-99"` used to survive as Invalid Date and propagate NaN into the quality-score math and every lifecycle `daysSince` comparison. Garbage activity stamps now fall back to null (treated as "never"), and a garbage `created_at` anchors the age clock at now — matching the semantics the comment already claimed. `last_used_at` / `last_viewed_at` / `last_patched_at` / `archived_at` share the same guard. (N-3)
+- Regression tests on all three consuming faces, failing on the pre-fix code (verified by temporarily reverting the guard): `usage.spec` pins the fallback values, `quality.spec` pins a finite score + boolean warn through `normalizeUsageRecord → computeQualityScores`, `curator.spec` pins a garbage-activity record still transitioning on its valid `created_at` instead of vanishing from every decision via NaN. (N-3)
+- `SkillLibrary.archive` collision guard: two re-archives of one skill within the same second used to share one stamped destination and overwrite each other; the stamp probe now keeps appending a random suffix while the destination exists, mirroring the `snapshotAll` guard. Regression test archives the same skill three times in one second and asserts three distinct, complete destinations. (N-6)
+- `retainSnapshots` comment now states the actual behavior (older snapshots removed outright) instead of claiming a `.backups history` fold that never existed. (N-6)
+
 ## Unreleased — rc.56: platform-version reconciliation (N-2) + CI range guard
 
 The v2 audit's second P1: publish metadata declared `@deepseek-ai/dsh-*` peer ranges as `^0.1.0-rc.6` (`UPSTREAM_VERSION`) while the compat gate validated the release against `dsh-v0.1.1-rc.2` — under semver prerelease rules `^0.1.0-rc.6` does not match `0.1.1-rc.2`, so the declared support range silently diverged from the platform actually validated.

@@ -363,3 +363,22 @@ it('list() reports dot-prefixed protection markers with bundled-hub-pinned prece
   expect(by.get('rep-pinned')?.managed).toBe(false)
   await rm(root, { recursive: true, force: true })
 })
+
+it('same-second re-archives get unique stamped destinations (N-6)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-arc-n6-'))
+  const lib = new SkillLibrary(root)
+  const paths: string[] = []
+  // Three create→archive rounds within one second: without the collision
+  // guard the third round reuses the same stamped destination of the second.
+  for (let i = 0; i < 3; i += 1) {
+    await lib.create('collide-skill', USABLE('collide-skill'), 'foreground')
+    const result = await lib.archive('collide-skill')
+    expect(result.ok).toBe(true)
+    expect(result.path).toBeDefined()
+    paths.push(result.path as string)
+    const md = await nodeEvolutionIo().readText(join(result.path as string, 'SKILL.md'))
+    expect(md).toContain('Body of collide-skill.')
+  }
+  expect(new Set(paths).size).toBe(3)
+  await rm(root, { recursive: true, force: true })
+})

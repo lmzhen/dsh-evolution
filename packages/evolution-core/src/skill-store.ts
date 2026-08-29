@@ -655,6 +655,13 @@ export class SkillLibrary {
     if (await this.io.exists(dest)) {
       const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
       dest = join(archiveRoot, `${name.trim()}-${stamp}`)
+      // Stamp collisions within one second (N-6): two re-archives of the same
+      // name in the same second used to share one stamped destination and
+      // overwrite each other. Keep probing with a random suffix, mirroring the
+      // snapshotAll() collision guard.
+      while (await this.io.exists(dest)) {
+        dest = join(archiveRoot, `${name.trim()}-${stamp}-${Math.random().toString(36).slice(2, 8)}`)
+      }
     }
     // Symlink guard (G7): moving a symlinked tree would relocate the link, not
     // the content it points at — refuse before the rename instead.
@@ -903,7 +910,7 @@ export class SkillLibrary {
     }
   }
 
-  /** Keep only the newest N snapshots (Hermes keep=5 parity); oldest folded into .backups history. */
+  /** Keep only the newest N snapshots (Hermes keep=5 parity); older ones are removed outright. */
   private async retainSnapshots(keep: number): Promise<void> {
     const snapshots = await this.listSnapshots()
     for (const snapshot of snapshots.slice(keep)) {

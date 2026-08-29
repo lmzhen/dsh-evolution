@@ -34,6 +34,23 @@ describe('usage sidecar field normalization (P2-3)', () => {
     expect(typeof record.created_at).toBe('string')
   })
 
+  it('garbage timestamps fall back instead of propagating Invalid Date (N-3)', () => {
+    const record = normalizeUsageRecord({
+      created_at: 'not-a-date',
+      last_used_at: '2026-13-99',
+      last_viewed_at: 'not a date either',
+      last_patched_at: '2026-01-01T00:00:00.000Z',
+      archived_at: 'garbage',
+    })
+    // A garbage created_at anchors the age clock at now (finite ISO); null is
+    // still valid for the optional activity stamps.
+    expect(Number.isFinite(Date.parse(record.created_at))).toBe(true)
+    expect(record.last_used_at).toBeNull()
+    expect(record.last_viewed_at).toBeNull()
+    expect(record.last_patched_at).toBe('2026-01-01T00:00:00.000Z')
+    expect(record.archived_at).toBeNull()
+  })
+
   it('keeps well-typed records byte-for-byte intact', () => {
     const good = {
       created_by: 'agent',
