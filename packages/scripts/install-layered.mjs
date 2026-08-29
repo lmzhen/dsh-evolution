@@ -230,11 +230,42 @@ async function resolveStandardComposition() {
 }
 
 /**
+ * Row id set of a composition fragment — lightweight line parse, no YAML
+ * library (v2 §10 scope control). Only `- id:` rows count; a row whose id
+ * appears in BOTH fragments would mount twice in the generated composition.
+ */
+function rowIds(composition) {
+  const ids = new Set()
+  for (const line of composition.split('\n')) {
+    const match = /^- id:\s*(\S+)/.exec(line)
+    if (match) ids.add(match[1])
+  }
+  return ids
+}
+
+/**
  * Build the installed Evolution preset composition: the runtime platform's
  * `standard` rows verbatim, then the evolution delta. The delta stays the
  * only evolution-owned text, so the preset tracks every platform version.
+ *
+ * N-5 collision guard: an id present in BOTH fragments would mount twice
+ * (worse, the duplicate could shadow the platform row). Fails loud; the
+ * `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1` escape lets an upstream that absorbs
+ * a delta row into standard transition (warn + keep both, mounting twice).
  */
 export function generateAgentPreset(standardComposition, deltaComposition) {
+  const standardIds = rowIds(standardComposition)
+  const deltaIds = rowIds(deltaComposition)
+  const collisions = [...deltaIds].filter(id => standardIds.has(id)).sort()
+  if (collisions.length > 0 && process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS !== '1') {
+    throw new Error(
+      `install-layered: evolution delta rows collide with runtime standard rows: ${collisions.join(', ')}. `
+      + 'Remove them from the delta, or set DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1 to keep both (the row will mount twice).',
+    )
+  }
+  if (collisions.length > 0) {
+    console.warn(`install-layered: warning — delta rows collide with standard rows (${collisions.join(', ')}); keeping both (DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1)`)
+  }
   return `${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`
 }
 
@@ -243,7 +274,9 @@ async function installAgentPreset(home, dryRun, force) {
   // The generated composition always resolves, also in dry-run: a preset that
   // cannot be built from the runtime platform should be reported up front.
   const standardComposition = await resolveStandardComposition()
-  const deltaPath = join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
+  // DSH_EVOLUTION_DELTA_PATH lets tests (and one-off builds) inject the delta
+  // fragment; the packaged evolution-agent/agent.cordis.yml stays the default.
+  const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
   const deltaComposition = await readFile(deltaPath, 'utf8')
   const composition = generateAgentPreset(standardComposition, deltaComposition)
   if (!dryRun) {

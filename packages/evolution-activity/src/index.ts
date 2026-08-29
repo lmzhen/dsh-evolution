@@ -18,8 +18,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, evolutionIoAdapter, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 /** One persisted plan outcome (payload v2 of `evolution/plan-applied`). */
@@ -40,12 +40,6 @@ export const ACTIVITY_FILE_VERSION = 2
 
 export function activityFile(root: string): string {
   return join(root, 'activity.json')
-}
-
-/** Minimal IO surface the driver needs (subset of `EvolutionIoLike`). */
-export interface ActivityIoLike {
-  readText(path: string): Promise<string | null>
-  writeText(path: string, content: string): Promise<void>
 }
 
 /** Fold one plan-applied payload into a bounded record list (pure). */
@@ -72,8 +66,8 @@ export function applyActivityEvent(
   return [...items, record].slice(-cap)
 }
 
-export async function loadActivity(root: string, io: ActivityIoLike): Promise<EvolutionActivityRecord[]> {
-  const raw = await io.readText(activityFile(root))
+/** Parse a raw sidecar into records; malformed content reads as empty (best-effort telemetry). */
+export function parseActivityContent(raw: string | null): EvolutionActivityRecord[] {
   if (raw === null) return []
   try {
     const parsed = JSON.parse(raw) as unknown
@@ -90,7 +84,11 @@ export async function loadActivity(root: string, io: ActivityIoLike): Promise<Ev
   }
 }
 
-export async function saveActivity(root: string, items: EvolutionActivityRecord[], io: ActivityIoLike): Promise<void> {
+export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
+  return parseActivityContent(await io.readText(activityFile(root)))
+}
+
+export async function saveActivity(root: string, items: EvolutionActivityRecord[], io: EvolutionIoLike): Promise<void> {
   await io.writeText(activityFile(root), JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2))
 }
 
@@ -107,24 +105,27 @@ export const Config: z<Config> = z.object({
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const maxItems = rawConfig.maxItems ?? 200
-  const ioRegistry = ctx.get('evolutionIo') as { provider(): ActivityIoLike } | undefined
+  const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
   if (!ioRegistry) {
     ctx.logger.warn('evolution-activity: no evolution IO provider mounted; plan outcomes will not be persisted')
     return
   }
-  const io: ActivityIoLike = {
-    readText: path => ioRegistry.provider().readText(path),
-    writeText: (path, content) => ioRegistry.provider().writeText(path, content),
-  }
+  // Lazy adapter: forwards transact (N-4) when the backend provides it — the
+  // fold then runs inside one cross-process lock, so a second process sharing
+  // DSH_HOME cannot interleave between our read and write.
+  const io = evolutionIoAdapter(() => ioRegistry.provider())
   const root = evolutionHome()
-  // In-process serialization: each event is one load→fold→save cycle, so
-  // concurrent outcomes can never overwrite each other's newest record.
+  // In-process serialization: each event is one transactIo cycle, so
+  // concurrent outcomes in THIS process can never overwrite each other's
+  // newest record (the backend lock covers other processes).
   let chain: Promise<unknown> = Promise.resolve()
   ctx.on('evolution/plan-applied', (event) => {
-    const run = chain.then(async () => {
-      const items = await loadActivity(root, io)
-      await saveActivity(root, applyActivityEvent(items, event, maxItems), io)
-    })
+    const run = chain.then(() =>
+      transactIo(io, activityFile(root), (current) => {
+        const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
+        return Promise.resolve(JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2))
+      }),
+    )
     chain = run.then(() => undefined, () => undefined)
     run.catch((error: unknown) => {
       // Persistence is best-effort: the outcome was already applied upstream.

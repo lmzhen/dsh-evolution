@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,8 +12,8 @@ import { insertedRows, rowIds } from '../../test-support/cordis-rows.ts'
 const run = promisify(execFile)
 const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
 
-async function runInstaller(home: string, mode: string, profile = 'evo-test', extra: string[] = []) {
-  return run(process.execPath, [installer, '--mode', mode, '--profile', profile, '--home', home, ...extra])
+async function runInstaller(home: string, mode: string, profile = 'evo-test', extra: string[] = [], env: Record<string, string> = {}) {
+  return run(process.execPath, [installer, '--mode', mode, '--profile', profile, '--home', home, ...extra], { env: { ...process.env, ...env } })
 }
 
 describe('layered installer', () => {
@@ -82,4 +82,36 @@ describe('layered installer', () => {
     await expect(readFile(join(dryHome, 'profiles', 'evo-test', 'package.json'), 'utf8')).rejects.toThrow()
     await rm(dryHome, { recursive: true, force: true })
   })
+
+  it('rejects a delta that collides with runtime standard rows (N-5)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-n5-'))
+    const standard = '# runtime standard\n- id: persona\n- id: tool-session-query\n- id: dsh-tools\n'
+    const delta = '# evolution delta\n- id: tool-memory\n- id: tool-session-query\n'
+    await mkdir(join(home, 'preset', 'standard'), { recursive: true })
+    await writeFile(join(home, 'preset', 'standard', 'agent.cordis.yml'), standard)
+    await writeFile(join(home, 'delta.yml'), delta)
+    const error = await runInstaller(home, 'layered', 'evo-n5', ['--dry-run'], {
+      DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      DSH_EVOLUTION_DELTA_PATH: join(home, 'delta.yml'),
+    }).then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(error).not.toBeNull()
+    expect(error?.stderr).toContain('tool-session-query')
+    await rm(home, { recursive: true, force: true })
+  }, 20_000)
+
+  it('keeps both rows under the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (N-5)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-n5b-'))
+    const standard = '- id: persona\n- id: tool-session-query\n'
+    const delta = '- id: tool-memory\n- id: tool-session-query\n'
+    await mkdir(join(home, 'preset', 'standard'), { recursive: true })
+    await writeFile(join(home, 'preset', 'standard', 'agent.cordis.yml'), standard)
+    await writeFile(join(home, 'delta.yml'), delta)
+    const { stderr } = await runInstaller(home, 'layered', 'evo-n5b', ['--dry-run'], {
+      DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      DSH_EVOLUTION_DELTA_PATH: join(home, 'delta.yml'),
+      DSH_EVOLUTION_ALLOW_ROW_COLLISIONS: '1',
+    })
+    expect(stderr).toContain('collide with standard rows')
+    await rm(home, { recursive: true, force: true })
+  }, 20_000)
 })

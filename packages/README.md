@@ -12,7 +12,6 @@ policy, prompts, routing, state, and audit history are control-plane data.
 
 | Package | Role |
 |---|---|
-| `dsh-evolution` | Legacy one-row facade + shared stores/prompts/signals (compatibility) |
 | `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
@@ -55,10 +54,10 @@ evolution tools.
 
 ### One-click compatibility install
 
-Use the legacy preset overlay on a standard DSH host:
+Use the compatibility preset overlay on a standard DSH host:
 
 ```yaml
-- id: dsh-evolution
+- id: dsh-evolution-preset
   name: '@deepseek-ai/dsh-evolution-preset'
 ```
 

@@ -46,9 +46,22 @@ runs:
       shell: bash
       run: |
         mkdir -p upstream/packages/evolution
-        cp tsconfig.base.json upstream/tsconfig.base.json
         if [ "${{ inputs.copy_host_tsconfig }}" = "true" ]; then
+          # Baseline job: the mirror owns the root configs — it overlays the
+          # pinned dev tree (UPSTREAM_SHA checkout) with OUR base/host files
+          # (the baseline tree has no evolution alias paths otherwise).
+          cp tsconfig.base.json upstream/tsconfig.base.json
           cp tsconfig.host.json upstream/tsconfig.host.json
+        else
+          # Released-upstream compat job (N-7 purity): the target tree is a
+          # REAL released dsh commit; its own root configs must stay untouched
+          # so the chain validates the tree as shipped. Only the evolution
+          # alias paths are injected (single source: the mirror base's
+          # evolution lines), and the script fails loudly if the released tree
+          # already declares one of those keys.
+          node packages/scripts/inject-evolution-paths.mjs \
+            upstream/tsconfig.base.json \
+            tsconfig.base.json
         fi
         cp -r packages/. upstream/packages/evolution/
         rm -rf upstream/packages/evolution/node_modules \

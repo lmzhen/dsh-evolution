@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
-import { nodeEvolutionIo, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { ACTIVITY_FILE_VERSION, activityFile, apply, applyActivityEvent, loadActivity, type EvolutionActivityRecord } from '../src/index.ts'
+import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
+import { ACTIVITY_FILE_VERSION, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, type EvolutionActivityRecord } from '../src/index.ts'
 
 function payload(overrides: Partial<EvolutionPlanAppliedEvent> = {}): EvolutionPlanAppliedEvent {
   return {
@@ -31,6 +31,47 @@ async function pollUntil(root: string, lastPlanId: string, timeoutMs = 8_000): P
     if (items.some(item => item.planId === lastPlanId) || Date.now() > deadline) return items
     await new Promise(resolve => setTimeout(resolve, 25))
   }
+}
+
+/** In-memory backend. With `withTransact` it serializes RMW like the node file
+ * lock — each task delays inside the lock, so interleaving would be certain
+ * without it. */
+function fakeIo(withTransact: boolean): EvolutionIoLike {
+  let content: string | null = null
+  let tail: Promise<unknown> = Promise.resolve()
+  const io: EvolutionIoLike = {
+    readText: async () => {
+      await new Promise(resolve => setTimeout(resolve, 5))
+      return content
+    },
+    writeText: async (_path, next) => {
+      await new Promise(resolve => setTimeout(resolve, 5))
+      content = next
+    },
+    remove: async () => {
+      content = null
+    },
+    list: async () => [],
+    exists: async () => content !== null,
+    rename: async () => {},
+    copy: async () => {},
+  }
+  if (withTransact) {
+    io.transact = (_path, task) => {
+      // Backend lock: serialize task entry, then run the RMW inside it.
+      const run = tail.then(() => task(content).then((next) => {
+        if (next === null) content = null
+        else content = next
+      }))
+      tail = run.then(() => undefined, () => undefined)
+      return run
+    }
+  }
+  return io
+}
+
+function serialize(items: EvolutionActivityRecord[]): string {
+  return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
 }
 
 describe('evolution-activity store', () => {
@@ -126,6 +167,26 @@ describe('evolution-activity store', () => {
     ctx.emit('evolution/plan-applied', payload())
     await new Promise(resolve => setTimeout(resolve, 10))
     await ctx.fiber.dispose()
+  })
+
+  it('concurrent folds inside transact never drop a record (N-4)', async () => {
+    const io = fakeIo(true)
+    const file = activityFile('root')
+    // Two "processes" fold concurrently: each reads inside the backend lock,
+    // so the second sees the first's fold instead of resurrecting an empty list.
+    await Promise.all([
+      transactIo(io, file, async current => serialize(applyActivityEvent(parseActivityContent(current), payload({ planId: 'a1' }), 10))),
+      transactIo(io, file, async current => serialize(applyActivityEvent(parseActivityContent(current), payload({ planId: 'b1' }), 10))),
+    ])
+    const items = parseActivityContent(await io.readText(file))
+    expect(items.map(item => item.planId).sort()).toEqual(['a1', 'b1'])
+  })
+
+  it('falls back to plain read+write when the backend has no transact (N-4)', async () => {
+    const io = fakeIo(false)
+    const file = activityFile('root')
+    await transactIo(io, file, async current => serialize(applyActivityEvent(parseActivityContent(current), payload(), 10)))
+    expect(await io.readText(file)).toContain('plan-1')
   })
   it('clamps a non-positive maxItems so the sidecar stays bounded (rc.42 regression)', () => {
 

@@ -231,8 +231,9 @@ turn/end
   -> process event + activity store record the outcome
 ```
 
-The review subagent is allowed `skill`, `skill_search`, and `skill_load` by
-default so it also works under Anchored Standard presets.
+The review subagent is allowed `skill` by default (`reviewToolAllow`), so it
+also works under Anchored Standard presets; extend it to the discovery pair
+when the platform exposes `skill_search`/`skill_load`.
 
 ### Curator
 
@@ -315,8 +316,9 @@ packages/
 - Explicitly tested against the real Anchored Standard bootstrap plugin:
   evolution tools stay hidden during bootstrap, remain hidden after promotion,
   and appear only after `dev_tool_search` unlocks them.
-- Review subagents default to `skill`, `skill_search`, and `skill_load` for
-  Anchored Standard compatibility.
+- Review subagents default to `skill` (`reviewToolAllow`); `skill_search` /
+  `skill_load` are opt-in extras where the platform exposes them — extend via
+  `reviewToolAllow` in a profile overlay.
 
 ---
 
@@ -340,7 +342,8 @@ A profile can override every stable row id. Examples:
   config:
     provider: json
 
-# extend review tooling
+# extend review tooling (default is [skill]; search/load exist only
+# where the platform exposes them)
 - id: evolution-review
   config:
     reviewToolAllow: [skill, skill_search, skill_load, read]
@@ -353,6 +356,12 @@ compatibility layers stay synchronized.
 
 ## Development and tests
 
+Two layouts carry the same sources: the dev tree / CI overlay path
+(`packages/evolution/scripts/`... inside the harness checkout) and the flat
+mirror path (`packages/scripts/`... in this repository). Every change must be
+synced to both — a script edited on one side only is how the rc.51
+`tsdown.package.config.ts` drift happened (D-7).
+
 Inside the DeepSeek Harness monorepo:
 
 ```bash
@@ -360,12 +369,9 @@ tsc -b tsconfig.host.json --force
 vitest run packages/evolution
 ```
 
-Current gate status:
-
-```text
-tsc     0 errors
-vitest  45 files / 90 tests passing
-```
+Current gate status: validated continuously by CI (baseline anchor +
+released-upstream compat check); the test/lint numbers live in the CI logs
+and are not pinned here.
 
 Test families include state concurrency, memory drift and budget boundaries,
 skill archival fallback, approval atomicity, Anchored Standard compatibility,
