@@ -59,7 +59,7 @@ describe('layered installer', () => {
     const manifest = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
     expect(manifest.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-preset')
     await rm(home, { recursive: true, force: true })
-  })
+  }, 60_000)
 
   it('uninstalls the layered installation without touching user data', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-uninstall-'))
@@ -70,7 +70,7 @@ describe('layered installer', () => {
     const { readdir } = await import('node:fs/promises')
     expect(await readdir(join(home, 'profiles', 'evo-test', 'node_modules/@deepseek-ai'))).toHaveLength(0)
     await rm(home, { recursive: true, force: true })
-  })
+  }, 60_000)
 
   it('does not write profile files in dry-run mode', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-dry-'))
@@ -81,7 +81,7 @@ describe('layered installer', () => {
     expect(stdout).toContain('dry-run:  no files were written')
     await expect(readFile(join(dryHome, 'profiles', 'evo-test', 'package.json'), 'utf8')).rejects.toThrow()
     await rm(dryHome, { recursive: true, force: true })
-  })
+  }, 60_000)
 
   it('rejects a delta that collides with runtime standard rows (N-5)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-n5-'))

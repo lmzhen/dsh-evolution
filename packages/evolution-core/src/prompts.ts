@@ -295,4 +295,10 @@ Quality bar:
 - Prefer verbatim flags, paths, and APIs from the source. Never invent them.
 - Keep it tight: ~100 lines simple, ~200 complex.
 - No router/index/hub skills that only point at other skills.
-- References go in \`references/\`, templates in \`templates/\`.`
+- References go in \`references/\`, templates in \`templates/\`.
+
+Learn workflow (when the user asks you to learn a reusable skill, or you decide to turn a source/request into one):
+1. Gather every source named (files, URLs, "what we just did", pasted notes) with the tools you already have — and treat prose after a source as authoring requirements, not noise.
+2. Apply every requirement and constraint from the request to the SKILL.md you author.
+3. Author exactly ONE SKILL.md and save it with \`skill_manage\` (action=create); non-trivial scripts go under \`scripts/\`.
+4. When done, tell the user the skill name, its category, and a one-line summary of what it captured.`

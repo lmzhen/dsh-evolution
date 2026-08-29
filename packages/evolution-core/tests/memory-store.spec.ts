@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MemoryStore, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { MemoryStore, nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 it('memory add and batch (replace/remove semantics via applyBatch)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-'))
@@ -253,4 +253,58 @@ it('memory recoverable errors carry a bounded current-entries preview (G5)', asy
   expect(batch.message).toContain('old_text is required')
   expect(batch.message).toContain('Current entries (preview):')
   await rm(root, { recursive: true, force: true })
+})
+
+/** In-memory backend; with `withTransact` it serializes RMW like the node lock. */
+function memoryFakeIo(withTransact: boolean): EvolutionIoLike {
+  const files = new Map<string, string>()
+  let tail: Promise<unknown> = Promise.resolve()
+  const io: EvolutionIoLike = {
+    readText: async path => files.get(path) ?? null,
+    writeText: async (path, content) => { files.set(path, content) },
+    remove: async (path) => { files.delete(path) },
+    list: async () => [],
+    exists: async path => files.has(path),
+    rename: async (from, to) => { const v = files.get(from); if (v !== undefined) { files.delete(from); files.set(to, v) } },
+    copy: async (from, to) => { const v = files.get(from); if (v !== undefined) files.set(to, v) },
+  }
+  if (withTransact) {
+    io.transact = (_path, task) => {
+      const run = tail.then(() => task(files.get(_path) ?? null).then((next) => {
+        if (next === null) files.delete(_path)
+        else files.set(_path, next)
+      }))
+      tail = run.then(() => undefined, () => undefined)
+      return run
+    }
+  }
+  return io
+}
+
+it('concurrent batch writes to one memory file never drop a record (P1-①)', async () => {
+  const io = memoryFakeIo(true)
+  const storeA = new MemoryStore({ root: 'root', io })
+  const storeB = new MemoryStore({ root: 'root', io })
+  // Two "processes" fold concurrently: each read-modify-write runs inside the
+  // backend lock, so both records survive (the old read outside / write path
+  // would compute on the same old entries and the last rename wins).
+  await Promise.all([
+    storeA.applyBatch('memory', [{ action: 'add', facts: 'alpha record' }]),
+    storeB.applyBatch('memory', [{ action: 'add', facts: 'beta record' }]),
+  ])
+  const entries = await storeA.read('memory')
+  expect(entries).toHaveLength(2)
+  expect(entries).toContain('alpha record')
+  expect(entries).toContain('beta record')
+})
+
+it('memory add also runs inside the transaction (P1-①)', async () => {
+  const io = memoryFakeIo(true)
+  const store = new MemoryStore({ root: 'root', io })
+  await Promise.all([
+    store.add('memory', 'gamma record'),
+    store.add('memory', 'delta record'),
+  ])
+  const entries = await store.read('memory')
+  expect(entries).toHaveLength(2)
 })

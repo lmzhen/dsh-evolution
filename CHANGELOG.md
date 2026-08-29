@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — rc.62: engineering-debt closeout (P1 ①②③ + P2 ④⑤⑥)
+
+All six items from the formalization-readiness inventory landed in one batch (no release formalization yet — the 0.1.0 move stays a separate operator decision).
+
+- **P1-① memory files transactional**: `MemoryStore.add`/`applyBatch` now run their read-modify-write inside `transactIo` — the last RMW media outside the sidecar inventory. A locked-view drift check replaces the second read (`driftFromRaw`, same formula as `detectDrift`), and every failure/no-op returns the current content unchanged (IMPORTANT: `null` means DELETE in the transact contract — returning null on a no-op wiped the file, caught by the existing regression suite during this batch). Regression tests: concurrent batches through a locking backend keep both records, concurrent adds too.
+- **P1-② layout-sync guard**: `verify-layout-sync.mjs` compares the dev-tree and mirror `scripts/` trees with line-ending normalization — any real drift fails loudly (D-7 class). The batch also discovered and fixed a LIVE drift: the mirror `build-lib.mjs` carried CRLF while dev was LF. Subprocess tests cover identical/modulo-endings, content drift, and one-sided files.
+- **P1-③ sidecar inventory enforced**: the inventory test reads the actual sources and asserts every RMW sidecar (usage / mutations / suppressed / activity / feedback / memory media) implements its write through `transactIo` — the documented list is now a mechanically enforced door. The inventory itself caught `evolution-feedback`: it was in the documented list but still did a plain full overwrite; `flush` now merges with the disk state inside a transact (union by target, in-memory values win) instead of clobbering another process's records. The local vitest harness also gained the missing `evolution-feedback` include.
+- **P2-④ Learn workflow**: `DSH_AUTHORING_STANDARDS` ends with the 4-step learn operation chain (gather sources → apply requirements → author exactly ONE SKILL.md → report name/category/summary), the Hermes `learn_prompt.py` flow adapted to DSH tools.
+- **P2-⑤ merge heuristic input**: curator recommendation candidates now include near-duplicate group members (via `computeDedupGroups` on the tree) in addition to the deterministic scanner's stale names — the LLM sees overlap even when the deterministic side sees nothing. Fake-LLM test asserts both members appear in the recommendation prompt.
+- **P2-⑥ installer local false alarms**: the three slow installer tests gained explicit 60s timeouts (they were eating the vitest 5s default on slow local pnpm cold starts while CI stayed green) — the local full suite is now green for the first time (222/222).
+
 ## Unreleased — rc.61: authoring wording precision + mount/restore contract for the 60-char catalog cap
 
 - The `Authoring check` over-bar line now states the mechanism precisely instead of asserting deployment specifics: "exceeds the 60-char authoring bar (Hermes standard; the catalog truncates at the configured platform cap)" — true on both a 500-cap platform and one injected with 60 by the host bundle, and no longer claims truncation unconditionally (the P0 wording correction becomes deployment-neutral).

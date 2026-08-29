@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { computeLifecycleTransitions, emptyRecord, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, computeLifecycleTransitions, emptyRecord, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
@@ -824,6 +824,58 @@ Body of ${name}.
       expect(usage.get('stale-src')?.state).toBe('archived')
       const report = await ctx.evolutionCurator.latestReport()
       expect(report?.consolidated?.some(item => item.from === 'stale-src' && item.into === 'umbrella-skill')).toBe(true)
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('near-duplicate members join the LLM recommendation candidate pool (P2-5)', { timeout: 20_000 }, async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-dedup-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const seen: string[] = []
+      const emptyYaml = '## Structured summary (required)\n```yaml\nconsolidations: []\nprunings: []\n```\n'
+      const ctx = new Context()
+      ctx.provide('llm', {
+        stream: async function* (options: { messages: Array<{ content: Array<{ text: string }> }> }) {
+          seen.push(options.messages[0]?.content[0]?.text ?? '')
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: emptyYaml }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
+          yield { type: 'finish', reason: 'stop' }
+        },
+      })
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      ctx.provide('evolutionState', {
+        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+        saveCuratorState: async () => {},
+      })
+      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+      const skills = ctx.evolutionCurator.skills
+      // Two nearly-identical skills: the deterministic scanner sees nothing
+      // (both fresh), only the dedup pool can surface them as candidates.
+      // The shared body is a long DISTINCT-word block (dedup compares token
+      // SETS, so repetition adds no weight): ~58 shared tokens vs 2 name
+      // tokens difference keeps the Jaccard above the 0.95 gate.
+      const near = (name: string) => `---
+name: ${name}
+description: ${name} helper
+---
+
+# ${name}
+Run the same generic workflow. Capture the standard result. Report the common outcome. Verify the shared conventions. Apply the usual tool patterns. Keep the canonical steps. Use the normal entry points. Follow the established procedure. Match the documented behavior. Maintain the expected shape. Preserve the original semantics. Document the known limits. Refresh the stale examples. Review the recent changes. Test the real world cases. Record the observed facts. Summarize the key findings. Reference the source material.
+`
+      await skills.create('dup-a', near('dup-a'), 'foreground')
+      await skills.create('dup-b', near('dup-b'), 'foreground')
+      expect(computeDedupGroups({ contents: new Map([['dup-a', near('dup-a')], ['dup-b', near('dup-b')]]) })).toEqual([['dup-a', 'dup-b']])
+      await ctx.evolutionCurator.run({ ignoreGates: true })
+      expect(seen[0]).toContain('- dup-a')
+      expect(seen[0]).toContain('- dup-b')
       ctx.evolutionCurator.stop()
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME

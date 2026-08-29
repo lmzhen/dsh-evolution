@@ -5,7 +5,7 @@
 
 import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
-import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
+import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { scanMemoryThreats } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
@@ -221,92 +221,131 @@ export class MemoryStore {
   }
 
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
+    if (!facts.trim()) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    const path = fileFor(this.root, target)
+    let outcome: MemoryApplyResult | undefined
+    await transactIo(this.io, path, async (current) => {
+      const core = await this.addCore(target, facts, current ?? '')
+      outcome = core.result
+      // `null` means DELETE in the transact contract, so a failure/no-op must
+      // return the current content unchanged (never null).
+      return core.write ?? (current ?? '')
+    })
+    return outcome as MemoryApplyResult
+  }
+
+  /**
+   * Single-entry add inside the transaction: shared checks (oversized,
+   * drift, threat) and the content computation. `raw` is the locked view
+   * (`current`) — never a second IO read. `write: null` means "no change".
+   */
+  private async addCore(target: MemoryTarget, facts: string, raw: string): Promise<{ result: MemoryApplyResult; write: string | null }> {
+    const content = facts.trim()
+    if (!content) return { result: this.failure(target, 'Content cannot be empty.', []), write: null }
     const refusal = await this.oversizedRefusal(target)
-    if (refusal) return refusal
-    // Symmetric with mutate/applyBatch: never silently normalize an
-    // externally modified file on the single-add path either.
-    if (await this.detectDrift(target)) {
+    if (refusal) return { result: refusal, write: null }
+    const drift = this.driftFromRaw(target, raw)
+    if (drift) {
       const backup = await this.backupFile(target)
       const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
-      return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
+      return { result: { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     }
-    const content = facts.trim()
-    if (!content) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const threat = scanMemoryThreats(content)
-    if (threat) return { ok: false, message: threat, entries: [], chars: 0, limit: this.limitFor(target) }
+    if (threat) return { result: { ok: false, message: threat, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
 
-    const entries = await this.read(target)
+    const entries = [...new Set(normalizeEntries(raw))]
     if (entries.some(entry => stripDatePrefix(entry) === content)) {
       this.resetFailures()
-      return {
-        ok: true, message: `Entry already exists (no duplicate added).${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries,
-        chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target),
-      }
+      return { result: { ok: true, message: `Entry already exists (no duplicate added).${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
     }
     const next = [...entries, this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${content}` : content]
     const total = next.join(ENTRY_DELIMITER).length
     const addLimit = this.limitFor(target)
     if (addLimit > 0 && total > addLimit) {
-      return this.failure(target, `Adding this entry would exceed the ${addLimit} char limit. Consolidate or remove stale entries, then retry.`, entries)
+      return { result: this.failure(target, `Adding this entry would exceed the ${addLimit} char limit. Consolidate or remove stale entries, then retry.`, entries), write: null }
     }
-    await this.write(target, next)
     this.resetFailures()
-    return { ok: true, message: `Entry added.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }
+    return { result: { ok: true, message: `Entry added.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }, write: render(next) }
+  }
+
+  /** Canonical-form drift check derived from the locked view (same formula as `detectDrift`, no second read). */
+  private driftFromRaw(target: MemoryTarget, raw: string): boolean {
+    if (raw.trim() === '') return false
+    const entries = normalizeEntries(raw)
+    const limit = this.limitFor(target)
+    if (limit > 0 && entries.some(entry => entry.length > limit)) return true
+    return render(entries) !== raw
   }
 
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
-    if (operations.length === 0) {
-      return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
-    }
+    if (operations.length === 0) return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    const path = fileFor(this.root, target)
+    let outcome: MemoryApplyResult | undefined
+    await transactIo(this.io, path, async (current) => {
+      const core = await this.applyBatchCore(target, operations, current ?? '')
+      outcome = core.result
+      // `null` means DELETE in the transact contract, so a failure/no-op must
+      // return the current content unchanged (never null).
+      return core.write ?? (current ?? '')
+    })
+    return outcome as MemoryApplyResult
+  }
+
+  /** Batch RMW inside the transaction. `write: null` = failure/no-op, disk untouched. */
+  private async applyBatchCore(
+    target: MemoryTarget,
+    operations: MemoryOperation[],
+    raw: string,
+  ): Promise<{ result: MemoryApplyResult; write: string | null }> {
     const refusal = await this.oversizedRefusal(target)
-    if (refusal) return refusal
-    if (await this.detectDrift(target)) {
+    if (refusal) return { result: refusal, write: null }
+    const drift = this.driftFromRaw(target, raw)
+    if (drift) {
       const backup = await this.backupFile(target)
       const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
-      return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
+      return { result: { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     }
-    const entries = await this.read(target)
+    const entries = [...new Set(normalizeEntries(raw))]
     const working = [...entries]
     for (const [index, op] of operations.entries()) {
       const position = index + 1
       if (op.action === 'add') {
         const body = (op.facts ?? '').trim()
-        if (!body) return { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = scanMemoryThreats(body)
-        if (threat) return { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         if (!working.some(entry => stripDatePrefix(entry) === body)) {
           working.push(this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body)
         }
         continue
       }
       const needle = (op.old_text ?? '').trim()
-      if (!needle) return { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+      if (!needle) return { result: { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
       const matches = working.map((entry, matchIndex) => ({ entry, matchIndex })).filter(({ entry }) => entry.includes(needle))
       if (matches.length === 0) {
-        return this.failure(target, `Operation ${position}: no entry matching "${needle}" found. No operations were applied.`, entries)
+        return { result: this.failure(target, `Operation ${position}: no entry matching "${needle}" found. No operations were applied.`, entries), write: null }
       }
       if (new Set(matches.map(m => m.entry)).size > 1) {
-        return { ok: false, message: `Operation ${position}: "${needle}" matched multiple distinct entries. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        return { result: { ok: false, message: `Operation ${position}: "${needle}" matched multiple distinct entries. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
       }
       const matchIndex = matches[0]?.matchIndex ?? -1
       if (op.action === 'remove') {
         working.splice(matchIndex, 1)
       } else {
         const body = (op.facts ?? '').trim()
-        if (!body) return { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (!body) return { result: { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = scanMemoryThreats(body)
-        if (threat) return { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
+        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         working[matchIndex] = body
       }
     }
     const total = working.join(ENTRY_DELIMITER).length
     const batchLimit = this.limitFor(target)
     if (batchLimit > 0 && total > batchLimit) {
-      return this.failure(target, `Batch result (${total} chars) exceeds the ${batchLimit} limit. Remove or shorten more entries in the same batch.`, entries)
+      return { result: this.failure(target, `Batch result (${total} chars) exceeds the ${batchLimit} limit. Remove or shorten more entries in the same batch.`, entries), write: null }
     }
-    await this.write(target, working)
     this.resetFailures()
-    return { ok: true, message: `Applied ${operations.length} operation(s).${this.storageHint(target, total)}`, entries: working, chars: total, limit: this.limitFor(target) }
+    return { result: { ok: true, message: `Applied ${operations.length} operation(s).${this.storageHint(target, total)}`, entries: working, chars: total, limit: this.limitFor(target) }, write: render(working) }
   }
 
   async renderContext(): Promise<string> {

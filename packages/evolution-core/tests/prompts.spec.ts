@@ -57,6 +57,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
 it('authoring standards carry the colon-quote and privacy motive guarantees', () => {
   expect(DSH_AUTHORING_STANDARDS).toContain('wrap the whole value in double quotes')
   expect(DSH_AUTHORING_STANDARDS).toContain('privacy leak')
+  expect(DSH_AUTHORING_STANDARDS).toContain('Learn workflow')
 })
 
 it('skills guidance section is the Hermes SKILLS_GUIDANCE analogue (save + immediate patch)', () => {

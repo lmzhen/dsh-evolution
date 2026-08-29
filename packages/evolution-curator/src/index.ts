@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -451,6 +451,16 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       suppressed: suppressedNames,
     })
     const { bundledNames, treeNames } = await this.seedBaseline(usage)
+    // P2-5: near-duplicate groups join the recommendation candidate pool —
+    // the deterministic scanner sees idle names, only the LLM sees overlap.
+    const contents = new Map<string, string>()
+    for (const name of treeNames) {
+      const text = await this.skills.read(name)
+      if (text) contents.set(name, text)
+    }
+    const dedupMembers = [...new Set(
+      computeDedupGroups({ contents }).filter(group => group.length >= 2).flat(),
+    )]
     // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
     // engine reads `quality_warn` to apply the shorter quality-warn stale
     // window, so it must see THIS run's freshly computed scores — the old
@@ -468,7 +478,9 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
     }, new Date(), gates)
-    const nominations = this.llmReview ? await this.recommend(result.markStale, { dryRun }) : { prunings: [], consolidations: [] }
+    const nominations = this.llmReview
+      ? await this.recommend([...new Set([...result.markStale, ...dedupMembers])], { dryRun })
+      : { prunings: [], consolidations: [] }
     // Automatic merge nominations must pass the same gates as the control
     // plane: excluded/referenced/suppressed skills are never merged (source
     // or target), even when the LLM nominates them.

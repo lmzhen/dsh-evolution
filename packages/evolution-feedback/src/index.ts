@@ -11,6 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
+import { evolutionIoAdapter, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -31,10 +32,7 @@ export interface FeedbackState {
   sessions: Record<string, FeedbackRecord>
 }
 
-interface IoLike {
-  readText(path: string): Promise<string | null>
-  writeText(path: string, content: string): Promise<void>
-}
+type IoLike = EvolutionIoLike
 
 export class EvolutionFeedback {
   private state: FeedbackState = { skills: {}, sessions: {} }
@@ -100,8 +98,37 @@ export class EvolutionFeedback {
     const path = this.path
     if (!path || !io) return
     await this.mutate(async () => {
-      await io.writeText(path, JSON.stringify(this.state, null, 2))
+      // Sidecar transaction (P1-③): the flush merges with whatever another
+      // process persisted — a full overwrite would drop another process's
+      // records (same interleave class as activity before rc.58).
+      await transactIo(io, path, (current) => {
+        const merged = mergeStates(parseState(current), this.state)
+        this.state = merged
+        return Promise.resolve(JSON.stringify(merged, null, 2))
+      })
     })
+  }
+}
+
+/** Parse a raw feedback sidecar; malformed reads as empty (best-effort). */
+function parseState(raw: string | null): FeedbackState {
+  if (raw === null) return { skills: {}, sessions: {} }
+  try {
+    const parsed = JSON.parse(raw) as Partial<FeedbackState>
+    return {
+      skills: typeof parsed.skills === 'object' ? parsed.skills : {},
+      sessions: typeof parsed.sessions === 'object' ? parsed.sessions : {},
+    }
+  } catch {
+    return { skills: {}, sessions: {} }
+  }
+}
+
+/** Deep-merge two feedback states: union by target, in-memory values win on conflict. */
+function mergeStates(disk: FeedbackState, memory: FeedbackState): FeedbackState {
+  return {
+    skills: { ...disk.skills, ...memory.skills },
+    sessions: { ...disk.sessions, ...memory.sessions },
   }
 }
 
@@ -124,11 +151,10 @@ interface SkillUsageLike {
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  const ioRegistry = ctx.get('evolutionIo') as { provider(): IoLike } | undefined
-  const io = ioRegistry ? {
-    readText: (path: string) => ioRegistry.provider().readText(path),
-    writeText: (path: string, content: string) => ioRegistry.provider().writeText(path, content),
-  } : undefined
+  const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+  // Lazy adapter: forwards transact (P1-③) so flush merges with the disk
+  // state instead of overwriting another process's records.
+  const io = ioRegistry ? evolutionIoAdapter(() => ioRegistry.provider()) : undefined
   const feedback = new EvolutionFeedback(io, process.env.DSH_HOME ?? join(homedir(), '.dsh'), rawConfig.path || undefined)
   if (io) {
     void feedback.restore(io).catch((error: unknown) => {
