@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
-import { insertedRows, rowIds } from '../../test-support/cordis-rows.ts'
+import { cordisRows, insertedRows, rowId, rowIds } from '../../test-support/cordis-rows.ts'
 
 const run = promisify(execFile)
 const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
@@ -112,6 +112,22 @@ describe('layered installer', () => {
       DSH_EVOLUTION_ALLOW_ROW_COLLISIONS: '1',
     })
     expect(stderr).toContain('collide with standard rows')
+    await rm(home, { recursive: true, force: true })
+  }, 20_000)
+
+  it('mounts the 60-char catalog cap as a top-level tool-skill override (mount-and-restore semantics)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-hostpatch-'))
+    await runInstaller(home, 'layered')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    const overlay = loadOverlayPatches('test', join(profileDir, 'node_modules', '@deepseek-ai', 'dsh-evolution-host', 'cordis.patch.yml'))
+    const topLevel = cordisRows(overlay)
+    const override = topLevel.find(row => rowId(row) === 'tool-skill')
+    expect(override).toBeDefined()
+    expect(override?.config).toMatchObject({ catalogDescriptionMaxLength: 60 })
+    // It overrides the BASE row in place — never an inserted duplicate that
+    // would mount the tool twice. A profile overlay (later patch) may replace
+    // the value; removing the host bundle removes the injection entirely.
+    expect(insertedRows(overlay).some(row => rowId(row) === 'tool-skill')).toBe(false)
     await rm(home, { recursive: true, force: true })
   }, 20_000)
 })

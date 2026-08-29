@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — rc.61: authoring wording precision + mount/restore contract for the 60-char catalog cap
+
+- The `Authoring check` over-bar line now states the mechanism precisely instead of asserting deployment specifics: "exceeds the 60-char authoring bar (Hermes standard; the catalog truncates at the configured platform cap)" — true on both a 500-cap platform and one injected with 60 by the host bundle, and no longer claims truncation unconditionally (the P0 wording correction becomes deployment-neutral).
+- New contract test for the "mount to inject, unmount to restore" semantics the host bundle already provides: `evolution-host/cordis.patch.yml` carries the `catalogDescriptionMaxLength: 60` as a TOP-LEVEL override of the base `tool-skill` row (never an inserted duplicate that would mount the tool twice). Installing the host bundle injects the 60-char cap automatically; removing it restores the platform default (500 on the validated anchors, or whatever a later profile overlay replaces it with). The test loads the real installed patch through the loader and asserts both the override value and the insert-free shape; a profile overlay may still replace the value later in the chain.
+- (Background: the upstream dev HEAD has since changed the platform default to 60 itself — the bundle injection simply pins the Hermes behavior across platform versions.)
+
 ## Unreleased — rc.60: authoring feedback (P0) + curator scale adaptation + merge-chain auditability (P1)
 
 The product-manager pass on the second-round review: the highest-value near-term items are the knowledge "first mile" (does a new skill's description get written well enough to route?) and making the merge channel — which has never fired — auditable and trusted.

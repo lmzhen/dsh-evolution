@@ -208,7 +208,7 @@ export function authoringFeedback(frontmatter: Frontmatter): AuthoringFeedback {
   const hasColon = description.includes(':')
   const lines: string[] = []
   lines.push(over60
-    ? `Description is ${description.length}/60 characters — exceeds the 60-char authoring bar (Hermes skill-authoring standard).`
+    ? `Description is ${description.length}/60 characters — exceeds the 60-char authoring bar (Hermes standard; the catalog truncates at the configured platform cap).`
     : `Description ${description.length}/60 characters — within the authoring bar.`)
   if (hasColon) lines.push('Description contains a colon — wrap the whole value in double quotes.')
   return { descriptionChars: description.length, over60, hasColon, lines }
