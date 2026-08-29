@@ -339,11 +339,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // P1-9 pre-check: with approval ENABLED but no registered runner for
       // this kind (host-only compositions mount no tool runners), staging
       // would create a pending record that no approver could ever replay.
-      // The trusted direct executor below is the only way the write can land,
-      // so it is used instead of staging. (`capability` is exempt by design,
-      // but the review never issues that kind.)
+      // Enabled approval is an explicit operator gate on autonomous writes -
+      // with no runner there is no approval path, so the write is REFUSED
+      // (fail closed) rather than staged or silently executed. It becomes
+      // answerable again as soon as a tool that registers the runner mounts.
       if (approval.isEnabled === true && !approval.hasRunner(kind)) {
-        return await runnerDirect(kind, runnerArgs)
+        ctx.logger.warn(`dsh-evolution-review: approval enabled but no replay runner registered for kind "${kind}" - skipping write (${summary})`)
+        return { ok: false, message: `Approval is enabled but no replay runner is registered for kind "${kind}"; write skipped (mount the tool that provides it, or disable approval).` }
       }
       const decision = await approval.request({ kind, summary, args: stored, origin: origins.approval })
       if (decision.action === 'staged') return { ok: false, message: decision.message }

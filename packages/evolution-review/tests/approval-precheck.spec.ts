@@ -87,14 +87,13 @@ describe('review approval pre-check (P1-9)', () => {
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
-    // onTurnEnd is async-void: poll for the write to land (or fail to).
-    const deadline = Date.now() + 5_000
-    while (applied === 0 && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 25))
-    }
-    // The write landed through the direct executor...
-    expect(applied).toBe(1)
-    // ...and NOTHING was staged: no unanswerable pending record exists.
+    // onTurnEnd is async-void: wait out the poll window (the pipeline must
+    // have visited the op by then — and REFUSED it).
+    await new Promise(resolve => setTimeout(resolve, 200))
+    // Enabled approval is an operator gate: with no replay runner the write
+    // is REFUSED (fail closed) — it must NOT land through a silent bypass.
+    expect(applied).toBe(0)
+    // And nothing was staged either: no unanswerable pending record exists.
     expect(pending).toHaveLength(0)
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
   })
