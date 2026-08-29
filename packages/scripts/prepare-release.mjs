@@ -9,11 +9,15 @@
  *   - --version and --upstream-version pin the release and upstream family
  *   - tarballs are validated before manifest/smoke artifacts are written
  *
+ * Version single-source (M4 §5.3): the release workflow's environment is the
+ * only place that pins `RELEASE_VERSION` / `UPSTREAM_VERSION`; this script
+ * requires them rather than carrying its own defaults, so a version can never
+ * silently drift between the workflow and the pack step.
+ *
  * Usage:
  *   node packages/evolution/scripts/build-lib.mjs
- *   node packages/evolution/scripts/prepare-release.mjs
  *   node packages/evolution/scripts/prepare-release.mjs \
- *     --scope @lmzhen --version 0.1.0-rc.1 --upstream-version 0.1.0-rc.6
+ *     --scope @lmzhen --version 0.1.0-rc.NN --upstream-version 0.1.0-rc.NN
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -30,21 +34,19 @@ function arg(name, fallback = '') {
   return index >= 0 ? argv[index + 1] : fallback
 }
 
-const scope = arg('--scope')
-const releaseVersion = arg('--version', '0.1.0-rc.1')
-const upstreamVersion = arg('--upstream-version', '0.1.0-rc.6')
+function requireArg(name) {
+  const value = arg(name)
+  if (!value) throw new Error(`prepare-release: missing required --${name}; the release workflow pins it (single source)`)
+  return value
+}
 
-/**
- * Packages kept in the tree as source of record but retired from npm
- * publishing. The legacy `dsh-evolution` facade was deleted at rc.18
- * (superseded by the host bundle + Evolution agent preset).
- */
-const PUBLISH_EXCLUDE = new Set()
+const scope = requireArg('scope')
+const releaseVersion = requireArg('version')
+const upstreamVersion = requireArg('upstream-version')
 
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
   .map(entry => entry.name)
-  .filter(dir => !PUBLISH_EXCLUDE.has(dir))
   .sort()
 
 function readJson(path) {

@@ -5,7 +5,8 @@
 #   ctx.evolutionStateStorage  -> storage-domain KV provider, with a JSON
 #                                provider mounted as fallback/portable audit
 #
-# The legacy `@deepseek-ai/dsh-evolution` facade was retired at rc.18; this
+# The legacy `@deepseek-ai/dsh-evolution` facade was retired from publishing
+# after the v0.1.0-rc.18 release tag (see docs/codebase-audit-rc16.md); this
 # composition uses the smaller native packages instead.
 
 # ── control plane (immutable policy, deterministic plan validation) ────────
@@ -60,8 +61,8 @@
   config:
     enabled: false
     stageForeground: true
-- id: evolution-capability
-  name: '@deepseek-ai/dsh-evolution-capability'
+# D-9 (rc.51): `evolution-capability` is held out of the preset too — staged
+# Creator-mode governance with no live consumer; adopters add the row on top.
 - id: evolution-threat
   name: '@deepseek-ai/dsh-evolution-threat'
 

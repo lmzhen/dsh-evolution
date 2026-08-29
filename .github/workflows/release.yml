@@ -105,6 +105,78 @@ jobs:
           path: upstream/packages/evolution/scripts
           retention-days: 14
 
+  # M4 §4.6: the published platform version (dsh-v0.1.1-rc.2) is a different
+  # commit than the pinned development baseline (UPSTREAM_SHA), so this job
+  # re-checks type compatibility and smoke-loads the built artifacts against
+  # the RELEASED upstream tag. Independent of validate/publish: a compat
+  # failure surfaces as a failed run without blocking an already-validated
+  # release.
+  compat-check:
+    name: compat (released upstream)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: dsh-v0.1.1-rc.2
+          path: upstream
+          persist-credentials: false
+
+      - name: Overlay mirror packages into upstream
+        shell: bash
+        run: |
+          mkdir -p upstream/packages/evolution
+          cp tsconfig.base.json upstream/tsconfig.base.json
+          cp tsconfig.host.json upstream/tsconfig.host.json
+          cp -r packages/. upstream/packages/evolution/
+          rm -rf upstream/packages/evolution/node_modules \
+                 upstream/packages/evolution/lib \
+                 upstream/packages/evolution/dist
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.7.0'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: upstream/pnpm-lock.yaml
+
+      - name: Install immutable dependencies
+        working-directory: upstream
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Type-check against the released upstream (tsc host graph)
+        working-directory: upstream
+        run: node node_modules/typescript/bin/tsc -b tsconfig.host.json
+
+      - name: Build and smoke-load the published artifacts
+        working-directory: upstream
+        run: |
+          node packages/evolution/scripts/build-lib.mjs
+          node -e "
+            (async () => {
+              const { readdirSync, existsSync } = require('node:fs');
+              const { join } = require('node:path');
+              const { pathToFileURL } = require('node:url');
+              const root = join('packages', 'evolution', 'dist');
+              let loaded = 0;
+              for (const dir of readdirSync(root)) {
+                const entry = join(root, dir, 'lib', 'index.js');
+                if (!existsSync(entry)) continue;
+                await import(pathToFileURL(entry).href);
+                loaded += 1;
+              }
+              if (loaded === 0) throw new Error('no published artifacts loaded');
+              console.log('smoke-loaded ' + loaded + ' packages');
+            })();
+          "
+
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')

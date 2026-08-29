@@ -1,9 +1,8 @@
 /**
- * Structural IO seam for the legacy facade stores.
+ * Structural IO seam for the evolution plugin family.
  *
- * The facade accepts any object exposing this small async file-tree surface.
- * Native DSH packages pass `ctx.evolutionIo.provider()`; standalone consumers
- * (and the facade's own tests) can use `nodeEvolutionIo`.
+ * Every evolution package passes `ctx.evolutionIo.provider()`; standalone
+ * consumers (and the core's own tests) can use `nodeEvolutionIo`.
  */
 
 import { cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'

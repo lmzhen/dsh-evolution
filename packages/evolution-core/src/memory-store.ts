@@ -254,59 +254,6 @@ export class MemoryStore {
     return { ok: true, message: `Entry added.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }
   }
 
-  async replace(target: MemoryTarget, oldText: string, facts: string): Promise<MemoryApplyResult> {
-    return this.mutate(target, oldText, 'replace', facts)
-  }
-
-  async remove(target: MemoryTarget, oldText: string): Promise<MemoryApplyResult> {
-    return this.mutate(target, oldText, 'remove', undefined)
-  }
-
-  private async mutate(target: MemoryTarget, oldText: string, action: 'replace' | 'remove', facts?: string): Promise<MemoryApplyResult> {
-    const needle = oldText.trim()
-    if (!needle) {
-      // Recoverable-error preview (B-line G5): echo the current entries so
-      // the model can self-recover without a separate read.
-      const current = await this.read(target)
-      return { ok: false, message: `old_text cannot be empty.${previewEntries(current)}`, entries: current, chars: current.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }
-    }
-    const refusal = await this.oversizedRefusal(target)
-    if (refusal) return refusal
-    const content = action === 'replace' ? (facts ?? '').trim() : ''
-    if (action === 'replace' && !content) return { ok: false, message: 'facts is required for replace; use remove to delete.', entries: [], chars: 0, limit: this.limitFor(target) }
-    if (action === 'replace') {
-      const threat = scanMemoryThreats(content)
-      if (threat) return { ok: false, message: threat, entries: [], chars: 0, limit: this.limitFor(target) }
-    }
-
-    if (await this.detectDrift(target)) {
-      const backup = await this.backupFile(target)
-      const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
-      return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
-    }
-    const entries = await this.read(target)
-    const matches = entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.includes(needle))
-    if (matches.length === 0) return this.failure(target, `No entry matching "${needle}" found.`, entries)
-    if (new Set(matches.map(m => m.entry)).size > 1) {
-      return {
-        ok: false,
-        message: `Multiple distinct entries matched "${needle}". Be more specific.`,
-        entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target),
-      }
-    }
-    const index = matches[0]?.index ?? -1
-    const next = [...entries]
-    if (action === 'remove') next.splice(index, 1)
-    else next[index] = content
-    const total = next.join(ENTRY_DELIMITER).length
-    const mutateLimit = this.limitFor(target)
-    if (mutateLimit > 0 && total > mutateLimit) return this.failure(target, `Resulting memory would exceed the ${mutateLimit} char limit.`, entries)
-    await this.write(target, next)
-    this.resetFailures()
-    return { ok: true, message: `Entry ${action === 'remove' ? 'removed' : 'replaced'}.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }
-  }
-
-
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
     if (operations.length === 0) {
       return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }

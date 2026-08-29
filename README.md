@@ -195,7 +195,7 @@ override examples.
 | Automation only, no model tools | host-only bundle |
 | Standard coding preset | host bundle; model tools remain hidden |
 | Anchored Standard preset | host bundle; unlock `memory`/`skill_manage` with `dev_tool_search` |
-| Minimal preset | host bundle; services mount but the complete persona suppresses evolution prompt text |
+| Minimal preset | host bundle; services mount — the "complete persona suppresses evolution prompt text" behavior is an **upstream host** behavior: this repository has no implementation or verification artifact for it (upstream carries it) |
 | Creator mode | host bundle + `evolution-capability` governance; code activation stays manual |
 
 ---
@@ -264,12 +264,24 @@ evolution-capability  validate + stage Creator packages; never execute them
 
 ## Repository layout
 
+> **Layout note (mirror vs dev tree — decision D2, rc.51)**: this mirror
+> repository uses a FLAT `packages/<pkg>` layout and is the *publishing
+> carrier* only: builds, tests and type checks run in the upstream
+> `deepseek-harness` monorepo (its `packages/evolution/**` tree is the
+> canonical source, overlaid onto the pinned `UPSTREAM_SHA` in CI). This
+> repository does not carry a runnable build/test scaffold of its own;
+> runtime scripts used during publication live under `scripts/` here and
+> document their canonical path as
+> `packages/evolution/scripts/...` in the dev tree. The `docs/` and
+> `AUDIT_REPORT.md` / `OPTIMIZATION_PLAN.md` documents are mirrored
+> deliverables.
+
 ```text
 packages/
 ├── evolution-host/                 host-plane infrastructure bundle
 ├── evolution-agent/                Evolution agent preset
 ├── evolution-preset/               one-click compatibility bundle
-├── evolution-capability/           staged Creator-mode governance
+├── evolution-capability/           staged Creator-mode governance (optional; not in the host bundle since rc.51 D-9)
 ├── evolution-io/ + io-node/        IO seam and atomic node provider
 ├── memory/ + memory-files/ + tool-memory/
 ├── skill-usage/ + tool-skill-manage/ + evolution-skill-catalog/

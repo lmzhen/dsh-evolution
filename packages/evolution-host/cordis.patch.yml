@@ -48,8 +48,9 @@
       config:
         enabled: false
         stageForeground: true
-    - id: evolution-capability
-      name: '@deepseek-ai/dsh-evolution-capability'
+    # D-9 (rc.51): `evolution-capability` is no longer part of the host bundle
+    # — staged, non-executing Creator-mode adapter with no live consumer; keep
+    # the host mount minimal and let deployments opt in by adding the row.
     - id: evolution-threat
       name: '@deepseek-ai/dsh-evolution-threat'
 

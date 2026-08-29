@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Normalize manifests after copying the upstream packages/evolution tree into
- * the flat public mirror (D:/claw/dsh-evolution):
+ * the flat public mirror (D2: the mirror is the publishing carrier; the dev
+ * tree stays canonical for builds/tests):
  *   - repository URL points at the public mirror
  *   - repository.directory points at the flat package directory
  *   - package and root versions stay aligned at 0.1.0-rc.1

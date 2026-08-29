@@ -177,8 +177,8 @@ D 侧路径省略 `packages/evolution/`；H 侧省略 `D:\claw\hermes-agent\`。
 |---|---|---|---|---|
 | 调度 | `agent/curator.py:1958`（gateway poll）；`cron/jobs.py`（任务调度域） | `evolution-curator:106,158,173-187`（autoStart，默认 true） | ≈ | 进程内 timer+boot 追赶；task-board cron 可作外部通道（渠道差异） |
 | 默认值单源 | `hermes_cli/config.py:2245-2295`（curator 块） | `constants.ts:51-67` + 各包 `Config.z.default` | ✅ | interval 168h/minIdle 2h/stale 30d/archive 90d/consolidate off/prune_builtins（D false vs H true）/keep 5 逐项对齐 |
-| 版本迁移 | `hermes_cli/config.py:5605,5711`（v 迁移 seed） | `state-store.ts:35-50`（mergeDeep） | ≈ | 无版本化迁移 seed；mergeDeep 前向兼容 |
-| 解析兜底 | `hermes_cli/config.py` load 容错 | `JsonState.mergeDeep`（:16-90）；schema 默认 | ✅ | |
+| 版本迁移 | `hermes_cli/config.py:5605,5711`（v 迁移 seed） | `evolution-state-json` provider 实测路径（模块解析容错 + schema 默认；core `JsonState`/`mergeDeep` 已于 rc.51 D-1 删除——退役未删） | ≈ | 无版本化迁移 seed；provider 的前向兼容 |
+| 解析兜底 | `hermes_cli/config.py` load 容错 | `evolution-state-json` 的 load 容错 + zod/schemastery schema 默认（rc.51 起：`JsonState.mergeDeep` 已删除，见 D-1） | ✅ | |
 
 ---
 
