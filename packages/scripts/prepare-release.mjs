@@ -36,13 +36,13 @@ function arg(name, fallback = '') {
 
 function requireArg(name) {
   const value = arg(name)
-  if (!value) throw new Error(`prepare-release: missing required --${name}; the release workflow pins it (single source)`)
+  if (!value) throw new Error(`prepare-release: missing required ${name}; the release workflow pins it (single source)`)
   return value
 }
 
-const scope = requireArg('scope')
-const releaseVersion = requireArg('version')
-const upstreamVersion = requireArg('upstream-version')
+const scope = requireArg('--scope')
+const releaseVersion = requireArg('--version')
+const upstreamVersion = requireArg('--upstream-version')
 
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
