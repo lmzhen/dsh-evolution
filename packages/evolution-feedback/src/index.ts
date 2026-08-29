@@ -116,8 +116,8 @@ function parseState(raw: string | null): FeedbackState {
   try {
     const parsed = JSON.parse(raw) as Partial<FeedbackState>
     return {
-      skills: typeof parsed.skills === 'object' ? parsed.skills : {},
-      sessions: typeof parsed.sessions === 'object' ? parsed.sessions : {},
+      skills: typeof parsed.skills === 'object' && !Array.isArray(parsed.skills) ? parsed.skills : {},
+      sessions: typeof parsed.sessions === 'object' && !Array.isArray(parsed.sessions) ? parsed.sessions : {},
     }
   } catch {
     return { skills: {}, sessions: {} }

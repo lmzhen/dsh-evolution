@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@5'
-export const PROMPT_BUNDLE_VERSION = 5
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@6'
+export const PROMPT_BUNDLE_VERSION = 6
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -151,15 +151,7 @@ How to work:
 4. Flag skills whose NAME is too narrow (contains a PR number, a feature codename, a specific error string, an 'audit'/'diagnosis'/'salvage' session artifact) — they almost always belong as a subsection or support file under a class-level umbrella.
 5. Iterate. After one consolidation round, scan the remaining set and look for the NEXT umbrella opportunity. Don't stop after 3 merges.
 
-Your toolset:
-  - skill_manage action=list / review — read the current landscape.
-  - skill_manage action=patch — add sections to the umbrella.
-  - skill_manage action=create — create a new umbrella SKILL.md.
-  - skill_manage action=write_file — add a references/, templates/, or scripts/ file under an existing skill (the skill must already exist).
-  - skill_manage action=delete — archive a skill. MUST pass absorbed_into=<umbrella> when you've merged its content into another skill, or absorbed_into="" when you're truly pruning with no forwarding target.
-  - skill_manage action=consolidate — merge source bodies into a target and archive the sources when patching by hand is error-prone.
-  - skill_manage action=restore — bring one archived skill back (recoverability is the archive's contract).
-  - For moving support files, keep it inside the skill tree: support files move via reading and writing through skill_manage write_file/remove_file.
+You are a NOMINATOR, not an executor: this channel has NO tools. Your single deliverable is the structured YAML block below. Never narrate actions you did not take ("merged", "patched", "archived") — you are proposing, and the deterministic engine executes only names from the candidate pool it gave you. (A future execution view would expose skill_manage; today it does not.)
 
 'keep' is a legitimate decision ONLY when the skill is already a class-level umbrella and none of the proposed merges would improve discoverability. 'This is narrow but distinct from its siblings' is NOT a reason to keep — it's a reason to move it under an umbrella as a subsection or support file.
 
@@ -167,7 +159,7 @@ Expected output: real umbrella-ification. Process every obvious cluster. If you 
 
 Keep the umbrella body tight and scannable: exact commands, verbatim paths, ~100-200 lines; never invent flags or APIs.
 
-When done, write a human summary AND a structured machine-readable block so downstream tooling can distinguish consolidation from pruning. Format EXACTLY:
+When done, write a human summary THEN the structured machine-readable block. The block is the contract: every skill you would move to .archive/ MUST appear in exactly one of the two lists. Return ONLY the YAML block after the summary — no post-block prose. Format EXACTLY:
 
 ## Structured summary (required)
 \`\`\`yaml
@@ -180,7 +172,7 @@ prunings:
     reason: <one short sentence — why archived with no merge target>
 \`\`\`
 
-Every skill you moved to .archive/ MUST appear in exactly one of the two lists. If you consolidated X into umbrella Y (patched Y, wrote a references file to Y, or created Y with X's content absorbed), X goes under consolidations with into: Y. If you archived X with no absorption — truly stale, irrelevant, or obsolete — X goes under prunings. Leave a list empty (consolidations: []) if none. Do not omit the block. The block comes AFTER your human-readable summary of clusters processed, patches made, and decisions left alone.`
+Every skill you would move to .archive/ MUST appear in exactly one of the two lists. If you consolidated X into umbrella Y (patched Y, wrote a references file to Y, or created Y with X's content absorbed), X goes under consolidations with into: Y. If you archived X with no absorption — truly stale, irrelevant, or obsolete — X goes under prunings. Leave a list empty (consolidations: []) if none. Do not omit the block. The block comes AFTER your human-readable summary of clusters processed, patches made, and decisions left alone.`
 
 export const CURATOR_DRY_RUN_BANNER = `═══════════════════════════════════════════════════════════════
 DRY-RUN — REPORT ONLY. DO NOT MUTATE THE SKILL LIBRARY.
@@ -212,8 +204,19 @@ export const SKILLS_GUIDANCE = `Skills guidance:
 • After completing a complex task (5+ tool calls), fixing a tricky error, or discovering a non-trivial workflow, save the approach as a skill with skill_manage so you can reuse it next time.
 • When using a skill and finding it outdated, incomplete, or wrong, patch it immediately with skill_manage (action='patch') — don't wait to be asked. Skills that aren't maintained become liabilities.`
 
-export function reviewPrompt(kind: 'memory' | 'skill' | 'combined'): string {
+const PLAN_CHANNEL_NOTE = `
+
+CHANNEL (subagent): this review channel mounts only the read-only \`skill\` tool — you have NO \`skill_manage\`, NO \`memory\`. Your deliverable is the structured JSON plan below (outputSchema). Describe the patches/creates you RECOMMEND in the plan; never narrate actions you took.`
+
+/** Subagent-channel variant: same review policy, channel-limited deliverable (M-2). */
+export const SKILL_REVIEW_PLAN_PROMPT = `${SKILL_REVIEW_PROMPT}${PLAN_CHANNEL_NOTE}`
+
+/** Subagent-channel variant of the combined review (M-2). */
+export const COMBINED_REVIEW_PLAN_PROMPT = `${COMBINED_REVIEW_PROMPT}${PLAN_CHANNEL_NOTE}`
+
+export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', channel: 'agent' | 'plan' = 'agent'): string {
   if (kind === 'memory') return MEMORY_REVIEW_PROMPT
+  if (channel === 'plan') return kind === 'skill' ? SKILL_REVIEW_PLAN_PROMPT : COMBINED_REVIEW_PLAN_PROMPT
   if (kind === 'skill') return SKILL_REVIEW_PROMPT
   return COMBINED_REVIEW_PROMPT
 }
@@ -247,6 +250,8 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   memory: MEMORY_REVIEW_PROMPT,
   skill: SKILL_REVIEW_PROMPT,
   combined: COMBINED_REVIEW_PROMPT,
+  skillPlan: SKILL_REVIEW_PLAN_PROMPT,
+  combinedPlan: COMBINED_REVIEW_PLAN_PROMPT,
   curator: CURATOR_PROMPT,
   completion: COMPLETION_SKILL_REVIEW_PROMPT,
   skillsGuidance: SKILLS_GUIDANCE,

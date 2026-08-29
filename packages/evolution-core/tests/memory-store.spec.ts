@@ -308,3 +308,13 @@ it('memory add also runs inside the transaction (P1-①)', async () => {
   const entries = await store.read('memory')
   expect(entries).toHaveLength(2)
 })
+
+it('a failed write to a MISSING file keeps it missing (M-4)', async () => {
+  const io = memoryFakeIo(true)
+  const store = new MemoryStore({ root: 'root', io, memoryCharLimit: 10 })
+  const over = await store.applyBatch('memory', [{ action: 'add', facts: 'this entry is far above the ten char budget' }])
+  expect(over.ok).toBe(false)
+  expect(await io.exists('root/MEMORY.md')).toBe(false)
+  await store.add('memory', 'also-too-long-for-ten')
+  expect(await io.exists('root/MEMORY.md')).toBe(false)
+})

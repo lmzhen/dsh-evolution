@@ -21,6 +21,14 @@ async function fakeTrees(devContent: string, mirrorContent: string) {
 }
 
 describe('verify-layout-sync (P1-② layout drift guard)', () => {
+  it('requires both paths and refuses to run without them (M-5)', async () => {
+    const error = await run(process.execPath, [guard], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('both required')
+  })
+
   it('passes when scripts are identical modulo line endings', async () => {
     const { root, dev, mirror } = await fakeTrees('line one\nline two\n', 'line one\r\nline two\r\n')
     const { stdout } = await run(process.execPath, [guard, dev, mirror], { encoding: 'utf8' })

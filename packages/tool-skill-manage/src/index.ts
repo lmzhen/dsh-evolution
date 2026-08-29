@@ -78,6 +78,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // register the skills guidance section exactly when THIS tool mounts (i.e.
   // when `skill_manage` is actually available to the model — the DSH analogue
   // of Hermes' `if "skill_manage" in agent.valid_tool_names` condition).
+  // systemPrompt is an OPTIONAL service (a host without it must still boot),
+  // so it is read via the soft `ctx.get` probe — unlike `approval`, a hard
+  // dependency declared in `inject`. The two styles are deliberate per
+  // dependency strength (M-7).
   const systemPrompt = ctx.get('systemPrompt') as { section(section: { name: string; order: number; text: string }): () => void } | undefined
   if (systemPrompt) {
     ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: 900, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')

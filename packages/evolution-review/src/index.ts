@@ -225,7 +225,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
         signal: AbortSignal.timeout(config.reviewTimeoutMs),
         maxDepth: config.reviewMaxDepth,
         agentOptions,
-        persona: reviewPrompt(kind),
+        // M-2 (v3 audit): the subagent channel mounts only the read-only
+        // `skill` tool — the plan variant of the persona states the channel
+        // limit (deliverable = plan, never narrated actions) instead of the
+        // operative wording that contradicts the tool filter.
+        persona: reviewPrompt(kind, 'plan'),
         toolFilter: { allow: [...config.reviewToolAllow] },
         outputSchema: {
           type: 'object',

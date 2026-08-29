@@ -227,9 +227,10 @@ export class MemoryStore {
     await transactIo(this.io, path, async (current) => {
       const core = await this.addCore(target, facts, current ?? '')
       outcome = core.result
-      // `null` means DELETE in the transact contract, so a failure/no-op must
-      // return the current content unchanged (never null).
-      return core.write ?? (current ?? '')
+      // M-4 (v3 audit): a failure on a MISSING file must keep it missing —
+      // returning '' would fabricate an empty file. `null` (DELETE) is safe
+      // here: the file does not exist, so the remove is a no-op.
+      return core.write ?? (current ?? null)
     })
     return outcome as MemoryApplyResult
   }
@@ -284,9 +285,9 @@ export class MemoryStore {
     await transactIo(this.io, path, async (current) => {
       const core = await this.applyBatchCore(target, operations, current ?? '')
       outcome = core.result
-      // `null` means DELETE in the transact contract, so a failure/no-op must
-      // return the current content unchanged (never null).
-      return core.write ?? (current ?? '')
+      // M-4: a failure on a MISSING file must keep it missing (null = DELETE,
+      // and the remove is a no-op when nothing exists).
+      return core.write ?? (current ?? null)
     })
     return outcome as MemoryApplyResult
   }

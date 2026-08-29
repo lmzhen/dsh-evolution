@@ -8,6 +8,30 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { computeDedupGroups, computeLifecycleTransitions, emptyRecord, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
+/** Plain skill body used by the merge-chain fixtures. */
+function basicBody(name: string): string {
+  return `---
+name: ${name}
+description: ${name} body
+---
+
+Body of ${name}.
+`
+}
+
+/** Near-duplicate skill body (dedup pool fixture): ~58 shared distinct tokens
+ * vs 2 name-token difference keeps the 0.95 Jaccard gate happy (Set-based). */
+function nearBody(name: string): string {
+  return `---
+name: ${name}
+description: ${name} helper
+---
+
+# ${name}
+Run the same generic workflow. Capture the standard result. Report the common outcome. Verify the shared conventions. Apply the usual tool patterns. Keep the canonical steps. Use the normal entry points. Follow the established procedure. Match the documented behavior. Maintain the expected shape. Preserve the original semantics. Document the known limits. Refresh the stale examples. Review the recent changes. Test the real world cases. Record the observed facts. Summarize the key findings. Reference the source material.
+`
+}
+
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-'))
@@ -797,13 +821,7 @@ Body of ${name}.
       })
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
       const skills = ctx.evolutionCurator.skills
-      const body = (name: string) => `---
-name: ${name}
-description: ${name} body
----
-
-Body of ${name}.
-`
+      const body = basicBody
       await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
       await skills.create('stale-src', body('stale-src'), 'foreground')
       // stale-src is 45d idle: inside the stale window (30) but below archive
@@ -862,20 +880,93 @@ Body of ${name}.
       // The shared body is a long DISTINCT-word block (dedup compares token
       // SETS, so repetition adds no weight): ~58 shared tokens vs 2 name
       // tokens difference keeps the Jaccard above the 0.95 gate.
-      const near = (name: string) => `---
-name: ${name}
-description: ${name} helper
----
-
-# ${name}
-Run the same generic workflow. Capture the standard result. Report the common outcome. Verify the shared conventions. Apply the usual tool patterns. Keep the canonical steps. Use the normal entry points. Follow the established procedure. Match the documented behavior. Maintain the expected shape. Preserve the original semantics. Document the known limits. Refresh the stale examples. Review the recent changes. Test the real world cases. Record the observed facts. Summarize the key findings. Reference the source material.
-`
+      const near = nearBody
       await skills.create('dup-a', near('dup-a'), 'foreground')
       await skills.create('dup-b', near('dup-b'), 'foreground')
       expect(computeDedupGroups({ contents: new Map([['dup-a', near('dup-a')], ['dup-b', near('dup-b')]]) })).toEqual([['dup-a', 'dup-b']])
       await ctx.evolutionCurator.run({ ignoreGates: true })
       expect(seen[0]).toContain('- dup-a')
       expect(seen[0]).toContain('- dup-b')
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('prunings nominations never touch non-stale skills even from the dedup pool (M-3)', { timeout: 20_000 }, async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-m3-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const pruneYaml = '```yaml\nconsolidations: []\nprunings:\n  - name: dup-a\n    reason: duplicate\n```\n'
+      const ctx = new Context()
+      ctx.provide('llm', {
+        stream: async function* () {
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: pruneYaml }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: pruneYaml } }
+          yield { type: 'finish', reason: 'stop' }
+        },
+      })
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      ctx.provide('evolutionState', {
+        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+        saveCuratorState: async () => {},
+      })
+      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+      const skills = ctx.evolutionCurator.skills
+      const near = nearBody
+      // Both fresh: in the dedup pool but in NO stale pool.
+      await skills.create('dup-a', near('dup-a'), 'foreground')
+      await skills.create('dup-b', near('dup-b'), 'foreground')
+      await ctx.evolutionCurator.run({ ignoreGates: true })
+      expect(await skills.read('dup-a')).not.toBeNull()
+      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'dup-a'))).toBe(false)
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('a consolidation nomination outside the candidate pool is refused visibly (M-1 backstop)', { timeout: 20_000 }, async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-m1-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const yaml = '```yaml\nconsolidations:\n  - from: plain-skill\n    into: umbrella-skill\n    reason: absorb\nprunings: []\n```\n'
+      const ctx = new Context()
+      ctx.provide('llm', {
+        stream: async function* () {
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: yaml }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+          yield { type: 'finish', reason: 'stop' }
+        },
+      })
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      ctx.provide('evolutionState', {
+        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+        saveCuratorState: async () => {},
+      })
+      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+      const skills = ctx.evolutionCurator.skills
+      const body = basicBody
+      await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
+      // plain-skill exists in the tree but is neither stale nor duplicated:
+      // in NO recommendation pool, so the LLM narrating "merged plain-skill"
+      // must be refused before any file move.
+      await skills.create('plain-skill', body('plain-skill'), 'foreground')
+      await ctx.evolutionCurator.run({ ignoreGates: true })
+      expect(await skills.read('plain-skill')).not.toBeNull()
+      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'plain-skill'))).toBe(false)
+      const report = await ctx.evolutionCurator.latestReport()
+      expect(report?.consolidated?.some(item => item.from === 'plain-skill')).toBe(false)
       ctx.evolutionCurator.stop()
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME

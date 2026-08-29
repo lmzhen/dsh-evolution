@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — rc.63: v3-audit round (M-1…M-7) — prompt-channel separation, candidate-pool integrity, guard hardening
+
+All seven findings of AUDIT_REPORT_v3.md landed in one round.
+
+- **M-1 (P1, nomination channel vs execution reality)**: `CURATOR_PROMPT` is now an explicit NOMINATOR view — the operative "Your toolset:" section (skill_manage actions the channel never had) is gone, replaced by a "no tools, single deliverable = the YAML block" statement plus a "Return ONLY the YAML block" hard output constraint. Two hard backstops make the boundary mechanical: the recommendation parser now filters `consolidations` by the candidate pool (symmetric with prunings), and `applyMutations` refuses (visibly, into report `failed`) any consolidation whose source is outside the exact pool this run presented to the model — a model narrating actions it did not take can never land a real tree change.
+- **M-2 (P2, review persona vs subagent tool filter)**: new `SKILL_REVIEW_PLAN_PROMPT` / `COMBINED_REVIEW_PLAN_PROMPT` channel variants — the full review policy with a channel-limited deliverable note ("only the read-only `skill` tool; deliverable = the structured plan; never narrate actions you took"). The subagent path uses the plan variant (`reviewPrompt(kind, 'plan')`); the inject path keeps the operative wording. Prompt bundle bumped to `dsh-evolution@6` (both variants in the digest).
+- **M-3 (P2, my rc.62 regression)**: prunings nominations are filtered back to the deterministic stale pool only — dedup members join the recommendation pool for CONSOLIDATION inputs, never for pruning; an active non-stale skill is not archivable via LLM nomination. Regression test: a dedup member nominated into `prunings` stays in the tree.
+- **M-4 (P3)**: memory transact wrappers return `null` on failure-with-missing-file (DELETE is a no-op when nothing exists) instead of fabricating an empty MEMORY.md/USER.md. Test: failed batch on a missing file leaves it missing.
+- **M-5 (P3)**: `verify-layout-sync.mjs` dropped hardcoded `--auto` machine paths — both layout paths are required arguments.
+- **M-6 (P3)**: the layout-sync header now states the actual coverage (scripts/ trees only; `packages/` is the normalize-mirror release surface, `--deep` deferred).
+- **M-7 (P3)**: `verify-platform-ranges.mjs` fails loud when `--our-scope @deepseek-ai` would make family/platform deps indistinguishable (`--family-prefixes` required); feedback `parseState` excludes array shapes; tool-skill-manage documents why `systemPrompt` uses the soft `ctx.get` probe (optional service) vs `approval`'s hard `inject` (deliberate per dependency strength).
+
 ## Unreleased — rc.62: engineering-debt closeout (P1 ①②③ + P2 ④⑤⑥)
 
 All six items from the formalization-readiness inventory landed in one batch (no release formalization yet — the 0.1.0 move stays a separate operator decision).

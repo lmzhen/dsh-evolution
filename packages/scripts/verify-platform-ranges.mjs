@@ -38,13 +38,22 @@ function requireArg(name) {
 const platformVersion = requireArg('--platform-version')
 const manifestDir = requireArg('--manifest-dir')
 const ourScope = arg('--our-scope', '@lmzhen')
+const familyPrefixes = arg('--family-prefixes', `${ourScope}/dsh-`)
 const expected = `^${platformVersion}`
+
+// M-7 (v3 audit): when the publish scope IS the platform scope, family and
+// platform packages are indistinguishable by prefix — the guard would exempt
+// everything and go silent. Fail loud instead of vacuous-passing.
+if (ourScope === '@deepseek-ai') {
+  console.error('verify-platform-ranges: --our-scope @deepseek-ai cannot distinguish family from platform deps; pass --family-prefixes (e.g. @lmzhen/dsh-)')
+  process.exit(1)
+}
 
 const failures = []
 let checked = 0
 
 function isPlatformDep(name) {
-  return name.startsWith('@deepseek-ai/dsh-') && !name.startsWith(`${ourScope}/dsh-`)
+  return name.startsWith('@deepseek-ai/dsh-') && !name.startsWith(familyPrefixes)
 }
 
 for (const dir of readdirSync(manifestDir, { withFileTypes: true })) {

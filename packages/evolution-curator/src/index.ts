@@ -285,7 +285,10 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       const parsed = parseCuratorNominations(text)
       return {
         prunings: parsed.prunings.filter(name => candidates.includes(name)),
-        consolidations: parsed.consolidations,
+        // M-1 (v3 audit): consolidations get the same pool filter as prunings —
+        // a nomination whose source is NOT a known candidate has no executability
+        // authority (the engine runs only names it presented to the model).
+        consolidations: parsed.consolidations.filter(item => candidates.includes(item.from)),
       }
     } catch {
       // LLM curation is advisory. The deterministic scanner still owns the decision.
@@ -478,14 +481,19 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
     }, new Date(), gates)
+    const recommendPool = [...new Set([...result.markStale, ...dedupMembers])]
     const nominations = this.llmReview
-      ? await this.recommend([...new Set([...result.markStale, ...dedupMembers])], { dryRun })
+      ? await this.recommend(recommendPool, { dryRun })
       : { prunings: [], consolidations: [] }
     // Automatic merge nominations must pass the same gates as the control
     // plane: excluded/referenced/suppressed skills are never merged (source
-    // or target), even when the LLM nominates them.
+    // or target), even when the LLM nominates them. Prunings additionally
+    // keep the deterministic stale pool only (M-3, v3 audit): the dedup
+    // members joined the pool for CONSOLIDATION inputs, not for pruning —
+    // an active, non-stale skill must never be archivable via LLM nomination.
     const gatedNominations = {
       ...nominations,
+      prunings: nominations.prunings.filter(name => result.markStale.includes(name)),
       consolidations: gateConsolidations(nominations.consolidations, gates),
     }
     const llmNominations = gatedNominations.prunings
@@ -499,6 +507,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       bundledNames,
       suppressedNames,
       root,
+      recommendPool: new Set(recommendPool),
       failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
     })
     if (!dryRun) this.lastRun = Date.now()
@@ -638,6 +647,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     root: string
     /** Pre-transition state per archive candidate (for failed-archive rollback). */
     failedFrom?: Map<string, 'active' | 'stale'>
+    /** The exact candidate pool this run presented to the LLM (M-1 hard backstop). */
+    recommendPool: Set<string>
   }): Promise<{
     archivedSkills: Array<{ name: string; path: string; reason: string }>
     errors: string[]
@@ -687,6 +698,13 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       if (alreadyArchived.has(nomination.from)) continue
       if (!treeNames.has(nomination.from) || !treeNames.has(nomination.into)) {
         errors.push(`${nomination.from}: consolidation target or source missing from the skill tree`)
+        continue
+      }
+      // M-1 hard backstop: a source outside this run's candidate pool has no
+      // executability authority (the model may have narrated an action it did
+      // not take). Skip visibly, never silently.
+      if (!input.recommendPool.has(nomination.from)) {
+        errors.push(`${nomination.from}: consolidation nomination outside the candidate pool — refused (advisory text has no executability authority)`)
         continue
       }
       const consolidated = await this.skills.consolidate(nomination.into, [nomination.from], 'background_review')

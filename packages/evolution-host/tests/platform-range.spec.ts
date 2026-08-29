@@ -53,6 +53,18 @@ describe('verify-platform-ranges (N-2 guard)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('rejects --our-scope @deepseek-ai so the guard cannot go silent (M-7)', async () => {
+    const root = await stagedDir([
+      { name: '@lmzhen/dsh-evolution-host', dependencies: { '@deepseek-ai/dsh-llm': '^0.1.1-rc.2' } },
+    ])
+    const error = await run(process.execPath, [guard, '--platform-version', '0.1.1-rc.2', '--manifest-dir', root, '--our-scope', '@deepseek-ai'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('--family-prefixes')
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('tolerates missing manifests and empty manifest dirs', async () => {
     const root = await stagedDir([{ name: '@lmzhen/dsh-evolution-host' }])
     await writeFile(join(root, 'pkg-0', 'package.json'), '{not json')

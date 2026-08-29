@@ -1,34 +1,28 @@
 #!/usr/bin/env node
 /**
  * Layout-sync guard (P1-②): the dev tree and the flat mirror carry the SAME
- * source set (`packages/<pkg>` plus `scripts/`), and every change must be
- * synced by hand — the rc.51 `tsdown.package.config.ts` drift (D-7) was
- * exactly a one-sided edit. This script compares the two `scripts/` trees
- * (the publishing carrier) with line-ending normalization, so a pure
- * CRLF/LF difference is NOT a drift while any content difference is.
+ * source set, and every change must be synced by hand — the rc.51
+ * `tsdown.package.config.ts` drift (D-7) was exactly a one-sided edit.
  *
- * Usage (run from either tree root):
+ * Coverage (M-6, v3 audit): this guard compares the two `scripts/` trees —
+ * the publish-carrying scripts that are maintained in BOTH layouts by hand.
+ * The `packages/<pkg>` trees are the release-surface output of
+ * normalize-mirror; a full-tree comparison is a future `--deep` option.
+ *
+ * Usage (both paths are REQUIRED — no hardcoded machine layouts):
  *   node packages/scripts/verify-layout-sync.mjs <dev-scripts-dir> <mirror-scripts-dir>
- *   node packages/scripts/verify-layout-sync.mjs --auto   # defaults for this repo
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 const argv = process.argv.slice(2)
-function arg(name, fallback = '') {
-  const index = argv.indexOf(name)
-  return index >= 0 ? argv[index + 1] : fallback
-}
 
-let devDir = arg('--auto') === '1' ? 'D:/dsh/deepseek-harness/packages/evolution/scripts' : argv[0]
-let mirrorDir = arg('--auto') === '1' ? 'D:/dsh/dsh-evolution-mirror/packages/scripts' : argv[1]
-if (!devDir || !mirrorDir) {
-  console.error('usage: verify-layout-sync.mjs <dev-scripts-dir> <mirror-scripts-dir>')
+const devDir = resolve(argv[0] ?? '')
+const mirrorDir = resolve(argv[1] ?? '')
+if (!argv[0] || !argv[1]) {
+  console.error('usage: verify-layout-sync.mjs <dev-scripts-dir> <mirror-scripts-dir> (both required)')
   process.exit(1)
 }
-devDir = resolve(devDir)
-mirrorDir = resolve(mirrorDir)
 
 const normalize = (content) => content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
