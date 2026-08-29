@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadUsage, nodeEvolutionIo, normalizeUsageRecord, usageFile } from '@deepseek-ai/dsh-evolution-core'
+import { getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 
 describe('usage sidecar field normalization (P2-3)', () => {
   it('falls back to the emptyRecord baseline for mistyped fields', () => {
@@ -62,6 +62,42 @@ describe('usage sidecar field normalization (P2-3)', () => {
     const usage = await loadUsage(root, nodeEvolutionIo())
     expect(usage.get('broken-skill')?.use_count).toBe(0)
     expect(usage.get('good-skill')?.use_count).toBe(4)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('suppression merge must never resurrect a concurrently deleted name (rc.52 regression)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-suppressed-'))
+    const io = nodeEvolutionIo()
+    // Disk starts with {deleted-skill, keep-skill}.
+    await updateSuppressedNames(root, io, (current) => {
+      current.add('deleted-skill')
+      current.add('keep-skill')
+    })
+    // A concurrent restore deletes `deleted-skill` from the sidecar.
+    await updateSuppressedNames(root, io, (current) => {
+      current.delete('deleted-skill')
+    })
+    // The curator's save merges ONLY its own run-added delta ("new-skill");
+    // a full-set union would re-add deleted-skill.
+    await updateSuppressedNames(root, io, (current) => {
+      current.add('new-skill')
+    })
+    const names = await loadSuppressedNames(root, io)
+    expect(names.has('deleted-skill')).toBe(false)
+    expect(names.has('keep-skill')).toBe(true)
+    expect(names.has('new-skill')).toBe(true)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('mutateUsage runs an atomic read-modify-write where concurrent bumps are preserved', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mutate-'))
+    const io = nodeEvolutionIo()
+    await Promise.all(Array.from({ length: 8 }, () => mutateUsage(root, io, (map) => {
+      const record = getRecord(map, 'atomic-skill')
+      record.use_count += 1
+    })))
+    const usage = await loadUsage(root, io)
+    expect(usage.get('atomic-skill')?.use_count).toBe(8)
     await rm(root, { recursive: true, force: true })
   })
 })

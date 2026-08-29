@@ -951,9 +951,9 @@ export class SkillLibrary {
     // authority, so every NON-system entry in the active root is cleared first
     // — a stray directory the manifest never declared must not survive a
     // restore. System entries (sidecars/.archive/.backups, all dot-prefixed)
-    // are untouched here and restored/reconciled by the manifest below.
-    // Legacy manifests (readable snapshot, unreadable/absent manifest field)
-    // keep the old name-only clear so they can still restore everything.
+    // are untouched here and restored/reconciled by the manifest below. The
+    // same clear runs for legacy manifests: their "restore everything" branch
+    // below repopulates from the snapshot, so no entry is lost either way.
     let rootEntries: string[]
     try {
       rootEntries = await this.io.list(this.root)

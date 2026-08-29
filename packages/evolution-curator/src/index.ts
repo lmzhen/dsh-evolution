@@ -631,6 +631,10 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
     let suppressedChanged = false
+    // Delta set (rc.52 regression review): the save below must merge only the
+    // names THIS run added — a full-set union would resurrect a suppression a
+    // concurrent restore deleted between our load and our save.
+    const suppressedAdded = new Set<string>()
     for (const name of archiveCandidates) {
       const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
@@ -654,6 +658,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
         if (bundledNames.has(name)) {
           suppressedNames.add(name)
+          suppressedAdded.add(name)
           suppressedChanged = true
         }
       }
@@ -683,11 +688,11 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     }
     if (suppressedChanged) {
       try {
-        // Atomic RMW (rc.50 P2-2): merge this run's names into the current
-        // on-disk set inside one transact — a second process's additions are
-        // preserved instead of being overwritten by this run's snapshot.
+        // Atomic RMW (rc.50 P2-2): merge only this run's ADDITIONS into the
+        // current on-disk set inside one transact — a second process's
+        // additions are preserved and its deletions are not re-added.
         await updateSuppressedNames(root, this.io, (current) => {
-          for (const name of suppressedNames) current.add(name)
+          for (const name of suppressedAdded) current.add(name)
         })
       } catch {
         // Best-effort like the report write: a transient disk failure must not
