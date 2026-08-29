@@ -77,7 +77,7 @@ describe('tool-skill-manage', () => {
     expect(created.isError).toBe(false)
     const message = (created.value as { message?: string } | undefined)?.message ?? ''
     expect(message).toContain('Authoring check:')
-    expect(message).toContain('exceeds the authoring bar')
+    expect(message).toContain('exceeds the 60-char authoring bar')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })

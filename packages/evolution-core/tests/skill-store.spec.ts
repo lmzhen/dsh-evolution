@@ -390,10 +390,10 @@ it('authoringFeedback reports the 60-char bar and colon rule without changing va
   expect(ok.over60).toBe(false)
   expect(ok.hasColon).toBe(false)
   expect(ok.lines[0]).toContain('27/60')
-  // Over the bar: advisory line names the count and the truncation risk.
+  // Over the bar: advisory line names the count and the Hermes standard.
   const long = authoringFeedback({ description: 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories.' })
   expect(long.over60).toBe(true)
-  expect(long.lines[0]).toContain('exceeds the authoring bar')
+  expect(long.lines[0]).toContain('exceeds the 60-char authoring bar')
   // Colon rule: flagged for double-quote wrapping.
   const colon = authoringFeedback({ description: 'Search: arXiv papers by keyword.' })
   expect(colon.hasColon).toBe(true)
