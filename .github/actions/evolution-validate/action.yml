@@ -58,10 +58,12 @@ runs:
         cache-dependency-path: upstream/pnpm-lock.yaml
 
     - name: Install immutable dependencies
+      shell: bash
       working-directory: upstream
       run: pnpm install --no-frozen-lockfile
 
     - name: Build, test and lint
+      shell: bash
       working-directory: upstream
       run: |
         node packages/evolution/scripts/build-lib.mjs
@@ -69,6 +71,7 @@ runs:
         node node_modules/oxlint/bin/oxlint packages/evolution
 
     - name: Pack scoped release
+      shell: bash
       working-directory: upstream
       run: |
         node packages/evolution/scripts/prepare-release.mjs \
@@ -77,6 +80,7 @@ runs:
           --upstream-version "$UPSTREAM_VERSION"
 
     - name: Publish dry-run
+      shell: bash
       working-directory: upstream
       run: |
         node packages/evolution/scripts/publish-scoped.mjs \
