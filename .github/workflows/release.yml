@@ -51,13 +51,13 @@ jobs:
   # publish dry-run) — against the RELEASED upstream tag. The only overlay
   # difference: the baseline's project graph (tsconfig.host.json) is
   # commit-bound and is NOT copied into the released tree.
+  #
+  # GATE (rc.54): after consecutive green runs (rc.52 main + rc.53 tag), this
+  # job is a hard requirement of `publish` — a released-upstream
+  # incompatibility now blocks the release instead of merely failing a run.
   compat-check:
     name: validate (released upstream)
     runs-on: ubuntu-latest
-    # Watching mode: a released-upstream failure is visible but never blocks
-    # the tag's publish gate. Promote to a hard gate after consecutive green
-    # runs.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +73,7 @@ jobs:
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: validate
+    needs: [validate, compat-check]
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
