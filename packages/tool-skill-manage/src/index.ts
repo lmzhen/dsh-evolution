@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, computeDedupGroups, resolveOrigins, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, computeDedupGroups, resolveOrigins, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -71,6 +71,14 @@ interface SkillWriteArgs {
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
+  // Hermes SKILLS_GUIDANCE parity: when the system-prompt service is mounted,
+  // register the skills guidance section exactly when THIS tool mounts (i.e.
+  // when `skill_manage` is actually available to the model — the DSH analogue
+  // of Hermes' `if "skill_manage" in agent.valid_tool_names` condition).
+  const systemPrompt = ctx.get('systemPrompt') as { section(section: { name: string; order: number; text: string }): () => void } | undefined
+  if (systemPrompt) {
+    ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: 900, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
+  }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   const library = new SkillLibrary(rawConfig.root || undefined, io, {
     maxNameLength: rawConfig.maxSkillNameLength ?? DEFAULT_SKILL_LIMITS.maxNameLength,

@@ -49,6 +49,20 @@ describe('tool-skill-manage', () => {
     expect(ctx.tools.get('skill_manage')).toBeDefined()
   })
 
+  it('mounts the Hermes SKILLS_GUIDANCE system-prompt section (alignment)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guidance-')) })
+    await ctx.plugin(ToolSkillManage)
+    const assembly = await ctx.systemPrompt.assemble()
+    const rendered = (assembly.sections ?? []).map(s => (typeof s === 'string' ? s : s.text)).join('\n')
+    expect(rendered).toContain('Skills guidance:')
+    expect(rendered).toContain('don\'t wait to be asked')
+    await ctx.fiber.dispose()
+  })
+
   it('marks review-created skills for curator lifecycle management, but not foreground writes', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = async (origin: string | undefined, name: string) => ctx.tools.execute({

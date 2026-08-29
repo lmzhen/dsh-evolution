@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { COMBINED_REVIEW_PROMPT, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -18,4 +18,46 @@ it('verifyPromptBundle rejects tampered prompt content', () => {
     prompts: { ...PROMPT_BUNDLE.prompts, skill: (PROMPT_BUNDLE.prompts['skill'] ?? '') + '\n# injected' },
   }
   expect(verifyPromptBundle(tampered)).toBe(false)
+})
+
+// Hermes-alignment contract (2026-08-29): the operational guidance the model
+// follows must keep the original's structure — these substrings are the
+// load-bearing instruction points, not prose. A future simplification that
+// drops any of them fails here first.
+it('skill review prompt keeps the Hermes guiding structure (alignment contract)', () => {
+  expect(SKILL_REVIEW_PROMPT).toContain('A pass that does nothing is a missed learning opportunity')
+  expect(SKILL_REVIEW_PROMPT).toContain('FIRST-CLASS skill signals')
+  expect(SKILL_REVIEW_PROMPT).toContain('UPDATE A CURRENTLY-LOADED SKILL')
+  expect(SKILL_REVIEW_PROMPT).toContain('session artifact')
+  expect(SKILL_REVIEW_PROMPT).toContain('how to do this class of task for this user')
+  // Pinned semantics must match the DSH guard (read-only within review) — not
+  // the Hermes "pin only blocks the curator" wording.
+  expect(SKILL_REVIEW_PROMPT).toContain('read-only to THIS background review pass')
+  expect(SKILL_REVIEW_PROMPT).toContain('Two-tier deposition discipline')
+  expect(MEMORY_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
+})
+
+it('combined review prompt mirrors the same guidance and two-tier rule', () => {
+  expect(COMBINED_REVIEW_PROMPT).toContain('Frustration is a FIRST-CLASS skill signal')
+  expect(COMBINED_REVIEW_PROMPT).toContain('Body density IS reuse rate')
+})
+
+it('curator prompt keeps package integrity and the consolidated/pruned block contract', () => {
+  expect(CURATOR_PROMPT).toContain('UMBRELLA-BUILDING')
+  expect(CURATOR_PROMPT).toContain('Package integrity')
+  expect(CURATOR_PROMPT).toContain('absorbed_into=<umbrella>')
+  expect(CURATOR_PROMPT).toContain('consolidations:')
+  expect(CURATOR_PROMPT).toContain('prunings:')
+  expect(CURATOR_PROMPT).toContain('scheduled-task-referenced')
+})
+
+it('authoring standards carry the colon-quote and privacy motive guarantees', () => {
+  expect(DSH_AUTHORING_STANDARDS).toContain('wrap the whole value in double quotes')
+  expect(DSH_AUTHORING_STANDARDS).toContain('privacy leak')
+})
+
+it('skills guidance section is the Hermes SKILLS_GUIDANCE analogue (save + immediate patch)', () => {
+  expect(SKILLS_GUIDANCE).toContain('5+ tool calls')
+  expect(SKILLS_GUIDANCE).toContain("don't wait to be asked")
+  expect(PROMPT_BUNDLE.prompts['skillsGuidance']).toBe(SKILLS_GUIDANCE)
 })
