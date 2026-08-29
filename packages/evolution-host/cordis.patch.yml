@@ -89,7 +89,7 @@
 # wholesale, so both path and openAt are set here.
 - id: session-query-sqlite
   config:
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? ((process.env.DSH_HOME ?? process.env.USERPROFILE ?? '.') + '/evolution/session-query.db'))
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
     openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY ?? 'startup'
 
 # ── Hermes 60-char catalog rule: platform interface, deployment default ──────

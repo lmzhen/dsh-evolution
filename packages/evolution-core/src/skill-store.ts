@@ -646,6 +646,12 @@ export class SkillLibrary {
       const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
       dest = join(archiveRoot, `${name.trim()}-${stamp}`)
     }
+    // Symlink guard (G7): moving a symlinked tree would relocate the link, not
+    // the content it points at — refuse before the rename instead.
+    if (this.io.isSymlink) {
+      const link = await this.io.isSymlink(dir)
+      if (link === true) return { ok: false, message: `Skill "${name}" is a symlink; refusing to archive it.` }
+    }
     try {
       await this.io.rename(dir, dest)
     } catch {
@@ -740,6 +746,12 @@ export class SkillLibrary {
     if (!chosen) return { ok: false, message: `Skill "${name}" is not in .archive.` }
     const source = join(archiveRoot, chosen)
     const dest = this.dirOf(name)
+    // Symlink guard (G7): restoring a symlinked archive entry would recreate a
+    // link in the active tree instead of the real content — refuse first.
+    if (this.io.isSymlink) {
+      const link = await this.io.isSymlink(source)
+      if (link === true) return { ok: false, message: `Archived entry "${chosen}" is a symlink; refusing to restore it.` }
+    }
     try {
       await this.io.rename(source, dest)
     } catch {
@@ -935,8 +947,22 @@ export class SkillLibrary {
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
     await this.snapshotAll('pre-rollback', extras)
-    for (const name of await listNames(this.root, this.io)) {
-      await this.io.remove(this.dirOf(name))
+    // Whole-tree replacement (rc.50 P2-14): the manifest is the only restore
+    // authority, so every NON-system entry in the active root is cleared first
+    // — a stray directory the manifest never declared must not survive a
+    // restore. System entries (sidecars/.archive/.backups, all dot-prefixed)
+    // are untouched here and restored/reconciled by the manifest below.
+    // Legacy manifests (readable snapshot, unreadable/absent manifest field)
+    // keep the old name-only clear so they can still restore everything.
+    let rootEntries: string[]
+    try {
+      rootEntries = await this.io.list(this.root)
+    } catch {
+      rootEntries = []
+    }
+    for (const entry of rootEntries) {
+      if (entry.startsWith('.')) continue
+      await this.io.remove(join(this.root, entry))
     }
     const manifest = await this.readSnapshotManifest(latest.path)
     if (manifest === null) {

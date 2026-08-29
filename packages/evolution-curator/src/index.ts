@@ -12,7 +12,7 @@ import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
-import { emptyRecord, loadSuppressedNames, saveSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
+import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
@@ -683,7 +683,12 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     }
     if (suppressedChanged) {
       try {
-        await saveSuppressedNames(root, suppressedNames, this.io)
+        // Atomic RMW (rc.50 P2-2): merge this run's names into the current
+        // on-disk set inside one transact — a second process's additions are
+        // preserved instead of being overwritten by this run's snapshot.
+        await updateSuppressedNames(root, this.io, (current) => {
+          for (const name of suppressedNames) current.add(name)
+        })
       } catch {
         // Best-effort like the report write: a transient disk failure must not
         // make a run that already archived skills throw after the fact.
@@ -858,9 +863,13 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     if (record) record.archived_at = null
     await saveUsage(this.skills.root, usage, this.io)
     const suppressed = new Set(await loadSuppressedNames(this.skills.root, this.io))
-    if (suppressed.delete(name)) {
+    if (suppressed.has(name)) {
       try {
-        await saveSuppressedNames(this.skills.root, suppressed, this.io)
+        // Atomic RMW (rc.50 P2-2): delete only inside the transact so a
+        // concurrent process's suppression additions survive the restore.
+        await updateSuppressedNames(this.skills.root, this.io, (current) => {
+          current.delete(name)
+        })
       } catch {
         // The restore itself already landed; suppression cleanup is best-effort.
         this.ctx.logger.warn(`evolution-curator: failed to persist suppressed names after restoring ${name}`)

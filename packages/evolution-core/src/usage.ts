@@ -4,7 +4,7 @@
  */
 
 import { join } from 'node:path'
-import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
+import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 
 export type SkillState = 'active' | 'stale' | 'archived'
 
@@ -84,20 +84,38 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
   }
 }
 
-export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<UsageMap> {
+/** Parse a raw usage sidecar; malformed content reads as empty (best-effort telemetry). */
+function parseUsage(raw: string | null): UsageMap {
   const map: UsageMap = new Map()
-  const raw = await io.readText(usageFile(root))
-  if (raw !== null) {
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      for (const [name, record] of Object.entries(parsed)) {
-        map.set(name, normalizeUsageRecord(record))
-      }
-    } catch {
-      // Malformed sidecar is treated as empty. Telemetry is best-effort.
+  if (raw === null) return map
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    for (const [name, record] of Object.entries(parsed)) {
+      map.set(name, normalizeUsageRecord(record))
     }
+  } catch {
+    // Malformed sidecar is treated as empty.
   }
   return map
+}
+
+export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<UsageMap> {
+  return parseUsage(await io.readText(usageFile(root)))
+}
+
+/**
+ * Atomic read-modify-write on the usage sidecar (rc.50 P2-2): `task` receives
+ * the map parsed from the current on-disk state and may mutate it; the result
+ * is persisted inside the same transact so a second process sharing DSH_HOME
+ * cannot interleave its RMW and lose a counter update. Callers keep their own
+ * single-process serialize chain as the second layer.
+ */
+export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map: UsageMap) => void | Promise<void>): Promise<void> {
+  await transactIo(io, usageFile(root), async (current) => {
+    const map = parseUsage(current)
+    await task(map)
+    return JSON.stringify(Object.fromEntries(map.entries()), null, 2)
+  })
 }
 
 export async function saveUsage(root: string, map: UsageMap, io: EvolutionIoLike = nodeEvolutionIo()): Promise<void> {
@@ -156,7 +174,10 @@ export function suppressedFile(root: string): string {
 }
 
 export async function loadSuppressedNames(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<ReadonlySet<string>> {
-  const raw = await io.readText(suppressedFile(root))
+  return parseSuppressed(await io.readText(suppressedFile(root)))
+}
+
+function parseSuppressed(raw: string | null): Set<string> {
   if (raw === null) return new Set()
   try {
     const parsed = JSON.parse(raw) as unknown
@@ -178,4 +199,22 @@ export async function saveSuppressedNames(
   io: EvolutionIoLike = nodeEvolutionIo(),
 ): Promise<void> {
   await io.writeText(suppressedFile(root), JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2))
+}
+
+/**
+ * Atomic read-modify-write on the suppression sidecar (rc.50 P2-2): `task`
+ * receives the set parsed from the current on-disk state and may mutate it;
+ * the result is persisted inside the same transact so a second process
+ * sharing DSH_HOME cannot interleave its RMW. Best-effort posture unchanged.
+ */
+export async function updateSuppressedNames(
+  root: string,
+  io: EvolutionIoLike,
+  task: (names: Set<string>) => void | Promise<void>,
+): Promise<void> {
+  await transactIo(io, suppressedFile(root), async (current) => {
+    const names = parseSuppressed(current)
+    await task(names)
+    return JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2)
+  })
 }

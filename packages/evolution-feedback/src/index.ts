@@ -155,6 +155,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.effect(() => () => {
-    if (io) void feedback.flush(io)
+    // Return the flush promise so cordis awaits it during plugin unload
+    // (rc.50 P2-12): a fire-and-forget flush could lose the last records when
+    // the fiber tears down right after a record().
+    if (io) return feedback.flush(io)
   }, 'evolution-feedback.flush')
 }

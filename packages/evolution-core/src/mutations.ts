@@ -7,7 +7,7 @@
 
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
+import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 
 export interface MutationRecord {
   skillName: string
@@ -30,28 +30,32 @@ export function contentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex')
 }
 
-export async function loadMutations(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<MutationRecord[]> {
-  const raw = await io.readText(mutationsFile(root))
+/**
+ * Parse a raw mutations sidecar; malformed content reads as empty (auditing is
+ * best-effort). Versioned shape ({ version, records }) with legacy
+ * plain-array compat, plus a field-level guard for records without the
+ * required identity/timestamp fields (rc.42 audit P2-3).
+ */
+function parseMutationRecords(raw: string | null): MutationRecord[] {
   if (raw === null) return []
   try {
     const parsed = JSON.parse(raw) as unknown
-    // Versioned shape ({ version, records }) with legacy plain-array compat.
     const records = Array.isArray(parsed)
       ? parsed
       : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { records?: unknown }).records)
         ? (parsed as { records: unknown[] }).records
         : []
-    // Field-level guard (rc.42 audit P2-3): `at` feeds `.slice()` in the
-    // command surfaces, so a record without a string timestamp is dropped —
-    // same posture as the skillName/action checks, never a throw.
     return records.filter((entry): entry is MutationRecord =>
       typeof entry === 'object' && entry !== null && typeof (entry as MutationRecord).skillName === 'string'
       && typeof (entry as MutationRecord).action === 'string'
       && typeof (entry as MutationRecord).at === 'string')
   } catch {
-    // Malformed audit is treated as empty; auditing is best-effort.
     return []
   }
+}
+
+export async function loadMutations(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<MutationRecord[]> {
+  return parseMutationRecords(await io.readText(mutationsFile(root)))
 }
 
 /** Append one record, trim to `cap`, and write atomically (versioned shape). */
@@ -61,8 +65,13 @@ export async function recordMutation(
   record: MutationRecord,
   cap = DEFAULT_MUTATION_CAP,
 ): Promise<void> {
-  const existing = await loadMutations(root, io)
-  existing.push(record)
-  const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing
-  await io.writeText(mutationsFile(root), JSON.stringify({ version: MUTATIONS_FILE_VERSION, records: trimmed }, null, 2))
+  // The read-append-write runs as one atomic transact (rc.50 P2-2): a second
+  // process sharing DSH_HOME can no longer interleave its append between our
+  // read and write and lose an audit record.
+  await transactIo(io, mutationsFile(root), (current) => {
+    const existing = parseMutationRecords(current)
+    existing.push(record)
+    const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing
+    return Promise.resolve(JSON.stringify({ version: MUTATIONS_FILE_VERSION, records: trimmed }, null, 2))
+  })
 }

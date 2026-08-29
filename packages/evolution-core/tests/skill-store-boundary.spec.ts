@@ -45,6 +45,11 @@ function fakeIo(): EvolutionIoLike & { files: Map<string, string> } {
         }
       }
     },
+    // G7 fake: the probe answers per-entry symlink-ness (default: not a link).
+    async isSymlink(path) {
+      const key = normalize(path)
+      return files.get(`${key}.symlink`) === 'true'
+    },
   }
 }
 
@@ -74,5 +79,32 @@ describe('SkillLibrary IO boundaries', () => {
     expect(restored.ok).toBe(true)
     expect(await io.readText('/skills/boundary-skill/SKILL.md')).toBeTruthy()
     expect(await io.readText('/skills/boundary-skill/scripts/run.mjs')).toBe('export {}')
+  })
+
+  it('refuses to archive a symlinked skill (G7)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('linky-skill', SKILL.replace('boundary-skill', 'linky-skill'), 'foreground')
+    // Mark the skill directory as a symlink for the probe.
+    await io.writeText('/skills/linky-skill.symlink', 'true')
+    const result = await lib.archive('linky-skill')
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('symlink')
+    // The tree is untouched.
+    expect(await io.readText('/skills/linky-skill/SKILL.md')).toBeTruthy()
+  })
+
+  it('restore clears non-system residue the manifest does not declare (P2-14)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('keep-skill', SKILL.replace('boundary-skill', 'keep-skill'), 'foreground')
+    await lib.snapshotAll('pre-residue')
+    // A stray file lands in the active root AFTER the snapshot; it is not a
+    // declared skill and must not survive the manifest-driven restore.
+    await io.writeText('/skills/stray-thing.md', 'not a skill')
+    const restored = await lib.restoreLatestSnapshot()
+    expect(restored.ok).toBe(true)
+    expect(await io.exists('/skills/stray-thing.md')).toBe(false)
+    expect(await io.readText('/skills/keep-skill/SKILL.md')).toBeTruthy()
   })
 })

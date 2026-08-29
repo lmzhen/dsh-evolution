@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionIoAdapter,  skillsRoot } from '@deepseek-ai/dsh-evolution-core'
-import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 declare module '@deepseek-ai/cordis' {
@@ -29,7 +29,6 @@ export class SkillUsageRegistry extends Service {
 
   readonly root: string
   private readonly io: EvolutionIoLike
-  private usage: UsageMap | null = null
   private chain: Promise<unknown> = Promise.resolve()
 
   constructor(ctx: Context, config: Config = {}) {
@@ -40,39 +39,42 @@ export class SkillUsageRegistry extends Service {
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   }
 
-  private async map(): Promise<UsageMap> {
-    if (!this.usage) this.usage = await loadUsage(this.root, this.io)
-    return this.usage
-  }
-
-  async flush(): Promise<void> {
-    if (this.usage) await saveUsage(this.root, this.usage, this.io)
-  }
-
-  /** Serialize read-modify-write cycles so concurrent record calls never lose updates. */
-  private mutate<T>(task: (map: UsageMap) => Promise<T>): Promise<T> {
-    const run = this.chain.then(async () => task(await this.map()))
+  /**
+   * Serialize read-modify-write cycles so concurrent record calls never lose
+   * updates, then run each cycle as ONE atomic transact (rc.50 P2-2): the map
+   * is read from disk inside the lock, so a second process that shares
+   * DSH_HOME cannot interleave its own RMW between our read and write.
+   */
+  private mutate<T>(task: (map: UsageMap) => T | Promise<T>): Promise<T> {
+    const run = this.chain.then(async () => {
+      let outcome = undefined as T | undefined
+      await mutateUsage(this.root, this.io, async (map) => {
+        outcome = await task(map)
+      })
+      return outcome as T
+    })
     this.chain = run.then(() => undefined, () => undefined)
     return run
   }
 
   async record(name: string, kind: 'use' | 'view' | 'patch', at = new Date()): Promise<void> {
-    await this.mutate(async (map) => {
+    await this.mutate((map) => {
       if (kind === 'use') bumpUse(map, name, at)
       else if (kind === 'view') bumpView(map, name, at)
       else bumpPatch(map, name, at)
-      await this.flush()
     })
   }
 
-  report(): Promise<UsageMap> {
-    return this.mutate(map => Promise.resolve(new Map(map)))
+  /** Read-only snapshot of the sidecar (no disk write — reading never mutates). */
+  async report(): Promise<UsageMap> {
+    const run = this.chain.then(async () => new Map(await loadUsage(this.root, this.io)))
+    this.chain = run.then(() => undefined, () => undefined)
+    return run
   }
 
   async markAgentCreated(name: string): Promise<void> {
-    await this.mutate(async (map) => {
+    await this.mutate((map) => {
       markAgentCreated(map, name)
-      await this.flush()
     })
   }
 
@@ -83,9 +85,8 @@ export class SkillUsageRegistry extends Service {
    * mutation maturity is not inflated by mere creation.
    */
   async ensureRecord(name: string): Promise<void> {
-    await this.mutate(async (map) => {
+    await this.mutate((map) => {
       getRecord(map, name)
-      await this.flush()
     })
   }
 
@@ -95,34 +96,31 @@ export class SkillUsageRegistry extends Service {
    * a state transition, not a content mutation.
    */
   async markArchived(name: string, at = new Date()): Promise<void> {
-    await this.mutate(async (map) => {
+    await this.mutate((map) => {
       const record = map.get(name)
       if (record) {
         record.state = 'archived'
         record.archived_at = at.toISOString()
       }
-      await this.flush()
     })
   }
 
   /**
-   * Drop the in-memory cache once queued work drains, so the next `map()` reads
-   * the file again. The curator writes the sidecar directly; without this, the
-   * next tool telemetry flush would re-cover its quality/state/pinned writes.
+   * Barrier for external writers: every mutate reads the sidecar fresh from
+   * disk (rc.50 P2-2 transact), so a curator direct-write is visible on the
+   * next call without a cache flush; this waits for queued work to drain.
    */
   async invalidate(): Promise<void> {
     await this.chain
-    this.usage = null
   }
 
   /** Write feedback-derived quality onto the usage sidecar; curator reads it. */
   async setQuality(name: string, score: number, warn: boolean): Promise<void> {
-    await this.mutate(async (map) => {
+    await this.mutate((map) => {
       const record = map.get(name)
       if (!record) return
       record.quality_score = score
       record.quality_warn = warn
-      await this.flush()
     })
   }
 }
