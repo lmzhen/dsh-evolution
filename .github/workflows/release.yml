@@ -69,7 +69,6 @@ jobs:
           upstream_ref: dsh-v0.1.1-rc.2
           artifact_suffix: released
           copy_host_tsconfig: 'false'
-          compat_released: 'true'
 
   publish:
     name: publish

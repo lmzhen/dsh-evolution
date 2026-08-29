@@ -15,6 +15,7 @@
  */
 
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -169,16 +170,89 @@ async function removeCopiedEvolutionPackages(profileDir) {
   return removed
 }
 
+/**
+ * Locate the `standard` agent preset composition at install time.
+ *
+ * Discovery order (rc.53 — the preset must follow the RUNTIME platform, not a
+ * vendored baseline):
+ *   1. `DSH_AGENT_PRESET_ROOT` (explicit, points at an agent-presets root);
+ *   2. a nearby source tree (`apps/cli/config/agent-presets/...`) — the CI
+ *      overlay layout and upstream dev checkouts both carry the real file;
+ *   3. the globally installed `@deepseek-ai/dsh` (npm root -g).
+ * Fails loud otherwise: a preset built from a guessed baseline would silently
+ * mismatch the platform it runs on.
+ */
+async function resolveStandardComposition() {
+  const standardName = join('standard', 'agent.cordis.yml')
+  const direct = (root) => join(root, standardName)
+
+  const explicit = process.env.DSH_AGENT_PRESET_ROOT?.trim()
+  if (explicit) {
+    const path = direct(explicit)
+    if (!existsSync(path)) throw new Error(`DSH_AGENT_PRESET_ROOT is set but ${path} does not exist`)
+    return await readFile(path, 'utf8')
+  }
+
+  // Walk upward from this script: mirror layout (packages/scripts) and the
+  // upstream overlay layout (packages/evolution/scripts) both reach the tree
+  // root within a few levels.
+  const scriptDir = dirname(fileURLToPath(import.meta.url))
+  for (let level = scriptDir; level !== dirname(level); level = dirname(level)) {
+    const path = direct(join(level, 'apps', 'cli', 'config', 'agent-presets'))
+    if (existsSync(path)) return await readFile(path, 'utf8')
+  }
+
+  try {
+    if (process.platform === 'win32') {
+      // spawn of npm.cmd is blocked on Windows (EINVAL); the default global
+      // module root is derivable from the standard APPDATA layout instead.
+      const roots = [
+        join(process.env.APPDATA ?? '', 'npm', 'node_modules'),
+        join(homedir(), 'AppData', 'Roaming', 'npm', 'node_modules'),
+      ]
+      for (const root of roots) {
+        const path = direct(join(root, '@deepseek-ai', 'dsh', 'config', 'agent-presets'))
+        if (existsSync(path)) return await readFile(path, 'utf8')
+      }
+    } else {
+      const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).trim()
+      const path = direct(join(globalRoot, '@deepseek-ai', 'dsh', 'config', 'agent-presets'))
+      if (existsSync(path)) return await readFile(path, 'utf8')
+    }
+  } catch {
+    // npm root -g is unavailable; fall through to the loud error below.
+  }
+
+  throw new Error(
+    'install-layered: cannot find a runtime `standard` agent preset — install dsh first, '
+    + 'set DSH_AGENT_PRESET_ROOT, or run from a source checkout containing apps/cli/config/agent-presets',
+  )
+}
+
+/**
+ * Build the installed Evolution preset composition: the runtime platform's
+ * `standard` rows verbatim, then the evolution delta. The delta stays the
+ * only evolution-owned text, so the preset tracks every platform version.
+ */
+export function generateAgentPreset(standardComposition, deltaComposition) {
+  return `${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`
+}
+
 async function installAgentPreset(home, dryRun, force) {
   const destination = agentPresetDirectory(home)
+  // The generated composition always resolves, also in dry-run: a preset that
+  // cannot be built from the runtime platform should be reported up front.
+  const standardComposition = await resolveStandardComposition()
+  const deltaPath = join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
+  const deltaComposition = await readFile(deltaPath, 'utf8')
+  const composition = generateAgentPreset(standardComposition, deltaComposition)
   if (!dryRun) {
     if (existsSync(destination) && !force) {
       return { destination, installed: false, reason: 'exists; use --force to overwrite' }
     }
     await mkdir(destination, { recursive: true })
-    for (const file of ['agent.cordis.yml', 'preset.yml']) {
-      await cp(join(packageSourceRoot(), 'evolution-agent', file), join(destination, file), { force })
-    }
+    await writeFile(join(destination, 'agent.cordis.yml'), composition)
+    await cp(join(packageSourceRoot(), 'evolution-agent', 'preset.yml'), join(destination, 'preset.yml'), { force })
   }
   return { destination, installed: true }
 }

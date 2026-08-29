@@ -38,7 +38,14 @@ describe('layered installer', () => {
     }
 
     const presetDir = join(home, '.agent-presets', 'evolution')
-    expect(await readFile(join(presetDir, 'agent.cordis.yml'), 'utf8')).toContain('tool-memory')
+    const composition = await readFile(join(presetDir, 'agent.cordis.yml'), 'utf8')
+    // rc.53: the installed preset is GENERATED from the runtime platform's
+    // standard rows + the evolution delta — standard rows verbatim first
+    // (persona is one), then the delta's model tools.
+    expect(composition).toContain('- id: persona')
+    expect(composition.indexOf('- id: persona')).toBeLessThan(composition.indexOf('- id: tool-memory'))
+    expect(composition).toContain('- id: tool-memory')
+    expect(composition).toContain('- id: evolution-skill-catalog')
 
     const patchRows = insertedRows(loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')))
     expect(rowIds(patchRows)).toContain('evolution-review')
