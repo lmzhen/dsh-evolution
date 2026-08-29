@@ -1,0 +1,97 @@
+name: evolution-validate
+description: >-
+  Validate the evolution family against one upstream ref: overlay the flat
+  mirror packages into the upstream tree, install, build/test/lint, pack the
+  scoped release and run the publish dry-run. Shared by the baseline validate
+  job and the released-upstream compat check (they differ only in the anchor
+  ref and whether the baseline's tsconfig.host.json project graph is copied).
+inputs:
+  upstream_repo:
+    description: Upstream repository to overlay onto
+    required: true
+  upstream_ref:
+    description: Upstream commit or tag to validate against
+    required: true
+  artifact_suffix:
+    description: Suffix for the uploaded artifacts (baseline / released)
+    required: false
+    default: baseline
+  copy_host_tsconfig:
+    description: >-
+      'true' overlays tsconfig.host.json (the UPSTREAM_SHA-specific project
+      graph used by the baseline job); 'false' leaves the target tree's own
+      root configs untouched (required for a different upstream ref — the
+      host project graph is commit-bound and must never cross trees).
+    required: false
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.upstream_repo }}
+        ref: ${{ inputs.upstream_ref }}
+        path: upstream
+        persist-credentials: false
+
+    - name: Overlay mirror packages into upstream
+      shell: bash
+      run: |
+        mkdir -p upstream/packages/evolution
+        cp tsconfig.base.json upstream/tsconfig.base.json
+        if [ "${{ inputs.copy_host_tsconfig }}" = "true" ]; then
+          cp tsconfig.host.json upstream/tsconfig.host.json
+        fi
+        cp -r packages/. upstream/packages/evolution/
+        rm -rf upstream/packages/evolution/node_modules \
+               upstream/packages/evolution/lib \
+               upstream/packages/evolution/dist
+
+    - uses: pnpm/action-setup@v4
+      with:
+        version: '11.7.0'
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: pnpm
+        cache-dependency-path: upstream/pnpm-lock.yaml
+
+    - name: Install immutable dependencies
+      working-directory: upstream
+      run: pnpm install --no-frozen-lockfile
+
+    - name: Build, test and lint
+      working-directory: upstream
+      run: |
+        node packages/evolution/scripts/build-lib.mjs
+        node node_modules/vitest/vitest.mjs run packages/evolution
+        node node_modules/oxlint/bin/oxlint packages/evolution
+
+    - name: Pack scoped release
+      working-directory: upstream
+      run: |
+        node packages/evolution/scripts/prepare-release.mjs \
+          --scope "$NPM_SCOPE" \
+          --version "${RELEASE_VERSION#v}" \
+          --upstream-version "$UPSTREAM_VERSION"
+
+    - name: Publish dry-run
+      working-directory: upstream
+      run: |
+        node packages/evolution/scripts/publish-scoped.mjs \
+          --tag next \
+          --no-provenance \
+          --dry-run
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: evolution-dist-${{ inputs.artifact_suffix }}
+        path: upstream/packages/evolution/dist
+        retention-days: 14
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: evolution-scripts-${{ inputs.artifact_suffix }}
+        path: upstream/packages/evolution/scripts
+        retention-days: 14
