@@ -125,6 +125,27 @@ describe('tool-skill-manage', () => {
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
   })
+
+  it('review text marks protection with [pinned] (N-1)', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`pin-mark-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    await execute({ action: 'create', name: 'pinned-review', content: SKILL.replace('boundary-skill', 'pinned-review') })
+    await execute({ action: 'pin', name: 'pinned-review' })
+    const review = await execute({ action: 'review' })
+    expect(review.isError).toBe(false)
+    const message = (review.value as { message?: string } | undefined)?.message ?? ''
+    expect(message).toContain('- pinned-review')
+    expect(message).toContain('[pinned]')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
 })
 
 

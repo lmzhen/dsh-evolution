@@ -712,4 +712,37 @@ Body of ${name}.
     await rm(home, { recursive: true, force: true })
   })
 
+  it('scopeView reports pinned skills as protected through the library view (N-1)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-scopeview-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(EvolutionCurator, { enabled: true })
+      const skills = ctx.evolutionCurator.skills
+      const body = (name: string) => `---
+name: ${name}
+description: ${name}
+---
+
+Body of ${name}.
+`
+      await skills.create('view-pinned', body('view-pinned'), 'foreground')
+      // The marker is dot-prefixed; scopeView() derives its protected set from
+      // SkillLibrary.list()'s protectedBy, so a list-side miss hides the pin.
+      await writeFile(join(skills.root, 'view-pinned', '.pinned'), '', 'utf8')
+      await skills.create('view-plain', body('view-plain'), 'foreground')
+      const view = await ctx.evolutionCurator.scopeView()
+      expect(view.protected).toContain('view-pinned')
+      expect(view.protected).not.toContain('view-plain')
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
 })

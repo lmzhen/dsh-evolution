@@ -108,8 +108,16 @@ function skillDir(root: string, name: string): string {
   return join(root, name)
 }
 
+/** Dot-prefixed on-disk marker name. SINGLE source: `list()` matches directory
+ * entries against this name, and path builders must never hardcode a marker
+ * literal (N-1: the rc.49 exists()-probe convergence dropped the dot,
+ * poisoning every protectedBy/managed report). */
+function markerEntryName(marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
+  return `.${marker}`
+}
+
 function markerPath(dir: string, marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
-  return join(dir, `.${marker}`)
+  return join(dir, markerEntryName(marker))
 }
 
 export interface Frontmatter {
@@ -333,14 +341,16 @@ export class SkillLibrary {
       if (!md) continue
       const parsed = parseFrontmatter(md)
       // One directory listing replaces the per-marker exists() probes (P2-6
-      // N+1 convergence); the marker set matches deleteProtection().
+      // N+1 convergence); the marker set matches deleteProtection(). Names are
+      // matched through markerEntryName() so the scan sees exactly the names
+      // markerPath() would probe (N-1).
       let entries: string[] = []
       try {
         entries = await this.io.list(dir)
       } catch {
         // A listing failure must not hide the skill; markers report absent.
       }
-      const has = (marker: string) => entries.includes(marker)
+      const has = (marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed') => entries.includes(markerEntryName(marker))
       const protectedBy = has('bundled') ? 'bundled' : has('hub-installed') ? 'hub-installed' : has('pinned') ? 'pinned' : null
       summaries.push({
         name,

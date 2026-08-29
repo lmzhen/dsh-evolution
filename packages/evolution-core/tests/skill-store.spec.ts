@@ -333,3 +333,33 @@ Body.
   expect(relatedSkillNames('no frontmatter here')).toEqual([])
   expect(relatedSkillNames(md(''))).toEqual([])
 })
+
+it('list() reports dot-prefixed protection markers with bundled-hub-pinned precedence (N-1)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-list-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('rep-pinned', USABLE('rep-pinned'), 'foreground')
+  await lib.create('rep-hub', USABLE('rep-hub'), 'foreground')
+  await lib.create('rep-bundled', USABLE('rep-bundled'), 'foreground')
+  await lib.create('rep-clash', USABLE('rep-clash'), 'foreground')
+  await lib.create('rep-managed', USABLE('rep-managed'), 'foreground')
+  // Markers are dot-prefixed files (markerPath); list() must match the same
+  // names it would probe through exists(), or every protectedBy/managed
+  // report is poisoned (N-1).
+  await writeFile(join(root, 'rep-pinned', '.pinned'), '', 'utf8')
+  await writeFile(join(root, 'rep-hub', '.hub-installed'), '', 'utf8')
+  await writeFile(join(root, 'rep-bundled', '.bundled'), '', 'utf8')
+  await writeFile(join(root, 'rep-managed', '.hermes-managed'), '', 'utf8')
+  // Precedence mirrors deleteProtection(): bundled > hub-installed > pinned.
+  await writeFile(join(root, 'rep-clash', '.pinned'), '', 'utf8')
+  await writeFile(join(root, 'rep-clash', '.hub-installed'), '', 'utf8')
+  await writeFile(join(root, 'rep-clash', '.bundled'), '', 'utf8')
+  const by = new Map((await lib.list()).map(s => [s.name, s]))
+  expect(by.get('rep-pinned')?.protectedBy).toBe('pinned')
+  expect(by.get('rep-hub')?.protectedBy).toBe('hub-installed')
+  expect(by.get('rep-bundled')?.protectedBy).toBe('bundled')
+  expect(by.get('rep-clash')?.protectedBy).toBe('bundled')
+  expect(by.get('rep-managed')?.protectedBy).toBeNull()
+  expect(by.get('rep-managed')?.managed).toBe(true)
+  expect(by.get('rep-pinned')?.managed).toBe(false)
+  await rm(root, { recursive: true, force: true })
+})
