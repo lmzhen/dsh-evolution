@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, computeDedupGroups, resolveOrigins, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -26,6 +26,8 @@ export interface Config {
   maxDescriptionLength?: number
   maxSkillContentChars?: number
   maxSkillFileBytes?: number
+  /** When true, create/update refuse a description over the 60-char authoring bar (default: advisory feedback only). */
+  descriptionStrict?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -34,6 +36,7 @@ export const Config: z<Config> = z.object({
   maxDescriptionLength: z.number().default(DEFAULT_SKILL_LIMITS.maxDescriptionLength),
   maxSkillContentChars: z.number().default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
   maxSkillFileBytes: z.number().default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
+  descriptionStrict: z.boolean().default(false),
 })
 
 interface ApprovalLike {
@@ -96,6 +99,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const list = await library.list()
       return { ok: true, message: `Listed ${list.length} skills.`, skills: list.map(s => s.name) }
     }
+    let feedbackLines: string[] = []
+    // P0 authoring feedback: every create/update reports the description
+    // against the 60-char authoring bar; the strict mode refuses a violation
+    // up front (default off — advisory only, matching the platform limit).
+    if ((action === 'create' || action === 'update') && args.content) {
+      const parsed = parseFrontmatter(args.content)
+      if (parsed) {
+        const feedback = authoringFeedback(parsed.frontmatter)
+        feedbackLines = feedback.lines
+        if (rawConfig.descriptionStrict === true && feedback.over60) {
+          return { ok: false, message: `Authoring check: description ${feedback.descriptionChars}/60 characters exceeds the strict bar; tighten it to <=60 or set descriptionStrict=false.`, skills: [] }
+        }
+      }
+    }
     let result
     if (action === 'create') result = await library.create(name, args.content ?? '', origin)
     else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin)
@@ -132,7 +149,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // every write path — tool, curator, graph, restore — now covers the
       // catalog invalidation from a single sink.
     }
-    return { ok: result.ok, message: result.message, skills: [] }
+    return {
+      ok: result.ok,
+      message: result.ok && feedbackLines.length > 0
+        ? `${result.message}\n\nAuthoring check:\n${feedbackLines.map(line => `- ${line}`).join('\n')}`
+        : result.message,
+      skills: [],
+    }
   }
 
   async function buildSkillReviewText(): Promise<string> {

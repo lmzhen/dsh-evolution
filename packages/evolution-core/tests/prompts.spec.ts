@@ -49,6 +49,9 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('consolidations:')
   expect(CURATOR_PROMPT).toContain('prunings:')
   expect(CURATOR_PROMPT).toContain('scheduled-task-referenced')
+  // The cluster expectation must stay library-scale adaptive, not a hard count
+  // that overfits a large original-library collection (P1a).
+  expect(CURATOR_PROMPT).toContain('scale with the library')
 })
 
 it('authoring standards carry the colon-quote and privacy motive guarantees', () => {

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback, SkillLibrary, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -381,4 +381,25 @@ it('same-second re-archives get unique stamped destinations (N-6)', async () => 
   }
   expect(new Set(paths).size).toBe(3)
   await rm(root, { recursive: true, force: true })
+})
+
+it('authoringFeedback reports the 60-char bar and colon rule without changing validation (P0)', () => {
+  // Within the bar: positive line, no colon warning.
+  const ok = authoringFeedback({ description: 'Run and debug Python tests.' })
+  expect(ok.descriptionChars).toBe(27)
+  expect(ok.over60).toBe(false)
+  expect(ok.hasColon).toBe(false)
+  expect(ok.lines[0]).toContain('27/60')
+  // Over the bar: advisory line names the count and the truncation risk.
+  const long = authoringFeedback({ description: 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories.' })
+  expect(long.over60).toBe(true)
+  expect(long.lines[0]).toContain('exceeds the authoring bar')
+  // Colon rule: flagged for double-quote wrapping.
+  const colon = authoringFeedback({ description: 'Search: arXiv papers by keyword.' })
+  expect(colon.hasColon).toBe(true)
+  expect(colon.lines.some(line => line.includes('double quotes'))).toBe(true)
+  // Absent description: zero chars, no crash.
+  const missing = authoringFeedback({})
+  expect(missing.descriptionChars).toBe(0)
+  expect(missing.hasColon).toBe(false)
 })

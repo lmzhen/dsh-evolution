@@ -767,4 +767,69 @@ Body of ${name}.
     expect(result.archive).toContain('dirty-skill')
   })
 
+  it('runs the full LLM-提名→门→吸收→归档→报告 merge chain (P1b)', { timeout: 20_000 }, async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-merge-chain-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      // One block: a consolidation nomination from the "LLM" for the stale skill.
+      const yaml = '## Structured summary (required)\n```yaml\n'
+        + 'consolidations:\n'
+        + '  - from: stale-src\n'
+        + '    into: umbrella-skill\n'
+        + '    reason: absorbs the sibling\n'
+        + 'prunings: []\n'
+        + '```\n'
+      const ctx = new Context()
+      ctx.provide('llm', {
+        stream: async function* () {
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: yaml }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+          yield { type: 'finish', reason: 'stop' }
+        },
+      })
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      ctx.provide('evolutionState', {
+        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+        saveCuratorState: async () => {},
+      })
+      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+      const skills = ctx.evolutionCurator.skills
+      const body = (name: string) => `---
+name: ${name}
+description: ${name} body
+---
+
+Body of ${name}.
+`
+      await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
+      await skills.create('stale-src', body('stale-src'), 'foreground')
+      // stale-src is 45d idle: inside the stale window (30) but below archive
+      // (90), so the deterministic scanner puts it in markStale — the
+      // candidate list the LLM recommendation pass sees.
+      await saveUsage(skills.root, new Map([
+        ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
+        ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
+      ]), nodeEvolutionIo())
+
+      await ctx.evolutionCurator.run({ ignoreGates: true })
+
+      // The full chain landed: source archived, umbrella absorbed the body,
+      // usage state folded, and the report records the consolidation.
+      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'stale-src'))).toBe(true)
+      expect(await skills.read('umbrella-skill') ?? '').toContain('consolidated from stale-src')
+      const usage = await loadUsage(skills.root, nodeEvolutionIo())
+      expect(usage.get('stale-src')?.state).toBe('archived')
+      const report = await ctx.evolutionCurator.latestReport()
+      expect(report?.consolidated?.some(item => item.from === 'stale-src' && item.into === 'umbrella-skill')).toBe(true)
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
 })

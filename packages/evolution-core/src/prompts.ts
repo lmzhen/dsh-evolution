@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@4'
-export const PROMPT_BUNDLE_VERSION = 4
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@5'
+export const PROMPT_BUNDLE_VERSION = 5
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -139,7 +139,7 @@ Hard rules:
 6. Before archiving a merged skill, ensure its unique content was preserved in the umbrella.
 
 How to work:
-1. Scan the candidate list. Identify PREFIX CLUSTERS — skills sharing a first word or domain keyword (expect 10-25 clusters).
+1. Scan the candidate list. Identify PREFIX CLUSTERS — skills sharing a first word or domain keyword. Expected cluster count scales with the library: a large collection may show 10-25 prefix clusters, a small one often has none — a clean "nothing to consolidate" summary is the correct small-library outcome, not a shortage of ambition.
 2. For each cluster with 2+ members, ask "what is the UMBRELLA CLASS these skills serve?" and consolidate:
    a. MERGE INTO AN EXISTING UMBRELLA (patch a labeled section for each sibling's unique insight, then archive the siblings).
    b. CREATE A NEW UMBRELLA SKILL.md covering the shared workflow with short labeled subsections, then archive the absorbed siblings.

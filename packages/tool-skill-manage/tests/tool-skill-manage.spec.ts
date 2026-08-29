@@ -63,6 +63,56 @@ describe('tool-skill-manage', () => {
     await ctx.fiber.dispose()
   })
 
+  it('reports the authoring check on create and refuses under descriptionStrict (P0)', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`authoring-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: args,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
+    const created = await execute({ action: 'create', name: 'authoring-skill', content: SKILL.replace('boundary-skill', 'authoring-skill').replace('lifecycle boundary test', over) })
+    expect(created.isError).toBe(false)
+    const message = (created.value as { message?: string } | undefined)?.message ?? ''
+    expect(message).toContain('Authoring check:')
+    expect(message).toContain('exceeds the authoring bar')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('refuses an over-bar description when descriptionStrict is enabled (P0)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-strict-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      await mountAgentLoopTestDependencies(ctx)
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(SkillUsageRegistry, { root })
+      await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
+      const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
+      const result = await ctx.tools.execute({
+        callId: CallId(`strict-${Math.random()}`),
+        name: 'skill_manage',
+        arguments: { action: 'create', name: 'strict-skill', content: SKILL.replace('boundary-skill', 'strict-skill').replace('lifecycle boundary test', over) },
+        agent: fakeAgent(undefined),
+        signal: new AbortController().signal,
+      })
+      expect(result.isError).toBe(false)
+      expect((result.value as { ok?: boolean; message?: string } | undefined)?.ok).toBe(false)
+      expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+      await ctx.fiber.dispose()
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('marks review-created skills for curator lifecycle management, but not foreground writes', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = async (origin: string | undefined, name: string) => ctx.tools.execute({

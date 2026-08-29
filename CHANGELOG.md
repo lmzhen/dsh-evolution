@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — rc.60: authoring feedback (P0) + curator scale adaptation + merge-chain auditability (P1)
+
+The product-manager pass on the second-round review: the highest-value near-term items are the knowledge "first mile" (does a new skill's description get written well enough to route?) and making the merge channel — which has never fired — auditable and trusted.
+
+- **P0 — authoring check in `skill_manage`**: new `authoringFeedback()` in core evaluates a frontmatter description against the 60-char bar WITHOUT changing platform validation semantics (the 60 rule was prompt-only while the implementation checked 1024 — the same standard-vs-implementation drift class as the F-1 README fix). `create`/`update` success messages now carry an `Authoring check:` block: `description N/60 characters` (or the exceeds-the-bar warning with the truncation risk) plus the colon→double-quote rule when the description contains a colon. New `descriptionStrict` config (default **false** — advisory only) refuses an over-bar description up front when enabled. Tests cover the pure function (bar/colon/absent), the advisory message, and the strict refusal.
+- **P1a — curator scale adaptation**: the CURATOR_PROMPT's "expect 10-25 clusters" (an original-library-size assumption) now scales with the library: a large collection may show 10-25 prefix clusters, a small one often has none, and a clean "nothing to consolidate" summary is the correct small-library outcome. Prompt bundle bumped to `dsh-evolution@5`.
+- **P1b — merge-chain auditability + trust**: the end-to-end "LLM recommendation → gate → absorb → archive → report" chain was never covered — a fake-LLM test now proves the whole path (source archived, umbrella body absorbed, usage state folded, report recording the consolidation). The report shape gains `consolidated: CuratorConsolidation[]` (actual executed merges with from/into — previously only the raw nomination list was persisted, so executed merges were not auditable); `renderCuratorReportMarkdown` gains a line for it. Library-scale note: with a 2-skill library and `llmReview` off by default the channel stays dormant by design; it is now trusted when it fires.
+- **P2 — already implemented, one fix**: `MEMORY_GUIDANCE` (Hermes dual-track for memory) turned out to already exist in `tool-memory` and to be mounted as a system-prompt section — the only warp was its `session_search` reference naming a Hermes-only tool; it now names the DSH session-query tool.
+
 ## Unreleased — rc.59: Hermes prompt alignment (operation/guidance parity, DSH-adapted)
 
 The prompt bundle is rebuilt against the Hermes originals (`agent/background_review.py`, `agent/curator.py`, `agent/learn_prompt.py`) — the operational steps and instructions the model follows now mirror them structurally, with tool/platform differences DSH-adapted and DSH-only additions marked as such.

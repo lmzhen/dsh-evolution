@@ -26,7 +26,7 @@ describe('tool-memory', () => {
     expect(MEMORY_GUIDANCE).toMatch(/user preferences/i)
     expect(MEMORY_GUIDANCE).toMatch(/recurring corrections/i)
     expect(MEMORY_GUIDANCE).toMatch(/task progress/i)
-    expect(MEMORY_GUIDANCE).toMatch(/session_search/)
+    expect(MEMORY_GUIDANCE).toMatch(/session query tool/)
     expect(MEMORY_GUIDANCE).toMatch(/User prefers concise responses/)
     expect(MEMORY_GUIDANCE).toMatch(/Always respond concisely/)
   })
@@ -35,7 +35,7 @@ describe('tool-memory', () => {
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/save proactively/i)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/user preferences & corrections/i)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/"user" = who the user is/)
-    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/session_search/)
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/session query tool/)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/belong in a skill/)
   })
 

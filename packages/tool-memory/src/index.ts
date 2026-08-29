@@ -34,9 +34,9 @@ export const MEMORY_GUIDANCE =
   + 'Imperative phrasing is re-read as a directive in later sessions and can '
   + 'override the user\u2019s current request.\n'
   + 'Do NOT save task progress, session outcomes, completed-work logs, PR/issue '
-  + 'numbers, commit SHAs, or anything stale within a week — use `session_search` '
-  + 'to recall past sessions instead. Reusable procedures belong in a skill, not '
-  + 'memory.'
+  + 'numbers, commit SHAs, or anything stale within a week — use the session '
+  + 'query tool to recall past sessions instead. Reusable procedures belong in '
+  + 'a skill, not memory.'
 
 /**
  * Tool-schema description for `memory`, aligned with Hermes `MEMORY_SCHEMA`.
@@ -62,7 +62,7 @@ export const MEMORY_TOOL_DESCRIPTION =
   + '"memory" = your notes (environment, conventions, tool quirks, lessons).\n\n'
   + 'SKIP: trivial/obvious info, easily re-discovered facts, task progress, '
   + 'completed-work logs, temporary TODO state. To recall a past session use '
-  + '`session_search`, not memory. Reusable procedures belong in a skill, not '
+  + 'the session query tool, not memory. Reusable procedures belong in a skill, not '
   + 'memory.'
 
 interface ApprovalLike {

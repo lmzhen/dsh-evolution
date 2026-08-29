@@ -67,6 +67,8 @@ export interface CuratorRunReport {
   archiveCandidates: string[]
   archived: CuratorArchivedSkill[]
   failed: CuratorFailedSkill[]
+  /** Consolidations actually executed this run (source absorbed into target). */
+  consolidated?: CuratorConsolidation[]
   snapshotPath?: string
   /** Whether the LLM nomination pass was enabled for this run (decision visibility). */
   llmReviewEnabled?: boolean
@@ -81,6 +83,7 @@ export interface CuratorReportInput {
   archiveCandidates: readonly string[]
   archived: readonly CuratorArchivedSkill[]
   failed: readonly CuratorFailedSkill[]
+  consolidated?: readonly CuratorConsolidation[]
   snapshotPath?: string
   llmReviewEnabled?: boolean
 }
@@ -96,6 +99,7 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
     archiveCandidates: [...input.archiveCandidates],
     archived: [...input.archived],
     failed: [...input.failed],
+    ...input.consolidated === undefined ? {} : { consolidated: [...input.consolidated] },
     ...input.snapshotPath === undefined ? {} : { snapshotPath: input.snapshotPath },
     ...input.llmReviewEnabled === undefined ? {} : { llmReviewEnabled: input.llmReviewEnabled },
   }

@@ -478,7 +478,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     }
     const llmNominations = gatedNominations.prunings
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
-    const { archivedSkills, errors } = await this.applyMutations({
+    const { archivedSkills, errors, consolidated } = await this.applyMutations({
       dryRun,
       archiveCandidates,
       nominations: gatedNominations,
@@ -505,6 +505,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
           const error = errors.find(item => item.startsWith(`${name}:`))
           return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
         }),
+      consolidated,
       ...snapshotPath === undefined ? {} : { snapshotPath },
       llmReviewEnabled: this.llmReview,
     })
@@ -625,11 +626,17 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     root: string
     /** Pre-transition state per archive candidate (for failed-archive rollback). */
     failedFrom?: Map<string, 'active' | 'stale'>
-  }): Promise<{ archivedSkills: Array<{ name: string; path: string; reason: string }>; errors: string[]; suppressedChanged: boolean }> {
-    if (input.dryRun) return { archivedSkills: [], errors: [], suppressedChanged: false }
+  }): Promise<{
+    archivedSkills: Array<{ name: string; path: string; reason: string }>
+    errors: string[]
+    suppressedChanged: boolean
+    consolidated: CuratorConsolidation[]
+  }> {
+    if (input.dryRun) return { archivedSkills: [], errors: [], suppressedChanged: false, consolidated: [] }
     const { archiveCandidates, nominations, treeNames, usage, bundledNames, suppressedNames, root, failedFrom } = input
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
+    const executedConsolidations: CuratorConsolidation[] = []
     let suppressedChanged = false
     // Delta set (rc.52 regression review): the save below must merge only the
     // names THIS run added — a full-set union would resurrect a suppression a
@@ -681,6 +688,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         record.archived_at = new Date().toISOString()
       }
       alreadyArchived.add(nomination.from)
+      executedConsolidations.push({ from: nomination.from, into: nomination.into })
       // Approximate recovered location: the exact archive dir may carry a
       // stamp suffix, but consolidated.path points at the TARGET, not the
       // archived source, so it must not be reported as the source's path.
@@ -716,7 +724,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     } catch {
       // Best-effort like the flush above.
     }
-    return { archivedSkills, errors, suppressedChanged }
+    return { archivedSkills, errors, suppressedChanged, consolidated: executedConsolidations }
   }
 
   private recentSessionActive(): boolean {

@@ -179,6 +179,41 @@ export function validateFrontmatter(content: string, expectedName?: string, limi
   return null
 }
 
+/** Hermes authoring quality bar for descriptions (the 60-char Rule). The
+ * platform's own index limit stays in `validateFrontmatter`; this bar is the
+ * target the authoring standard names, enforced as ADVISORY feedback. */
+export const AUTHORING_DESCRIPTION_BAR = 60
+
+export interface AuthoringFeedback {
+  /** Frontmatter description length in characters (0 when absent). */
+  descriptionChars: number
+  /** Whether the description exceeds the authoring bar (60) while still passing the platform limit. */
+  over60: boolean
+  /** Whether the description contains a colon (the standard requires double-quote wrapping). */
+  hasColon: boolean
+  /** Advice lines appended to mutation success messages. */
+  lines: string[]
+}
+
+/**
+ * Advisory authoring feedback (P0): evaluate frontmatter against the
+ * authoring bar WITHOUT changing platform validation semantics. The bar is
+ * the quality target, `validateFrontmatter`'s limits are the compatibility
+ * floor, and this bridge layer tells the model when its text would be
+ * truncated or route-poor instead of silently shipping it.
+ */
+export function authoringFeedback(frontmatter: Frontmatter): AuthoringFeedback {
+  const description = frontmatter.description ?? ''
+  const over60 = description.length > AUTHORING_DESCRIPTION_BAR
+  const hasColon = description.includes(':')
+  const lines: string[] = []
+  lines.push(over60
+    ? `Description is ${description.length}/60 characters — exceeds the authoring bar; the index may truncate it. Consider tightening it to <=60.`
+    : `Description ${description.length}/60 characters — within the authoring bar.`)
+  if (hasColon) lines.push('Description contains a colon — wrap the whole value in double quotes.')
+  return { descriptionChars: description.length, over60, hasColon, lines }
+}
+
 async function listNames(root: string, io: EvolutionIoLike): Promise<string[]> {
   const entries = await io.list(root)
   const names: string[] = []
