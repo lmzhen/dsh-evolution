@@ -9,6 +9,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 // THE sidecar transaction inventory (docs/release/decisions.md, v2 §8.3):
 // every read-modify-write sidecar must run through io.transact via transactIo.
 // Adding a new RMW sidecar requires a row here — this test is the door.
+// Known granularity (v4 K-1 / v5 F-7): the gate checks marker presence per
+// FILE, not per write point. Manual-review remainder: within an inventoried
+// file, EVERY RMW write site must also go through transactIo — a new path
+// added to a file that already carries the marker is not caught here.
 const INVENTORY: Array<{ file: string; marker: string }> = [
   { file: 'evolution-core/src/usage.ts', marker: 'mutateUsage' },
   { file: 'evolution-core/src/usage.ts', marker: 'updateSuppressedNames' },
@@ -24,7 +28,7 @@ describe('sidecar transaction inventory (P1-③ decisions.md §8.3)', () => {
     const failures: string[] = []
     for (const entry of INVENTORY) {
       const source = await readFile(join(root, entry.file), 'utf8')
-      const functionDef = new RegExp(`async function? ${entry.marker}\\b|function ${entry.marker}\\b|${entry.marker}\\s*[:=(]`)
+      const functionDef = new RegExp(`async function ${entry.marker}\\b|function ${entry.marker}\\b|${entry.marker}\\s*[:=(]`)
       if (!functionDef.test(source) || !source.includes('transactIo')) {
         failures.push(`${entry.file} (${entry.marker}): missing transactIo-backed RMW`)
       }

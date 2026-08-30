@@ -64,7 +64,9 @@ describe('evolution-commands', () => {
     expect(withRequest.text).toContain('Learning request sent')
     expect(withRequest.text).not.toContain('THE REQUEST:')
     expect(injected).toHaveLength(1)
-    const message = injected[0] as { content: Array<{ text?: string }>; source?: { plugin?: string } }
+    const message = injected[0] as { content: Array<{ text?: string }>; source?: { plugin?: string }; role?: string }
+    // UserMessage contract: role is required and minted by createUserMessage.
+    expect(message.role).toBe('user')
     expect(message.source?.plugin).toBe('dsh-evolution-commands')
     expect(message.content?.[0]?.text).toContain('distill the auth flow from <url>')
     expect(message.content?.[0]?.text).toContain('skill_manage')

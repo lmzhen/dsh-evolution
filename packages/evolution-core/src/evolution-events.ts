@@ -42,6 +42,11 @@ function isEventRecord(event: unknown): event is EvolutionEvent {
  * Parse an event log body. A missing file, a whitespace-only file (rc.69:
  * rebuildable, NOT malformed) or a corrupt one reads as empty; corrupt content
  * is still refused on append, never overwritten.
+ *
+ * Per-entry normalization (rc.70 F-1): entries without a numeric `seq` are
+ * skipped here and dropped at the next append — valid entries survive, the
+ * damaged record is the only loss (self-heal semantics, matching the usage
+ * sidecar's per-field normalization on read).
  */
 export function parseEvolutionEvents(raw: string | null): EvolutionEvent[] {
   if (raw === null || raw.trim() === '') return []
@@ -80,7 +85,10 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
 
 export interface EventLogRead {
   events: EvolutionEvent[]
-  /** True when the file existed but could not be parsed (loss case; never overwritten). */
+  /** True when the body is not valid JSON (syntax-level damage): refused on
+   * append, bytes untouched. Well-formed JSON with a damaged `events` field
+   * is REPLACEABLE garbage — reads as empty and is rewritten at the next
+   * append (rc.70 F-1: read and append agree on the same boundary). */
   malformed: boolean
 }
 
@@ -91,7 +99,9 @@ export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Pr
   if (raw === null || raw.trim() === '') return { events: [], malformed: false }
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
-    if (!Array.isArray(parsed.events)) return { events: [], malformed: true }
+    // Shape damage is replaceable garbage (read as empty, rebuilt on append);
+    // only syntax-level damage is "malformed" (never overwritten).
+    if (!Array.isArray(parsed.events)) return { events: [], malformed: false }
     return {
       events: parsed.events.filter(isEventRecord),
       malformed: false,

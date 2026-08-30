@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — rc.70: audit-v5 batch (all seven findings)
+
+- **F-1 (P2, malformed-gate inconsistency)**: read and append now agree on ONE boundary — "malformed" means NOT VALID JSON (refused on append, bytes untouched); well-formed JSON with a damaged `events` field is REPLACEABLE garbage (reads empty, rebuilt at the next append); a single damaged entry is normalized away at the next append while valid entries survive (self-heal semantics, matching the usage sidecar's per-entry normalization on read). Tests: shape-damage reads empty + rebuilds, damaged-entry drop with valid-entry survival.
+- **F-2 (P2, UserMessage contract)**: `/evolution learn` now injects through `createUserMessage` — `UserMessage` requires `role:'user'` plus the minted id; the bare object only worked because the DeepSeek adapter routes undefined-role into the user branch. `evolution-commands` gains the `@deepseek-ai/dsh-llm` dependency (the review path already used the same factory). Spec asserts `role:'user'` on the injected message.
+- **F-3 (P3, stale diagnostics)**: the EPERM comment and the fail-loud message now say 40 attempts (matching the rc.69 budget).
+- **F-4 (P3, empty-file residue)**: `migrateFeedbackEvents` skip path returns `current` (null stays null = "no file" in the transact contract) — an empty legacy aggregate no longer creates an empty `events.json`. Test: no file created.
+- **F-5 (P3, design/impl alignment)**: the 006 design doc now states the cache's write form accurately ("atomic whole-file write (rename under the write lock) — not an RMW transact, the cache is derived and rebuildable").
+- **F-6 (P3, observability)**: a failed learn-event append is now `ctx.logger.warn`-ed instead of silently swallowed.
+- **F-7 (P3, gate regex)**: the sidecar-inventory regex typo (`async function?` quantified the `n`) is fixed; the known per-file (not per-write-point) granularity is documented as a manual-review remainder.
+
 ## Unreleased — rc.69: audit-followup fixes (migration merge race, empty-log self-heal)
 
 The post-rc.68 audit found two real defects in the event-log layer; both fixed with regression tests.

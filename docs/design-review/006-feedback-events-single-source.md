@@ -30,7 +30,7 @@ dependency edges. The event log is the loop substrate, not feedback's private fi
 | Artifact | Role | Writes |
 |---|---|---|
 | `evolution/events.json` `{ version: 1, events: [...] }` | **Single source of truth.** Append-only by design (compact only into a new file + rename, never in place). | Hot path ONLY: `appendEvolutionEvent(io, path, event)` — transact RMW, `seq = max+1` inside the lock (cross-process unique). Malformed → refuse (rc.65 posture). |
-| `evolution/feedback.json` `{ version: 2, lastSeq, skills, sessions }` | **Rebuildable boot cache.** Losing it costs an O(events) fold, no truth. | Boot when `lastSeq < max(events.seq)` (incremental fold: cache + delta); unload best-effort write. Uses transact; failure = warn only. |
+| `evolution/feedback.json` `{ version: 2, lastSeq, skills, sessions }` | **Rebuildable boot cache.** Losing it costs an O(events) fold, no truth. | Boot when `lastSeq < max(events.seq)` (incremental fold: cache + delta); unload best-effort write. Atomic whole-file write (rename under the write lock) — not an RMW transact, the cache is DERIVED and rebuildable, so no read-modify-write semantics are needed; failure = warn only. |
 | In-memory `EvolutionFeedback.state` | Derived aggregate (fold of cache + events delta). | `score()`/`snapshot()` read it; `record()` updates it optimistically with the same timeout-free posture as rc.66. |
 
 Event shape (tagged union in one timeline, `seq` = ordering key):

@@ -130,7 +130,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
         // when a peer's holder-lock delete races our create; treat it as the
         // same retryable contention as EEXIST (rc.67). The retry budget still
-        // fails loud at 10 attempts.
+        // fails loud at 40 attempts.
         if (code !== 'EEXIST' && code !== 'EPERM') throw error
         try {
           const st = await stat(lock)
@@ -148,7 +148,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         await new Promise(resolve => setTimeout(resolve, 50))
       }
     }
-    throw new Error(`could not acquire write lock for ${path} after 10 attempts`)
+    throw new Error(`could not acquire write lock for ${path} after 40 attempts`)
   }
   return {
     async readText(path) {

@@ -233,6 +233,25 @@ describe('evolution-feedback', () => {
     }
   })
 
+  it('an empty legacy aggregate does not create an events file (rc.70 F-4)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-empty-agg-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await Feedback.migrateFeedbackEvents(io, eventsPath, { skills: {}, sessions: {} })
+      expect(await io.readText(eventsPath)).toBeNull()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('an empty event log is rebuilt on the next record (rc.69)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-empty-'))
     const previous = process.env.DSH_HOME

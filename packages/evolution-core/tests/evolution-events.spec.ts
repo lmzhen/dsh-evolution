@@ -57,4 +57,38 @@ describe('evolution event log (rc.68)', () => {
     expect(events[0]?.seq).toBe(1)
     await rm(root, { recursive: true, force: true })
   })
+
+  it('shape-damaged content reads as empty (replaceable) and is rebuilt on append (rc.70 F-1)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-shape-'))
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    await io.writeText(path, JSON.stringify({ version: 1, events: 42 }))
+    // Read and append agree on the same boundary: shape damage = empty, not malformed.
+    expect(await readEvolutionEvents(io, path)).toEqual({ events: [], malformed: false })
+    await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })
+    const { events, malformed } = await readEvolutionEvents(io, path)
+    expect(malformed).toBe(false)
+    expect(events).toHaveLength(1)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('a single damaged entry is dropped at append while valid entries survive (rc.70 F-1 self-heal)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-entry-'))
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    await io.writeText(path, JSON.stringify({
+      version: 1,
+      events: [
+        { seq: 1, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: 'good', kind: 'skill', rating: 'positive' },
+        { broken: true },
+      ],
+    }))
+    await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'negative' })
+    const { events, malformed } = await readEvolutionEvents(io, path)
+    expect(malformed).toBe(false)
+    expect(events).toHaveLength(2)
+    expect(events[0]?.target).toBe('good')
+    expect(events[1]?.target).toBe('x')
+    await rm(root, { recursive: true, force: true })
+  })
 })

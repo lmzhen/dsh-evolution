@@ -213,7 +213,10 @@ export async function migrateFeedbackEvents(io: IoLike, eventsPath: string, aggr
   const expected = synthesizeFeedbackEvents(aggregate)
   await transactIo(io, eventsPath, (current) => {
     const existing = parseEvolutionEvents(current)
-    if (containsLegacySequence(existing, expected)) return Promise.resolve(current ?? '')
+    // Skip = hand back `current` untouched: null means "no file" in the
+    // transact contract, so an empty legacy aggregate never creates one
+    // (rc.70 F-4).
+    if (containsLegacySequence(existing, expected)) return Promise.resolve(current)
     const maxSeq = existing.reduce((max, event) => Math.max(max, event.seq), 0)
     const merged = [...existing, ...expected.map((event, index) => ({ ...event, seq: maxSeq + index + 1 }))]
     return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: merged }, null, 2))
