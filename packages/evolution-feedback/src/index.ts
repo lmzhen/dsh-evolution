@@ -17,7 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, readEvolutionEvents, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, parseEvolutionEvents, readEvolutionEvents, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -71,18 +71,18 @@ export class EvolutionFeedback {
     if (!path || !eventsPath) return
     await this.mutate(async () => {
       const rawEvents = await io.readText(eventsPath)
-      // Migration (rc.68, idempotent): no event log yet — fold whatever
-      // aggregate exists (legacy v1 or a v2 cache) into synthetic events so
-      // history starts from the old truth once. The first process to win the
-      // transact creates the log; a later boot sees it and skips migration.
-      if (rawEvents === null) {
+      // Migration (rc.68/rc.69, idempotent + race-safe): no event log yet —
+      // fold whatever aggregate exists (legacy v1 or v2 cache) into synthetic
+      // events. rc.69: a concurrent first writer may create the log between
+      // this read and the transact — when the log does not already START with
+      // the expected legacy sequence, the sequence is APPENDED (seq shifted)
+      // instead of dropped, so neither the concurrent events nor the legacy
+      // history is lost.
+      if (rawEvents === null || rawEvents.trim() === '') {
         const aggregate = parseAggregate(await io.readText(path))
         if (aggregate) {
           try {
-            await transactIo(io, eventsPath, (current) => {
-              if (current !== null) return Promise.resolve(current)
-              return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: synthesizeFeedbackEvents(aggregate) }, null, 2))
-            })
+            await migrateFeedbackEvents(io, eventsPath, aggregate)
           } catch {
             // Best-effort: a failed migration means the log stays absent and
             // history starts empty — the old aggregate is not re-booted.
@@ -177,6 +177,49 @@ export class EvolutionFeedback {
   }
 }
 
+/** True when `existing` contains the legacy sequence as a contiguous run on
+ * its semantic fields (skip case). `seq` and `at` are excluded: after a merge
+ * the legacy events carry shifted seqs, and a re-synthesis stamps a different
+ * `at` — the semantic identity is type/kind/target/rating/note. A coincidental
+ * semantic match of an already-appended user sequence yields the identical
+ * aggregation, so the skip is harmless for counts and notes. */
+function containsLegacySequence(existing: EvolutionEvent[], expected: EvolutionEvent[]): boolean {
+  if (expected.length === 0) return true
+  for (let start = 0; start <= existing.length - expected.length; start += 1) {
+    let match = true
+    for (let offset = 0; offset < expected.length; offset += 1) {
+      const a = expected[offset]
+      const b = existing[start + offset]
+      if (!a || !b || a.type !== b.type || a.kind !== b.kind || a.target !== b.target || a.rating !== b.rating || a.note !== b.note) {
+        match = false
+        break
+      }
+    }
+    if (match) return true
+  }
+  return false
+}
+
+/**
+ * Merge a legacy aggregate into the event log (rc.69): the expected synthetic
+ * sequence is APPENDED (seq-shifted) when the log does not already contain it
+ * — so a concurrent first writer's events AND the legacy history both
+ * survive; when the sequence is already present the migration was completed
+ * (by a first writer or by this path) and nothing is re-appended. Idempotent
+ * and race-safe (the search runs inside the same transact). Exported for the
+ * migration-race regression test.
+ */
+export async function migrateFeedbackEvents(io: IoLike, eventsPath: string, aggregate: FeedbackState): Promise<void> {
+  const expected = synthesizeFeedbackEvents(aggregate)
+  await transactIo(io, eventsPath, (current) => {
+    const existing = parseEvolutionEvents(current)
+    if (containsLegacySequence(existing, expected)) return Promise.resolve(current ?? '')
+    const maxSeq = existing.reduce((max, event) => Math.max(max, event.seq), 0)
+    const merged = [...existing, ...expected.map((event, index) => ({ ...event, seq: maxSeq + index + 1 }))]
+    return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: merged }, null, 2))
+  })
+}
+
 /** Parse a legacy aggregate (v1) or a v2 cache into a plain aggregate state. */
 function parseAggregate(raw: string | null): FeedbackState | null {
   if (raw === null) return null
@@ -268,8 +311,9 @@ export const name = 'evolution-feedback'
 export interface Config {
   /** Score below which curator receives quality_warn for a skill. */
   qualityWarnThreshold?: number
-  /** Explicit boot-cache file path; empty derives $DSH_HOME/evolution/feedback.json
-   * (the event log is its sibling `events.json`). */
+  /** Explicit boot-cache file path; empty derives $DSH_HOME/evolution/feedback.json.
+   * The event log always stays at $DSH_HOME/evolution/events.json (derived from
+   * home, never from this override). */
   path?: string
 }
 

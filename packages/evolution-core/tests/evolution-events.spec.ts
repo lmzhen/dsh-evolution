@@ -43,4 +43,18 @@ describe('evolution event log (rc.68)', () => {
     expect(read.events).toEqual([])
     await rm(root, { recursive: true, force: true })
   })
+
+  it('a whitespace-only log reads as empty and is rebuilt on append (rc.69)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-empty-'))
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    await io.writeText(path, '')
+    expect(await readEvolutionEvents(io, path)).toEqual({ events: [], malformed: false })
+    await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })
+    const { events, malformed } = await readEvolutionEvents(io, path)
+    expect(malformed).toBe(false)
+    expect(events).toHaveLength(1)
+    expect(events[0]?.seq).toBe(1)
+    await rm(root, { recursive: true, force: true })
+  })
 })

@@ -38,8 +38,13 @@ function isEventRecord(event: unknown): event is EvolutionEvent {
   return typeof event === 'object' && event !== null && typeof (event as { seq?: unknown }).seq === 'number'
 }
 
-function parseEventList(raw: string | null): EvolutionEvent[] {
-  if (raw === null) return []
+/**
+ * Parse an event log body. A missing file, a whitespace-only file (rc.69:
+ * rebuildable, NOT malformed) or a corrupt one reads as empty; corrupt content
+ * is still refused on append, never overwritten.
+ */
+export function parseEvolutionEvents(raw: string | null): EvolutionEvent[] {
+  if (raw === null || raw.trim() === '') return []
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
     if (!Array.isArray(parsed.events)) return []
@@ -58,10 +63,12 @@ function parseEventList(raw: string | null): EvolutionEvent[] {
 export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, event: Omit<EvolutionEvent, 'seq' | 'at'>): Promise<number> {
   let assigned = 0
   await transactIo(io, path, (current) => {
-    if (current !== null) {
+    // rc.69: a whitespace-only log (crash residue) is rebuildable — treat it
+    // as missing; a genuinely corrupt body is still refused.
+    if (current !== null && current.trim() !== '') {
       try { JSON.parse(current) } catch { return Promise.resolve(current) }
     }
-    const events = parseEventList(current)
+    const events = parseEvolutionEvents(current)
     const maxSeq = events.reduce((max, entry) => Math.max(max, entry.seq), 0)
     const record: EvolutionEvent = { ...event, seq: maxSeq + 1, at: new Date().toISOString() }
     assigned = record.seq
@@ -77,10 +84,11 @@ export interface EventLogRead {
   malformed: boolean
 }
 
-/** Read the event log; a missing file reads as empty, malformed is flagged. */
+/** Read the event log; a missing/whitespace-only file reads as empty,
+ * corrupt content is flagged (and refused on append). */
 export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Promise<EventLogRead> {
   const raw = await io.readText(path)
-  if (raw === null) return { events: [], malformed: false }
+  if (raw === null || raw.trim() === '') return { events: [], malformed: false }
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
     if (!Array.isArray(parsed.events)) return { events: [], malformed: true }

@@ -4,6 +4,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import * as Feedback from '../src/index.ts'
+import { appendEvolutionEvent, readEvolutionEvents } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -190,6 +191,66 @@ describe('evolution-feedback', () => {
       // And a fresh fold of the log agrees with the cached view.
       const eventsRaw = JSON.parse(await io.readText(join(home, 'evolution', 'events.json')) ?? '{}') as { events: Array<{ rating?: string }> }
       expect(eventsRaw.events.filter(event => event.rating === 'positive')).toHaveLength(1)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('a concurrent first append does not lose the legacy aggregate (rc.69 migration merge)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-merge-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const cachePath = join(home, 'evolution', 'feedback.json')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      // Legacy aggregate + a concurrent writer that created the log FIRST —
+      // the migration transact must APPEND, never drop, the legacy sequence.
+      await io.writeText(cachePath, JSON.stringify({ skills: { 'old-skill': { positive: 2, negative: 1 } }, sessions: {} }))
+      await appendEvolutionEvent(io, eventsPath, { type: 'feedback', target: 'new-skill', kind: 'skill', rating: 'positive' })
+      const aggregate = JSON.parse(await io.readText(cachePath) ?? '{}') as { skills: Record<string, { positive: number; negative: number }> }
+      await Feedback.migrateFeedbackEvents(io, eventsPath, aggregate)
+      const events = (await readEvolutionEvents(io, eventsPath)).events
+      expect(events).toHaveLength(4)
+      // A second migration is idempotent (the log already starts with the sequence).
+      await Feedback.migrateFeedbackEvents(io, eventsPath, aggregate)
+      expect((await readEvolutionEvents(io, eventsPath)).events).toHaveLength(4)
+      // And a full restore from the merged log yields both sides.
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      expect(feedback.snapshot().skills['old-skill']).toMatchObject({ positive: 2, negative: 1 })
+      expect(feedback.snapshot().skills['new-skill']?.positive).toBe(1)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('an empty event log is rebuilt on the next record (rc.69)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-empty-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await io.writeText(eventsPath, '')
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      feedback.record('session-1', 'positive')
+      await feedback.waitIdle()
+      const read = await readEvolutionEvents(io, eventsPath)
+      expect(read.malformed).toBe(false)
+      expect(read.events).toHaveLength(1)
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
