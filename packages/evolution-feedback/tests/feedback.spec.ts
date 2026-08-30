@@ -43,6 +43,7 @@ describe('evolution-feedback', () => {
     ctx.evolutionFeedback.record('python-testing', 'negative', undefined, 'skill')
     ctx.evolutionFeedback.record('python-testing', 'negative', undefined, 'skill')
     // give the serialized persistence/quality writes a chance to settle
+    await ctx.evolutionFeedback.waitIdle()
     await new Promise(resolve => setTimeout(resolve, 20))
     expect((await ctx.skillUsage.report()).get('python-testing')?.quality_warn).toBe(true)
 
@@ -97,6 +98,9 @@ describe('evolution-feedback', () => {
     await new Promise(resolve => setTimeout(resolve, 20))
     ctx.evolutionFeedback.record('session-1', 'positive')
     expect(ctx.evolutionFeedback.score('session-1')).toBe(1)
+    // The record task is async (locked RMW); wait for it before teardown so a
+    // slow CI cannot rm a directory the task is still writing into.
+    await ctx.evolutionFeedback.waitIdle()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
