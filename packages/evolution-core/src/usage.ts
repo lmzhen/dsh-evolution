@@ -139,8 +139,23 @@ export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map:
  * folds copy this set only.
  */
 export function applyCuratorFields(disk: UsageRecord, curated: UsageRecord): void {
+  applyCuratorMetaFields(disk, curated)
+  applyCuratorLifecycleFields(disk, curated)
+}
+
+/** Copy only the lifecycle pair (state/archived_at) — see the ownership split
+ * rationale on {@link applyCuratorMetaFields}. */
+export function applyCuratorLifecycleFields(disk: UsageRecord, curated: UsageRecord): void {
   disk.state = curated.state
   disk.archived_at = curated.archived_at
+}
+
+/**
+ * Copy the recomputed meta pair (quality_score/quality_warn + the
+ * marker-mirrored pin flag) — refreshed tree-wide each run by design, so a
+ * concurrent curator run's lifecycle changes are never reverted by them.
+ */
+export function applyCuratorMetaFields(disk: UsageRecord, curated: UsageRecord): void {
   disk.quality_score = curated.quality_score
   disk.quality_warn = curated.quality_warn
   disk.pinned = curated.pinned
@@ -151,13 +166,20 @@ export function applyCuratorFields(disk: UsageRecord, curated: UsageRecord): voi
  * each curated record is projected onto its disk peer by copying only the
  * curator-owned fields, so a concurrent tool-side bump between snapshot and
  * save survives. Records absent from the snapshot are left untouched; a
- * curated record with no disk peer is seeded from the snapshot.
+ * curated record with no disk peer is seeded from the snapshot. `stateOwned`
+ * (rc.72 H-1) restricts the lifecycle pair to the names this run ACTUALLY
+ * transitioned — a concurrent curator run's archive/restore is never reverted
+ * by a stale snapshot; without it both pairs apply everywhere.
  */
-export function foldCuratorFields(disk: UsageMap, curated: UsageMap): void {
+export function foldCuratorFields(disk: UsageMap, curated: UsageMap, stateOwned?: ReadonlySet<string>): void {
   for (const [name, record] of curated) {
     const diskRecord = disk.get(name)
-    if (diskRecord) applyCuratorFields(diskRecord, record)
-    else disk.set(name, { ...record })
+    if (!diskRecord) {
+      disk.set(name, { ...record })
+      continue
+    }
+    applyCuratorMetaFields(diskRecord, record)
+    if (stateOwned === undefined || stateOwned.has(name)) applyCuratorLifecycleFields(diskRecord, record)
   }
 }
 

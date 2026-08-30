@@ -158,6 +158,21 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('a state-ownership set never reverts a concurrent lifecycle write (rc.72 H-1)', () => {
+    const disk = new Map([['x', { ...emptyRecord(), use_count: 9, state: 'archived' as const, archived_at: '2026-02-02T00:00:00.000Z' }]])
+    // A concurrent curator run archived X AFTER this run's snapshot; this run
+    // never transitioned X, so the lifecycle pair must stay untouched — meta
+    // (quality) is still refreshed tree-wide.
+    const curated = new Map([['x', { ...emptyRecord(), state: 'stale' as const, quality_score: 0.4 }]])
+    foldCuratorFields(disk, curated, new Set(['other']))
+    expect(disk.get('x')).toMatchObject({
+      use_count: 9,
+      state: 'archived',
+      archived_at: '2026-02-02T00:00:00.000Z',
+      quality_score: 0.4,
+    })
+  })
+
   it('a malformed sidecar is never overwritten by the RMW (P3)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-evo-malformed-'))
     const io = nodeEvolutionIo()

@@ -34,12 +34,12 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/dsh-llm": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^"

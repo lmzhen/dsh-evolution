@@ -284,6 +284,34 @@ describe('evolution-feedback', () => {
     }
   })
 
+  it('a cache below the timeline floor is ignored, never partially folded (rc.72 G-3)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-floor-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      // The timeline only holds seqs 5-6 — everything below is a pruned window.
+      await io.writeText(join(home, 'evolution', 'events.json'), JSON.stringify({ version: 1, events: [
+        { seq: 5, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: 'x', kind: 'skill', rating: 'negative' },
+        { seq: 6, at: '2026-01-01T00:00:01.000Z', type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' },
+      ] }, null, 2))
+      // A cache whose lastSeq fell below the retained window — using it would
+      // fabricate a partial fold; the full fold must win.
+      await io.writeText(join(home, 'evolution', 'feedback.json'), JSON.stringify({ version: 2, lastSeq: 1, skills: { x: { positive: 99, negative: 0 } }, sessions: {} }, null, 2))
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      expect(feedback.snapshot().skills['x']).toMatchObject({ positive: 1, negative: 1 })
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('an empty event log is rebuilt on the next record (rc.69)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-empty-'))
     const previous = process.env.DSH_HOME

@@ -17,9 +17,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, EVENT_ARCHIVE_PREFIX, eventsFile, evolutionIoAdapter, parseEvolutionEvents, readEvolutionTimeline, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -41,6 +41,13 @@ export interface FeedbackState {
 type IoLike = EvolutionIoLike
 
 const CACHE_VERSION = 2
+
+/** Cache snapshot cadence (rc.72 G-3): every N-th appended event refreshes the
+ * boot cache, so `cache.lastSeq` always stays inside the retention window —
+ * a hard crash between snapshots loses at most N events, all of which still
+ * live in the ACTIVE log (bounded by `EVENT_LOG_ROTATE_AT`), so the next fold
+ * is complete. Package-private tunable, not a config surface. */
+const CACHE_SNAP_EVERY = 1024
 
 export class EvolutionFeedback {
   private state: FeedbackState = { skills: {}, sessions: {} }
@@ -78,7 +85,7 @@ export class EvolutionFeedback {
       // re-synthesized from the cache. rc.69: a concurrent first writer that
       // created the log in the race window is handled by the merge in
       // migrateFeedbackEvents (append, never drop).
-      const archiveNames = (await io.list(dirname(eventsPath))).filter(name => name.startsWith(EVENT_ARCHIVE_PREFIX) && name.endsWith('.json'))
+      const archiveNames = await listEventArchives(io, eventsPath)
       const noLog = rawEvents === null || rawEvents.trim() === ''
       if (noLog && archiveNames.length === 0) {
         const aggregate = parseAggregate(await io.readText(path))
@@ -94,7 +101,13 @@ export class EvolutionFeedback {
       const { events } = await readEvolutionTimeline(io, eventsPath)
       const cache = parseCache(await io.readText(path))
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
-      const truth = cache ? foldWithDelta(cache, events) : foldFeedbackState(events)
+      const floor = events[0]?.seq ?? 0
+      // rc.72 G-3: a cache whose lastSeq fell below the timeline floor is out
+      // of the retained window — using it would silently fabricate a partial
+      // fold; fall back to the full fold (an unrecoverable band stays lost,
+      // but the result is never WRONG).
+      const usableCache = cache && cache.lastSeq >= floor - 1 ? cache : null
+      const truth = usableCache ? foldWithDelta(usableCache, events) : foldFeedbackState(events)
       // Memory wins per record (rc.66 semantics): a record() that landed
       // optimistically before this restore settled must survive.
       this.state = {
@@ -130,7 +143,10 @@ export class EvolutionFeedback {
     // append (rc.65 posture) and the optimistic count stays.
     void this.mutate(async () => {
       try {
-        await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
+        const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
+        // rc.72 G-3: cadence snapshot keeps the boot cache inside the retention
+        // window (see CACHE_SNAP_EVERY); best-effort inside the same task.
+        if (seq % CACHE_SNAP_EVERY === 0) await this.writeCacheNow()
       } catch (error: unknown) {
         // Best-effort: the optimistic count stays (recoverable on the next
         // successful record); a persistence failure must not throw.
@@ -160,21 +176,27 @@ export class EvolutionFeedback {
     return this.chain
   }
 
-  /** Rebuild the boot cache from the log truth (rc.68); best-effort. */
-  persistCache(): Promise<void> {
+  /** Snapshot the boot cache from the log truth (rc.68/rc.72); best-effort. */
+  private async writeCacheNow(): Promise<void> {
     const path = this.path
     const eventsPath = this.eventsPath
     const recordIo = this.io
-    if (!path || !eventsPath || !recordIo) return Promise.resolve()
+    if (!path || !eventsPath || !recordIo) return
+    try {
+      const { events } = await readEvolutionTimeline(recordIo, eventsPath)
+      const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
+      if (maxSeq === 0) return
+      await recordIo.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events) }, null, 2))
+    } catch {
+      // Best-effort: the cache is disposable.
+    }
+  }
+
+  /** Rebuild the boot cache from the log truth (rc.68); best-effort, queued
+   * on the record chain so it runs after the pending appends. */
+  persistCache(): Promise<void> {
     return this.mutate(async () => {
-      try {
-        const { events } = await readEvolutionTimeline(recordIo, eventsPath)
-        const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
-        if (maxSeq === 0) return
-        await recordIo.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events) }, null, 2))
-      } catch {
-        // Best-effort: the cache is disposable.
-      }
+      await this.writeCacheNow()
     })
   }
 }

@@ -517,6 +517,11 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       suppressedNames,
       root,
       recommendPool: new Set(recommendPool),
+      // rc.72 H-1: the lifecycle pair folds only for names this run changed —
+      // the transitions engine mutates the snapshot (state='stale'/'archived'/
+      // 'active'), and a concurrent curator run's archive/restore must never be
+      // reverted by a stale snapshot.
+      stateOwned: new Set([...result.transitions.map(t => t.name), ...archiveCandidates]),
       failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
     })
     if (!dryRun) this.lastRun = Date.now()
@@ -658,6 +663,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     failedFrom?: Map<string, 'active' | 'stale'>
     /** The exact candidate pool this run presented to the LLM (M-1 hard backstop). */
     recommendPool: Set<string>
+    /** Names this run actually transitioned (rc.72 H-1 lifecycle ownership). */
+    stateOwned?: ReadonlySet<string>
   }): Promise<{
     archivedSkills: Array<{ name: string; path: string; reason: string }>
     errors: string[]
@@ -674,6 +681,11 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     // names THIS run added — a full-set union would resurrect a suppression a
     // concurrent restore deleted between our load and our save.
     const suppressedAdded = new Set<string>()
+    // rc.72 H-1: the lifecycle pair is folded only for names this run actually
+    // transitioned (transitions engine + success/rollback archive writes +
+    // consolidation sources) — a concurrent curator run's archive/restore must
+    // never be reverted by this run's stale snapshot.
+    const stateOwned = new Set(input.stateOwned ?? [])
     for (const name of archiveCandidates) {
       const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
@@ -688,6 +700,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         if (record && (from === 'stale' || from === 'active')) {
           record.state = from
           record.archived_at = null
+          stateOwned.add(name)
         }
         errors.push(`${name}: ${archived.message}`)
       } else {
@@ -699,6 +712,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         if (record) {
           record.state = 'archived'
           record.archived_at = new Date().toISOString()
+          stateOwned.add(name)
         }
         archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
         if (bundledNames.has(name)) {
@@ -731,6 +745,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       if (record) {
         record.state = 'archived'
         record.archived_at = new Date().toISOString()
+        stateOwned.add(nomination.from)
       }
       alreadyArchived.add(nomination.from)
       executedConsolidations.push({ from: nomination.from, into: nomination.into })
@@ -758,7 +773,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       // same transact-backed mutateUsage the tool side uses, at FIELD
       // granularity — a whole-record set would clobber a concurrent tool-side
       // counter bump between the run-start load and this save.
-      await mutateUsage(root, this.io, (disk) => { foldCuratorFields(disk, usage) })
+      await mutateUsage(root, this.io, (disk) => { foldCuratorFields(disk, usage, stateOwned) })
     } catch {
       // Best-effort: curation decisions already landed; a failed usage flush
       // must not surface as a run error after the fact.

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — rc.72: audit-v6 + deep-sweep batch (G-1..G-3, H-1..H-3)
+
+- **G-1 (P2, seq shadowing after active loss)**: `appendEvolutionEvent` derives the next seq from the ACTIVE only — a missing/whitespace active with archives present restarted at seq 1 and, by the timeline's active-wins dedupe, shadowed archived history one event per append. Now the empty-active branch consults the archive NAME anchors (single numeric glob, no content parse) and continues FROM the highest archived seq; `rotateIfDue` guards `rotateAt < 2` and empty tails (a one-event rotation previously archived everything and restarted seqs at 1). Regression: deleted-active + archive → append seq 2, timeline [1,2] intact.
+- **G-2 (P3, retention/metadata surface)**: archive naming is STRICTLY numeric (`/^events-\d+\.json$/`) — a user file like `events-backup.json` is neither read into the timeline NOR pruned; `readEvolutionEvents` isolates `readText` errors (EISDIR squatting archive names) — such a file flags malformed and is skipped, never bricks the boot.
+- **G-3 (P3, retention window vs aggregate integrity)**: cache snapshots now run at a CACHE_SNAP_EVERY=1024 appends cadence (inside the record task, truncated to the window), so `cache.lastSeq` always stays inside the retained window — after a hard crash the fold is complete (the at-most-cadence gap lives in the ACTIVE log); plus a fold floor guard: a cache whose lastSeq fell below the timeline is IGNORED (full fold) instead of fabricating a partial fold.
+- **H-1 (existing P2 known-record, solved)**: curator fold lifecycle ownership — `applyCuratorLifecycleFields` is applied only to the names the run ACTUALLY transitioned (transitions engine + archive success/rollback + consolidation sources, passed as `stateOwned`); concurrent curator runs no longer revert each other's archive/restore via stale snapshots. Meta (quality + pinned) still refreshes tree-wide. Tests: ownership unit + the P1-2 stale-window behavior preserved (the transitions engine mutates the snapshot — discovering that the stateOwned set had to include `markStale` and all transition names).
+- **H-3 (observations)**: single `listEventArchives` helper (numeric glob) now feeds the timeline, retention AND the feedback migration check; `@deepseek-ai/dsh-llm` moved to peerDependencies in evolution-commands (family alignment — review/curator already peers).
+
 ## Unreleased — rc.71: event-log rotation (007 design)
 
 The audit-v5 §3 growth warning is resolved by split rotation — the active log is bounded so a single append is O(active) instead of O(total-history).

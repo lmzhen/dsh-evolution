@@ -104,3 +104,14 @@ largest sidecar and the hottest write point.
 1. `ROTATE_AT = 4000` / `RETAIN_ARCHIVES = 10` as shipped defaults?
 2. Retention prunes WITHOUT config surface (constants only) — ok for now?
 3. Segue into implementation as rc.71 with the six tests above?
+
+## Post-implementation resolutions (rc.72)
+
+- Deleted-active recovery now continues seqs from the archive-name anchors
+  (actives or archives) — the "rebuild by next append" claim holds without
+  shadowing archived history (G-1).
+- Archive naming is strictly numeric (`/^events-\d+\.json$/`): user files in the
+  same directory are neither read nor pruned (G-2).
+- The FOLD floor guard plus the cache snapshot cadence (every 1024 appends)
+  make "cache covers ≥ retained-window floor" an invariant, so pruning never
+  creates an unrecoverable band (G-3).

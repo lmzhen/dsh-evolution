@@ -6,8 +6,13 @@
  * learn on target X" is answerable. The aggregate `feedback.json` is a
  * rebuildable boot cache, never the truth.
  *
- * The malformed-refusal posture matches the whole sidecar family (rc.65): an
- * append NEVER rewrites a corrupt log — the bytes stay untouched.
+ * Rotation (rc.71, 007 design): when the active log reaches
+ * `EVENT_LOG_ROTATE_AT` the older half is split into an archive
+ * (`events-<lastArchivedSeq>.json`); the boot timeline merges active +
+ * archives and dedupes by seq (active copy wins), so the rotation crash window
+ * yields the identical timeline. Archival naming is STRICTLY numeric
+ * (`/^events-\d+\.json$/`) — user files under the same directory are never
+ * read as archives and never pruned (rc.72 G-2).
  */
 
 import { transactIo, type EvolutionIoLike } from './io.ts'
@@ -28,6 +33,10 @@ export const EVENT_LOG_RETAIN_ARCHIVES = 10
 /** Archive file prefix: `events-<lastArchivedSeq>.json`. The active file is
  * `events.json` and never matches this glob. */
 export const EVENT_ARCHIVE_PREFIX = 'events-'
+
+/** Archive naming is strictly numeric: a user file such as `events-backup.json`
+ * under the same directory is neither read into the timeline nor pruned. */
+const EVENT_ARCHIVE_RE = /^events-(\d+)\.json$/
 
 export interface EvolutionEvent {
   /** Global monotonic order key, assigned inside the append transact. */
@@ -74,6 +83,23 @@ export function parseEvolutionEvents(raw: string | null): EvolutionEvent[] {
 }
 
 /**
+ * List the numeric archives under the log's directory, sorted ascending by
+ * their last-archived seq. Single glob predicate for the timeline, the
+ * retention pass and the feedback migration check (rc.72 H-3).
+ */
+export async function listEventArchives(io: EvolutionIoLike, path: string): Promise<string[]> {
+  const dir = dirname(path)
+  const names = await io.list(dir)
+  return names
+    .filter(name => EVENT_ARCHIVE_RE.test(name))
+    .sort((a, b) => {
+      const sa = Number.parseInt(a.slice(EVENT_ARCHIVE_PREFIX.length, a.length - 5), 10)
+      const sb = Number.parseInt(b.slice(EVENT_ARCHIVE_PREFIX.length, b.length - 5), 10)
+      return sa - sb
+    })
+}
+
+/**
  * Append one event under the write lock (rc.68): `seq` = current max + 1
  * computed inside the transact, so two processes appending concurrently never
  * collide. A malformed log is refused (bytes preserved) and the append fails.
@@ -86,6 +112,11 @@ export function parseEvolutionEvents(raw: string | null): EvolutionEvent[] {
  * archive write and active write leaves both copies, which the timeline merge
  * dedupes by seq. An archive-write failure aborts the append (active keeps the
  * full old content — no loss) and the caller's best-effort handling applies.
+ *
+ * rc.72 G-1: when the ACTIVE is missing/whitespace but archives exist (a
+ * deleted active, or B-2 self-heal), seq derivation consults the archive names
+ * — the active restarts AFTER the highest archived seq, never at 1, so a new
+ * event can never shadow an archived one in the seq-deduped timeline.
  */
 export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, event: Omit<EvolutionEvent, 'seq' | 'at'>, rotateAt = EVENT_LOG_ROTATE_AT): Promise<number> {
   let assigned = 0
@@ -97,7 +128,15 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
     }
     const events = parseEvolutionEvents(current)
     const nextEvents = await rotateIfDue(io, path, events, rotateAt)
-    const maxSeq = nextEvents.reduce((max, entry) => Math.max(max, entry.seq), 0)
+    let maxSeq = nextEvents.reduce((max, entry) => Math.max(max, entry.seq), 0)
+    if (maxSeq === 0) {
+      // The active is empty/missing: seq continues from the highest ARCHIVE
+      // name (archives always carry lower seqs than a present active, so this
+      // branch is only reached when the active is gone or newly rebuilt).
+      for (const name of await listEventArchives(io, path)) {
+        maxSeq = Math.max(maxSeq, Number.parseInt(name.slice(EVENT_ARCHIVE_PREFIX.length, name.length - 5), 10))
+      }
+    }
     const record: EvolutionEvent = { ...event, seq: maxSeq + 1, at: new Date().toISOString() }
     assigned = record.seq
     return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...nextEvents, record] }, null, 2)
@@ -111,14 +150,16 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
  * `events-<lastArchivedSeq>.json` (await — a failed archive write aborts the
  * append so the active is never truncated without its copy), old archives are
  * pruned, and the newer half is returned as the next active body. No-op when
- * under the threshold.
+ * under the threshold; `rotateAt < 2` is a guarded no-op (rc.72 G-1: a
+ * one-event rotate would archive everything and restart seqs at 1).
  */
 async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionEvent[], rotateAt: number): Promise<EvolutionEvent[]> {
-  if (events.length < rotateAt) return events
+  if (rotateAt < 2 || events.length < rotateAt) return events
   const mid = Math.ceil(events.length / 2)
   const head = events.slice(0, mid)
   const tail = events.slice(mid)
-  const anchor = tail[0]?.seq ?? (events[events.length - 1]?.seq ?? 0)
+  if (tail.length === 0) return events
+  const anchor = tail[0]?.seq ?? 0
   const archivePath = join(dirname(path), `${EVENT_ARCHIVE_PREFIX}${anchor - 1}.json`)
   await io.writeText(archivePath, JSON.stringify({ version: EVENT_LOG_VERSION, events: head }, null, 2))
   await retainEventArchives(io, path)
@@ -128,15 +169,13 @@ async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionE
 /**
  * Prune old event archives (rc.71): keep the newest `EVENT_LOG_RETAIN_ARCHIVES`.
  * The name's numeric part is the last archived seq, so ordering is NUMERIC —
- * lexicographic would rank `events-10` before `events-2`. Best-effort per
- * removal; exported for the retention test.
+ * lexicographic would rank `events-10` before `events-2`. Only strictly
+ * numeric names participate (rc.72 G-2: user files are never deleted).
+ * Best-effort per removal; exported for the retention test.
  */
 export async function retainEventArchives(io: EvolutionIoLike, path: string): Promise<void> {
   const dir = dirname(path)
-  const names = (await io.list(dir))
-    .filter(name => name.startsWith(EVENT_ARCHIVE_PREFIX) && name.endsWith('.json'))
-  const archiveSeq = (name: string): number => Number.parseInt(name.slice(EVENT_ARCHIVE_PREFIX.length, name.length - 5), 10) || 0
-  names.sort((a, b) => archiveSeq(a) - archiveSeq(b))
+  const names = await listEventArchives(io, path)
   const excess = names.slice(0, Math.max(0, names.length - EVENT_LOG_RETAIN_ARCHIVES))
   for (const name of excess) {
     await io.remove(join(dir, name)).catch(() => {})
@@ -148,14 +187,21 @@ export interface EventLogRead {
   /** True when the body is not valid JSON (syntax-level damage): refused on
    * append, bytes untouched. Well-formed JSON with a damaged `events` field
    * is REPLACEABLE garbage — reads as empty and is rewritten at the next
-   * append (rc.70 F-1: read and append agree on the same boundary). */
+   * append (rc.70 F-1: read and append agree on the same boundary). A READ
+   * error (EISDIR etc.) also flags malformed — the file is unusable either
+   * way and is never overwritten (the append read would fail identically). */
   malformed: boolean
 }
 
 /** Read the event log; a missing/whitespace-only file reads as empty,
  * corrupt content is flagged (and refused on append). */
 export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Promise<EventLogRead> {
-  const raw = await io.readText(path)
+  let raw: string | null
+  try {
+    raw = await io.readText(path)
+  } catch {
+    return { events: [], malformed: true }
+  }
   if (raw === null || raw.trim() === '') return { events: [], malformed: false }
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
@@ -175,16 +221,14 @@ export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Pr
  * Read the full timeline (rc.71): active log + all archives, merged by seq
  * (active copy wins, duplicates only arise from the rotation crash window),
  * sorted ascending. Per-file malformed flag as in `readEvolutionEvents`; a
- * malformed ARCHIVE is skipped (never bricks the boot) and still flagged.
+ * malformed (or unreadable) ARCHIVE is skipped — it never bricks the boot and
+ * it is still flagged.
  */
 export async function readEvolutionTimeline(io: EvolutionIoLike, path: string): Promise<EventLogRead> {
   const dir = dirname(path)
-  const names = (await io.list(dir))
-    .filter(name => name.startsWith(EVENT_ARCHIVE_PREFIX) && name.endsWith('.json'))
-    .sort()
   let malformed = false
   const bySeq = new Map<number, EvolutionEvent>()
-  for (const name of names) {
+  for (const name of await listEventArchives(io, path)) {
     const read = await readEvolutionEvents(io, join(dir, name))
     if (read.malformed) malformed = true
     for (const event of read.events) bySeq.set(event.seq, event)
