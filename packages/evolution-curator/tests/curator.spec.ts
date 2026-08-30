@@ -280,6 +280,42 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('control-plane folds keep counters and never flatten a malformed usage sidecar (rc.67 K-1)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-k1-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator)
+    const skills = ctx.evolutionCurator.skills
+    const skill = (name: string, description: string, body: string) => `---\nname: ${name}\ndescription: ${description}\n---\n${body}\n`
+    await skills.create('target-skill', skill('target-skill', 't', 'Target body.'), 'foreground')
+    await skills.create('source-a', skill('source-a', 'a', 'Body A.'), 'foreground')
+    // A tool-side usage record whose counters must survive the control-plane fold.
+    await saveUsage(skills.root, new Map([['source-a', {
+      created_by: 'agent', created_at: new Date().toISOString(), use_count: 42, view_count: 7, patch_count: 0,
+      last_used_at: new Date().toISOString(), last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    const consolidated = await ctx.evolutionCurator.consolidate('target-skill', ['source-a'])
+    expect(consolidated.ok).toBe(true)
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('source-a')).toMatchObject({ use_count: 42, view_count: 7, state: 'archived' })
+    expect(usage.get('source-a')?.archived_at).toBeTruthy()
+    // A malformed sidecar must survive a restore byte-for-byte: the pre-K-1
+    // path parsed malformed as empty and rewrote an empty map over it.
+    const io = nodeEvolutionIo()
+    const usagePath = join(skills.root, '.usage.json')
+    await io.writeText(usagePath, '{corrupt telemetry')
+    const restored = await ctx.evolutionCurator.restore('source-a')
+    expect(restored.ok).toBe(true)
+    expect(await io.readText(usagePath)).toBe('{corrupt telemetry')
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('refuses consolidation with a missing target', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-consolidate-bad-'))
     const previous = process.env.DSH_HOME
@@ -925,6 +961,41 @@ Body of ${name}.
       await ctx.evolutionCurator.run({ ignoreGates: true })
       expect(await skills.read('dup-a')).not.toBeNull()
       expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'dup-a'))).toBe(false)
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('hands the model deterministic prefix clusters as orientation (rc.67 merge heuristic)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-prefix-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      let captured = ''
+      const emptyYaml = '```yaml\nconsolidations: []\nprunings: []\n```\n'
+      const ctx = new Context()
+      ctx.provide('llm', {
+        stream: async function* (options: { messages: unknown[] }) {
+          const message = options.messages[0] as { content: Array<{ text?: string }> } | undefined
+          captured = message?.content[0]?.text ?? ''
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: emptyYaml }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
+          yield { type: 'finish', reason: 'stop' }
+        },
+      })
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(EvolutionCurator, { llmReview: true })
+      const nominations = await ctx.evolutionCurator.recommend(['sql-backup', 'SQL-restore', 'unrelated'])
+      expect(nominations).toEqual({ prunings: [], consolidations: [] })
+      expect(captured).toContain('Prefix clusters observed')
+      expect(captured).toContain("'sql'")
+      expect(captured).toContain('SQL-restore')
+      expect(captured).not.toContain("'unrelated'")
       ctx.evolutionCurator.stop()
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME

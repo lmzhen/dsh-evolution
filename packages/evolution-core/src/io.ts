@@ -124,7 +124,11 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         }
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
-        if (code !== 'EEXIST') throw error
+        // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
+        // when a peer's holder-lock delete races our create; treat it as the
+        // same retryable contention as EEXIST (rc.67). The retry budget still
+        // fails loud at 10 attempts.
+        if (code !== 'EEXIST' && code !== 'EPERM') throw error
         try {
           const st = await stat(lock)
           if (Date.now() - st.mtimeMs > 5000) {

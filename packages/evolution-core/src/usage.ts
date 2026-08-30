@@ -129,6 +129,38 @@ export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map:
   })
 }
 
+/**
+ * Curator-owned usage fields (rc.67 K-2): the curator writes ONLY this set —
+ * lifecycle state, archive stamp, the six-factor quality pair, and the
+ * marker-mirrored pin flag. Counter and activity-stamp fields belong to the
+ * tool-telemetry side (skill-usage / tool-skill-manage), which bumps them
+ * through its own transact-backed RMW. A whole-record overwrite by either
+ * side would clobber the other side's concurrent increment, so cross-side
+ * folds copy this set only.
+ */
+export function applyCuratorFields(disk: UsageRecord, curated: UsageRecord): void {
+  disk.state = curated.state
+  disk.archived_at = curated.archived_at
+  disk.quality_score = curated.quality_score
+  disk.quality_warn = curated.quality_warn
+  disk.pinned = curated.pinned
+}
+
+/**
+ * Fold a curator run-start snapshot onto the current on-disk map (rc.67 K-2):
+ * each curated record is projected onto its disk peer by copying only the
+ * curator-owned fields, so a concurrent tool-side bump between snapshot and
+ * save survives. Records absent from the snapshot are left untouched; a
+ * curated record with no disk peer is seeded from the snapshot.
+ */
+export function foldCuratorFields(disk: UsageMap, curated: UsageMap): void {
+  for (const [name, record] of curated) {
+    const diskRecord = disk.get(name)
+    if (diskRecord) applyCuratorFields(diskRecord, record)
+    else disk.set(name, { ...record })
+  }
+}
+
 export async function saveUsage(root: string, map: UsageMap, io: EvolutionIoLike = nodeEvolutionIo()): Promise<void> {
   const obj = Object.fromEntries(map.entries())
   await io.writeText(usageFile(root), JSON.stringify(obj, null, 2))

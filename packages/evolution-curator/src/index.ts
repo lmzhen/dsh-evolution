@@ -11,9 +11,9 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import { loadUsage, mutateUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -264,12 +264,21 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     if (!llm) return empty
     const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } } | undefined
     const model = policy?.get().curatorModel ?? 'deepseek-v4-pro'
+    const clusters = computePrefixClusters(candidates)
+    const clusterLines = clusters.length === 0
+      ? ['Prefix clusters observed in the candidate list: (none)']
+      : [
+          'Prefix clusters observed in the candidate list (orientation only — verify against the names above; you may also flag additional clusters):',
+          ...clusters.map(cluster => `- '${cluster.key}': ${cluster.members.join(', ')}`),
+        ]
     const prompt = [
       options.dryRun ? CURATOR_DRY_RUN_BANNER : '',
       CURATOR_PROMPT,
       '',
       `Stale candidates observed by the deterministic lifecycle scanner:${candidates.length === 0 ? ' (none)' : ''}`,
       ...candidates.map(name => `- ${name}`),
+      '',
+      ...clusterLines,
       '',
       'Return a YAML summary with consolidations and prunings lists. Nominate only actions whose archival/merge is clearly safe.',
     ].join('\n')
@@ -745,13 +754,11 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       }
     }
     try {
-      // M-5 (v3 audit): the curator folds its authoritative records through
-      // the same transact-backed mutateUsage the tool side uses — a plain
-      // whole-map write would clobber a concurrent usage bump between our
-      // load (run start) and this save.
-      await mutateUsage(root, this.io, (disk) => {
-        for (const [name, record] of usage) disk.set(name, record)
-      })
+      // rc.67 K-1/K-2: the curator folds its authoritative records through the
+      // same transact-backed mutateUsage the tool side uses, at FIELD
+      // granularity — a whole-record set would clobber a concurrent tool-side
+      // counter bump between the run-start load and this save.
+      await mutateUsage(root, this.io, (disk) => foldCuratorFields(disk, usage))
     } catch {
       // Best-effort: curation decisions already landed; a failed usage flush
       // must not surface as a run error after the fact.
@@ -828,8 +835,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   async latestReport(): Promise<CuratorRunReport | null> {
     const reportsRoot = join(evolutionHome(), 'reports')
     const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json')).sort()
-    // M-4 (v3 audit): filenames carry randomUUIDs — lexicographic order is
-    // NOT chronological. Read each report's own startedAt (retention keeps 20).
+    // v3-round self-check: filenames carry randomUUIDs — lexicographic order
+    // is NOT chronological. Read each report's own startedAt (retention keeps 20).
     let latest: { name: string; startedAt: number } | null = null
     for (const name of names) {
       const raw = await this.io.readText(join(reportsRoot, name))
@@ -908,13 +915,18 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     await this.snapshotFull('pre-consolidate')
     const result = await this.skills.consolidate(target, sources)
     if (!result.ok) return result
-    const usage: UsageMap = await loadUsage(this.skills.root, this.io)
-    for (const source of sources) {
-      const record = usage.get(source)
-      if (record) record.state = 'archived'
-      if (record) record.archived_at = new Date().toISOString()
-    }
-    await saveUsage(this.skills.root, usage, this.io)
+    // rc.67 K-1: the control plane folds through the same transact-backed RMW
+    // as the automated path — a whole-file saveUsage here would clobber a
+    // concurrent tool-side bump and would flatten a malformed sidecar to empty.
+    await mutateUsage(this.skills.root, this.io, (disk) => {
+      for (const source of sources) {
+        const record = disk.get(source)
+        if (record) {
+          record.state = 'archived'
+          record.archived_at = new Date().toISOString()
+        }
+      }
+    })
     return result
   }
 
@@ -926,11 +938,14 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     await this.snapshotFull('pre-restore')
     const result = await this.skills.restoreFromArchive(name)
     if (!result.ok) return result
-    const usage: UsageMap = await loadUsage(this.skills.root, this.io)
-    const record = usage.get(name)
-    if (record) record.state = 'active'
-    if (record) record.archived_at = null
-    await saveUsage(this.skills.root, usage, this.io)
+    // rc.67 K-1: same transact-backed, malformed-safe fold as consolidate.
+    await mutateUsage(this.skills.root, this.io, (disk) => {
+      const record = disk.get(name)
+      if (record) {
+        record.state = 'active'
+        record.archived_at = null
+      }
+    })
     const suppressed = new Set(await loadSuppressedNames(this.skills.root, this.io))
     if (suppressed.has(name)) {
       try {

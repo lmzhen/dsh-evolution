@@ -174,3 +174,27 @@ export function computeDedupGroups(input: {
   }
   return [...groups.values()].filter(group => group.length > 1)
 }
+
+/**
+ * Prefix-cluster index over a name set (rc.67 merge heuristic, input side):
+ * the curator prompt asks the model to identify "prefix clusters — skills
+ * sharing a first word or domain keyword"; the deterministic index supplies
+ * stable ground truth instead of letting the model infer clusters from the
+ * raw list. Key = first alphanumeric run of the lowercased name; groups with
+ * at least two members, largest first then alphabetical. Orientation-only:
+ * nomination authority stays with the LLM and the candidate-pool gates.
+ */
+export function computePrefixClusters(names: ReadonlyArray<string>): Array<{ key: string; members: string[] }> {
+  const groups = new Map<string, string[]>()
+  for (const name of names) {
+    const key = name.toLowerCase().split(/[^a-z0-9]+/)[0]
+    if (!key) continue
+    const bucket = groups.get(key)
+    if (bucket) bucket.push(name)
+    else groups.set(key, [name])
+  }
+  return [...groups.entries()]
+    .filter(([, members]) => members.length >= 2)
+    .map(([key, members]) => ({ key, members }))
+    .sort((a, b) => b.members.length - a.members.length || a.key.localeCompare(b.key))
+}

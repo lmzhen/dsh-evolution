@@ -143,7 +143,7 @@ export function apply(ctx: Context): void {
       } catch (error: unknown) {
         // Missing key is the benign "no such pending record" outcome; a
         // closed domain or backend failure must surface so approval reports
-        // the real cause instead of "already being resolved" (v3-audit M-9).
+        // the real cause instead of "already being resolved" (v3-round self-check).
         if (error instanceof DomainError && error.code === 'missing-key') return null
         throw error
       }
@@ -174,7 +174,7 @@ export function apply(ctx: Context): void {
         if (resolved.record === null) return { record: record.status === status ? record : null, applied: false }
         return { record: resolved.record, applied: true }
       } catch (error: unknown) {
-        // v3-audit M-9: only missing-key is benign; closed/backend errors propagate.
+        // v3-round self-check: only missing-key is benign; closed/backend errors propagate.
         if (error instanceof DomainError && error.code === 'missing-key') return { record: null, applied: false }
         throw error
       }

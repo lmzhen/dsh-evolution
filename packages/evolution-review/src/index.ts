@@ -245,13 +245,15 @@ export function apply(ctx: Context, rawConfig: Config): void {
       })
       // Read-before-write must see what the REVIEW subagent itself loaded: it
       // runs in its own session, and the parent session's events never contain
-      // its `skill` calls. Capture the child session before dispose.
+      // its `skill` calls. Read the child session after the run settles, while
+      // the try/finally below still owns it (the disposer runs in the finally,
+      // so capture MUST precede every disposal path).
       // Everything after start() sits in a try/finally so the child run is
       // disposed on every exit path (success, timeout, validation throw).
       try {
         const result = await run.result
         if (!result.structured) return true
-        // M-4 (v3 audit): collect AFTER the subagent finished so its own
+        // v3-round self-check: collect AFTER the subagent finished so its own
         // `skill` reads are visible to read-before-write (session events of
         // the child never reach the parent; the child session must be read
         // before dispose).

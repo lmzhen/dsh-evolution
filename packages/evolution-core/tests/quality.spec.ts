@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { computeQualityScores, computeDedupGroups, normalizeUsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { computeQualityScores, computeDedupGroups, computePrefixClusters, normalizeUsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
 function record(now: Date, overrides: Partial<{
   created_at: string
@@ -89,5 +89,14 @@ it('dedup clusters exact copies and token-neighbors, skipping size-ratio outlier
   const cluster = groups.find(group => group.includes('a'))
   expect(cluster).toContain('b')
   expect(groups.some(group => group.includes('huge'))).toBe(false)
+})
+
+it('prefix clusters group by the first alphanumeric run, size-descending (rc.67 merge heuristic)', () => {
+  const clusters = computePrefixClusters(['sql-backup', 'SQL-restore', 'sql-index', 'unrelated', '--dash-start'])
+  expect(clusters).toEqual([
+    { key: 'sql', members: ['sql-backup', 'SQL-restore', 'sql-index'] },
+  ])
+  expect(computePrefixClusters(['solo'])).toEqual([])
+  expect(computePrefixClusters([])).toEqual([])
 })
 

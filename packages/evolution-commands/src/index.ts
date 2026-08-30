@@ -15,7 +15,7 @@ export function apply(ctx: Context): void {
       name: 'evolution',
       description: 'Self-evolution status and approval controls',
       recordInput: false,
-      async handler(invocation: { rawInput?: string }) {
+      async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
@@ -88,7 +88,8 @@ export function apply(ctx: Context): void {
             line('Protected (pinned / bundled / hub)', view.protected),
           ].join('\n'))
         }
-        if (input === 'curator report') {          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
+        if (input === 'curator report') {
+          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
           if (!curator) return err('Curator service not mounted.')
           const report = await curator.latestReport()
           if (!report) return ok('No curator report available.')
@@ -122,7 +123,14 @@ export function apply(ctx: Context): void {
         }
         if (input === 'learn' || input.startsWith('learn ')) {
           const request = input === 'learn' ? '' : input.slice(6).trim()
-          return ok(buildLearnPrompt(request))
+          // rc.67: command results never enter model history, so an echo can
+          // never reach the agent. INJECT the learn prompt as a first-class
+          // user message (same pattern as the auto-review inject path).
+          invocation.agent.inject({
+            content: [{ type: 'text', text: buildLearnPrompt(request) }],
+            source: { kind: 'plugin', plugin: 'dsh-evolution-commands', form: 'notice', summary: 'learn request' },
+          })
+          return ok('Learning request sent to this session. Follow it now.')
         }
         if (input === 'replay') {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
@@ -137,6 +145,11 @@ export function apply(ctx: Context): void {
 
 interface CommandRuntimeLike {
   register(definition: unknown): () => void
+}
+
+interface CommandInvocation {
+  rawInput?: string
+  agent: { inject(message: unknown): void }
 }
 
 interface ApprovalLike {

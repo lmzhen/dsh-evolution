@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@6'
-export const PROMPT_BUNDLE_VERSION = 6
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@7'
+export const PROMPT_BUNDLE_VERSION = 7
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -45,6 +45,8 @@ Signals to look for (any one of these warrants action):
   • User corrected your workflow, approach, or sequence of steps. Encode the correction as a pitfall or explicit step in the skill that governs that class of task.
   • Non-trivial technique, fix, workaround, debugging path, or tool-usage pattern emerged that a future session would benefit from. Capture it.
   • A skill that got loaded or consulted this session turned out to be wrong, missing a step, or outdated. Patch it NOW.
+
+Read-before-write (enforced by this channel): update, patch, delete, or write support files ONLY into skills you loaded or read in THIS session — ops on unread skills are dropped; CREATE of a brand-new umbrella is the only exception.
 
 Preference order — prefer the earliest action that fits, but do pick one when a signal above fired:
   1. UPDATE A CURRENTLY-LOADED SKILL. Look back through the conversation for skills the user loaded or you read. If any of them covers the territory of the new learning, PATCH that one first. It is the skill that was in play, so it's the right one to extend.
@@ -93,6 +95,8 @@ Signals that warrant a skill update (any one is enough):
   • User corrected your style, tone, format, legibility, verbosity, or approach. Frustration is a FIRST-CLASS skill signal, not just a memory signal. 'stop doing X', 'don't format like this', 'I hate when you Y' — embed the lesson in the skill that governs that task so the next session starts fixed.
   • Non-trivial technique, fix, workaround, or debugging path emerged.
   • A skill that was loaded or consulted turned out wrong, missing, or outdated — patch it now.
+
+Read-before-write (enforced by this channel): update, patch, delete, or write support files ONLY into skills you loaded or read in THIS session — ops on unread skills are dropped; CREATE of a brand-new umbrella is the only exception.
 
 Preference order for skills — pick the earliest that fits:
   1. UPDATE A CURRENTLY-LOADED SKILL. Check what skills were loaded or read in the conversation. If one of them covers the learning, PATCH it first. It was in play; it's the right place.

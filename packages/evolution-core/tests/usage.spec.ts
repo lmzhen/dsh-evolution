@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
+import { applyCuratorFields, emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 describe('usage sidecar field normalization (P2-3)', () => {
   it('falls back to the emptyRecord baseline for mistyped fields', () => {
     const record = normalizeUsageRecord({
@@ -114,6 +114,47 @@ describe('usage sidecar field normalization (P2-3)', () => {
     })))
     const usage = await loadUsage(root, io)
     expect(usage.get('atomic-skill')?.use_count).toBe(8)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('applyCuratorFields copies exactly the curator-owned field set (rc.67 K-2)', () => {
+    const disk = { ...emptyRecord(), use_count: 7, view_count: 2, patch_count: 1 }
+    const curated = {
+      ...emptyRecord(),
+      state: 'archived' as const,
+      archived_at: '2026-01-01T00:00:00.000Z',
+      quality_score: 0.2,
+      quality_warn: true,
+      pinned: true,
+      use_count: 999,
+      view_count: 999,
+    }
+    applyCuratorFields(disk, curated)
+    expect(disk.use_count).toBe(7)
+    expect(disk.view_count).toBe(2)
+    expect(disk.patch_count).toBe(1)
+    expect(disk).toMatchObject({
+      state: 'archived',
+      archived_at: '2026-01-01T00:00:00.000Z',
+      quality_score: 0.2,
+      quality_warn: true,
+      pinned: true,
+    })
+  })
+
+  it('foldCuratorFields keeps tool-side counters while applying curated lifecycle fields (rc.67 K-2)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-fold-'))
+    const io = nodeEvolutionIo()
+    // The disk record carries a tool-side bump that landed AFTER the curator's
+    // run-start snapshot; the fold must keep it under the curated state.
+    await mutateUsage(root, io, (map) => {
+      const record = getRecord(map, 'lifecycle-skill')
+      record.use_count = 5
+    })
+    const curated = new Map([['lifecycle-skill', { ...emptyRecord(), state: 'stale' as const, quality_score: 0.3, quality_warn: true }]])
+    await mutateUsage(root, io, (map) => foldCuratorFields(map, curated))
+    const usage = await loadUsage(root, io)
+    expect(usage.get('lifecycle-skill')).toMatchObject({ use_count: 5, state: 'stale', quality_score: 0.3, quality_warn: true })
     await rm(root, { recursive: true, force: true })
   })
 

@@ -44,23 +44,30 @@ describe('evolution-commands', () => {
     expect(missing.kind).toBe('error')
   })
 
-  it('learn returns the standards-guided skill distillation prompt', async () => {    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+  it('learn injects the standards-guided prompt into the invoking agent (rc.67)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {
         captured = definition as typeof captured
         return () => {}
       },
     })
+    const injected: unknown[] = []
     await ctx.plugin(Commands)
-    const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>' })
-    expect(withRequest.text).toContain('THE REQUEST:')
-    expect(withRequest.text).toContain('distill the auth flow from <url>')
-    expect(withRequest.text).toContain('skill-authoring standards')
-    expect(withRequest.text).toContain('skill_manage')
+    const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>', agent: { inject: (message: unknown) => injected.push(message) } })
+    // The command result only feeds the UI; the agent receives the message.
+    expect(withRequest.text).toContain('Learning request sent')
+    expect(withRequest.text).not.toContain('THE REQUEST:')
+    expect(injected).toHaveLength(1)
+    const message = injected[0] as { content: Array<{ text?: string }>; source?: { plugin?: string } }
+    expect(message.source?.plugin).toBe('dsh-evolution-commands')
+    expect(message.content?.[0]?.text).toContain('distill the auth flow from <url>')
+    expect(message.content?.[0]?.text).toContain('skill_manage')
     // Empty argument falls back to the "what we just did" guidance.
-    const empty = await captured!.handler({ rawInput: 'learn' })
-    expect(empty.text).toContain('the workflow we just went through')
+    const empty = await captured!.handler({ rawInput: 'learn', agent: { inject: (message: unknown) => injected.push(message) } })
+    expect(empty.text).toContain('Learning request sent')
+    expect((injected[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
   })
 
   it('curator scope renders the lifecycle lists including quality-warned', async () => {
