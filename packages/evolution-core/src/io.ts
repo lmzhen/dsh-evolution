@@ -110,11 +110,14 @@ export function nodeEvolutionIo(): EvolutionIoLike {
    * the holder pid it carries (rc.66): a LIVE holder is never stolen, so a
    * slow writer no longer loses its lock to a peer at the 5s mark (the
    * takeover is the only best-effort surface; the retry budget fails loud —
-   * rc.65 — instead of ever proceeding unlocked).
+   * rc.65 — instead of ever proceeding unlocked). Budget = 40 * 50ms (~2s,
+   * rc.69): 8-writer contention bursts on a loaded CI runner exceed 10
+   * attempts (500ms), and a fail-loud throw was observed instead of a clean
+   * serialization.
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
       try {
         await writeFile(lock, String(process.pid), { flag: 'wx' })
         try {
