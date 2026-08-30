@@ -3,7 +3,6 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
-
 describe('usage sidecar field normalization (P2-3)', () => {
   it('falls back to the emptyRecord baseline for mistyped fields', () => {
     const record = normalizeUsageRecord({
@@ -115,6 +114,21 @@ describe('usage sidecar field normalization (P2-3)', () => {
     })))
     const usage = await loadUsage(root, io)
     expect(usage.get('atomic-skill')?.use_count).toBe(8)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('a malformed sidecar is never overwritten by the RMW (P3)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-malformed-'))
+    const io = nodeEvolutionIo()
+    await io.writeText(usageFile(root), '{corrupted telemetry')
+    await mutateUsage(root, io, (map) => {
+      const record = getRecord(map, 'should-not-persist')
+      record.use_count = 1
+    })
+    expect(await io.readText(usageFile(root))).toBe('{corrupted telemetry')
+    await io.writeText(join(root, '.curator-suppressed.json'), 'not-json either')
+    await updateSuppressedNames(root, io, (names) => { names.add('x') })
+    expect(await io.readText(join(root, '.curator-suppressed.json'))).toBe('not-json either')
     await rm(root, { recursive: true, force: true })
   })
 })

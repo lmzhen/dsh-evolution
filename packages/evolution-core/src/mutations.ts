@@ -68,7 +68,11 @@ export async function recordMutation(
   // The read-append-write runs as one atomic transact (rc.50 P2-2): a second
   // process sharing DSH_HOME can no longer interleave its append between our
   // read and write and lose an audit record.
-  await transactIo(io, mutationsFile(root), (current) => {
+  await transactIo(io, mutationsFile(root), async (current) => {
+    // P3 (v3 audit): never overwrite a malformed audit file with a re-serialized empty.
+    if (current !== null) {
+      try { JSON.parse(current) } catch { return current }
+    }
     const existing = parseMutationRecords(current)
     existing.push(record)
     const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing

@@ -65,9 +65,14 @@ function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
   return evidence.every((item) => {
     if (!item || typeof item !== 'object') return false
     const record = item as Record<string, unknown>
+    // P3 (v3 audit): only a REAL numeric seq passes — Number(null)/Number('')/
+    // Number(false) coerce to 0 and would mint fake evidence order.
     const seq = typeof record.event_seq === 'number'
       ? record.event_seq
-      : typeof record.seq === 'number' ? record.seq : Number(record.event_seq)
+      : typeof record.seq === 'number' ? record.seq
+        : typeof record.event_seq === 'string' && /^\d+$/.test(record.event_seq)
+          ? Number(record.event_seq)
+          : -1
     return Number.isInteger(seq) && seq >= 0 && seq <= sessionSeq
   })
 }

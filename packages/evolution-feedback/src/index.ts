@@ -124,7 +124,13 @@ function parseState(raw: string | null): FeedbackState {
   }
 }
 
-/** Deep-merge two feedback states: union by target, in-memory values win on conflict. */
+/** Deep-merge two feedback states: union by target; in-memory values win on
+ * conflict. NOTE (v3 audit P3 reviewed): additive counting was rejected — a
+ * restart merge (restore+flush) would double-count the same records, and a
+ * stateless JSON sidecar cannot distinguish "two processes incrementing the
+ * same target" from "the same record seen twice". Cross-process same-target
+ * increments stay a documented limitation; an append-only event log would be
+ * the real fix. */
 function mergeStates(disk: FeedbackState, memory: FeedbackState): FeedbackState {
   return {
     skills: { ...disk.skills, ...memory.skills },

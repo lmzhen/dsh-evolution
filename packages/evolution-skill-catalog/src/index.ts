@@ -47,7 +47,7 @@ export const Config: z<Config> = z.object({
 })
 
 /** Below filesystem's user rank so the evolution-owned tree wins duplicates. */
-export const EVOLUTION_SKILL_RANK = 390
+const EVOLUTION_SKILL_RANK = 390
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const invocation: SkillInvocationPolicy = {

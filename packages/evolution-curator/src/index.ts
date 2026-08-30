@@ -673,7 +673,13 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         // drop the stale flag and cause a stale->active->stale oscillation.
         const record = usage.get(name)
         const from = failedFrom?.get(name)
-        if (record && (from === 'stale' || from === 'active')) record.state = from
+        // P3 (v3 audit): the pre-transition state write also cleared the
+        // archive timestamp — rollback must undo BOTH fields or the record
+        // reads as 'active' with a non-null archived_at (record invariant).
+        if (record && (from === 'stale' || from === 'active')) {
+          record.state = from
+          record.archived_at = null
+        }
         errors.push(`${name}: ${archived.message}`)
       } else {
         // Uniform state transition for EVERY successful archive — deterministic

@@ -443,7 +443,7 @@ export function shouldCompletionReview(reason: { kind?: string } | undefined, se
 }
 
 /** Skill names this session loaded (read-before-write source for the background review). */
-export function collectReadSkillNames(session: Session): Set<string> {
+function collectReadSkillNames(session: Session): Set<string> {
   const names = new Set<string>()
   for (const event of session.events) {
     if (event.type !== 'tool/call') continue
@@ -462,7 +462,7 @@ export function collectReadSkillNames(session: Session): Set<string> {
 }
 
 /** Map/set size that triggers a dead-session counter sweep (bounded, not a hard cap). */
-export const COUNTER_SWEEP_THRESHOLD = 128
+const COUNTER_SWEEP_THRESHOLD = 128
 
 /**
  * Remove every entry whose session is no longer live (rc.42 audit P1-10):

@@ -85,6 +85,10 @@ export function advanceReview(
   if (!signal.substantive) return null
 
   state.turnsSinceMemory += signal.memorySignal ? 1 : 0
+  // P3 (v3 audit): turnsSinceSkill is an ACTIVITY-weighted counter — a turn
+  // without a skill signal advances by the turn's tool-call count (so skills
+  // fire on accumulated work, not turn count). The field name is kept for
+  // on-disk record compatibility; the semantic is documented here.
   state.turnsSinceSkill += signal.skillSignal ? 1 : Math.max(1, signal.toolCalls)
 
   const memoryDue = state.turnsSinceMemory >= config.memoryInterval

@@ -22,7 +22,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export const CAPABILITY_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+const CAPABILITY_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 
 export interface CapabilityPackage {
   name: string
@@ -91,7 +91,9 @@ export class EvolutionCapability extends Service {
       origin,
     })
     if (decision.action !== 'staged') {
-      return { ok: false, message: 'Capability submission was not staged.' }
+      // P3 (v3 audit): a capability submission must ALWAYS stage — the
+      // allow-direct path would dead-end capability evolution silently.
+      return { ok: false, message: 'Capability submission requires staged approval: set approval.stageForeground=true (it keeps capability submissions paused for review; allow would bypass the audit).' }
     }
     return { ok: true, pendingId: decision.pendingId, message: decision.message }
   }

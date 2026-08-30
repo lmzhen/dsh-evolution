@@ -92,6 +92,9 @@ export class EvolutionApproval extends Service {
   }
 
   registerRunner(kind: PendingKind, runner: WriteRunner): () => void {
+    // P3 (v3 audit): a duplicate kind would silently shadow the first runner
+    // (mirroring EvolutionStateStorageRegistry.registerProvider, which throws).
+    if (this.runners.has(kind)) throw new Error(`approval runner for "${kind}" is already registered`)
     this.runners.set(kind, runner)
     return () => {
       if (this.runners.get(kind) === runner) this.runners.delete(kind)

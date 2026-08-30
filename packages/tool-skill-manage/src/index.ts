@@ -40,7 +40,7 @@ export const Config: z<Config> = z.object({
 })
 
 interface ApprovalLike {
-  request(input: { kind: 'skill'; summary: string; args: unknown; origin: WriteOrigin; sessionPolicy?: 'ask' | 'never' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  request(input: { kind: 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review'; sessionPolicy?: 'ask' | 'never' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
   registerRunner(kind: 'skill', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
 }
 

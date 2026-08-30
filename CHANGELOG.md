@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — rc.65: v3-audit P3 batch (dead code, data boundaries, interface/doc hardening)
+
+- **Dead-code privatized (5, test-free)**: `EVOLUTION_SKILL_RANK`, `CAPABILITY_NAME_RE`, `scorePlan`, `collectReadSkillNames`, `COUNTER_SWEEP_THRESHOLD` lost their exports (module-private helpers). Test-consumed exports (`gateConsolidations`, `shouldCompletionReview`, `filterUnreadSkillOps`, `sweepDeadSessionEntries`, `graphDensity`) were verified against the audit's own rule and left exported — test infrastructure, not dead code.
+- **Data boundaries**: `mutateUsage` / `recordMutation` / `updateSuppressedNames` now refuse to rewrite a malformed sidecar (the swallow→empty→persist path would destroy recoverable telemetry; regression test pins byte preservation); a failed-archive rollback also clears `archived_at` (the pre-transition record read as 'active' with a stale archive timestamp); `plan-validator` accepts `event_seq` only as a real integer or a numeric string — `Number(null)` no longer mints seq 0; `signals.ts` documents that `turnsSinceSkill` is an activity-weighted counter (field kept for on-disk compatibility).
+- **Feedback merge reverted with rationale**: the additive cross-process merge was rejected after the restore+flush double-count surfaced — a stateless JSON sidecar cannot distinguish two processes incrementing the same target from one record seen twice. The union-by-target overwrite stays, with the limitation documented (an append-only event log is the real fix).
+- **Interface/docs**: the stale untracked `evolution-io/src/index.d.ts` artifact (missing transact/isSymlink) is deleted; `tool-skill-manage`'s `ApprovalLike` mirror narrows `origin` to the real 2-value contract; capability submission states the required `stageForeground=true` explicitly; `approval.registerRunner` throws on a duplicate kind instead of silently shadowing the first runner.
+- Local harness include gained the `evolution-plan-validator` spec tree (another CI-only coverage gap closed).
+
 ## Unreleased — rc.64: v3-audit P2 batch (all eleven findings)
 
 - **Tool layer**: `action=edit` now gets the same authoring/strict gate as create/update (the enum alias bypassed it — regression test added); staged approval args carry BOTH the approval origin and the library origin, so replay of a delegated-subagent write keeps the `subagent` library semantic and the pinned guard stays consistent; the tool description now states the enforced pin rule precisely (foreground and delegated subagents may; never from a background review).

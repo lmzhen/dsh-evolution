@@ -61,7 +61,7 @@ export const Config: z<Config> = z.object({
   }).default(DEFAULT_WEIGHTS),
 })
 
-export function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): number {
+function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): number {
   return plan.acceptedOps * weights.accepted
     - plan.rejectedOps * weights.rejectedPenalty
     + plan.evidenceQuotes * weights.evidence

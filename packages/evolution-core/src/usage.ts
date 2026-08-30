@@ -118,6 +118,11 @@ export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutio
  */
 export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map: UsageMap) => void | Promise<void>): Promise<void> {
   await transactIo(io, usageFile(root), async (current) => {
+    // P3 (v3 audit): a malformed sidecar is never overwritten by the RMW —
+    // JSON.parse swallow→empty then persist would destroy recoverable telemetry.
+    if (current !== null) {
+      try { JSON.parse(current) } catch { return current }
+    }
     const map = parseUsage(current)
     await task(map)
     return JSON.stringify(Object.fromEntries(map.entries()), null, 2)
@@ -219,6 +224,10 @@ export async function updateSuppressedNames(
   task: (names: Set<string>) => void | Promise<void>,
 ): Promise<void> {
   await transactIo(io, suppressedFile(root), async (current) => {
+    // P3: never overwrite a malformed suppression sidecar.
+    if (current !== null) {
+      try { JSON.parse(current) } catch { return current }
+    }
     const names = parseSuppressed(current)
     await task(names)
     return JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2)
