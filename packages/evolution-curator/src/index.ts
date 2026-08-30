@@ -268,9 +268,9 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const clusterLines = clusters.length === 0
       ? ['Prefix clusters observed in the candidate list: (none)']
       : [
-          'Prefix clusters observed in the candidate list (orientation only — verify against the names above; you may also flag additional clusters):',
-          ...clusters.map(cluster => `- '${cluster.key}': ${cluster.members.join(', ')}`),
-        ]
+        'Prefix clusters observed in the candidate list (orientation only — verify against the names above; you may also flag additional clusters):',
+        ...clusters.map(cluster => `- '${cluster.key}': ${cluster.members.join(', ')}`),
+      ]
     const prompt = [
       options.dryRun ? CURATOR_DRY_RUN_BANNER : '',
       CURATOR_PROMPT,
@@ -758,7 +758,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       // same transact-backed mutateUsage the tool side uses, at FIELD
       // granularity — a whole-record set would clobber a concurrent tool-side
       // counter bump between the run-start load and this save.
-      await mutateUsage(root, this.io, (disk) => foldCuratorFields(disk, usage))
+      await mutateUsage(root, this.io, (disk) => { foldCuratorFields(disk, usage) })
     } catch {
       // Best-effort: curation decisions already landed; a failed usage flush
       // must not surface as a run error after the fact.

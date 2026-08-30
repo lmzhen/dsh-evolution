@@ -152,7 +152,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
       record.use_count = 5
     })
     const curated = new Map([['lifecycle-skill', { ...emptyRecord(), state: 'stale' as const, quality_score: 0.3, quality_warn: true }]])
-    await mutateUsage(root, io, (map) => foldCuratorFields(map, curated))
+    await mutateUsage(root, io, (map) => { foldCuratorFields(map, curated) })
     const usage = await loadUsage(root, io)
     expect(usage.get('lifecycle-skill')).toMatchObject({ use_count: 5, state: 'stale', quality_score: 0.3, quality_warn: true })
     await rm(root, { recursive: true, force: true })
