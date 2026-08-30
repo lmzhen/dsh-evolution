@@ -109,5 +109,4 @@ jobs:
         shell: bash
         run: |
           mkdir -p packages/evolution/dist
-          node packages/evolution/scripts/publish-scoped.mjs \
-            --tag next
+          node packages/evolution/scripts/publish-scoped.mjs

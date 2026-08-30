@@ -113,7 +113,6 @@ runs:
       working-directory: upstream
       run: |
         node packages/evolution/scripts/publish-scoped.mjs \
-          --tag next \
           --no-provenance \
           --dry-run
 

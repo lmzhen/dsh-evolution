@@ -193,7 +193,7 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 
 ## 兼容性
 
-- 基于 DeepSeek Harness `0.1.0-rc.5` 开发。
+- 基于 DeepSeek Harness `0.1.1-rc.2` 兼容验证（CI 发布锚点双锚检查）。
 - 与 standard / minimal / code / Creator preset 服务级兼容。
 - 使用 Anchored Standard 真实插件代码测试：
   - bootstrap 阶段隐藏 evolution 工具；

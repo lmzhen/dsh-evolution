@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — rc.72: audit-v6 + deep-sweep batch (G-1..G-3, H-1..H-3)
+## 0.1.0 (stable) — rc.72 content: audit-v6 + deep-sweep batch (G-1..G-3, H-1..H-3)
 
 - **G-1 (P2, seq shadowing after active loss)**: `appendEvolutionEvent` derives the next seq from the ACTIVE only — a missing/whitespace active with archives present restarted at seq 1 and, by the timeline's active-wins dedupe, shadowed archived history one event per append. Now the empty-active branch consults the archive NAME anchors (single numeric glob, no content parse) and continues FROM the highest archived seq; `rotateIfDue` guards `rotateAt < 2` and empty tails (a one-event rotation previously archived everything and restarted seqs at 1). Regression: deleted-active + archive → append seq 2, timeline [1,2] intact.
 - **G-2 (P3, retention/metadata surface)**: archive naming is STRICTLY numeric (`/^events-\d+\.json$/`) — a user file like `events-backup.json` is neither read into the timeline NOR pruned; `readEvolutionEvents` isolates `readText` errors (EISDIR squatting archive names) — such a file flags malformed and is skipped, never bricks the boot.
