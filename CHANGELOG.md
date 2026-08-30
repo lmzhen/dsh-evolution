@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — rc.64: v3-audit P2 batch (all eleven findings)
+
+- **Tool layer**: `action=edit` now gets the same authoring/strict gate as create/update (the enum alias bypassed it — regression test added); staged approval args carry BOTH the approval origin and the library origin, so replay of a delegated-subagent write keeps the `subagent` library semantic and the pinned guard stays consistent; the tool description now states the enforced pin rule precisely (foreground and delegated subagents may; never from a background review).
+- **Orchestration**: `latestReport()` reads each report's own `startedAt` instead of sorting UUID filenames (regression test: name-"a" newer beats name-"z" older); the curator's usage fold persists through `mutateUsage` (transact-backed) so a concurrent usage bump between run start and save is not clobbered; the review subagent's skill reads are collected AFTER `await run.result` so read-before-write sees them.
+- **IO/state**: the memory oversized-file read-guard runs BEFORE the transact entry (inside, the backend has already loaded the whole file — "never loaded" only holds pre-lock; the in-flight refusal path that rewrote full bytes verbatim is gone); `evolution-state-json` state mutations (review/curator/pending claim, release, resolve, save) run through `transactIo` with the process chain as the second layer — the JSON provider was the last cross-process unsynchronized RMW; `evolution-state-domain` catches only `DomainError('missing-key')` and lets closed/backend failures propagate instead of masquerading as "already resolved" (both providers' tryResolvePending semantics aligned).
+- **Architecture**: the curator prompt no longer promises scheduled-task reference rewriting that the engine never performs (referenced skills are stated as fully protected); `evolution-learning-graph` binds its command registration to the fiber via `ctx.effect` so HMR/reload cannot duplicate `/evolution graph`.
+- Local harness gained the two previously-uncovered spec trees (state-json/state-domain tests) and the `dsh-storage-json` alias — the local full-suite coverage now matches CI's include surface for these packages.
+
 ## Unreleased — rc.63: v3-audit round (M-1…M-7) — prompt-channel separation, candidate-pool integrity, guard hardening
 
 All seven findings of AUDIT_REPORT_v3.md landed in one round.

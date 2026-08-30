@@ -223,6 +223,11 @@ export class MemoryStore {
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
     if (!facts.trim()) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const path = fileFor(this.root, target)
+    // M-7 (v3 audit): the oversized read-guard must run BEFORE the transact —
+    // inside it, node transact has already loaded the whole file, so the
+    // "skipped for reading (never loaded)" contract only holds pre-lock.
+    const refusal = await this.oversizedRefusal(target)
+    if (refusal) return refusal
     let outcome: MemoryApplyResult | undefined
     await transactIo(this.io, path, async (current) => {
       const core = await this.addCore(target, facts, current ?? '')
@@ -243,8 +248,8 @@ export class MemoryStore {
   private async addCore(target: MemoryTarget, facts: string, raw: string): Promise<{ result: MemoryApplyResult; write: string | null }> {
     const content = facts.trim()
     if (!content) return { result: this.failure(target, 'Content cannot be empty.', []), write: null }
-    const refusal = await this.oversizedRefusal(target)
-    if (refusal) return { result: refusal, write: null }
+    // The oversized guard runs pre-transact in add(); drift is derived from
+    // the locked view below.
     const drift = this.driftFromRaw(target, raw)
     if (drift) {
       const backup = await this.backupFile(target)
@@ -281,6 +286,9 @@ export class MemoryStore {
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
     if (operations.length === 0) return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const path = fileFor(this.root, target)
+    // M-7: oversized guard pre-lock (see add()).
+    const refusal = await this.oversizedRefusal(target)
+    if (refusal) return refusal
     let outcome: MemoryApplyResult | undefined
     await transactIo(this.io, path, async (current) => {
       const core = await this.applyBatchCore(target, operations, current ?? '')
@@ -298,8 +306,8 @@ export class MemoryStore {
     operations: MemoryOperation[],
     raw: string,
   ): Promise<{ result: MemoryApplyResult; write: string | null }> {
-    const refusal = await this.oversizedRefusal(target)
-    if (refusal) return { result: refusal, write: null }
+    // The oversized guard runs pre-transact in applyBatch(); drift is derived
+    // from the locked view below.
     const drift = this.driftFromRaw(target, raw)
     if (drift) {
       const backup = await this.backupFile(target)

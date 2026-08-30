@@ -107,7 +107,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // P0 authoring feedback: every create/update reports the description
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
-    if ((action === 'create' || action === 'update') && args.content) {
+    if ((action === 'create' || action === 'edit' || action === 'update') && args.content) {
       const parsed = parseFrontmatter(args.content)
       if (parsed) {
         const feedback = authoringFeedback(parsed.frontmatter)
@@ -192,7 +192,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.tools.register(defineTool({
     name: 'skill_manage',
     description:
-      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin work only from the foreground — never from a background review). '
+      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
@@ -236,7 +236,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const decision = await approval.request({
           kind: 'skill',
           summary: `skill ${args.action ?? '?'} ${args.name ?? ''}`.trim(),
-          args: { operation: args, origin: reviewOrigin },
+          // M-2 (v3 audit): staged args carry BOTH surfaces — the approval
+          // origin (review channel for any subagent) AND the library origin
+          // (a delegated subagent stays 'subagent'), so replay preserves the
+          // pinned-guard distinction instead of folding subagent to review.
+          args: { operation: args, origin: reviewOrigin, libraryOrigin },
           origin: reviewOrigin,
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
@@ -251,8 +255,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.inject(['evolutionApproval'], (approvalCtx) => {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
     const dispose = approval.registerRunner('skill', (args) => {
-      const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; origin?: 'foreground' | 'background_review' }
-      return executeCore(wrapped.operation ?? {}, wrapped.origin ?? 'background_review')
+      const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; origin?: 'foreground' | 'background_review'; libraryOrigin?: 'foreground' | 'subagent' | 'background_review' }
+      return executeCore(wrapped.operation ?? {}, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
     })
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })

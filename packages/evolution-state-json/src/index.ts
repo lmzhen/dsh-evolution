@@ -9,6 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
+import { transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -39,14 +40,28 @@ export function apply(ctx: Context, rawConfig: Config): void {
     try { return JSON.parse(raw) as T } catch { return null }
   }
 
-  async function writeJson(file: string, value: unknown): Promise<void> {
-    await io().writeText(pathOf(file), JSON.stringify(value, null, 2))
+  /**
+   * Cross-process JSON-file RMW (v3-audit M-8): every read-modify-write state
+   * mutation runs inside the IO backend's transact lock (via transactIo) so a
+   * second process sharing DSH_HOME cannot interleave its claim/resolve.
+   * `task` returns the next value (null = delete); the legacy `pending.json`
+   * merge stays inside the task via `readJson` where relevant.
+   */
+  async function jsonTransact<T>(file: string, task: (current: T | null) => T | null | Promise<T | null>): Promise<void> {
+    await transactIo(ctx.evolutionIo.provider(), pathOf(file), async (current) => {
+      let parsed: T | null = null
+      if (current !== null) {
+        try { parsed = JSON.parse(current) as T } catch { parsed = null }
+      }
+      const next = await task(parsed)
+      return next === null ? null : JSON.stringify(next, null, 2)
+    })
   }
 
   // All JSON-file state mutations share one queue: each read-modify-write is
   // a single task, so concurrent review/curator/approval writers can never
-  // overwrite each other's newest record. The IO provider itself already
-  // writes atomically; this closes the lost-update window above it.
+  // overwrite each other's newest record in THIS process. The transact lock
+  // (jsonTransact) covers OTHER processes; this chain is the second layer.
   let chain: Promise<unknown> = Promise.resolve()
   function mutate<T>(task: () => Promise<T>): Promise<T> {
     const run = chain.then(task, task)
@@ -64,7 +79,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       readJson<Record<string, PendingRecord>>('pending-state.json'),
       readJson<Record<string, PendingRecord>>('pending.json'),
     ])
-    return { ...legacy ?? {}, ...current ?? {} }
+    return { ...(legacy ?? {}), ...(current ?? {}) }
   }
 
   const provider: EvolutionStateStorage = {
@@ -79,9 +94,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async saveReviewState(sessionId, record) {
       await mutate(async () => {
-        const map = await readJson<Record<string, ReviewStateRecord>>('review-state.json') ?? {}
-        map[sessionId] = record
-        await writeJson('review-state.json', map)
+        await jsonTransact<Record<string, ReviewStateRecord>>('review-state.json', current => ({ ...(current ?? {}), [sessionId]: record }))
       })
     },
 
@@ -94,9 +107,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async saveCuratorState(record) {
       await mutate(async () => {
-        const map = await readJson<Record<string, CuratorStateRecord>>('curator-state.json') ?? {}
-        map.primary = record
-        await writeJson('curator-state.json', map)
+        await jsonTransact<Record<string, CuratorStateRecord>>('curator-state.json', current => ({ ...(current ?? {}), primary: record }))
       })
     },
 
@@ -109,48 +120,65 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async savePending(record) {
       await mutate(async () => {
-        const map = await loadPendingMap()
-        map[record.id] = record
-        await writeJson('pending-state.json', map)
+        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const map = { ...(legacy ?? {}), ...(current ?? {}), [record.id]: record }
+          return map
+        })
       })
     },
 
     async claimPending(id, claimId) {
       return await mutate(async () => {
-        const map = await loadPendingMap()
-        const record = map[id] ?? null
-        if (record === null || record.status !== 'pending') return null
-        const now = Date.now()
-        const claimedAt = typeof record.claimedAt === 'string' ? Date.parse(record.claimedAt) : 0
-        if (record.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < 10 * 60_000) return null
-        record.claimedBy = claimId
-        record.claimedAt = new Date(now).toISOString()
-        await writeJson('pending-state.json', map)
-        return { ...record }
+        const slot = { claimed: null as PendingRecord | null }
+        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const map = { ...(legacy ?? {}), ...(current ?? {}) }
+          const record = map[id] ?? null
+          if (record === null || record.status !== 'pending') return map
+          const now = Date.now()
+          const claimedAt = typeof record.claimedAt === 'string' ? Date.parse(record.claimedAt) : 0
+          if (record.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < 10 * 60_000) return map
+          slot.claimed = { ...record, claimedBy: claimId, claimedAt: new Date(now).toISOString() }
+          map[id] = slot.claimed
+          return map
+        })
+        return slot.claimed ? { ...slot.claimed } : null
       })
     },
 
     async releasePendingClaim(id, claimId) {
       await mutate(async () => {
-        const map = await loadPendingMap()
-        const record = map[id]
-        if (record && record.status === 'pending' && record.claimedBy === claimId) {
-          delete record.claimedBy
-          delete record.claimedAt
-          await writeJson('pending-state.json', map)
-        }
+        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const map = { ...(legacy ?? {}), ...(current ?? {}) }
+          const record = map[id]
+          if (record && record.status === 'pending' && record.claimedBy === claimId) {
+            delete record.claimedBy
+            delete record.claimedAt
+          }
+          return map
+        })
       })
     },
 
     async tryResolvePending(id, status): Promise<PendingResolution> {
       return await mutate(async () => {
-        const map = await loadPendingMap()
-        const record = map[id] ?? null
-        if (record === null || record.status !== 'pending') return { record, applied: false }
-        record.status = status
-        record.resolvedAt = new Date().toISOString()
-        await writeJson('pending-state.json', map)
-        return { record, applied: true }
+        let result: PendingResolution = { record: null, applied: false }
+        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const map = { ...(legacy ?? {}), ...(current ?? {}) }
+          const record = map[id] ?? null
+          if (record === null || record.status !== 'pending') {
+            result = { record, applied: false }
+            return map
+          }
+          const resolved = { ...record, status, resolvedAt: new Date().toISOString() }
+          map[id] = resolved
+          result = { record: resolved, applied: true }
+          return map
+        })
+        return result
       })
     },
   }

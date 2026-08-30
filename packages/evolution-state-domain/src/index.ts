@@ -10,7 +10,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
-import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
+import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 
@@ -140,8 +140,12 @@ export function apply(ctx: Context): void {
           return slot.record
         })
         return slot.record
-      } catch {
-        return null
+      } catch (error: unknown) {
+        // Missing key is the benign "no such pending record" outcome; a
+        // closed domain or backend failure must surface so approval reports
+        // the real cause instead of "already being resolved" (v3-audit M-9).
+        if (error instanceof DomainError && error.code === 'missing-key') return null
+        throw error
       }
     },
 
@@ -169,8 +173,10 @@ export function apply(ctx: Context): void {
         })
         if (resolved.record === null) return { record: record.status === status ? record : null, applied: false }
         return { record: resolved.record, applied: true }
-      } catch {
-        return { record: null, applied: false }
+      } catch (error: unknown) {
+        // v3-audit M-9: only missing-key is benign; closed/backend errors propagate.
+        if (error instanceof DomainError && error.code === 'missing-key') return { record: null, applied: false }
+        throw error
       }
     },
   }

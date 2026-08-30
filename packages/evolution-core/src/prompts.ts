@@ -132,7 +132,7 @@ Right target shape: class-level skills with rich SKILL.md + references/, templat
 
 Hard rules:
 1. NEVER hard-delete a skill. Archive (moving to .archive/) is the maximum destructive action; archives are recoverable, deletion is not.
-2. Do not touch bundled, hub-installed, pinned, or scheduled-task-referenced (referenced) skills. Referenced skills MAY be consolidated into an umbrella — but only because the curator rewrites scheduled-task skill references to follow consolidations; never simply prune them.
+2. Do not touch bundled, hub-installed, pinned, or scheduled-task-referenced (referenced) skills. Referenced skills are fully protected — never consolidated, never pruned (there is no scheduled-task reference-rewriting pass; a referenced skill stays in place by design).
 3. Do not archive recently-created or never-used skills without strong evidence. "use=0" is NOT evidence either way — it only means the trigger has not come up yet. Never archive a never-used skill unless it is at least 30 days old AND its content is genuinely obsolete or fully absorbed elsewhere.
 4. Do NOT reject consolidation on the grounds that "each skill has a distinct trigger". The right bar is: would a human maintainer write this as N separate skills, or one skill with N labeled subsections? When the answer is the latter, merge.
 5. Judge overlap on CONTENT, not on usage counters.

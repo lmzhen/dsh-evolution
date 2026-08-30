@@ -975,4 +975,37 @@ Body of ${name}.
     }
   })
 
+  it('latestReport picks the newest by startedAt, not by filename order (M-4)', { timeout: 20_000 }, async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-latest-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const reportsRoot = join(home, 'evolution', 'reports')
+      await mkdir(reportsRoot, { recursive: true })
+      const base = {
+        schemaVersion: 1,
+        staleCandidates: [],
+        llmNominations: [],
+        archiveCandidates: [],
+        archived: [],
+        failed: [],
+      }
+      // Filenames sort "z" BEFORE "a" lexicographically; the newer run carries
+      // the "a" name — latestReport must follow startedAt, not the file names.
+      await nodeEvolutionIo().writeText(join(reportsRoot, 'curator-zzzz.json'), JSON.stringify({ ...base, runId: 'older', startedAt: '2026-08-29T01:00:00.000Z', finishedAt: '2026-08-29T01:00:00.000Z' }))
+      await nodeEvolutionIo().writeText(join(reportsRoot, 'curator-aaaa.json'), JSON.stringify({ ...base, runId: 'newer', startedAt: '2026-08-29T10:00:00.000Z', finishedAt: '2026-08-29T10:00:00.000Z' }))
+      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+      const report = await ctx.evolutionCurator.latestReport()
+      expect(report?.runId).toBe('newer')
+      ctx.evolutionCurator.stop()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
 })

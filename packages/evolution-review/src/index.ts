@@ -247,9 +247,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // Everything after start() sits in a try/finally so the child run is
       // disposed on every exit path (success, timeout, validation throw).
       try {
-        const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
         const result = await run.result
         if (!result.structured) return true
+        // M-4 (v3 audit): collect AFTER the subagent finished so its own
+        // `skill` reads are visible to read-before-write (session events of
+        // the child never reach the parent; the child session must be read
+        // before dispose).
+        const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
         const snapshot = policy()
         const plan: unknown = result.structured
         const policyFingerprint = fingerprintPolicy(snapshot)

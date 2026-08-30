@@ -154,7 +154,9 @@ export const name = 'evolution-learning-graph'
 export function apply(ctx: Context): void {
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
-    commands.register({
+    // M-11 (v3 audit): the register disposer must be bound to the fiber — an
+    // unbound registration survives HMR/reload and duplicates the command.
+    commandCtx.effect(() => commands.register({
       name: 'graph',
       description: 'Show the learning graph, or act on a node: graph [detail|edit|delete] <nodeId>',
       recordInput: false,
@@ -247,6 +249,6 @@ export function apply(ctx: Context): void {
           return result.ok ? ok(result.message) : err(result.message)
         }
       },
-    })
+    }), 'evolution-learning-graph.command')
   })
 }

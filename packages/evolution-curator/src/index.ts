@@ -11,7 +11,7 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import { loadUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { loadUsage, mutateUsage, saveUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
@@ -739,7 +739,13 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       }
     }
     try {
-      await saveUsage(root, usage, this.io)
+      // M-5 (v3 audit): the curator folds its authoritative records through
+      // the same transact-backed mutateUsage the tool side uses — a plain
+      // whole-map write would clobber a concurrent usage bump between our
+      // load (run start) and this save.
+      await mutateUsage(root, this.io, (disk) => {
+        for (const [name, record] of usage) disk.set(name, record)
+      })
     } catch {
       // Best-effort: curation decisions already landed; a failed usage flush
       // must not surface as a run error after the fact.
@@ -815,10 +821,24 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
 
   async latestReport(): Promise<CuratorRunReport | null> {
     const reportsRoot = join(evolutionHome(), 'reports')
-    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json')).sort().reverse()
-    const latest = names[0]
-    if (!latest) return null
-    const raw = await this.io.readText(join(reportsRoot, latest))
+    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json')).sort()
+    // M-4 (v3 audit): filenames carry randomUUIDs — lexicographic order is
+    // NOT chronological. Read each report's own startedAt (retention keeps 20).
+    let latest: { name: string; startedAt: number } | null = null
+    for (const name of names) {
+      const raw = await this.io.readText(join(reportsRoot, name))
+      if (raw === null) continue
+      try {
+        const parsed = JSON.parse(raw) as { startedAt?: string }
+        const startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : 0
+        if (!Number.isFinite(startedAt)) continue
+        if (latest === null || startedAt > latest.startedAt) latest = { name, startedAt }
+      } catch {
+        // Unreadable reports are skipped (retention refuses to classify them too).
+      }
+    }
+    if (latest === null) return null
+    const raw = await this.io.readText(join(reportsRoot, latest.name))
     if (raw === null) return null
     try { return JSON.parse(raw) as CuratorRunReport } catch { return null }
   }

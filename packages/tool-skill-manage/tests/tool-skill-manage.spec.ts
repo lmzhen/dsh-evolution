@@ -210,6 +210,36 @@ describe('tool-skill-manage', () => {
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
   })
+
+  it('action=edit gets the same authoring strict gate as create/update (M-1)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-strict-edit-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      await mountAgentLoopTestDependencies(ctx)
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(SkillUsageRegistry, { root })
+      await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
+      const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
+      // edit routes to the same full-content update as update — the gate must not be bypassable.
+      const result = await ctx.tools.execute({
+        callId: CallId(`edit-strict-${Math.random()}`),
+        name: 'skill_manage',
+        arguments: { action: 'edit', name: 'edit-strict', content: SKILL.replace('boundary-skill', 'edit-strict').replace('lifecycle boundary test', over) },
+        agent: fakeAgent(undefined),
+        signal: new AbortController().signal,
+      })
+      expect((result.value as { ok?: boolean } | undefined)?.ok).toBe(false)
+      expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+      await ctx.fiber.dispose()
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 
