@@ -252,6 +252,38 @@ describe('evolution-feedback', () => {
     }
   })
 
+  it('archives suppress legacy migration: a deleted active is not re-synthesized (rc.71)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-archive-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      // Truth lives in the archive (seq 1-2); the active is gone.
+      await io.writeText(join(home, 'evolution', 'events-2.json'), JSON.stringify({ version: 1, events: [
+        { seq: 1, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: 'old-skill', kind: 'skill', rating: 'negative' },
+        { seq: 2, at: '2026-01-01T00:00:01.000Z', type: 'feedback', target: 'old-skill', kind: 'skill', rating: 'positive' },
+      ] }, null, 2))
+      // A legacy aggregate that WOULD be synthesized if migration ran.
+      await io.writeText(join(home, 'evolution', 'feedback.json'), JSON.stringify({ skills: { 'ghost-skill': { positive: 5, negative: 0 } }, sessions: {} }))
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      // Migration suppressed: the ghost aggregate never materializes, the
+      // archive timeline is the truth, and the active stays absent.
+      expect(feedback.snapshot().skills['ghost-skill']).toBeUndefined()
+      expect(feedback.snapshot().skills['old-skill']).toMatchObject({ positive: 1, negative: 1 })
+      expect(await io.readText(eventsPath)).toBeNull()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('an empty event log is rebuilt on the next record (rc.69)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-empty-'))
     const previous = process.env.DSH_HOME

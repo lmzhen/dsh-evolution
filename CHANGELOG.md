@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — rc.71: event-log rotation (007 design)
+
+The audit-v5 §3 growth warning is resolved by split rotation — the active log is bounded so a single append is O(active) instead of O(total-history).
+
+- **Split rotation inside the append transact** (`appendEvolutionEvent`, `rotateAt` default `EVENT_LOG_ROTATE_AT=4000`): when the active reaches the threshold, the older half is copied to `events-<lastArchivedSeq>.json` (its own lock file — no recursion) and the active is replaced with the newer half + the new event; seqs stay globally monotonic. An archive-write failure aborts the append (active keeps the full old content — no loss). `rotateAt` is a per-call knob (tests use small values; not a config surface).
+- **Crash-safe by seq-dedupe**: the boot timeline (`readEvolutionTimeline` = active + all archives, merged by seq — active copy wins, sorted ascending) makes the crash window (archive written, active rewrite failed) yield the identical timeline — no double counts, no loss. Per-file `malformed` flag as rc.70-F-1; a malformed archive is skipped, never bricks the boot.
+- **Retention**: `EVENT_LOG_RETAIN_ARCHIVES=10` at rotation, pruned NUMERICALLY (names carry the last archived seq — `events-10` must not outrank `events-2`); best-effort per removal; a concurrent boot read races a delete safely (missing = skipped).
+- **Migration condition tightened**: legacy synthesis runs only when the active is absent AND no archive exists — with archives present the archive timeline is the truth, so a manually deleted active is never re-synthesized from the cache.
+- **Consumers**: feedback `restore()`/`persistCache()` read the timeline (folds unchanged — they consume a seq-sorted array); boot cost calibrated: active parse bounded, total parse O(history) (~100-200ms at 10⁵ events — acceptable; NDJSON+offset index deferred to the 10⁶ scale).
+- Tests: threshold rotation (archive/active split, seq continuity, 5-event timeline), crash-window dedupe, numeric retention (12 → 10 keeps 3..12), archives-suppress-migration.
+
 ## Unreleased — rc.70: audit-v5 batch (all seven findings)
 
 - **F-1 (P2, malformed-gate inconsistency)**: read and append now agree on ONE boundary — "malformed" means NOT VALID JSON (refused on append, bytes untouched); well-formed JSON with a damaged `events` field is REPLACEABLE garbage (reads empty, rebuilt at the next append); a single damaged entry is normalized away at the next append while valid entries survive (self-heal semantics, matching the usage sidecar's per-entry normalization on read). Tests: shape-damage reads empty + rebuilds, damaged-entry drop with valid-entry survival.

@@ -17,9 +17,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, parseEvolutionEvents, readEvolutionEvents, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, EVENT_ARCHIVE_PREFIX, eventsFile, evolutionIoAdapter, parseEvolutionEvents, readEvolutionTimeline, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -71,14 +71,16 @@ export class EvolutionFeedback {
     if (!path || !eventsPath) return
     await this.mutate(async () => {
       const rawEvents = await io.readText(eventsPath)
-      // Migration (rc.68/rc.69, idempotent + race-safe): no event log yet —
-      // fold whatever aggregate exists (legacy v1 or v2 cache) into synthetic
-      // events. rc.69: a concurrent first writer may create the log between
-      // this read and the transact — when the log does not already START with
-      // the expected legacy sequence, the sequence is APPENDED (seq shifted)
-      // instead of dropped, so neither the concurrent events nor the legacy
-      // history is lost.
-      if (rawEvents === null || rawEvents.trim() === '') {
+      // Migration (rc.68/rc.69, idempotent + race-safe): no event log AND no
+      // archive yet — fold whatever aggregate exists (legacy v1 or v2 cache)
+      // into synthetic events. rc.71: with archives present the truth lives in
+      // the archive timeline, so a manually deleted active file must never be
+      // re-synthesized from the cache. rc.69: a concurrent first writer that
+      // created the log in the race window is handled by the merge in
+      // migrateFeedbackEvents (append, never drop).
+      const archiveNames = (await io.list(dirname(eventsPath))).filter(name => name.startsWith(EVENT_ARCHIVE_PREFIX) && name.endsWith('.json'))
+      const noLog = rawEvents === null || rawEvents.trim() === ''
+      if (noLog && archiveNames.length === 0) {
         const aggregate = parseAggregate(await io.readText(path))
         if (aggregate) {
           try {
@@ -89,7 +91,7 @@ export class EvolutionFeedback {
           }
         }
       }
-      const { events } = await readEvolutionEvents(io, eventsPath)
+      const { events } = await readEvolutionTimeline(io, eventsPath)
       const cache = parseCache(await io.readText(path))
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       const truth = cache ? foldWithDelta(cache, events) : foldFeedbackState(events)
@@ -166,7 +168,7 @@ export class EvolutionFeedback {
     if (!path || !eventsPath || !recordIo) return Promise.resolve()
     return this.mutate(async () => {
       try {
-        const { events } = await readEvolutionEvents(recordIo, eventsPath)
+        const { events } = await readEvolutionTimeline(recordIo, eventsPath)
         const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
         if (maxSeq === 0) return
         await recordIo.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events) }, null, 2))
