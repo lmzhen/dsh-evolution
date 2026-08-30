@@ -97,9 +97,10 @@ export function nodeEvolutionIo(): EvolutionIoLike {
   /**
    * Cross-process write lock (claw `withFileLock` parity): an O_EXCL lock file
    * guards the atomic write; a >5s-old lock is treated as stale and taken
-   * over. After the retry budget the write proceeds unlocked — the lock is a
-   * best-effort accommodation for multi-process deployments, never a read of
-   * availability.
+   * over. A held lock that outlasts the retry budget fails LOUD instead of
+   * proceeding unlocked — two unlocked writers overlap their RMW and lose
+   * updates, which is exactly how the rc.65 CI-only 7≠8 occurred (a slow
+   * writer held the lock past the budget and a peer entered unlocked).
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
@@ -126,7 +127,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         await new Promise(resolve => setTimeout(resolve, 50))
       }
     }
-    return await task()
+    throw new Error(`could not acquire write lock for ${path} after 10 attempts`)
   }
   return {
     async readText(path) {
