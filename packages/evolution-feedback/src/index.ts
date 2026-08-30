@@ -38,9 +38,11 @@ export class EvolutionFeedback {
   private state: FeedbackState = { skills: {}, sessions: {} }
   private chain: Promise<unknown> = Promise.resolve()
   private readonly path?: string
+  private readonly io: IoLike | undefined
 
   constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh'), pathOverride?: string) {
     if (io) this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
+    this.io = io
   }
 
   private mutate<T>(task: () => Promise<T>): Promise<T> {
@@ -57,8 +59,9 @@ export class EvolutionFeedback {
       if (raw === null) return
       try {
         const parsed = JSON.parse(raw) as Partial<FeedbackState>
-        // MERGE instead of replace: records written before the (background)
-        // restore settled must not be clobbered by a stale disk snapshot.
+        // MERGE disk into memory, memory wins (rc.66): a record() that landed
+        // before the restore settled must survive — the disk is the older
+        // view, the optimistic in-memory count the newer one.
         this.state = {
           skills: { ...parsed.skills, ...this.state.skills },
           sessions: { ...parsed.sessions, ...this.state.sessions },
@@ -70,12 +73,42 @@ export class EvolutionFeedback {
   }
 
   record(target: string, rating: 'positive' | 'negative', note?: string, kind: 'skill' | 'session' = 'session', io?: IoLike): void {
-    const table = kind === 'skill' ? this.state.skills : this.state.sessions
+    const mode = kind === 'skill' ? 'skills' : 'sessions'
+    // Optimistic in-memory update: score()/quality read it synchronously.
+    const table = this.state[mode]
     const current = table[target] ?? { positive: 0, negative: 0 }
     current[rating] += 1
     if (note !== undefined) current.lastNote = note
     table[target] = current
-    if (io && this.path) void this.flush(io)
+    const recordIo = io ?? this.io
+    const path = this.path
+    if (!recordIo || !path) return
+    // rc.66 (v3-audit P3-①): the count increment lands INSIDE the transact —
+    // the same locked RMW pattern as memory/activity/state-json, so two
+    // processes recording the same target can no longer lose an increment.
+    // The snapshot settles to the on-disk truth after the write.
+    void this.mutate(async () => {
+      try {
+        await transactIo(recordIo, path, (raw) => {
+          // Malformed sidecars are never overwritten (rc.65 protection).
+          if (raw !== null) {
+            try { JSON.parse(raw) } catch { return Promise.resolve(raw) }
+          }
+          const diskState = parseState(raw)
+          const diskTable = diskState[mode]
+          const diskRec = diskTable[target] ?? { positive: 0, negative: 0 }
+          diskRec[rating] += 1
+          if (note !== undefined) diskRec.lastNote = note
+          diskTable[target] = diskRec
+          this.state = diskState
+          return Promise.resolve(JSON.stringify(diskState, null, 2))
+        })
+      } catch (error: unknown) {
+        // Best-effort: the optimistic count stays (recoverable on the next
+        // successful record); a persistence failure must not throw.
+        void error
+      }
+    })
   }
 
   score(target: string, kind: 'skill' | 'session' = 'session'): number {
@@ -94,19 +127,9 @@ export class EvolutionFeedback {
     }
   }
 
-  async flush(io?: IoLike): Promise<void> {
-    const path = this.path
-    if (!path || !io) return
-    await this.mutate(async () => {
-      // Sidecar transaction (P1-③): the flush merges with whatever another
-      // process persisted — a full overwrite would drop another process's
-      // records (same interleave class as activity before rc.58).
-      await transactIo(io, path, (current) => {
-        const merged = mergeStates(parseState(current), this.state)
-        this.state = merged
-        return Promise.resolve(JSON.stringify(merged, null, 2))
-      })
-    })
+  /** Await the pending record-task chain (unload safety; rc.66). */
+  waitIdle(): Promise<unknown> {
+    return this.chain
   }
 }
 
@@ -121,20 +144,6 @@ function parseState(raw: string | null): FeedbackState {
     }
   } catch {
     return { skills: {}, sessions: {} }
-  }
-}
-
-/** Deep-merge two feedback states: union by target; in-memory values win on
- * conflict. NOTE (v3 audit P3 reviewed): additive counting was rejected — a
- * restart merge (restore+flush) would double-count the same records, and a
- * stateless JSON sidecar cannot distinguish "two processes incrementing the
- * same target" from "the same record seen twice". Cross-process same-target
- * increments stay a documented limitation; an append-only event log would be
- * the real fix. */
-function mergeStates(disk: FeedbackState, memory: FeedbackState): FeedbackState {
-  return {
-    skills: { ...disk.skills, ...memory.skills },
-    sessions: { ...disk.sessions, ...memory.sessions },
   }
 }
 
@@ -187,9 +196,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.effect(() => () => {
-    // Return the flush promise so cordis awaits it during plugin unload
-    // (rc.50 P2-12): a fire-and-forget flush could lose the last records when
-    // the fiber tears down right after a record().
-    if (io) return feedback.flush(io)
-  }, 'evolution-feedback.flush')
+    // rc.66: records land inside the transact, so no flush is needed at
+    // unload — wait for the pending record task chain instead (the same
+    // fire-and-forget safety rc.50 P2-12 provided via flush).
+    return feedback.waitIdle()
+  }, 'evolution-feedback.records')
 }

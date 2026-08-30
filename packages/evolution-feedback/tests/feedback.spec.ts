@@ -101,4 +101,31 @@ describe('evolution-feedback', () => {
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
   })
+
+  it('two instances recording the same target never lose an increment (rc.66)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-rc66-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const a = new Feedback.EvolutionFeedback(io, home)
+      const b = new Feedback.EvolutionFeedback(io, home)
+      // Two "processes" record the same skill concurrently: each increment
+      // runs inside the transact, so both counts survive.
+      for (let i = 0; i < 4; i += 1) {
+        a.record('shared-skill', 'positive', undefined, 'skill', io)
+        b.record('shared-skill', 'positive', undefined, 'skill', io)
+      }
+      await Promise.all([a.waitIdle(), b.waitIdle()])
+      const disk = JSON.parse(await io.readText(join(home, 'evolution', 'feedback.json')) ?? '{}') as { skills?: Record<string, { positive: number }> }
+      expect(disk.skills?.['shared-skill']?.positive).toBe(8)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
 })

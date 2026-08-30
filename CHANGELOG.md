@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — rc.66: hanging-limit closeout (feedback transactional counts + lock liveness probe)
+
+The four documented hangover items analysis concluded two were real and solvable with existing platform interfaces; both now landed.
+
+- **feedback counts are transactional (was P3-①)**: `EvolutionFeedback.record` no longer accumulates in memory and flushes an overwrite — each increment runs INSIDE the transact (locked read → +1 → write), the same pattern as memory/activity/state-json. The in-memory state is now a read snapshot (settling to the on-disk truth after each locked write) with a synchronous optimistic update so `score()`/`setQuality` stays immediately consistent; malformed sidecars are still never overwritten; the old `flush` merge path is retired (each record is already durable) and unload now awaits the record task chain (`waitIdle`). The cross-process same-target lost-increment limitation is gone — regression test: two instances recording the same skill concurrently end with the exact sum on disk.
+- **write-lock liveness probe (was P3-②)**: the >5s stale-lock takeover now reads the holder pid from the lock file and probes it with `process.kill(pid, 0)` — a LIVE holder is never stolen (a slow writer keeps its lock across the 5s mark), a GONE pid is taken over. The only remaining best-effort surface is pid-reuse-level; the retry budget still fails loud (rc.65). Tests: live-holder refusal, gone-pid takeover, plus the updated stale test.
+- **reviewProvider note (was audit misreport)**: the schemastery field is documented as optional-by-default, matching the interface and the "Omit to inherit" doc.
+
 ## Unreleased — rc.65: v3-audit P3 batch (dead code, data boundaries, interface/doc hardening)
 
 - **Dead-code privatized (5, test-free)**: `EVOLUTION_SKILL_RANK`, `CAPABILITY_NAME_RE`, `scorePlan`, `collectReadSkillNames`, `COUNTER_SWEEP_THRESHOLD` lost their exports (module-private helpers). Test-consumed exports (`gateConsolidations`, `shouldCompletionReview`, `filterUnreadSkillOps`, `sweepDeadSessionEntries`, `graphDensity`) were verified against the audit's own rule and left exported — test infrastructure, not dead code.

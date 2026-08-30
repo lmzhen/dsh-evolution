@@ -94,13 +94,23 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     const code = (error as NodeJS.ErrnoException | undefined)?.code
     return code === 'ENOENT' || code === 'ENOTDIR'
   }
+  /** True when the pid is alive (EPERM = alive but unowned; ESRCH = gone). */
+  const isAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (error) {
+      return (error as NodeJS.ErrnoException | undefined)?.code === 'EPERM'
+    }
+  }
+
   /**
    * Cross-process write lock (claw `withFileLock` parity): an O_EXCL lock file
-   * guards the atomic write; a >5s-old lock is treated as stale and taken
-   * over. A held lock that outlasts the retry budget fails LOUD instead of
-   * proceeding unlocked — two unlocked writers overlap their RMW and lose
-   * updates, which is exactly how the rc.65 CI-only 7≠8 occurred (a slow
-   * writer held the lock past the budget and a peer entered unlocked).
+   * guards the atomic write. A >5s-old lock is taken over ONLY after probing
+   * the holder pid it carries (rc.66): a LIVE holder is never stolen, so a
+   * slow writer no longer loses its lock to a peer at the 5s mark (the
+   * takeover is the only best-effort surface; the retry budget fails loud —
+   * rc.65 — instead of ever proceeding unlocked).
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
@@ -118,8 +128,12 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         try {
           const st = await stat(lock)
           if (Date.now() - st.mtimeMs > 5000) {
-            try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
-            continue
+            const holder = Number((await readFile(lock, 'utf8').catch(() => '')))
+            const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
+            if (!holderAlive) {
+              try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
+              continue
+            }
           }
         } catch {
           continue // the lock vanished between fails

@@ -20,12 +20,38 @@ it('nodeEvolutionIo.writeText takes over a stale lock (5s) and still writes', as
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-stale-'))
   const io = nodeEvolutionIo()
   const target = join(root, 'stale.txt')
-  await writeFile(`${target}.lock`, '9999', 'utf8')
+  // A pid that cannot exist: the lock is stale AND holderless (rc.66 probe).
+  await writeFile(`${target}.lock`, '999999', 'utf8')
   const old = new Date(Date.now() - 60_000)
   await utimes(`${target}.lock`, old, old)
   await io.writeText(target, 'fresh')
   expect(await readFile(target, 'utf8')).toBe('fresh')
   expect((await io.readText(`${target}.lock`))).toBeNull()
+  await rm(root, { recursive: true, force: true })
+})
+
+it('nodeEvolutionIo never steals a lock from a LIVE holder older than 5s (rc.66)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-live-lock-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'live.txt')
+  // The current process is alive: the probe must refuse the takeover even
+  // though the lock looks stale by age.
+  await writeFile(`${target}.lock`, String(process.pid), 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock`, old, old)
+  await expect(io.writeText(target, 'fresh')).rejects.toThrow(/could not acquire write lock/)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('nodeEvolutionIo takes over a stale lock from a GONE pid (rc.66)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-gone-lock-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'gone.txt')
+  await writeFile(`${target}.lock`, '999999', 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock`, old, old)
+  await io.writeText(target, 'fresh')
+  expect(await readFile(target, 'utf8')).toBe('fresh')
   await rm(root, { recursive: true, force: true })
 })
 

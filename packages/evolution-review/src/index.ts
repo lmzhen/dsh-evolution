@@ -54,6 +54,8 @@ export const Config: z<Config> = z.object({
   reviewContextMessages: z.number().default(60),
   reviewMessageChars: z.number().default(2000),
   reviewMaxDepth: z.number().default(0),
+  // (rc.66 note) schemastery fields are optional by default — the interface
+  // `reviewProvider?` and this schema agree; "Omit to inherit" holds.
   reviewProvider: z.string(),
   skillReviewTrigger: z.string().default(DEFAULT_SKILL_REVIEW_TRIGGER),
   skillReviewCompletionMinToolCalls: z.number().default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
