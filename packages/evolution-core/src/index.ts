@@ -9,6 +9,7 @@
  */
 
 export * from './curator.ts'
+export * from './evolution-events.ts'
 export * from './gates.ts'
 export * from './events.ts'
 export * from './io.ts'

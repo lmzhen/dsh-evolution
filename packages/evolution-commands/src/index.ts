@@ -4,7 +4,9 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { buildLearnPrompt } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, eventsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 export const name = 'evolution-commands'
 
@@ -130,6 +132,15 @@ export function apply(ctx: Context): void {
             content: [{ type: 'text', text: buildLearnPrompt(request) }],
             source: { kind: 'plugin', plugin: 'dsh-evolution-commands', form: 'notice', summary: 'learn request' },
           })
+          // rc.68: the learn action joins the event timeline (the loop
+          // substrate). Soft probe: without the io registry the log is
+          // skipped and the inject is never blocked.
+          const registry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const eventIo = registry?.provider()
+          if (eventIo) {
+            const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+            void appendEvolutionEvent(eventIo, eventsFile(home), { type: 'learn', source: 'manual', ...(request ? { request } : {}) }).catch((error: unknown) => { void error })
+          }
           return ok('Learning request sent to this session. Follow it now.')
         }
         if (input === 'replay') {

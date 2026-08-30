@@ -12,6 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const INVENTORY: Array<{ file: string; marker: string }> = [
   { file: 'evolution-core/src/usage.ts', marker: 'mutateUsage' },
   { file: 'evolution-core/src/usage.ts', marker: 'updateSuppressedNames' },
+  { file: 'evolution-core/src/evolution-events.ts', marker: 'appendEvolutionEvent' },
   { file: 'evolution-core/src/mutations.ts', marker: 'recordMutation' },
   { file: 'evolution-activity/src/index.ts', marker: 'transactIo' },
   { file: 'evolution-feedback/src/index.ts', marker: 'transactIo' },
@@ -32,8 +33,8 @@ describe('sidecar transaction inventory (P1-③ decisions.md §8.3)', () => {
   })
 
   it('the inventory stays in lockstep with the decisions.md list count', async () => {
-    // The documented list names five sidecars + the memory files: usage /
-    // mutations / suppressed / activity / feedback (+ memory-store media).
-    expect(INVENTORY.length).toBeGreaterThanOrEqual(6)
+    // The documented list names the sidecars: usage / mutations / suppressed /
+    // activity / feedback (+ memory media) plus the rc.68 event log.
+    expect(INVENTORY.length).toBeGreaterThanOrEqual(7)
   })
 })

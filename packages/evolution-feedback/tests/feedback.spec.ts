@@ -69,12 +69,12 @@ describe('evolution-feedback', () => {
     await ctx.plugin(NodeIo)
     const io = ctx.evolutionIo.provider('node')
     const path = join(home, 'evolution', 'feedback.json')
-    // Pre-existing disk state: one old positive.
+    // Pre-existing aggregate state: one old positive (legacy v1 shape).
     await io.writeText(path, JSON.stringify({ skills: { 'old-skill': { positive: 1, negative: 0 } }, sessions: {} }))
     const feedback = new Feedback.EvolutionFeedback(io, home)
     // Simulate the startup race: restore is already in flight when a record lands.
     const restoring = feedback.restore(io)
-    feedback.record('new-skill', 'positive', undefined, 'skill', io)
+    feedback.record('new-skill', 'positive', undefined, 'skill')
     await restoring
     await new Promise(resolve => setTimeout(resolve, 20))
     const snapshot = feedback.snapshot()
@@ -85,7 +85,7 @@ describe('evolution-feedback', () => {
     await rm(home, { recursive: true, force: true })
   })
 
-  it('ignores a malformed feedback file and stays functional', async () => {
+  it('ignores a malformed aggregate and still records into the event log', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-bad-'))
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = home
@@ -106,8 +106,8 @@ describe('evolution-feedback', () => {
     await rm(home, { recursive: true, force: true })
   })
 
-  it('two instances recording the same target never lose an increment (rc.66)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-rc66-'))
+  it('two instances recording the same target never lose an increment in the event log (rc.68)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-rc68-'))
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = home
     try {
@@ -117,15 +117,102 @@ describe('evolution-feedback', () => {
       const io = ctx.evolutionIo.provider('node')
       const a = new Feedback.EvolutionFeedback(io, home)
       const b = new Feedback.EvolutionFeedback(io, home)
-      // Two "processes" record the same skill concurrently: each increment
-      // runs inside the transact, so both counts survive.
+      // Two "processes" record the same skill concurrently: each append runs
+      // inside the transact, so both counts survive in the log.
       for (let i = 0; i < 4; i += 1) {
-        a.record('shared-skill', 'positive', undefined, 'skill', io)
-        b.record('shared-skill', 'positive', undefined, 'skill', io)
+        a.record('shared-skill', 'positive', undefined, 'skill')
+        b.record('shared-skill', 'positive', undefined, 'skill')
       }
       await Promise.all([a.waitIdle(), b.waitIdle()])
-      const disk = JSON.parse(await io.readText(join(home, 'evolution', 'feedback.json')) ?? '{}') as { skills?: Record<string, { positive: number }> }
-      expect(disk.skills?.['shared-skill']?.positive).toBe(8)
+      const disk = JSON.parse(await io.readText(join(home, 'evolution', 'events.json')) ?? '{}') as { events: Array<{ type?: string; target?: string; rating?: string }> }
+      const hits = disk.events.filter(event => event.type === 'feedback' && event.target === 'shared-skill' && event.rating === 'positive')
+      expect(hits).toHaveLength(8)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('migrates the legacy aggregate into the event log once and rebuilds the cache (rc.68)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-migrate-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    await io.writeText(cachePath, JSON.stringify({ skills: { 'old-skill': { positive: 2, negative: 1, lastNote: 'keep me' } }, sessions: {} }))
+    const first = new Feedback.EvolutionFeedback(io, home)
+    await first.restore(io)
+    await first.waitIdle()
+    expect(first.snapshot().skills['old-skill']).toMatchObject({ positive: 2, negative: 1, lastNote: 'keep me' })
+    const eventsRaw = JSON.parse(await io.readText(eventsPath) ?? '{}') as { events: Array<{ seq: number; type?: string; rating?: string }> }
+    expect(eventsRaw.events).toHaveLength(3)
+    expect(eventsRaw.events.filter(event => event.rating === 'positive')).toHaveLength(2)
+    expect(eventsRaw.events.every(event => typeof event.seq === 'number')).toBe(true)
+    // Idempotent: a second boot does not duplicate the log.
+    const second = new Feedback.EvolutionFeedback(io, home)
+    await second.restore(io)
+    await second.waitIdle()
+    const once = JSON.parse(await io.readText(eventsPath) ?? '{}') as { events: unknown[] }
+    expect(once.events).toHaveLength(3)
+    // The boot cache is now v2 with the truth fold.
+    const cache = JSON.parse(await io.readText(cachePath) ?? '{}') as { version?: number; lastSeq?: number }
+    expect(cache.version).toBe(2)
+    expect(cache.lastSeq).toBe(3)
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('an append after a booted cache does not double-count at the next boot (rc.68)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-delta-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const first = new Feedback.EvolutionFeedback(io, home)
+      await first.restore(io)
+      first.record('shared-skill', 'positive', undefined, 'skill')
+      await first.waitIdle()
+      // Second boot: the cache was written from the TRUTH (event fold only),
+      // so the incremental fold must yield exactly one count.
+      const second = new Feedback.EvolutionFeedback(io, home)
+      await second.restore(io)
+      await second.waitIdle()
+      expect(second.snapshot().skills['shared-skill']?.positive).toBe(1)
+      // And a fresh fold of the log agrees with the cached view.
+      const eventsRaw = JSON.parse(await io.readText(join(home, 'evolution', 'events.json')) ?? '{}') as { events: Array<{ rating?: string }> }
+      expect(eventsRaw.events.filter(event => event.rating === 'positive')).toHaveLength(1)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('a malformed event log refuses appends and keeps its bytes (rc.65 posture)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-events-bad-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await io.writeText(eventsPath, '{corrupt log')
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      feedback.record('session-1', 'positive')
+      await feedback.waitIdle()
+      expect(await io.readText(eventsPath)).toBe('{corrupt log')
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous

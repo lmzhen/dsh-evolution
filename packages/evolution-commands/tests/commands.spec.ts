@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('evolution-commands', () => {
   it('loads without the commands service mounted', async () => {
@@ -68,6 +72,38 @@ describe('evolution-commands', () => {
     const empty = await captured!.handler({ rawInput: 'learn', agent: { inject: (message: unknown) => injected.push(message) } })
     expect(empty.text).toContain('Learning request sent')
     expect((injected[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
+  })
+
+  it('records a learn event into the event log when the io registry is mounted (rc.68)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-cmd-learn-event-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          captured = definition as typeof captured
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      const injected: unknown[] = []
+      await ctx.plugin(Commands)
+      await captured!.handler({ rawInput: 'learn node packaging', agent: { inject: (message: unknown) => injected.push(message) } })
+      // The append is fire-and-forget; give the locked RMW a settle window.
+      await new Promise(resolve => setTimeout(resolve, 50))
+      const raw = await nodeEvolutionIo().readText(join(home, 'evolution', 'events.json'))
+      expect(raw).not.toBeNull()
+      const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; source?: string; request?: string }> }
+      expect(parsed.events).toHaveLength(1)
+      expect(parsed.events[0]).toMatchObject({ type: 'learn', source: 'manual', request: 'node packaging' })
+      expect(injected).toHaveLength(1)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
   })
 
   it('curator scope renders the lifecycle lists including quality-warned', async () => {

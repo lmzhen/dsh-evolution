@@ -4,6 +4,12 @@
  * Feedback is durable through `ctx.evolutionIo` (when mounted) and skill
  * feedback feeds `quality_score` / `quality_warn` on the usage record, so
  * curator decisions can consume it deterministically.
+ *
+ * Persistence (rc.68): the EVENTS LOG (`evolution/events.json`, via
+ * `evolution-core/evolution-events.ts`) is the single source of truth —
+ * every increment appends one event under the write lock. `feedback.json` is
+ * a rebuildable BOOT CACHE (`{ version: 2, lastSeq, skills, sessions }`),
+ * never the truth; the in-memory state is the optimistic aggregate.
  * @module @deepseek-ai/dsh-evolution-feedback
  */
 
@@ -11,7 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { evolutionIoAdapter, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, readEvolutionEvents, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -34,14 +40,22 @@ export interface FeedbackState {
 
 type IoLike = EvolutionIoLike
 
+const CACHE_VERSION = 2
+
 export class EvolutionFeedback {
   private state: FeedbackState = { skills: {}, sessions: {} }
   private chain: Promise<unknown> = Promise.resolve()
   private readonly path?: string
+  private readonly eventsPath?: string
   private readonly io: IoLike | undefined
 
   constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh'), pathOverride?: string) {
-    if (io) this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
+    if (io) {
+      // rc.68 + K-6: BOTH paths derive from the constructor surface only —
+      // record() takes no backend io, so path and io backend can never disagree.
+      this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
+      this.eventsPath = eventsFile(home)
+    }
     this.io = io
   }
 
@@ -53,26 +67,52 @@ export class EvolutionFeedback {
 
   async restore(io: IoLike): Promise<void> {
     const path = this.path
-    if (!path) return
+    const eventsPath = this.eventsPath
+    if (!path || !eventsPath) return
     await this.mutate(async () => {
-      const raw = await io.readText(path)
-      if (raw === null) return
-      try {
-        const parsed = JSON.parse(raw) as Partial<FeedbackState>
-        // MERGE disk into memory, memory wins (rc.66): a record() that landed
-        // before the restore settled must survive — the disk is the older
-        // view, the optimistic in-memory count the newer one.
-        this.state = {
-          skills: { ...parsed.skills, ...this.state.skills },
-          sessions: { ...parsed.sessions, ...this.state.sessions },
+      const rawEvents = await io.readText(eventsPath)
+      // Migration (rc.68, idempotent): no event log yet — fold whatever
+      // aggregate exists (legacy v1 or a v2 cache) into synthetic events so
+      // history starts from the old truth once. The first process to win the
+      // transact creates the log; a later boot sees it and skips migration.
+      if (rawEvents === null) {
+        const aggregate = parseAggregate(await io.readText(path))
+        if (aggregate) {
+          try {
+            await transactIo(io, eventsPath, (current) => {
+              if (current !== null) return Promise.resolve(current)
+              return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: synthesizeFeedbackEvents(aggregate) }, null, 2))
+            })
+          } catch {
+            // Best-effort: a failed migration means the log stays absent and
+            // history starts empty — the old aggregate is not re-booted.
+          }
         }
-      } catch {
-        // Malformed feedback is non-fatal; start with an empty state.
+      }
+      const { events } = await readEvolutionEvents(io, eventsPath)
+      const cache = parseCache(await io.readText(path))
+      const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
+      const truth = cache ? foldWithDelta(cache, events) : foldFeedbackState(events)
+      // Memory wins per record (rc.66 semantics): a record() that landed
+      // optimistically before this restore settled must survive.
+      this.state = {
+        skills: { ...truth.skills, ...this.state.skills },
+        sessions: { ...truth.sessions, ...this.state.sessions },
+      }
+      // Refresh the boot cache from the TRUTH, never from the memory-merged
+      // state — an optimistic record whose event is not yet on disk must not
+      // double-count at the next boot.
+      if (maxSeq > 0 && (!cache || cache.lastSeq < maxSeq)) {
+        try {
+          await io.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...truth }, null, 2))
+        } catch {
+          // Best-effort: the cache is disposable.
+        }
       }
     })
   }
 
-  record(target: string, rating: 'positive' | 'negative', note?: string, kind: 'skill' | 'session' = 'session', io?: IoLike): void {
+  record(target: string, rating: 'positive' | 'negative', note?: string, kind: 'skill' | 'session' = 'session'): void {
     const mode = kind === 'skill' ? 'skills' : 'sessions'
     // Optimistic in-memory update: score()/quality read it synchronously.
     const table = this.state[mode]
@@ -80,29 +120,15 @@ export class EvolutionFeedback {
     current[rating] += 1
     if (note !== undefined) current.lastNote = note
     table[target] = current
-    const recordIo = io ?? this.io
-    const path = this.path
-    if (!recordIo || !path) return
-    // rc.66 (v3-audit P3-①): the count increment lands INSIDE the transact —
-    // the same locked RMW pattern as memory/activity/state-json, so two
-    // processes recording the same target can no longer lose an increment.
-    // The snapshot settles to the on-disk truth after the write.
+    const recordIo = this.io
+    const eventsPath = this.eventsPath
+    if (!recordIo || !eventsPath) return
+    // rc.68: the increment is an EVENT APPEND under the write lock — the log
+    // is the truth, the aggregate is derived. A malformed log refuses the
+    // append (rc.65 posture) and the optimistic count stays.
     void this.mutate(async () => {
       try {
-        await transactIo(recordIo, path, (raw) => {
-          // Malformed sidecars are never overwritten (rc.65 protection).
-          if (raw !== null) {
-            try { JSON.parse(raw) } catch { return Promise.resolve(raw) }
-          }
-          const diskState = parseState(raw)
-          const diskTable = diskState[mode]
-          const diskRec = diskTable[target] ?? { positive: 0, negative: 0 }
-          diskRec[rating] += 1
-          if (note !== undefined) diskRec.lastNote = note
-          diskTable[target] = diskRec
-          this.state = diskState
-          return Promise.resolve(JSON.stringify(diskState, null, 2))
-        })
+        await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
       } catch (error: unknown) {
         // Best-effort: the optimistic count stays (recoverable on the next
         // successful record); a persistence failure must not throw.
@@ -131,20 +157,110 @@ export class EvolutionFeedback {
   waitIdle(): Promise<unknown> {
     return this.chain
   }
+
+  /** Rebuild the boot cache from the log truth (rc.68); best-effort. */
+  persistCache(): Promise<void> {
+    const path = this.path
+    const eventsPath = this.eventsPath
+    const recordIo = this.io
+    if (!path || !eventsPath || !recordIo) return Promise.resolve()
+    return this.mutate(async () => {
+      try {
+        const { events } = await readEvolutionEvents(recordIo, eventsPath)
+        const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
+        if (maxSeq === 0) return
+        await recordIo.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events) }, null, 2))
+      } catch {
+        // Best-effort: the cache is disposable.
+      }
+    })
+  }
 }
 
-/** Parse a raw feedback sidecar; malformed reads as empty (best-effort). */
-function parseState(raw: string | null): FeedbackState {
-  if (raw === null) return { skills: {}, sessions: {} }
+/** Parse a legacy aggregate (v1) or a v2 cache into a plain aggregate state. */
+function parseAggregate(raw: string | null): FeedbackState | null {
+  if (raw === null) return null
   try {
-    const parsed = JSON.parse(raw) as Partial<FeedbackState>
+    const parsed = JSON.parse(raw) as Partial<{ skills?: unknown; sessions?: unknown }>
+    const skills = isRecord(parsed.skills) ? parsed.skills as FeedbackState['skills'] : undefined
+    const sessions = isRecord(parsed.sessions) ? parsed.sessions as FeedbackState['sessions'] : undefined
+    if (!skills && !sessions) return null
+    return { skills: skills ?? {}, sessions: sessions ?? {} }
+  } catch {
+    return null
+  }
+}
+
+function parseCache(raw: string | null): { lastSeq: number; state: FeedbackState } | null {
+  if (raw === null) return null
+  try {
+    const parsed = JSON.parse(raw) as { version?: unknown; lastSeq?: unknown; skills?: unknown; sessions?: unknown }
+    if (parsed.version !== CACHE_VERSION || typeof parsed.lastSeq !== 'number') return null
+    if (!isRecord(parsed.skills) || !isRecord(parsed.sessions)) return null
     return {
-      skills: typeof parsed.skills === 'object' && !Array.isArray(parsed.skills) ? parsed.skills : {},
-      sessions: typeof parsed.sessions === 'object' && !Array.isArray(parsed.sessions) ? parsed.sessions : {},
+      lastSeq: parsed.lastSeq,
+      state: { skills: parsed.skills as FeedbackState['skills'], sessions: parsed.sessions as FeedbackState['sessions'] },
     }
   } catch {
-    return { skills: {}, sessions: {} }
+    return null
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Fold all feedback events from zero (the truth view). */
+function foldFeedbackState(events: EvolutionEvent[]): FeedbackState {
+  const state: FeedbackState = { skills: {}, sessions: {} }
+  for (const event of events) applyFeedbackEvent(state, event)
+  return state
+}
+
+/** Fold events after the cache's lastSeq onto the cached aggregates. */
+function foldWithDelta(cache: { lastSeq: number; state: FeedbackState }, events: EvolutionEvent[]): FeedbackState {
+  const state: FeedbackState = {
+    skills: { ...cache.state.skills },
+    sessions: { ...cache.state.sessions },
+  }
+  for (const event of events) {
+    if (event.seq > cache.lastSeq) applyFeedbackEvent(state, event)
+  }
+  return state
+}
+
+function applyFeedbackEvent(state: FeedbackState, event: EvolutionEvent): void {
+  if (event.type !== 'feedback') return
+  const target = event.target
+  if (target === undefined || event.rating === undefined) return
+  const table = event.kind === 'skill' ? state.skills : state.sessions
+  const record = table[target] ?? { positive: 0, negative: 0 }
+  record[event.rating] += 1
+  if (event.note !== undefined) record.lastNote = event.note
+  table[target] = record
+}
+
+/** Synthesize one event per aggregate count unit, lastNote on the final event (migration). */
+function synthesizeFeedbackEvents(aggregate: FeedbackState): EvolutionEvent[] {
+  const events: EvolutionEvent[] = []
+  const at = new Date().toISOString()
+  const emitTarget = (kind: 'skill' | 'session', target: string, record: FeedbackRecord): void => {
+    const first = events.length + 1
+    for (let index = 0; index < record.positive; index += 1) {
+      events.push({ seq: events.length + 1, at, type: 'feedback', kind, target, rating: 'positive' })
+    }
+    for (let index = 0; index < record.negative; index += 1) {
+      events.push({ seq: events.length + 1, at, type: 'feedback', kind, target, rating: 'negative' })
+    }
+    if (record.lastNote !== undefined && events.length >= first) {
+      const last = events.length - 1
+      const final = events[last]
+      if (final) events[last] = { ...final, note: record.lastNote }
+    }
+  }
+  for (const [target, record] of Object.entries(aggregate.skills)) emitTarget('skill', target, record)
+  for (const [target, record] of Object.entries(aggregate.sessions)) emitTarget('session', target, record)
+  return events
 }
 
 export const name = 'evolution-feedback'
@@ -152,7 +268,8 @@ export const name = 'evolution-feedback'
 export interface Config {
   /** Score below which curator receives quality_warn for a skill. */
   qualityWarnThreshold?: number
-  /** Explicit feedback file path; empty derives $DSH_HOME/evolution/feedback.json. */
+  /** Explicit boot-cache file path; empty derives $DSH_HOME/evolution/feedback.json
+   * (the event log is its sibling `events.json`). */
   path?: string
 }
 
@@ -167,8 +284,6 @@ interface SkillUsageLike {
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-  // Lazy adapter: forwards transact (P1-③) so flush merges with the disk
-  // state instead of overwriting another process's records.
   const io = ioRegistry ? evolutionIoAdapter(() => ioRegistry.provider()) : undefined
   const feedback = new EvolutionFeedback(io, process.env.DSH_HOME ?? join(homedir(), '.dsh'), rawConfig.path || undefined)
   if (io) {
@@ -183,8 +298,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const skillUsage = ctx.get('skillUsage') as SkillUsageLike | undefined
   if (skillUsage) {
     const original = feedback.record.bind(feedback)
-    feedback.record = (target, rating, note, kind, recordIo) => {
-      original(target, rating, note, kind ?? 'session', recordIo ?? io)
+    feedback.record = (target, rating, note, kind) => {
+      original(target, rating, note, kind ?? 'session')
       if (kind === 'skill') {
         const score = feedback.score(target, 'skill')
         const warn = score < (rawConfig.qualityWarnThreshold ?? -0.25)
@@ -196,9 +311,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.effect(() => () => {
-    // rc.66: records land inside the transact, so no flush is needed at
-    // unload — wait for the pending record task chain instead (the same
-    // fire-and-forget safety rc.50 P2-12 provided via flush).
-    return feedback.waitIdle()
+    // rc.68: the event log is the only durable write, but the boot cache is
+    // refreshed from the log truth at unload — plus the rc.66 waitIdle for
+    // pending appends so a slow CI cannot remove a file mid-write.
+    return Promise.all([feedback.persistCache(), feedback.waitIdle()])
   }, 'evolution-feedback.records')
 }

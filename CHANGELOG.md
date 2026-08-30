@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — rc.68: feedback event log — single source of truth (K-6 absorbed, /learn events)
+
+The rc.66 hangover's real fix (append-only event log) landed per the reviewed design (`docs/design-review/006-feedback-events-single-source.md`).
+
+- **Event log is the truth** (`$DSH_HOME/evolution/events.json`): new `evolution-core/evolution-events.ts` primitives (`eventsFile`/`appendEvolutionEvent`/`readEvolutionEvents`) — every feedback increment appends one `{ seq, at, type: 'feedback', kind, target, rating, note? }` event under the write lock (seq = max+1 inside the transact, cross-process unique; malformed logs refuse the append, rc.65 posture). `feedback.json` becomes a **rebuildable boot cache** `{ version: 2, lastSeq, skills, sessions }`, written only from the event-fold truth (never from the optimistic memory state — no phantom double-count at later boots); the in-memory state stays the optimistic aggregate with the rc.66 memory-wins restore semantics.
+- **Migration (idempotent)**: no event log yet → the existing aggregate (legacy v1 or v2 cache) is folded into synthetic events once (first process wins the transact, later boots see the log and skip), then the cache is rebuilt from the log. Tests: migration counts/notes, idempotence across two boots, cache-incremental fold never double-counts after an append, concurrent appends keep unique seq, malformed log bytes preserved.
+- **K-6 absorbed**: `record(target, rating, note?, kind?)` dropped the per-call `io` parameter — both paths derive from the constructor surface only (io backend + home), so path/backend mismatch is structurally impossible.
+- **/learn events**: the learn branch appends `{ type: 'learn', source: 'manual', request }` to the same timeline (soft-probed `evolutionIo` registry; the inject is never blocked). Feedback and learn now share one ordered log, so the self-improvement loop ("feedback before/after learning X") is answerable.
+- **Sidecar inventory**: 7th row — `evolution-core/src/evolution-events.ts` (`appendEvolutionEvent`) joins the transact list; the lockstep test floor moved to 7.
+
 ## Unreleased — rc.67: audit-v4 batch (curator write-path convergence, merge-heuristic input, read-before-write, /learn injection)
 
 The four AUDIT_REPORT_v4.md findings that belong to this batch landed together with the previously-accepted merge-heuristic input and the /learn delivery fix.
