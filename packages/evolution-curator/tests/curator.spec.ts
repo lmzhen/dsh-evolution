@@ -280,6 +280,28 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('healthView reports degraded structure only, derived on demand (rc.73 A1)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-health-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { healthSoftBodyChars: 1_000 })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('fat-skill', `---\nname: fat-skill\ndescription: f\n---\n\n${'x'.repeat(2_400)}\n`, 'foreground')
+    await skills.create('lean-skill', '---\nname: lean-skill\ndescription: l\n---\n\nLean body.\n', 'foreground')
+    const rows = await ctx.evolutionCurator.healthView()
+    const names = rows.map(row => row.name)
+    expect(names).toContain('fat-skill')
+    expect(names).not.toContain('lean-skill')
+    const fat = rows.find(row => row.name === 'fat-skill')
+    expect(fat?.verdict).toBe('needs-restructure')
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('control-plane folds keep counters and never flatten a malformed usage sidecar (rc.67 K-1)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-k1-'))
     const previous = process.env.DSH_HOME

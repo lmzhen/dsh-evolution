@@ -76,6 +76,36 @@ describe('evolution-commands', () => {
     expect((injected[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
   })
 
+  it('skills health renders degraded structure rows or a clean verdict (rc.73 A1)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    let first = true
+    ctx.provide('evolutionCurator', {
+      healthView: async () => {
+        if (!first) return []
+        first = false
+        return [
+          { name: 'fat-skill', verdict: 'needs-restructure', reasons: ['body 41000 chars is >= 2x the soft limit (20000)'] },
+          { name: 'log-skill', verdict: 'warn', reasons: ['stamp density 3.2/KB'] },
+        ]
+      },
+    })
+    await ctx.plugin(Commands)
+    const result = await captured!.handler({ rawInput: 'skills health' })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('Structure health (2 degraded):')
+    expect(result.text).toContain('needs-restructure  fat-skill')
+    expect(result.text).toContain('stamp density')
+    const empty = await captured!.handler({ rawInput: 'skills health' })
+    expect(empty.text).toContain('all skills healthy')
+  })
+
   it('records a learn event into the event log when the io registry is mounted (rc.68)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-cmd-learn-event-'))
     const previous = process.env.DSH_HOME
@@ -108,8 +138,7 @@ describe('evolution-commands', () => {
     }
   })
 
-  it('curator scope renders the lifecycle lists including quality-warned', async () => {
-    const ctx = new Context()
+  it('curator scope renders the lifecycle lists including quality-warned', async () => {    const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {

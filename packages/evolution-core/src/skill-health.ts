@@ -1,0 +1,84 @@
+/**
+ * Skill structure-health domain (rc.73 A1, 008 design): a SECOND assessment
+ * dimension beside the six-factor usage quality — document hygiene, consumed
+ * by the curator health view and the `/evolution skills health` command.
+ *
+ * PURE and DERIVED: nothing is persisted; every assessment is computed from
+ * file facts at read time. The judgment split follows the original's
+ * boundary/治理 layering — deterministic signals here, refinement proposals
+ * stay in the review/curator judgment layer. Never become a 7th factor of
+ * `computeQualityScores` (different dimension, different consumers).
+ */
+
+export interface SkillHealthThresholds {
+  /** Soft body limit: body chars at/below stay 'healthy' by size; above ->
+   * 'warn'; >= 2x -> 'needs-restructure'. */
+  softBodyChars: number
+  /** Stamp-density ceiling per KB of body text: rc.NN / commit shas / ISO
+   * dates per KB at/above this -> 'warn' (log-like content living in the
+   * body — the "invalid info" indicator). */
+  stampDensityPerKb: number
+}
+
+export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
+  softBodyChars: 40_000,
+  stampDensityPerKb: 2,
+}
+
+const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z)?\b/g
+
+export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure'
+
+/** Facts a caller already has; assessors never do IO. */
+export interface SkillHealthSnapshot {
+  skillName: string
+  bodyChars: number
+  bodyText?: string | undefined
+  /** Number of non-empty support groups (references/ templates/ scripts/). */
+  supportGroups: number
+}
+
+export interface SkillHealthDim {
+  bodyChars: number
+  stampDensityPerKb: number | null
+  supportGroups: number
+}
+
+export interface SkillHealthAssessment {
+  verdict: SkillHealthVerdict
+  dims: SkillHealthDim
+  reasons: string[]
+}
+
+export function assessStructureHealth(
+  snapshot: SkillHealthSnapshot,
+  thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+): SkillHealthAssessment {
+  const reasons: string[] = []
+  const dims: SkillHealthDim = {
+    bodyChars: snapshot.bodyChars,
+    stampDensityPerKb: null,
+    supportGroups: snapshot.supportGroups,
+  }
+  const needs = snapshot.bodyChars >= thresholds.softBodyChars * 2
+  if (needs) {
+    reasons.push(`body ${snapshot.bodyChars} chars is >= 2x the soft limit (${thresholds.softBodyChars}) — consider splitting or offloading`)
+  } else if (snapshot.bodyChars >= thresholds.softBodyChars) {
+    reasons.push(`body ${snapshot.bodyChars} chars above the soft limit (${thresholds.softBodyChars})`)
+  }  if (snapshot.bodyText) {
+    const kb = Math.max(1, snapshot.bodyChars / 1024)
+    const stamps = (snapshot.bodyText.match(HEALTH_STAMP_RE) ?? []).length
+    dims.stampDensityPerKb = stamps / kb
+    if (dims.stampDensityPerKb >= thresholds.stampDensityPerKb) {
+      reasons.push(`stamp density ${dims.stampDensityPerKb.toFixed(1)}/KB (rc/sha/date lines — log-like content in the body)`)
+    }
+  }
+  if (snapshot.supportGroups === 0 && snapshot.bodyChars >= thresholds.softBodyChars / 2) {
+    reasons.push(`large body (${snapshot.bodyChars} chars) with NO support files — session detail may belong in references/`)
+  }
+  return {
+    verdict: needs ? 'needs-restructure' : reasons.length > 0 ? 'warn' : 'healthy',
+    dims,
+    reasons,
+  }
+}

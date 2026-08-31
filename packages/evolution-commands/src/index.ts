@@ -124,6 +124,14 @@ export function apply(ctx: Context): void {
           const result = curator ? await curator.restore(name) : { ok: false, message: 'Curator service not mounted.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
+        if (input === 'skills health') {
+          const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>> } | undefined
+          if (!curator) return err('Curator service not mounted.')
+          const rows = await curator.healthView()
+          if (rows.length === 0) return ok('Structure health: all skills healthy.')
+          const line = (row: { verdict: string; name: string; reasons: string[] }): string => `${row.verdict.padEnd(18)} ${row.name}${row.reasons.length > 0 ? ` — ${row.reasons.join('; ')}` : ''}`
+          return ok([`Structure health (${rows.length} degraded):`, ...rows.map(line)].join('\n'))
+        }
         if (input === 'learn' || input.startsWith('learn ')) {
           const request = input === 'learn' ? '' : input.slice(6).trim()
           // rc.67: command results never enter model history, so an echo can
@@ -154,7 +162,7 @@ export function apply(ctx: Context): void {
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | learn [request] | replay.')
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | skills health | learn [request] | replay.')
       },
     })
   })

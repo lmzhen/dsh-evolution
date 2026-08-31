@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — rc.73 A1: skill structure-health observability (008 batch I)
+
+- **`SkillHealth` domain** (`evolution-core/src/skill-health.ts`): a pure, derived assessment dimension beside the six-factor usage quality — `assessStructureHealth` over body size (soft limit 40k chars, `needs-restructure` at 2x), stamp density (rc.NN / commit-sha / ISO-date lines per KB — the "invalid info" indicator) and scatter (large body with no support groups). Thresholds are declarative `DEFAULT_HEALTH_THRESHOLDS`, curator-configurable (`healthSoftBodyChars` / `healthStampDensityPerKb`).
+- **Curator `healthView()`**: degraded skills only (verdict + reasons), derived on demand — never persisted, never a 7th quality factor (different dimension, different consumers).
+- **`/evolution skills health`**: prints degraded rows or a clean verdict.
+- **100k gate split-advice**: the create and patch error messages now carry the original's "Consider splitting into a smaller SKILL.md with supporting files." — the one-line gap against the original.
+- Design: `docs/design-review/008-skill-loop-completion.md` (judgement table, four-seam architecture, robust batch decomposition A1/A2/B/C). Zero behavior change: assessment is read-only exposure; both new seams are additive.
+
 ## 0.1.0 (stable) — rc.72 content: audit-v6 + deep-sweep batch (G-1..G-3, H-1..H-3)
 
 - **G-1 (P2, seq shadowing after active loss)**: `appendEvolutionEvent` derives the next seq from the ACTIVE only — a missing/whitespace active with archives present restarted at seq 1 and, by the timeline's active-wins dedupe, shadowed archived history one event per append. Now the empty-active branch consults the archive NAME anchors (single numeric glob, no content parse) and continues FROM the highest archived seq; `rotateIfDue` guards `rotateAt < 2` and empty tails (a one-event rotation previously archived everything and restarted seqs at 1). Regression: deleted-active + archive → append seq 2, timeline [1,2] intact.

@@ -13,8 +13,8 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
@@ -57,6 +57,10 @@ export interface Config {
   bootGraceSeconds?: number
   /** Max tokens for the optional LLM nomination pass. */
   curatorReviewMaxTokens?: number
+  /** Structure-health soft body limit (chars) — see DEFAULT_HEALTH_THRESHOLDS (rc.73 A1). */
+  healthSoftBodyChars?: number
+  /** Structure-health stamp-density ceiling per KB — see DEFAULT_HEALTH_THRESHOLDS. */
+  healthStampDensityPerKb?: number
 }
 
 /** Outcome of one curator run pass. */
@@ -112,6 +116,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     autoStart: z.boolean().default(true),
     bootGraceSeconds: z.number().default(10),
     curatorReviewMaxTokens: z.number().default(2048),
+    healthSoftBodyChars: z.number().default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
+    healthStampDensityPerKb: z.number().default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
   })
 
   readonly skills: SkillLibrary
@@ -130,6 +136,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   private readonly referencedSkillNames: ReadonlySet<string>
   private readonly bootGraceSeconds: number
   private readonly curatorReviewMaxTokens: number
+  private readonly healthSoftBodyChars: number
+  private readonly healthStampDensityPerKb: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
   private bootCheck: NodeJS.Timeout | undefined
@@ -153,6 +161,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
     this.bootGraceSeconds = config.bootGraceSeconds ?? 10
     this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
+    this.healthSoftBodyChars = config.healthSoftBodyChars ?? DEFAULT_HEALTH_THRESHOLDS.softBodyChars
+    this.healthStampDensityPerKb = config.healthStampDensityPerKb ?? DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
@@ -896,6 +906,22 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       pruneBuiltins: this.pruneBuiltins,
       bundledNames,
     }, await this.protectedNameMap(), gates)
+  }
+
+  /**
+   * Structure-health view (rc.73 A1, 008 design): degraded skills only,
+   * derived on demand — never persisted. Signals for review/curate proposals;
+   * the deterministic assessment stays here, refinement stays in the judgment
+   * layer.
+   */
+  async healthView(): Promise<Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }>> {
+    const thresholds = { softBodyChars: this.healthSoftBodyChars, stampDensityPerKb: this.healthStampDensityPerKb }
+    const rows: Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }> = []
+    for (const summary of await this.skills.list()) {
+      const assessment = await this.skills.assessHealth(summary.name, thresholds)
+      if (assessment && assessment.verdict !== 'healthy') rows.push({ name: summary.name, verdict: assessment.verdict, reasons: assessment.reasons })
+    }
+    return rows
   }
 
   /** marker info (pinned/bundled/hub-installed) per skill, from the library list. */

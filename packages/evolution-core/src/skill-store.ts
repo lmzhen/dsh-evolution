@@ -13,6 +13,7 @@ import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { suppressedFile, usageFile } from './usage.ts'
+import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 import type { EvolutionSkillMutatedEvent } from './events.ts'
 
@@ -175,7 +176,10 @@ export function validateFrontmatter(content: string, expectedName?: string, limi
   if (!parsed.frontmatter.description) return 'Frontmatter must include a description field.'
   const description = parsed.frontmatter.description
   if (description.length > limits.maxDescriptionLength) return `Description exceeds ${limits.maxDescriptionLength} characters.`
-  if (content.length > limits.maxSkillContentChars) return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters.`
+  if (content.length > limits.maxSkillContentChars) {
+    return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters. ` +
+      'Consider splitting into a smaller SKILL.md with supporting files.'
+  }
   return null
 }
 
@@ -524,6 +528,26 @@ export class SkillLibrary {
     return count
   }
 
+  /**
+   * Structure-health facts for one skill (rc.73 A1, 008 design): body
+   * chars/density from SKILL.md, support groups from countSupportDirs.
+   * Derived, never persisted; null when the skill is unreadable.
+   */
+  async assessHealth(
+    rawName: string,
+    thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+  ): Promise<SkillHealthAssessment | null> {
+    const name = rawName.trim()
+    const content = await this.read(name)
+    if (content === null) return null
+    return assessStructureHealth({
+      skillName: name,
+      bodyChars: content.length,
+      bodyText: content,
+      supportGroups: await this.countSupportDirs(name),
+    }, thresholds)
+  }
+
   /** Best-effort audit trail entry; never blocks the mutation. */
   private async audit(skillName: string, action: string, before: string | null, after: string | null, summary: string): Promise<void> {
     try {
@@ -659,7 +683,7 @@ export class SkillLibrary {
       return { ok: false, message: `Patched file exceeds ${this.limits.maxSkillFileBytes} bytes.` }
     }
     if (patched.length > this.limits.maxSkillContentChars && target === skillMd) {
-      return { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters.` }
+      return { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }
     }
     const threat = scanContentThreats(patched)
     if (threat) return { ok: false, message: threat }
