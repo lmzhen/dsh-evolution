@@ -273,9 +273,10 @@ evolution-capability  validate + stage Creator packages; never execute them
 > repository does not carry a runnable build/test scaffold of its own;
 > runtime scripts used during publication live under `scripts/` here and
 > document their canonical path as
-> `packages/evolution/scripts/...` in the dev tree. The `docs/` and
-> `AUDIT_REPORT.md` / `OPTIMIZATION_PLAN.md` documents are mirrored
-> deliverables.
+> `packages/evolution/scripts/...` in the dev tree. The `docs/` subtree and
+> the current audit baseline (`AUDIT_REPORT_v6.md`) are mirrored
+> deliverables; intermediate audit reports and pre-release plans are
+> archived in git history.
 
 ```text
 packages/
