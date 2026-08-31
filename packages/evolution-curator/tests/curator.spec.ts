@@ -905,6 +905,54 @@ Body of ${name}.
     expect(result.archive).toContain('dirty-skill')
   })
 
+  it('runs the reference-mode demote chain: nomination → reference file + pointer → archive (009-II)', { timeout: 20_000 }, async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-demote-chain-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const yaml = '## Structured summary (required)\n```yaml\n'
+        + 'consolidations:\n'
+        + '  - from: stale-src\n'
+        + '    mode: reference\n'
+        + '    into: umbrella-skill\n'
+        + '    reason: session detail demotes to the umbrella references\n'
+        + 'prunings: []\n'
+        + '```\n'
+      const ctx = new Context()
+      ctx.provide('llm', {
+        stream: async function* () {
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: yaml }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+          yield { type: 'finish', reason: 'stop' }
+        },
+      })
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      ctx.provide('evolutionState', {
+        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+        saveCuratorState: async () => {},
+      })
+      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+      const skills = ctx.evolutionCurator.skills
+      await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
+      await skills.create('stale-src', basicBody('stale-src'), 'foreground')
+      await saveUsage(skills.root, new Map([
+        ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
+        ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
+      ]), nodeEvolutionIo())
+      await ctx.evolutionCurator.run({ ignoreGates: true })
+      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'stale-src'))).toBe(true)
+      expect(await nodeEvolutionIo().exists(join(skills.root, 'umbrella-skill', 'references', 'stale-src.md'))).toBe(true)
+      expect((await skills.read('umbrella-skill')) ?? '').toContain('> 详见 references/stale-src.md')
+      expect((await skills.read('umbrella-skill')) ?? '').not.toContain('Body of stale-src.')
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('runs the full LLM-提名→门→吸收→归档→报告 merge chain (P1b)', { timeout: 20_000 }, async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-merge-chain-'))
     const previous = process.env.DSH_HOME

@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@8'
-export const PROMPT_BUNDLE_VERSION = 8
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@9'
+export const PROMPT_BUNDLE_VERSION = 9
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -171,6 +171,7 @@ When done, write a human summary THEN the structured machine-readable block. The
 \`\`\`yaml
 consolidations:
   - from: <old-skill-name>
+    mode: reference  # optional — ONLY for a 'demote': source is narrow-but-valuable session detail, write it as references/<source>.md under the umbrella instead of appending to the body. Default is append. Place this line BEFORE into:. NEVER use reference when the source body links its own references/ templates/ scripts/ files.
     into: <umbrella-skill-name>
     reason: <one short sentence — why merged, not just 'similar'>
 prunings:

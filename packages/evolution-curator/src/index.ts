@@ -753,7 +753,9 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         errors.push(`${nomination.from}: consolidation nomination outside the candidate pool — refused (advisory text has no executability authority)`)
         continue
       }
-      const consolidated = await this.skills.consolidate(nomination.into, [nomination.from], 'background_review')
+      const consolidated = await this.skills.consolidate(nomination.into, [nomination.from], 'background_review', {
+        ...nomination.mode === undefined ? {} : { mode: nomination.mode },
+      })
       if (!consolidated.ok) {
         errors.push(`${nomination.from}: ${consolidated.message}`)
         continue

@@ -373,6 +373,48 @@ interface PlannedRestructureSection {
 /** Planned section extraction (pure; no IO): new body + extracted section texts. */
 type RestructurePlan = { error: string } | { body: string; sections: PlannedRestructureSection[] }
 
+/**
+ * Support-directory references in a markdown body (009 kernel): `references/…`,
+ * `templates/…`, `scripts/…`, `assets/…` relative links. Pure — who checks
+ * them and what the verdict is belongs to the caller's context (a moved/
+ * appended body whose references travel with an archived source is a dangling
+ * link; a restructure pointer is a fresh link to a file written in the same
+ * plan).
+ */
+function supportRefs(content: string): string[] {
+  const refs: string[] = []
+  for (const match of content.matchAll(/\b(?:references|templates|scripts|assets)\/[A-Za-z0-9._-]+\.md/g)) {
+    refs.push(match[0])
+  }
+  return refs
+}
+
+/** One content write of a tree-change plan; `target` is an absolute path. */
+interface TreeChangeWrite {
+  target: string
+  content: string
+}
+
+/**
+ * Deterministic tree-change plan (009 kernel): a batch of content writes with
+ * one commit point. The kernel owns validation order, pre-read versions,
+ * rollback bytes, audit and the mutation event — mutators compose plans, they
+ * never implement two-phase commit themselves.
+ */
+interface TreeChangePlan {
+  name: string
+  origin: WriteOrigin
+  protection: 'write' | 'delete' | 'none'
+  writes: TreeChangeWrite[]
+  /** Semantic validation of the plan (caller context: source existence, mode rules…). */
+  validate?: (ctx: { dir: string; currentMd: string | null }) => string | null
+  /** Direction-guard mount (R1-1): checked before any write; empty today. */
+  preconditions?: Array<(ctx: { dir: string }) => Promise<string | null>>
+  auditAction: string
+  auditSummary: string
+  eventAction: string
+}
+
 function planRestructureSections(body: string, moves: SkillRestructureMove[]): RestructurePlan {
   const lines = body.split('\n')
   const spans: Array<{ start: number; end: number; rel: string; heading: string; text: string }> = []
@@ -829,9 +871,32 @@ export class SkillLibrary {
    * Merge the bodies of `sources` into `target` and archive the sources with
    * an absorbed-into marker. Hermes-style consolidation: overlapping skills
    * collapse into one, and the originals stay recoverable under `.archive/`.
+   *
+   * `mode:'append'` (default) appends each source body to the target. The
+   * target write goes through the tree-change kernel (009) — byte-level
+   * rollback, audit and the mutation event are kernel-owned. Package-integrity
+   * (009-I): append-mode consolidation REFUSES a source whose directory has
+   * support files or whose body carries support-directory links — an append
+   * would leave those references pointing at an archived package (dangling);
+   * the refusal message directs to the reference mode / whole-package archive.
+   *
+   * `mode:'reference'` writes each source's body (frontmatter stripped) into
+   * `target/references/<source>.md` and archives the source — the demote path
+   * (009-II). A source body with support-directory links is refused there too
+   * (the references file would carry links whose files were archived).
    */
-  async consolidate(target: string, sources: string[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
-    // Names normalize before validation (rc.42 audit P2-5): the trimmed form    // is what every path-building call below resolves to, so validation and    // IO can never disagree about which skill is meant.    const targetName = target.trim()    const normalizedSources = [...new Set(sources.map(name => name.trim()))].filter(name => name !== targetName)
+  async consolidate(
+    target: string,
+    sources: string[],
+    origin: WriteOrigin = 'foreground',
+    options: { mode?: 'append' | 'reference' } = {},
+  ): Promise<SkillActionResult> {
+    // Names normalize before validation (rc.42 audit P2-5): the trimmed form
+    // is what every path-building call below resolves to, so validation and
+    // IO can never disagree about which skill is meant.
+    const targetName = target.trim()
+    const normalizedSources = [...new Set(sources.map(name => name.trim()))].filter(name => name !== targetName)
+    const mode = options.mode ?? 'append'
     if (normalizedSources.length === 0) return { ok: false, message: 'Consolidation requires at least one distinct source skill.' }
     for (const name of [targetName, ...normalizedSources]) {
       if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
@@ -841,29 +906,57 @@ export class SkillLibrary {
     if (!targetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
     const targetProtection = await this.writeProtection(targetName, origin)
     if (targetProtection) return { ok: false, message: `Skill "${targetName}" is protected (${targetProtection}).` }
-    const parts: string[] = []
-    for (const source of normalizedSources) {
-      const protection = await this.deleteProtection(source)
-      if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
-      const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-      if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
-      const parsed = parseFrontmatter(sourceMd)
-      if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
-      parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
+    const writes: TreeChangeWrite[] = []
+    if (mode === 'append') {
+      const parts: string[] = []
+      for (const source of normalizedSources) {
+        const protection = await this.deleteProtection(source)
+        if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
+        const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+        if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
+        const parsed = parseFrontmatter(sourceMd)
+        if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
+        // Package integrity (009-I): an append must never leave dangling
+        // support links — refuse before ANY side effect (no archive, no write).
+        if (await this.countSupportDirs(source) > 0) {
+          return { ok: false, message: `Consolidation rejected: source "${source}" carries support files — use mode:'reference' or archive the whole package instead.` }
+        }
+        const refs = supportRefs(parsed.body)
+        if (refs.length > 0) {
+          return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.` }
+        }
+        parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
+      }
+      const merged = targetMd.trimEnd() + parts.join('\n') + '\n'
+      const validation = validateFrontmatter(merged, targetName, this.limits)
+      if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+      writes.push({ target: join(targetDir, 'SKILL.md'), content: merged })
+    } else {
+      for (const source of normalizedSources) {
+        const protection = await this.deleteProtection(source)
+        if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
+        const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+        if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
+        const parsed = parseFrontmatter(sourceMd)
+        if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to demote.` }
+        const refs = supportRefs(parsed.body)
+        if (refs.length > 0) {
+          return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.` }
+        }
+        const target = join(targetDir, 'references', `${source}.md`)
+        writes.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
+      }
+      // Discoverability: the umbrella's body gains one pointer per demoted source.
+      const pointerLines = normalizedSources.map(source => `\n> 详见 references/${source}.md`).join('')
+      const extended = targetMd.trimEnd() + pointerLines + '\n'
+      const validation = validateFrontmatter(extended, targetName, this.limits)
+      if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+      writes.push({ target: join(targetDir, 'SKILL.md'), content: extended })
     }
-    const merged = targetMd.trimEnd() + parts.join('\n') + '\n'
-    const validation = validateFrontmatter(merged, targetName, this.limits)
-    if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
-    const threat = scanContentThreats(merged)
-    if (threat) return { ok: false, message: threat }
     // Two-phase commit so a failure partway never leaves the tree inconsistent:
     // (1) archive every source first — a source that cannot be archived aborts
     //     before target is touched; (2) only when all sources are safely in
-    //     .archive do we write the merged target. Any failure — including a
-    //     refused archive mid-loop (rc.42 audit P1-1: an early `return` here
-    //     skipped the rollback and left earlier sources consumed) — goes
-    //     through the catch, which restores the target and un-archives every
-    //     already-moved source.
+    //     .archive does the kernel commit the writes (byte-level rollback).
     const archived: string[] = []
     try {
       for (const source of normalizedSources) {
@@ -871,35 +964,37 @@ export class SkillLibrary {
         if (!result.ok) throw new Error(result.message)
         archived.push(source)
       }
-      await this.io.writeText(join(targetDir, 'SKILL.md'), merged)
+      const result = await this.applyTreeChange({
+        name: targetName,
+        origin,
+        protection: 'write',
+        writes,
+        auditAction: 'consolidate',
+        auditSummary: `consolidated ${normalizedSources.join(', ')} (${mode}) into ${targetName}`,
+        eventAction: 'consolidate',
+      })
+      if (!result.ok) throw new Error(result.message)
     } catch (error) {
-      // Restore the target that we may have (partially) overwritten.
-      await this.io.writeText(join(targetDir, 'SKILL.md'), targetMd).catch(() => {})
       // Bring back any source we already archived so the merge is fully undone.
       for (const source of archived.reverse()) {
         await this.restoreFromArchive(source).catch(() => {})
       }
       return { ok: false, message: `Consolidation failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
     }
-    this.notifyMutation({ action: 'consolidate', name: targetName, filePath: targetDir })
     return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
   }
 
   /**
-   * Restore one skill from `.archive/` back to the active root. Hermes-style
-   * recoverability: archival never deletes, and this is the control-plane
-   * path back. The `.archive-reason` marker is dropped on restore.
-   */
-  /**
-   * Content-distribution repair (008 batch B): move body sections — anchored
-   * by their exact `## heading` lines — into references/ support files and
-   * replace each span with a pointer line. The skill name/dir never change
-   * (routing stays; only content location shifts, so a fat body sheds its
-   * log-like detail). Deterministic, never automatic: candidates come from an
-   * approved review plan. Two-phase: every move is validated against one
-   * snapshot first (a miss aborts with zero writes), then support files and
-   * the body commit; a mid-loop write failure restores every file it already
-   * touched (consolidate's rollback discipline).
+   * Content-distribution repair (008 batch B, 009-R kernel): move body
+   * sections — anchored by their exact `## heading` lines — into references/
+   * support files and replace each span with a pointer line. The skill
+   * name/dir never change (routing stays; only content location shifts, so a
+   * fat body sheds its log-like detail). Deterministic, never automatic:
+   * candidates come from an approved review plan. The write batch goes
+   * through the tree-change kernel — one commit point, byte-level rollback.
+   * Package integrity (009-R): a moved section whose text carries
+   * support-directory links is refused (those links' files stay behind in the
+   * same package; the moved text belongs in references/ beside them).
    */
   async restructure(rawName: string, moves: SkillRestructureMove[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const name = rawName.trim()
@@ -918,8 +1013,6 @@ export class SkillLibrary {
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.writeProtection(name, origin)
-    if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const normalized = md.replace(/\r\n/g, '\n')
     const plan = planRestructureSections(normalized, moves)
     if ('error' in plan) return { ok: false, message: `Restructure rejected: ${plan.error}` }
@@ -928,8 +1021,12 @@ export class SkillLibrary {
     const newMd = normalized.slice(0, frontmatterEnd + 4) + plan.body
     const newMdCheck = validateFrontmatter(newMd, name, this.limits)
     if (newMdCheck) return { ok: false, message: `Restructure rejected: ${newMdCheck}` }
-    const threat = scanContentThreats(newMd)
-    if (threat) return { ok: false, message: threat }
+    for (const section of plan.sections) {
+      const refs = supportRefs(section.text)
+      if (refs.length > 0) {
+        return { ok: false, message: `Restructure rejected: section "## ${section.heading}" references support files (${refs.join(', ')}) that stay behind — split the section or move it with its files.` }
+      }
+    }
     // Aggregate by destination: two moves into one file append in move order.
     const byRel = new Map<string, { rel: string; texts: string[] }>()
     for (const section of plan.sections) {
@@ -937,26 +1034,70 @@ export class SkillLibrary {
       entry.texts.push(section.text)
       byRel.set(section.rel, entry)
     }
-    const writes: Array<{ target: string; content: string; previous: string | null }> = []
+    const writes: TreeChangeWrite[] = []
     for (const entry of byRel.values()) {
       const target = join(dir, ...entry.rel.split('/'))
       const previous = await this.io.readText(target).catch(() => null)
       const base = previous?.trimEnd() ?? ''
-      const content = base === '' ? entry.texts.join('\n\n') : `${base}\n\n${entry.texts.join('\n\n')}`
-      if (Buffer.byteLength(content, 'utf8') > this.limits.maxSkillFileBytes) {
-        return { ok: false, message: `Support file "${entry.rel}" exceeds ${this.limits.maxSkillFileBytes} bytes.` }
-      }
-      const fileThreat = scanContentThreats(content)
-      if (fileThreat) return { ok: false, message: fileThreat }
-      writes.push({ target, content, previous })
+      writes.push({
+        target,
+        content: base === '' ? entry.texts.join('\n\n') : `${base}\n\n${entry.texts.join('\n\n')}`,
+      })
     }
-    // Two-phase commit: any write failure restores every already-touched file
-    // (support files first, body last) from the pre-read bytes.
-    const landing: Array<{ target: string; content: string; previous: string | null }> = [...writes, {
-      target: join(dir, 'SKILL.md'),
-      content: newMd,
-      previous: md,
-    }]
+    writes.push({ target: join(dir, 'SKILL.md'), content: newMd })
+    const result = await this.applyTreeChange({
+      name,
+      origin,
+      protection: 'write',
+      writes,
+      auditAction: 'restructure',
+      auditSummary: `moved ${plan.sections.length} section(s): ${[...byRel.keys()].join(', ')}`,
+      eventAction: 'restructure',
+    })
+    if (!result.ok) return result
+    return { ok: true, message: `Restructured "${name}": moved ${plan.sections.length} section(s) to references/.`, path: dir }
+  }
+
+  /**
+   * Unified tree-change commit point (009 kernel): owns validation order,
+   * pre-read rollback bytes, two-phase write with byte-level rollback, audit
+   * and the mutation event. Mutators compose `TreeChangePlan`s — consolidate,
+   * restructure (and future reference-mode consolidations) never implement
+   * two-phase commit themselves.
+   */
+  private async applyTreeChange(plan: TreeChangePlan): Promise<SkillActionResult> {
+    const name = plan.name.trim()
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
+    const dir = this.dirOf(name)
+    const md = await this.io.readText(join(dir, 'SKILL.md'))
+    if (!md) return { ok: false, message: `Skill "${name}" not found.` }
+    const protection = plan.protection === 'write'
+      ? await this.writeProtection(name, plan.origin)
+      : plan.protection === 'delete'
+        ? await this.deleteProtection(name)
+        : null
+    if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
+    for (const precondition of plan.preconditions ?? []) {
+      const issue = await precondition({ dir })
+      if (issue) return { ok: false, message: issue }
+    }
+    // Pre-read EVERY write target: the rollback bytes are kernel-owned and the
+    // caller cannot fabricate them. The same read feeds the append semantics of
+    // restructure (the caller re-reads for its own construction — kernel reads
+    // again because the bytes it restores must be the bytes on disk at commit).
+    const landing: Array<{ target: string; content: string; previous: string | null }> = []
+    for (const write of plan.writes) {
+      const previous = await this.io.readText(write.target).catch(() => null)
+      if (Buffer.byteLength(write.content, 'utf8') > this.limits.maxSkillFileBytes) {
+        return { ok: false, message: `Write exceeds ${this.limits.maxSkillFileBytes} bytes: ${write.target}` }
+      }
+      const threat = scanContentThreats(write.content)
+      if (threat) return { ok: false, message: threat }
+      landing.push({ target: write.target, content: write.content, previous })
+    }
+    const semantic = plan.validate?.({ dir, currentMd: md }) ?? null
+    if (semantic) return { ok: false, message: semantic }
     const written: Array<{ target: string; previous: string | null }> = []
     try {
       for (const entry of landing) {
@@ -969,17 +1110,22 @@ export class SkillLibrary {
           ? this.io.remove(entry.target)
           : this.io.writeText(entry.target, entry.previous)
         ).catch(() => {
-          // Rollback is best-effort; the original bytes stay readable via the
-          // .backups snapshot when the curator took one (control-plane rule).
+          // Rollback is best-effort; the .backups snapshot stays the recovery
+          // path when the curator took one (control-plane rule).
         })
       }
-      return { ok: false, message: `Restructure failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
+      return { ok: false, message: `Tree change failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
     }
-    await this.audit(name, 'restructure', md, newMd, `moved ${plan.sections.length} section(s): ${[...byRel.keys()].join(', ')}`)
-    this.notifyMutation({ action: 'restructure', name, filePath: dir })
-    return { ok: true, message: `Restructured "${name}": moved ${plan.sections.length} section(s) to references/.`, path: dir }
+    await this.audit(name, plan.auditAction, md, landing.find(entry => entry.target.endsWith('SKILL.md'))?.content ?? md, plan.auditSummary)
+    this.notifyMutation({ action: plan.eventAction, name, filePath: dir })
+    return { ok: true, message: `${plan.eventAction} "${name}" succeeded.`, path: dir }
   }
 
+  /**
+   * Restore one skill from `.archive/` back to the active root. Hermes-style
+   * recoverability: archival never deletes, and this is the control-plane
+   * path back. The `.archive-reason` marker is dropped on restore.
+   */
   async restoreFromArchive(rawName: string): Promise<SkillActionResult> {
     const name = rawName.trim()
     if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }

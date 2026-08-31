@@ -134,10 +134,14 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
   ].join('\n')
 }
 
-/** One LLM-nominated consolidation: `from` merges into the umbrella `into`. */
+/** One LLM-nominated consolidation: `from` merges into the umbrella `into`.
+ * `mode:'reference'` demotes the source (its body becomes
+ * `references/<source>.md` under the umbrella) instead of appending to the
+ * target body (009-II); absent means append. */
 export interface CuratorConsolidation {
   from: string
   into: string
+  mode?: 'append' | 'reference' | undefined
 }
 
 /** Structured result of the optional curator LLM nomination pass. */
@@ -158,20 +162,32 @@ export function parseCuratorNominations(text: string): CuratorNominations {
   const consolidations: CuratorConsolidation[] = []
   let section: 'consolidations' | 'prunings' | null = null
   let currentFrom = ''
+  let currentMode: 'append' | 'reference' | undefined
   for (const line of text.split('\n')) {
     const consolidated = /^\s*-\s*from:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
     if (consolidated) {
       section = 'consolidations'
       currentFrom = consolidated[1] ?? ''
+      currentMode = undefined
+      continue
+    }
+    const mode = /^\s*mode:\s*(append|reference)\s*$/.exec(line)
+    if (mode) {
+      if (currentFrom !== '') currentMode = mode[1] === 'reference' ? 'reference' : 'append'
       continue
     }
     const into = /^\s*into:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
     if (into) {
       const intoName = into[1] ?? ''
       if (section === 'consolidations' && currentFrom !== '' && currentFrom !== intoName) {
-        consolidations.push({ from: currentFrom, into: intoName })
+        consolidations.push({
+          from: currentFrom,
+          into: intoName,
+          ...currentMode === undefined ? {} : { mode: currentMode },
+        })
       }
       currentFrom = ''
+      currentMode = undefined
       continue
     }
     const pruned = /^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)

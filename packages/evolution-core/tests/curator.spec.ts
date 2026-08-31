@@ -93,6 +93,24 @@ it('parseCuratorNominations reads both YAML sections defensively', () => {
   expect(nominations.prunings).not.toContain('invalid NAME')
 })
 
+it('parseCuratorNominations reads the optional consolidation mode (009-II)', () => {
+  const text = [
+    'consolidations:',
+    '  - from: demo-a',
+    '    mode: reference',
+    '    into: umbrella',
+    '    reason: session detail',
+    '  - from: demo-b',
+    '    into: umbrella',
+    '    reason: regular',
+  ].join('\n')
+  const nominations = parseCuratorNominations(text)
+  expect(nominations.consolidations).toEqual([
+    { from: 'demo-a', into: 'umbrella', mode: 'reference' },
+    { from: 'demo-b', into: 'umbrella' },
+  ])
+})
+
 it('computeScopeView classifies managed/watched/exempted/protected like the transition gates', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
   const age = new Date(now.getTime() - 200 * 86_400_000)

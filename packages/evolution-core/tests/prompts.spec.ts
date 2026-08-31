@@ -59,7 +59,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(8)
+  expect(PROMPT_BUNDLE_VERSION).toBe(9)
 })
 
 it('channel variants carry the subagent deliverable limit (M-2)', () => {
