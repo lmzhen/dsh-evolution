@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — A2: skill-usage read observation + usage churn dimension (008 batch II)
+
+- **Read-side observation** (`skill-usage/src/index.ts`): the service now listens on `session/event` for `tool/call` records of the read tools (`skill`, `skill_load`) — the same bus seam evolution-review already uses — parses the skill name the same way, and bumps `view` on EXISTING records only. The declarative `READ_TOOL_KIND` table is the single classification point; a read of an unknown skill never mints a usage record (records stay authored by creation / patch / curator seed). This closes the read-side telemetry gap: the usage sidecar's view counters are live, so `usage.json = {}` no longer means "no reads".
+- **Churn dimension** (`evolution-core/src/skill-health.ts`): `assessStructureHealth` gains an optional usage dimension — patch count at/above `churnMinPatches` (default 20, `DEFAULT_HEALTH_THRESHOLDS`) with zero reads warns "patched N times but never read (write-ghost — content may be dead)". Absent counts keep the dimension null; the verdict logic and the six-factor quality scoring stay untouched.
+- **Curator `healthView()`** now loads the usage sidecar and passes per-skill `patch_count` / `view_count` into the assessment; `healthChurnMinPatches` joins the threshold config surface. Existing behavior pinned: observation is additive wiring, the write path (`record`/`report`/`setQuality`/archival) is unchanged.
+- Tests: session/event emission through a real Cordis ctx (view counts from `skill` + `skill_load`, non-read tools ignored, no mint for unknown reads), churn warn/ignore units, curator write-ghost row via seeded usage counts. Zero behavior change, zero version move (008 program stays main-only).
+
 ## Unreleased — rc.73 A1: skill structure-health observability (008 batch I)
 
 - **`SkillHealth` domain** (`evolution-core/src/skill-health.ts`): a pure, derived assessment dimension beside the six-factor usage quality — `assessStructureHealth` over body size (soft limit 40k chars, `needs-restructure` at 2x), stamp density (rc.NN / commit-sha / ISO-date lines per KB — the "invalid info" indicator) and scatter (large body with no support groups). Thresholds are declarative `DEFAULT_HEALTH_THRESHOLDS`, curator-configurable (`healthSoftBodyChars` / `healthStampDensityPerKb`).

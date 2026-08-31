@@ -17,6 +17,7 @@ import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions,
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 
 
@@ -61,6 +62,8 @@ export interface Config {
   healthSoftBodyChars?: number
   /** Structure-health stamp-density ceiling per KB — see DEFAULT_HEALTH_THRESHOLDS. */
   healthStampDensityPerKb?: number
+  /** Structure-health write-ghost floor: patches at/above with zero reads (A2). */
+  healthChurnMinPatches?: number
 }
 
 /** Outcome of one curator run pass. */
@@ -118,6 +121,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     curatorReviewMaxTokens: z.number().default(2048),
     healthSoftBodyChars: z.number().default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
     healthStampDensityPerKb: z.number().default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
+    healthChurnMinPatches: z.number().default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
   })
 
   readonly skills: SkillLibrary
@@ -138,6 +142,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   private readonly curatorReviewMaxTokens: number
   private readonly healthSoftBodyChars: number
   private readonly healthStampDensityPerKb: number
+  private readonly healthChurnMinPatches: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
   private bootCheck: NodeJS.Timeout | undefined
@@ -163,6 +168,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
     this.healthSoftBodyChars = config.healthSoftBodyChars ?? DEFAULT_HEALTH_THRESHOLDS.softBodyChars
     this.healthStampDensityPerKb = config.healthStampDensityPerKb ?? DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb
+    this.healthChurnMinPatches = config.healthChurnMinPatches ?? DEFAULT_HEALTH_THRESHOLDS.churnMinPatches
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
@@ -915,10 +921,19 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
    * layer.
    */
   async healthView(): Promise<Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }>> {
-    const thresholds = { softBodyChars: this.healthSoftBodyChars, stampDensityPerKb: this.healthStampDensityPerKb }
+    const thresholds: SkillHealthThresholds = {
+      softBodyChars: this.healthSoftBodyChars,
+      stampDensityPerKb: this.healthStampDensityPerKb,
+      churnMinPatches: this.healthChurnMinPatches,
+    }
+    const usage = await loadUsage(this.skills.root, this.io)
     const rows: Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }> = []
     for (const summary of await this.skills.list()) {
-      const assessment = await this.skills.assessHealth(summary.name, thresholds)
+      const record = usage.get(summary.name)
+      const assessment = await this.skills.assessHealth(summary.name, thresholds, record ? {
+        patchCount: record.patch_count,
+        readCount: record.view_count,
+      } : undefined)
       if (assessment && assessment.verdict !== 'healthy') rows.push({ name: summary.name, verdict: assessment.verdict, reasons: assessment.reasons })
     }
     return rows

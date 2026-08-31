@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { computeDedupGroups, computeLifecycleTransitions, emptyRecord, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, computeLifecycleTransitions, emptyRecord, getRecord, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 /** Plain skill body used by the merge-chain fixtures. */
 function basicBody(name: string): string {
@@ -297,6 +297,38 @@ describe('evolution-curator', () => {
     expect(names).not.toContain('lean-skill')
     const fat = rows.find(row => row.name === 'fat-skill')
     expect(fat?.verdict).toBe('needs-restructure')
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('healthView folds usage churn into the assessment (A2 write-ghost)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-churn-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { healthChurnMinPatches: 20 })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string) => `---\nname: ${name}\ndescription: ${name}\n---\n\nSmall body.\n`
+    await skills.create('ghost-skill', body('ghost-skill'), 'foreground')
+    await skills.create('read-skill', body('read-skill'), 'foreground')
+    await mutateUsage(skills.root, nodeEvolutionIo(), (map) => {
+      // create() does not author usage records; getRecord anchors the fields
+      // exactly as tool-side patching would leave them (A2 write-ghost).
+      const ghost = getRecord(map, 'ghost-skill')
+      ghost.patch_count = 30
+      ghost.view_count = 0
+      const read = getRecord(map, 'read-skill')
+      read.patch_count = 30
+      read.view_count = 4
+    })
+    const rows = await ctx.evolutionCurator.healthView()
+    const ghost = rows.find(row => row.name === 'ghost-skill')
+    expect(ghost?.verdict).toBe('warn')
+    expect(ghost?.reasons.some(reason => reason.includes('never read'))).toBe(true)
+    expect(rows.some(row => row.name === 'read-skill')).toBe(false)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })

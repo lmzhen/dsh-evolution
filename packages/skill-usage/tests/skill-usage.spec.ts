@@ -65,4 +65,40 @@ describe('skill-usage', () => {
     await ctx.plugin(SkillUsageRegistry)
     expect(ctx.skillUsage.root).toBe(skillsRoot())
   })
+
+  it('observes skill/skill_load reads through session/event and records views (A2)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-observe-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.ensureRecord('demo-read')
+    const toolCall = (name: string, args: unknown) => ({
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c1', name, arguments: JSON.stringify(args) },
+    }) as never
+    ctx.emit('session/event', {} as never, toolCall('skill', { name: 'demo-read' }))
+    ctx.emit('session/event', {} as never, toolCall('skill_load', { skill: 'demo-read' }))
+    // A non-read tool must not count.
+    ctx.emit('session/event', {} as never, toolCall('skill_search', { name: 'demo-read' }))
+    await ctx.skillUsage.invalidate()
+    const seen = (await ctx.skillUsage.report()).get('demo-read')
+    expect(seen?.view_count).toBe(2)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('does not mint a usage record for a read of an unknown skill (A2 guard)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-no-mint-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: JSON.stringify({ name: 'never-created' }) },
+    } as never)
+    await ctx.skillUsage.invalidate()
+    expect((await ctx.skillUsage.report()).has('never-created')).toBe(false)
+    await rm(root, { recursive: true, force: true })
+  })
 })

@@ -7,9 +7,35 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
+import type {} from '@deepseek-ai/dsh-session'
 import { evolutionIoAdapter,  skillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+
+/**
+ * Read tool names -> usage kind. The single declarative classification table
+ * for read-side observation (A2): any tool listed here records a `view` when
+ * its call arguments name a skill.
+ */
+const READ_TOOL_KIND: Record<string, 'view'> = {
+  skill: 'view',
+  skill_load: 'view',
+}
+
+/**
+ * Skill name from a tool/call arguments payload (A2, mirrors
+ * evolution-review's collectReadSkillNames): JSON strings are re-parsed and
+ * `name` wins over `skill`. Empty when unparseable or anonymous.
+ */
+function skillNameFromToolCall(raw: unknown): string {
+  let parsed: Record<string, unknown> = {}
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw) as Record<string, unknown> } catch { return '' }
+  } else if (raw && typeof raw === 'object') {
+    parsed = raw as Record<string, unknown>
+  }
+  return typeof parsed.name === 'string' ? parsed.name : typeof parsed.skill === 'string' ? parsed.skill : ''
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -37,6 +63,37 @@ export class SkillUsageRegistry extends Service {
     // so a config-driven '' must fall back to the real default path (P0-3).
     this.root = config.root || skillsRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    // A2 observation: `session/event` tool/call records are the read-side
+    // signal, on the same bus seam evolution-review already listens to. This
+    // makes the sidecar's view counters live; names without a usage record are
+    // skipped so unrelated reads never mint entries (records are authored by
+    // creation / patch / seed, never by observation).
+    ctx.on('session/event', (_session, event) => {
+      if (event.type !== 'tool/call') return
+      const kind = READ_TOOL_KIND[event.data.name]
+      if (!kind) return
+      const name = skillNameFromToolCall(
+        (event.data as unknown as { arguments?: string | Record<string, unknown> }).arguments,
+      )
+      if (!name) return
+      void this.observeRead(name).catch(() => {
+        // Observation is best-effort: a telemetry write failure must never
+        // surface in the conversation that just read a skill.
+      })
+    })
+  }
+
+  /**
+   * Read-side telemetry (A2): bump the view counter for an EXISTING record
+   * only. Creation-free by design — otherwise an arbitrary read mints a
+   * record, and "patched many times, reads zero" (the write-ghost signal)
+   * stays computable only while records exist from authorship paths.
+   */
+  private observeRead(name: string): Promise<void> {
+    return this.mutate((map) => {
+      if (!map.has(name)) return
+      bumpView(map, name, new Date())
+    })
   }
 
   /**

@@ -530,12 +530,14 @@ export class SkillLibrary {
 
   /**
    * Structure-health facts for one skill (rc.73 A1, 008 design): body
-   * chars/density from SKILL.md, support groups from countSupportDirs.
+   * chars/density from SKILL.md, support groups from countSupportDirs, plus
+   * optional usage counts (A2 churn dimension) when the caller has them.
    * Derived, never persisted; null when the skill is unreadable.
    */
   async assessHealth(
     rawName: string,
     thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+    counts?: { patchCount?: number; readCount?: number },
   ): Promise<SkillHealthAssessment | null> {
     const name = rawName.trim()
     const content = await this.read(name)
@@ -545,6 +547,8 @@ export class SkillLibrary {
       bodyChars: content.length,
       bodyText: content,
       supportGroups: await this.countSupportDirs(name),
+      patchCount: counts?.patchCount,
+      readCount: counts?.readCount,
     }, thresholds)
   }
 

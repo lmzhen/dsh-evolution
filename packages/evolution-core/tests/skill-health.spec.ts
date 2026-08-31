@@ -46,3 +46,34 @@ it('custom thresholds drive the same rules', () => {
   const assessment = assessStructureHealth({ skillName: 't', bodyChars: 2_500, supportGroups: 0 }, { softBodyChars: 1_000, stampDensityPerKb: 5 })
   expect(assessment.verdict).toBe('needs-restructure')
 })
+
+it('churn dimension warns when patched many times but never read (A2 write-ghost)', () => {
+  const thresholds = { ...DEFAULT_HEALTH_THRESHOLDS, churnMinPatches: 20 }
+  const ghost = assessStructureHealth({
+    skillName: 'ghost',
+    bodyChars: 500,
+    supportGroups: 1,
+    patchCount: 30,
+    readCount: 0,
+  }, thresholds)
+  expect(ghost.verdict).toBe('warn')
+  expect(ghost.reasons.some(reason => reason.includes('never read'))).toBe(true)
+  expect(ghost.dims.churnPatches).toBe(30)
+  expect(ghost.dims.churnReads).toBe(0)
+})
+
+it('churn dimension ignores usage when counts are absent or the skill is read', () => {
+  const thresholds = { ...DEFAULT_HEALTH_THRESHOLDS, churnMinPatches: 20 }
+  const noCounts = assessStructureHealth({ skillName: 'n', bodyChars: 500, supportGroups: 1 }, thresholds)
+  expect(noCounts.verdict).toBe('healthy')
+  expect(noCounts.dims.churnPatches).toBeNull()
+  const read = assessStructureHealth({
+    skillName: 'r',
+    bodyChars: 500,
+    supportGroups: 1,
+    patchCount: 40,
+    readCount: 3,
+  }, thresholds)
+  expect(read.verdict).toBe('healthy')
+  expect(read.reasons.some(reason => reason.includes('never read'))).toBe(false)
+})
