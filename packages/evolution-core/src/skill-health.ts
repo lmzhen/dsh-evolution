@@ -35,7 +35,7 @@ const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[
  * Bodies below this size skip stamp-density assessment: a few dates or shas
  * in a short body are ordinary documentation, not log-like content. With the
  * 1KB density floor a 3-date sentence in a small skill measured 3.0/KB and
- * warned on a perfectly healthy body (audit 2026-09-01 X1).
+ * warned on a perfectly healthy body (audit 2026-08-31 X1).
  */
 const MIN_STAMP_BODY_CHARS = 2_000
 
