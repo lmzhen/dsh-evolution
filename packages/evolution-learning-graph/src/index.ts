@@ -160,6 +160,12 @@ export function apply(ctx: Context): void {
       name: 'graph',
       description: 'Show the learning graph, or act on a node: graph [detail|edit|delete] <nodeId>',
       recordInput: false,
+      // input declaration (same fix as /evolution, 2026-08-31): the frontend
+      // drops every argument after the first word for commands without it —
+      // /graph detail <id> submitted as the bare /graph.
+      input: {
+        hint: '[detail|edit|delete] <nodeId> [text]',
+      },
       handler: async (invocation: { rawInput?: string }) => {
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
