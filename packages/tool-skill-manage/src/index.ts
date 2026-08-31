@@ -71,6 +71,8 @@ interface SkillWriteArgs {
   file_path?: string
   file_content?: string
   absorbed_into?: string
+  /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
+  restructure?: Array<{ heading?: string; to_file?: string }>
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -124,6 +126,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     else if (action === 'delete') result = await library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
     else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin)
     else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin)
+    else if (action === 'restructure') {
+      result = await library.restructure(name, (args.restructure ?? []).map(move => ({
+        heading: move.heading ?? '',
+        toFile: move.to_file ?? '',
+      })), origin)
+    }
     else if (action === 'pin') result = await library.setPinned(name, true, origin)
     else if (action === 'unpin') result = await library.setPinned(name, false, origin)
     else result = { ok: false, message: `Unknown action "${action}".` }
@@ -195,9 +203,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
+      + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'skip', 'pin', 'unpin'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'skip', 'pin', 'unpin'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -206,6 +215,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       file_path: { type: 'string' },
       file_content: { type: 'string' },
       absorbed_into: { type: 'string' },
+      restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
     },
     output: {
       schema: {

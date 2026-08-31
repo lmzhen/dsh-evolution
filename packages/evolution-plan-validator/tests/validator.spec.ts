@@ -33,4 +33,27 @@ describe('evolution-plan-validator', () => {
     }, { sessionSeq: 10 })
     expect(accepted.ok).toBe(true)
   })
+
+  it('validates restructure moves: shape, domain and move cap (008 batch B)', () => {
+    const base = { action: 'restructure', name: 'fat-skill', evidence: [{ event_seq: 4 }] } as const
+    const ok = validateEvolutionPlan({
+      skillOps: [{ ...base, restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] }],
+    }, { sessionSeq: 10 })
+    expect(ok.ok).toBe(true)
+    const missing = validateEvolutionPlan({ skillOps: [{ ...base }] }, { sessionSeq: 10 })
+    expect(missing.ok).toBe(false)
+    expect(missing.rejected[0]?.reason).toContain('non-empty restructure list')
+    const badFile = validateEvolutionPlan({
+      skillOps: [{ ...base, restructure: [{ heading: 'Details log', to_file: 'templates/x.md' }] }],
+    }, { sessionSeq: 10 })
+    expect(badFile.rejected[0]?.reason).toContain('references/<topic>.md')
+    const badHeading = validateEvolutionPlan({
+      skillOps: [{ ...base, restructure: [{ heading: '', to_file: 'references/x.md' }] }],
+    }, { sessionSeq: 10 })
+    expect(badHeading.rejected[0]?.reason).toContain('non-empty heading')
+    const tooMany = validateEvolutionPlan({
+      skillOps: [{ ...base, restructure: Array.from({ length: 6 }, (_, i) => ({ heading: `h${i}`, to_file: `references/${i}.md` })) }],
+    }, { sessionSeq: 10 })
+    expect(tooMany.rejected[0]?.reason).toContain('exceeds')
+  })
 })

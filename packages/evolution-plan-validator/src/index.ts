@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
-import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, MAX_RESTRUCTURE_MOVES, RESTRUCTURE_TARGET_RE } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
   target?: string
@@ -25,6 +25,8 @@ export interface SkillOp {
   new_string?: string
   file_path?: string
   absorbed_into?: string
+  /** restructure payload: body sections moved to references/ (008 batch B). */
+  restructure?: Array<{ heading?: string; to_file?: string } | null>
   evidence?: unknown[]
 }
 
@@ -57,7 +59,7 @@ export interface ValidationResult {
 }
 
 const MEMORY_ACTIONS = new Set(['add', 'replace', 'remove'])
-const SKILL_ACTIONS = new Set(['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file'])
+const SKILL_ACTIONS = new Set(['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure'])
 const FORBIDDEN_KEYS = ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config']
 
 function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
@@ -142,5 +144,17 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   const writeContent = op.file_content ?? op.content ?? ''
   if (action === 'write_file' && !writeContent.trim()) return `skill op ${index}: write_file requires file_content`
   if (writeContent.length > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
+  if (action === 'restructure') {
+    if (!Array.isArray(op.restructure) || op.restructure.length === 0) return `skill op ${index}: restructure requires a non-empty restructure list`
+    if (op.restructure.length > MAX_RESTRUCTURE_MOVES) return `skill op ${index}: restructure exceeds ${MAX_RESTRUCTURE_MOVES} moves`
+    for (const [moveIndex, move] of op.restructure.entries()) {
+      if (!move || typeof move.heading !== 'string' || !move.heading.trim()) {
+        return `skill op ${index}: restructure[${moveIndex}] requires a non-empty heading`
+      }
+      if (typeof move.to_file !== 'string' || !RESTRUCTURE_TARGET_RE.test(move.to_file)) {
+        return `skill op ${index}: restructure[${moveIndex}] to_file must be references/<topic>.md`
+      }
+    }
+  }
   return null
 }

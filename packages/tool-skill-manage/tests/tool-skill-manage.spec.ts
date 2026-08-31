@@ -7,7 +7,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -233,6 +233,61 @@ describe('tool-skill-manage', () => {
       })
       expect((result.value as { ok?: boolean } | undefined)?.ok).toBe(false)
       expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+      await ctx.fiber.dispose()
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('action=restructure moves a body section to references/ (B)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-restructure-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      await mountAgentLoopTestDependencies(ctx)
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(SkillUsageRegistry, { root })
+      await ctx.plugin(ToolSkillManage)
+      const body = `---
+name: fat-body
+description: restructure fixture.
+---
+
+# Fat Body
+
+## Details log
+
+- rc.99 detail
+
+## Usage
+
+Use it.
+`
+      const created = await ctx.tools.execute({
+        callId: CallId(`restructure-create-${Math.random()}`),
+        name: 'skill_manage',
+        arguments: { action: 'create', name: 'fat-body', content: body },
+        agent: fakeAgent(undefined),
+        signal: new AbortController().signal,
+      })
+      expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+      const moved = await ctx.tools.execute({
+        callId: CallId(`restructure-move-${Math.random()}`),
+        name: 'skill_manage',
+        arguments: { action: 'restructure', name: 'fat-body', restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] },
+        agent: fakeAgent(undefined),
+        signal: new AbortController().signal,
+      })
+      expect((moved.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+      const md = await readFile(join(root, 'skills', 'fat-body', 'SKILL.md'), 'utf8')
+      expect(md).toContain('> 详见 references/log.md')
+      expect(md).not.toContain('rc.99')
+      const sidecar = await ctx.skillUsage.report()
+      expect(sidecar.get('fat-body')?.patch_count).toBe(1)
       await ctx.fiber.dispose()
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME

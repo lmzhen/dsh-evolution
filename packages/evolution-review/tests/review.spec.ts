@@ -41,11 +41,12 @@ describe('evolution-review', () => {
       { action: 'write_file', name: 'unread-skill' },
       { action: 'remove_file', name: 'unread-skill' },
       { action: 'edit', name: 'unread-skill' },
+      { action: 'restructure', name: 'unread-skill' },
       { action: 'create', name: 'brand-new-skill' },
       { action: 'patch' },
     ]
     const dropped = Review.filterUnreadSkillOps(ops, new Set(['read-skill']))
-    expect(dropped).toBe(5)
+    expect(dropped).toBe(6)
     expect(ops.map(op => op.name).filter(Boolean)).toEqual(['read-skill', 'brand-new-skill'])
   })
 })

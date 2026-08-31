@@ -430,6 +430,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
       }
       if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? op.content ?? '', origin)
       if (op.action === 'remove_file') return await library.removeSupportFile(name, op.file_path ?? '', origin)
+      if (op.action === 'restructure') {
+        const moves = (op.restructure ?? [])
+          .filter((move): move is { heading?: string; to_file?: string } => move !== null)
+          .map(move => ({ heading: move.heading ?? '', toFile: move.to_file ?? '' }))
+        return await library.restructure(name, moves, origin)
+      }
       return { ok: false, message: `Unknown skill action "${op.action ?? ''}"` }
     }
   }
@@ -495,7 +501,7 @@ export function sweepDeadSessionEntries<K>(entries: Map<K, unknown> | Set<K>, is
  * them as rejected.
  */
 export function filterUnreadSkillOps(ops: Array<{ action?: string; name?: string }>, readNames: ReadonlySet<string>): number {
-  const READ_REQUIRED = ['edit', 'update', 'patch', 'delete', 'write_file', 'remove_file']
+  const READ_REQUIRED = ['edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure']
   let dropped = 0
   for (let index = ops.length - 1; index >= 0; index -= 1) {
     const op = ops[index]

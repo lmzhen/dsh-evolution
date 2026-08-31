@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@7'
-export const PROMPT_BUNDLE_VERSION = 7
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@8'
+export const PROMPT_BUNDLE_VERSION = 8
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -56,7 +56,8 @@ Preference order — prefer the earliest action that fits, but do pick one when 
      • templates/<name>.<ext> — starter files meant to be copied and modified (boilerplate configs, scaffolding, a known-good example the agent can reproduce with modifications).
      • scripts/<name>.<ext> — statically re-runnable actions the skill can invoke directly (verification scripts, fixture generators, deterministic probes, anything the agent should run rather than hand-type each time).
      Add support files via skill_manage action=write_file with file_path starting 'references/', 'templates/', or 'scripts/'. The umbrella's SKILL.md should gain a one-line pointer to any new support file so future agents know it exists.
-  4. CREATE A NEW CLASS-LEVEL UMBRELLA SKILL when no existing skill covers the class. The name MUST be at the class level. The name MUST NOT be a specific PR number, error string, feature codename, library-alone name, or 'fix-X / debug-Y / audit-Z-today' session artifact. If the proposed name only makes sense for today's task, it's wrong — fall back to (1), (2), or (3).
+  4. RESTRUCTURE a loaded skill whose body grew log-like — rc/sha/date-dense sections, session-detail spirals, or a fat body with no support files. Use skill_manage action=restructure with restructure: [{"heading": "<the exact ## heading text>", "to_file": "references/<topic>.md"}] — the ENTIRE ## section (from that heading to the next heading) moves into the support file and its position becomes a pointer line. The skill's name and directory never change. Only propose headings that exist verbatim in the body; never invent one, and never restructure a healthy small skill.
+  5. CREATE A NEW CLASS-LEVEL UMBRELLA SKILL when no existing skill covers the class. The name MUST be at the class level. The name MUST NOT be a specific PR number, error string, feature codename, library-alone name, or 'fix-X / debug-Y / audit-Z-today' session artifact. If the proposed name only makes sense for today's task, it's wrong — fall back to (1), (2), or (3).
 
 User-preference embedding (important): when the user expressed a style/format/workflow preference, the update belongs in the SKILL.md body, not just in memory. Memory captures 'who the user is and what the current situation and state of your operations are'; skills capture 'how to do this class of task for this user'. When they complain about how you handled a task, the skill that governs that task needs to carry the lesson.
 
@@ -102,7 +103,8 @@ Preference order for skills — pick the earliest that fits:
   1. UPDATE A CURRENTLY-LOADED SKILL. Check what skills were loaded or read in the conversation. If one of them covers the learning, PATCH it first. It was in play; it's the right place.
   2. UPDATE AN EXISTING UMBRELLA. Patch it.
   3. ADD A SUPPORT FILE under an existing umbrella via skill_manage action=write_file. Three kinds: references/<topic>.md for session-specific detail OR condensed knowledge banks (quoted research, API docs excerpts, domain notes) written concise and task-focused; templates/<name>.<ext> for starter files meant to be copied and modified; scripts/<name>.<ext> for statically re-runnable actions (verification, fixture generators, probes). Add a one-line pointer in SKILL.md so future agents find them.
-  4. CREATE A NEW CLASS-LEVEL UMBRELLA when nothing exists. Name at the class level — NOT a PR number, error string, codename, library-alone name, or 'fix-X / debug-Y' session artifact. If the name only fits today's task, fall back to (1), (2), or (3).
+  4. RESTRUCTURE a loaded skill whose body grew log-like (rc/sha/date-dense sections, session-detail spirals, fat body with no support files) via skill_manage action=restructure with restructure: [{"heading": "<the exact ## heading text>", "to_file": "references/<topic>.md"}] — the ENTIRE ## section moves into the support file and its position becomes a pointer line; the skill's name and directory never change. Only propose headings that exist verbatim in the body.
+  5. CREATE A NEW CLASS-LEVEL UMBRELLA when nothing exists. Name at the class level — NOT a PR number, error string, codename, library-alone name, or 'fix-X / debug-Y' session artifact. If the name only fits today's task, fall back to (1), (2), or (3).
 
 Two-tier deposition discipline (DSH addition): classify before writing — PATTERN (symptom → mechanism → fix → verification) goes in the SKILL.md body; LOG (commit SHAs, npm/profile states, this release's change list, this session's narrative) goes in a references/ file. Body density IS reuse rate; a pattern fits in 2-8 physical lines.
 

@@ -46,6 +46,25 @@ export interface SkillActionResult {
   path?: string
 }
 
+/**
+ * One section move of a restructure proposal (008 batch B): a body section
+ * anchored by its exact `## heading` line is moved to a references/ support
+ * file and replaced by a pointer line. The skill name/dir never change —
+ * restructure is a content-distribution repair, not a routing change.
+ */
+export interface SkillRestructureMove {
+  /** The `##` heading title, matched as an exact line (leading `##` + spaces); no fuzzy matching. */
+  heading: string
+  /** Destination support file: `references/<topic>.md` (references/ only — moved content is log/detail, never a template or script). */
+  toFile: string
+}
+
+/** Upper bound of moves per restructure proposal (validator and core agree). */
+export const MAX_RESTRUCTURE_MOVES = 5
+
+/** Restructure targets are plain markdown files under references/ — no subdirectories, no other support kind. */
+export const RESTRUCTURE_TARGET_RE = /^references\/[a-z0-9][a-z0-9._-]*\.md$/
+
 /** Extra file name carried inside a snapshot's `extras/` directory. */
 export const SNAPSHOT_EXTRA_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
 
@@ -342,6 +361,65 @@ function fuzzyPatch(content: string, oldString: string, newString: string, repla
     return patched === content ? null : patched
   }
   return null
+}
+
+/** Deterministic section-extraction plan facts; the caller owns the IO and the append semantics. */
+interface PlannedRestructureSection {
+  rel: string
+  heading: string
+  text: string
+}
+
+/** Planned section extraction (pure; no IO): new body + extracted section texts. */
+type RestructurePlan = { error: string } | { body: string; sections: PlannedRestructureSection[] }
+
+function planRestructureSections(body: string, moves: SkillRestructureMove[]): RestructurePlan {
+  const lines = body.split('\n')
+  const spans: Array<{ start: number; end: number; rel: string; heading: string; text: string }> = []
+  for (const move of moves) {
+    const wanted = move.heading.trim()
+    const starts: number[] = []
+    for (let i = 0; i < lines.length; i += 1) {
+      const match = /^#{2}\s+(.+?)\s*$/.exec(lines[i] ?? '')
+      const title = match?.[1]?.trim() ?? ''
+      if (title === wanted) starts.push(i)
+    }
+    const [start] = starts
+    if (start === undefined) return { error: `no "## ${wanted}" heading in the body` }
+    if (starts.length > 1) return { error: `heading "## ${wanted}" appears ${starts.length} times (ambiguous anchor)` }
+    let end = lines.length
+    for (let i = start + 1; i < lines.length; i += 1) {
+      // H2 is the section boundary: a moved section spans to the NEXT `##`
+      // heading (or EOF). Deeper headings travel with their parent section —
+      // anchors are H2-only, so H2-anchored sections can never nest.
+      if (/^#{2}\s/.test(lines[i] ?? '')) {
+        end = i
+        break
+      }
+    }
+    if (end === start + 1) return { error: `heading "## ${wanted}" has an empty section` }
+    if (spans.some(span => start === span.start)) return { error: `heading "## ${wanted}" is moved twice` }
+    spans.push({
+      start,
+      end,
+      rel: move.toFile,
+      heading: wanted,
+      text: lines.slice(start, end).join('\n'),
+    })
+  }
+  // Rebuild the body line-wise: a moved section collapses to its pointer line.
+  const byStart = new Map(spans.map(span => [span.start, span]))
+  const rebuilt: string[] = []
+  for (let i = 0; i < lines.length; i += 1) {
+    const span = byStart.get(i)
+    if (span) {
+      rebuilt.push(`> 详见 references/${span.rel.split('/').at(-1)}`)
+      i = span.end - 1
+    } else {
+      rebuilt.push(lines[i] ?? '')
+    }
+  }
+  return { body: rebuilt.join('\n'), sections: spans.map(({ rel, heading, text }) => ({ rel, heading, text })) }
 }
 
 export class SkillLibrary {
@@ -812,6 +890,96 @@ export class SkillLibrary {
    * recoverability: archival never deletes, and this is the control-plane
    * path back. The `.archive-reason` marker is dropped on restore.
    */
+  /**
+   * Content-distribution repair (008 batch B): move body sections — anchored
+   * by their exact `## heading` lines — into references/ support files and
+   * replace each span with a pointer line. The skill name/dir never change
+   * (routing stays; only content location shifts, so a fat body sheds its
+   * log-like detail). Deterministic, never automatic: candidates come from an
+   * approved review plan. Two-phase: every move is validated against one
+   * snapshot first (a miss aborts with zero writes), then support files and
+   * the body commit; a mid-loop write failure restores every file it already
+   * touched (consolidate's rollback discipline).
+   */
+  async restructure(rawName: string, moves: SkillRestructureMove[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    const name = rawName.trim()
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
+    if (moves.length === 0) return { ok: false, message: 'Restructure requires at least one section move.' }
+    if (moves.length > MAX_RESTRUCTURE_MOVES) return { ok: false, message: `Restructure exceeds ${MAX_RESTRUCTURE_MOVES} moves.` }
+    for (const move of moves) {
+      if (typeof move.heading !== 'string' || !move.heading.trim()) {
+        return { ok: false, message: 'Every restructure move needs a non-empty heading.' }
+      }
+      if (!RESTRUCTURE_TARGET_RE.test(move.toFile)) {
+        return { ok: false, message: `toFile must be references/<topic>.md (got "${move.toFile}").` }
+      }
+    }
+    const dir = this.dirOf(name)
+    const md = await this.io.readText(join(dir, 'SKILL.md'))
+    if (!md) return { ok: false, message: `Skill "${name}" not found.` }
+    const protection = await this.writeProtection(name, origin)
+    if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
+    const normalized = md.replace(/\r\n/g, '\n')
+    const plan = planRestructureSections(normalized, moves)
+    if ('error' in plan) return { ok: false, message: `Restructure rejected: ${plan.error}` }
+    const frontmatterEnd = normalized.indexOf('\n---', 3)
+    if (frontmatterEnd < 0) return { ok: false, message: 'SKILL.md has no valid frontmatter; refusing to restructure.' }
+    const newMd = normalized.slice(0, frontmatterEnd + 4) + plan.body
+    const newMdCheck = validateFrontmatter(newMd, name, this.limits)
+    if (newMdCheck) return { ok: false, message: `Restructure rejected: ${newMdCheck}` }
+    const threat = scanContentThreats(newMd)
+    if (threat) return { ok: false, message: threat }
+    // Aggregate by destination: two moves into one file append in move order.
+    const byRel = new Map<string, { rel: string; texts: string[] }>()
+    for (const section of plan.sections) {
+      const entry = byRel.get(section.rel) ?? { rel: section.rel, texts: [] }
+      entry.texts.push(section.text)
+      byRel.set(section.rel, entry)
+    }
+    const writes: Array<{ target: string; content: string; previous: string | null }> = []
+    for (const entry of byRel.values()) {
+      const target = join(dir, ...entry.rel.split('/'))
+      const previous = await this.io.readText(target).catch(() => null)
+      const base = previous?.trimEnd() ?? ''
+      const content = base === '' ? entry.texts.join('\n\n') : `${base}\n\n${entry.texts.join('\n\n')}`
+      if (Buffer.byteLength(content, 'utf8') > this.limits.maxSkillFileBytes) {
+        return { ok: false, message: `Support file "${entry.rel}" exceeds ${this.limits.maxSkillFileBytes} bytes.` }
+      }
+      const fileThreat = scanContentThreats(content)
+      if (fileThreat) return { ok: false, message: fileThreat }
+      writes.push({ target, content, previous })
+    }
+    // Two-phase commit: any write failure restores every already-touched file
+    // (support files first, body last) from the pre-read bytes.
+    const landing: Array<{ target: string; content: string; previous: string | null }> = [...writes, {
+      target: join(dir, 'SKILL.md'),
+      content: newMd,
+      previous: md,
+    }]
+    const written: Array<{ target: string; previous: string | null }> = []
+    try {
+      for (const entry of landing) {
+        await this.io.writeText(entry.target, entry.content)
+        written.push({ target: entry.target, previous: entry.previous })
+      }
+    } catch (error) {
+      for (const entry of written.reverse()) {
+        await (entry.previous === null
+          ? this.io.remove(entry.target)
+          : this.io.writeText(entry.target, entry.previous)
+        ).catch(() => {
+          // Rollback is best-effort; the original bytes stay readable via the
+          // .backups snapshot when the curator took one (control-plane rule).
+        })
+      }
+      return { ok: false, message: `Restructure failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
+    }
+    await this.audit(name, 'restructure', md, newMd, `moved ${plan.sections.length} section(s): ${[...byRel.keys()].join(', ')}`)
+    this.notifyMutation({ action: 'restructure', name, filePath: dir })
+    return { ok: true, message: `Restructured "${name}": moved ${plan.sections.length} section(s) to references/.`, path: dir }
+  }
+
   async restoreFromArchive(rawName: string): Promise<SkillActionResult> {
     const name = rawName.trim()
     if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
