@@ -83,7 +83,7 @@ L0 共享核心层   evolution-core（MemoryStore / SkillLibrary / threats / usa
 |---|---|---|---|---|
 | 0.1 | 横切 | 架构张力 1 | 按决策 D 搭建镜像内测试/类型检查通道（最小 vitest + tsc） | `vitest run` 在镜像内可执行，现存 51 个 spec 的基线通过/失败清单产出 |
 
-> **已裁决（rc.51 决策 D = D2）**：构建与测试只在上游树进行，镜像只承载发布——本行随 D2 隐式取消（取代关系见 `docs/integration-plan-m0-g8.md` 第九步）。
+> **已裁决（rc.51 决策 D = D2）**：构建与测试只在上游树进行，镜像只承载发布——本行随 D2 隐式取消（原取代关系详见已归档的集成计划）。
 | 0.2 | L4→L5 | P0-1 | 按决策 A1 改事件通道；对**已写坏**的会话日志提供检测说明（文档：遇到 `SessionFormatUnsupportedError` 的处置） | 含 evolution 活动的会话 restart/resume 通过；会话日志 0 个 `evolution/*` 类型 |
 | 0.3 | L5 | P0-2 | `evolution replay` → 改名 `evolution-replay`（或并入 `/evolution replay` 子命令由 evolution-commands 承接，推荐后者以减少命令数量）；handler 返回 `{kind:'success',text}` | commands 注册不抛错；运行时返回形状过校验 |
 | 0.4 | L1 | P0-3 | skill-usage root 改 `rawConfig.root || skillsRoot()`，与其余 4 处写法对齐 | 未配置 root 时 sidecar 落在 `~/.dsh/skills/.usage.json` |
