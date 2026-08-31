@@ -18,6 +18,14 @@ export function apply(ctx: Context): void {
       name: 'evolution',
       description: 'Self-evolution status and approval controls',
       recordInput: false,
+      // input declaration: the frontend treats a declared-input command as
+      // args-tolerant (leading claim keeps the whole rest, spaces included) —
+      // without it, multi-word subcommands (skills health, curator run, …)
+      // submit as the bare `/evolution` and the handler only ever sees the
+      // help branch (field report 2026-08-31; /goal is the working precedent).
+      input: {
+        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | replay',
+      },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
         const ok = (text: string) => ({ kind: 'success' as const, text })
