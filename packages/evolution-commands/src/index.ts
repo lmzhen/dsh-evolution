@@ -125,12 +125,16 @@ export function apply(ctx: Context): void {
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'skills health') {
-          const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>> } | undefined
+          const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>>; usageObserved(): Promise<boolean> } | undefined
           if (!curator) return err('Curator service not mounted.')
-          const rows = await curator.healthView()
-          if (rows.length === 0) return ok('Structure health: all skills healthy.')
+          const [rows, observed] = await Promise.all([curator.healthView(), curator.usageObserved()])
+          // C observation window: before ANY observed read exists, view_count
+          // zero is not evidence — say so instead of silently showing a clean
+          // (or churn-skewed) verdict.
+          const banner = observed ? '' : 'Usage observation not yet established — churn (write-ghost) rows are suppressed.'
           const line = (row: { verdict: string; name: string; reasons: string[] }): string => `${row.verdict.padEnd(18)} ${row.name}${row.reasons.length > 0 ? ` — ${row.reasons.join('; ')}` : ''}`
-          return ok([`Structure health (${rows.length} degraded):`, ...rows.map(line)].join('\n'))
+          if (rows.length === 0) return ok(banner ? `Structure health: all skills healthy. ${banner}` : 'Structure health: all skills healthy.')
+          return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...rows.map(line)].join('\n'))
         }
         if (input === 'learn' || input.startsWith('learn ')) {
           const request = input === 'learn' ? '' : input.slice(6).trim()

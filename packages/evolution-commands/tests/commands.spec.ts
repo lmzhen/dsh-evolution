@@ -86,6 +86,7 @@ describe('evolution-commands', () => {
       },
     })
     let first = true
+    let observed = true
     ctx.provide('evolutionCurator', {
       healthView: async () => {
         if (!first) return []
@@ -95,6 +96,7 @@ describe('evolution-commands', () => {
           { name: 'log-skill', verdict: 'warn', reasons: ['stamp density 3.2/KB'] },
         ]
       },
+      usageObserved: async () => observed,
     })
     await ctx.plugin(Commands)
     const result = await captured!.handler({ rawInput: 'skills health' })
@@ -102,8 +104,14 @@ describe('evolution-commands', () => {
     expect(result.text).toContain('Structure health (2 degraded):')
     expect(result.text).toContain('needs-restructure  fat-skill')
     expect(result.text).toContain('stamp density')
+    expect(result.text).not.toContain('Usage observation')
     const empty = await captured!.handler({ rawInput: 'skills health' })
     expect(empty.text).toContain('all skills healthy')
+    // C observation window: before any observed read, the verdict says so.
+    observed = false
+    const windowed = await captured!.handler({ rawInput: 'skills health' })
+    expect(windowed.text).toContain('Usage observation not yet established')
+    expect(windowed.text).toContain('all skills healthy')
   })
 
   it('records a learn event into the event log when the io registry is mounted (rc.68)', async () => {

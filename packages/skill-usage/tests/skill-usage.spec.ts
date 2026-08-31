@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '../src/index.ts'
-import { loadUsage, saveUsage, nodeEvolutionIo, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { eventsFile, loadUsage, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -71,7 +71,7 @@ describe('skill-usage', () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
     await ctx.skillUsage.ensureRecord('demo-read')
     const toolCall = (name: string, args: unknown) => ({
       type: 'tool/call',
@@ -84,6 +84,33 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('demo-read')
     expect(seen?.view_count).toBe(2)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('appends the observation-window anchor once, on the first observed read (C)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-anchor-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
+    await ctx.skillUsage.ensureRecord('anchor-skill')
+    const read = (step: number) => {
+      ctx.emit('session/event', {} as never, {
+        type: 'tool/call',
+        data: { turn: 1, step, callId: `c${step}`, name: 'skill', arguments: JSON.stringify({ name: 'anchor-skill' }) },
+      } as never)
+    }
+    read(1)
+    read(2)
+    await ctx.skillUsage.invalidate()
+    const { events } = await readEvolutionTimeline(nodeEvolutionIo(), eventsFile(root))
+    const anchors = events.filter(event => event.type === 'usage')
+    expect(anchors).toHaveLength(1)
+    expect(anchors[0]?.kind).toBe('skill')
+    expect(anchors[0]?.source).toBe('observation')
+    expect(anchors[0]?.window?.opened).toBeTruthy()
+    // Counts are the snapshot at the moment the window opened (first read).
+    expect(anchors[0]?.counts?.views).toBe(1)
     await rm(root, { recursive: true, force: true })
   })
 

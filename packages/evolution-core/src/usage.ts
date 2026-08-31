@@ -227,6 +227,20 @@ export function latestActivityAt(record: UsageRecord): string | null {
 }
 
 /**
+ * Whether the library has ANY observed read evidence (C observation window):
+ * reads were invisible to the usage sidecar before A2, so `view_count` zero
+ * means "never read" ONLY after the first observed read exists anywhere in
+ * the map. Before that, churn-based signals (write-ghost) are untrustworthy
+ * and callers must suppress them. Pure and derived — never persisted.
+ */
+export function usageObserved(usage: ReadonlyMap<string, UsageRecord>): boolean {
+  for (const record of usage.values()) {
+    if (record.view_count > 0) return true
+  }
+  return false
+}
+
+/**
  * Curator suppression sidecar: built-in skills the curator has archived stay
  * suppressed across re-seeds, so the lifecycle never fights a re-created
  * bundled skill. Best-effort load/save, mirroring the usage sidecar posture.

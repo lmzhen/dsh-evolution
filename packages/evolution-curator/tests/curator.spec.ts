@@ -334,6 +334,30 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('suppresses churn rows before any observed read exists (C observation window)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-window-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { healthChurnMinPatches: 20 })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('ghost-skill', '---\nname: ghost-skill\ndescription: g\n---\n\nSmall body.\n', 'foreground')
+    await mutateUsage(skills.root, nodeEvolutionIo(), (map) => {
+      const ghost = getRecord(map, 'ghost-skill')
+      ghost.patch_count = 30
+      ghost.view_count = 0
+    })
+    // No observed read anywhere in the library: view_count zero is not evidence yet.
+    expect(await ctx.evolutionCurator.usageObserved()).toBe(false)
+    const rows = await ctx.evolutionCurator.healthView()
+    expect(rows.find(row => row.name === 'ghost-skill')).toBeUndefined()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('control-plane folds keep counters and never flatten a malformed usage sidecar (rc.67 K-1)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-k1-'))
     const previous = process.env.DSH_HOME

@@ -8,7 +8,10 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { evolutionIoAdapter,  skillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
@@ -37,6 +40,19 @@ function skillNameFromToolCall(raw: unknown): string {
   return typeof parsed.name === 'string' ? parsed.name : typeof parsed.skill === 'string' ? parsed.skill : ''
 }
 
+/** Cumulative library-wide usage totals (C observation-window event counts). */
+function usageTotals(map: UsageMap): { skills: number; views: number; use: number; patches: number } {
+  let views = 0
+  let use = 0
+  let patches = 0
+  for (const record of map.values()) {
+    views += record.view_count
+    use += record.use_count
+    patches += record.patch_count
+  }
+  return { skills: map.size, views, use, patches }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     skillUsage: SkillUsageRegistry
@@ -45,15 +61,19 @@ declare module '@deepseek-ai/cordis' {
 
 export interface Config {
   root?: string
+  /** Home for the evolution event timeline (`<eventsHome>/evolution/events.json`); defaults to DSH_HOME or ~/.dsh. */
+  eventsHome?: string
 }
 
 export class SkillUsageRegistry extends Service {
   static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
     root: z.string().default(''),
+    eventsHome: z.string().default(''),
   })
 
   readonly root: string
+  private readonly eventsHome: string
   private readonly io: EvolutionIoLike
   private chain: Promise<unknown> = Promise.resolve()
 
@@ -62,6 +82,7 @@ export class SkillUsageRegistry extends Service {
     // `||` not `??`: schemastery's `default('')` yields '' which is NOT nullish,
     // so a config-driven '' must fall back to the real default path (P0-3).
     this.root = config.root || skillsRoot()
+    this.eventsHome = config.eventsHome || process.env.DSH_HOME || join(homedir(), '.dsh')
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // A2 observation: `session/event` tool/call records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
@@ -88,12 +109,41 @@ export class SkillUsageRegistry extends Service {
    * only. Creation-free by design — otherwise an arbitrary read mints a
    * record, and "patched many times, reads zero" (the write-ghost signal)
    * stays computable only while records exist from authorship paths.
+   *
+   * Observation window (C): the FIRST observed read library-wide opens the
+   * window — one `type:'usage'` event is appended to the evolution timeline
+   * (best-effort; the usage sidecar stays the truth and never fails the read
+   * path). Post-A2 deployments treat `view_count` as trustworthy only after
+   * that anchor exists (curator gates churn on `usageObserved()`).
    */
   private observeRead(name: string): Promise<void> {
-    return this.mutate((map) => {
+    return this.mutate(async (map) => {
       if (!map.has(name)) return
+      const viewsBefore = usageTotals(map).views
       bumpView(map, name, new Date())
+      if (viewsBefore === 0) {
+        await this.appendUsageWindowEvent(map)
+      }
     })
+  }
+
+  /** Append the observation-window anchor event; best-effort, never fails the observation. */
+  private async appendUsageWindowEvent(map: UsageMap): Promise<void> {
+    try {
+      const at = new Date().toISOString()
+      await appendEvolutionEvent(this.io, eventsFile(this.eventsHome), {
+        type: 'usage',
+        kind: 'skill',
+        source: 'observation',
+        note: 'observation window opened',
+        counts: usageTotals(map),
+        window: { opened: at },
+      })
+    } catch {
+      // Best-effort anchor: a failed timeline append must never surface in the
+      // conversation that just read a skill (the sidecar keeps the truth, and
+      // the next observed read retries while no OTHER read opened the window).
+    }
   }
 
   /**

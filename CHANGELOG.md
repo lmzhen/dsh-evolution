@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — C: observation window semantics + usage anchor events (008 batch IV)
+
+- **Observation window（信号门，零持久化）**：`usageObserved(usage)`（core，纯派生）判定库内是否已有任一观察证据；curator `healthView()` 在窗口开启前**不向评估传递 usage 计数**——churn（写幽灵）维度整体抑制（无 counts = 无可信输入），新增 `usageObserved()` 公开方法供命令面使用。`/evolution skills health` 在窗口未开时输出 `Usage observation not yet established — churn (write-ghost) rows are suppressed.`，不再静默显示干净结果。语义：`view_count=0` 仅在窗口开启后（库内出现任一可观测读）才等于"从未被读"——A2 部署前历史读取不可见的迁移期失真由此消除。
+- **Usage 锚点事件**（`evolution-events.ts`）：`EvolutionEvent.type` 联合扩展 `'usage'`，新增 `counts`（库级累计快照 skills/views/use/patches）与 `window.opened` 字段；skill-usage 在**库级首次观察读**（view 0→1）时向事件时间线追加一次锚点事件（`type:'usage'`, `kind:'skill'`, `source:'observation'`, `note:'observation window opened'`，best-effort，侧车仍为真值）。语义注释入模块头。`eventsHome` 加入 skill-usage Config（默认 DSH_HOME/`~/.dsh`，测试显式隔离）。
+- 周期聚合快照（每 N 次观察）**有意未实现**：观察计数在 usage 侧车已权威（时间线事件仅作窗口锚+时序可回溯），快照在真实观察高频且需跨重启聚合展示时再加（见 known-limitations #4）。
+- Tests: 锚点事件（首读写一次/不重复/快照语义）、窗口抑制（无 view 时 ghost 不出现）、commands 窗口注记（有/无观察两态）。C 簇 51/51，全量 296/299（3 例已知负载假失败类，隔离绿），tsc 0，oxlint 0/0。
+
 ## Unreleased — B: restructure execution loop — SkillLibrary.restructure + plan op + approval reuse + prompt line (008 batch III)
 
 - **`SkillLibrary.restructure(name, moves, origin)`** (`evolution-core/src/skill-store.ts`): deterministic content-distribution repair — body sections anchored by their exact `## heading` line move into `references/<topic>.md` and each span becomes a `> 详见 references/<file>` pointer line. The skill's name/directory never change (routing stays; the fat body sheds log-like detail — the mechanical counterpart of A1's size/stamp/scatter signals). Deterministic contract: H2-only anchors, H2 section boundaries (deeper headings travel with their parent), `references/`-only targets (`RESTRUCTURE_TARGET_RE`, no `templates/`, no subdirectories), max 5 moves (`MAX_RESTRUCTURE_MOVES`), duplicate/ambiguous/empty sections rejected with zero writes, frontmatter + threat + byte-budget revalidation, pinned/bundled/hub origin gate, two-phase commit with full byte-level rollback, audit trail + `evolution/skill-mutated` event (action `restructure`). Never automatic: candidates come from the approved review plan.

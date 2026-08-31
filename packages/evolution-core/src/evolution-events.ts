@@ -6,6 +6,15 @@
  * learn on target X" is answerable. The aggregate `feedback.json` is a
  * rebuildable boot cache, never the truth.
  *
+ * Usage events (C semantics, rc.73+): `type:'usage'` records are the
+ * OBSERVATION WINDOW ANCHOR — written once, when the library's first observed
+ * read (`view_count` 0 -> 1) happens. Before that anchor the usage sidecar
+ * has no read evidence (reads were invisible pre-A2), so churn-based health
+ * judgments are NOT trustworthy; the curator suppresses them (its
+ * `usageObserved()` gate) until the anchor exists. `counts` on the event is a
+ * cumulative library-wide snapshot (skills/views/use/patches) at that moment,
+ * and `window.opened` pins the window start for the timeline.
+ *
  * Rotation (rc.71, 007 design): when the active log reaches
  * `EVENT_LOG_ROTATE_AT` the older half is split into an archive
  * (`events-<lastArchivedSeq>.json`); the boot timeline merges active +
@@ -43,14 +52,20 @@ export interface EvolutionEvent {
   seq: number
   /** ISO timestamp at append time. */
   at: string
-  /** Tagged-union discriminator: feedback increments vs learn actions. */
-  type: 'feedback' | 'learn'
+  /** Tagged-union discriminator: feedback increments, learn actions, and
+   * usage observation anchors (C semantics: `usage` events carry the library-
+   * wide count snapshot at the moment the observation window opened). */
+  type: 'feedback' | 'learn' | 'usage'
   target?: string | undefined
   kind?: 'skill' | 'session' | undefined
   rating?: 'positive' | 'negative' | undefined
   note?: string | undefined
   source?: string | undefined
   request?: string | undefined
+  /** Library-wide usage totals (usage events; counts are cumulative, not deltas). */
+  counts?: { skills?: number; views?: number; use?: number; patches?: number } | undefined
+  /** Anchor fields for one event (usage: the observation window). */
+  window?: { opened?: string } | undefined
 }
 
 export function eventsFile(home: string): string {

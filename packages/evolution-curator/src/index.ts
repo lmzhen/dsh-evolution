@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
+import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
@@ -927,16 +928,26 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       churnMinPatches: this.healthChurnMinPatches,
     }
     const usage = await loadUsage(this.skills.root, this.io)
+    // C observation window: before ANY observed read exists in the library,
+    // `view_count` zero is not evidence (reads were invisible pre-A2), so the
+    // churn dimension is suppressed — no counts reach the assessment at all.
+    const observed = usageObserved(usage)
     const rows: Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }> = []
     for (const summary of await this.skills.list()) {
       const record = usage.get(summary.name)
-      const assessment = await this.skills.assessHealth(summary.name, thresholds, record ? {
+      const assessment = await this.skills.assessHealth(summary.name, thresholds, observed && record ? {
         patchCount: record.patch_count,
         readCount: record.view_count,
       } : undefined)
       if (assessment && assessment.verdict !== 'healthy') rows.push({ name: summary.name, verdict: assessment.verdict, reasons: assessment.reasons })
     }
     return rows
+  }
+
+  /** Whether the library has ANY observed read evidence (C observation-window gate for churn signals). */
+  async usageObserved(): Promise<boolean> {
+    const usage = await loadUsage(this.skills.root, this.io)
+    return usageObserved(usage)
   }
 
   /** marker info (pinned/bundled/hub-installed) per skill, from the library list. */
