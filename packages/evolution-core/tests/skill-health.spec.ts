@@ -21,19 +21,32 @@ it('body above the soft limit warns, at 2x it demands restructure (rc.73 A1)', (
   expect(needs.reasons[0]).toContain('2x the soft limit')
 })
 
-it('stamp density flags log-like content in the body', () => {
+it('stamp density flags log-like content in a large body', () => {
+  const pad = 'Ordinary upkeep note: the body stays scannable for future agents. '.repeat(29)
   const lines = [
     '# Log',
-    '- rc.67 fixed X',
-    '- rc.68 fixed Y',
-    '- rc.69 fixed Z',
+    pad,
+    '- rc.61 fixed A',
+    '- rc.62 fixed B',
+    '- rc.63 fixed C',
+    '- rc.64 fixed D',
+    '- rc.65 fixed E',
+    '- rc.66 fixed F',
+    '- rc.67 fixed G',
     '- commit abc1234 did more',
     'done',
   ].join('\n')
-  const assessment = assessStructureHealth({ skillName: 'log', bodyChars: 500, bodyText: lines, supportGroups: 0 })
+  const assessment = assessStructureHealth({ skillName: 'log', bodyChars: lines.length, bodyText: lines, supportGroups: 0 })
   expect(assessment.verdict).toBe('warn')
   expect(assessment.dims.stampDensityPerKb).not.toBeNull()
   expect(assessment.reasons.some(reason => reason.includes('stamp density'))).toBe(true)
+})
+
+it('short bodies skip stamp density — a few dates are ordinary documentation (audit X1)', () => {
+  const body = '# Ok\n\nUpdated on 2026-08-30. Also 2026-08-31.\n'
+  const assessment = assessStructureHealth({ skillName: 'short', bodyChars: body.length, bodyText: body, supportGroups: 1 })
+  expect(assessment.verdict).toBe('healthy')
+  expect(assessment.dims.stampDensityPerKb).toBeNull()
 })
 
 it('a large body with no support groups is flagged as scatter', () => {

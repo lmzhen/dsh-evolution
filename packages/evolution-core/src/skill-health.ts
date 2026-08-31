@@ -31,6 +31,14 @@ export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
 
 const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z)?\b/g
 
+/**
+ * Bodies below this size skip stamp-density assessment: a few dates or shas
+ * in a short body are ordinary documentation, not log-like content. With the
+ * 1KB density floor a 3-date sentence in a small skill measured 3.0/KB and
+ * warned on a perfectly healthy body (audit 2026-09-01 X1).
+ */
+const MIN_STAMP_BODY_CHARS = 2_000
+
 export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure'
 
 /** Facts a caller already has; assessors never do IO. */
@@ -79,7 +87,7 @@ export function assessStructureHealth(
   } else if (snapshot.bodyChars >= thresholds.softBodyChars) {
     reasons.push(`body ${snapshot.bodyChars} chars above the soft limit (${thresholds.softBodyChars})`)
   }
-  if (snapshot.bodyText) {
+  if (snapshot.bodyText && snapshot.bodyChars >= MIN_STAMP_BODY_CHARS) {
     const kb = Math.max(1, snapshot.bodyChars / 1024)
     const stamps = (snapshot.bodyText.match(HEALTH_STAMP_RE) ?? []).length
     dims.stampDensityPerKb = stamps / kb
