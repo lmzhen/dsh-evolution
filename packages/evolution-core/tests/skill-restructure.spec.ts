@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { parseFrontmatter, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 const BODY = `---
 name: demo-skill
@@ -156,5 +156,25 @@ it('refuses pinned skills from the background review (origin gate)', async () =>
   expect(result.ok).toBe(false)
   expect(result.message).toContain('protected')
   expect(await lib.read('demo-skill')).toBe(BODY)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('never duplicates frontmatter on success or on repeated restructures (v7 audit P1-1)', async () => {
+  const { root, lib } = await makeLib()
+  const first = await lib.restructure('demo-skill', [{ heading: 'Details log', toFile: 'references/log.md' }], 'background_review')
+  expect(first.ok).toBe(true)
+  const md = await lib.read('demo-skill')
+  // Structure-level assertion: `toContain` cannot see a duplicated frontmatter
+  // block, but the parse body must never START with `---`.
+  const parsed = parseFrontmatter(md ?? '')
+  expect(parsed).not.toBeNull()
+  expect(parsed?.body.startsWith('---')).toBe(false)
+  await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/use.md' }], 'background_review')
+  const md2 = await lib.read('demo-skill')
+  const parsed2 = parseFrontmatter(md2 ?? '')
+  expect(parsed2?.body.startsWith('---')).toBe(false)
+  expect(parsed2?.frontmatter.name).toBe('demo-skill')
+  expect(md2 ?? '').toContain('> 详见 references/log.md')
+  expect(md2 ?? '').toContain('> 详见 references/use.md')
   await rm(root, { recursive: true, force: true })
 })
