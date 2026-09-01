@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — v7 audit fixes (P1-1 restructure frontmatter duplication + P3-1/P3-2/P3-3)
+
+- **P1-1 (correctness, in the tagged rc.1/rc.2 code)**: `restructure` assembled `header + plan.body` where the planner had been fed the FULL normalized text — every successful call wrote a second frontmatter block (duplicate `name`/`description` keys, accumulating on repeated calls). The lenient `parseFrontmatter` and all `toContain`-style tests tolerated it (v7 audit caught it; 009-R claimed "zero behavior change" and this betrayed that claim). Fix: the planner now receives the body only; structure-level regression added — parsed body must never start with `---` and a second restructure must not stack copies.
+- **P3-1 (gate completeness)**: `supportRefs` now matches ANY extension and nested paths (`scripts/run.sh`, `references/sub/x.md`) — the `.md`-only regex missed both, so the "dangling links are not constructible" claim was stronger than the implementation. `..` traversal stays out of the link set (path validation owns that class). Regression: non-md + nested refusal in append mode.
+- **P3-2 (comment accuracy)**: `appendUsageWindowEvent` no longer claims "the next observed read retries" — the anchor fires exactly once (view 0→1); a failed append is never retried (sidecar stays the truth).
+- **P3-3**: removed the dead `tag` variable in mirror `publish-scoped.mjs` (unused since distTag auto-selection); 008 design doc gains an implementation note (`type:'usage'` not `type:'skill'`; restructure events live on the process bus, not the timeline; anchor is fire-once). Cosmetic double-blank-line residue in skill-store comments left as-is (zero behavior).
+- Local: v7-fix clusters 33/33, full 303/308 (5 load-timeout/8-writer class failures, known pattern), tsc 0, oxlint 0/0.
+
 ## Unreleased — 009: unified tree-change kernel — package-integrity gate + reference-mode demote (design 009, all batches)
 
 - **Kernel `applyTreeChange`** (`evolution-core/src/skill-store.ts`): the single commit point for deterministic tree mutations — owns validation order (badName → protection → preconditions mount → pre-read rollback bytes → semantic/bytes/threat validation), two-phase write with byte-level rollback, audit and the mutation event. Mutators compose `TreeChangePlan`s; consolidate and restructure no longer implement two-phase commit themselves (009-I + 009-R; the archive step stays outside the kernel — it is a tree-external move with its own rollback loop).

@@ -375,16 +375,21 @@ type RestructurePlan = { error: string } | { body: string; sections: PlannedRest
 
 /**
  * Support-directory references in a markdown body (009 kernel): `references/…`,
- * `templates/…`, `scripts/…`, `assets/…` relative links. Pure — who checks
- * them and what the verdict is belongs to the caller's context (a moved/
- * appended body whose references travel with an archived source is a dangling
- * link; a restructure pointer is a fresh link to a file written in the same
- * plan).
+ * `templates/…`, `scripts/…`, `assets/…` relative links — any extension and
+ * nested paths (v7 audit P3-1: `.md`-only matching missed `scripts/run.sh` and
+ * `references/sub/x.md`, both of which dangle just like a `.md` link once the
+ * source package is archived). Pure — who checks them and what the verdict is
+ * belongs to the caller's context (a moved/appended body whose references
+ * travel with an archived source is a dangling link; a restructure pointer is
+ * a fresh link to a file written in the same plan). `..` traversal is a
+ * different defect class (path validation owns it) and is not a support link.
  */
 function supportRefs(content: string): string[] {
   const refs: string[] = []
-  for (const match of content.matchAll(/\b(?:references|templates|scripts|assets)\/[A-Za-z0-9._-]+\.md/g)) {
-    refs.push(match[0])
+  for (const match of content.matchAll(/\b(?:references|templates|scripts|assets)\/[A-Za-z0-9._/-]+/g)) {
+    const ref = match[0]
+    if (ref.includes('..')) continue
+    refs.push(ref)
   }
   return refs
 }
@@ -1014,11 +1019,18 @@ export class SkillLibrary {
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const normalized = md.replace(/\r\n/g, '\n')
-    const plan = planRestructureSections(normalized, moves)
-    if ('error' in plan) return { ok: false, message: `Restructure rejected: ${plan.error}` }
     const frontmatterEnd = normalized.indexOf('\n---', 3)
     if (frontmatterEnd < 0) return { ok: false, message: 'SKILL.md has no valid frontmatter; refusing to restructure.' }
-    const newMd = normalized.slice(0, frontmatterEnd + 4) + plan.body
+    // P1-1 (v7 audit): the planner must receive the BODY ONLY — its rebuilt
+    // body is spliced after the frontmatter header, so feeding it the full
+    // text duplicated the frontmatter on every successful restructure (a
+    // second `---` block the lenient parser tolerated but strict YAML
+    // consumers read as duplicate name/description keys).
+    const header = normalized.slice(0, frontmatterEnd + 4)
+    const bodyRaw = normalized.slice(frontmatterEnd + 4)
+    const plan = planRestructureSections(bodyRaw, moves)
+    if ('error' in plan) return { ok: false, message: `Restructure rejected: ${plan.error}` }
+    const newMd = header + plan.body
     const newMdCheck = validateFrontmatter(newMd, name, this.limits)
     if (newMdCheck) return { ok: false, message: `Restructure rejected: ${newMdCheck}` }
     for (const section of plan.sections) {

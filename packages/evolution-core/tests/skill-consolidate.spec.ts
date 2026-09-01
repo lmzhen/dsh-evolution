@@ -66,6 +66,25 @@ See references/details.md for the rest.
   await rm(root, { recursive: true, force: true })
 })
 
+it('integrity refuses non-md and nested support links too (v7 audit P3-1)', async () => {
+  const { root, lib } = await make()
+  await lib.update('narrow-a', `---
+name: narrow-a
+description: non-md links
+---
+
+# Narrow A
+
+Run scripts/run.sh and see references/sub/x.md for details.
+`, 'foreground')
+  const result = await lib.consolidate('umbrella', ['narrow-a'], 'background_review')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('scripts/run.sh')
+  expect(result.message).toContain('references/sub/x.md')
+  expect(await lib.read('narrow-a')).not.toBeNull()
+  await rm(root, { recursive: true, force: true })
+})
+
 it('reference mode demotes a source into umbrella references/ and adds a pointer line (009-II)', async () => {
   const { root, lib } = await make()
   const result = await lib.consolidate('umbrella', ['narrow-a'], 'background_review', { mode: 'reference' })

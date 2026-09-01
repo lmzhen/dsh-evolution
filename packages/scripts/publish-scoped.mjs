@@ -28,7 +28,6 @@ function hasFlag(name) { return argv.includes(name) }
  * a prerelease version (`-rc.x` etc.) publishes to `next`, a STABLE semver
  * publishes to `latest` (the 0.1.0 formal-release rule). */
 const explicitTag = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : undefined
-const tag = explicitTag ?? 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')

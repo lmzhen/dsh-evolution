@@ -141,8 +141,11 @@ export class SkillUsageRegistry extends Service {
       })
     } catch {
       // Best-effort anchor: a failed timeline append must never surface in the
-      // conversation that just read a skill (the sidecar keeps the truth, and
-      // the next observed read retries while no OTHER read opened the window).
+      // conversation that just read a skill. NOTE (v7 audit P3-2): this is NOT
+      // retried — the anchor fires exactly once (on the view 0→1 read), and
+      // once the sidecar's view is ≥1 later reads never re-trigger it. The
+      // timeline may therefore miss the anchor; the usage sidecar (and the
+      // curator's usageObserved() gate, which reads it) stays the truth.
     }
   }
 

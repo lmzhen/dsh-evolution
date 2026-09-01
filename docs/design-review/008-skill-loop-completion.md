@@ -45,6 +45,12 @@ verify:   re-assess + report + event kind:'restructure'
 
 Observation windows between batches; B's trigger thresholds are data-derived (A1/A2 baselines), never guessed.
 
+## 实现注记（2026-08-31 v7 审计校准，覆盖本设计中的两处表述）
+
+1. **事件命名**：判定表与 C 批次的 `type:'skill'` 在实现中为 **`type:'usage'`（`kind:'skill'`）**——usage 类别与 feedback/learn 并列，kind 字段承担对象域（skill/session）。语义不变：窗口锚点 + use 聚合落时间线。
+2. **restructure 事件**：实现落在进程事件总线 `evolution/skill-mutated`（action `'restructure'`），**不进事件时间线**（时间线是 loop 事实记录，非树变更审计；树变更审计走 mutations 侧车）。因此"feedback 与 restructure 先后可答"仅适用于 usage 锚点与 feedback/learn 之间；restructure 时序由 mutations 侧车回答。
+3. **幂等锚点**：窗口锚点在 view 0→1 那次读取追加一次；append 失败不重试（侧车是真相），见 skill-usage `appendUsageWindowEvent` 注释（v7 P3-2 校准）。
+
 ## Non-negotiable boundaries (from原版分层 + 三问 + loop discipline)
 
 1. Sensing/Boundary = deterministic; Judgment = LLM proposal; Execution = human approval + deterministic implementation; Verification = probes + report (split-first, reversible).
