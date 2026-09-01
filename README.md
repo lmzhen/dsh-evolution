@@ -12,6 +12,23 @@ English | [中文](README.zh.md)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+## The 10-second version
+
+Your agent keeps a **lasting memory** of you, builds a **library of reusable
+procedures** (skills) as it works, and lets a background reviewer **improve
+that library over time** — all inside a control boundary: the model may write
+memory and skills, everything else (policy, approval, audit, snapshots) stays
+in your hands.
+
+**What changes after install:** your agent remembers corrections from last
+week in a new session, reuses procedures it learned earlier, and periodically
+reviews and curates its own skill library. You stay in control — background
+writes can be staged for your approval, and every change is logged.
+
+**If this sounds like too much autonomy:** the default is safe — background
+review only rewrites skills your agent actually loaded this session, pinned
+skills are off-limits to it, and staged approval is one config line away.
+
 > [!IMPORTANT]
 > Community-published packages under `@lmzhen` are maintained by the
 > dsh-evolution community. They are not official DeepSeek releases and are
@@ -62,6 +79,18 @@ Everything else is control plane:
 | Usage telemetry | Per-skill `use/view/patch` sidecar compatible with Hermes-style lifecycle decisions |
 | Observability | Durable activity store, replay/A-B scoring, feedback quality scores, and a learning graph |
 | Capability governance | Validates Creator-mode capability packages and stages them for manual activation — code is never auto-executed |
+
+**In plain language, what you get:**
+- **It remembers you** — preferences, corrections, and durable facts survive
+  across sessions, with dedup, budgets, and threat filtering.
+- **It learns procedures** — techniques your agent discovers get saved as
+  reusable skills (with support files), so future sessions start smarter.
+- **It maintains itself** — a background reviewer proposes improvements and a
+  curator keeps the library healthy (archives stale skills, consolidates
+  overlaps) — all gated by your approval policy.
+- **It stays accountable** — every write is audited, snapshotted, and
+  reviewable; nothing rewrites your skills without read-before-write and
+  protection markers.
 
 ---
 
@@ -198,6 +227,22 @@ override examples.
 | Minimal preset | host bundle; services mount — the "complete persona suppresses evolution prompt text" behavior is an **upstream host** behavior: this repository has no implementation or verification artifact for it (upstream carries it) |
 | Creator mode | host bundle + `evolution-capability` governance; code activation stays manual |
 
+### What it looks like in daily use
+
+- **A long-term personal assistant.** You correct it once ("always use
+  absolute paths", "please ask before installing tools"); next session it
+  already knows. Techniques it discovers (backup recipes, your stack's quirks)
+  become skills it reuses instead of re-deriving.
+- **A team-shared skill library.** Several sessions share one evolution host:
+  a contributor fixes a reusable workflow, the reviewer shelves it into the
+  shared library, everyone's future sessions find it.
+- **Automation on autopilot.** Scheduled tasks run without model tools; the
+  services (usage telemetry, event log, curator) keep the library healthy in
+  the background.
+- **Audit and governance.** You can watch what the agent "learned", what it
+  would have changed, approve or reject staged writes, and roll back to a
+  snapshot — before you trust the loop with more autonomy.
+
 ---
 
 ## How each piece works
@@ -260,6 +305,45 @@ tools.guard         immutable policy denials
 evolution-approval  stage -> approve/reject -> audit history
 evolution-capability  validate + stage Creator packages; never execute them
 ```
+
+---
+
+## Running impact — honest caveats
+
+- **It adds model tools and prompt sections.** The Evolution preset adds
+  `memory`, `skill_manage`, a session-query tool and a catalog tool (four),
+  plus small guidance text. Every added tool description lives in the prompt
+  prefix: model-visible surface grows, **KV cache prefix changes**, and first
+  turns after installing or changing tools are cold. Use per-session profiles
+  or presets if you run many tool-heavy sessions.
+- **It runs with your local permissions.** Like any DSH plugin, evolution
+  code executes in the host process — review the repository before install,
+  and prefer an isolated profile for a first test.
+- **It writes only where you let it.** The loop's writes target `memory` and
+  skills under `~/.dsh/` (both configurable); its writes go through origin
+  gates (pinned/bundled skills are refused by the background reviewer), staged
+  approval, snapshots, and an audit trail. It never touches the platform's
+  sandbox/permission model.
+- **Default posture is conservative.** Background review is read-before-write;
+  curator runs on schedules you configure; staged approval is off by default
+  (matching upstream Hermes) and can be enabled with one config line.
+
+## Glossary in one line
+
+- **Memory** — durable facts/preferences about you, kept in the agent's own
+  `MEMORY.md`/`USER.md` style stores; deduped, budgeted, threat-filtered.
+- **Skill sedimentation** — turning a discovered technique into a reusable
+  `SKILL.md` (+ references/templates/scripts) so future sessions reuse it.
+- **Background review** — a gated pass that proposes memory/skill updates from
+  evidence in your session; never rewrites what it did not read.
+- **Curator** — deterministic maintenance: marks stale, archives unused,
+  consolidates overlapping skills, optionally with an LLM nomination pass.
+- **Staged approval** — background writes wait for your approve/reject;
+  history is kept.
+- **Threat guard** — prompt-injection, secret-exfiltration and obfuscation
+  scans before any write lands.
+- **Usage telemetry & event log** — per-skill use/view/patch counters plus an
+  ordered timeline of feedback/learn/usage events; the loop's evidence base.
 
 ---
 
