@@ -19,14 +19,15 @@ memory, skill sedimentation, background review, and a skill curator. The loop
 is bounded — the model writes memory and skills only; policy, approval,
 audit, and snapshots stay in the control plane.
 
-After install, the agent retains corrections and preferences across sessions,
-reuses procedures it learned earlier, and reviews or curates its skill library
-on a schedule. Background writes are subject to read-before-write, protection
-markers, and your approval policy (staged writes are one config line away);
-every change is logged.
+Without it, an agent starts every session with no record of your corrections
+and re-derives procedures it already learned. With it, corrections persist
+across sessions, discovered workflows become reusable skills, and the skill
+library is reviewed and curated on a schedule — under your approval policy.
 
 Default posture is conservative: background review only rewrites skills the
-agent loaded this session, and pinned skills are off-limits to it.
+agent loaded this session, and pinned skills are off-limits to it. Staged
+approval (approve/reject before a background write lands) is one config line
+away; every change is logged.
 
 > [!IMPORTANT]
 > Community-published packages under `@lmzhen` are maintained by the
@@ -81,10 +82,11 @@ Everything else is control plane:
 
 **What you get:**
 
-- Durable memory: preferences, corrections, and facts persist across sessions; dedup, budgets, and threat filtering apply.
-- Reusable skills: techniques discovered are saved with support files and reused by later sessions.
-- Self-maintenance: a reviewer proposes improvements; a curator archives stale skills and consolidates overlaps on the configured schedule.
-- Accountability: writes are audited, snapshotted, and can be staged for approval.
+- **Durable memory** — preferences, corrections, and facts persist across sessions; dedup, budgets, and threat filtering keep it clean. You stop repeating yourself; the agent stops re-asking.
+- **Skill sedimentation** — techniques the agent discovers (workflows, fixes, stack quirks) are saved as reusable skills with support files, so later sessions start from what was already learned instead of re-deriving it.
+- **Background review** — a gated pass proposes memory and skill updates from evidence in the session; it reads before it writes and never touches skills it did not load.
+- **Curator** — deterministic maintenance on a schedule you configure: stale skills are marked, unused ones archived, overlapping ones consolidated; the library stays findable and small.
+- **Approval, audit, snapshots** — staged writes can be approved or rejected, every change has a trail, and the library can be rolled back to a snapshot.
 
 ---
 
@@ -223,10 +225,10 @@ override examples.
 
 ### Typical uses
 
-- Long-term assistant: you correct it once; it follows the correction in later sessions, and workflows it discovers become skills.
-- Shared library: several sessions share one evolution host; a contributor's reusable workflow is reviewed into the shared library.
-- Unattended automation: scheduled runs without model tools; usage telemetry and the curator keep the library healthy in the background.
-- Governance: staged writes, approve/reject, snapshot rollback, and a full audit trail.
+- **Long-term personal assistant.** You correct it once — "always use absolute paths", "ask before installing tools" — and later sessions follow that correction. Techniques it works out (backup recipes, your stack's quirks) become skills it reuses instead of re-deriving them.
+- **Shared skill library across sessions.** Several sessions share one evolution host. A contributor turns a reusable workflow into a skill; the reviewer shelves it into the shared library; everyone's later sessions find it.
+- **Unattended automation.** Scheduled runs carry no model tools; usage telemetry and the curator keep the library healthy in the background while the agent's regular sessions stay lean.
+- **Audit and governance.** Watch what the agent learned and what it would change; approve or reject staged writes; roll back to a snapshot — with a full trail of what happened.
 
 ---
 
@@ -302,10 +304,10 @@ evolution-capability  validate + stage Creator packages; never execute them
 
 ## Glossary
 
-- **Memory** — durable facts about the user and session corrections, kept with dedup, budgets, and threat filtering.
-- **Skill sedimentation** — converting a discovered technique into a reusable `SKILL.md` with references/templates/scripts.
+- **Memory** — durable facts about the user and session corrections; deduped, budgeted, and threat-filtered.
+- **Skill sedimentation** — converting a discovered technique into a reusable `SKILL.md` plus references/templates/scripts.
 - **Background review** — a gated pass producing memory/skill updates from session evidence; rewrites only skills it read.
-- **Curator** — deterministic maintenance: stale marking, unused archiving, overlap consolidation, optional LLM nomination.
+- **Curator** — deterministic maintenance: marks stale, archives unused, consolidates overlaps; optional LLM nomination.
 - **Staged approval** — background writes wait for approve/reject; history is kept.
 - **Threat guard** — prompt-injection, secret-exfiltration, and obfuscation checks before a write lands.
 - **Usage telemetry and event log** — per-skill use/view/patch counters and an ordered timeline of feedback/learn/usage events.
