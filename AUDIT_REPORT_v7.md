@@ -7,6 +7,7 @@
 | 审计范围 | ① 逐条核验第六轮 G-1/G-2/G-3 及 H-1/H-3 修复；② 全量审计 rc.71→0.2.0-rc.2 增量（17 提交，约 +3073/−3317 行：rc.72 审计批次、0.1.0 发布与文档归档、008 四批——skill-health 域/usage 读侧观测/`SkillLibrary.restructure`/观测窗口语义、009 统一树变更内核 `applyTreeChange` + 包完整性门 + reference 降级、命令 input 声明）；③ 008/009 设计文档"宣称 vs 实现"比对；④ restructure 组装路径的逐字复现实跑验证 |
 | 约束 | 只读审计，未修改任何代码 |
 
+> **修复状态（2026-08-31 当日闭环）**：P1-1（restructure 双份 frontmatter）已修复（skill-store.ts planner 改收 body-only，回归=结构级断言+重复 restructure）;P3-1（supportRefs 非 md/子目录）已修复+回归;P3-2（锚点注释）已修正;P3-3（死变量/008 注记）已处理（空行观感保留）。修复在 d37daf5+3504b76（main），尚未发布（rc.2 为修复前 tag）。
 **结论摘要**：v6 的 G-1/G-2/G-3 **三项全部确认修复**（归档名锚点续接 seq、严格数字归档 glob + 读错误隔离、缓存快照节奏 + 折叠地板守卫），H-1（curator 生命周期字段所有权 `stateOwned`）与 H-3（单一 glob helper、dsh-llm 转 peer）同样落地。008/009 的架构方向正确（结构健康为独立维度不进六因子、树变更单一提交点、旋转保序）。**但本轮发现 1 项 P1**：本版旗舰功能 `restructure` 的**组装路径把 frontmatter 复制了一份**——经逐字复刻实跑证实，每次成功 restructure 都会把 SKILL.md 写成"双份 frontmatter + `------` 残线"的损坏形态，`validateFrontmatter` 与全部现有测试（`toContain` 断言）均不设防，且对同一技能重复 restructure 会让 frontmatter 份数持续累积。另有 3 项 P3。**问题总量与严重度：39 → 7 → 7 → 6 → 7 → 3 → 本轮 1 P1 + 3 P3 + 5 观察**，严重度峰值首次回升至 P1，源于新功能组装层的一次性失误（与此前六轮"并发收尾"主题不同源）。
 
 ---
