@@ -129,6 +129,19 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     order: 150,
     text: () => snapshotText,
   })
+  // P2 fix: the snapshot refresh moved to the write sink (MemoryRegistry
+  // emits evolution/memory-applied after ANY successful write). Bypass paths —
+  // `/graph edit|delete memory:`, background review direct writes — refresh the
+  // model-visible snapshot here, not only the foreground tool's own callback.
+  const refreshSnapshot = async (): Promise<void> => {
+    try {
+      snapshotText = await ctx.memory.renderContext()
+    } catch {
+      // Snapshot refresh is best-effort; a stale snapshot self-corrects at the
+      // next successful refresh (the write itself already landed).
+    }
+  }
+  ctx.effect(() => ctx.on('evolution/memory-applied', () => { void refreshSnapshot() }), 'tool-memory.snapshot-refresh')
 
   async function executeCore(normalized: MemoryWriteArgs): Promise<{
     ok: boolean

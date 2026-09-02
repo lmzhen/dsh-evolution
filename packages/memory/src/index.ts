@@ -23,6 +23,22 @@ export interface MemoryApplyResult {
   limit: number
 }
 
+/** Fired after ANY successful memory write (P2 fix): the snapshot refresh
+ * moved to the registry sink so bypass paths (`/graph memory:`, background
+ * review direct writes) also refresh the model-visible snapshot — not only
+ * the foreground `memory` tool's write callback. */
+export interface EvolutionMemoryAppliedEvent {
+  target: MemoryTarget
+  chars: number
+  entries: number
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'evolution/memory-applied'(event: EvolutionMemoryAppliedEvent): void
+  }
+}
+
 export interface MemorySnapshot {
   version: number
   sha256: string
@@ -69,8 +85,17 @@ export class MemoryRegistry extends Service {
     return this.provider().read(target, signal)
   }
 
-  applyBatch(target: MemoryTarget, operations: MemoryOperation[], signal?: AbortSignal): Promise<MemoryApplyResult> {
-    return this.provider().applyBatch(target, operations, signal)
+  async applyBatch(target: MemoryTarget, operations: MemoryOperation[], signal?: AbortSignal): Promise<MemoryApplyResult> {
+    const result = await this.provider().applyBatch(target, operations, signal)
+    // P2 fix: every successful write refreshes whatever listens — the snapshot
+    // subscriber (tool-memory) re-renders the model-visible context. This is
+    // the single write sink, so bypass paths are covered without per-path fixes.
+    if (result.ok) this.ctx.emit('evolution/memory-applied', {
+      target,
+      chars: result.chars,
+      entries: result.entries.length,
+    })
+    return result
   }
 
   snapshot(signal?: AbortSignal): Promise<MemorySnapshot> {

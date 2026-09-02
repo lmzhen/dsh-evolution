@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 (patch) — memory snapshot refresh bypass fix (v8 audit P2)
+
+- **Write-sink refresh** (`memory/src/index.ts`): `MemoryRegistry.applyBatch` now emits `evolution/memory-applied` after ANY successful write — the snapshot refresh moved from the foreground `memory` tool's own callback to the single write sink. Bypass paths (`/graph edit|delete memory:` and background-review direct writes, both default-deployment paths) now refresh the model-visible snapshot instead of leaving it stale until the next foreground tool call.
+- **Subscriber** (`tool-memory/src/index.ts`): listens to the event and re-renders `snapshotText` (best-effort; the local tool callback stays as immediate refresh — idempotent double refresh at negligible cost). Zero cache cost: an unchanged snapshot injects nothing, a changed one appends one tail message (platform dedup).
+- Tests: registry event unit (emit after successful write), tool-memory bypass regression (direct `applyBatch` → assembled context snapshot contains the new fact). Local: P2 clusters 32/32, full 294/311 (17 red = 14 timeouts + feedback 8-writer + layout-sync timing + anchored-smoke scheduling-sensitivity — all known/isolation-green classes, zero memory-surface), tsc 0, oxlint 0/0.
+- Tooling: `vitest.evo5.tmp.mjs` include restored for `memory/tests` and `learning-graph/tests` (they were never collected by the suite).
+
 ## Unreleased — v7 audit fixes (P1-1 restructure frontmatter duplication + P3-1/P3-2/P3-3)
 
 - **P1-1 (correctness, in the tagged rc.1/rc.2 code)**: `restructure` assembled `header + plan.body` where the planner had been fed the FULL normalized text — every successful call wrote a second frontmatter block (duplicate `name`/`description` keys, accumulating on repeated calls). The lenient `parseFrontmatter` and all `toContain`-style tests tolerated it (v7 audit caught it; 009-R claimed "zero behavior change" and this betrayed that claim). Fix: the planner now receives the body only; structure-level regression added — parsed body must never start with `---` and a second restructure must not stack copies.

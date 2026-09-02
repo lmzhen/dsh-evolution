@@ -20,4 +20,15 @@ describe('MemoryRegistry', () => {
     dispose()
     expect(() => ctx.memory.read('memory')).toThrow(/no provider/)
   })
+
+  it('emits evolution/memory-applied after any successful write (P2 fix)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    ctx.memory.registerProvider(provider)
+    const seen: Array<{ target: string; chars: number; entries: number }> = []
+    ctx.on('evolution/memory-applied', (event) => { seen.push(event) })
+    const result = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'x' }])
+    expect(result.ok).toBe(true)
+    expect(seen).toEqual([{ target: 'memory', chars: 1, entries: 1 }])
+  })
 })

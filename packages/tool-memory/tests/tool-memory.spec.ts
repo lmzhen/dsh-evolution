@@ -67,6 +67,24 @@ describe('tool-memory', () => {
     )
     expect(captured?.sessionPolicy).toBe('never')
   })
+
+  it('bypass writes refresh the model-visible snapshot through the applied event (P2 fix)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(ToolMemory, {})
+    // Bypass write — the `/graph memory:` / background-review direct path.
+    await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'P2-bypass-fact' }])
+    // Allow the event→renderContext→snapshotText chain to settle.
+    await new Promise(resolve => setTimeout(resolve, 80))
+    const systemPrompt = ctx.get('systemPrompt') as { assemble(): Promise<{ contexts?: Array<{ name?: string; text?: string }> }> } | undefined
+    const assembled = await systemPrompt?.assemble()
+    const snapshot = (assembled?.contexts ?? []).find(c => c.name === 'evolution:memory-snapshot')?.text ?? ''
+    expect(snapshot).toContain('P2-bypass-fact')
+  })
 })
 
 async function makeTmp(): Promise<string> {
