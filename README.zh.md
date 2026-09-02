@@ -164,8 +164,6 @@ node packages/evolution/scripts/install-layered.mjs \
 模型通过 `memory` 工具进行 add / replace / remove 或一个原子 operations
 batch。条目有字符预算，以 runtime snapshot 注入；稳定提示保持在
 system-prompt section。
-快照在**任何**成功写入后刷新——前台工具、后台评审、学习图都走同一个
-写入收口，模型可见的记忆不会因旁路写入而过期。
 
 ### 技能
 
@@ -237,7 +235,7 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 
 ## 运行影响
 
-- **会多出模型工具和提示内容。** Evolution preset 会加 `memory`、`skill_manage`、会话检索、技能目录四个工具，外加一小段引导文字。工具说明在提示前缀里：模型可见面变大，**KV 缓存前缀会变**，装或换工具之后第一轮会话偏慢（冷启动）。工具多的会话，建议按会话用 profile/preset 隔开。
+- **会多出模型工具和提示内容。** Evolution preset 会加 `memory`、`skill_manage`、会话检索、技能目录四个工具，外加一小段引导文字。工具说明与系统章节位于提示前缀：**安装或升级插件会改变前缀——每次变更一次冷启动**。动态内容（记忆快照、技能目录、评审通知）由平台以消息尾部追加——未变不注入，变了追加一条，**不会使前缀失效**。
 - **以本地用户权限运行。** 和其他 DSH 插件一样，evolution 的代码跑在宿主进程里——安装前先看一遍仓库；第一次试，建议用隔离 profile。
 - **只写 memory 和 skills。** 循环写入只针对 `~/.dsh/`（可配置）下的 memory 与 skills；写入会过保护标记（pinned、预装技能后台改不了）、分阶段审批、快照和审计；它不会动平台的沙箱或权限模型。
 - **默认保守。** 后台评审只改本会话读过的技能；curator 按你定的周期跑；分阶段审批默认关（和上游 Hermes 一致），一行配置可开。

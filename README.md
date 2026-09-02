@@ -240,10 +240,6 @@ override examples.
   atomic `operations` batch.
 - Entries are bounded by character budgets and are injected as a runtime
   snapshot while stable guidance stays in a system-prompt section.
-- The snapshot refreshes after ANY successful memory write — the foreground
-  tool, the background reviewer, and the learning graph all go through the
-  same write sink, so model-visible memory is never stale while alternative
-  write paths exist.
 - Ambiguous matches and external file drift are refused instead of silently
   corrupting memory.
 
@@ -301,7 +297,7 @@ evolution-capability  validate + stage Creator packages; never execute them
 
 ## Runtime effects
 
-- **Added model tools and prompt sections.** The Evolution preset adds `memory`, `skill_manage`, a session-query tool and a catalog tool, plus small guidance text. Tool descriptions live in the prompt prefix: the model-visible surface grows, **the KV cache prefix changes**, and the first turns after installing or changing tools are cold. Per-session profiles or presets isolate tool-heavy sessions.
+- **Added model tools and prompt sections.** The Evolution preset adds `memory`, `skill_manage`, a session-query tool and a catalog tool, plus small guidance text. Tool descriptions and system sections live in the prompt prefix: **installing or upgrading plugins changes the prefix — a one-time cold start per change**. Dynamic content (memory snapshot, skill catalog, review notices) is appended by the platform as tail messages — unchanged content injects nothing, changed content appends, so it never invalidates the prefix.
 - **Runs with your local permissions.** Like any DSH plugin, evolution code executes in the host process — review the repository before install, and prefer an isolated profile for a first test.
 - **Writes to memory and skills only.** The loop's writes target `~/.dsh/` memory and skills (configurable); they pass origin gates (pinned/bundled skills are refused by the background reviewer), staged approval, snapshots, and an audit trail. It does not change the platform sandbox or permission model.
 - **Conservative defaults.** Background review is read-before-write; the curator runs on a schedule you configure; staged approval is off by default (matching upstream Hermes) and enabled with one config line.
