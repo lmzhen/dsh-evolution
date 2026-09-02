@@ -164,6 +164,8 @@ node packages/evolution/scripts/install-layered.mjs \
 模型通过 `memory` 工具进行 add / replace / remove 或一个原子 operations
 batch。条目有字符预算，以 runtime snapshot 注入；稳定提示保持在
 system-prompt section。
+快照在**任何**成功写入后刷新——前台工具、后台评审、学习图都走同一个
+写入收口，模型可见的记忆不会因旁路写入而过期。
 
 ### 技能
 

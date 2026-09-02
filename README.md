@@ -240,6 +240,10 @@ override examples.
   atomic `operations` batch.
 - Entries are bounded by character budgets and are injected as a runtime
   snapshot while stable guidance stays in a system-prompt section.
+- The snapshot refreshes after ANY successful memory write — the foreground
+  tool, the background reviewer, and the learning graph all go through the
+  same write sink, so model-visible memory is never stale while alternative
+  write paths exist.
 - Ambiguous matches and external file drift are refused instead of silently
   corrupting memory.
 
