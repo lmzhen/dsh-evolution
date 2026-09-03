@@ -88,4 +88,5 @@ describe('computeProbe', () => {
     // Derived tokens only: stamp regex matches rc./sha/date shapes, never
     // credential-shaped text — so the redactor at the tools boundary is
     // conservative belt-and-suspenders, and no raw credential text can leak.
+  })
 })
