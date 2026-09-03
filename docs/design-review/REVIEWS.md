@@ -63,7 +63,7 @@ Unresolved:
 
 ## 010 Maintenance subagent (domain/layer drift review)
 
-Verdict: approve-with-changes (AUDIT_REPORT_v9).
+Verdict: approve-with-changes (v9 审计，已归档；设计被 011 取代).
 
 Accepted changes:
 - `drift-signals` naming split from the session review signal gate (`signals.ts`);
@@ -82,7 +82,7 @@ Unresolved:
 
 ## 011 Maintenance subagent v2 (revision)
 
-Verdict: approved (AUDIT_REPORT_v10).
+Verdict: approved (v10 审计，已归档).
 
 Accepted changes:
 - F-1/F-2/F-4/A1/A5/A6/A7 all responses landed; A4 prefers event payload over
@@ -98,6 +98,7 @@ Unresolved:
 
 ## Decision status
 
-All three designs are approved with the changes recorded above. No third-batch
-implementation starts until the unresolved items are answered or explicitly
-waived.
+All three designs are approved with the changes recorded above and shipped
+through the 0.2.0–0.3.1 releases. The design-time review record here is
+historical; the current audit baseline is `AUDIT_REPORT_v12.md` (v9–v11
+reports and the superseded 010 design were archived in the 0.3.1 cleanup).
