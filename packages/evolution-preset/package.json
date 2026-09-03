@@ -48,6 +48,7 @@
     "@deepseek-ai/dsh-evolution-review": "workspace:^",
     "@deepseek-ai/dsh-evolution-curator": "workspace:^",
     "@deepseek-ai/dsh-evolution-commands": "workspace:^",
+    "@deepseek-ai/dsh-evolution-maintenance/tools": "workspace:^",
     "@deepseek-ai/dsh-evolution-activity": "workspace:^",
     "@deepseek-ai/dsh-evolution-feedback": "workspace:^",
     "@deepseek-ai/dsh-evolution-learning-graph": "workspace:^",
