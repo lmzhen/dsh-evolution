@@ -22,7 +22,7 @@ import {
   MAINTAIN_PROMPT,
   computeDriftSignals,
 } from '@deepseek-ai/dsh-evolution-core'
-import { PROBE_SIGNALS, computeProbe, renderMaintainTemplate as render } from '../src/index.ts'
+import { PROBE_SIGNALS, computeProbe, renderMaintainTemplate as render, validateAndNormalizeMaintainPlan } from '../src/index.ts'
 
 function templateSignalRefs(): Set<string> {
   const refs = new Set<string>()
@@ -75,9 +75,33 @@ describe('011 self-consistency', () => {
   })
 
   it('④ evidence closure is enforced by the validator (cross-reference)', () => {
-    // Owned by validate-plan.spec: 'rejects evidence that references a signal
-    // outside the facts block'. This suite keeps the four-test contract
-    // explicit rather than duplicating the rejection matrix.
-    expect(PROBE_SIGNALS.length).toBeGreaterThan(0)
+    // Owned in depth by validate-plan.spec (rejection matrix). This suite
+    // keeps the four-test contract explicit with a real smoke, not a
+    // placeholder: a plan referencing a signal outside the facts block is
+    // rejected — no silent acceptance.
+    const report = computeDriftSignals([{ name: 'x', body: '# A\n' }])
+    const raw = {
+      verdict: 'issues',
+      plan: [{
+        kind: 'skill-level',
+        names: ['x'],
+        rule: 'B1',
+        evidence: [{ signal: 'ghost-signal', value: 'v' }],
+        finding: 'f',
+        recommendation: 'r',
+        semantic_reasoning: 's',
+        impact: 'better',
+        impact_reason: 'i',
+        reversibility: 'patch',
+        undo_path: 'u',
+        confidence: 0.8,
+        needs_human: false,
+        is_override: false,
+      }],
+      notes: [],
+    }
+    const result = validateAndNormalizeMaintainPlan(raw, report, new Set(['body_size']))
+    expect(result.ok).toBe(false)
+    expect(result.errors.some(error => error.includes('not in the facts block'))).toBe(true)
   })
 })
