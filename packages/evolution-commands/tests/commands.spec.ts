@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -263,6 +263,82 @@ describe('evolution-commands', () => {
 
     expect(result.text).toContain('lastRun=unknown')
 
+  })
+
+  it('maintain fails closed without io or subagents, and reports usage on syntax errors', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    await ctx.plugin(Commands)
+    const noIo = await captured!.handler({ rawInput: 'maintain' })
+    expect(noIo.kind).toBe('error')
+    expect(noIo.text).toContain('IO registry')
+    const badRestructure = await captured!.handler({ rawInput: 'restructure bad-syntax' })
+    expect(badRestructure.kind).toBe('error')
+    expect(badRestructure.text).toContain('Usage:')
+    const badToFile = await captured!.handler({ rawInput: 'restructure demo "Log" scripts/log.sh' })
+    expect(badToFile.kind).toBe('error')
+    expect(badToFile.text).toContain('references/')
+  })
+
+  it('restructure rejects missing skills via the real SkillLibrary path (no side effects)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', {
+      provider: () => io,
+    })
+    await ctx.plugin(Commands)
+    // The command constructs SkillLibrary over the default skills root; use a
+    // guaranteed-absent skill name so the path resolves to an error without
+    // touching real content.
+    const missingSkill = await captured!.handler({ rawInput: 'restructure evo-nonexistent-skill "Log" references/log.md' })
+    expect(missingSkill.kind).toBe('error')
+  })
+
+  it('restructure succeeds end-to-end on a temp library via Config.skillsRoot', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-restructure-'))
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          captured = definition as typeof captured
+          return () => {}
+        },
+      })
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', {
+        provider: () => io,
+      })
+      // Config.skillsRoot is the command-facing root (A7 alignment) — the
+      // temp root keeps the mutation off the real library.
+      await ctx.plugin(Commands, { skillsRoot: root })
+      const result = await captured!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
+      expect(result.kind).toBe('success')
+      const body = await io.readText(join(skillDir, 'SKILL.md'))
+      expect(body).not.toContain('old detail')
+      expect(body).toContain('references/log.md')
+      const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
+      expect(support).toContain('old detail')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
 })

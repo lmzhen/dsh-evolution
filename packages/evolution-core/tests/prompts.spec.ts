@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -59,7 +59,13 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(9)
+  expect(PROMPT_BUNDLE_VERSION).toBe(10)
+})
+
+it('maintain persona ships in the bundle with signal placeholders (011)', () => {
+  expect(PROMPT_BUNDLE.prompts['maintain']).toBe(MAINTAIN_PROMPT)
+  expect(MAINTAIN_PROMPT).toContain('{signal:')
+  expect(MAINTAIN_PROMPT).toContain('MECHANICAL_FACTS')
 })
 
 it('channel variants carry the subagent deliverable limit (M-2)', () => {

@@ -61,6 +61,41 @@ Unresolved:
 - Whether `requiredTools` should exist before upstream semantics.
 - Which upstream package owns the standard field.
 
+## 010 Maintenance subagent (domain/layer drift review)
+
+Verdict: approve-with-changes (AUDIT_REPORT_v9).
+
+Accepted changes:
+- `drift-signals` naming split from the session review signal gate (`signals.ts`);
+  signal definitions live in core, orchestration in the new `evolution-maintenance` package.
+- `prefix_cluster` threshold mirrors the engine (>=2), no parameter fork.
+- Execution mapping: new `/evolution restructure` user command bridging
+  `SkillLibrary.restructure`; B2-B5 go through patch guidance; B3 keeps the
+  ambiguous-anchor protection untouched.
+- Plan state: event-log summary + runId back-reference; no new state table.
+- Threat model with core-level `redact` migration; maintainRunning gate
+  **explicitly waived** (read-only diagnosis, no reentrancy damage; concurrency
+  costs tokens only).
+
+Unresolved:
+- Probe deep-dive tooling (Phase 3) and `--plan` audit back-reference (deferred).
+
+## 011 Maintenance subagent v2 (revision)
+
+Verdict: approved (AUDIT_REPORT_v10).
+
+Accepted changes:
+- F-1/F-2/F-4/A1/A5/A6/A7 all responses landed; A4 prefers event payload over
+  a state table; A3 keeps the core bundle with same-version release discipline.
+- Phase 1-2 implemented: `drift-signals`, `redact` migration,
+  `evolution-maintenance` (scan/render/validate/orchestrate), bundle v10
+  (`MAINTAIN_PROMPT`), `/evolution maintain|restructure`, commands
+  `Config.skillsRoot` (A7 alignment).
+
+Unresolved:
+- Phase 3 (probe); MISMATCH command-side preflight (bundle digest + model-side
+  signature comparison already cover it).
+
 ## Decision status
 
 All three designs are approved with the changes recorded above. No third-batch

@@ -5,13 +5,21 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, eventsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { runMaintain } from '@deepseek-ai/dsh-evolution-maintenance'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 export const name = 'evolution-commands'
 
-export function apply(ctx: Context): void {
+export interface Config {
+  /** Skill-tree root for maintain/restructure; empty uses skillsRoot().
+   * Align with tool-skill-manage/skill-usage/evolution-skill-catalog rows (A7). */
+  skillsRoot?: string | undefined
+}
+
+export function apply(ctx: Context, rawConfig: Config = {}): void {
+  const config = rawConfig
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: CommandRuntimeLike }).commands
     commands.register({
@@ -24,7 +32,7 @@ export function apply(ctx: Context): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | replay',
+        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | maintain | restructure <name> "<heading>" <to_file> | replay',
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
@@ -169,12 +177,54 @@ export function apply(ctx: Context): void {
           }
           return ok('Learning request sent to this session. Follow it now.')
         }
+        if (input === 'maintain') {
+          // User-command maintenance scan (design 011): deterministic facts +
+          // one-shot subagent → validated plan display. No writes, no auto
+          // execution; fail-closed when either dependency is missing. Scope
+          // filtering is reserved (011 §3) — reject unknown args explicitly
+          // instead of silently swallowing them.
+          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const subagents = ctx.get('subagents') as { start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }> } | undefined
+          if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
+          if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
+          const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+          const outcome = await runMaintain({ library, subagents, parent: invocation.agent })
+          if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
+          const eventIo = ioRegistry.provider()
+          const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+          void appendEvolutionEvent(eventIo, eventsFile(home), {
+            type: 'maintain',
+            source: 'manual',
+            runId: outcome.runId,
+            verdict: outcome.verdict,
+            recommendations: outcome.text?.split('\n').filter(line => line.startsWith('- [')).length ?? 0,
+          }).catch((error: unknown) => {
+            ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
+          })
+          return ok(`Maintenance scan ${outcome.runId}:\n${outcome.text ?? ''}`)
+        }
+        if (input.startsWith('restructure ')) {
+          // /evolution restructure <name> "<heading>" <to_file> — bridges the
+          // existing SkillLibrary.restructure (two-phase rollback + origin
+          // gate); one move per invocation; heading may contain spaces.
+          const match = /^restructure\s+(\S+)\s+"([^"]+)"\s+(\S+)$/.exec(input)
+          if (!match) return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
+          const name = match[1] ?? ''
+          const heading = match[2] ?? ''
+          const toFile = match[3] ?? ''
+          if (!toFile.startsWith('references/')) return err('to_file must live under references/ (log/detail destination).')
+          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
+          const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+          const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
+          return result.ok ? ok(result.message) : err(result.message)
+        }
         if (input === 'replay') {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | skills health | learn [request] | replay.')
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | skills health | learn [request] | maintain | restructure <name> "<heading>" <to_file> | replay.')
       },
     })
   })

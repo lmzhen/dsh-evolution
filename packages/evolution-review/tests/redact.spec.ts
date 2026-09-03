@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { redactReviewSecrets } from '../src/redact.ts'
+import { redactSecrets } from '@deepseek-ai/dsh-evolution-core'
 
 describe('review redaction', () => {
   it('masks well-known secret shapes', () => {
@@ -14,7 +14,7 @@ describe('review redaction', () => {
       'token=abcdefghijklmnop here',
       'api_key: "ABCDEFGHIJKLMNOP" here',
     ].join('\n')
-    const out = redactReviewSecrets(text)
+    const out = redactSecrets(text)
     expect(out).not.toContain('1234567890abcdef1234567890abcdef')
     expect(out).not.toContain('AKIA1234567890ABCDEF')
     expect(out).not.toContain('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456')
@@ -29,6 +29,6 @@ describe('review redaction', () => {
 
   it('leaves ordinary conversation text intact', () => {
     const text = 'Use vitest for tests. The password reset flow took 3 tries. Token budgets were fine.'
-    expect(redactReviewSecrets(text)).toBe(text)
+    expect(redactSecrets(text)).toBe(text)
   })
 })

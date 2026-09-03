@@ -18,16 +18,7 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../interaction/commands"
-    },
-    {
-      "path": "../evolution-approval"
-    },
-    {
-      "path": "../evolution-curator"
-    },
-    {
-      "path": "../evolution-maintenance"
+      "path": "../evolution-core"
     }
   ]
 }

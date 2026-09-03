@@ -1,0 +1,14 @@
+import type { Context } from '@deepseek-ai/cordis'
+import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+
+const PACKAGE_NAME = '@deepseek-ai/dsh-evolution-maintenance'
+
+export const name = 'evolution-maintenance-invariant'
+export const inject = ['invariants']
+
+// No runtime invariant: this package owns no process-level invariant; its
+// contract is covered by unit tests and the 011 self-consistency suite.
+const install: InvariantInstaller = () => {}
+
+export const apply = (ctx: Context): Promise<() => void> =>
+  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))

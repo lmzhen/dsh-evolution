@@ -52,16 +52,20 @@ export interface EvolutionEvent {
   seq: number
   /** ISO timestamp at append time. */
   at: string
-  /** Tagged-union discriminator: feedback increments, learn actions, and
-   * usage observation anchors (C semantics: `usage` events carry the library-
-   * wide count snapshot at the moment the observation window opened). */
-  type: 'feedback' | 'learn' | 'usage'
+  /** Tagged-union discriminator: feedback increments, learn actions, usage
+   * observation anchors (C semantics: `usage` events carry the library-wide
+   * count snapshot at the moment the observation window opened), and
+   * maintain scans (011: verdict + recommendation count + runId). */
+  type: 'feedback' | 'learn' | 'usage' | 'maintain'
   target?: string | undefined
   kind?: 'skill' | 'session' | undefined
   rating?: 'positive' | 'negative' | undefined
   note?: string | undefined
   source?: string | undefined
   request?: string | undefined
+  runId?: string | undefined
+  verdict?: string | undefined
+  recommendations?: number | undefined
   /** Library-wide usage totals (usage events; counts are cumulative, not deltas). */
   counts?: { skills?: number; views?: number; use?: number; patches?: number } | undefined
   /** Anchor fields for one event (usage: the observation window). */
