@@ -16,7 +16,9 @@ package owns assembly and rendering only.
   `/evolution maintain`; orchestration lives in this package.
 - `maintenance_probe` (read-only deep-dive tool, host-mounted via
   `evolution-maintenance-tools`) is available to maintenance subagents only
-  through the orchestrate `toolFilter` allow-list.
+  through the orchestrate `toolFilter` allow-list; it is globally visible to
+  every session as a read-only query (same exposure tier as the `skill`
+  tool — never a write path).
 - The model-visible template (`MAINTAIN_PROMPT`) ships in `evolution-core`
   `PROMPT_BUNDLE`; the joint-signature mismatch protocol is honored by
   `renderFacts` callers, not by this package alone.

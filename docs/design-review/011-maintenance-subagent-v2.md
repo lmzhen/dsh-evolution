@@ -73,7 +73,7 @@ P1 评判标准缺失→代理指标替代；P2 机制/提示错置→执行率�
 | `pointer_missing` | SUPPORT_DIRS 存在而正文无引用 | 新写 | 存在支持文件且正文 0 引用 → over | B |
 | `description_chars` | `authoringFeedback`（`AUTHORING_DESCRIPTION_BAR=60`） | 复用 | >60 → over | B |
 | `usage_observed` | usage 服务（`usageObserved`，usage.ts:236） | 复用 | 窗口未开 → pass（事实） | 环境 |
-| `quality_low` | quality 六因子（`LOW_QUALITY_THRESHOLD=0.3`） | 复用 | **窗口未开时=unknown**（A7：六因子含 usageFrequency/stability，观测前不可信，与 curator healthView 同款门） | 环境 |
+| `quality_low` | 侧车 `quality_score`（六因子（curator run 重算）与反馈分统一收口字段）；分缺失=unknown（窗口门语义：未落盘=不可信） | 复用 | <0.3 → over | 环境 |
 
 **归 LLM 语义层**：`pattern_sunk`、`dup_fact`（contextual 证据，confidence≤0.4 + needs_human）。
 **信号集开放**：事实块含、条款未列 → notes 区建议新增条款，不产生建议。
@@ -194,6 +194,7 @@ D. 库·整合纪律（计划形态约束，不是信号）
 - 库规模无关：判据是事实与条款，不是库体量印象。
 - 信号机制疑问（阈值、检测原理）→ 写 needs_human，不猜测机制。
 ```
+（**以 core `MAINTAIN_PROMPT` 常量为实现基准**；本文为语义基准，占位符渲染见 §7）
 
 模板变更点（vs 010 §5）：角色加"只读：无任何写工具"；quality_low=unknown 时默认人审；B2-B5 输出形态明确为 patch 指引；confidence 三区间归并为两区间+needs_human 判据；recommendation 要求写明执行形态。
 
