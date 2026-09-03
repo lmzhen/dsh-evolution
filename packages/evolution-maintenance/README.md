@@ -11,9 +11,12 @@ package owns assembly and rendering only.
 
 ## Known Limitations and Deferred Work
 
-- Phase 1 exposes no service or command: the chain (commands → scan → render →
-  subagent → validate) lands in Phase 2 of design 011.
-- `probe` deep-dive tooling (Phase 3) is not implemented here.
+- Phase 1-2 expose no service beyond the command surface: the chain
+  (commands → scan → render → subagent → validate) is wired through
+  `/evolution maintain`; orchestration lives in this package.
+- `maintenance_probe` (read-only deep-dive tool, host-mounted via
+  `evolution-maintenance-tools`) is available to maintenance subagents only
+  through the orchestrate `toolFilter` allow-list.
 - The model-visible template (`MAINTAIN_PROMPT`) ships in `evolution-core`
   `PROMPT_BUNDLE`; the joint-signature mismatch protocol is honored by
   `renderFacts` callers, not by this package alone.

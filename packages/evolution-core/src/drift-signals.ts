@@ -147,14 +147,18 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
   const dedup = computeDedupGroups({
     contents: new Map(snapshots.map(s => [s.name, s.body])),
   })
-  for (const group of dedup) {
-    library.push(sig('dedup_group', 'over', group.join(', '), 'size >= 2', `members=${group.join('|')}`))
-  }
+  library.push(
+    dedup.length === 0
+      ? sig('dedup_group', 'pass', 'none', 'size >= 2')
+      : sig('dedup_group', 'over', dedup.map(group => group.join(', ')).join(' | '), 'size >= 2', `members=${dedup.map(group => group.join('|')).join(';')}`),
+  )
 
   const clusters = computePrefixClusters(names)
-  for (const cluster of clusters) {
-    library.push(sig('prefix_cluster', 'over', cluster.members.join(', '), 'size >= 2', `key=${cluster.key}`))
-  }
+  library.push(
+    clusters.length === 0
+      ? sig('prefix_cluster', 'pass', 'none', 'size >= 2')
+      : sig('prefix_cluster', 'over', clusters.map(cluster => cluster.members.join(', ')).join(' | '), 'size >= 2', `key=${clusters.map(cluster => cluster.key).join('|')}`),
+  )
 
   const allObserved = snapshots.length > 0 && snapshots.every(s => s.usageObserved !== null && s.usageObserved !== undefined)
   library.push(

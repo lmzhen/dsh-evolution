@@ -19,6 +19,9 @@
     },
     {
       "path": "../evolution-core"
+    },
+    {
+      "path": "../../core/tools"
     }
   ]
 }

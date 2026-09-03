@@ -67,6 +67,8 @@
       name: '@deepseek-ai/dsh-evolution-curator'
     - id: evolution-commands
       name: '@deepseek-ai/dsh-evolution-commands'
+    - id: evolution-maintenance-tools
+      name: '@deepseek-ai/dsh-evolution-maintenance/tools'
     - id: evolution-activity
       name: '@deepseek-ai/dsh-evolution-activity'
     - id: evolution-feedback

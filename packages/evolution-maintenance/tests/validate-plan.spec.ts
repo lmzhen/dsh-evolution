@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DriftReport } from '@deepseek-ai/dsh-evolution-core'
-import { validateAndNormalizeMaintainPlan, type MaintainPlan, type ValidationResult } from '../src/index.ts'
+import { validateAndNormalizeMaintainPlan, type ValidationResult } from '../src/index.ts'
 
 const report: DriftReport = {
   library: [

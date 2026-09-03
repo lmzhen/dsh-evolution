@@ -97,4 +97,15 @@ describe('computeDriftSignals', () => {
     expect(cluster?.verdict).toBe('over')
     expect(cluster?.detail ?? '').toContain('key=align')
   })
+
+  it('library signals are always present (pass=none when no group/cluster exists)', () => {
+    const report = computeDriftSignals([
+      { name: 'alpha-tool', body: HEALTHY },
+      { name: 'gamma-helper', body: '# G\n\n## When to Use\n\n- z\n' },
+    ])
+    const dedup = findDriftSignal(report.library, 'dedup_group')
+    expect(dedup?.verdict).toBe('pass')
+    expect(dedup?.value).toBe('none')
+    expect(findDriftSignal(report.library, 'prefix_cluster')?.verdict).toBe('pass')
+  })
 })

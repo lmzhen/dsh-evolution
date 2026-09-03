@@ -161,7 +161,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       maxDepth: options.maxDepth ?? 2,
       agentOptions,
       persona: template,
-      toolFilter: { allow: [...(options.toolAllow ?? ['skill'])] },
+      toolFilter: { allow: [...(options.toolAllow ?? ['skill', 'maintenance_probe'])] },
       outputSchema: {
         type: 'object',
         additionalProperties: false,
