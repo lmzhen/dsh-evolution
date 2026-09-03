@@ -11,7 +11,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { SkillLibrary, type DriftSkillSnapshot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, redactSecrets, type DriftSkillSnapshot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 
 export const name = 'evolution-maintenance-tools'
@@ -61,7 +61,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (body === null) continue
             snapshots.push({ name: entry.name, body })
           }
-          return computeProbe(signal, target, snapshots)
+          // Probe output crosses the session boundary to the maintenance
+          // subagent — same redaction policy as the facts block (011 §8).
+          const probe = computeProbe(signal, target, snapshots)
+          const redacted = redactSecrets(probe.detail.join('\n'))
+          return { ...probe, detail: redacted.split('\n') }
         },
       }),
     )

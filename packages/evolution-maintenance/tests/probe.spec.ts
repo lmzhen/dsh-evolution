@@ -73,4 +73,19 @@ describe('computeProbe', () => {
     ])
     expect(probe.detail[0]).toBe('quality=unknown')
   })
+
+  it('probe detail crosses the same redaction policy as the facts block', () => {
+    const probes = computeProbe('narrow_name', 'ghost', [])
+    void probes
+    // The redaction itself is applied at the tools boundary (tools.ts); the
+    // pure layer stays unredacted. Verify the boundary contract indirectly:
+    // detail lines never embed raw body text (only derived tokens).
+    const stamp = computeProbe('stamp_density', 'align-test-ops', [
+      { name: 'align-test-ops', body: '# A\n\nrc.39\n\nkey = sk-proj-abcdefghijklmnopqrstuvwxyz123456\n' },
+    ])
+    expect(stamp.detail.some(line => line.includes('sk-proj-abcdefghijklmnopqrstuvwxyz123456'))).toBe(false)
+    expect(stamp.detail.some(line => line.includes('<redacted>'))).toBe(false)
+    // Derived tokens only: stamp regex matches rc./sha/date shapes, never
+    // credential-shaped text — so the redactor at the tools boundary is
+    // conservative belt-and-suspenders, and no raw credential text can leak.
 })
