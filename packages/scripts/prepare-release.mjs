@@ -141,6 +141,25 @@ function rewriteScopedJs(stagedDir, names) {
   }
 }
 
+/** Relative paths (posix separators) of every runtime bundle under lib/,
+ * skipping the tsc-only `types/` tree (never ships; it still carries the
+ * workspace names and would trip the unrewritten-scope guard). */
+function libBundles(libRoot) {
+  const out = []
+  const stack = [libRoot]
+  while (stack.length > 0) {
+    const current = stack.pop()
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!(current === libRoot && entry.name === 'types')) stack.push(join(current, entry.name))
+      } else if (entry.isFile() && entry.name.endsWith('.js')) {
+        out.push(join(current, entry.name).slice(libRoot.length + 1).split('\\').join('/'))
+      }
+    }
+  }
+  return out
+}
+
 rmSync(distRoot, { recursive: true, force: true })
 mkdirSync(distRoot, { recursive: true })
 const staging = join(evolutionRoot, '.release-staging')
@@ -179,10 +198,17 @@ for (const dir of sourceDirs) {
     const path = join(staged, file)
     if (existsSync(path)) writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names.keys()))
   }
-  rewriteScopedJs(staged, names.keys())
+  // names.keys() is a ONE-SHOT iterator: passing it straight into the walk
+  // would let the first file's rewrite consume every name and leave all
+  // later files unrewritten (0.3.0 bug: tools.js kept @deepseek-ai/dsh-*).
+  // A materialized array stays re-iterable for each file.
+  rewriteScopedJs(staged, [...names.keys()])
   let packed
   try {
-    packed = JSON.parse(npmPack(staged))[0]
+    const raw = JSON.parse(npmPack(staged))
+    // npm 11 packs as an array; npm 12 switched to an object keyed by the
+    // package id. Accept both so the loop (and local runs) stay portable.
+    packed = Array.isArray(raw) ? raw[0] : Object.values(raw)[0]
   } catch (error) {
     console.error(`pack failed: ${dir}`)
     console.error(error?.stderr ?? error?.message ?? error)
@@ -201,12 +227,18 @@ for (const item of tarballs) {
   if (typeof manifest.main === 'string' && !existsSync(join(staged, manifest.main))) {
     failures.push(`${item.name}: packed ${manifest.main} is missing`)
   }
-  const entry = join(staged, 'lib', 'index.js')
-  if (existsSync(entry)) {
-    const entryText = readFileSync(entry, 'utf8')
+  const libRoot = join(staged, 'lib')
+  for (const rel of libBundles(libRoot)) {
+    const text = readFileSync(join(libRoot, rel), 'utf8')
     for (const originalName of names.keys()) {
-      if (entryText.includes(originalName)) {
-        failures.push(`${item.name}: lib/index.js still imports ${originalName}`)
+      if (text.includes(originalName)) {
+        failures.push(`${item.name}: lib/${rel} still imports ${originalName} (unrewritten scope)`)
+      }
+    }
+    for (const match of text.matchAll(/from\s+"(\.\/[^"]+\.js)"/g)) {
+      const local = join(libRoot, match[1].slice(2))
+      if (!existsSync(local)) {
+        failures.push(`${item.name}: lib/${rel} imports ${match[1]} which is missing from the tarball`)
       }
     }
   }

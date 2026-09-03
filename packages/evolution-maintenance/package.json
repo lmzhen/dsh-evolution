@@ -30,12 +30,8 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/index.js",
-    "lib/invariant.js",
-    "lib/tools.js",
-    "lib/types/**/*.d.ts",
-    "lib/types/invariant.d.ts",
-    "lib/types/tools.d.ts"
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
   "dependencies": {

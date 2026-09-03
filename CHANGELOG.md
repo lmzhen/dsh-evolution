@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 (patch) — fixes the 0.3.0 maintenance package packaging
+
+0.3.0 shipped `@lmzhen/dsh-evolution-maintenance` broken in two ways (both fixed here, both caught by a new pack-time guard):
+
+- **Missing bundle chunk**: the tsdown build splits the shared `probe.ts` into `lib/probe-<hash>.js`, but the package `files` whitelist only listed `lib/{index,invariant,tools}.js` — `npm pack` silently excluded the chunk while `lib/index.js` and `lib/tools.js` both `import "./probe-<hash>.js"`. Runtime signature: `ERR_MODULE_NOT_FOUND` for `.../lib/probe-*.js` on plugin-tree load. Fix: whitelist is now `lib/*.js` + `lib/types/**/*.d.ts` (chunks ship, tsc-only `lib/types/*.js` and `tsbuildinfo` still do not).
+- **Unrewritten scope in a second entry**: `rewriteScopedJs` passed a single one-shot `names.keys()` iterator into every file's rewrite — the first file consumed the whole family-name set, so later files kept `@deepseek-ai/dsh-evolution-*`. Only `evolution-maintenance` has a non-index entry importing family code (`lib/tools.js` → `@deepseek-ai/dsh-evolution-core`), which is why only it broke. Fix: materialize `[...names.keys()]` (re-iterable per file) + comment pinned at the call site.
+- **Pack-time guard** (`prepare-release.mjs`): the post-pack validation now scans EVERY runtime bundle in `lib/` (not just `index.js`) for unrewritten family names AND resolves every relative `"./x.js"` import against the staged bundle set — both 0.3.0 defects would now fail the validate chain instead of reaching npm. Also accepts npm 12's object-shaped `npm pack --json` output (npm 11 returns an array).
+
 ## 0.2.1 (patch) — memory snapshot refresh bypass fix (v8 audit P2)
 
 - **Write-sink refresh** (`memory/src/index.ts`): `MemoryRegistry.applyBatch` now emits `evolution/memory-applied` after ANY successful write — the snapshot refresh moved from the foreground `memory` tool's own callback to the single write sink. Bypass paths (`/graph edit|delete memory:` and background-review direct writes, both default-deployment paths) now refresh the model-visible snapshot instead of leaving it stale until the next foreground tool call.
