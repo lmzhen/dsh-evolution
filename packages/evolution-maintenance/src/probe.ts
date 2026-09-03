@@ -11,6 +11,7 @@ import {
   computeDedupGroups,
   computePrefixClusters,
   duplicateHeadings,
+  HEALTH_STAMP_RE,
   missingSupportPointers,
   narrowNameMatches,
   overlongLines,
@@ -85,7 +86,7 @@ export function computeProbe(
   switch (signal) {
     case 'stamp_density': {
       const kb = Math.max(1, body.length / 1024)
-      const stamps = (body.match(/\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z)?\b/g) ?? [])
+      const stamps = (body.match(HEALTH_STAMP_RE) ?? [])
       const density = stamps.length / kb
       return result(signal, [
         `stamp_density=${density.toFixed(2)}/KB (${stamps.length} stamps / ${Math.round(kb)}KB)`,

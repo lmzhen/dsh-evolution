@@ -29,7 +29,8 @@ export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
   churnMinPatches: 20,
 }
 
-const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z)?\b/g
+/** Stamp regex shared by health assessment and the maintenance probe (single source, 011). */
+export const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z)?\b/g
 
 /**
  * Bodies below this size skip stamp-density assessment: a few dates or shas

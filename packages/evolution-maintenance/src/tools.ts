@@ -11,7 +11,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, type DriftSkillSnapshot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 
 export const name = 'evolution-maintenance-tools'
@@ -55,7 +55,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!ioRegistry) return { signal, detail: ['evolution-io registry not mounted'], ...(target ? { target } : {}) }
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
           const entries = await library.list()
-          const snapshots = []
+          const snapshots: DriftSkillSnapshot[] = []
           for (const entry of entries) {
             const body = await library.read(entry.name)
             if (body === null) continue

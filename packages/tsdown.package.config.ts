@@ -3,7 +3,7 @@ import { defineConfig } from 'tsdown'
 export default defineConfig(() => ({
   workspace: false,
   cwd: process.cwd(),
-  entry: ['lib/types/{index,invariant}.js'],
+  entry: ['lib/types/{index,invariant,tools}.js'],
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',
