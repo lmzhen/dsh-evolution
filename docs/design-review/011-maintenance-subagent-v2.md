@@ -204,7 +204,7 @@ D. 库·整合纪律（计划形态约束，不是信号）
 - **validate-plan.ts**：zod schema + §6 模板拒绝矩阵（含 confidence/needs_human 一致性）；引用闭合（evidence.signal ⊆ 事实块信号集）；**quality_low 全局施加**（读事实块环境信号，quality_low=unknown 的技能所有结构建议机械置 needs_human:true——与"未知必人审"判据同源，校验器实现，不依赖模型自觉）；拒绝→结构化失败报告（哪项/哪字段/为何拒）。
 - **probe 工具（tools.ts）**：只读；复用 scan 详情函数（单源）；输出 JSON；同样过 `redact`；子代理白名单 `['skill','maintenance_probe']`（无任何写工具）。
 - **编排器（service.ts）**：`maintainRunning` 重入门（照抄 curator `:402` `if (this.running)` + `already-running` 结果）+ `maintainTimeoutMs`（默认 120_000，`AbortSignal.timeout`，照抄 review `:52/:227`）；**命令内并发=第二请求返回 `already-running` 跳过，不并行起 LLM**。
-  **追加裁决（2026-09-03）**：`maintainRunning` 重入门**不实现**——maintain 是只读诊断（无写操作重入损坏风险，与 curator 的 rc.38 重复归档事故不同），并发最坏 = 双倍 token + 重复建议；用户手动命令并发面趋零。并发语义：**并发 maintain 会并行执行（成本翻倍），请串行使用**——一行文档替代一门逻辑；`maintainTimeoutMs` 超时已实现（挂起风险已覆盖）。
+  **追加裁决（2026-09-03）**：`maintainRunning` 重入门**不实现**——maintain 是只读诊断（无写操作重入损坏风险，与 curator 的 rc.38 重复归档事故不同），并发最坏 = 双倍 token + 重复建议；用户手动命令并发面趋零。**替代方案已落地：冷却窗**（`Config.maintainCooldownMs` 默认 60s，进程内瞬态）——短时间内的连点/重发（误触场景）在窗口内被拦截（返回上次 runId + 剩余秒），**同时覆盖并行与连点两个场景**；成功与失败都更新时间戳（防连续失败刷屏）；扫描仍可随时手动重跑（窗口默认 60s）。
 
 ## 8. 信任边界与威胁模型（A5 新增）
 

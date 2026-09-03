@@ -16,10 +16,16 @@ export interface Config {
   /** Skill-tree root for maintain/restructure; empty uses skillsRoot().
    * Align with tool-skill-manage/skill-usage/evolution-skill-catalog rows (A7). */
   skillsRoot?: string | undefined
+  /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
+   * secondary calls inside the window return the previous runId instead of
+   * spending another model call. Default 60s; transient (per-process). */
+  maintainCooldownMs?: number | undefined
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
+  let lastMaintainAt = 0
+  let lastMaintainRunId = ''
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: CommandRuntimeLike }).commands
     commands.register({
@@ -183,12 +189,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // execution; fail-closed when either dependency is missing. Scope
           // filtering is reserved (011 §3) — reject unknown args explicitly
           // instead of silently swallowing them.
+          const cooldownMs = config.maintainCooldownMs ?? 60_000
+          const sinceLast = Date.now() - lastMaintainAt
+          if (cooldownMs > 0 && sinceLast < cooldownMs) {
+            const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)
+            return ok(`Maintenance cooldown active (${remaining}s) — latest scan ${lastMaintainRunId}; re-running now would spend another model call.`)
+          }
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           const subagents = ctx.get('subagents') as { start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }> } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
           const outcome = await runMaintain({ library, subagents, parent: invocation.agent })
+          // Update the cooldown on success AND failure: repeated failing
+          // scans must not refire either.
+          lastMaintainAt = Date.now()
+          lastMaintainRunId = outcome.runId ?? ''
           if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
           const eventIo = ioRegistry.provider()
           const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
