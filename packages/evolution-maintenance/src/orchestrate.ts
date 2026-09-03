@@ -201,7 +201,10 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       prompt: [{ type: 'text', text: prompt }],
       parent: runtime.parent,
       signal: AbortSignal.timeout(timeoutMs),
-      maxDepth: options.maxDepth ?? 0,
+      // maxDepth is the ABSOLUTE cap of the subagent's own depth (platform
+      // resolveChildDepth: childDepth = parentDepth+1). 1 = subagent allowed,
+      // nesting denied (2 > 1); 0 = spawn itself rejected (0.3.1 defect).
+      maxDepth: options.maxDepth ?? 1,
       agentOptions,
       persona: template,
       toolFilter: { allow: [...(options.toolAllow ?? ['skill', 'maintenance_probe'])] },

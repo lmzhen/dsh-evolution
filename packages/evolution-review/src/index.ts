@@ -34,6 +34,10 @@ export interface Config {
   executionTimeoutMs?: number
   reviewContextMessages?: number
   reviewMessageChars?: number
+  /** ABSOLUTE cap of the review subagent's own delegation depth (platform
+   * resolveChildDepth: childDepth = parentDepth+1 must be <= maxDepth).
+   * 1 permits the subagent itself and denies nesting (2 > 1); 0 rejects the
+   * spawn outright (SubagentDepthError on any real run — the 0.3.1 defect). */
   reviewMaxDepth?: number
   /** LLM provider for review subagents. Omit to inherit the deployment default route. */
   reviewProvider?: string
@@ -53,7 +57,7 @@ export const Config: z<Config> = z.object({
   executionTimeoutMs: z.number().default(30_000),
   reviewContextMessages: z.number().default(60),
   reviewMessageChars: z.number().default(2000),
-  reviewMaxDepth: z.number().default(0),
+  reviewMaxDepth: z.number().default(1),
   // (rc.66 note) schemastery fields are optional by default — the interface
   // `reviewProvider?` and this schema agree; "Omit to inherit" holds.
   reviewProvider: z.string(),

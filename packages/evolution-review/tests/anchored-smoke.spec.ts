@@ -77,11 +77,13 @@ describe('anchored-standard review smoke', () => {
     // route instead of a hardcoded provider name.
     expect((request?.agentOptions as Record<string, unknown> | undefined)?.provider).toBeUndefined()
     expect(typeof (request?.agentOptions as Record<string, unknown> | undefined)?.model).toBe('string')
-    // P2-9 contract pins (verified against dsh-v0.1.1-rc.2 source): maxDepth 0
-    // is a legal non-negative safe integer (blocks further spawns), and the
-    // structured-output schema is an object whose array items use the DSL's
-    // lossless 'json' node type.
-    expect(request?.maxDepth).toBe(0)
+    // P2-9 contract pin (corrected after the 0.3.1 real-run SubagentDepthError):
+    // request.maxDepth is the ABSOLUTE cap on the child's own depth
+    // (resolveChildDepth throws when parentDepth+1 > maxDepth). 1 permits the
+    // review subagent itself while denying nesting (2 > 1); 0 rejects the
+    // spawn outright. The structured-output schema is an object whose array
+    // items use the DSL's lossless 'json' node type.
+    expect(request?.maxDepth).toBe(1)
     const outputSchema = request?.outputSchema as {
       type?: string
       properties?: Record<string, { items?: { type?: string } }>
