@@ -424,34 +424,44 @@ describe('evolution-commands', () => {
   })
 
   it('maintain cooldown blocks rapid repeat triggers (single model call)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', {
-      provider: () => io,
-    })
-    let starts = 0
-    const plan = { verdict: 'no_issues', plan: [], notes: [] }
-    ctx.provide('subagents', {
-      async start(_kind: string, _options: unknown) {
-        starts += 1
-        return { result: Promise.resolve({ text: 'x', structured: plan }) }
-      },
-    })
-    await ctx.plugin(Commands, { maintainCooldownMs: 60_000 })
-    const first = await captured!.handler({ rawInput: 'maintain' })
-    expect(first.kind).toBe('success')
-    expect(starts).toBe(1)
-    const second = await captured!.handler({ rawInput: 'maintain' })
-    expect(second.kind).toBe('success')
-    expect(second.text).toContain('cooldown')
-    expect(starts).toBe(1)
+    // Self-contained library (temp root) — a clean CI HOME has no skills and
+    // the empty-library short-circuit would skip the subagent, breaking the
+    // model-call count assertion.
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-cooldown-'))
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          captured = definition as typeof captured
+          return () => {}
+        },
+      })
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', { provider: () => io })
+      let starts = 0
+      const plan = { verdict: 'no_issues', plan: [], notes: [] }
+      ctx.provide('subagents', {
+        async start(_kind: string, _options: unknown) {
+          starts += 1
+          return { result: Promise.resolve({ text: 'x', structured: plan }) }
+        },
+      })
+      await ctx.plugin(Commands, { maintainCooldownMs: 60_000, skillsRoot: root })
+      const first = await captured!.handler({ rawInput: 'maintain' })
+      expect(first.kind).toBe('success')
+      expect(starts).toBe(1)
+      const second = await captured!.handler({ rawInput: 'maintain' })
+      expect(second.kind).toBe('success')
+      expect(second.text).toContain('cooldown')
+      expect(starts).toBe(1)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
 })
