@@ -21,6 +21,9 @@ export interface Config {
    * spending another model call. Default 130s (>= maintain timeout 120s, so
    * the window also covers in-flight runs); transient (per-process). */
   maintainCooldownMs?: number | undefined
+  /** Subagent deadline for one maintenance scan (ms). Default 120s; raise on
+   * slow providers or very large skill libraries (0.3.3). */
+  maintainTimeoutMs?: number | undefined
 }
 
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
@@ -257,6 +260,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const outcome = await runMaintain(
             { library, subagents, parent: invocation.agent },
             {
+              timeoutMs: config.maintainTimeoutMs ?? 120_000,
               descriptions: () => enrichment.descriptions,
               supportFiles: () => enrichment.supportFiles,
               quality: () => enrichment.quality,

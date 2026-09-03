@@ -272,6 +272,17 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       text: formatPlan(validated, runId),
     }
   } catch (error) {
-    return { ok: false, error: String(error) }
+    // 0.3.3: translate platform abort results instead of surfacing the raw
+    // `Error: This operation was aborted` (the AbortSignal.timeout deadline,
+    // or a cancelled parent turn). Detect by name — DOMException does not
+    // reliably extend Error across Node versions.
+    const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : undefined
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      ok: false,
+      error: name === 'AbortError'
+        ? 'Maintenance scan was aborted (subagent timeout or cancellation) before a plan was produced — retry, or raise the timeout (evolution-commands maintainTimeoutMs) on a slow/large library.'
+        : `Maintenance scan failed: ${message}`,
+    }
   }
 }

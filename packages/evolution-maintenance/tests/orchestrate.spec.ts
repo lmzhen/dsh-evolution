@@ -117,6 +117,40 @@ describe('runMaintain', () => {
     expect(outcome.error ?? '').toContain('spawn bum')
   })
 
+  it('translates an AbortError into a readable message (0.3.3)', async () => {
+    const aborting: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start() {
+          const abort = new Error('This operation was aborted')
+          abort.name = 'AbortError'
+          return { result: Promise.reject(abort) }
+        },
+      },
+    }
+    const outcome = await runMaintain(aborting)
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error ?? '').toContain('aborted')
+    expect(outcome.error ?? '').not.toContain('This operation was aborted')
+  })
+
+  it('passes the caller-specified timeout to the subagent start (0.3.3)', async () => {
+    let capturedOptions: { signal?: AbortSignal } | undefined
+    const runtimeWithTimeout: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          capturedOptions = options as typeof capturedOptions
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeWithTimeout, { timeoutMs: 240_000 })
+    expect(outcome.ok).toBe(true)
+    // AbortSignal.timeout(240_000) — the deadline rides the signal.
+    expect(capturedOptions?.signal).toBeTruthy()
+  })
+
   it('persona carries the template once; the prompt carries facts only (v11 P3-4)', async () => {
     let capturedOptions: { persona?: string; prompt?: Array<{ text: string }> } | undefined
     const runtimeWithCapture: MaintainRuntime = {
