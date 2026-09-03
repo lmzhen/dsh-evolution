@@ -239,6 +239,7 @@ D. 库·整合纪律（计划形态约束，不是信号）
 
 - **裁决**：plan 摘要（runId、verdict、每条建议的 rule/kind/names/impact 摘要、confidence、needs_human 数）落 `type:'maintain'` 事件载荷（`appendEvolutionEvent` 既有通道，learn 先例）；**不建 state 表**——维护计划是瞬态审查产物，新建表=新持久化面+新迁移/恢复逻辑，而审计需求（"哪个建议导致这次操作"）只需 runId 回引即可满足；plan 全文可通过 `-v` 重跑或 `--plan <runId>` 回查事件载荷摘要链。
 - **执行命令回引**：consolidate/restructure（新增）接受可选 `--plan <runId>`，写入调用记录/事件——审计断链闭合（§2-P4 反制）。**边界（诚实标注）**：事件日志有保留窗（007：10 归档 + 4000 active）——低频命令下实际无虞，但"审计链"承诺以保留窗为界；`--plan` 回查得到的是**摘要链**，plan 全文需重跑再生（凭 runId 从事件载荷摘要定位后重跑，或直接重跑命令）。
+  **v12 修订（裁决出处化）**：`--plan` 当前实现为 **L2 人读闭合**（结果文本 `[audit] plan=<id>` 注记；`recordInput:false` 但经会话事件落盘）。**L3 机器链**（runId 写入 mutation 审计记录）在两条路径上**均零新持久化面**（`plan.auditSummary` 字段——TreeChangePlan 宿主——restructure:1089/consolidate:1001 已填 summary，仅需把 runId 拼入）——**裁决为优先级选择而非架构限制**：L1（事件载荷）+L2 已满足当前真实需求（无程序化查询消费者），L3 推迟至出现真实需求时一行接入（restructure/consolidate 同法）。
 - **B2-B5 的 patch 指引**（无命令通道的建议）同样有 runId 回引栖身处（载荷摘要含条目），不落地也不丢失线索。
 
 ## 11. 自洽方案与 bundle 演进（A3 记录）
@@ -261,6 +262,7 @@ D. 库·整合纪律（计划形态约束，不是信号）
 
 **三备选论证（A8）**：
 1. **纯确定性报告（无 LLM）**：可满足"事实"（Phase 1 的扫描器即产物，`/evolution maintain --facts` 可只显示事实块），但**不满足"建议"**——锚 vs 残留、同伞与否、窄名语义是语义判定（§2 归因：阈值只能给事实，裁决需要语义）；**裁决：确定性报告作 Phase 1 交付（事实面），LLM 只负责语义面**——二层各取所需，不二选一。
+   **v12 修订（裁决出处化）**："作 Phase 1 交付"指**扫描器代码产物**（事实面计算层交付即确定性事实保证）；**用户可达的 `--facts` 能力入口**（`/evolution maintain --facts` 仅渲染事实块、零 LLM、不设冷却）**尚未实现**——归类为候选能力（非契约缺失：不在任何 Phase 验收标准中），若实现复用主链富化 helper（富化已接齐，v11 P1-1 已闭环），~15 行 + 1 测试。
 2. **扩展 curator `healthView` + `/evolution skills health`**：healthView 是逐技能只读健康（无跨库关系诊断），且无 LLM 语义层；库级域/层诊断需要跨技能判断（近重复/孤立域/层漂移）——**裁决：不并入**（healthView 保持只读轻量，maintain 用不同信号面）。
 3. **review 通道加库级模式**：review 是会话级（读标记约束、本会话技能、cadence/completion 自动触发）；库级审查=全库+无读标记+用户命令——**裁决：不并入**（集成会破坏"先不做自动化治理"的触发面隔离；review 的读标记约束对库级语义不适用）。
 
