@@ -383,6 +383,46 @@ describe('evolution-commands', () => {
     }
   })
 
+  it('maintain --facts renders the facts block with zero subagent calls and no cooldown', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-facts-'))
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          captured = definition as typeof captured
+          return () => {}
+        },
+      })
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', { provider: () => io })
+      let subagentStarts = 0
+      ctx.provide('subagents', {
+        async start(_kind: string, _options: unknown) {
+          subagentStarts += 1
+          throw new Error('--facts must never spawn a subagent')
+        },
+      })
+      await ctx.plugin(Commands, { skillsRoot: root })
+      const result = await captured!.handler({ rawInput: 'maintain --facts' })
+      expect(result.kind).toBe('success')
+      expect(result.text).toContain('MECHANICAL_FACTS')
+      expect(result.text).toContain('signal=description_chars')
+      expect(result.text).toContain('END FACTS')
+      expect(subagentStarts).toBe(0)
+      // Cooldown is a scan-command guard; a second facts preview must not hit it.
+      const second = await captured!.handler({ rawInput: 'maintain --facts' })
+      expect(second.kind).toBe('success')
+      expect(second.text).toContain('MECHANICAL_FACTS')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('maintain cooldown blocks rapid repeat triggers (single model call)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined

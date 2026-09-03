@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, eventsFile, parseFrontmatter, SkillLibrary, usageObserved, type EvolutionIoLike, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
-import { runMaintain } from '@deepseek-ai/dsh-evolution-maintenance'
+import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -18,8 +18,42 @@ export interface Config {
   skillsRoot?: string | undefined
   /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
    * secondary calls inside the window return the previous runId instead of
-   * spending another model call. Default 60s; transient (per-process). */
+   * spending another model call. Default 130s (>= maintain timeout 120s, so
+   * the window also covers in-flight runs); transient (per-process). */
   maintainCooldownMs?: number | undefined
+}
+
+/** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
+interface Enrichment {
+  descriptions: ReadonlyMap<string, string>
+  supportFiles: ReadonlyMap<string, readonly string[]>
+  quality: ReadonlyMap<string, number>
+  usageObservedValue: boolean | undefined
+}
+
+async function buildEnrichment(ctx: Context, library: SkillLibrary): Promise<Enrichment> {
+  // Enrichment hooks (011 §7, v11 P1-1): all four use existing APIs; a
+  // missing service degrades to unknown (never a fabricated pass).
+  const skillUsage = ctx.get('skillUsage') as { report?(): Promise<UsageMap> } | undefined
+  const usageMap = skillUsage?.report ? await skillUsage.report() : undefined
+  const usageObservedValue = usageMap ? usageObserved(usageMap) : undefined
+  const descriptions = new Map<string, string>()
+  const supportFiles = new Map<string, readonly string[]>()
+  const quality = new Map<string, number>()
+  for (const entry of await library.list()) {
+    const body = await library.read(entry.name)
+    if (body === null) continue
+    const parsed = parseFrontmatter(body)
+    const description = parsed?.frontmatter.description
+    if (typeof description === 'string' && description.trim().length > 0) {
+      descriptions.set(entry.name, description)
+    }
+    const files = await library.listSupportFiles(entry.name)
+    if (files.length > 0) supportFiles.set(entry.name, files)
+    const record = usageMap?.get(entry.name)
+    if (typeof record?.quality_score === 'number') quality.set(entry.name, record.quality_score)
+  }
+  return { descriptions, supportFiles, quality, usageObservedValue }
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -187,6 +221,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           return ok('Learning request sent to this session. Follow it now.')
         }
+        if (input === 'maintain --facts') {
+          // 0-token deterministic preview (011 §12-1 v12): facts block only,
+          // no subagent call, no cooldown (the cooldown guards LLM calls).
+          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
+          const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+          const enrichment = await buildEnrichment(ctx, library)
+          const snapshots = await snapshotFromLibrary(library, {
+            descriptions: enrichment.descriptions,
+            supportFiles: enrichment.supportFiles,
+            quality: enrichment.quality,
+          })
+          const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
+          return ok(`Maintenance facts (0-token preview):\n${facts}`)
+        }
         if (input === 'maintain') {
           // User-command maintenance scan (design 011): deterministic facts +
           // one-shot subagent → validated plan display. No writes, no auto
@@ -204,35 +253,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
-          // Enrichment hooks (011 §7, v11 P1-1): the four enrichers use only
-          // existing APIs; a missing service degrades to unknown (never a
-          // fabricated pass).
-          const skillUsage = ctx.get('skillUsage') as { report?(): Promise<UsageMap> } | undefined
-          const usageMap = skillUsage?.report ? await skillUsage.report() : undefined
-          const usageObservedValue = usageMap ? usageObserved(usageMap) : undefined
-          const descriptions = new Map<string, string>()
-          const supportFiles = new Map<string, readonly string[]>()
-          const quality = new Map<string, number>()
-          for (const entry of await library.list()) {
-            const body = await library.read(entry.name)
-            if (body === null) continue
-            const parsed = parseFrontmatter(body)
-            const description = parsed?.frontmatter.description
-            if (typeof description === 'string' && description.trim().length > 0) {
-              descriptions.set(entry.name, description)
-            }
-            const files = await library.listSupportFiles(entry.name)
-            if (files.length > 0) supportFiles.set(entry.name, files)
-            const record = usageMap?.get(entry.name)
-            if (typeof record?.quality_score === 'number') quality.set(entry.name, record.quality_score)
-          }
+          const enrichment = await buildEnrichment(ctx, library)
           const outcome = await runMaintain(
             { library, subagents, parent: invocation.agent },
             {
-              descriptions: () => descriptions,
-              supportFiles: () => supportFiles,
-              quality: () => quality,
-              usageObserved: () => usageObservedValue,
+              descriptions: () => enrichment.descriptions,
+              supportFiles: () => enrichment.supportFiles,
+              quality: () => enrichment.quality,
+              usageObserved: () => enrichment.usageObservedValue,
             },
           )
           // Update the cooldown on success AND failure: repeated failing

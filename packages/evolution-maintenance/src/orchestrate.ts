@@ -19,6 +19,7 @@ import {
   PROMPT_BUNDLE_ID,
   verifyPromptBundle,
   type DriftReport,
+  type DriftSkillSnapshot,
 } from '@deepseek-ai/dsh-evolution-core'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { renderFacts } from './render-facts.ts'
@@ -105,6 +106,33 @@ function jointSignature(template: string, signalsVersion: string): string {
   return createHash('sha256').update(canonical).digest('hex').slice(0, 16)
 }
 
+/** Facts bundle shared by the full scan and the `--facts` 0-token preview. */
+export interface FactsBundle {
+  report: DriftReport
+  facts: string
+  signalsVersion: string
+  signature: string
+}
+
+/**
+ * Deterministic half of a maintenance scan: snapshots → drift report →
+ * rendered facts block (joint signature + redaction). Shared by `runMaintain`
+ * and the `--facts` preview so the preview can never disagree with the scan.
+ */
+export function buildMaintainFacts(
+  snapshots: ReadonlyArray<DriftSkillSnapshot>,
+  usageObserved: boolean | undefined,
+  redact: ((text: string) => string) | undefined,
+): FactsBundle {
+  const report = computeDriftSignals(
+    snapshots.map(snapshot => ({ ...snapshot, usageObserved })),
+  )
+  const signalsVersion = DRIFT_SIGNALS_VERSION
+  const signature = jointSignature(MAINTAIN_PROMPT, signalsVersion)
+  const facts = renderFacts(report, { signalsVersion, signature, redact })
+  return { report, facts, signalsVersion, signature }
+}
+
 function formatPlan(validated: ValidationResult, runId: string): string {
   const { plan, forcedHuman } = validated
   const lines: string[] = []
@@ -155,14 +183,8 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       return { ok: true, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
     const usageObserved = options.usageObserved ? options.usageObserved() : undefined
-    const report = computeDriftSignals(
-      snapshots.map(snapshot => ({ ...snapshot, usageObserved })),
-    )
-
-    const signalsVersion = DRIFT_SIGNALS_VERSION
-    const signature = jointSignature(MAINTAIN_PROMPT, signalsVersion)
+    const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, usageObserved, options.redact)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
-    const facts = renderFacts(report, { signalsVersion, signature, redact: options.redact })
 
     // Persona carries the full template; the prompt carries ONLY the facts
     // block and the output instruction — one copy of the template in the
