@@ -19,7 +19,11 @@ describe('evolution-host dependency contract', () => {
   it('declares every row package in the bundle manifest', () => {
     for (const row of rows) {
       const name = rowName(row)
-      if (name.startsWith('@deepseek-ai/')) expect(declared.has(name)).toBe(true)
+      if (!name.startsWith('@deepseek-ai/')) continue
+      // Subpath exports (e.g. @deepseek-ai/dsh-evolution-maintenance/tools)
+      // are satisfied by the main package's dependency entry.
+      const declaredName = name.split('/').slice(0, 2).join('/')
+      expect(declared.has(declaredName)).toBe(true)
     }
   })
 
