@@ -11,6 +11,7 @@ import {
 } from '../src/drift-signals.ts'
 
 const HEALTHY = '# A\n\nintro\n\n## When to Use\n\n- x\n\n## Verification\n\n- y\n'
+const OTHER_BODY = '# G\n\n## When to Use\n\n- z\n'
 
 describe('drift-signals pure checks', () => {
   it('detects duplicate ## headings', () => {
@@ -69,6 +70,23 @@ describe('computeDriftSignals', () => {
     expect(findDriftSignal(report.skills[0]?.signals ?? [], 'quality_low')?.verdict).toBe('unknown')
     expect(findDriftSignal(report.library, 'usage_observed')?.verdict).toBe('unknown')
     expect(findDriftSignal(report.skills[0]?.signals ?? [], 'description_chars')?.verdict).toBe('pass')
+  })
+
+  it('unenumerated support files yield unknown, never a fabricated pass', () => {
+    const report = computeDriftSignals([{ name: 'solo', body: HEALTHY }])
+    const pointer = findDriftSignal(report.skills[0]?.signals ?? [], 'pointer_missing')
+    expect(pointer?.verdict).toBe('unknown')
+    expect(pointer?.value).toBe('not-enumerated')
+  })
+
+  it('usage_observed=false reports pass/unobserved (truthful value text)', () => {
+    const report = computeDriftSignals([
+      { name: 'a', body: HEALTHY, usageObserved: false },
+      { name: 'b', body: OTHER_BODY, usageObserved: false },
+    ])
+    const signal = findDriftSignal(report.library, 'usage_observed')
+    expect(signal?.verdict).toBe('pass')
+    expect(signal?.value).toBe('unobserved')
   })
 
   it('does not report usage_observed=observed for an empty library', () => {

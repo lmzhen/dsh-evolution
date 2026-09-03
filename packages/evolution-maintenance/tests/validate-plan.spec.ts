@@ -107,6 +107,13 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(imposed[2]?.needs_human).toBe(true)
   })
 
+  it('rejects NaN confidence (was allowed before isFinite)', () => {
+    const item = validItem({ confidence: Number.NaN })
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
+    expect(result.ok).toBe(false)
+    expect(result.errors.some(e => e.includes('finite'))).toBe(true)
+  })
+
   it('applies the quality_low=unknown gate globally and reports forcedHuman', () => {
     const item = validItem({ names: ['no-quality-skill'], confidence: 0.9 })
     const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)

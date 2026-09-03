@@ -5,7 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, eventsFile, parseFrontmatter, SkillLibrary, usageObserved, type EvolutionIoLike, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { runMaintain } from '@deepseek-ai/dsh-evolution-maintenance'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -132,12 +132,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('consolidate ')) {
-          const names = input.slice(12).trim().split(/\s+/).filter(Boolean)
+          const planTail = /\s--plan\s+(\S+)\s*$/.exec(input) ?? null
+          const planRunId = planTail?.[1] ?? undefined
+          const rest = planTail ? input.slice(0, planTail.index) : input
+          const names = rest.slice(12).trim().split(/\s+/).filter(Boolean)
           const [target, ...sources] = names
           if (!target || sources.length === 0) return err('Usage: /evolution consolidate <target> <source...>')
           const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: 'Curator service not mounted.' }
-          return result.ok ? ok(result.message) : err(result.message)
+          if (!result.ok) return err(result.message)
+          return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
         }
         if (input.startsWith('skill restore ')) {
           const name = input.slice(14).trim()
@@ -189,7 +193,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // execution; fail-closed when either dependency is missing. Scope
           // filtering is reserved (011 §3) — reject unknown args explicitly
           // instead of silently swallowing them.
-          const cooldownMs = config.maintainCooldownMs ?? 60_000
+          const cooldownMs = config.maintainCooldownMs ?? 130_000
           const sinceLast = Date.now() - lastMaintainAt
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)
@@ -200,7 +204,37 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
-          const outcome = await runMaintain({ library, subagents, parent: invocation.agent })
+          // Enrichment hooks (011 §7, v11 P1-1): the four enrichers use only
+          // existing APIs; a missing service degrades to unknown (never a
+          // fabricated pass).
+          const skillUsage = ctx.get('skillUsage') as { report?(): Promise<UsageMap> } | undefined
+          const usageMap = skillUsage?.report ? await skillUsage.report() : undefined
+          const usageObservedValue = usageMap ? usageObserved(usageMap) : undefined
+          const descriptions = new Map<string, string>()
+          const supportFiles = new Map<string, readonly string[]>()
+          const quality = new Map<string, number>()
+          for (const entry of await library.list()) {
+            const body = await library.read(entry.name)
+            if (body === null) continue
+            const parsed = parseFrontmatter(body)
+            const description = parsed?.frontmatter.description
+            if (typeof description === 'string' && description.trim().length > 0) {
+              descriptions.set(entry.name, description)
+            }
+            const files = await library.listSupportFiles(entry.name)
+            if (files.length > 0) supportFiles.set(entry.name, files)
+            const record = usageMap?.get(entry.name)
+            if (typeof record?.quality_score === 'number') quality.set(entry.name, record.quality_score)
+          }
+          const outcome = await runMaintain(
+            { library, subagents, parent: invocation.agent },
+            {
+              descriptions: () => descriptions,
+              supportFiles: () => supportFiles,
+              quality: () => quality,
+              usageObserved: () => usageObservedValue,
+            },
+          )
           // Update the cooldown on success AND failure: repeated failing
           // scans must not refire either.
           lastMaintainAt = Date.now()
@@ -220,10 +254,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(`Maintenance scan ${outcome.runId}:\n${outcome.text ?? ''}`)
         }
         if (input.startsWith('restructure ')) {
-          // /evolution restructure <name> "<heading>" <to_file> — bridges the
-          // existing SkillLibrary.restructure (two-phase rollback + origin
-          // gate); one move per invocation; heading may contain spaces.
-          const match = /^restructure\s+(\S+)\s+"([^"]+)"\s+(\S+)$/.exec(input)
+          // /evolution restructure <name> "<heading>" <to_file> [--plan <runId>]
+          // — bridges the existing SkillLibrary.restructure (two-phase
+          // rollback + origin gate); one move per invocation; heading may
+          // contain spaces. `--plan` back-references a maintain scan runId
+          // (011 §10 audit chain; shallow — annotated in the result text).
+          const planTail = /\s--plan\s+(\S+)\s*$/.exec(input) ?? null
+          const planRunId = planTail?.[1] ?? undefined
+          const rest = planTail ? input.slice(0, planTail.index) : input
+          const match = /^restructure\s+(\S+)\s+"([^"]+)"\s+(\S+)$/.exec(rest)
           if (!match) return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
           const name = match[1] ?? ''
           const heading = match[2] ?? ''
@@ -233,7 +272,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
-          return result.ok ? ok(result.message) : err(result.message)
+          if (!result.ok) return err(result.message)
+          return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
         }
         if (input === 'replay') {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined

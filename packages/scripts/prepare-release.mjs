@@ -232,6 +232,7 @@ const publishGroups = [
   ['memory', 'memory-files', 'skill-usage'],
   ['evolution-policy', 'evolution-approval', 'evolution-threat'],
   ['evolution-plan-validator'],
+  ['evolution-maintenance'],
   ['tool-memory', 'tool-skill-manage'],
   ['evolution-review', 'evolution-curator', 'evolution-commands'],
   ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog', 'evolution-capability'],

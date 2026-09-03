@@ -160,17 +160,20 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
       : sig('prefix_cluster', 'over', clusters.map(cluster => cluster.members.join(', ')).join(' | '), 'size >= 2', `key=${clusters.map(cluster => cluster.key).join('|')}`),
   )
 
-  const allObserved = snapshots.length > 0 && snapshots.every(s => s.usageObserved !== null && s.usageObserved !== undefined)
+  const allProvided = snapshots.length > 0 && snapshots.every(s => s.usageObserved !== null && s.usageObserved !== undefined)
   library.push(
-    allObserved
-      ? sig('usage_observed', 'pass', 'observed')
-      : sig('usage_observed', 'unknown', 'not-observed', undefined, 'usage window status missing'),
+    !allProvided
+      ? sig('usage_observed', 'unknown', 'not-observed', undefined, 'usage window status missing')
+      : snapshots.every(s => s.usageObserved === true)
+        ? sig('usage_observed', 'pass', 'observed')
+        : sig('usage_observed', 'pass', 'unobserved'),
   )
 
   const skills: DriftSkillAssessment[] = snapshots.map((snapshot) => {
     const signals: DriftSignal[] = []
     const body = snapshot.body
     const supportFiles = snapshot.supportFiles ?? []
+    const supportEnumerated = snapshot.supportFiles !== undefined
 
     const health = assessStructureHealth(
       {
@@ -215,11 +218,13 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
         : sig('overlong_line', 'over', long.map(l => `${l.lineNo}:${l.chars}`).join(', '), `${DRIFT_MAX_LINE_CHARS}`),
     )
 
-    const missing = missingSupportPointers(body, supportFiles)
+    const missing = supportEnumerated ? missingSupportPointers(body, supportFiles) : undefined
     signals.push(
-      missing.length === 0
-        ? sig('pointer_missing', 'pass', 'none')
-        : sig('pointer_missing', 'over', missing.join(', ')),
+      !supportEnumerated
+        ? sig('pointer_missing', 'unknown', 'not-enumerated', undefined, 'support files not enumerated')
+        : (missing ?? []).length === 0
+          ? sig('pointer_missing', 'pass', 'none')
+          : sig('pointer_missing', 'over', missing?.join(', ') ?? ''),
     )
 
     const narrow = narrowNameMatches(snapshot.name)

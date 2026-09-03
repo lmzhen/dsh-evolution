@@ -7,14 +7,17 @@
 
 import { createHash, randomUUID } from 'node:crypto'
 import {
+  AUTHORING_DESCRIPTION_BAR,
   computeDriftSignals,
+  DRIFT_MAX_LINE_CHARS,
   DRIFT_SIGNAL_NOUNS,
   DRIFT_SIGNALS_VERSION,
-  AUTHORING_DESCRIPTION_BAR,
   DEFAULT_HEALTH_THRESHOLDS,
-  DRIFT_MAX_LINE_CHARS,
+  LOW_QUALITY_THRESHOLD,
   MAINTAIN_PROMPT,
+  PROMPT_BUNDLE,
   PROMPT_BUNDLE_ID,
+  verifyPromptBundle,
   type DriftReport,
 } from '@deepseek-ai/dsh-evolution-core'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
@@ -39,10 +42,10 @@ export interface MaintainOptions {
   provider?: string
   toolAllow?: readonly string[]
   redact?: ((text: string) => string) | undefined
-  supportFiles?: () => Promise<ReadonlyMap<string, readonly string[]>>
-  descriptions?: () => Promise<ReadonlyMap<string, string>>
-  quality?: () => Promise<ReadonlyMap<string, number>>
-  usageObserved?: () => Promise<boolean | undefined>
+  supportFiles?: () => ReadonlyMap<string, readonly string[]>
+  descriptions?: () => ReadonlyMap<string, string>
+  quality?: () => ReadonlyMap<string, number>
+  usageObserved?: () => boolean | undefined
 }
 
 export interface MaintainOutcome {
@@ -85,11 +88,19 @@ function thresholdNoun(id: string): string {
   return `(阈 ${id})`
 }
 
-function jointSignature(template: string, report: DriftReport, signalsVersion: string): string {
+function jointSignature(template: string, signalsVersion: string): string {
   const canonical = JSON.stringify({
     signalsVersion,
-    ids: existingSignalIds(report),
-    template: template.slice(0, 2048),
+    template,
+    nouns: DRIFT_SIGNAL_NOUNS,
+    thresholds: {
+      stampDensityPerKb: DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb,
+      minStampBodyChars: 2_000,
+      softBodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars,
+      descriptionChars: AUTHORING_DESCRIPTION_BAR,
+      qualityLow: LOW_QUALITY_THRESHOLD,
+      maxLineChars: DRIFT_MAX_LINE_CHARS,
+    },
   })
   return createHash('sha256').update(canonical).digest('hex').slice(0, 16)
 }
@@ -128,27 +139,37 @@ function formatPlan(validated: ValidationResult, runId: string): string {
 /** Run one maintenance scan and return display text plus validation metadata. */
 export async function runMaintain(runtime: MaintainRuntime, options: MaintainOptions = {}): Promise<MaintainOutcome> {
   try {
+    // Template integrity is a hard gate on the maintenance link (011 §7):
+    // the bundle digest covers the FULL template; the joint signature adds
+    // the signal vocabulary + thresholds agreement.
+    if (!verifyPromptBundle(PROMPT_BUNDLE)) {
+      return { ok: false, error: 'dsh-evolution prompt bundle integrity check failed; refusing to run maintain' }
+    }
     const snapshots = await snapshotFromLibrary(runtime.library, {
-      supportFiles: options.supportFiles ? await options.supportFiles() : undefined,
-      descriptions: options.descriptions ? await options.descriptions() : undefined,
-      quality: options.quality ? await options.quality() : undefined,
+      supportFiles: options.supportFiles ? options.supportFiles() : undefined,
+      descriptions: options.descriptions ? options.descriptions() : undefined,
+      quality: options.quality ? options.quality() : undefined,
     })
     if (snapshots.length === 0) {
       // Empty library: no facts to review — do not spend a model call.
       return { ok: true, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
-    const usageObserved = options.usageObserved ? await options.usageObserved() : undefined
+    const usageObserved = options.usageObserved ? options.usageObserved() : undefined
     const report = computeDriftSignals(
       snapshots.map(snapshot => ({ ...snapshot, usageObserved })),
     )
 
     const signalsVersion = DRIFT_SIGNALS_VERSION
-    const signature = jointSignature(MAINTAIN_PROMPT, report, signalsVersion)
+    const signature = jointSignature(MAINTAIN_PROMPT, signalsVersion)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
     const facts = renderFacts(report, { signalsVersion, signature, redact: options.redact })
 
-    const prompt = `${template}\n\n${facts}\n\n以下为机械事实块与维护模板。按模板 §4 契约输出 JSON 维护计划
-（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。`
+    // Persona carries the full template; the prompt carries ONLY the facts
+    // block and the output instruction — one copy of the template in the
+    // model input (011 v11 P3-4).
+    const prompt = `${facts}
+
+按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。`
 
     const timeoutMs = options.timeoutMs ?? 120_000
     const agentOptions: Record<string, string> = { model: options.model ?? 'deepseek-v4-pro' }
@@ -158,7 +179,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       prompt: [{ type: 'text', text: prompt }],
       parent: runtime.parent,
       signal: AbortSignal.timeout(timeoutMs),
-      maxDepth: options.maxDepth ?? 2,
+      maxDepth: options.maxDepth ?? 0,
       agentOptions,
       persona: template,
       toolFilter: { allow: [...(options.toolAllow ?? ['skill', 'maintenance_probe'])] },

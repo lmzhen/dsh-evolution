@@ -117,6 +117,24 @@ describe('runMaintain', () => {
     expect(outcome.error ?? '').toContain('spawn bum')
   })
 
+  it('persona carries the template once; the prompt carries facts only (v11 P3-4)', async () => {
+    let capturedOptions: { persona?: string; prompt?: Array<{ text: string }> } | undefined
+    const runtimeWithCapture: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          capturedOptions = options as typeof capturedOptions
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeWithCapture)
+    expect(outcome.ok).toBe(true)
+    expect(capturedOptions?.persona).toContain('## 角色')
+    expect(capturedOptions?.prompt?.[0]?.text ?? '').not.toContain('## 角色')
+    expect(capturedOptions?.prompt?.[0]?.text ?? '').toContain('MECHANICAL_FACTS')
+  })
+
   it('quality_low gate: unknown quality forces needs_human on all items (no usage data in Phase 2)', async () => {
     const outcome = await runMaintain(runtime(validResult))
     expect(outcome.ok).toBe(true)

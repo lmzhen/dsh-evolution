@@ -654,13 +654,37 @@ export class SkillLibrary {
   }
 
   /**
+   * Relative support-file paths (`references/x.md`) under SUPPORT_DIRS for one
+   * skill; empty when the directory is unreadable or has no support files.
+   * Used by the maintenance enrichment (011 §7) and probe reads.
+   */
+  async listSupportFiles(rawName: string): Promise<string[]> {
+    const dir = this.dirOf(rawName)
+    let entries: string[]
+    try { entries = await this.io.list(dir) } catch { return [] }
+    const out: string[] = []
+    for (const subdir of SUPPORT_DIRS) {
+      if (!entries.includes(subdir)) continue
+      try {
+        const files = await this.io.list(join(dir, subdir))
+        for (const file of files) {
+          if (file === '.gitkeep' || file.startsWith('.')) continue
+          out.push(`${subdir}/${file}`)
+        }
+      } catch {
+        // Subdir unreadable; treat as empty.
+      }
+    }
+    return out
+  }
+
+  /**
    * Structure-health facts for one skill (rc.73 A1, 008 design): body
    * chars/density from SKILL.md, support groups from countSupportDirs, plus
    * optional usage counts (A2 churn dimension) when the caller has them.
    * Derived, never persisted; null when the skill is unreadable.
    */
-  async assessHealth(
-    rawName: string,
+  async assessHealth(    rawName: string,
     thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
     counts?: { patchCount?: number; readCount?: number },
   ): Promise<SkillHealthAssessment | null> {

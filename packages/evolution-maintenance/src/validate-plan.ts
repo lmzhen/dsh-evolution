@@ -145,8 +145,8 @@ export function validateAndNormalizeMaintainPlan(
         errors.push(`${path}.reversibility: invalid`)
       }
       if (!isNonEmptyString(item.undo_path)) errors.push(`${path}.undo_path: required`)
-      if (typeof item.confidence !== 'number' || item.confidence < 0 || item.confidence > 1) {
-        errors.push(`${path}.confidence: number in [0,1] required`)
+      if (typeof item.confidence !== 'number' || !Number.isFinite(item.confidence) || item.confidence < 0 || item.confidence > 1) {
+        errors.push(`${path}.confidence: finite number in [0,1] required`)
       }
       if (typeof item.needs_human !== 'boolean') errors.push(`${path}.needs_human: boolean required`)
       if (typeof item.is_override !== 'boolean') errors.push(`${path}.is_override: boolean required`)

@@ -341,6 +341,48 @@ describe('evolution-commands', () => {
     }
   })
 
+  it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-enrich-'))
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(join(skillDir, 'references'), { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    await writeFile(join(skillDir, 'references', 'notes.md'), '# notes\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          captured = definition as typeof captured
+          return () => {}
+        },
+      })
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', { provider: () => io })
+      let capturedPrompt = ''
+      ctx.provide('subagents', {
+        async start(_kind: string, options: unknown) {
+          const opts = options as { prompt?: Array<{ text: string }> }
+          capturedPrompt = opts.prompt?.[0]?.text ?? ''
+          return {
+            result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
+          }
+        },
+      })
+      await ctx.plugin(Commands, { skillsRoot: root })
+      const result = await captured!.handler({ rawInput: 'maintain' })
+      expect(result.kind).toBe('success')
+      // Enriched facts: the unlinked support file is reported as a real over,
+      // never a fabricated pass/unknown.
+      expect(capturedPrompt).toContain('signal=pointer_missing')
+      expect(capturedPrompt).toMatch(/signal=pointer_missing value=references\/notes\.md verdict=over/)
+      expect(capturedPrompt).toContain('signal=description_chars')
+      expect(capturedPrompt).toContain('signal=usage_observed')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('maintain cooldown blocks rapid repeat triggers (single model call)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
