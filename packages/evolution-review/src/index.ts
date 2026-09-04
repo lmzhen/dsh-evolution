@@ -84,8 +84,8 @@ interface MemoryLike {
 }
 
 interface ApprovalLike {
-  request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: WriteOrigin }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
-  run(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string }>
+  request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: WriteOrigin; sessionId?: string }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
+  run(kind: 'memory' | 'skill', args: unknown, intent?: { interface: 'background_review' }): Promise<{ ok: boolean; message: string }>
   /** P1-9 pre-check surface: can this kind be replayed at all? */
   hasRunner(kind: 'memory' | 'skill'): boolean
   isEnabled?: boolean
@@ -279,7 +279,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const acceptedSkillOps = validation.accepted.skillOps ?? []
         const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-        const actions = await executePlan(validation.accepted)
+        const actions = await executePlan(validation.accepted, session.id)
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
         // Process event, payload v2 (sessionId) — plan-outcome durability is the
@@ -321,7 +321,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }
   }
 
-  async function executePlan(plan: EvolutionPlan): Promise<string[]> {
+  async function executePlan(plan: EvolutionPlan, sessionId?: string): Promise<string[]> {
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
@@ -350,8 +350,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }
     return actions
 
-    async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {
-      if (!approval) return undefined
+    async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
       // P1-9 pre-check: with approval ENABLED but no registered runner for
       // this kind (host-only compositions mount no tool runners), staging
       // would create a pending record that no approver could ever replay.
@@ -363,14 +362,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
         ctx.logger.warn(`dsh-evolution-review: approval enabled but no replay runner registered for kind "${kind}" - skipping write (${summary})`)
         return { ok: false, message: `Approval is enabled but no replay runner is registered for kind "${kind}"; write skipped (mount the tool that provides it, or disable approval).` }
       }
-      const decision = await approval.request({ kind, summary, args: stored, origin: origins.approval })
+      const decision = await approval.request({ kind, summary, args: stored, origin: origins.approval, ...sessionId ? { sessionId } : {} })
       if (decision.action === 'staged') return { ok: false, message: decision.message }
       // The staged service is mounted but DISABLED (the default deployment),
       // and host-only compositions mount no tool runners — replaying would
       // return "No replay runner registered" for every op. Execute directly
       // with the explicit background_review origin instead.
       if (approval.isEnabled === false) return await runnerDirect(kind, runnerArgs)
-      return await approval.run(kind, runnerArgs)
+      // 0.3.17 (S3.2): the replay channel requires the declared background
+      // review intent.
+      return await approval.run(kind, runnerArgs, { interface: 'background_review' })
     }
 
     /** Direct execution for the approval-disabled case (parallel to executeSkillDirect). */

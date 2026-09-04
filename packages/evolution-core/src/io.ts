@@ -6,7 +6,7 @@
  */
 
 import { cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
 export interface EvolutionIoLike {
@@ -112,35 +112,38 @@ export function nodeEvolutionIo(): EvolutionIoLike {
 
   /**
    * Cross-process write lock (claw `withFileLock` parity): an O_EXCL lock file
-   * guards the atomic write. A >5s-old lock is taken over ONLY after probing
+   * guards the atomic write. A >1s-old lock is taken over ONLY after probing
    * the holder pid it carries (rc.66): a LIVE holder is never stolen, so a
-   * slow writer no longer loses its lock to a peer at the 5s mark (the
+   * slow writer no longer loses its lock to a peer at the threshold (the
    * takeover is the only best-effort surface; the retry budget fails loud —
    * rc.65 — instead of ever proceeding unlocked). Budget = 40 * 50ms (~2s,
    * rc.69): 8-writer contention bursts on a loaded CI runner exceed 10
    * attempts (500ms), and a fail-loud throw was observed instead of a clean
    * serialization.
+   * 0.3.17 (E-8): acquisition and the task are now SEPARATE try blocks — a
+   * task error (win32 rename/EBUSY surfaces as EPERM) used to be mistaken for
+   * lock contention, retried up to 40x and finally reported as
+   * "could not acquire write lock" while the real cause was hidden.
+   * 0.3.17 (E-8a): the takeover threshold (1000ms) now fits INSIDE the ~2s
+   * retry budget (budget >= 2 x threshold), so a dead holder's lock is
+   * actually recoverable within one budget instead of being arithmetically
+   * unreachable.
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
     for (let attempt = 0; attempt < 40; attempt += 1) {
+      // Phase 1 — acquire. ONLY acquisition errors are retryable contention.
       try {
         await writeFile(lock, String(process.pid), { flag: 'wx' })
-        try {
-          return await task()
-        } finally {
-          await rm(lock, { force: true }).catch(() => {})
-        }
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
         // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
         // when a peer's holder-lock delete races our create; treat it as the
-        // same retryable contention as EEXIST (rc.67). The retry budget still
-        // fails loud at 40 attempts.
+        // same retryable contention as EEXIST (rc.67).
         if (code !== 'EEXIST' && code !== 'EPERM') throw error
         try {
           const st = await stat(lock)
-          if (Date.now() - st.mtimeMs > 5000) {
+          if (Date.now() - st.mtimeMs > 1000) {
             const holder = Number((await readFile(lock, 'utf8').catch(() => '')))
             const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
             if (!holderAlive) {
@@ -152,9 +155,43 @@ export function nodeEvolutionIo(): EvolutionIoLike {
           continue // the lock vanished between fails
         }
         await new Promise(resolve => setTimeout(resolve, 50))
+        continue
+      }
+      // Phase 2 — run the task under the held lock. Its own errors propagate
+      // (the lock was released in finally); they are never lock contention.
+      try {
+        return await task()
+      } finally {
+        await rm(lock, { force: true }).catch(() => {})
       }
     }
     throw new Error(`could not acquire write lock for ${path} after 40 attempts`)
+  }
+
+  /** 0.3.17 (E-8b): sweep tmp files a crashed writer left behind — same
+   * `<target>.<pid>.<rand>.tmp` shape, older than 1h AND held by a dead pid.
+   * Lazy: only the directory a write is about to touch gets swept, once per
+   * write, inside the write lock. */
+  const sweepStaleTmps = async (path: string): Promise<void> => {
+    const dir = dirname(path)
+    const base = basename(path)
+    let entries: string[]
+    try { entries = await readdir(dir) } catch { return }
+    const prefix = `${base}.`
+    for (const name of entries) {
+      if (!name.startsWith(prefix) || !name.endsWith('.tmp')) continue
+      const tmpPath = join(dir, name)
+      const holder = Number(name.slice(prefix.length, name.length - 4).split('.')[0] ?? '')
+      try {
+        const st = await stat(tmpPath)
+        const deadHolder = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
+        if (Date.now() - st.mtimeMs > 3_600_000 && deadHolder) {
+          await rm(tmpPath, { force: true })
+        }
+      } catch {
+        // The tmp vanished (or a race with its reaper); nothing to clean.
+      }
+    }
   }
   return {
     async readText(path) {
@@ -169,6 +206,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     async writeText(path, content) {
       await mkdir(dirname(path), { recursive: true })
       await withWriteLock(path, async () => {
+        await sweepStaleTmps(path)
         const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
         await writeFile(tmp, content, 'utf8')
         await rename(tmp, path)
@@ -177,6 +215,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     async transact(path, task) {
       await mkdir(dirname(path), { recursive: true })
       await withWriteLock(path, async () => {
+        await sweepStaleTmps(path)
         let current: string | null
         try {
           current = await readFile(path, 'utf8')

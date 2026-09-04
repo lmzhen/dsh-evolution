@@ -11,6 +11,67 @@ import EvolutionState from '@deepseek-ai/dsh-evolution-state'
 import EvolutionApproval from '../src/index.ts'
 
 describe('evolution-approval', () => {
+  it('ignores a self-reported "never" when the platform service is mounted without a never stance (S3.1, E-22)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3a-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    ctx.provide('approval', { overrideOf: () => undefined })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const staged = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'x', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'never',
+    })
+    expect(staged.action).toBe('staged') // the self-report lost; default stands
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('allows when the platform service derives "never" even if the caller said "ask" (S3.1, E-22)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3b-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    ctx.provide('approval', { overrideOf: () => 'never' })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const allowed = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'y', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
+    })
+    expect(allowed.action).toBe('allow')
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('a crashed approve is never replayed: executing records block approve and reject cleans up (S3.3, E-24)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3crash-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    let executions = 0
+    ctx.evolutionApproval.registerRunner('memory', async () => { executions += 1; return { ok: true, message: 'ok' } })
+    await ctx.evolutionApproval.request({ kind: 'memory', summary: 'x', args: {}, origin: 'background_review' })
+    const staged = (await ctx.evolutionApproval.list('pending'))[0]!
+    // Simulate the crash: the record is claimed (→ executing) and the process
+    // dies before the resolve. The runner never ran in this simulation.
+    await ctx.evolutionState.claimPending(staged.id, 'crash-claim')
+    const retry = await ctx.evolutionApproval.approve(staged.id)
+    expect(retry.ok).toBe(false)
+    expect(retry.message).toContain('executing')
+    expect(executions).toBe(0) // ALWAYS zero duplication
+    // Operator cleanup: reject resolves the executing record without a runner.
+    const cleanup = await ctx.evolutionApproval.reject(staged.id)
+    expect(cleanup.ok).toBe(true)
+    expect(await ctx.evolutionApproval.list('pending').then(rows => rows.length)).toBe(0)
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('stages background writes, keeps audit records and replays through a registered runner', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-'))
     const ctx = new Context()

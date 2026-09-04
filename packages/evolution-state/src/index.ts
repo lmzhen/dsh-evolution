@@ -25,12 +25,11 @@ export type {
   PendingStatus,
   ReviewStateRecord,
 } from '@deepseek-ai/dsh-evolution-state-storage'
-export {
-  curatorStateSchema,
-  EVOLUTION_DOMAIN,
-  pendingSchema,
-  reviewStateSchema,
-} from '@deepseek-ai/dsh-evolution-state-domain'
+// 0.3.17 (E-11): the runtime re-export of the domain's zod schemas and
+// EVOLUTION_DOMAIN is gone — it dragged evolution-state-domain (zod stack +
+// dsh-storage-domain) into every deployment, even a pure-json one. The
+// schemas stay in evolution-state-domain (their owner); consumers with a
+// need import that package explicitly.
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

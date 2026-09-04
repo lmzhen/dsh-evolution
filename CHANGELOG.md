@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.17 (patch) — 审计 v13 修复批（阶段 2+3：存储介质层 + 审批控制面 19 步）
+
+外部审计（dsh-evolution-mirror-audit-report.md）的第二批落地；每步先核验问题属实再修。
+
+**存储介质层（S2.1-S2.8）**
+- **E-8 写锁误判**：锁获取与任务分离为两个 try——win32 rename/EBUSY 的 EPERM 不再被当成锁竞争重试 40 次再报"could not acquire"（真实错误立即直抛）；接管阈值 5000ms→1000ms（此前大于 2000ms 重试预算，算术上永不接管死锁残留）。
+- **E-8b tmp 残留**：写前惰性清扫同目录 `*.tmp`（>1h 且 pid 已死才删；在途新 tmp 保留）。
+- **E-9 损坏状态文件**：JSON 解析失败不再当"空"覆写（曾静默清空全部 review state / pending 表）——原文件隔离为 `*.corrupt-<时间戳>` 并抛结构化错误；契约测试反转（quarantine + 拒绝覆写）。
+- **E-10 resolve 返回分歧**：domain 的 tryResolvePending 对"已决但状态不符"改为返回记录（与 json 一致）——两个 provider 平行契约测试。
+- **E-11 消费门面耦合**：evolution-state 不再运行时 re-export domain 的 zod schema/EVOLUTION_DOMAIN（纯 json 部署不再被拖入 zod + storage-domain 栈）；schema 留在其属主。
+- **E-17 句柄泄漏**：dispose 先等待在途 open（重试预算内）再 close。
+- **E-73 memory 注册表/快照**：provider 支持按名取用（与另两个 registry 对齐）；快照双读改为串行（消除混合代际）。
+- **E-75/T-1**：claim 过期常量单点化（state-storage `CLAIM_EXPIRY_MS`）；状态 json 与 memory-files 的串行队列合并为 core `makeSerialQueue()`。
+- **D-10 AbortSignal 死通道**：审议后保留（接口删除触面大，列入 0.4）。
+
+**审批与控制面（S3.1-S3.11）**
+- **S3.1/E-22 sessionPolicy 服务端化**：平台 approval 服务挂载时，会话策略由 `overrideOf(sessionId)` 派生——调用方自报值仅在无平台服务时作为回退（"自报 never 绕过暂存"关闭）；review 执行面透传 sessionId。
+- **S3.2/E-23 run 闸门**：approval.run 是声明式的后台评审回放通道（无意图调用被拒）。
+- **S3.3/E-24 崩溃窗口（executing 中间态）**：claim 原子置 `executing`——runner 执行后、resolve 落盘前崩溃，记录保持 executing+claimed：二次 approve 被拒（重复执行结构性不可能）；reject 提供无 runner 的清理通道；release 回滚 executing→pending（失败可重试）；`/evolution pending` 显式显示 EXECUTING。状态机（canClaim/canResolve/releasedStatus）在 state-storage 单点，两个 provider 共用（消灭 E-10 类漂移）。
+- **S3.4/E-25/E-61 审计归因**：PendingRecord 记录 origin+sessionId；reject 失败路径释放 claim（原与 approve 不对称）；approve 成功消息含 id+summary。
+- **S3.5/D-4**：PendingKind 删除 `skill_batch`（从未有创建方；zod 同步）。
+- **S3.6/E-27**：validator 内容预算纳入 patch `new_string`（此前该字段可绕过 100K 上限）。
+- **S3.7/E-28/E-28a**：policy 守卫扫描 memory `operations[]` 内层禁写键；threat 对 op 的 facts/content 取并集扫描（facts 非字符串不再遮蔽 content）。
+- **S3.8/E-60**：validator 对畸形 op（null/string/[]）逐条拒绝而非 TypeError（模型输出面）。
+- **S3.9/E-35**：capability 名正则禁尾/双连字符；approvedPackage 读回重校验（防带外篡改进入 Creator 激活）。
+- **S3.10/T-1**：禁写键 + 写工具名单单点化 core constants（validator/policy/threat 三处引用）。
+- **S3.11/E-76**：replay 空 policyFingerprint 视为缺失（排行榜不再出现空名条目）。
+
+**门禁修正（重要）**：vitest include 曾漏 9 个包（approval/policy/threat/io/io-node/state/state-storage/capability/memory-files 的测试从未进入全量套件）——已补全；全量从 68 文件/429 测试提升到 **77 文件/462 测试**；新增状态机/崩溃回归/双 provider 平行测试。本地：77/77（462）、oxlint 0/0、tsc（全部涉改包）0。
+
 ## 0.3.16 (patch) — audit v13 修复批（阶段 0+1：7 项 P1/P2/P3 修复 + 债务批）
 
 外部审计（dsh-evolution-mirror-audit-report.md，5 路分包全量通读 + 实测复现）的第一批落地，每步先核验问题属实再修。

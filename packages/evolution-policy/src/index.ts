@@ -12,6 +12,7 @@ import {
   DEFAULT_REVIEW_SKILL_INTERVAL,
   DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS,
   DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
+  FORBIDDEN_CONTROL_KEYS,
   DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
   DEFAULT_MAX_OPS_PER_PLAN,
   DEFAULT_CURATOR_INTERVAL_HOURS,
@@ -130,10 +131,26 @@ export class EvolutionPolicy extends Service {
   }
 
   guardReason(toolName: string, args: unknown): string | undefined {
+    // 0.3.17 (E-28): the forbidden-key list used to be a local copy and only
+    // covered the TOP-LEVEL args of a memory call — `operations[]` entries
+    // (the atomic-batch shape the threat scanner already treats as real)
+    // carried control-plane keys unchecked. Both fixed via the core constant
+    // (S3.10) and the inner scan (E-28).
     if (toolName === 'memory' || toolName === 'skill_manage') {
+      const scan = (candidate: Record<string, unknown>): string | undefined => {
+        for (const forbidden of FORBIDDEN_CONTROL_KEYS) {
+          if (forbidden in candidate) return `evolution-policy: tool call may not mutate ${forbidden}`
+        }
+        return undefined
+      }
       const record = asRecord(args)
-      for (const forbidden of ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config']) {
-        if (forbidden in record) return `evolution-policy: tool call may not mutate ${forbidden}`
+      const top = scan(record)
+      if (top) return top
+      if (Array.isArray(record.operations)) {
+        for (const op of record.operations) {
+          const inner = scan(asRecord(op))
+          if (inner) return inner
+        }
       }
     }
     return undefined

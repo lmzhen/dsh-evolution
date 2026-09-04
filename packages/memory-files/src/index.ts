@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, MemoryStore } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, makeSerialQueue, MemoryStore } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
 
@@ -40,12 +40,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // In-process write serialization: applyBatch is read-modify-write, so two
   // concurrent callers (multi-session host) can otherwise compute on the same
   // old entries and the last rename wins, silently dropping the other's ops.
-  let writeChain: Promise<unknown> = Promise.resolve()
-  const serializedWrite = <T>(task: () => Promise<T>): Promise<T> => {
-    const run = writeChain.then(task, task)
-    writeChain = run.then(() => undefined, () => undefined)
-    return run
-  }
+  // 0.3.17 (S2.8, T-1): the queue factory is shared with state-json now.
+  const serializedWrite = makeSerialQueue()
   const store = new MemoryStore({
     memoryCharLimit: config.memoryCharLimit,
     userCharLimit: config.userCharLimit,
@@ -62,7 +58,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return await serializedWrite(() => store.applyBatch(target, normalized))
     },
     snapshot: async (): Promise<MemorySnapshot> => {
-      const [memory, user] = await Promise.all([store.read('memory'), store.read('user')])
+      // 0.3.17 (E-73): serial reads — a concurrent write between the two
+      // Promise.all reads used to produce a mixed-generation snapshot. The
+      // cross-process window is documented as accepted (single-process chain
+      // is this family's second layer).
+      const memory = await store.read('memory')
+      const user = await store.read('user')
       const text = JSON.stringify([memory, user])
       return { version: 1, sha256: createHash('sha256').update(text).digest('hex'), memory, user }
     },

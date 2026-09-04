@@ -22,7 +22,9 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-const CAPABILITY_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+// 0.3.17 (E-35): a trailing (or double) hyphen never matches — `foo-` used to
+// pass and would be unreachable/ambiguous once on disk.
+const CAPABILITY_NAME_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
 export interface CapabilityPackage {
   name: string
@@ -107,7 +109,12 @@ export class EvolutionCapability extends Service {
   async approvedPackage(id: string): Promise<CapabilityPackage | null> {
     const records = await this.ctx.evolutionState.listPending('approved')
     const record = records.find(item => item.id === id && item.kind === 'capability')
-    return record ? record.args as CapabilityPackage : null
+    if (!record) return null
+    // 0.3.17 (E-35): re-validate on read-back — the approved record is
+    // persistent data that has crossed the approval chain; a malformed one
+    // (or one edited out-of-band) must not reach Creator-mode activation.
+    const validation = this.validate(record.args)
+    return validation.ok ? record.args as CapabilityPackage : null
   }
 }
 

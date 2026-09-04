@@ -21,6 +21,25 @@ describe('evolution-plan-validator', () => {
     expect(result.rejected[0]?.reason).toMatch(/forbidden|evidence/)
   })
 
+  it('rejects malformed ops per-item instead of throwing (E-60, 0.3.17)', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [null, 'x', { action: 'add', target: 'memory', facts: 'ok', evidence: [{ event_seq: 1 }] }],
+      skillOps: [{ action: 'patch', name: 'a', evidence: [{ event_seq: 1 }] }, []],
+    } as never, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected.filter(r => r.reason.includes('malformed'))).toHaveLength(3)
+    expect(result.accepted.memoryOps).toHaveLength(1)
+  })
+
+  it('enforces the content budget on a patch new_string (E-27, 0.3.17)', () => {
+    const giant = 'x'.repeat(100_001)
+    const result = validateEvolutionPlan({
+      skillOps: [{ action: 'patch', name: 'fat-skill', old_string: 'old', new_string: giant, evidence: [{ event_seq: 4 }] }],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected[0]?.reason).toContain('exceeds skill budget')
+  })
+
   it('rejects a background delete without absorbed_into (Hermes fail-closed guard)', () => {
     const result = validateEvolutionPlan({
       skillOps: [{ action: 'delete', name: 'narrow-skill', evidence: [{ event_seq: 4 }] }],

@@ -68,6 +68,15 @@ export const DEFAULT_USER_CHAR_LIMIT = 1375
 export const DEFAULT_CONSOLIDATION_FAILURES = 3
 export const DEFAULT_SKILL_CONTENT_CHARS = 100_000
 
+/** 0.3.17 (S3.10, T-1): control-plane fields a model-facing write call may
+ * never carry — single source for plan-validator, evolution-policy and the
+ * threat scanner (they used to each hardcode the list). */
+export const FORBIDDEN_CONTROL_KEYS = ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config'] as const
+
+/** 0.3.17 (S3.10): the model-facing write tools the policy guard and threat
+ * scanner cover. */
+export const EVOLUTION_WRITE_TOOLS = ['memory', 'skill_manage'] as const
+
 /** Hermes authoring quality bar for descriptions (the 60-char Rule). The
  * platform's own index limit stays in validateFrontmatter; this bar is the
  * target the authoring standard names, enforced as ADVISORY feedback.

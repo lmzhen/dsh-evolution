@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
-import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import { canClaimPending, canResolvePending, CLAIM_EXPIRY_MS, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 
 export const name = 'evolution-state-domain'
 export const inject = ['evolutionStateStorage', 'storageDomain']
@@ -34,11 +34,13 @@ export const curatorStateSchema = z.object({
 
 export const pendingSchema = z.object({
   id: z.string(),
-  kind: z.union([z.literal('memory'), z.literal('skill'), z.literal('skill_batch'), z.literal('capability')]),
+  // 0.3.17 (S3.5, D-4): 'skill_batch' is gone — nothing ever created one, and
+  // the TYPE no longer carries it (legacy-looking values parse as unknown).
+  kind: z.union([z.literal('memory'), z.literal('skill'), z.literal('capability')]),
   summary: z.string(),
   args: z.unknown(),
   createdAt: z.string(),
-  status: z.union([z.literal('pending'), z.literal('approved'), z.literal('rejected')]),
+  status: z.union([z.literal('pending'), z.literal('executing'), z.literal('approved'), z.literal('rejected')]),
   resolvedAt: z.string().optional(),
   claimedBy: z.string().optional(),
   claimedAt: z.string().optional(),
@@ -133,10 +135,13 @@ export function apply(ctx: Context): void {
         const slot = { record: null as PendingRecord | null }
         const now = Date.now()
         await table.update(id, (current) => {
-          if (current.status !== 'pending') return current
+          // 0.3.17 (S3.3, E-24): SAME transition table as the json provider
+          // (state-storage helpers) — claim atomically moves to 'executing' so
+          // a crash mid-approve can never double-execute the runner.
+          if (!canClaimPending(current.status)) return current
           const claimedAt = typeof current.claimedAt === 'string' ? Date.parse(current.claimedAt) : 0
-          if (current.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < 10 * 60_000) return current
-          slot.record = { ...current, claimedBy: claimId, claimedAt: new Date(now).toISOString() }
+          if (current.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < CLAIM_EXPIRY_MS) return current
+          slot.record = { ...current, status: 'executing', claimedBy: claimId, claimedAt: new Date(now).toISOString() }
           return slot.record
         })
         return slot.record
@@ -152,13 +157,12 @@ export function apply(ctx: Context): void {
     async releasePendingClaim(id, claimId) {
       const table = (await ensure()).table('pending')
       await table.update(id, (current) => {
-        if (current.status === 'pending' && current.claimedBy === claimId) {
-          const released = { ...current }
-          delete released.claimedBy
-          delete released.claimedAt
-          return released
-        }
-        return current
+        if (current.status !== 'pending' && current.status !== 'executing') return current
+        if (current.claimedBy !== claimId) return current
+        const released = { ...current, status: releasedStatus(current.status) }
+        delete released.claimedBy
+        delete released.claimedAt
+        return released
       })
     },
 
@@ -167,11 +171,11 @@ export function apply(ctx: Context): void {
       try {
         const resolved = { record: null as PendingRecord | null }
         const record = await table.update(id, (current) => {
-          if (current.status !== 'pending') return current
+          if (!canResolvePending(current.status)) return current
           resolved.record = { ...current, status, resolvedAt: new Date().toISOString() }
           return resolved.record
         })
-        if (resolved.record === null) return { record: record.status === status ? record : null, applied: false }
+        if (resolved.record === null) return { record, applied: false }
         return { record: resolved.record, applied: true }
       } catch (error: unknown) {
         // v3-round self-check: only missing-key is benign; closed/backend errors propagate.
@@ -185,6 +189,10 @@ export function apply(ctx: Context): void {
     const dispose = ctx.evolutionStateStorage.registerProvider(provider)
     return async () => {
       dispose()
+      // 0.3.17 (E-17): an in-flight open (still inside its retry budget) used
+      // to resolve AFTER disposal and left the freshly opened domain unclosed —
+      // a fast enable/disable cycle leaked a handle. Wait for it, then close.
+      if (opening) await opening.catch(() => null)
       if (domain) await domain.close()
       domain = null
       opening = null

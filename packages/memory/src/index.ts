@@ -75,9 +75,13 @@ export class MemoryRegistry extends Service {
     }
   }
 
-  private provider(): MemoryProvider {
+  /** 0.3.17 (E-73): named lookup like the io/state-storage registries; no
+   * name = first registered (backward compatible). */
+  provider(name?: string): MemoryProvider {
+    const byName = name ? this.providers.get(name) : undefined
+    if (byName) return byName
     const first = this.providers.values().next().value
-    if (!first) throw new Error('memory: no provider registered')
+    if (!first) throw new Error(`memory: no provider registered${name ? ` named "${name}"` : ''}`)
     return first
   }
 

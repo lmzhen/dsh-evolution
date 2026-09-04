@@ -101,7 +101,10 @@ export class EvolutionReplayDriver {
 
   record(plan: EvolutionPlanAppliedEvent): void {
     this.plans.push({
-      policyId: typeof plan.policyFingerprint === 'string' ? plan.policyFingerprint : plan.planId,
+      // 0.3.17 (E-76): an EMPTY policyFingerprint counts as missing — the
+      // leaderboard used to show a nameless "" entry (empty-string checks pass
+      // through typeof).
+      policyId: typeof plan.policyFingerprint === 'string' && plan.policyFingerprint.length > 0 ? plan.policyFingerprint : plan.planId,
       acceptedOps: plan.memoryApplied + plan.skillApplied,
       rejectedOps: plan.rejectedOps,
       memoryOps: plan.memoryApplied,

@@ -65,8 +65,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const err = (text: string) => ({ kind: 'error' as const, text })
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         if (input === 'pending') {
-          const pending = approval ? await approval.list('pending') : []
-          return ok(pending.length === 0 ? 'No pending evolution writes.' : pending.map(p => `${p.id}  ${p.kind}  ${p.summary}`).join('\n'))
+          // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
+          // mid-run) stay visible — approve will refuse to re-run them.
+          const pending = approval ? [...await approval.list('pending'), ...await approval.list('executing')] : []
+          if (pending.length === 0) return ok('No pending evolution writes.')
+          const body = pending.map(p => `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}`).join('\n')
+          const hint = pending.some(p => p.status === 'executing')
+            ? '\n(EXECUTING: a previous approve may have crashed after running; verify the write manually, then reject — approve will not re-run it)'
+            : ''
+          return ok(body + hint)
         }
         if (input.startsWith('approve ')) {
           const id = input.slice(8).trim()
@@ -398,7 +405,7 @@ interface CommandInvocation {
 }
 
 interface ApprovalLike {
-  list(status: 'pending' | 'approved' | 'rejected'): Promise<Array<{ id: string; kind: string; summary: string }>>
+  list(status: 'pending' | 'executing' | 'approved' | 'rejected'): Promise<Array<{ id: string; kind: string; summary: string; status?: string }>>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>
 }

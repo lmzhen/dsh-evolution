@@ -16,6 +16,16 @@ describe('evolution-policy', () => {
     expect((ctx.evolutionPolicy as unknown as Record<string, unknown>).isProtectedPath).toBeUndefined()
   })
 
+  it('refuses governance keys inside memory operations[] too (E-28, 0.3.17)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionPolicy)
+    // Top-level clean; the forbidden key sits in an atomic-batch operation.
+    const top = ctx.evolutionPolicy.guardReason('memory', { operations: [{ action: 'add', facts: 'x' }] })
+    expect(top).toBeUndefined()
+    const inner = ctx.evolutionPolicy.guardReason('memory', { operations: [{ action: 'add', facts: 'x', threshold: 1 }] })
+    expect(inner).toContain('threshold')
+  })
+
   it('keeps snapshot defaults in sync with the shared core constants', async () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionPolicy)

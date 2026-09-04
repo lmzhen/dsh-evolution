@@ -35,6 +35,9 @@ export interface ApprovalRequest {
    * (no session / no approval service) keeps the previous behavior.
    */
   sessionPolicy?: 'ask' | 'never'
+  /** 0.3.17 (E-25): the requesting session id, kept on the record for
+   * audit attribution (staged AND resolved history). */
+  sessionId?: string
 }
 
 export interface ApprovalDecision {
@@ -112,8 +115,17 @@ export class EvolutionApproval extends Service {
     return this.runners.has(kind)
   }
 
-  /** Trusted plan-executor entry point: replay a write through the registered runner exactly once. */
-  async run(kind: PendingKind, args: unknown): Promise<{ ok: boolean; message: string }> {
+  /**
+   * Trusted plan-executor entry point: replay a write through the registered
+   * runner exactly once. 0.3.17 (S3.2, E-23): this is the BACKGROUND-REVIEW
+   * replay channel only — the caller must declare the intent (the review
+   * pipeline is the sole production consumer); a bare call is refused so the
+   * staging boundary cannot be bypassed by accident from another surface.
+   */
+  async run(kind: PendingKind, args: unknown, intent?: { interface: 'background_review' }): Promise<{ ok: boolean; message: string }> {
+    if (intent?.interface !== 'background_review') {
+      return { ok: false, message: 'approval.run is the background-review replay channel; direct execution must use the tool path (staging is the only gate bypass for foreground).' }
+    }
     const runner = this.runners.get(kind)
     if (!runner) return { ok: false, message: `No replay runner registered for kind "${kind}".` }
     return await runner(args)
@@ -123,10 +135,16 @@ export class EvolutionApproval extends Service {
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
     const summary = normalizeSummary(input)
     if (!this.enabled) return { action: 'allow', message: 'Approval disabled.' }
-    // The session declared the deterministic unattended stance ('never' — CI,
-    // cron, isolated runs): no human answers a staged queue there, so allow
-    // instead of piling up unanswerable pending writes.
-    if (input.sessionPolicy === 'never') return { action: 'allow', message: 'Session approval policy is "never"; write allowed without staging.' }
+    // 0.3.17 (S3.1, E-22): the session policy is DERIVED server-side from the
+    // platform approval service when it is mounted (overrideOf is the platform
+    // authority). The caller's self-reported sessionPolicy is honored ONLY in
+    // assemblies WITHOUT the platform service — a tool can no longer claim
+    // 'never' and bypass staging on its own.
+    const derived = this.deriveSessionPolicy(input.sessionId)
+    const policy = derived ?? (this.ctx.get('approval') ? undefined : input.sessionPolicy)
+    if (policy === 'never') {
+      return { action: 'allow', message: 'Session approval policy is "never"; write allowed without staging.' }
+    }
     if (input.origin === 'background_review' || this.stageForeground) {
       // Observability for the P1-9 trap (rc.42 audit): staging a memory/skill
       // write with no registered runner creates a pending record that no
@@ -142,6 +160,10 @@ export class EvolutionApproval extends Service {
         args: input.args,
         createdAt: new Date().toISOString(),
         status: 'pending',
+        // 0.3.17 (E-25): attribution was previously dropped at staging — the
+        // audit history could not say WHERE a staged write came from.
+        origin: input.origin,
+        ...input.sessionId ? { sessionId: input.sessionId } : {},
       }
       await this.state().savePending(record)
       return {
@@ -168,14 +190,41 @@ export class EvolutionApproval extends Service {
       const claimId = randomUUID()
       const record = await this.state().claimPending(id, claimId)
       if (!record) {
+        // 0.3.17 (S3.3): operator cleanup for a crashed approve — rejecting an
+        // 'executing' record resolves it WITHOUT running any runner (the write
+        // may already have landed; approval never replays it).
+        const stuck = (await this.state().listPending('executing')).find(item => item.id === id)
+        if (stuck) {
+          const resolution = await this.state().tryResolvePending(id, 'rejected')
+          return resolution.applied
+            ? { ok: true, message: `Rejected executing write "${id}" (crashed approve cleaned up; verify the write state manually).` }
+            : { ok: false, message: `Pending write "${id}" could not be rejected: it resolved concurrently.` }
+        }
         return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
       }
       const resolution = await this.state().tryResolvePending(id, 'rejected')
       if (!resolution.applied || !resolution.record) {
+        // 0.3.17 (E-61): the claim stays HELD otherwise — the reject path was
+        // asymmetric with approve (which releases on every failure branch).
+        await this.state().releasePendingClaim(id, claimId)
         return { ok: false, message: `Pending write "${id}" is not pending (already resolved or missing).` }
       }
       return { ok: true, message: `Rejected ${resolution.record.kind} write "${id}".` }
     })
+  }
+
+  /**
+   * 0.3.17 (S3.1): platform-side session policy derivation — the platform's
+   * approval service (`overrideOf`) is the authority; a caller's self-reported
+   * sessionPolicy is a fallback only without it (E-22). The mount check is
+   * lazy: the platform service can start before or after this plugin.
+   */
+  private deriveSessionPolicy(sessionId?: string): 'ask' | 'never' | undefined {
+    if (!sessionId) return undefined
+    const platformApproval = this.ctx.get('approval') as { overrideOf?(sessionId: string): unknown } | undefined
+    if (!platformApproval) return undefined
+    const override = platformApproval.overrideOf?.(sessionId)
+    return override === 'never' || override === 'ask' ? override : undefined
   }
 
   private dedupe(id: string, task: () => Promise<{ ok: boolean; message: string }>): Promise<{ ok: boolean; message: string }> {
@@ -189,7 +238,18 @@ export class EvolutionApproval extends Service {
   private async doApprove(id: string): Promise<{ ok: boolean; message: string }> {
     const claimId = randomUUID()
     const record = await this.state().claimPending(id, claimId)
-    if (!record) return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
+    if (!record) {
+      // 0.3.17 (S3.3, E-24): the claim was refused — either another writer is
+      // resolving, or the record sits 'executing' (a previous approve may have
+      // run then crashed). NEVER auto-replay an executing record: the write
+      // may already have landed, and re-running it duplicates a non-idempotent
+      // operation.
+      const stuck = (await this.state().listPending('executing')).find(item => item.id === id)
+      if (stuck) {
+        return { ok: false, message: `Pending write "${id}" is executing (a previous approve may have run before a crash). Verify its effect manually, then reject it — /evolution pending shows it as EXECUTING.` }
+      }
+      return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
+    }
     const runner = this.runners.get(record.kind)
     if (!runner) {
       if (record.kind === 'capability') {
@@ -215,7 +275,9 @@ export class EvolutionApproval extends Service {
     if (!resolution.applied) {
       return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
     }
-    return { ok: true, message: `Approved ${record.kind}` }
+    // 0.3.17 (E-61): the success message names what was approved, not just
+    // the kind — a reviewer acting on several batches can tell them apart.
+    return { ok: true, message: `Approved ${record.kind} write "${id}" (${record.summary}).` }
   }
 }
 

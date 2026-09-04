@@ -9,8 +9,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { transactIo } from '@deepseek-ai/dsh-evolution-core'
-import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import { makeSerialQueue, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { canClaimPending, canResolvePending, CLAIM_EXPIRY_MS, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -34,10 +34,24 @@ export function apply(ctx: Context, rawConfig: Config): void {
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
 
+  /** 0.3.17 (E-9): a malformed state file used to parse to `null` and was then
+   * OVERWRITTEN by the next save — every other session's review state / the
+   * whole pending table vanished silently. Fail loud instead: preserve the
+   * original bytes beside it and throw, so the operator can rescue and the
+   * corruption is never accepted as "empty". */
+  async function quarantine(file: string, raw: string, reason: string): Promise<never> {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const dest = `${pathOf(file)}.corrupt-${stamp}-${Math.random().toString(36).slice(2, 6)}`
+    await io().writeText(dest, raw).catch(() => {})
+    throw new Error(`evolution state file "${file}" is not valid JSON (${reason}); original preserved at ${dest} — inspect and fix it, then retry.`)
+  }
+
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
     if (raw === null) return null
-    try { return JSON.parse(raw) as T } catch { return null }
+    try { return JSON.parse(raw) as T } catch (error) {
+      return await quarantine(file, raw, error instanceof Error ? error.message : String(error))
+    }
   }
 
   /**
@@ -51,7 +65,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
     await transactIo(ctx.evolutionIo.provider(), pathOf(file), async (current) => {
       let parsed: T | null = null
       if (current !== null) {
-        try { parsed = JSON.parse(current) as T } catch { parsed = null }
+        try { parsed = JSON.parse(current) as T } catch (error) {
+          return await quarantine(file, current, error instanceof Error ? error.message : String(error))
+        }
       }
       const next = await task(parsed)
       return next === null ? null : JSON.stringify(next, null, 2)
@@ -62,12 +78,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // a single task, so concurrent review/curator/approval writers can never
   // overwrite each other's newest record in THIS process. The transact lock
   // (jsonTransact) covers OTHER processes; this chain is the second layer.
-  let chain: Promise<unknown> = Promise.resolve()
-  function mutate<T>(task: () => Promise<T>): Promise<T> {
-    const run = chain.then(task, task)
-    chain = run.then(() => undefined, () => undefined)
-    return run
-  }
+  // 0.3.17 (S2.8, T-1): the queue factory is shared with memory-files now.
+  const mutate = makeSerialQueue()
 
   // `pending.json` is the pre-split approval store name. Reads MERGE both
   // files and the new `pending-state.json` wins on id conflicts, so creating
@@ -135,11 +147,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id] ?? null
-          if (record === null || record.status !== 'pending') return map
+          if (record === null || !canClaimPending(record.status)) return map
           const now = Date.now()
           const claimedAt = typeof record.claimedAt === 'string' ? Date.parse(record.claimedAt) : 0
-          if (record.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < 10 * 60_000) return map
-          slot.claimed = { ...record, claimedBy: claimId, claimedAt: new Date(now).toISOString() }
+          if (record.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < CLAIM_EXPIRY_MS) return map
+          // 0.3.17 (S3.3, E-24): claiming moves the record to 'executing'
+          // atomically — a crash after the runner executed but before the
+          // resolve can no longer be re-claimed into a SECOND execution (the
+          // resolve only accepts pending/executing, and a fresh claim requires
+          // 'pending').
+          slot.claimed = { ...record, status: 'executing', claimedBy: claimId, claimedAt: new Date(now).toISOString() }
           map[id] = slot.claimed
           return map
         })
@@ -153,10 +170,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id]
-          if (record && record.status === 'pending' && record.claimedBy === claimId) {
-            delete record.claimedBy
-            delete record.claimedAt
-          }
+          // 0.3.17 (S3.3): releasing a CLAIMED-EXECUTING record rolls it back to
+          // pending (a runner FAILURE is retryable); a crash leaves it
+          // executing + claimed until expiry, then operator-resolvable.
+          if (!record || record.claimedBy !== claimId) return map
+          record.status = releasedStatus(record.status)
+          delete record.claimedBy
+          delete record.claimedAt
           return map
         })
       })
@@ -169,7 +189,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id] ?? null
-          if (record === null || record.status !== 'pending') {
+          // 0.3.17 (S3.3): 'executing' (claimed but not yet resolved) is a
+          // legal resolve source — a crash mid-approve leaves it there for the
+          // operator; a DUPLICATE execution is what this blocks.
+          if (record === null || !canResolvePending(record.status)) {
             result = { record, applied: false }
             return map
           }

@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
-import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, MAX_RESTRUCTURE_MOVES, RESTRUCTURE_TARGET_RE } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, RESTRUCTURE_TARGET_RE } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
   target?: string
@@ -60,7 +60,8 @@ export interface ValidationResult {
 
 const MEMORY_ACTIONS = new Set(['add', 'replace', 'remove'])
 const SKILL_ACTIONS = new Set(['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure'])
-const FORBIDDEN_KEYS = ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config']
+// 0.3.17 (S3.10, T-1): single source lives in core constants.
+const FORBIDDEN_KEYS: readonly string[] = FORBIDDEN_CONTROL_KEYS
 
 function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
   if (!Array.isArray(evidence) || evidence.length === 0) return false
@@ -96,13 +97,26 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
     return { accepted, rejected, ok: false }
   }
 
-  for (const [index, op] of (plan.memoryOps ?? []).entries()) {
+  for (const [index, rawOp] of ((plan.memoryOps ?? []) as unknown[]).entries()) {
+    // 0.3.17 (E-60): a malformed entry (null/string/array) used to throw a
+    // TypeError from the validator — the caller hands it MODEL OUTPUT; a
+    // deterministic validator rejects per-item instead.
+    if (rawOp === null || typeof rawOp !== 'object' || Array.isArray(rawOp)) {
+      rejected.push({ index, kind: 'memory', reason: `memory op ${index}: malformed operation (expected an object)` })
+      continue
+    }
+    const op = rawOp as MemoryOp
     const reason = validateMemoryOp(op, context, index)
     if (reason) rejected.push({ index, kind: 'memory', reason })
     else memoryOps.push(op)
   }
 
-  for (const [index, op] of (plan.skillOps ?? []).entries()) {
+  for (const [index, rawOp] of ((plan.skillOps ?? []) as unknown[]).entries()) {
+    if (rawOp === null || typeof rawOp !== 'object' || Array.isArray(rawOp)) {
+      rejected.push({ index, kind: 'skill', reason: `skill op ${index}: malformed operation (expected an object)` })
+      continue
+    }
+    const op = rawOp as SkillOp
     const reason = validateSkillOp(op, context, index)
     if (reason) rejected.push({ index, kind: 'skill', reason })
     else skillOps.push(op)
@@ -141,7 +155,9 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   // absorbed_into umbrella target — a bare delete is reserved for the
   // deterministic curator channel and the user's foreground path.
   if (action === 'delete' && !(op.absorbed_into ?? '').trim()) return `skill op ${index}: delete requires absorbed_into`
-  const writeContent = op.file_content ?? op.content ?? ''
+  // 0.3.17 (E-27): a patch's new_string IS the write payload — the budget
+  // must see it too (threat scanning already treats it as real field).
+  const writeContent = op.file_content ?? op.content ?? op.new_string ?? ''
   if (action === 'write_file' && !writeContent.trim()) return `skill op ${index}: write_file requires file_content`
   if (writeContent.length > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
   if (action === 'restructure') {
