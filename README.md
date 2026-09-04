@@ -98,9 +98,10 @@ Everything else is control plane:
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
-Then restart the DSH profile, run `/evolution preset install` (one-time
-delivery of the preset files), and select the **Evolution** agent preset for the
-sessions that should expose self-evolution tools. The agent now has durable
+Then restart the DSH profile, run `/evolution preset install` (one-time:
+composes the runtime `standard` preset with the evolution delta), and select
+the **Evolution** agent preset for the sessions that should expose
+self-evolution tools. The agent now has durable
 memory, `skill_manage`, background review, curator, approval, and threat checks.
 
 > [!WARNING]
@@ -167,11 +168,13 @@ model tools           memory / skill_manage / skill catalog — only sessions
   approval history are preserved).
 
 Then make the preset available and select it for sessions that should expose
-self-evolution tools: run `/evolution preset install` (one-time; copies the
-preset files from the installed `dsh-evolution-agent-preset` package into
-`$DSH_HOME/.agent-presets/evolution/` — no manual file copying), then select
-the **Evolution** preset. Other presets still get review, curator, approval,
-and observability without exposing model-facing evolution tools.
+self-evolution tools: run `/evolution preset install` (one-time; reads the
+runtime `standard` preset composition from the agent-preset registry, merges
+the evolution delta shipped in `dsh-evolution-agent-preset`, and writes the
+composed `agent.cordis.yml`/`preset.yml` into `$DSH_HOME/.agent-presets/evolution/`
+— no manual file copying), then select the **Evolution** preset. Other presets
+still get review, curator, approval, and observability without exposing
+model-facing evolution tools.
 
 #### Choosing an install (scenario → operation → what you get)
 

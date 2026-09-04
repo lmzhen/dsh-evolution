@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.15 (patch) — preset install composes the runtime standard + delta (P1-1 follow-up)
+
+0.3.14's `/evolution preset install` copied the published `agent.cordis.yml` **delta-only** fragment into `$DSH_HOME/.agent-presets/evolution/`. The agent-preset registry mounts a preset's composition file **verbatim** (verified against `dsh-agent-presets` `mountPreset`), so the delta alone would have produced an agent carrying only the delta rows (no tools, no persona). The source installer path (`install-layered.mjs`) already generated the full composition — the 0.3.14 command skipped that step.
+
+- `evolution-core`: new pure `composePresetComposition(standard, delta)` — standard rows first, then the delta, with the same colliding-row guard as `install-layered.mjs`; `installer.spec` pins **byte parity** between the two implementations.
+- `evolution-commands` `preset install`: reads the runtime `standard` composition via the agent-preset registry (`agentPresets.read('standard')`), merges the delta shipped in `dsh-evolution-agent-preset`, and writes the composed `agent.cordis.yml` + `preset.yml` (idempotent; fails loud when delta rows collide with a standard that already absorbed them).
+- Docs (README/README.zh/INSTALL.md): preset-install step now describes the compose semantics (was "copies the preset files").
+- Tests: commands (composed output assertion + collision refusal), core (compose table), installer (parity pin).
+
+- Local: full suite 65/65 (404), oxlint 0/0, tsc -b (core/commands/host) 0.
+
 ## 0.3.14 (patch) — audit v13 batch: preset delivery (P1-1), single-flight TOCTOU (P2-1), seven P3 items
 
 The v13 audit verified the 0.3.12 install story and found a **claimed-but-unbacked mechanism**: the docs promised "preset installed by the family's preset layer — no manual copying", but `dsh plugin add` has no agent-preset install channel (upstream `apps/cli/src/plugin.ts` verified) and the preset files were not inside any published dependency closure — a user following the docs could not select the Evolution preset. The same audit surfaced a single-flight race and seven P3 items.

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-state-storage",
   "description": "Provider registry seam for durable evolution state",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "publishConfig": {
     "access": "public"
   },

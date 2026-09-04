@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-activity",
   "description": "Session projection for self-evolution activity",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "publishConfig": {
     "access": "public"
   },

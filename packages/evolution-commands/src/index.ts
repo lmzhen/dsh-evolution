@@ -5,9 +5,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
@@ -303,17 +303,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // preset package (ships agent.cordis.yml/preset.yml) as part of the
           // dependency closure, but nothing auto-copies it into
           // ~/.dsh/.agent-presets/evolution — this command performs that
-          // delivery explicitly, idempotently and reversibly (P1-1 audit fix).
+          // delivery explicitly, idempotently and reversibly.
+          // 0.3.15 (P1-1 follow-up): the agent-preset registry mounts the
+          // composition file VERBATIM, so the delivered agent.cordis.yml must
+          // be the runtime `standard` composition + the delta — 0.3.14 copied
+          // the delta alone, which would produce an agent with only the delta
+          // rows (no tools, no persona).
           const target = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), '.agent-presets', 'evolution')
           try {
             const source = resolveAgentPresetDir(import.meta.url)
+            const deltaPath = join(source, 'agent.cordis.yml')
+            const presetPath = join(source, 'preset.yml')
+            if (!existsSync(deltaPath) || !existsSync(presetPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
+            const registry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
+            if (!registry) return err('Agent preset registry not mounted — cannot compose the Evolution preset against the runtime standard.')
+            const standard = await registry.read('standard')
+            const composition = composePresetComposition(standard, readFileSync(deltaPath, 'utf8'))
             mkdirSync(target, { recursive: true })
-            for (const file of ['agent.cordis.yml', 'preset.yml'] as const) {
-              const from = join(source, file)
-              if (!existsSync(from)) return err(`Preset file missing from ${source}/${file} — is @lmzhen/dsh-evolution-agent-preset installed?`)
-              copyFileSync(from, join(target, file))
-            }
-            return ok(`Evolution agent preset installed to ${target} (agent.cordis.yml, preset.yml). Restart the session switcher to select it.`)
+            writeFileSync(join(target, 'agent.cordis.yml'), composition)
+            copyFileSync(presetPath, join(target, 'preset.yml'))
+            return ok(`Evolution agent preset installed to ${target} (runtime standard + delta). Restart the session switcher to select it.`)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }

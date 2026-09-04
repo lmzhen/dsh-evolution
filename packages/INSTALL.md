@@ -42,15 +42,19 @@ After install, restart the profile and make the **Evolution** agent preset
 available:
 
 ```bash
-# one-time delivery of the preset files into $DSH_HOME/.agent-presets/evolution/
+# one-time: composes the runtime `standard` preset + the evolution delta into
+# $DSH_HOME/.agent-presets/evolution/
 /evolution preset install
 ```
 
 Then select the **Evolution** preset for the sessions that should expose
-self-evolution tools. The preset files ship inside the installed
+self-evolution tools. The delta files ship inside the installed
 `@lmzhen/dsh-evolution-agent-preset` package (part of the `dsh-evolution-all`
-dependency closure); `/evolution preset install` copies them into place —
-idempotent, no manual file copying.
+dependency closure); `/evolution preset install` reads the runtime
+`standard` composition via the agent-preset registry, merges the delta, and
+writes the composed `agent.cordis.yml`/`preset.yml` into place — idempotent,
+no manual file copying. An agent preset mounts its composition file verbatim,
+so the delta alone would produce an agent with only the delta rows.
 
 ## Prerequisites (source-checkout installs only)
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -517,7 +517,7 @@ describe('evolution-commands', () => {
     }
   })
 
-  it('preset install delivers agent.cordis.yml + preset.yml from the dev-tree container (0.3.14)', async () => {
+  it('preset install composes the runtime standard + delta into the user preset dir (0.3.15)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-'))
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = home
@@ -531,12 +531,47 @@ describe('evolution-commands', () => {
         },
       })
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
+      ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
       await ctx.plugin(Commands, { skillsRoot: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
       const result = await handler!.handler({ rawInput: 'preset install' })
       expect(result.kind).toBe('success')
       const target = join(home, '.agent-presets', 'evolution')
-      expect(existsSync(join(target, 'agent.cordis.yml'))).toBe(true)
+      const composed = readFileSync(join(target, 'agent.cordis.yml'), 'utf8')
+      // The registry mounts the composition verbatim: the written file is the
+      // standard rows + the delta, NEVER the delta alone (0.3.14 defect shape).
+      const delta = readFileSync(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url), 'utf8')
+      expect(composed).toBe(`${standardFixture.replace(/\s+$/, '')}\n\n${delta.trim()}\n`)
+      expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.yml', import.meta.url), 'utf8'))
       expect(existsSync(join(target, 'preset.yml'))).toBe(true)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('preset install fails loud when delta rows collide with the runtime standard (0.3.15)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      // A standard that already carries tool-memory would mount the row twice
+      // if merged — the composition must refuse instead of shadowing it.
+      ctx.provide('agentPresets', { read: async () => '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n' })
+      await ctx.plugin(Commands, { skillsRoot: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+      const result = await handler!.handler({ rawInput: 'preset install' })
+      expect(result.kind).toBe('error')
+      expect(result.text).toContain('collide')
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome

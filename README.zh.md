@@ -50,7 +50,7 @@
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
-安装后重启 profile，运行 `/evolution preset install`（一次性投放预设文件），并为需要自进化工具的会话选择 **Evolution** 预设。
+安装后重启 profile，运行 `/evolution preset install`（一次性：用运行时 standard 预设 + evolution delta 组合出预设文件），并为需要自进化工具的会话选择 **Evolution** 预设。
 Agent 即拥有：
 
 ```text
@@ -110,8 +110,7 @@ host 基础设施   review、curator、审批、审计、可观测性、威胁�
 - 细粒度安装（仅 host、或按需挑选工具包）受支持——见下表。卸载：对同样包执行
   `dsh plugin --profile web remove`（移除 rows 与包；记忆、技能、状态、报告和审批历史保留）。
 
-之后先让预设可用：运行 `/evolution preset install`（一次性；从已安装的 `dsh-evolution-agent-preset` 包把预设文件
-复制到 `$DSH_HOME/.agent-presets/evolution/`——无需手动拷贝文件），再为需要自进化工具的会话选择 **Evolution** 预设。
+之后先让预设可用：运行 `/evolution preset install`（一次性；从 agent-preset 注册表读运行时 `standard` 组合，合并 `dsh-evolution-agent-preset` 携带的 delta，把组合后的 `agent.cordis.yml`/`preset.yml` 写入 `$DSH_HOME/.agent-presets/evolution/`——无需手动拷贝文件），再为需要自进化工具的会话选择 **Evolution** 预设。
 其他预设仍获得 review、curator、审批和观测能力，但不会暴露模型侧的自进化工具。
 
 #### 选择安装方式（场景 → 操作 → 你得到什么）

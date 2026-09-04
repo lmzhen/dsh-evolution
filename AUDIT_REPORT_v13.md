@@ -120,7 +120,7 @@
 
 | 项 | 状态 | 落地 |
 |---|---|---|
-| P1-1 | ✅ 已修 | `evolution-all` 依赖 += `dsh-evolution-agent-preset`（预设文件进入发布闭包）+ 新 `/evolution preset install` 命令（幂等复制 agent.cordis.yml/preset.yml 到 `$DSH_HOME/.agent-presets/evolution/`）；README/README.zh/INSTALL.md 从"no manual copying"失实改为真实的 one-time 命令步骤 |
+| P1-1 | ✅ 已修 | `evolution-all` 依赖 += `dsh-evolution-agent-preset`（预设文件进入发布闭包）+ 新 `/evolution preset install` 命令（幂等复制 agent.cordis.yml/preset.yml 到 `$DSH_HOME/.agent-presets/evolution/`）；README/README.zh/INSTALL.md 从"no manual copying"失实改为真实的 one-time 命令步骤。**0.3.15 跟进**：0.3.14 的命令只复制 delta 片段，而预设注册表将组合文件**原样挂载**——delta 单独会得到一个只剩 delta 行的 agent；0.3.15 改为"读运行时 standard + 合并 delta"（core `composePresetComposition`，与 install-layered 逐字节一致，installer.spec 钉死） |
 | P2-1 | ✅ 已修 | `maintainInFlightSince` 提前到首个 await 之前（检查+置位隔同步代码）；并发窗口回归 |
 | P3-1 | ✅ 已修 | `011:207-208` 数值更正（600_000 / 30s + 撤回"≥超时"理由）+ "以 code 常量为准"注 |
 | P3-2 | ✅ 已修 | `^maintain\b` 显式拒绝分支（替代静默落帮助文本） |

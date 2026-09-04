@@ -130,4 +130,19 @@ describe('layered installer', () => {
     expect(insertedRows(overlay).some(row => rowId(row) === 'tool-skill')).toBe(false)
     await rm(home, { recursive: true, force: true })
   }, 20_000)
+
+  it('core composePresetComposition and installer generateAgentPreset agree byte-for-byte (0.3.15 single-source pin)', async () => {
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const standard = '# runtime standard\n- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n'
+    // The installer script ships no type declarations, so the parity check
+    // runs it in a fresh node subprocess (base64 stdout, no lint-visible any).
+    const script = [
+      `import { generateAgentPreset } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,
+      `const out = generateAgentPreset(${JSON.stringify(standard)}, ${JSON.stringify(delta)})`,
+      'process.stdout.write(Buffer.from(out, "utf8").toString("base64"))',
+    ].join('\n')
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
+    expect(Buffer.from(stdout, 'base64').toString('utf8')).toBe(composePresetComposition(standard, delta))
+  })
 })
