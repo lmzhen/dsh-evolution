@@ -109,4 +109,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p packages/evolution/dist
-          node packages/evolution/scripts/publish-scoped.mjs
+          # --tag latest is REQUIRED (0.3.18 lesson): publish-scoped.mjs defaults
+          # to 'next'; the 0.3.18 release went out as next=0.3.18 / latest=stale
+          # and needed manual dist-tag repair. Explicitly pin stable releases.
+          node packages/evolution/scripts/publish-scoped.mjs --tag latest
