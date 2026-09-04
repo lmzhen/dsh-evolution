@@ -149,9 +149,10 @@ export function validateAndNormalizeMaintainPlan(
         // the truthful 'n/a' (display/audit contract). Reversible items keep
         // the hard requirement: a fabricated undo path is never acceptable.
         if (item.reversibility === 'none') {
-          ;(item as Record<string, unknown>).undo_path = 'n/a'
+          item.undo_path = 'n/a'
         } else {
-          errors.push(`${path}.undo_path: required (reversibility=${String(item.reversibility ?? 'missing')})`)
+          const rev = typeof item.reversibility === 'string' ? item.reversibility : 'missing'
+          errors.push(`${path}.undo_path: required (reversibility=${rev})`)
         }
       }
       if (typeof item.confidence !== 'number' || !Number.isFinite(item.confidence) || item.confidence < 0 || item.confidence > 1) {
