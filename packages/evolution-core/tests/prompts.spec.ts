@@ -59,7 +59,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(12)
+  expect(PROMPT_BUNDLE_VERSION).toBe(13)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {
@@ -68,7 +68,7 @@ it('maintain persona ships in the bundle with signal placeholders (011)', () => 
   expect(MAINTAIN_PROMPT).toContain('MECHANICAL_FACTS')
 })
 
-it('maintain persona v12 carries the guidance clauses pinned by the prompt loops (0.3.7 + 0.3.11)', () => {
+it('maintain persona v13 carries the guidance clauses pinned by the prompt loops (0.3.7 + 0.3.11 + 0.3.13)', () => {
   // §3 completeness contract: every over signal lands in an item or a note.
   expect(MAINTAIN_PROMPT).toContain('完整性契约')
   expect(MAINTAIN_PROMPT).toContain('禁止静默省略')
@@ -92,6 +92,11 @@ it('maintain persona v12 carries the guidance clauses pinned by the prompt loops
   expect(MAINTAIN_PROMPT).toContain('提交前自查')
   // §7 reviewer perspective (independent judgment, no self-narrative as evidence).
   expect(MAINTAIN_PROMPT).toContain('审查者视角')
+  // §6 language rule follows the library (0.3.13 de-coupling: the previous
+  // hardcoded '（中文）' was the only dataset-visible content coupling and
+  // would mis-drive output language on a non-Chinese library).
+  expect(MAINTAIN_PROMPT).toContain('与库正文语言一致')
+  expect(MAINTAIN_PROMPT).not.toContain('（中文）')
 })
 
 it('channel variants carry the subagent deliverable limit (M-2)', () => {

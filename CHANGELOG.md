@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.13 (patch) — maintain template v13: §6 language de-coupling
+
+Content-level audit of MAINTAIN_PROMPT (v12) found exactly one dataset-visible coupling: the §6 language rule hardcoded the output language as `（中文）` ("follow the library body language (Chinese)"). On a non-Chinese library this would mis-drive the output language.
+
+- §6: `与库正文一致（中文）` → `与库正文语言一致（不自订语言）` — the design intent (output follows the audited library) is preserved; the language anchor is gone.
+- `PROMPT_BUNDLE_ID`/`VERSION` 12 → 13 (template text changed semantically; id and version bump together per the module contract).
+- prompts.spec: version pin 13 + anchor on the de-coupled wording + a `not.toContain('（中文）')` guard against re-coupling.
+- Local: full suite 64/64 (393), oxlint 0/0.
+
 ## 0.3.12 (patch) — one-command aggregate entry `dsh-evolution-all` + install docs
 
 The family's published install previously needed five entry packages. `dsh-evolution-all` (dependency-only aggregate, no composition rows of its own — `evolution-host` plus the three model-tool packages `tool-memory`/`tool-skill-manage`/`evolution-skill-catalog`) makes it one command:

@@ -22,8 +22,8 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@11'
-export const PROMPT_BUNDLE_VERSION = 12
+export const PROMPT_BUNDLE_ID = 'dsh-evolution@13'
+export const PROMPT_BUNDLE_VERSION = 13
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -261,7 +261,7 @@ D. 库·整合纪律（计划形态约束）
 - verdict=no_issues ⇒ plan=[]（不允许空 plan 之外的"无问题"表述）。
 - **confidence 降档规则（机械）**：条款全部由机械证据支撑 → 0.6–0.9；每含一项语义推断（是否锚/是否同伞/性质归类）→ 上限 0.4。
 - needs_human = (confidence < 0.6) OR (不可逆) OR (is_override) OR (引用 unknown 信号)。
-- 语言：finding/recommendation/notes 与库正文一致（中文）；字段名/信号 id/枚举保留英文。
+- 语言：finding/recommendation/notes 与库正文语言一致（不自订语言）；字段名/信号 id/枚举保留英文。
 - **提交前自查（逐项对照，不许跳过）**：① verdict 与 plan 一致 ② 每条 evidence 在事实块 ③ undo_path 非空（不可逆=n/a）④ confidence 含推断≤0.4 ⑤ finding 无"应"字 ⑥ §3 完整性契约满足。
 
 ## 7. 裁决纪律
