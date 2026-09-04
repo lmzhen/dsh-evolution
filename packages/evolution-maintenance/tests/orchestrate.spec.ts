@@ -134,6 +134,35 @@ describe('runMaintain', () => {
     expect(outcome.error ?? '').not.toContain('This operation was aborted')
   })
 
+  it('translates a plain Error with the abort message (0.3.8, command-retry cancellation shape)', async () => {
+    const aborting: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start() {
+          return { result: Promise.reject(new Error('This operation was aborted')) }
+        },
+      },
+    }
+    const outcome = await runMaintain(aborting)
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error ?? '').toContain('aborted')
+    expect(outcome.error ?? '').not.toContain('This operation was aborted')
+  })
+
+  it('distinguishes a cancelled settle (stopReason=aborted) from a missing plan (0.3.8)', async () => {
+    const cancelled: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start() {
+          return { result: Promise.resolve({ text: 'x', stopReason: 'aborted' }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(cancelled)
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error ?? '').toContain('aborted')
+  })
+
   it('passes the caller-specified timeout to the subagent start (0.3.3)', async () => {
     let capturedOptions: { signal?: AbortSignal } | undefined
     const runtimeWithTimeout: MaintainRuntime = {

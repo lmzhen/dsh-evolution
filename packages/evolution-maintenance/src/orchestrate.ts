@@ -249,12 +249,20 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       },
     })
 
-    const runResult = (await run.result) as { structured?: unknown } | null | undefined
+    const runResult = (await run.result) as { structured?: unknown; stopReason?: string } | null | undefined
     const raw = runResult?.structured
     if (raw === undefined) {
+      // 0.3.8: a CANCELLED run settles by RESOLVING (driver readResult) with
+      // structured=undefined and stopReason="aborted" — distinguish that from
+      // "the model produced no structured plan" instead of reporting a bare
+      // error (evidence: command retry cancels the previous invocation, which
+      // surfaced as both "This operation was aborted" and the no-plan text).
+      if (runResult?.stopReason === 'aborted') {
+        return { ok: false, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
+      }
       // Platform contract: the subagent channel wraps its output as
       // `{ structured }` — a missing structured payload means no usable plan.
-      return { ok: false, error: 'Maintain subagent returned no structured plan.' }
+      return { ok: false, error: 'Maintain subagent returned no structured plan (the model did not emit the structured plan, or the run ended without one) — retry; if it repeats, raise --timeout or check the model output shape.' }
     }
     const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
     if (!validated.ok) {
@@ -272,16 +280,18 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       text: formatPlan(validated, runId),
     }
   } catch (error) {
-    // 0.3.3: translate platform abort results instead of surfacing the raw
-    // `Error: This operation was aborted` (the AbortSignal.timeout deadline,
-    // or a cancelled parent turn). Detect by name — DOMException does not
-    // reliably extend Error across Node versions.
+    // 0.3.3/0.3.8: translate platform abort results instead of surfacing the
+    // raw `Error: This operation was aborted`. Detect by name AND message:
+    // DOMException keeps name=AbortError, but a plain Error('This operation
+    // was aborted') from a cancelled path carries only the message (0.3.8
+    // evidence: command-retry cancellation surfaced exactly that shape).
     const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : undefined
     const message = error instanceof Error ? error.message : String(error)
+    const aborted = name === 'AbortError' || /abort/i.test(`${String(name)} ${message}`)
     return {
       ok: false,
-      error: name === 'AbortError'
-        ? 'Maintenance scan was aborted (subagent timeout or cancellation) before a plan was produced — retry, or raise the timeout (evolution-commands maintainTimeoutMs) on a slow/large library.'
+      error: aborted
+        ? 'Maintenance scan was aborted (cancellation or timeout) before a plan was produced — retry, or raise the timeout (evolution-commands maintainTimeoutMs) on a slow/large library.'
         : `Maintenance scan failed: ${message}`,
     }
   }

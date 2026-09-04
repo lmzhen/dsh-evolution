@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.8 (patch) — maintain cancelled-run translation
+
+A cancelled `/evolution maintain` surfaced misleading text: the platform's driver **resolves** (not rejects) a cancelled run with `structured: undefined, stopReason: "aborted"`, while the command-retry cancellation path can also reject with a plain `Error("This operation was aborted")` (name not AbortError). Both slipped past the 0.3.3 name-only detection and were reported raw/undefined-plan.
+
+- `orchestrate` no-plan branch now reads `runResult.stopReason === 'aborted'` → "Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan."; other no-plan results keep the clarified message.
+- `orchestrate` catch broadens abort detection to `name === 'AbortError' || /abort/i.test(name + message)` — the plain-Error abort shape now translates too.
+- Tests: plain-Error abort shape, cancelled settle with stopReason. Local: orchestrate + commands 58/58, oxlint 0/0.
+
 ## 0.3.7 (patch) — maintain template v11: prompt-guidance rebuild (subagent-verified loop)
 
 MAINTAIN_PROMPT rewritten (PROMPT_BUNDLE v10→v11) after a three-round **rewrite → real-subagent run → review-against-standards → fix** loop on the real skill library. Guidance fixes that landed:
