@@ -108,6 +108,13 @@ export function validateAndNormalizeMaintainPlan(
 ): ValidationResult {
   const errors: string[] = []
   const forcedHuman: string[] = []
+  // 0.3.14 (P3-5): §7 "protected set → 0 recommendations" is enforced here —
+  // the only component that audits a plan. `protected` flows into the report
+  // since 0.3.11 (facts meta), so the data is already present.
+  const protectedNames = new Set<string>()
+  for (const skill of report.skills) {
+    if (skill.protected) protectedNames.add(skill.name)
+  }
 
   if (!isRecord(raw)) return { ok: false, errors: ['plan root: must be an object'], plan: { verdict: 'no_issues', plan: [], notes: [] }, forcedHuman }
 
@@ -134,6 +141,9 @@ export function validateAndNormalizeMaintainPlan(
       if (typeof item.kind !== 'string' || !KINDS.has(item.kind)) errors.push(`${path}.kind: invalid`)
       if (!Array.isArray(item.names) || item.names.length === 0 || !item.names.every(isNonEmptyString)) {
         errors.push(`${path}.names: non-empty string array required`)
+      } else if (item.names.some(nm => protectedNames.has(nm))) {
+        const hit = item.names.find(nm => protectedNames.has(nm))
+        errors.push(`${path}.names: references protected skill "${String(hit)}" — §7 forbids recommendations for bundled/hub-installed/pinned skills`)
       }
       if (!isNonEmptyString(item.rule)) errors.push(`${path}.rule: required`)
       if (typeof item.finding !== 'string' || item.finding.trim().length === 0) errors.push(`${path}.finding: required`)

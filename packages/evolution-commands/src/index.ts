@@ -7,8 +7,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const name = 'evolution-commands'
 
@@ -54,7 +57,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | maintain [--timeout ms] | restructure <name> "<heading>" <to_file> | replay',
+        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | maintain [--timeout ms] | preset install | restructure <name> "<heading>" <to_file> | replay',
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
@@ -246,9 +249,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const subagents = ctx.get('subagents') as { start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }> } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
+          // 0.3.14 (P2-1): set the in-flight flag BEFORE the first await
+          // (enrichment is the slowest segment). Check and set are now
+          // adjacent across synchronous code only — two re-triggers arriving
+          // during the enrich window can no longer both pass the guard.
+          maintainInFlightSince = Date.now()
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
           const enrichment = await buildEnrichment(ctx, library)
-          maintainInFlightSince = Date.now()
           let outcome: Awaited<ReturnType<typeof runMaintain>>
           try {
             outcome = await runMaintain(
@@ -284,6 +291,33 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           })
           return ok(`Maintenance scan ${outcome.runId}:\n${outcome.text ?? ''}`)
         }
+        if (/^maintain\b/.test(input)) {
+          // 0.3.14 (P3-2): an input that STARTS with maintain but did not
+          // match the grammar (unknown flags, `--timeout=600000`, stray args)
+          // was silently falling into the help branch despite the branch
+          // comment claiming explicit rejection. Reject it here.
+          return err('Unknown maintain arguments: expected bare `maintain` or `maintain --timeout <ms>` (a positive integer). Got: ' + input)
+        }
+        if (input === 'preset install') {
+          // 0.3.14 (P1-1): the published install delivers the Evolution agent
+          // preset package (ships agent.cordis.yml/preset.yml) as part of the
+          // dependency closure, but nothing auto-copies it into
+          // ~/.dsh/.agent-presets/evolution — this command performs that
+          // delivery explicitly, idempotently and reversibly (P1-1 audit fix).
+          const target = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), '.agent-presets', 'evolution')
+          try {
+            const source = resolveAgentPresetDir(import.meta.url)
+            mkdirSync(target, { recursive: true })
+            for (const file of ['agent.cordis.yml', 'preset.yml'] as const) {
+              const from = join(source, file)
+              if (!existsSync(from)) return err(`Preset file missing from ${source}/${file} — is @lmzhen/dsh-evolution-agent-preset installed?`)
+              copyFileSync(from, join(target, file))
+            }
+            return ok(`Evolution agent preset installed to ${target} (agent.cordis.yml, preset.yml). Restart the session switcher to select it.`)
+          } catch (error) {
+            return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
+          }
+        }
         if (input.startsWith('restructure ')) {
           // /evolution restructure <name> "<heading>" <to_file> [--plan <runId>]
           // — bridges the existing SkillLibrary.restructure (two-phase
@@ -311,7 +345,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | skills health | learn [request] | maintain | restructure <name> "<heading>" <to_file> | replay.')
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | skills health | learn [request] | maintain | preset install | restructure <name> "<heading>" <to_file> | replay.')
       },
     })
   })
@@ -319,6 +353,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
 interface CommandRuntimeLike {
   register(definition: unknown): () => void
+}
+
+/**
+ * 0.3.14 (P1-1): locate the installed `dsh-evolution-agent-preset` package
+ * (the delivery container for agent.cordis.yml/preset.yml). Resolution order:
+ * npm-name sibling (published profile layout), dev-tree sibling (source/test
+ * layout), then module resolution. The package dir name differs from the npm
+ * name (`evolution-agent` vs `@lmzhen/dsh-evolution-agent-preset` — the rc.44
+ * dir≠name trap), so BOTH sibling shapes are probed.
+ */
+function resolveAgentPresetDir(importMetaUrl: string): string {
+  const dir = dirname(fileURLToPath(importMetaUrl))
+  const candidates = [
+    join(dir, '..', 'dsh-evolution-agent-preset'),
+    join(dir, '..', '..', 'evolution-agent'),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, 'agent.cordis.yml')) && existsSync(join(candidate, 'preset.yml'))) return candidate
+  }
+  try {
+    return dirname(createRequire(importMetaUrl).resolve('@deepseek-ai/dsh-evolution-agent-preset/package.json'))
+  } catch {
+    return candidates[0] ?? join(dir, '..', 'dsh-evolution-agent-preset')
+  }
 }
 
 interface CommandInvocation {

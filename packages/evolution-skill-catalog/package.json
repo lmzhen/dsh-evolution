@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-catalog",
   "description": "Native ctx.skills provider for the evolution-managed skill tree",
-  "version": "0.1.0-rc.1",
+  "version": "0.3.14",
   "publishConfig": {
     "access": "public"
   },

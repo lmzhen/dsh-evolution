@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -463,6 +464,13 @@ describe('evolution-commands', () => {
       })
       await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
       const first = handler!.handler({ rawInput: 'maintain' }) // pends on the deferred run
+      // 0.3.14 (P2-1): the flag is set BEFORE the first await, so a second
+      // trigger racing inside the enrich window must already see "running" —
+      // the old code exposed two spawns in this window.
+      const concurrent = await handler!.handler({ rawInput: 'maintain' })
+      expect(concurrent.kind).toBe('success')
+      expect(concurrent.text).toContain('already running')
+      expect(starts).toBe(0) // first has NOT spawned yet — the window stayed closed
       await spawned // deterministic: wait for the spawn instead of a fixed sleep
       expect(starts).toBe(1)
       const second = await handler!.handler({ rawInput: 'maintain' })
@@ -479,6 +487,60 @@ describe('evolution-commands', () => {
     } finally {
       if (resolveRun) resolveRun()
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('maintain rejects unknown arguments explicitly instead of falling into help (P3-2)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-reject-'))
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      const unknown = await handler!.handler({ rawInput: 'maintain --foo' })
+      expect(unknown.kind).toBe('error')
+      expect(unknown.text).toContain('Unknown maintain arguments')
+      const equals = await handler!.handler({ rawInput: 'maintain --timeout=600000' })
+      expect(equals.kind).toBe('error')
+      expect(equals.text).toContain('Unknown maintain arguments')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('preset install delivers agent.cordis.yml + preset.yml from the dev-tree container (0.3.14)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      await ctx.plugin(Commands, { skillsRoot: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+      const result = await handler!.handler({ rawInput: 'preset install' })
+      expect(result.kind).toBe('success')
+      const target = join(home, '.agent-presets', 'evolution')
+      expect(existsSync(join(target, 'agent.cordis.yml'))).toBe(true)
+      expect(existsSync(join(target, 'preset.yml'))).toBe(true)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(home, { recursive: true, force: true })
     }
   })
 

@@ -204,8 +204,9 @@ D. 库·整合纪律（计划形态约束，不是信号）
 - **render-facts.ts**：事实块与模板头同源产生联合签名 `sig = sha256(模板原文 + drift-signals 定义序列化)`；**渲染前过 `redact`**（A5，见 §8）；`signals_version` 信号集变更递增。
 - **validate-plan.ts**：zod schema + §6 模板拒绝矩阵（含 confidence/needs_human 一致性）；引用闭合（evidence.signal ⊆ 事实块信号集）；**quality_low 全局施加**（读事实块环境信号，quality_low=unknown 的技能所有结构建议机械置 needs_human:true——与"未知必人审"判据同源，校验器实现，不依赖模型自觉）；拒绝→结构化失败报告（哪项/哪字段/为何拒）。
 - **probe 工具（tools.ts）**：只读；复用 scan 详情函数（单源）；输出 JSON；同样过 `redact`；子代理白名单 `['skill','maintenance_probe']`（无任何写工具）。
-- **编排器（service.ts）**：`maintainTimeoutMs`（默认 120_000，`AbortSignal.timeout`）；**富化钩子为命令侧必接项（v11 P1-1 修订）**：descriptions（`parseFrontmatter`）、supportFiles（`SkillLibrary.listSupportFiles`）、quality（skill-usage `report()` 的 `quality_score`）、usageObserved（`usageObserved()`）——四个钩子全部现成 API；**任一服务缺失 → 对应信号 `unknown`（绝不伪造 pass）**——`supportFiles` 未枚举与枚举为空必须区分（前者 `[UNKNOWN]`，后者才允许 pass/over）。
-**追加裁决（2026-09-03）**：`maintainRunning` 重入门**不实现**——maintain 是只读诊断（无写操作重入损坏风险，与 curator 的 rc.38 重复归档事故不同），并发最坏 = 双倍 token + 重复建议；用户手动命令并发面趋零。**替代方案已落地：冷却窗**（`Config.maintainCooldownMs` 默认 130s（v11 P3-1：≥超时 120s 才无重叠窗口），进程内瞬态）——短时间内的连点/重发（误触场景）在窗口内被拦截（返回上次 runId + 剩余秒），**同时覆盖并行与连点两个场景**；成功与失败都更新时间戳（防连续失败刷屏）；扫描仍可随时手动重跑（窗口默认 130s）。
+- **编排器（service.ts）**：`maintainTimeoutMs`（默认 600_000（0.3.10：真实全库扫描需 4-8 分钟，旧默认 120_000 会中途掐断——13:38 成功 run 用 `--timeout 600000`），`AbortSignal.timeout`）；**富化钩子为命令侧必接项（v11 P1-1 修订）**：descriptions（`parseFrontmatter`）、supportFiles（`SkillLibrary.listSupportFiles`）、quality（skill-usage `report()` 的 `quality_score`）、usageObserved（`usageObserved()`）——四个钩子全部现成 API；**任一服务缺失 → 对应信号 `unknown`（绝不伪造 pass）**——`supportFiles` 未枚举与枚举为空必须区分（前者 `[UNKNOWN]`，后者才允许 pass/over）。
+**追加裁决（2026-09-03）**：`maintainRunning` 重入门**不实现**——maintain 是只读诊断（无写操作重入损坏风险，与 curator 的 rc.38 重复归档事故不同），并发最坏 = 双倍 token + 重复建议；用户手动命令并发面趋零。**替代方案已落地：冷却窗**（`Config.maintainCooldownMs` 默认 30s，进程内瞬态）——短时间内的连点/重发（误触场景）在窗口内被拦截（返回上次 runId + 剩余秒），**覆盖连点场景；并行/in-flight 场景不由冷却窗承担**（窗口从 run settle 后才计时——v11 所记"≥超时 120s 才无重叠窗口"论据为注释 bug，80ec941 已把 130s 降为 30s），由 0.3.11 单飞标志 `maintainInFlightSince` 覆盖（0.3.14 P2-1：设置点提前到首个 await 之前）；成功与失败都更新时间戳（防连续失败刷屏）；扫描仍可随时手动重跑（窗口默认 30s）。
+**0.3.14 P3-1 数值更正**：本节数值以 code 常量为准——`maintainTimeoutMs` 默认 **600_000**、`maintainCooldownMs` 默认 **30_000**。
 
 ## 8. 信任边界与威胁模型（A5 新增）
 

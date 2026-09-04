@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-core",
   "description": "Shared stores, prompts, signals and lifecycle logic for the dsh-evolution plugin family",
-  "version": "0.1.0-rc.1",
+  "version": "0.3.14",
   "publishConfig": {
     "access": "public"
   },
@@ -32,12 +32,16 @@
     "lib/types/invariant.d.ts"
   ],
   "license": "MIT",
+  "dependencies": {
+    "js-yaml": "^4.2.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^"

@@ -9,6 +9,7 @@
 
 import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
+import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -149,15 +150,35 @@ export interface Frontmatter {
   [key: string]: unknown
 }
 
-export function parseFrontmatter(content: string): { frontmatter: Frontmatter; body: string } | null {
+/**
+ * Shared frontmatter block detection (P3-3 single owner): opening line `---`
+ * and closing line exactly `---` (both trimmed). Used by `parseFrontmatter`,
+ * `frontmatterYamlUnsafeValues` and `normalizeFrontmatter` so the three can
+ * never disagree about where the block ends (the loose `indexOf('\n---')`
+ * form matched `\n----` and was replaced by this strict line rule).
+ */
+export function frontmatterBlock(content: string): { block: string; lines: string[]; end: number; nl: string } | null {
   if (!content.trimStart().startsWith('---')) return null
-  const end = content.indexOf('\n---', 3)
+  const nl = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content.split(nl)
+  if ((lines[0] ?? '').trim() !== '---') return null
+  let end = -1
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line === undefined) continue
+    if (line.trim() === '---') { end = i; break }
+  }
   if (end < 0) return null
-  const block = content.slice(3, end)
-  const body = content.slice(end + 4).trim()
+  return { block: lines.slice(1, end).join(nl), lines, end, nl }
+}
+
+export function parseFrontmatter(content: string): { frontmatter: Frontmatter; body: string } | null {
+  const found = frontmatterBlock(content)
+  if (!found) return null
+  const body = found.lines.slice(found.end + 1).join(found.nl).trim()
   if (!body) return null
   const frontmatter: Frontmatter = {}
-  for (const line of block.split('\n')) {
+  for (const line of found.block.split(found.nl)) {
     const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
     if (match) {
       const [, key, value] = match
@@ -174,7 +195,10 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; b
  * silently split family-visibility from platform-visibility (0.3.11
  * inkos-harness case: the description carried "…: " and the catalog dropped
  * the whole skill). Already-quoted values and well-formed flow collections
- * (`[a, b]` / `{a: b}`) are considered safe. */
+ * (`[a, b]` / `{a: b}`) are considered safe. This rule is only the FAST
+ * PATH — the write path re-verifies every rewrite with the real YAML parser
+ * (see normalizeFrontmatter), so an incomplete approximation can never
+ * corrupt a multiline flow value (P3-4). */
 export function yamlPlainScalarNeedsQuotes(value: string): boolean {
   if (value.length === 0) return false
   if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) return false
@@ -192,20 +216,9 @@ export function yamlPlainScalarNeedsQuotes(value: string): boolean {
  * path. Single-line entries only; lines with embedded line breaks skip. */
 export function frontmatterYamlUnsafeValues(content: string): Array<{ key: string; value: string }> {
   const found: Array<{ key: string; value: string }> = []
-  if (!content.trimStart().startsWith('---')) return found
-  const nl = content.includes('\r\n') ? '\r\n' : '\n'
-  const lines = content.split(nl)
-  if ((lines[0] ?? '').trim() !== '---') return found
-  let end = -1
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]
-    if (line === undefined) continue
-    if (line.trim() === '---') { end = i; break }
-  }
-  if (end < 0) return found
-  for (let i = 1; i < end; i++) {
-    const line = lines[i]
-    if (line === undefined) continue
+  const block = frontmatterBlock(content)
+  if (!block) return found
+  for (const line of block.block.split(block.nl)) {
     if (line.includes('\n') || line.includes('\r')) continue
     const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
     if (!match) continue
@@ -222,9 +235,10 @@ export interface FrontmatterNormalizeResult {
   changed: boolean
   /** Frontmatter keys whose values were auto-quoted. */
   fields: string[]
-  /** Values that cannot be auto-quoted safely (control characters only —
-   * double/single-quote fallback covers `"`/`\`/`'`, so a quote-containing
-   * value no longer traps the write path in an unfixable loop). */
+  /** Values that cannot be auto-quoted safely (control characters, or a
+   * rewrite that failed the real-parser verification — a multiline flow
+   * collection line etc. is left untouched and reported here, so the write
+   * path rejects instead of silently damaging a value; 0.3.14). */
   issues: string[]
 }
 
@@ -232,27 +246,22 @@ export interface FrontmatterNormalizeResult {
  * Normalize a SKILL.md frontmatter block into catalog-loadable YAML: values
  * that YAML forbids unquoted get quotes — double quotes normally, single
  * quotes (with `''` doubling) when the value contains `"` or `\` (both legal
- * unescaped inside single-quoted YAML). Idempotent (a normalized block
- * passes through unchanged); only single-line `key: value` entries are
- * touched; body text is never modified; a key line carrying an embedded
- * line break (mixed ending styles) is left untouched rather than risking
- * continuation-line data loss. Line-ending style of the block is preserved.
+ * unescaped inside single-quoted YAML). Idempotent; only single-line
+ * `key: value` entries are touched; body text is never modified; line-ending
+ * style is preserved. **Every rewrite is re-verified with the real YAML
+ * parser** (js-yaml — the same parser the platform catalog uses): if the
+ * rewritten block no longer parses, or a rewritten value's parsed content
+ * differs from the original, the rewrite is rolled back and reported in
+ * `issues` (fail-loud, never a silent value corruption — P3-4).
  */
 export function normalizeFrontmatter(content: string): FrontmatterNormalizeResult {
-  if (!content.trimStart().startsWith('---')) return { content, changed: false, fields: [], issues: [] }
-  const nl = content.includes('\r\n') ? '\r\n' : '\n'
-  const lines = content.split(nl)
-  if ((lines[0] ?? '').trim() !== '---') return { content, changed: false, fields: [], issues: [] }
-  let end = -1
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]
-    if (line === undefined) continue
-    if (line.trim() === '---') { end = i; break }
-  }
-  if (end < 0) return { content, changed: false, fields: [], issues: [] }
+  const block = frontmatterBlock(content)
+  if (!block) return { content, changed: false, fields: [], issues: [] }
+  const { lines, end, nl } = block
   // Detection is shared with the audit side (frontmatterYamlUnsafeValues):
   // normalize and catalog-invalid detection can never disagree.
   const unsafe = new Map(frontmatterYamlUnsafeValues(content).map(entry => [entry.key, entry.value]))
+  const originalValues = new Map(unsafe)
   const fields: string[] = []
   const issues: string[] = []
   let changed = false
@@ -277,7 +286,29 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
     fields.push(key)
     changed = true
   }
-  return { content: changed ? lines.join(nl) : content, changed, fields, issues }
+  if (!changed) return { content, changed: false, fields: [], issues }
+  // 0.3.14: verify the rewritten block with the real parser — the fast-path
+  // rule can mis-detect a multiline flow collection (`[a,` + continuation)
+  // or any shape the plain-scalar approximation does not know. A failure must
+  // roll back, never ship a value mutation.
+  const rewrittenBlock = lines.slice(1, end).join(nl)
+  try {
+    const parsed = loadYaml(rewrittenBlock) as Record<string, unknown>
+    for (const key of fields) {
+      if (String(parsed[key]) !== originalValues.get(key)) {
+        throw new Error(`rewritten value for ${key} differs from the original`)
+      }
+    }
+    return { content: lines.join(nl), changed: true, fields, issues }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    return {
+      content,
+      changed: false,
+      fields: [],
+      issues: [`frontmatter rewrite verification failed (${reason}) — quoting skipped; wrap this value manually`],
+    }
+  }
 }
 
 /**

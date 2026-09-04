@@ -55,6 +55,18 @@ function validPlan(items: unknown[] = []): Record<string, unknown> {
 }
 
 describe('validateAndNormalizeMaintainPlan', () => {
+  it('rejects items that name a protected skill (§7 enforced mechanically — 0.3.14 P3-5)', () => {
+    const protectedReport: DriftReport = {
+      library: report.library,
+      skills: [{ name: 'pinned-skill', protected: 'pinned', signals: [{ id: 'stamp_density', verdict: 'over', value: '3/KB', threshold: '2/KB' }] }],
+    }
+    const item = validItem()
+    item.names = ['pinned-skill']
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), protectedReport, SIGNALS)
+    expect(result.ok).toBe(false)
+    expect(result.errors?.join(' ')).toContain('protected')
+  })
+
   it('accepts a well-formed issues plan', () => {
     const result = validateAndNormalizeMaintainPlan(validPlan([validItem()]), report, SIGNALS)
     expect(result.ok).toBe(true)

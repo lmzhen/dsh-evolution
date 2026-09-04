@@ -168,6 +168,8 @@ function formatPlan(validated: ValidationResult, runId: string): string {
 
 /** Run one maintenance scan and return display text plus validation metadata. */
 export async function runMaintain(runtime: MaintainRuntime, options: MaintainOptions = {}): Promise<MaintainOutcome> {
+  // Hoisted so the catch can consult the abort signal (0.3.14 P3-6).
+  let abortSignal: AbortSignal | undefined
   try {
     // Template integrity is a hard gate on the maintenance link (011 §7):
     // the bundle digest covers the FULL template; the joint signature adds
@@ -198,13 +200,19 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
 按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。`
 
     const timeoutMs = options.timeoutMs ?? 600_000
+    // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
+    // hoisted so the catch can consult `signal.aborted` (our own timeout)
+    // instead of matching error text. The narrow literals remain only for the
+    // platform's unstructured leak of a parent-cancelled run.
+    const signal = AbortSignal.timeout(timeoutMs)
+    abortSignal = signal
     const agentOptions: Record<string, string> = { model: options.model ?? 'deepseek-v4-pro' }
     if (options.provider) agentOptions.provider = options.provider
     const run = await runtime.subagents.start('spawn', {
       label: 'dsh-evolution-maintain',
       prompt: [{ type: 'text', text: prompt }],
       parent: runtime.parent,
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
       // maxDepth is the ABSOLUTE cap of the subagent's own depth (platform
       // resolveChildDepth: childDepth = parentDepth+1). 1 = subagent allowed,
       // nesting denied (2 > 1); 0 = spawn itself rejected (0.3.1 defect).
@@ -284,14 +292,13 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       text: formatPlan(validated, runId),
     }
   } catch (error) {
-    // 0.3.3/0.3.8: translate platform abort results instead of surfacing the
-    // raw `Error: This operation was aborted`. Detect by name AND message:
-    // DOMException keeps name=AbortError, but a plain Error('This operation
-    // was aborted') from a cancelled path carries only the message (0.3.8
-    // evidence: command-retry cancellation surfaced exactly that shape).
+    // 0.3.3/0.3.8/0.3.14: translate platform abort results instead of surfacing
+    // the raw `Error: This operation was aborted`. Primary evidence is our own
+    // signal state (signal.aborted); the narrow literals cover the platform's
+    // unstructured parent-cancel leak (plain Error with that exact message).
     const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : undefined
     const message = error instanceof Error ? error.message : String(error)
-    const aborted = name === 'AbortError' || /abort/i.test(`${String(name)} ${message}`)
+    const aborted = abortSignal?.aborted === true || name === 'AbortError' || message === 'This operation was aborted'
     return {
       ok: false,
       error: aborted

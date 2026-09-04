@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { frontmatterYamlUnsafeValues, normalizeFrontmatter, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
+import { frontmatterYamlUnsafeValues, normalizeFrontmatter, parseFrontmatter, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
 
 describe('yamlPlainScalarNeedsQuotes (0.3.11)', () => {
   it('flags the plain-scalar hazards the strict YAML catalog rejects', () => {
@@ -93,6 +93,29 @@ describe('normalizeFrontmatter (0.3.11)', () => {
     const result = normalizeFrontmatter(mixed)
     expect(result.content).toBe(mixed)
     expect(result.fields).toEqual([])
+  })
+
+  it('rolls back a rewrite that fails real-parser verification (multiline flow — P3-4)', () => {
+    const multilineFlow = '---\nname: demo-skill\nrelated_skills: [a,\n  b]\n---\n\n# Demo\n'
+    const result = normalizeFrontmatter(multilineFlow)
+    expect(result.content).toBe(multilineFlow) // never mutates the value
+    expect(result.changed).toBe(false)
+    expect(result.issues.length).toBeGreaterThan(0) // fail-loud, caller rejects
+    // The valid rewrites still succeed and survive verification.
+    const normal = normalizeFrontmatter('---\nname: demo-skill\ndescription: a: b\nrelated_skills: [x, y]\n---\n\n# Demo\n')
+    expect(normal.changed).toBe(true)
+    expect(normal.issues).toEqual([])
+    expect(normal.content).toContain('description: "a: b"')
+  })
+
+  it('frontmatterBlock is the single owner: strict closing line, parse/normalize agree (P3-3)', () => {
+    const looseClose = '---\nname: demo-skill\ndescription: Demo.\n----\n\n# Demo\n'
+    // A closing line of `----` is NOT a frontmatter terminator under the
+    // shared strict rule — parser and normalizer must agree (previously the
+    // parser's indexOf matched \n---- slurping the remainder).
+    expect(parseFrontmatter(looseClose)).toBeNull()
+    expect(normalizeFrontmatter(looseClose).changed).toBe(false)
+    expect(frontmatterYamlUnsafeValues(looseClose)).toEqual([])
   })
 
   it('preserves the file line-ending style', () => {

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.14 (patch) — audit v13 batch: preset delivery (P1-1), single-flight TOCTOU (P2-1), seven P3 items
+
+The v13 audit verified the 0.3.12 install story and found a **claimed-but-unbacked mechanism**: the docs promised "preset installed by the family's preset layer — no manual copying", but `dsh plugin add` has no agent-preset install channel (upstream `apps/cli/src/plugin.ts` verified) and the preset files were not inside any published dependency closure — a user following the docs could not select the Evolution preset. The same audit surfaced a single-flight race and seven P3 items.
+
+- **P1-1 preset delivery**: `dsh-evolution-all` now depends on `dsh-evolution-agent-preset` (the preset container — `agent.cordis.yml`/`preset.yml` ship inside the published dependency closure); new `/evolution preset install` command copies them idempotently into `$DSH_HOME/.agent-presets/evolution/` (no manual file copying anywhere); docs (README/README.zh/INSTALL.md) updated to the one-time `preset install` step; command hint + help text list it.
+- **P2-1 single-flight TOCTOU**: `maintainInFlightSince` is now set **before** the first await (`buildEnrichment` is the slowest segment) — check and set are adjacent across synchronous code only, so two re-triggers during the enrich window can no longer both pass the guard; concurrent-window regression test asserts the second trigger gets "already running" and the scan starts once.
+- **P3-1 doc values**: `011-maintenance-subagent-v2.md` still said `maintainTimeoutMs 默认 120_000` (code: 600_000 since 0.3.10) and cooldown 130s with the withdrawn "≥ timeout" rationale (code: 30s since 80ec941) — corrected + "以 code 常量为准" note.
+- **P3-2 unknown maintain args**: `maintain --foo` / `--timeout=600000` silently fell into the generic help branch despite the branch comment claiming explicit rejection — replaced with an explicit `^maintain\b` rejection.
+- **P3-3 frontmatter boundary single-owner**: new shared `frontmatterBlock` is the single closing-`---` detector for parse/normalize/detector (previously `parseFrontmatter`'s `indexOf('\n---', 3)` also matched `\n----` while normalize/detector required a trimmed exact line — a `----`-closed file would be seen as no-frontmatter by the normalizer but parsed by the family parser).
+- **P3-4 real-parser verification**: `normalizeFrontmatter` now re-verifies every rewrite with the real YAML parser (`js-yaml` — the platform catalog's parser; new `evolution-core` dependency + `@types/js-yaml` dev dep): if the rewritten block no longer parses or a rewritten value's parsed content differs (the multiline flow `[a,` fast-path mis-quote shape), the rewrite is rolled back and reported in `issues` — fail-loud, never a silent value mutation.
+- **P3-5 protected set enforced**: `validate-plan` builds `protectedNames` from `report.skills[].protected` and rejects any recommendation naming a protected skill — §7 "protected set → 0 recommendations" is now mechanical, not prompt-layer only.
+- **P3-6 abort detection tightened**: the abort signal is hoisted so the catch can consult it; detection is `abortSignal?.aborted === true || name === 'AbortError' || message === 'This operation was aborted'` (replaces the broad `/abort/i`) — a cancelled run still translates to the aborted message, an unrelated "abort" string no longer does.
+- **P3-7 manifest version alignment**: `normalize-mirror` aligns every package + root manifest version to the newest CHANGELOG line (was a hardcoded dev baseline `0.1.0-rc.1` — 13 releases off from what humans read); the dev-tree twin is a documented no-op (never rewrites canonical dev manifests); the exact release version still comes from the git tag via `prepare-release --version`.
+
+- Local: full suite 64/64 (398 tests), oxlint 0/0, tsc -b (core/maintenance/commands/all) 0.
+
 ## 0.3.13 (patch) — maintain template v13: §6 language de-coupling
 
 Content-level audit of MAINTAIN_PROMPT (v12) found exactly one dataset-visible coupling: the §6 language rule hardcoded the output language as `（中文）` ("follow the library body language (Chinese)"). On a non-Chinese library this would mis-drive the output language.

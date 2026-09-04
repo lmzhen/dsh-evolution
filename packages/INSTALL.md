@@ -38,10 +38,19 @@ Omit `@<version>` for the latest stable; pre-release lines need an explicit
 `@<version>-rc.x` (`next` tag). Uninstall with
 `dsh plugin --profile web remove` on the same packages.
 
-After install, restart the profile and select the **Evolution** agent preset
-for the sessions that should expose self-evolution tools. The preset lives at
-`$DSH_HOME/.agent-presets/evolution/` and is installed by the family's preset
-layer (`@lmzhen/dsh-evolution-preset`) — no manual copying of source trees.
+After install, restart the profile and make the **Evolution** agent preset
+available:
+
+```bash
+# one-time delivery of the preset files into $DSH_HOME/.agent-presets/evolution/
+/evolution preset install
+```
+
+Then select the **Evolution** preset for the sessions that should expose
+self-evolution tools. The preset files ship inside the installed
+`@lmzhen/dsh-evolution-agent-preset` package (part of the `dsh-evolution-all`
+dependency closure); `/evolution preset install` copies them into place —
+idempotent, no manual file copying.
 
 ## Prerequisites (source-checkout installs only)
 

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-all",
   "description": "One-command aggregate entry for the dsh-evolution plugin family (host + model tools)",
-  "version": "0.1.0-rc.1",
+  "version": "0.3.14",
   "publishConfig": {
     "access": "public"
   },
@@ -35,7 +35,8 @@
     "@deepseek-ai/dsh-evolution-host": "workspace:^",
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
+    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
+    "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
