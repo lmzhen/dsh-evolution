@@ -75,7 +75,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | maintain | restructure <name> "<heading>" <to_file> | replay',
+        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | maintain [--timeout ms] | restructure <name> "<heading>" <to_file> | replay',
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
@@ -239,12 +239,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
           return ok(`Maintenance facts (0-token preview):\n${facts}`)
         }
-        if (input === 'maintain') {
+        const maintainArgs = /^maintain(?: --timeout (\d+))?\s*$/.exec(input)
+        if (maintainArgs) {
           // User-command maintenance scan (design 011): deterministic facts +
           // one-shot subagent → validated plan display. No writes, no auto
           // execution; fail-closed when either dependency is missing. Scope
           // filtering is reserved (011 §3) — reject unknown args explicitly
-          // instead of silently swallowing them.
+          // instead of silently swallowing them. `--timeout <ms>` (0.3.4)
+          // overrides the deadline for THIS run — no file edit, no restart.
+          const runTimeoutMs = maintainArgs[1] ? Number(maintainArgs[1]) : (config.maintainTimeoutMs ?? 120_000)
+          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
+            return err('Invalid --timeout value: expected a positive integer number of milliseconds (e.g. /evolution maintain --timeout 600000).')
+          }
           const cooldownMs = config.maintainCooldownMs ?? 130_000
           const sinceLast = Date.now() - lastMaintainAt
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
@@ -260,7 +266,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const outcome = await runMaintain(
             { library, subagents, parent: invocation.agent },
             {
-              timeoutMs: config.maintainTimeoutMs ?? 120_000,
+              timeoutMs: runTimeoutMs,
               descriptions: () => enrichment.descriptions,
               supportFiles: () => enrichment.supportFiles,
               quality: () => enrichment.quality,

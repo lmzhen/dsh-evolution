@@ -383,6 +383,48 @@ describe('evolution-commands', () => {
     }
   })
 
+  it('maintain --timeout overrides the subagent deadline for this run (0.3.4)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-timeout-'))
+    const root = join(dir, 'skills')
+    // A non-empty library: runMaintain short-circuits an EMPTY library before
+    // the subagent start (so the signal capture below would stay undefined).
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          captured = definition as typeof captured
+          return () => {}
+        },
+      })
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', { provider: () => io })
+      let capturedSignal: AbortSignal | undefined
+      ctx.provide('subagents', {
+        async start(_kind: string, options: unknown) {
+          capturedSignal = (options as { signal?: AbortSignal }).signal
+          return {
+            result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
+          }
+        },
+      })
+      // maintainCooldownMs: 0 — the cooldown is module-level transient state,
+      // and an earlier test already ran `maintain` (would block this run and
+      // skip the subagent call, leaving the signal capture undefined).
+      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      const bad = await captured!.handler({ rawInput: 'maintain --timeout 0' })
+      expect(bad.kind).toBe('error')
+      expect(bad.text).toContain('Invalid --timeout')
+      const good = await captured!.handler({ rawInput: 'maintain --timeout 600000' })
+      expect(good.kind).toBe('success')
+      expect(capturedSignal).toBeTruthy()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('maintain --facts renders the facts block with zero subagent calls and no cooldown', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'evo-commands-facts-'))
     const root = join(dir, 'skills')

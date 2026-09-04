@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.4 (patch) — per-run maintenance timeout flag
+
+`/evolution maintain --timeout <ms>` overrides the subagent deadline for THAT run only — no file edit, no restart (the runtime-facing answer to "keep timing out"). `maintainTimeoutMs` stays as the persistent default; the flag wins when present.
+
+- `evolution-commands`: maintain branch parses `--timeout <ms>` (positive safe integer, rejects anything else explicitly — 011 §3 no-silent-swallow), threads it into `runMaintain` options; command hint + help text updated.
+- Test: flag parsing (invalid value rejected with guidance; `--timeout 600000` reaches the subagent start with a signal). Note the test library must be NON-empty — `runMaintain` short-circuits an empty library before the subagent start (the empty-library path returns "Nothing to do" without spending a model call).
+- Local: commands 16/16 + maintenance 38.
+
+## 0.3.3 (patch) — maintenance abort translation + configurable timeout
+
+0.3.2's `/evolution maintain` could surface the raw platform abort text (`Error: This operation was aborted`) when the one-shot subagent hit the 120s `AbortSignal.timeout` deadline (or a cancelled turn) — the orchestrate catch funneled `String(error)` straight to the command reply.
+
+- `evolution-maintenance` orchestrate catch now detects `AbortError` **by name** (DOMException does not reliably extend Error) and returns a readable message ("Maintenance scan was aborted (subagent timeout or cancellation) — retry, or raise the timeout..."); other errors get a `Maintenance scan failed:` prefix instead of the bare `Error:` text.
+- `evolution-commands` gains `maintainTimeoutMs` (default 120_000) threaded into the subagent `signal` — slow providers / very large skill libraries can raise the deadline.
+- Tests: AbortError translation (clean message, raw text absent), timeout pass-through via the signal, existing failure-message case unchanged. Local: orchestrate 11/11 + commands 15/15.
+
+## 0.3.2 (patch) — subagent maxDepth semantics fix
+
+0.3.1's `maintain`/`review` subagents crashed on any real run with `SubagentDepthError: subagent depth 1 exceeds maxDepth 0`. The `maxDepth` spawn option is the **absolute cap of the child's own delegation depth** (platform `resolveChildDepth`: `childDepth = parentDepth+1` must be `<= maxDepth`), not "the subagent may not nest" — a `0` rejects the spawn itself. P2-9 had verified the value as *legal* (validator accepts non-negative safe integers) but not the *semantics*; the shape pins locked the wrong value and fake-subagent tests never exercised the real check.
+
+- `evolution-review` `config.reviewMaxDepth` default `0` → `1` (interface comment corrected too).
+- `evolution-maintenance` orchestrate spawn `maxDepth: options.maxDepth ?? 0` → `?? 1`.
+- `anchored-smoke.spec.ts` shape pin now asserts `1` with the corrected contract note; local run 38/38 green (maintenance suite + anchored-smoke).
+- Integration-plan P2-9 note corrected with the 0.3.2 re-read.
+
 ## 0.3.1 (patch) — fixes the 0.3.0 maintenance package packaging
 
 0.3.0 shipped `@lmzhen/dsh-evolution-maintenance` broken in two ways (both fixed here, both caught by a new pack-time guard):
