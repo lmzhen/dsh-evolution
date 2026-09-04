@@ -149,4 +149,21 @@ describe('evolution-approval', () => {
 
     await rm(home, { recursive: true, force: true })
   })
+  it('hasRunner mirrors the runner registry for the P1-9 pre-check', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-hasrunner-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    expect(ctx.evolutionApproval.hasRunner('memory')).toBe(false)
+    const dispose = ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: true, message: 'ok' }))
+    expect(ctx.evolutionApproval.hasRunner('memory')).toBe(true)
+    dispose()
+    expect(ctx.evolutionApproval.hasRunner('memory')).toBe(false)
+    await rm(home, { recursive: true, force: true })
+  })
+
 })
