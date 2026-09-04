@@ -13,20 +13,29 @@ published npm packages or work from a source checkout.
 ## 0. Published install (recommended for end users)
 
 Family packages are published under the `@lmzhen` scope (community; not
-official DeepSeek releases). The standard entry set:
+official DeepSeek releases). The one-command entry:
 
 ```bash
-dsh plugin --profile web add \
-  @lmzhen/dsh-evolution-host \
-  @lmzhen/dsh-evolution-activity \
-  @lmzhen/dsh-evolution-skill-catalog \
-  @lmzhen/dsh-tool-memory \
-  @lmzhen/dsh-tool-skill-manage
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
-The `plugin add` reconciler pulls the full dependency tree (the rest of the
-`@lmzhen` family). Omit `@<version>` for the latest stable; pre-release lines
-need an explicit `@<version>-rc.x` (`next` tag). Uninstall with
+`dsh-evolution-all` is a dependency-only aggregate: it pulls
+`dsh-evolution-host` (infrastructure + control plane; its `dsh.bundle.patch`
+manifest carries the profile composition rows) plus the three model-tool
+packages (`tool-memory`, `tool-skill-manage`, `evolution-skill-catalog`).
+`plugin add` auto-recognizes the declared patch manifests and pulls the
+dependency tree — no extra flags.
+
+Fine-grained installs (host only, or selected tool packages):
+
+```bash
+dsh plugin --profile web add @lmzhen/dsh-evolution-host
+# model tools (optional, layered on the host):
+dsh plugin --profile web add @lmzhen/dsh-evolution-skill-catalog @lmzhen/dsh-tool-memory @lmzhen/dsh-tool-skill-manage
+```
+
+Omit `@<version>` for the latest stable; pre-release lines need an explicit
+`@<version>-rc.x` (`next` tag). Uninstall with
 `dsh plugin --profile web remove` on the same packages.
 
 After install, restart the profile and select the **Evolution** agent preset

@@ -47,12 +47,7 @@
 > 社区 npm 包只发布在 `@lmzhen` scope 下。
 
 ```bash
-dsh plugin --profile web add \
-  @lmzhen/dsh-evolution-host \
-  @lmzhen/dsh-evolution-activity \
-  @lmzhen/dsh-evolution-skill-catalog \
-  @lmzhen/dsh-tool-memory \
-  @lmzhen/dsh-tool-skill-manage
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
 安装后重启 profile，并为需要自进化工具的会话选择 **Evolution** 预设。
@@ -94,13 +89,13 @@ curator
 ### 1. 发布安装（推荐）
 
 ```bash
-dsh plugin --profile web add \
-  @lmzhen/dsh-evolution-host \
-  @lmzhen/dsh-evolution-activity \
-  @lmzhen/dsh-evolution-skill-catalog \
-  @lmzhen/dsh-tool-memory \
-  @lmzhen/dsh-tool-skill-manage
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
+
+`dsh-evolution-all` 是**纯依赖聚合包**：pull `dsh-evolution-host`（基础设施 + 控制面；其
+bundle patch 承载 profile 组合 rows）加三个模型工具包（`tool-memory`、
+`tool-skill-manage`、`evolution-skill-catalog`）。`plugin add` 自动识别声明的
+`dsh.bundle.patch` 清单并把整个依赖树带进来——无需任何额外 flags。
 
 安装效果：
 
@@ -111,13 +106,23 @@ host 基础设施   review、curator、审批、审计、可观测性、威胁�
                  预设的会话才看得到
 ```
 
-- `plugin add` 的 reconciler 会自动把完整依赖树（`@lmzhen` 家族其余包）装进 profile。
 - 版本：省略 `@<version>` 安装最新稳定版；预发布线需显式 `@<version>-rc.x`（发布在 `next` tag）。
-- 卸载：对同样五个包执行 `dsh plugin --profile web remove`（移除 rows 与包；记忆、技能、
-  状态、报告和审批历史保留）。
+- 细粒度安装（仅 host、或按需挑选工具包）受支持——见下表。卸载：对同样包执行
+  `dsh plugin --profile web remove`（移除 rows 与包；记忆、技能、状态、报告和审批历史保留）。
 
 之后给需要自进化工具的会话选择 **Evolution** 预设。其他预设仍获得 review、curator、
 审批和观测能力，但不会暴露模型侧的自进化工具。
+
+#### 选择安装方式（场景 → 操作 → 你得到什么）
+
+| 想要 | 发布操作 | 你得到 | 注意 |
+|---|---|---|---|
+| **全量**（host+工具） | `add @lmzhen/dsh-evolution-all`（推荐） | review/curator/审批/审计/威胁检查（全会话）+ memory/`skill_manage`/技能目录（Evolution 预设会话） | 其他预设会话看不到模型工具——这是设计 |
+| **仅 host**（无模型工具） | `add @lmzhen/dsh-evolution-host`（需要时加 `activity`/`skill-catalog`） | 后台自动化 + 审批 + 审计 + 威胁检查 | **模型无法自主写记忆/技能**——自动化但"手脚受限" |
+| **精细暴露** | 装全量 + 会话侧选/不选 Evolution 预设 | 同一 profile 内按会话分级暴露模型工具 | 需在会话切换处手动选预设 |
+| **兼容旧包** | `add @lmzhen/dsh-evolution-preset` | 与旧单体 facade 等价的兼容包（会全会话暴露模型工具） | **仅 legacy 兼容**；新部署用第一行 |
+
+业务视角的另一面见 [使用场景](#使用场景)。
 
 ### 2. 源码安装（仅开发）
 

@@ -95,12 +95,7 @@ Everything else is control plane:
 > Community npm packages are published under `@lmzhen` only.
 
 ```bash
-dsh plugin --profile web add \
-  @lmzhen/dsh-evolution-host \
-  @lmzhen/dsh-evolution-activity \
-  @lmzhen/dsh-evolution-skill-catalog \
-  @lmzhen/dsh-tool-memory \
-  @lmzhen/dsh-tool-skill-manage
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
 Then restart the DSH profile and select the **Evolution** agent preset for the
@@ -144,13 +139,15 @@ recommended path for end users.**
 ### 1. Published install (recommended)
 
 ```bash
-dsh plugin --profile web add \
-  @lmzhen/dsh-evolution-host \
-  @lmzhen/dsh-evolution-activity \
-  @lmzhen/dsh-evolution-skill-catalog \
-  @lmzhen/dsh-tool-memory \
-  @lmzhen/dsh-tool-skill-manage
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
+
+`dsh-evolution-all` is a **dependency-only aggregate**: it pulls
+`dsh-evolution-host` (infrastructure + control plane; its bundle patch carries
+the profile composition rows) plus the three model-tool packages
+(`tool-memory`, `tool-skill-manage`, `evolution-skill-catalog`). `plugin add`
+auto-recognizes the declared `dsh.bundle.patch` manifests and pulls the whole
+dependency tree — no extra flags.
 
 What this gives you:
 
@@ -161,17 +158,28 @@ model tools           memory / skill_manage / skill catalog — only sessions
                       selecting the Evolution preset can see them
 ```
 
-- The `plugin add` reconciler pulls the full dependency tree (the rest of the
-  `@lmzhen` family) into the profile automatically.
 - Version handling: omitting `@<version>` installs the latest stable; pre-release
   lines need an explicit `@<version>-rc.x` (published on the `next` tag).
-- Uninstall: `dsh plugin --profile web remove` the same five packages (removes
-  the rows and packages; memory, skills, state, reports and approval history
-  are preserved).
+- Fine-grained installs (host only, or selected tool packages) are supported —
+  see the table below. Uninstall: `dsh plugin --profile web remove` the same
+  packages (removes the rows and packages; memory, skills, state, reports and
+  approval history are preserved).
 
 Then select the **Evolution** preset for sessions that should expose
 self-evolution tools. Other presets still get review, curator, approval, and
 observability without exposing model-facing evolution tools.
+
+#### Choosing an install (scenario → operation → what you get)
+
+| What you want | Operation | What you get | Note |
+|---|---|---|---|
+| **Full family** (host + tools) | `add @lmzhen/dsh-evolution-all` (recommended) | review/curator/approval/audit/threat checks (every session) + memory/`skill_manage`/skill catalog (Evolution preset sessions) | Other presets see no model tools — by design |
+| **Host only** (no model tools) | `add @lmzhen/dsh-evolution-host` (+ `activity` / `skill-catalog` if needed) | background automation + approval + audit + threat checks | The model cannot write memory/skills itself — automation with limited hands |
+| **Fine-grained exposure** | install the full family, then select the Evolution preset per session | per-session tiered exposure of model tools inside one profile | Preset selection happens in the session switcher |
+| **Legacy package** | `add @lmzhen/dsh-evolution-preset` | compatibility one-click bundle equivalent to the old facade (model tools in every session) | Legacy compatibility only — use the first row for new deployments |
+
+See [Usage scenarios](#usage-scenarios) for the business-side view of the same
+choices.
 
 ### 2. Source-checkout install (development only)
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.12 (patch) — one-command aggregate entry `dsh-evolution-all` + install docs
+
+The family's published install previously needed five entry packages. `dsh-evolution-all` (dependency-only aggregate, no composition rows of its own — `evolution-host` plus the three model-tool packages `tool-memory`/`tool-skill-manage`/`evolution-skill-catalog`) makes it one command:
+
+```bash
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+```
+
+- New package `evolution-all`: manifest-only aggregate (contract test pins the four-entry dependency set; `prepare-release` publish order extended).
+- Docs (README/README.zh/INSTALL.md): install section rewritten with the aggregate entry, a mechanism sentence (auto-recognized `dsh.bundle.patch` manifests → dependency tree pulled without flags), and a "choosing an install" table mapping scenario → operation → capability surface (full family / host-only / fine-grained exposure / legacy preset) — the model-tool visibility column is the safety-posture information a decision table previously lacked.
+- Local: evolution full suite + contract tests, oxlint 0/0, tsc 0.
+
 ## 0.3.11 (patch) — authoring normalization + review completeness batch (template v12)
 
 The inkos-harness case exposed a class defect: its frontmatter description carried an unquoted `: ` (YAML plain-scalar violation), so the **platform catalog silently dropped the whole skill** (strict YAML parse) while the family's lenient `parseFrontmatter` still scanned it — a skill invisible to the platform but "present" to the audit. This release fixes the class at the write point, surfaces it in the audit, and closes the review-completeness gaps found across four real runs (13:38 / A-B arms / 15:01).

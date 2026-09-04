@@ -268,7 +268,7 @@ const publishGroups = [
   ['tool-memory', 'tool-skill-manage'],
   ['evolution-review', 'evolution-curator', 'evolution-commands'],
   ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog', 'evolution-capability'],
-  ['evolution-host', 'evolution-preset', 'evolution-agent'],
+  ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
 writeFileSync(join(distRoot, 'publish-order.json'), JSON.stringify(publishGroups.map(group => group.map(dir => nameByDir[dir])), null, 2) + '\n')
 
