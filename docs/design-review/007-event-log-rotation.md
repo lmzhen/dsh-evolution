@@ -1,8 +1,8 @@
 # 007 — Event log growth: split rotation with seq-dedupe timeline (design)
 
 Status: design declaration for review before implementation. Trigger: the event-log
-growth warning recorded across the audit rounds (see `AUDIT_REPORT_v6.md` and the
-rc.71 CHANGELOG entry; the round-5 report that raised it is archived).
+growth warning recorded across the audit rounds (see the rc.71 CHANGELOG entry;
+the round-5 report that raised it is archived).
 reminder — under high-frequency feedback/learn traffic `events.json` is simultaneously the
 largest sidecar and the hottest write point.
 

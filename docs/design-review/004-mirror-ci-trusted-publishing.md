@@ -94,8 +94,8 @@ evolution-host, evolution-preset, evolution-agent-preset
   `environment: npm-publish` with required reviewers;
 - verify release tag or rely on environment protection for tag triggers;
 - publish with `npm publish --provenance --access public`;
-- npm trusted publishing must be configured per package; maintain a checklist
-  in `docs/release/oidc-checklist.md`.
+- npm trusted publishing must be configured per package; the per-package
+  verification steps live in the publish runbook (maintainer docs).
 
 ## Review questions
 
