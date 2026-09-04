@@ -193,7 +193,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
 
 按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。`
 
-    const timeoutMs = options.timeoutMs ?? 120_000
+    const timeoutMs = options.timeoutMs ?? 600_000
     const agentOptions: Record<string, string> = { model: options.model ?? 'deepseek-v4-pro' }
     if (options.provider) agentOptions.provider = options.provider
     const run = await runtime.subagents.start('spawn', {

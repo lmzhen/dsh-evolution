@@ -23,8 +23,10 @@ export interface Config {
    * in-flight runs, so the old 130s ">= timeout" rationale was a comment bug.
    * Transient (per-process). */
   maintainCooldownMs?: number | undefined
-  /** Subagent deadline for one maintenance scan (ms). Default 120s; raise on
-   * slow providers or very large skill libraries (0.3.3). */
+  /** Subagent deadline for one maintenance scan (ms). Default 600s (0.3.10):
+   * the real library's full audit (bodies + support files + judgment) needs
+   * 4-8 min — the 13:38 successful run used --timeout 600000; the old 120s
+   * default deadlined bare runs mid-analysis (14:37 run aborted at 119.94s). */
   maintainTimeoutMs?: number | undefined
 }
 
@@ -219,7 +221,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // filtering is reserved (011 §3) — reject unknown args explicitly
           // instead of silently swallowing them. `--timeout <ms>` (0.3.4)
           // overrides the deadline for THIS run — no file edit, no restart.
-          const runTimeoutMs = maintainArgs[1] ? Number(maintainArgs[1]) : (config.maintainTimeoutMs ?? 120_000)
+          const runTimeoutMs = maintainArgs[1] ? Number(maintainArgs[1]) : (config.maintainTimeoutMs ?? 600_000)
           if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
             return err('Invalid --timeout value: expected a positive integer number of milliseconds (e.g. /evolution maintain --timeout 600000).')
           }

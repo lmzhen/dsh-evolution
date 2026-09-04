@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.10 (patch) — maintain default timeout 120s → 600s
+
+A bare `/evolution maintain` run (14:37, commandId cmd-adce9ea7-1) aborted with "Maintenance scan was aborted..." exactly **119.94s** after the subagent spawned — the `AbortSignal.timeout(120_000)` default, verified from session logs (child createdAt → turn/end kind:parent; no user interrupt, no duplicate submission). The child was mid-analysis (§4 step ②, B2/B5 with the inkos-harness read-failure being handled correctly per §4) and needed only more time — the 13:38 run with `--timeout 600000` completed the same scan. 0.3.4's flag was the workaround; the persistent default stayed too tight.
+
+- `evolution-commands` `maintainTimeoutMs` default 120_000 → **600_000** (comment updated with the evidence).
+- `evolution-maintenance` orchestrate `options.timeoutMs ?? 120_000` → `?? 600_000` (standalone default parity).
+- No test pinned the old default (specs pass explicit values). Local: maintenance + commands 59/59, oxlint 0/0.
+
 ## 0.3.9 (patch) — maintain probe: single-source description/quality enrichment
 
 First real run (13:38) surfaced a source inconsistency as a B5 note: the facts block measured real `description_chars` (198/104/…) from SKILL.md frontmatter while `maintenance_probe` answered `description=missing` for the same skills. Root cause: the probe tool built **body-only** snapshots and never ran the scan's enrichment — two measurement sources for one signal (the 011 single-source violation).
