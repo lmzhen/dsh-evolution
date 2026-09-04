@@ -93,9 +93,10 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
 `dsh-evolution-all` 是**纯依赖聚合包**：pull `dsh-evolution-host`（基础设施 + 控制面；其
-bundle patch 承载 profile 组合 rows）加三个模型工具包（`tool-memory`、
-`tool-skill-manage`、`evolution-skill-catalog`）。`plugin add` 自动识别声明的
-`dsh.bundle.patch` 清单并把整个依赖树带进来——无需任何额外 flags。
+bundle patch 承载 profile 组合 rows）、三个模型工具包（`tool-memory`、
+`tool-skill-manage`、`evolution-skill-catalog`）与 `dsh-evolution-agent-preset`
+（预设容器：`/evolution preset install` 用它把 delta 合并进完整预设）。`plugin add`
+自动识别声明的 `dsh.bundle.patch` 清单并把整个依赖树带进来——无需任何额外 flags。
 
 安装效果：
 
@@ -266,12 +267,7 @@ tsc -b tsconfig.host.json --force
 vitest run packages/evolution
 ```
 
-当前状态：
-
-```text
-tsc     0 errors
-vitest  45 files / 90 tests passing
-```
+当前状态：持续由 CI 校验（baseline 锚点 + 已发布上游兼容检查）；测试/检查数字以 CI 日志为准，不在此固定。
 
 ## Attribution
 

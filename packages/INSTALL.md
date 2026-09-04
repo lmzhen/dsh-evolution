@@ -21,8 +21,10 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 `dsh-evolution-all` is a dependency-only aggregate: it pulls
 `dsh-evolution-host` (infrastructure + control plane; its `dsh.bundle.patch`
-manifest carries the profile composition rows) plus the three model-tool
-packages (`tool-memory`, `tool-skill-manage`, `evolution-skill-catalog`).
+manifest carries the profile composition rows), the three model-tool packages
+(`tool-memory`, `tool-skill-manage`, `evolution-skill-catalog`), and
+`dsh-evolution-agent-preset` (the preset container whose delta the
+`/evolution preset install` step composes into the full preset).
 `plugin add` auto-recognizes the declared patch manifests and pulls the
 dependency tree — no extra flags.
 

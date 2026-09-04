@@ -146,8 +146,10 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 `dsh-evolution-all` is a **dependency-only aggregate**: it pulls
 `dsh-evolution-host` (infrastructure + control plane; its bundle patch carries
-the profile composition rows) plus the three model-tool packages
-(`tool-memory`, `tool-skill-manage`, `evolution-skill-catalog`). `plugin add`
+the profile composition rows), the three model-tool packages
+(`tool-memory`, `tool-skill-manage`, `evolution-skill-catalog`), and
+`dsh-evolution-agent-preset` (the preset container whose delta the
+`/evolution preset install` step composes into the full preset). `plugin add`
 auto-recognizes the declared `dsh.bundle.patch` manifests and pulls the whole
 dependency tree — no extra flags.
 
@@ -343,7 +345,10 @@ evolution-capability  validate + stage Creator packages; never execute them
 ```text
 packages/
 ├── evolution-host/                 host-plane infrastructure bundle
-├── evolution-agent/                Evolution agent preset
+├── evolution-core/                 shared stores, prompts, composition helpers
+├── evolution-maintenance/          maintain scan: drift facts + subagent plan
+├── evolution-agent/                Evolution agent preset (delta + preset.yml)
+├── evolution-all/                  dependency-only one-command aggregate
 ├── evolution-preset/               one-click compatibility bundle
 ├── evolution-capability/           staged Creator-mode governance (optional; not in the host bundle since rc.51 D-9)
 ├── evolution-io/ + io-node/        IO seam and atomic node provider
