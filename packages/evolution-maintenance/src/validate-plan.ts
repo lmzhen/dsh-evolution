@@ -144,7 +144,16 @@ export function validateAndNormalizeMaintainPlan(
       if (typeof item.reversibility !== 'string' || !REVERSIBILITIES.has(item.reversibility)) {
         errors.push(`${path}.reversibility: invalid`)
       }
-      if (!isNonEmptyString(item.undo_path)) errors.push(`${path}.undo_path: required`)
+      if (!isNonEmptyString(item.undo_path)) {
+        // 0.3.6: irreversible items may omit/empty undo_path — normalize to
+        // the truthful 'n/a' (display/audit contract). Reversible items keep
+        // the hard requirement: a fabricated undo path is never acceptable.
+        if (item.reversibility === 'none') {
+          ;(item as Record<string, unknown>).undo_path = 'n/a'
+        } else {
+          errors.push(`${path}.undo_path: required (reversibility=${String(item.reversibility ?? 'missing')})`)
+        }
+      }
       if (typeof item.confidence !== 'number' || !Number.isFinite(item.confidence) || item.confidence < 0 || item.confidence > 1) {
         errors.push(`${path}.confidence: finite number in [0,1] required`)
       }

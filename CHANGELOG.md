@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6 (patch) — maintain plan: truthful undo_path default for irreversible items
+
+First real subagent plan hit `Maintain plan rejected by validator: plan[0].undo_path: required` — the model omitted/emptied `undo_path` on an item whose `reversibility` was `none`. The mechanical gate now normalizes that case instead of rejecting: `reversibility: none` + missing/empty `undo_path` → `'n/a'` (the display/audit contract's existing value). Reversible items (archive/restructure/patch/rename) keep the hard requirement — a fabricated undo path is never acceptable. Tests: missing undo_path + none → ok with `n/a`; missing + restructure → still rejected.
+
 ## 0.3.5 (patch) — maintain cooldown default 130s → 30s
 
 `maintainCooldownMs` default lowered to 30s. The old 130s rationale ("≥ maintain timeout, so the window also covers in-flight runs") was a comment bug: `lastMaintainAt` updates AFTER a run settles, so the window never deduped in-flight runs anyway — 130s only punished rapid legitimate retries (e.g. iterating a failing scan). 30s remains a sufficient misclick guard; the window still applies on success AND failure.

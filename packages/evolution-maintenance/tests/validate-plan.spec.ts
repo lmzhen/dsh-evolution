@@ -85,6 +85,22 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(result.errors.some(e => e.includes('override_reason'))).toBe(true)
   })
 
+  it('normalizes a missing undo_path to n/a for irreversible items (0.3.6)', () => {
+    const item = validItem({ reversibility: 'none' })
+    delete item.undo_path
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
+    expect(result.ok).toBe(true)
+    expect(result.plan.plan[0].undo_path).toBe('n/a')
+  })
+
+  it('keeps undo_path required for reversible items (0.3.6)', () => {
+    const item = validItem({ reversibility: 'restructure' })
+    delete item.undo_path
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
+    expect(result.ok).toBe(false)
+    expect(result.errors.some(e => e.includes('undo_path'))).toBe(true)
+  })
+
   it('rejects malformed verdict and missing required fields', () => {
     const root = validPlan([validItem({ kind: 'weird' })] as unknown[])
     root.verdict = 'maybe'
