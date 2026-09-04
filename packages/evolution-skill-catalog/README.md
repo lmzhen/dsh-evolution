@@ -22,5 +22,6 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Read-only native `ctx.skills` catalog. Skill mutations still happen through `tool-skill-manage`.
+- Read-only native `ctx.skills` catalog. Skill mutations still happen through `tool-skill-manage`.
+- **Out-of-band edits need a refresh (0.3.18, E-71).** The catalog invalidates on the in-band `evolution/skill-mutated` event (all writes through SkillLibrary). Edits made outside the family — manual file edit, a git pull, another process — bypass that event and cannot be auto-detected (decision C: no filesystem watcher). A root-mtime probe re-stamps the summaries cache when the provider is re-queried after a structural change (directory add/remove/rename), but any out-of-band change is only guaranteed to be visible after `/evolution skills refresh` runs (or the process restarts).
 

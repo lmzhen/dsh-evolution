@@ -27,7 +27,11 @@ export interface Config {
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
   ctx.inject(['tools'], (toolCtx) => {
-    const tools = (toolCtx as unknown as { tools: { register(definition: unknown): () => void } }).tools
+    // Single budget-cast on the injected `tools` service (X-6): the previous
+    // `toolCtx as unknown as {...}` double-cast was a gratuitous widening —
+    // the service is reachable directly via `get`, so the context object never
+    // needs to be re-shaped. Mirrors evolution-policy's tool-injection cast.
+    const tools = toolCtx.get('tools') as { register(definition: unknown): () => void }
     tools.register(
       defineTool({
         name: 'maintenance_probe',
@@ -67,6 +71,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             quality: enrichment.quality,
             protected: enrichment.protected,
             catalogInvalid: enrichment.catalogInvalid,
+            usageObserved: enrichment.usageObservedValue,
           })
           // Probe output crosses the session boundary to the maintenance
           // subagent — same redaction policy as the facts block (011 §8).

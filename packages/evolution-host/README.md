@@ -2,6 +2,13 @@
 
 Host-plane self-evolution infrastructure bundle for DeepSeek Harness
 
+> ⚠️ **Mutually exclusive install target.** `dsh-evolution-host` is the
+> infrastructure-only bundle: no model-facing tools, and it must be paired with
+> the Evolution agent preset to expose `memory`/`skill_manage`. It shares its
+> infrastructure rows with `@deepseek-ai/dsh-evolution-preset`; do **not** add
+> both bundles to the same profile — pick host+preset (layered) or the one-click
+> preset bundle.
+
 
 ## Model Experience
 

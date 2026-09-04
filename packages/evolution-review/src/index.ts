@@ -13,15 +13,16 @@ import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, SkillLibra
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { validateEvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
+import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
+import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 
 export const name = 'evolution-review'
-export const inject = ['agents', 'tools']
+export const inject = ['agents']
 
 export interface Config {
   reviewEnabled?: boolean
-  reviewMode?: string
+  reviewMode?: 'subagent' | 'inject'
   memoryInterval?: number
   skillInterval?: number
   /**
@@ -49,7 +50,7 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   reviewEnabled: z.boolean().default(true),
-  reviewMode: z.string().default('subagent'),
+  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
   memoryInterval: z.number().default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),
@@ -74,11 +75,6 @@ interface SubagentLike {
   }>
 }
 
-interface EvolutionPlan {
-  memoryOps?: Array<{ target?: string; action?: string; facts?: string; content?: string; old_text?: string; evidence?: unknown[] }>
-  skillOps?: Array<{ action?: string; name?: string; content?: string; old_string?: string; new_string?: string; evidence?: unknown[] }>
-}
-
 interface MemoryLike {
   applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
 }
@@ -91,31 +87,29 @@ interface ApprovalLike {
   isEnabled?: boolean
 }
 
-interface PolicyLike {
-  get(): {
-    reviewMemoryInterval: number
-    reviewSkillInterval: number
-    substantiveMinToolCalls: number
-    substantiveMinUserChars: number
-    substantiveMinAgentChars: number
-    reviewMode: 'subagent' | 'inject'
-    maxOpsPerPlan: number
-    protectedSkillNames: readonly string[]
-    memoryChars: number
-    userChars: number
-    skillContentChars: number
-  }
-}
-
 export function apply(ctx: Context, rawConfig: Config): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
   }
   const config = rawConfig as Required<Config>
   const turnStarts = new Map<SessionId, number>()
+  // Completion-channel state (E-59f): these two are deliberately NOT persisted
+  // to ReviewState. A process restart resets the "session is proven-long"
+  // counter and the "completion already injected" flag — which is ACCEPTED:
+  // the completion review is a one-per-session post-task adaptation, and a
+  // restart is a fresh conversation boundary. The cadence state (turnsSince*)
+  // is persisted via ReviewState; the completion channel is a lighter, lossy
+  // signal whose cost of losing (a deferred review) is lower than the cost of
+  // widening the on-disk record contract.
   const cumulativeToolCalls = new Map<SessionId, number>()
   const completionInjected = new Set<SessionId>()
-  const policy = () => (ctx.get('evolutionPolicy') as PolicyLike | undefined)?.get()
+  // 0.3.18 (E-19): ONE in-flight review subagent process-wide. The shared
+  // skill tree and memory have no cross-writer mutex, so two overlapping
+  // reviews (a 120s window is long) could fuzzyPatch the same file
+  // concurrently. While set, turn/end signals still accumulate (state was
+  // already advanced above) but never spawn a second subagent.
+  let reviewInFlight = false
+  const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
   ctx.on('session/event', (session, event) => {
     if (event.type === 'turn/start') turnStarts.set(session.id, session.seq - 1)
@@ -138,6 +132,20 @@ export function apply(ctx: Context, rawConfig: Config): void {
   })
 
   async function onTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
+    // 0.3.18 (E-6): the listener is fire-and-forget (`void`), so EVERYTHING
+    // below — state load/save, policy, cadence, the subagent start — must be
+    // self-contained. A throw here would surface as an unhandled rejection
+    // (the state service is an optional service; its failure used to crash
+    // the turn). Catch, log, emit review-error, never propagate.
+    try {
+      await runOnTurnEnd(session, event)
+    } catch (error) {
+      ctx.logger.warn(`dsh-evolution-review: turn-end review pipeline failed: ${error instanceof Error ? error.message : String(error)}`)
+      ctx.emit('evolution/review-error', { sessionId: session.id })
+    }
+  }
+
+  async function runOnTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
     if (!config.reviewEnabled) return
     if (session.header.origin === 'subagent') return
     const agent = ctx.agents.get(session.id)
@@ -164,18 +172,23 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
     cumulativeToolCalls.set(session.id, cumulative)
     if (kind) {
-      // Process event, payload v2 (sessionId) — never session.append: a
-      // session log carrying evolution/* types is refused wholesale at resume
-      // (assertEventsSupported; see core/events.ts for the full rationale).
-      ctx.emit('evolution/review-scheduled', {
-        sessionId: session.id,
-        kind,
-        toolCalls: signal.toolCalls,
-        userChars: signal.userChars,
-        assistantChars: signal.assistantChars,
-      })
+      // E-41: run the subagent FIRST, then confirm the schedule. review-scheduled
+      // is only emitted after a review actually started (and returned a plan);
+      // the inject fallback path (no subagent, or a subagent that yielded no
+      // structured plan) does NOT emit it — that signal now means "a review ran".
       const started = await trySubagentReview(session, agent, kind, signal)
-      if (!started) {
+      if (started) {
+        // Process event, payload v2 (sessionId) — never session.append: a
+        // session log carrying evolution/* types is refused wholesale at resume
+        // (assertEventsSupported; see core/events.ts for the full rationale).
+        ctx.emit('evolution/review-scheduled', {
+          sessionId: session.id,
+          kind,
+          toolCalls: signal.toolCalls,
+          userChars: signal.userChars,
+          assistantChars: signal.assistantChars,
+        })
+      } else {
         agent.inject(createUserMessage({
           content: [{ type: 'text', text: reviewPrompt(kind) }],
           source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
@@ -208,13 +221,20 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentLike | undefined
     if (!subagents) return false
+    // 0.3.18 (E-19) single-flight: another review is running (the window can
+    // be 120s). The caller injects the review prompt instead — the review
+    // still happens on THIS turn, just never concurrently with a subagent.
+    if (reviewInFlight) return false
+    reviewInFlight = true
     try {
-      const routingPolicy = ctx.get('evolutionPolicy') as {
-        get(): { memoryReviewModel: string; skillReviewModel: string }
-      } | undefined
+      // One authoritative policy read (E-57): the former PolicyLike view and
+      // the inline memory/skill model table disagreed with each other; both
+      // now come from the single PolicySnapshot type. The policy is immutable
+      // for the life of the process, so a single read is valid after the run.
+      const snapshot = policy()
       const model = kind === 'memory'
-        ? routingPolicy?.get().memoryReviewModel ?? 'deepseek-v4-flash'
-        : routingPolicy?.get().skillReviewModel ?? 'deepseek-v4-pro'
+        ? snapshot?.memoryReviewModel ?? 'deepseek-v4-flash'
+        : snapshot?.skillReviewModel ?? 'deepseek-v4-pro'
       const reviewText = redactReviewSecrets(buildReviewRequest(
         session,
         kind,
@@ -256,13 +276,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // disposed on every exit path (success, timeout, validation throw).
       try {
         const result = await run.result
-        if (!result.structured) return true
+        if (!result.structured) {
+          // E-59c: a started subagent that produced no structured plan is NOT a
+          // success — the review never happened, so surface review-error and
+          // fall through to the synchronous inject path (caller sees false).
+          ctx.emit('evolution/review-error', { sessionId: session.id })
+          ctx.logger.warn('dsh-evolution-review: review subagent returned no structured plan')
+          return false
+        }
         // v3-round self-check: collect AFTER the subagent finished so its own
         // `skill` reads are visible to read-before-write (session events of
         // the child never reach the parent; the child session must be read
         // before dispose).
         const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
-        const snapshot = policy()
         const plan: unknown = result.structured
         const policyFingerprint = fingerprintPolicy(snapshot)
         const validation = validateEvolutionPlan(plan as EvolutionPlan, {
@@ -279,7 +305,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const acceptedSkillOps = validation.accepted.skillOps ?? []
         const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-        const actions = await executePlan(validation.accepted, session.id)
+        const executed = await executePlan(validation.accepted, session.id)
+        const actions = executed.actions
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
         // Process event, payload v2 (sessionId) — plan-outcome durability is the
@@ -295,8 +322,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
           estimatedInputChars: reviewText.length,
         })
         if (actions.length > 0) {
+          const applied = actions.join(' · ')
+          // E-59d: on partial failure the model must know which ops already
+          // landed so it does not repeat them; the applied list stays explicit.
+          const note = executed.ok ? '' : '\n部分操作失败。以下操作已应用，请勿重复执行。'
           agent.inject(createUserMessage({
-            content: [{ type: 'text', text: `💾 Self-improvement review: ${actions.join(' · ')}` }],
+            content: [{ type: 'text', text: `💾 Self-improvement review: ${applied}${note}` }],
             source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
           }))
         }
@@ -318,15 +349,18 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // and fall through to the synchronous inject path (caller returns false).
       ctx.logger.warn(`dsh-evolution-review: subagent review failed: ${error instanceof Error ? error.message : String(error)}`)
       return false
+    } finally {
+      reviewInFlight = false
     }
   }
 
-  async function executePlan(plan: EvolutionPlan, sessionId?: string): Promise<string[]> {
+  async function executePlan(plan: EvolutionPlan, sessionId?: string): Promise<{ actions: string[]; ok: boolean }> {
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
     const origins = resolveOrigins(undefined, true)
     const actions: string[] = []
+    let ok = true
     for (const op of plan.memoryOps ?? []) {
       if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
       const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
@@ -335,6 +369,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized)
         : await memory?.applyBatch(normalized.target, [normalized])
       if (result?.ok) actions.push('Memory updated')
+      else ok = false
     }
     for (const op of plan.skillOps ?? []) {
       if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
@@ -347,8 +382,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
         ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
         : await executeSkillDirect(args)
       if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
+      else ok = false
     }
-    return actions
+    return { actions, ok }
 
     async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
       // P1-9 pre-check: with approval ENABLED but no registered runner for
@@ -457,12 +493,16 @@ export function shouldCompletionReview(reason: { kind?: string } | undefined, se
   return reason?.kind === 'completed' && sessionToolCalls >= minToolCalls
 }
 
-/** Skill names this session loaded (read-before-write source for the background review). */
+/** Skill names this session loaded (read-before-write source for the background review).
+ * Only the real `skill` tool is a read (E-59e): the platform has no `skill_load`/
+ * `skill_search` discovery pair, so that branch was dead. `skill_manage` has no
+ * per-skill read action (its `list`/`review` are whole-library), so a specific
+ * skill read through it cannot be tracked — see README Known Limitations. */
 function collectReadSkillNames(session: Session): Set<string> {
   const names = new Set<string>()
   for (const event of session.events) {
     if (event.type !== 'tool/call') continue
-    if (event.data.name !== 'skill' && event.data.name !== 'skill_load') continue
+    if (event.data.name !== 'skill') continue
     const raw = (event.data as unknown as { arguments?: string | Record<string, unknown> }).arguments
     let parsed: Record<string, unknown> = {}
     if (typeof raw === 'string') {

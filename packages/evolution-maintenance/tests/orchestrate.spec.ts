@@ -204,6 +204,66 @@ describe('runMaintain', () => {
     expect(outcome.forcedHuman?.length ?? 0).toBeGreaterThan(0)
     expect(outcome.text ?? '').toContain('quality_low gate')
   })
+
+  it('routes the subagent model off evolutionPolicy.curatorModel (E-55)', async () => {
+    let capturedOptions: { agentOptions?: Record<string, string> } | undefined
+    const runtimeWithPolicy: MaintainRuntime = {
+      library: fakeLibrary(),
+      evolutionPolicy: { get() { return { curatorModel: 'policy-curator-model' } } },
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          capturedOptions = options as typeof capturedOptions
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeWithPolicy)
+    expect(outcome.ok).toBe(true)
+    expect(capturedOptions?.agentOptions?.model).toBe('policy-curator-model')
+  })
+
+  it('falls back to the default model when no policy service is mounted (E-55)', async () => {
+    let capturedOptions: { agentOptions?: Record<string, string> } | undefined
+    const runtimeDefault: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          capturedOptions = options as typeof capturedOptions
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeDefault)
+    expect(outcome.ok).toBe(true)
+    expect(capturedOptions?.agentOptions?.model).toBe('deepseek-v4-pro')
+  })
+
+  it('outputSchema required aligns with the validator contract (E-56)', async () => {
+    let capturedOutputSchema: { required?: string[]; properties?: { plan?: { items?: { required?: string[] } } } } | undefined
+    const runtimeWithSchema: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          const opts = options as { outputSchema?: typeof capturedOutputSchema }
+          capturedOutputSchema = opts.outputSchema
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeWithSchema)
+    expect(outcome.ok).toBe(true)
+    // Root contract: the validator requires verdict/plan/notes.
+    expect(capturedOutputSchema?.required).toEqual(['verdict', 'plan', 'notes'])
+    const planRequired = capturedOutputSchema?.properties?.plan?.items?.required
+    // The plan-item set follows validate-plan.ts's validation set.
+    expect(planRequired).toEqual(expect.arrayContaining([
+      'kind', 'names', 'rule', 'evidence', 'finding', 'recommendation', 'semantic_reasoning',
+      'impact', 'impact_reason', 'reversibility', 'undo_path', 'confidence', 'needs_human', 'is_override',
+    ]))
+    // override_reason is conditionally required (only when is_override), so it
+    // stays OUT of the static schema list while the validator enforces it.
+    expect(planRequired).not.toContain('override_reason')
+  })
 })
 
 describe('renderMaintainTemplate', () => {

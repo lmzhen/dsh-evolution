@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.3.18 (patch) — 审计 v13 修复批（阶段 4-6：工具面 + 后台通道 + 命令观测，31 组修复）
+
+外部审计（dsh-evolution-mirror-audit-report.md）的第三批落地（S4.1-S4.6、S5.1-S5.11、S6.1-S6.6 全量 + L7 批次），每步先核验问题属实再修。
+
+**工具面（S4）**
+- **S4.1/E-30 技能树 root 单源**：core 新增 `resolveSkillsRoot(config)`（空/空白配置回落默认），tool-skill-manage / evolution-skill-catalog / skill-usage / evolution-learning-graph 四处统一调用（graph 此前无视配置）。
+- **S4.2/E-20 快照单汇点**：tool-memory 删除 executeCore 内的双重渲染，快照刷新只保留 `evolution/memory-applied` 监听器（写时竞态/后完成者胜消除）。
+- **S4.3/E-67 依赖强度与启动顺序**：systemPrompt 改软探测（M-7 教义；缺失时跳过引导/快照并 warn，主机照常启动）；挂载期 renderContext 包 try/catch（provider 未注册降级为空快照，首次写入自愈）。
+- **S4.4/E-68/69/70**：patch old===new 短路（不重写、不计数、不失效 catalog——`noop` 结果）；`delete X absorbed_into=X` 自吸收拒绝；create 遥测合并为单次原子 `ensureRecordCreated`（消除 null 窗口与双锁流量）；staged 不再 `pending_id ?? ''` 冒充缺省；pin/unpin 免审批取舍声明（包注释 + README Safety model）；review 建议数上限命名常量。
+- **S4.5/E-71/X-7**：catalog 进程内 summaries 缓存（mutation 事件 + 根 mtime 探针失效；带外改动经 `/evolution skills refresh` 显式失效 + README 声明）；core io seam 新增可选 `mtime?` 探针（node 后端实现，adapter 兜底 null）。
+- **S4.6/T-13**：tool-memory `entryPreviewChars` 与 tool-skill-manage 四个 limit 配置加 `.min(1)`（负值/0 在配置期拒绝而非语义反转/全拒）。
+
+**后台通道稳定性（S5.1-S5.3）**
+- **S5.1/E-6/E-19**：review `onTurnEnd` 整体包 try/catch（warn + `evolution/review-error` 事件，绝不冒泡）；`trySubagentReview` 进程级单飞（in-flight 期间的 turn/end 只累计信号不触发子代理）。
+- **S5.2/E-7**：curator `autoCheck` 顶层 try/catch（自动 tick 的瞬时 IO 故障不再 unhandled rejection；写 `curator-error-<id>.json` 留痕）。
+- **S5.3/E-18**：stateless 组合 first-run defer 死循环修复——内存基线推进 + 一次性标记 + `first-run-deferred(stateless)` 标注；第二次到期 tick 真正执行 curate。
+
+**后台通道数据面（S5.4-S5.8）**
+- **S5.4/E-15**：archive+fold 两阶段自愈——目录已失但 usage 未折叠的记录下次 run 直接置 archived（崩溃窗口形态），永久 failed 条目消除。
+- **S5.5/E-16**：curator state 原子化——state-storage seam 新增 `transactCuratorState(fn)`（json/domain 两 provider 实现），setPaused 与 runCore 收尾统一走单次原子读写。
+- **S5.6/E-51**：fresh-install 手动 run 基线锚定 run 时刻（`lastRunAt: Date.now()`；dryRun 保留不推基线）。
+- **S5.7/E-36/E-36a**：probe 与 facts 一致性——`snapshotFromLibrary` 接受并传递 `usageObserved`（同一构造）；core 导出 `MIN_STAMP_BODY_CHARS`；probe 输出 `below-min-body` 标记并区分 observed/unobserved/unknown（不再混同）；同 snapshot 探针/事实逐维度一致性测试。
+- **S5.8/E-55**：maintain 模型路由读 `evolutionPolicy.get().curatorModel`（与 curator 同源，缺省 'deepseek-v4-pro'）；`jointSignature` 的 minStampBodyChars 从 core 导入（阈值单源，drift-signals 同步改引用）。
+
+**后台通道契约清理（S5.9-S5.11）**
+- **S5.9/E-57/58/59/41/37**：review 删除本地 `PolicyLike`/`EvolutionPlan` 分歧视图（改 import evolution-policy `PolicySnapshot` / plan-validator 类型）；`inject` 移除未用 'tools'；`reviewMode` 收紧为 `z.union([const('subagent'), const('inject')])`（审计建议的 'both' 经核系 skillReviewTrigger 混淆，未加死值）；`!result.structured` → review-error 事件 + warn + inject 兜底（不再静默 return true）；executePlan 部分失败返回已应用标记（注入提示"以下操作已应用，勿重复执行"）；`review-scheduled` 移到子代理确认启动后（先做后发，inject 兜底不误发）；删 `skill_load` 幻影分支（平台无此工具），skill_manage 无单技能读 action 的缺口写 README；completion 状态重启清零为接受行为（注释 + README）。
+- **S5.10/E-52/53/54**：recommend 死分支删除 + 空 catch 补 warn；`CuratorStateRecord` 改 import 权威类型（schemaVersion 作为持久化字段延伸）；latestReport 改按 mtime 排序（UUID 文件名字典序误导死操作消除）；新增 `minIdleFailOpen` 配置（agents 缺失时 fail-open 可关）；policy 读取统一软探测。
+- **S5.11/E-56/T-8/X-6**：validate-plan 停止原地改写调用方输入（归一化副本）；orchestrate outputSchema 补 required 与 validator 对齐；maintenance 删除未用 schemastery devDep；tools 注册去双重 cast。
+
+**命令观测（S6）**
+- **S6.2/E-29**：`/evolution` 命令注册包进 effect（卸载/重载不重复注册）。
+- **S6.3/E-40**：preset install 原子化（临时名 + rename + `.bak` 保留 + 失败清理半截文件；第二写失败保持旧组合可用）。
+- **S6.4/E-34/31/32/63**：feedback/activity 的 apply 期 `ctx.get` 改为 `ctx.inject` 延迟绑定；`maxItems`/非有限值钳制守卫；feedback 校验 rating ∈ {positive,negative}（NaN 不再写入）；parseCache 逐记录数值域校验（非法跳过 + warn）；零计数 legacy 记录迁移生成独立 note 事件；追加失败回滚乐观计数。
+- **S6.5/E-26/21/72**：/graph edit|delete 的 skill 分支走审批 + 遥测（与 skill_manage 同等可用性模式）；memory 节点 id 嵌入快照 token（`memory:<source>:<index>:<snapshot>`），编辑/删除前重读索引位比对（TOCTOU 拒绝 + 提示重新 /graph）；memory→skill 建边改词元级全词匹配（`run` 不再与 running/grunt 建假边）；死分支 `?? id` 删除。
+- **S6.6/E-64/65/66**：commands 删除 `resolveAgentPresetDir` 死分支；help/hint 补 `mutations` 与 `maintain --facts`；建议数改锚定行首正则；skill-usage 对畸形 tool/call 事件防御（`data?.name` + typeof 窄化）；usage→events 锁序契约固化 + 锚点失败 warn。
+- **S6.1/E-5/E-39**：核验 0.3.16 已实现（单飞置位在 try 首行、失败/成功均更新冷却），无需改动。
+
+**装配收尾（S7）**
+- **S7.1/E-4**：核验 preset patch 已无 capability 行且依赖契约测试已存在，无需改动。
+- **S7.2/E-33**：host/preset 双 bundle 互斥声明 ×3（INSTALL + 两 README）+ 行级互斥契约测试（共享行配置字节一致，preset 显式补 reviewToolAllow 对齐）；install-layered 无冲突检测能力故未加拒绝逻辑。
+- **S7.3/E-74**：preset/host patch 的 `?? 'startup'` 改 `|| 'startup'`（空串穿透）；preset 路径改平台 `dshHomePath()`（home 解析单源）。
+- **S7.5/D-12/X-5**：30 包 invariant 注释收敛为统一一句话模板；curator 类声明格式修正。
+
+**发布前专项回归（本批交互引入的新 bug 修复）**
+- `latestReport` 的 `this.io.mtime(...)` 未做可选调用（S4.5 新增 optional 探针 × S5.10 实现的接口边缘）→ `?.` 修复。
+- maintain 模型路由 `runtime.evolutionPolicy?.get().curatorModel` 在 get() 返回 undefined 时读 undefined 属性（软探测接线 × E-55 实现）→ `get()?` + 类型携带 undefined。
+- commands 补 E-55 生产接线（`evolutionPolicy: { get: ... }` 软探测透传，否则同源能力只存在于测试）。
+
+**门禁**：vitest 全量 **80 文件/515 测试**（基线 77/462，+53）；oxlint 0/0（10 处风格/类型错误清零）；tsc 涉改 17 包 0；review/curator/maintenance 等各包新增回归测试（单飞、E-18 双 tick、TOCTOU、假边、probe-facts 一致、mtime 排序、原子 state 竞态等）。
+
+**已知未做（0.3.19 收口）**：S7.4 文档与元数据对齐（T-10）、W1 收口（ApprovalLike 权威化剩余 4 处内联 + state-json `defaultRoot` 并入 core）、D-10 AbortSignal 死通道（随 0.3.19）。
+
 ## 0.3.17 (patch) — 审计 v13 修复批（阶段 2+3：存储介质层 + 审批控制面 19 步）
 
 外部审计（dsh-evolution-mirror-audit-report.md）的第二批落地；每步先核验问题属实再修。

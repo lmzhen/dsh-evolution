@@ -15,6 +15,7 @@ import {
   DEFAULT_HEALTH_THRESHOLDS,
   LOW_QUALITY_THRESHOLD,
   MAINTAIN_PROMPT,
+  MIN_STAMP_BODY_CHARS,
   PROMPT_BUNDLE,
   PROMPT_BUNDLE_ID,
   verifyPromptBundle,
@@ -34,6 +35,11 @@ export interface MaintainRuntime {
   }
   /** Parent agent/session handle passed through to the subagent, when available. */
   parent?: unknown
+  /** Evolution-policy reader for model routing (same source as the curator:
+   * `policy.get().curatorModel`). Optional — a missing service falls back to
+   * the default model (E-55). `get()` may RESOLVE to undefined (a soft probe
+   * can return nothing), hence the type carries it. */
+  evolutionPolicy?: { get(): { curatorModel?: string | undefined } | undefined } | undefined
 }
 
 export interface MaintainOptions {
@@ -98,7 +104,7 @@ function jointSignature(template: string, signalsVersion: string): string {
     nouns: DRIFT_SIGNAL_NOUNS,
     thresholds: {
       stampDensityPerKb: DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb,
-      minStampBodyChars: 2_000,
+      minStampBodyChars: MIN_STAMP_BODY_CHARS,
       softBodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars,
       descriptionChars: AUTHORING_DESCRIPTION_BAR,
       qualityLow: LOW_QUALITY_THRESHOLD,
@@ -177,18 +183,22 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     if (!verifyPromptBundle(PROMPT_BUNDLE)) {
       return { ok: false, error: 'dsh-evolution prompt bundle integrity check failed; refusing to run maintain' }
     }
+    // 0.3.11: usageObserved is threaded straight into the snapshot assembly so
+    // the probe (which reads it off the snapshot) and the facts block (which
+    // injects it) can never disagree (E-36).
+    const usageObserved = options.usageObserved ? options.usageObserved() : undefined
     const snapshots = await snapshotFromLibrary(runtime.library, {
       supportFiles: options.supportFiles ? options.supportFiles() : undefined,
       descriptions: options.descriptions ? options.descriptions() : undefined,
       quality: options.quality ? options.quality() : undefined,
       protected: options.protected ? options.protected() : undefined,
       catalogInvalid: options.catalogInvalid ? options.catalogInvalid() : undefined,
+      usageObserved,
     })
     if (snapshots.length === 0) {
       // Empty library: no facts to review — do not spend a model call.
       return { ok: true, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
-    const usageObserved = options.usageObserved ? options.usageObserved() : undefined
     const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, usageObserved, options.redact)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
 
@@ -206,7 +216,15 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // platform's unstructured leak of a parent-cancelled run.
     const signal = AbortSignal.timeout(timeoutMs)
     abortSignal = signal
-    const agentOptions: Record<string, string> = { model: options.model ?? 'deepseek-v4-pro' }
+    // 0.3.11 (E-55): route off the same policy as the curator
+    // (`evolutionPolicy.get().curatorModel`) instead of a hard-coded maintain
+    // model — a missing policy service keeps the documented default. The `?.`
+    // after `get()` matters (0.3.18): the getter may RESOLVE to undefined when
+    // the service is mounted but returns nothing (commands wires a policy
+    // accessor that soft-probes), and `?.get().curatorModel` would read a
+    // property of undefined.
+    const model = options.model ?? runtime.evolutionPolicy?.get()?.curatorModel ?? 'deepseek-v4-pro'
+    const agentOptions: Record<string, string> = { model }
     if (options.provider) agentOptions.provider = options.provider
     const run = await runtime.subagents.start('spawn', {
       label: 'dsh-evolution-maintain',
@@ -223,6 +241,11 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       outputSchema: {
         type: 'object',
         additionalProperties: false,
+        // required aligns with validate-plan.ts's validation set (E-56): the
+        // two were hand-written copies of the same contract and the schema had
+        // no required. override_reason stays optional (case-conditionally
+        // required only when is_override, which the validator enforces).
+        required: ['verdict', 'plan', 'notes'],
         properties: {
           verdict: { type: 'string' },
           plan: {
@@ -230,6 +253,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
             items: {
               type: 'object',
               additionalProperties: false,
+              required: ['kind', 'names', 'rule', 'evidence', 'finding', 'recommendation', 'semantic_reasoning', 'impact', 'impact_reason', 'reversibility', 'undo_path', 'confidence', 'needs_human', 'is_override'],
               properties: {
                 kind: { type: 'string' },
                 names: { type: 'array', items: { type: 'string' } },
@@ -239,6 +263,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
                   items: {
                     type: 'object',
                     additionalProperties: false,
+                    required: ['signal', 'value'],
                     properties: { signal: { type: 'string' }, value: { type: 'string' } },
                   },
                 },

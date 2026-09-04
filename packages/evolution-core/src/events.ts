@@ -48,10 +48,23 @@ export interface EvolutionSkillMutatedEvent {
   archivedPath?: string
 }
 
+/** 0.3.18 (E-6): a turn-end review pipeline failure was caught (never an
+ * unhandled rejection); this event lets operators/observability see it. The
+ * reason is already logged by the emitter — the event is a timestamped signal. */
+export interface EvolutionReviewErrorEvent {
+  sessionId: string
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
     'evolution/review-scheduled'(event: EvolutionReviewScheduledEvent): void
     'evolution/plan-applied'(event: EvolutionPlanAppliedEvent): void
     'evolution/skill-mutated'(event: EvolutionSkillMutatedEvent): void
+    /** 0.3.18 (E-71): explicit catalog refresh request (`/evolution skills
+     * refresh`). Out-of-band tree edits (manual, git) may bypass the mutation
+     * event; listeners drop caches and invalidate downstream catalogs. No
+     * payload — it is a bare "re-read" signal, never a mutation record. */
+    'evolution/skills-refresh'(): void
+    'evolution/review-error'(event: EvolutionReviewErrorEvent): void
   }
 }

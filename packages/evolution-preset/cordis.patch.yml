@@ -65,6 +65,12 @@
     # ── review / curator / observability / human controls ───────────────────
     - id: evolution-review
       name: '@deepseek-ai/dsh-evolution-review'
+      config:
+        # Mirror evolution-host: the DSH tool catalog exposes the plain `skill`
+        # tool only, so review subagents load skills through it. Keeping the
+        # shared-row config byte-identical to host preserves the mutual exclusion
+        # between the host bundle and this preset bundle (E-33).
+        reviewToolAllow: [skill]
     - id: evolution-curator
       name: '@deepseek-ai/dsh-evolution-curator'
     - id: evolution-commands
@@ -86,5 +92,5 @@
 # via dsh `!!js` runtime env evaluation; profile overlays may still override.
 - id: session-query-sqlite
   config:
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? ((process.env.DSH_HOME ?? process.env.USERPROFILE ?? '.') + '/evolution/session-query.db'))
-    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY ?? 'startup'
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
+    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY || 'startup'

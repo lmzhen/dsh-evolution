@@ -38,7 +38,7 @@ export const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{
  * 1KB density floor a 3-date sentence in a small skill measured 3.0/KB and
  * warned on a perfectly healthy body (audit 2026-08-31 X1).
  */
-const MIN_STAMP_BODY_CHARS = 2_000
+export const MIN_STAMP_BODY_CHARS = 2_000
 
 export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure'
 

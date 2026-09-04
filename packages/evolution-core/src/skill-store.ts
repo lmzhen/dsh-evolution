@@ -53,6 +53,9 @@ export interface SkillActionResult {
   /** Frontmatter keys auto-quoted for catalog-loadable YAML (0.3.11) — set
    * only when the write path modified the block. */
   normalizedFrontmatterFields?: string[]
+  /** 0.3.18 (E-68): patch produced byte-identical content (old===new) — no
+   * write, no audit, no mutation event; callers must not count a patch. */
+  noop?: boolean
 }
 
 /**
@@ -112,6 +115,15 @@ export interface ArchiveOptions {
 
 export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
   return join(env.DSH_HOME || join(homedir(), '.dsh'), 'skills')
+}
+
+/** 0.3.18 (S4.1, E-30): the ONE root resolution for every member that reads
+ * the skills tree — tool-skill-manage / evolution-skill-catalog / skill-usage
+ * / evolution-learning-graph used to each resolve `config.root || skillsRoot()`
+ * (and the graph ignored config entirely). Empty/whitespace config falls
+ * through to the default; callers pass their raw Config. */
+export function resolveSkillsRoot(config: { root?: string } = {}): string {
+  return (config.root ?? '').trim() || skillsRoot()
 }
 
 /**
@@ -1041,6 +1053,13 @@ export class SkillLibrary {
     }
     const threat = scanContentThreats(writeContent)
     if (threat) return { ok: false, message: threat }
+    // 0.3.18 (E-68): old_string === replacement reaches fuzzyPatch's exact
+    // path and yields patched === md. Previously the file was rewritten, the
+    // patch counter bumped and the whole catalog invalidated for zero change.
+    // Byte-identical-to-write means a true no-op: skip write/audit/notify.
+    if (writeContent.trimEnd() + '\n' === md) {
+      return { ok: true, message: `Skill "${name}" unchanged: old_string already equals the replacement (${patchLabel}); nothing written.`, noop: true, path: dir }
+    }
     await this.io.writeText(target, writeContent.trimEnd() + '\n')
     await this.audit(name, 'patch', md, writeContent, `patched ${patchLabel}`)
     this.notifyMutation({ action: 'patch', name, skillDir: dir })
@@ -1060,6 +1079,12 @@ export class SkillLibrary {
     const protection = await this.deleteProtection(name, options.allowBundled === undefined ? {} : { allowBundled: options.allowBundled })
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     if (options.absorbedInto) {
+      // 0.3.18 (E-69): `delete X absorbed_into=X` used to pass the existence
+      // check (it read the archived skill's own still-present file) and
+      // archive X "into itself". Refuse the self-absorption up front.
+      if (options.absorbedInto.trim() === name) {
+        return { ok: false, message: 'absorbed_into cannot be the skill being archived (cannot absorb into itself).' }
+      }
       const target = await this.io.readText(join(this.dirOf(options.absorbedInto), 'SKILL.md'))
       if (!target) return { ok: false, message: `absorbed_into="${options.absorbedInto}" does not exist.` }
     }

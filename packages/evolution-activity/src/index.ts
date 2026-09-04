@@ -38,6 +38,10 @@ export interface EvolutionActivityRecord {
 /** Version of the `activity.json` shape; writers always emit the current one. */
 export const ACTIVITY_FILE_VERSION = 2
 
+/** Default bound on the retained sidecar (S6.4: also the fallback for a
+ * non-finite `maxItems`). */
+export const DEFAULT_MAX_ITEMS = 200
+
 export function activityFile(root: string): string {
   return join(root, 'activity.json')
 }
@@ -62,7 +66,10 @@ export function applyActivityEvent(
   }
   // A non-positive cap would disable the window entirely (`slice(-0)` keeps
   // everything), so it clamps to at least one record (rc.42 regression guard).
-  const cap = Math.max(1, maxItems)
+  // A non-finite cap (NaN/±Infinity) also disables the window (`slice(-NaN)`
+  // keeps everything), so it falls back to the default bound (S6.4) — the
+  // caller with a logger owns the diagnostic warn.
+  const cap = Number.isFinite(maxItems) ? Math.max(1, maxItems) : DEFAULT_MAX_ITEMS
   return [...items, record].slice(-cap)
 }
 
@@ -100,36 +107,45 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  maxItems: z.number().default(200),
+  maxItems: z.number().default(DEFAULT_MAX_ITEMS),
 })
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  const maxItems = rawConfig.maxItems ?? 200
-  const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-  if (!ioRegistry) {
-    ctx.logger.warn('evolution-activity: no evolution IO provider mounted; plan outcomes will not be persisted')
-    return
+  // S6.4: a non-finite `maxItems` (NaN slips through `z.number()` since
+  // `typeof NaN === 'number'`) would disable the window; resolve it once here,
+  // warn when it was bad, and let the pure fold fall back for direct callers.
+  const configuredMaxItems = rawConfig.maxItems ?? DEFAULT_MAX_ITEMS
+  const maxItems = Number.isFinite(configuredMaxItems) ? configuredMaxItems : DEFAULT_MAX_ITEMS
+  if (!Number.isFinite(configuredMaxItems)) {
+    ctx.logger.warn(`evolution-activity: maxItems is not a finite number; falling back to the default ${DEFAULT_MAX_ITEMS}`)
   }
-  // Lazy adapter: forwards transact (N-4) when the backend provides it — the
-  // fold then runs inside one cross-process lock, so a second process sharing
-  // DSH_HOME cannot interleave between our read and write.
-  const io = evolutionIoAdapter(() => ioRegistry.provider())
-  const root = evolutionHome()
-  // In-process serialization: each event is one transactIo cycle, so
-  // concurrent outcomes in THIS process can never overwrite each other's
-  // newest record (the backend lock covers other processes).
-  let chain: Promise<unknown> = Promise.resolve()
-  ctx.on('evolution/plan-applied', (event) => {
-    const run = chain.then(() =>
-      transactIo(io, activityFile(root), (current) => {
-        const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
-        return Promise.resolve(JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2))
-      }),
-    )
-    chain = run.then(() => undefined, () => undefined)
-    run.catch((error: unknown) => {
-      // Persistence is best-effort: the outcome was already applied upstream.
-      ctx.logger.warn(error instanceof Error ? error : String(error))
+  // Deferred binding (S6.4, tool-* pattern): subscribe only once the evolution
+  // IO provider mounts, so a provider registered after this plugin still wires
+  // persistence instead of being skipped by an apply-time probe. Without the
+  // provider the listener never registers, matching the previous no-op.
+  ctx.inject(['evolutionIo'], (ioCtx) => {
+    const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(): EvolutionIoLike } }).evolutionIo
+    // Lazy adapter: forwards transact (N-4) when the backend provides it — the
+    // fold then runs inside one cross-process lock, so a second process sharing
+    // DSH_HOME cannot interleave between our read and write.
+    const io = evolutionIoAdapter(() => ioRegistry.provider())
+    const root = evolutionHome()
+    // In-process serialization: each event is one transactIo cycle, so
+    // concurrent outcomes in THIS process can never overwrite each other's
+    // newest record (the backend lock covers other processes).
+    let chain: Promise<unknown> = Promise.resolve()
+    ioCtx.on('evolution/plan-applied', (event) => {
+      const run = chain.then(() =>
+        transactIo(io, activityFile(root), (current) => {
+          const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
+          return Promise.resolve(JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2))
+        }),
+      )
+      chain = run.then(() => undefined, () => undefined)
+      run.catch((error: unknown) => {
+        // Persistence is best-effort: the outcome was already applied upstream.
+        ioCtx.logger.warn(error instanceof Error ? error : String(error))
+      })
     })
   })
 }

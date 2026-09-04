@@ -696,4 +696,104 @@ describe('evolution-commands', () => {
     }
   })
 
+  it('binds the command registration to the fiber so unmount unregisters it (S6.2 E-29)', async () => {
+    const registry: Array<{ name: string }> = []
+    const register = (definition: unknown): (() => void) => {
+      const name = (definition as { name?: string }).name ?? ''
+      registry.push({ name })
+      return () => {
+        const idx = registry.findIndex(item => item.name === name)
+        if (idx >= 0) registry.splice(idx, 1)
+      }
+    }
+    const ctx = new Context()
+    ctx.provide('commands', { register })
+    await ctx.plugin(Commands)
+    expect(registry.map(item => item.name)).toEqual(['evolution'])
+    // Reload/HMR disposes the fiber; the effect-bound register disposer must
+    // run, so a reload can never leave a stale duplicate /evolution behind.
+    await ctx.fiber.dispose()
+    expect(registry).toHaveLength(0)
+  })
+
+  it('preset install commits atomically: a second-file write failure leaves the previous composition usable (S6.3 E-40)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-atomic-'))
+    const skillsRoot = await mkdtemp(join(tmpdir(), 'evo-commands-preset-atomic-skills-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const target = join(home, '.agent-presets', 'evolution')
+      await mkdir(target, { recursive: true })
+      // Seed an existing installation so we can prove it survives an update.
+      const oldComposition = 'OLD agent.cordis.yml\n'
+      const oldPreset = 'OLD preset.yml\n'
+      await writeFile(join(target, 'agent.cordis.yml'), oldComposition, 'utf8')
+      await writeFile(join(target, 'preset.yml'), oldPreset, 'utf8')
+      // The second staged file collides with a directory, so its write throws
+      // EISDIR — a deterministic "second write fails" on Windows and POSIX.
+      await mkdir(join(target, 'preset.yml.tmp'))
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
+      ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
+      await ctx.plugin(Commands, { skillsRoot })
+      const result = await handler!.handler({ rawInput: 'preset install' })
+      expect(result.kind).toBe('error')
+      expect(result.text).toContain('Preset install failed')
+      // The previous composition is untouched — no half-updated preset.
+      expect(readFileSync(join(target, 'agent.cordis.yml'), 'utf8')).toBe(oldComposition)
+      expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(oldPreset)
+      // Neither staged temp leaked.
+      expect(existsSync(join(target, 'agent.cordis.yml.tmp'))).toBe(false)
+      expect(existsSync(join(target, 'preset.yml.tmp'))).toBe(false)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(home, { recursive: true, force: true })
+      await rm(skillsRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('help documents the mutations and maintain --facts subcommands (S6.6-1 E-64)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }>; input?: { hint?: string } } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    await ctx.plugin(Commands)
+    // Both the input-declaration hint and the bare /evolution help list the
+    // previously-hidden subcommands.
+    expect(captured!.input?.hint).toContain('mutations')
+    expect(captured!.input?.hint).toContain('--facts')
+    const help = await captured!.handler({ rawInput: '' })
+    expect(help.kind).toBe('success')
+    expect(help.text).toContain('mutations')
+    expect(help.text).toContain('maintain [--timeout ms | --facts]')
+  })
+
+  it('counts maintain recommendations by the plan bullet, not any string prefix (S6.6-1 E-64)', () => {
+    const text = [
+      'Maintenance scan abc: verdict=issues (2 recommendations, 1 notes)',
+      '- [skill-level] demo-skill · rule=pointer_missing · better rev=patch conf=0.90',
+      '  - indented line must not count',
+      '- [library-level] all · rule=body_size',
+      'Notes:',
+      '- this note is a bullet but not a recommendation',
+    ].join('\n')
+    expect(Commands.countMaintainRecommendations(text)).toBe(2)
+    expect(Commands.countMaintainRecommendations(undefined)).toBe(0)
+    expect(Commands.countMaintainRecommendations('')).toBe(0)
+    expect(Commands.countMaintainRecommendations('no bullets here')).toBe(0)
+  })
+
 })

@@ -27,6 +27,11 @@ export interface SnapshotOptions {
   protected?: ReadonlyMap<string, string> | undefined
   /** Skills whose frontmatter the strict-YAML catalog cannot load (0.3.11). */
   catalogInvalid?: ReadonlyMap<string, boolean> | undefined
+  /** Usage observation window status (library-wide, applied to every snapshot
+   * — the same value the facts block injects). The probe reads it straight off
+   * the snapshot (E-36): without it the probe always answered 'unknown' while
+   * the facts block reported the enrichment value. */
+  usageObserved?: boolean | undefined
 }
 
 /**
@@ -50,6 +55,7 @@ export async function snapshotFromLibrary(
       quality: options.quality?.get(entry.name),
       ...(options.protected?.get(entry.name) !== undefined ? { protected: options.protected.get(entry.name) } : {}),
       ...(options.catalogInvalid?.get(entry.name) === true ? { catalogInvalid: true } : {}),
+      ...(options.usageObserved !== undefined ? { usageObserved: options.usageObserved } : {}),
     })
   }
   return snapshots

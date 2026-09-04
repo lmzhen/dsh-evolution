@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLearningGraph, graphDensity, parseGraphNodeId, resolveGraphNode } from '../src/index.ts'
+import { buildLearningGraph, graphDensity, memorySnapshotOf, parseGraphNodeId, readMemoryIndex, resolveGraphNode } from '../src/index.ts'
 
 describe('learning graph', () => {
   it('links memory entries to skills by token overlap', () => {
@@ -8,11 +8,17 @@ describe('learning graph', () => {
     expect(graph.edges.some(e => e.type === 'memory_skill' && e.to === 'python-testing')).toBe(true)
   })
 
-  it('memory nodes use the memory:<source>:<index> id rule for both targets (F15 parity)', () => {
+  it('memory nodes embed a snapshot token so edit/delete detect index drift (F15 parity + E-21)', () => {
     const usage = new Map([['python-testing', {}]])
     const graph = buildLearningGraph(usage, ['memory fact A'], ['user fact B'])
-    expect(graph.nodes.some(node => node.id === 'memory:memory:0')).toBe(true)
-    expect(graph.nodes.some(node => node.id === 'memory:user:0' && node.label === 'user fact B')).toBe(true)
+    const memoryNode = graph.nodes.find(node => node.kind === 'memory' && node.id.startsWith('memory:memory:0'))
+    expect(memoryNode).toBeDefined()
+    // The id keeps the `memory:<source>:<index>` rule but carries the label
+    // snapshot so a stale index is rejected (E-21 TOCTOU guard).
+    expect(memoryNode!.id).toMatch(/^memory:memory:0:[0-9a-f]{8}$/)
+    const userNode = graph.nodes.find(node => node.kind === 'memory' && node.id.startsWith('memory:user:0'))
+    expect(userNode).toBeDefined()
+    expect(userNode!.label).toBe('user fact B')
     // Every generated id must round-trip through the parser (fixes the
     // builder/parser mismatch where `graph detail memory:0` failed).
     for (const node of graph.nodes) {
@@ -20,12 +26,40 @@ describe('learning graph', () => {
     }
   })
 
-  it('parses node ids: skill names and memory:<source>:<index>', () => {
+  it('parses node ids: skill names and memory:<source>:<index>[:snapshot]', () => {
     expect(parseGraphNodeId('python-testing')).toEqual({ kind: 'skill', name: 'python-testing' })
     expect(parseGraphNodeId('memory:user:3')).toEqual({ kind: 'memory', source: 'user', index: 3 })
     expect(parseGraphNodeId('memory:memory:0')).toEqual({ kind: 'memory', source: 'memory', index: 0 })
+    // A snapshot-suffixed id (what the builder emits) parses into the token.
+    expect(parseGraphNodeId('memory:memory:0:abc12345')).toEqual({ kind: 'memory', source: 'memory', index: 0, snapshot: 'abc12345' })
     expect(parseGraphNodeId('memory:user:')).toBeNull()
+    expect(parseGraphNodeId('memory:user:3:tooshort')).toBeNull()
     expect(parseGraphNodeId('INVALID NAME')).toBeNull()
+  })
+
+  it('rejects a memory edit/delete whose index drifted after render (E-21 TOCTOU)', () => {
+    const entry = 'memory fact A'
+    const drifted = 'a different fact'
+    // Snapshot taken from a prior render matches the original entry...
+    const parsed = parseGraphNodeId(`memory:memory:0:${memorySnapshotOf(entry)}`)
+    if (!parsed || parsed.kind !== 'memory') throw new Error('expected a memory node')
+    expect(readMemoryIndex(parsed, [entry]).ok).toBe(true)
+    // ...but a memory write that shifted the index changes what's at the slot.
+    const leaked = readMemoryIndex(parsed, [drifted])
+    expect(leaked.ok).toBe(false)
+    expect(leaked.message).toContain('changed since the graph was rendered')
+    // Out-of-range index still refuses, and a bare id (no snapshot) skips drift.
+    expect(readMemoryIndex(parsed, []).ok).toBe(false)
+    expect(readMemoryIndex({ kind: 'memory', source: 'memory', index: 0 }, [drifted]).ok).toBe(true)
+  })
+
+  it('uses word-level matching so skill "run" never links "running"/"grunt" (E-72)', () => {
+    const usage = new Map([['run', {}], ['python-testing', {}]])
+    // Substring matching once produced false edges for run; word matching must
+    // not, while a hyphenated skill name stays a single whole token.
+    const graph = buildLearningGraph(usage, ['He is running the grunt job and uses python-testing'])
+    expect(graph.edges.filter(e => e.type === 'memory_skill' && e.to === 'run')).toEqual([])
+    expect(graph.edges.some(e => e.type === 'memory_skill' && e.to === 'python-testing')).toBe(true)
   })
 
   it('resolves skills and indexed memory entries (F15)', async () => {

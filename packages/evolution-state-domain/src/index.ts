@@ -120,6 +120,27 @@ export function apply(ctx: Context): void {
       await (await ensure()).table('curator_state').put('primary', record)
     },
 
+    async transactCuratorState(task) {
+      const table = (await ensure()).table('curator_state')
+      try {
+        // Atomic read-modify-write on the domain write chain: `task` sees the
+        // record current at its queue slot, so a setPaused racing the run-core
+        // bookkeeping write never interleaves. task returns null to keep the
+        // record unchanged (the domain update primitive cannot delete).
+        await table.update('primary', current => task(current) ?? current)
+      } catch (error) {
+        // Fresh install: no record yet — update() rejects missing-key. Seed by
+        // applying the task to null and putting the result (delete when null).
+        if (error instanceof DomainError && error.code === 'missing-key') {
+          const next = task(null)
+          if (next !== null) await table.put('primary', next)
+          else await table.delete('primary')
+          return
+        }
+        throw error
+      }
+    },
+
     async listPending(status: PendingStatus = 'pending') {
       const table = (await ensure()).table('pending')
       return [...table.entries()].map(([, value]) => value).filter(record => record.status === status)

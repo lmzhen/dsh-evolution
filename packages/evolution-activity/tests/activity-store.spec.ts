@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { ACTIVITY_FILE_VERSION, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, type EvolutionActivityRecord } from '../src/index.ts'
+import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, type EvolutionActivityRecord } from '../src/index.ts'
 
 function payload(overrides: Partial<EvolutionPlanAppliedEvent> = {}): EvolutionPlanAppliedEvent {
   return {
@@ -201,6 +201,50 @@ describe('evolution-activity store', () => {
 
     expect(items.map(item => item.planId)).toEqual(['p2'])
 
+  })
+
+  it('falls back to the default bound when maxItems is not finite (S6.4)', () => {
+
+    // slice(-NaN) keeps EVERYTHING: a NaN cap would disable the window just
+    // like a zero cap. The fold falls back to DEFAULT_MAX_ITEMS so the sidecar
+    // never loses its bound. The apply() warn owns the diagnostic for NaN config.
+    let items: EvolutionActivityRecord[] = []
+
+    items = applyActivityEvent(items, payload({ planId: 'p1' }), Number.NaN, 100)
+
+    items = applyActivityEvent(items, payload({ planId: 'p2' }), Number.POSITIVE_INFINITY, 200)
+
+    expect(items.map(item => item.planId)).toEqual(['p1', 'p2'])
+
+    // Both record exactly the DEFAULT_MAX_ITEMS window (bounded, not everything).
+    for (let i = 0; i < DEFAULT_MAX_ITEMS + 5; i += 1) {
+      items = applyActivityEvent(items, payload({ planId: `p${i}` }), Number.NaN, 300 + i)
+    }
+    expect(items).toHaveLength(DEFAULT_MAX_ITEMS)
+  })
+
+  it('a NaN maxItems config keeps the driver bounded instead of disabling the window (S6.4)', { timeout: 20_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-activity-nan-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      // `typeof NaN === 'number'` so schemastery accepts it; apply must warn and
+      // fall back to the default bound rather than disable the window.
+      await ctx.plugin(apply, { maxItems: Number.NaN })
+      ctx.emit('evolution/plan-applied', payload({ planId: 'n1' }))
+      ctx.emit('evolution/plan-applied', payload({ planId: 'n2' }))
+      ctx.emit('evolution/plan-applied', payload({ planId: 'n3' }))
+      const items = await pollUntil(root, 'n3')
+      expect(items.map(item => item.planId)).toEqual(['n1', 'n2', 'n3'])
+      await ctx.fiber.dispose()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
 })

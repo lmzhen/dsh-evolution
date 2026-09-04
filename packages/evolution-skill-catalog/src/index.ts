@@ -20,7 +20,7 @@ import type {
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { evolutionIoAdapter,  SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, resolveSkillsRoot, SkillLibrary, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'
@@ -55,18 +55,40 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     userInvocable: rawConfig.userInvocable ?? true,
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-  const library = new SkillLibrary(rawConfig.root || undefined, io)
+  const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io)
   const included = new Set(rawConfig.includeSkillNames ?? [])
   const excluded = new Set(rawConfig.excludeSkillNames ?? [])
   const visible = (name: string) => (included.size === 0 || included.has(name)) && !excluded.has(name)
   let control: SkillProviderControl | undefined
+  // 0.3.18 (S4.5, X-7): process-internal summaries cache — every `get()` used
+  // to run a full tree scan (read + parse every SKILL.md). Dropped on
+  // `evolution/skill-mutated` (in-band writes) and re-stamped via the root
+  // mtime probe, so a structural out-of-band change (directory add/remove/
+  // rename) does not serve stale metadata once the provider re-queries.
+  // In-place out-of-band CONTENT edits need `/evolution skills refresh`
+  // (explicit invalidation — decision C keeps no filesystem watcher); see
+  // README Known Limitations.
+  let summariesCache: SkillSummary[] | null = null
+  let summariesStamp: number | null = null
+  async function summaries(): Promise<SkillSummary[]> {
+    const stamp = await io.mtime?.(library.root) ?? null
+    if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) return summariesCache
+    if (summariesCache !== null && stamp !== null) control?.invalidate()
+    summariesCache = await library.list()
+    summariesStamp = stamp
+    return summariesCache
+  }
+  const dropSummariesCache = (): void => {
+    summariesCache = null
+    control?.invalidate()
+  }
 
   const provider: SkillProvider = {
     name: 'dsh-evolution',
 
     async list(_options: SkillLookupOptions) {
-      const summaries = await library.list()
-      return summaries.filter(summary => visible(summary.name)).map(summary => ({
+      const all = await summaries()
+      return all.filter(summary => visible(summary.name)).map(summary => ({
         name: summary.name,
         description: summary.description,
         invocation,
@@ -82,10 +104,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async get(candidate: SkillCandidate): Promise<SkillDefinition | undefined> {
       const name = candidate.name
       if (!visible(name)) return undefined
-      // One list per call, shared by lookup and metadata (P2-6): the summary
-      // set is fetched once and re-used instead of a second full scan.
-      const summaries = await library.list()
-      const summary = summaries.find(item => item.name === name)
+      const all = await summaries()
+      const summary = all.find(item => item.name === name)
       if (!summary) return undefined
       const content = await library.read(name)
       if (content === null) return undefined
@@ -108,9 +128,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       return provider
     })
     const disposeEvent = ctx.on('evolution/skill-mutated', () => {
-      control?.invalidate()
+      dropSummariesCache()
+    })
+    const disposeRefresh = ctx.on('evolution/skills-refresh', () => {
+      dropSummariesCache()
     })
     return () => {
+      disposeRefresh()
       disposeEvent()
       unregister()
       control = undefined

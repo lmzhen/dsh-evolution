@@ -359,4 +359,134 @@ describe('evolution-feedback', () => {
       await rm(home, { recursive: true, force: true })
     }
   })
+
+  it('skips a feedback event with an invalid rating instead of folding NaN (S6.4)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-badrating-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await io.writeText(eventsPath, JSON.stringify({ version: 1, events: [
+        { seq: 1, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: 'x', kind: 'skill', rating: 'garbage' },
+        { seq: 2, at: '2026-01-01T00:00:01.000Z', type: 'feedback', target: 'y', kind: 'skill', rating: 'positive' },
+      ] }, null, 2))
+      const warns: string[] = []
+      const feedback = new Feedback.EvolutionFeedback(io, home, undefined, message => warns.push(message))
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      // The invalid rating is skipped (never NaN) and reported through warn.
+      expect(feedback.snapshot().skills['x']).toBeUndefined()
+      expect(feedback.snapshot().skills['y']).toMatchObject({ positive: 1, negative: 0 })
+      expect(warns.some(message => message.includes('invalid rating'))).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('skips cache records with an invalid numeric domain (S6.4)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-badcache-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      // A non-empty log makes the cache the fold base (no migration), so the
+      // cached aggregates are what parseCache validation governs.
+      await io.writeText(eventsPath, JSON.stringify({ version: 1, events: [
+        { seq: 1, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: 'seed', kind: 'skill', rating: 'positive' },
+      ] }, null, 2))
+      await io.writeText(join(home, 'evolution', 'feedback.json'), JSON.stringify({
+        version: 2,
+        lastSeq: 1,
+        skills: {
+          good: { positive: 5, negative: 0, lastNote: 'ok' },
+          badnan: { positive: NaN, negative: 0 },
+          badneg: { positive: 0, negative: -2 },
+        },
+        sessions: {},
+      }, null, 2))
+      const warns: string[] = []
+      const feedback = new Feedback.EvolutionFeedback(io, home, undefined, message => warns.push(message))
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      // Valid record survives; NaN/negative records are dropped, never folded.
+      expect(feedback.snapshot().skills['good']).toMatchObject({ positive: 5, negative: 0, lastNote: 'ok' })
+      expect(feedback.snapshot().skills['badnan']).toBeUndefined()
+      expect(feedback.snapshot().skills['badneg']).toBeUndefined()
+      expect(warns.some(message => message.includes('finite numbers >= 0'))).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('migrates a zero-count legacy record without dropping its note (S6.4)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-noteonly-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const cachePath = join(home, 'evolution', 'feedback.json')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await io.writeText(cachePath, JSON.stringify({ skills: { noteonly: { positive: 0, negative: 0, lastNote: 'keep-note' } }, sessions: {} }))
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      // The note is preserved, represented as a single positive note event so
+      // it survives the migration into the event log.
+      expect(feedback.snapshot().skills['noteonly']).toMatchObject({ positive: 1, negative: 0, lastNote: 'keep-note' })
+      const eventsRaw = JSON.parse(await io.readText(eventsPath) ?? '{}') as { events: Array<{ rating?: string; note?: string }> }
+      expect(eventsRaw.events).toHaveLength(1)
+      expect(eventsRaw.events[0]).toMatchObject({ rating: 'positive', note: 'keep-note' })
+      // Idempotent: a second boot does not duplicate the note event.
+      const second = new Feedback.EvolutionFeedback(io, home)
+      await second.restore(io)
+      await second.waitIdle()
+      const once = JSON.parse(await io.readText(eventsPath) ?? '{}') as { events: unknown[] }
+      expect(once.events).toHaveLength(1)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('reclaims the optimistic count after a failed append (S6.4 E-8)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-rollback-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await io.writeText(eventsPath, '{corrupt log')
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      feedback.record('y', 'positive', undefined, 'skill')
+      // A failed append must not leave a phantom optimistic count in memory:
+      // the log is the truth, so the count rolls back instead of lingering.
+      await feedback.waitIdle()
+      expect(feedback.score('y', 'skill')).toBe(0)
+      expect(await io.readText(eventsPath)).toBe('{corrupt log')
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
 })

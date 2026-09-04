@@ -83,6 +83,14 @@ export interface EvolutionStateStorage {
   saveReviewState(sessionId: string, record: ReviewStateRecord): Promise<void>
   loadCuratorState(): Promise<CuratorStateRecord | null>
   saveCuratorState(record: CuratorStateRecord): Promise<void>
+  /**
+   * Atomically read-modify-write the curator-state record (S5.5): `task`
+   * receives the current record (or null when none exists) and returns the
+   * next record (or null to delete). The whole read → transform → write runs
+   * inside one provider transact, so a setPaused racing the run-core
+   * bookkeeping write can never interleave a stale load with a newer save.
+   */
+  transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void>
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
   /** Atomically transition a pending record exactly once. */

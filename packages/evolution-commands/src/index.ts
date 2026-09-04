@@ -1,5 +1,5 @@
 /**
- * Human commands for the evolution family: /evolution learn|pending|curator|restore|consolidate.
+ * Human commands for the evolution family: /evolution learn|pending|curator|restore|consolidate|skills refresh.
  * @module @deepseek-ai/dsh-evolution-commands
  */
 
@@ -7,7 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
@@ -47,7 +47,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let maintainInFlightSince = 0
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: CommandRuntimeLike }).commands
-    commands.register({
+    // M-11 (S6.2, E-29): bind the register disposer to the fiber — an unbound
+    // registration survives reload/HMR and registers /evolution twice.
+    // evolution-learning-graph is the aligned precedent
+    // (commandCtx.effect(() => commands.register(...))).
+    commandCtx.effect(() => commands.register({
       name: 'evolution',
       description: 'Self-evolution status and approval controls',
       recordInput: false,
@@ -57,7 +61,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | restore | consolidate <target> <sources...> | skill restore <name> | skills health | learn [request] | maintain [--timeout ms] | preset install | restructure <name> "<heading>" <to_file> | replay',
+        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | mutations | restore | consolidate <target> <sources...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout ms | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay',
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
@@ -188,6 +192,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (rows.length === 0) return ok(banner ? `Structure health: all skills healthy. ${banner}` : 'Structure health: all skills healthy.')
           return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...rows.map(line)].join('\n'))
         }
+        if (input === 'skills refresh') {
+          // 0.3.18 (E-71): out-of-band tree edits (manual/git/other process)
+          // bypass evolution/skill-mutated; this command drops the catalog's
+          // summaries cache and invalidates the published skill catalog.
+          ctx.emit('evolution/skills-refresh')
+          return ok('Skill catalog refresh requested: caches dropped, catalog re-read on next lookup.')
+        }
         if (input === 'learn' || input.startsWith('learn ')) {
           const request = input === 'learn' ? '' : input.slice(6).trim()
           // rc.67: command results never enter model history, so an echo can
@@ -270,7 +281,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
             const enrichment = await buildEnrichment(ctx, library)
             const outcome = await runMaintain(
-              { library, subagents, parent: invocation.agent },
+              // E-55 (0.3.18): same-source model routing — the maintain subagent
+              // reads evolutionPolicy.get().curatorModel exactly like the curator.
+              { library, subagents, parent: invocation.agent, evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() } },
               {
                 timeoutMs: runTimeoutMs,
                 descriptions: () => enrichment.descriptions,
@@ -290,7 +303,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               source: 'manual',
               runId: outcome.runId,
               verdict: outcome.verdict,
-              recommendations: outcome.text?.split('\n').filter(line => line.startsWith('- [')).length ?? 0,
+              recommendations: countMaintainRecommendations(outcome.text),
             }).catch((error: unknown) => {
               ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
             })
@@ -331,8 +344,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const standard = await registry.read('standard')
             const composition = composePresetComposition(standard, readFileSync(deltaPath, 'utf8'))
             mkdirSync(target, { recursive: true })
-            writeFileSync(join(target, 'agent.cordis.yml'), composition)
-            copyFileSync(presetPath, join(target, 'preset.yml'))
+            // S6.3 (E-40): commit both files atomically — each staged to a
+            // sibling `<name>.tmp` then renamed into place, a pre-existing file
+            // keeping a single `.bak`. A failure while staging either file (a
+            // write that throws) removes the staged temps and leaves the
+            // previous composition untouched, so a half-updated preset (one new
+            // file, one old) is impossible.
+            atomicWriteFiles(target, [
+              { name: 'agent.cordis.yml', content: composition },
+              { name: 'preset.yml', content: readFileSync(presetPath) },
+            ])
             return ok(`Evolution agent preset installed to ${target} (runtime standard + delta). Restart the session switcher to select it.`)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -365,9 +386,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | restore | consolidate <target> <source...> | skill restore <name> | skills health | learn [request] | maintain | preset install | restructure <name> "<heading>" <to_file> | replay.')
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | mutations | restore | consolidate <target> <source...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout ms | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay.')
       },
-    })
+    }))
   })
 }
 
@@ -385,18 +406,73 @@ interface CommandRuntimeLike {
  */
 function resolveAgentPresetDir(importMetaUrl: string): string {
   const dir = dirname(fileURLToPath(importMetaUrl))
-  const candidates = [
-    join(dir, '..', 'dsh-evolution-agent-preset'),
-    join(dir, '..', '..', 'evolution-agent'),
-  ]
+  const siblingCandidate = join(dir, '..', 'dsh-evolution-agent-preset')
+  const candidates = [siblingCandidate, join(dir, '..', '..', 'evolution-agent')]
   for (const candidate of candidates) {
     if (existsSync(join(candidate, 'agent.cordis.yml')) && existsSync(join(candidate, 'preset.yml'))) return candidate
   }
   try {
     return dirname(createRequire(importMetaUrl).resolve('@deepseek-ai/dsh-evolution-agent-preset/package.json'))
   } catch {
-    return candidates[0] ?? join(dir, '..', 'dsh-evolution-agent-preset')
+    // S6.6-1 (E-64): last-resort sibling path, already probed by the loop above
+    // and known not to hold both files — the caller's existsSync guard turns it
+    // into a clean error. This replaces the old `candidates[0] ?? join(...)`
+    // fallback whose `?? join(...)` right side was dead (siblingCandidate is
+    // never null) and which re-derived an already-failed path.
+    return siblingCandidate
   }
+}
+
+/**
+ * S6.3 (E-40): atomically replace a set of files within one directory.
+ * Each file is staged to a sibling `<name>.tmp`, then renamed into place
+ * (atomic on the same filesystem); a pre-existing file keeps a single
+ * `<name>.bak`. A failure at ANY staging step removes the staged temps and
+ * leaves the previous files untouched — a half-written target is impossible.
+ */
+function atomicWriteFiles(targetDir: string, writes: Array<{ name: string; content: string | Uint8Array }>): void {
+  const stage = (name: string): string => join(targetDir, `${name}.tmp`)
+  try {
+    for (const { name, content } of writes) writeFileSync(stage(name), content)
+    for (const { name } of writes) {
+      const finalPath = join(targetDir, name)
+      const bakPath = join(targetDir, `${name}.bak`)
+      // Back up the currently installed file once, so an interrupted commit can
+      // fall back to the previous usable composition.
+      if (existsSync(finalPath) && !existsSync(bakPath)) copyFileSync(finalPath, bakPath)
+    }
+    for (const { name } of writes) {
+      const finalPath = join(targetDir, name)
+      try {
+        renameSync(stage(name), finalPath)
+      } catch {
+        // Some filesystems refuse to overwrite the destination; the single
+        // .bak above already holds the previous file, so remove-then-rename is
+        // safe here.
+        rmSync(finalPath, { force: true })
+        renameSync(stage(name), finalPath)
+      }
+    }
+  } catch (error) {
+    for (const { name } of writes) rmSync(stage(name), { force: true, recursive: true })
+    throw error
+  }
+}
+
+/**
+ * Count the recommendation bullets in a rendered maintain plan.
+ * `formatPlan` renders each recommendation as a line starting with `- [<kind>]`;
+ * this matches that bullet (anchored at line start) instead of any string
+ * prefix, so a `- note` line can never inflate the count.
+ *
+ * @param text - the rendered maintain result text, or `undefined`.
+ * @returns the number of recommendation bullets in `text`.
+ * @remarks the count is still text-derived — MaintainOutcome does not expose the
+ * structured plan array, so a structured count would require a
+ * evolution-maintenance outcome change (out of this package's scope).
+ */
+export function countMaintainRecommendations(text: string | undefined): number {
+  return text?.match(/^- \[/gm)?.length ?? 0
 }
 
 interface CommandInvocation {

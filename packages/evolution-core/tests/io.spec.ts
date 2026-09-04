@@ -82,6 +82,49 @@ it('nodeEvolutionIo.transact deletes the file when task returns null', async () 
   await rm(root, { recursive: true, force: true })
 })
 
+it('a task failure propagates immediately — it is never lock contention (E-8, 0.3.17)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-taskfail-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'ephemeral.json')
+  let calls = 0
+  const taskError = Object.assign(new Error('rename raced the writer'), { code: 'EPERM' })
+  await expect(io.transact(target, async () => {
+    calls += 1
+    throw taskError
+  })).rejects.toThrow('rename raced the writer')
+  // Executed ONCE — the old shape retried the task up to 40 times and ended
+  // with the misleading "could not acquire write lock".
+  expect(calls).toBe(1)
+  // The lock was released on the failure path.
+  expect(await io.readText(`${target}.lock`)).toBeNull()
+  await rm(root, { recursive: true, force: true })
+})
+
+it('sweeps stale tmp files of dead writers on the next write (E-8b, 0.3.17)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-tmpsweep-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'sweep.json')
+  const stale = `${target}.999999.abcd1234.tmp` // dead pid
+  await writeFile(stale, 'leftover', 'utf8')
+  const old = new Date(Date.now() - 7_200_000)
+  await utimes(stale, old, old)
+  await io.writeText(target, 'fresh')
+  expect(await io.readText(stale)).toBeNull() // swept
+  expect(await readFile(target, 'utf8')).toBe('fresh')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('does not sweep a fresh tmp from a live pid (E-8b, 0.3.17)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-tmpkeep-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'keep.json')
+  const fresh = `${target}.${process.pid}.abcd1234.tmp`
+  await writeFile(fresh, 'in-flight', 'utf8')
+  await io.writeText(target, 'fresh')
+  expect(await io.readText(fresh)).toBe('in-flight') // kept (recent, live pid)
+  await rm(root, { recursive: true, force: true })
+})
+
 it('nodeEvolutionIo.list reports ENOENT as empty (P2-4) and isSymlink probes the entry (G7)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-list-'))
   const io = nodeEvolutionIo()

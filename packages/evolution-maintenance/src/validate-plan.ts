@@ -154,16 +154,18 @@ export function validateAndNormalizeMaintainPlan(
       if (typeof item.reversibility !== 'string' || !REVERSIBILITIES.has(item.reversibility)) {
         errors.push(`${path}.reversibility: invalid`)
       }
-      if (!isNonEmptyString(item.undo_path)) {
-        // 0.3.6: irreversible items may omit/empty undo_path — normalize to
-        // the truthful 'n/a' (display/audit contract). Reversible items keep
-        // the hard requirement: a fabricated undo path is never acceptable.
-        if (item.reversibility === 'none') {
-          item.undo_path = 'n/a'
-        } else {
-          const rev = typeof item.reversibility === 'string' ? item.reversibility : 'missing'
-          errors.push(`${path}.undo_path: required (reversibility=${rev})`)
-        }
+      // 0.3.6 / E-56: irreversible items may omit/empty undo_path — normalize to
+      // the truthful 'n/a' on the COPIED plan object (never the caller's input).
+      // Reversible items keep the hard requirement: a fabricated undo path is
+      // never acceptable.
+      let normalizedUndoPath: string | undefined
+      if (isNonEmptyString(item.undo_path)) {
+        normalizedUndoPath = item.undo_path
+      } else if (item.reversibility === 'none') {
+        normalizedUndoPath = 'n/a'
+      } else {
+        const rev = typeof item.reversibility === 'string' ? item.reversibility : 'missing'
+        errors.push(`${path}.undo_path: required (reversibility=${rev})`)
       }
       if (typeof item.confidence !== 'number' || !Number.isFinite(item.confidence) || item.confidence < 0 || item.confidence > 1) {
         errors.push(`${path}.confidence: finite number in [0,1] required`)
@@ -185,7 +187,7 @@ export function validateAndNormalizeMaintainPlan(
         impact: isNonEmptyString(item.impact) ? (item.impact as MaintainImpact) : 'neutral',
         impact_reason: str(item.impact_reason, ''),
         reversibility: isNonEmptyString(item.reversibility) ? (item.reversibility as MaintainReversibility) : 'none',
-        undo_path: str(item.undo_path, ''),
+        undo_path: normalizedUndoPath ?? str(item.undo_path, ''),
         confidence: typeof item.confidence === 'number' ? item.confidence : 0,
         needs_human: item.needs_human === true,
         is_override: item.is_override === true,

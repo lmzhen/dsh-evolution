@@ -3,12 +3,13 @@
  * (`/evolution graph [detail|edit|delete] <nodeId>`) aligned with the Hermes
  * journey surface: a skill node is its name, a memory node is
  * `memory:<source>:<index>` (source = memory|user, index = position in that
- * file's entries).
+ * file's entries). Memory node ids carry a trailing snapshot token so
+ * edit/delete can reject a stale index (E-21).
  * @module @deepseek-ai/dsh-evolution-learning-graph
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -73,7 +74,7 @@ export function graphDensity(graph: LearningGraph): GraphDensity {
  * chain was a placeholder that connected unrelated neighbors.
  */
 export function buildLearningGraph(
-  usage: ReadonlyMap<string, { use_count?: number; pinned?: boolean }>,
+  usage: ReadonlyMap<string, unknown>,
   memoryEntries: readonly string[],
   userEntries: readonly string[] = [],
   related?: ReadonlyMap<string, readonly string[]>,
@@ -98,11 +99,20 @@ export function buildLearningGraph(
   }
   const appendMemory = (source: 'memory' | 'user', entries: readonly string[]): void => {
     entries.forEach((entry, index) => {
-      const id = `memory:${source}:${index}`
-      nodes.push({ id, kind: 'memory', label: entry.split('\n')[0]?.slice(0, 80) ?? id })
-      const token = entry.toLowerCase()
+      // E-72 (D-9): `split('\n')[0]` is never undefined (a string always
+      // splits into at least one element), so the former `?? id` fallback was
+      // unreachable and is gone; an empty entry just yields an empty label.
+      const label = (entry.split('\n')[0] ?? '').slice(0, 80)
+      // E-21: id carries the label snapshot so edit/delete detect index drift.
+      const id = `memory:${source}:${index}:${memorySnapshotOf(label)}`
+      nodes.push({ id, kind: 'memory', label })
+      // E-72: word-level matching, not substring. Split the entry into word
+      // tokens on non-letter/digit/hyphen runs (a hyphenated skill name like
+      // `python-testing` stays one token) and require the skill name to be a
+      // whole token — so skill `run` no longer links "running"/"grunt".
+      const words = new Set(entry.toLowerCase().split(/[^a-z0-9-]+/).filter(Boolean))
       for (const name of sorted) {
-        if (name && token.includes(name.toLowerCase())) edges.push({ from: id, to: name, type: 'memory_skill' })
+        if (name && words.has(name.toLowerCase())) edges.push({ from: id, to: name, type: 'memory_skill' })
       }
     })
   }
@@ -113,12 +123,75 @@ export function buildLearningGraph(
 
 export type GraphNodeId =
   | { kind: 'skill'; name: string }
-  | { kind: 'memory'; source: 'memory' | 'user'; index: number }
+  | { kind: 'memory'; source: 'memory' | 'user'; index: number; snapshot?: string }
 
-/** Parse a graph node id: skill names pass through; `memory:<source>:<index>` becomes a memory node. */
+/**
+ * E-21 snapshot token: a deterministic 8-hex-char digest of a memory entry's
+ * rendered label (first line, first 80 chars). The graph builder embeds it in
+ * the memory node id so a later edit/delete can detect index drift — any
+ * memory write between the last render and the command shifts `memory:<source>:<index>`
+ * positions, and the token lets the command reject a stale index instead of
+ * mutating the wrong entry. FNV-1a (no imports, cross-platform).
+ */
+export function memorySnapshotOf(entry: string): string {
+  // `[0]` is never undefined (split always yields one element); asserted for
+  // noUncheckedIndexedAccess — see buildLearningGraph (E-72 / D-9).
+  const label = (entry.split('\n')[0] ?? '').slice(0, 80)
+  let hash = 0x811c9dc5
+  for (let i = 0; i < label.length; i += 1) {
+    hash ^= label.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0').slice(-8)
+}
+
+export interface MemoryIndexCheck {
+  ok: boolean
+  /** The current entry at the index, present when ok. */
+  entry?: string
+  message?: string
+}
+
+/**
+ * E-21 TOCTOU guard for a memory node operation. Re-reads the entry at
+ * `parsed.index` and, when the id carries a snapshot token, verifies the
+ * current entry's label still matches it. A mismatch means a memory write
+ * shifted the index between the last `/graph` render and this command, so the
+ * operation is refused (the caller surfaces "re-run /graph"). A missing
+ * snapshot (a hand-typed bare `memory:<source>:<index>` id) skips the check
+ * and falls back to operating on whatever currently sits at the index.
+ */
+export function readMemoryIndex(
+  parsed: Extract<GraphNodeId, { kind: 'memory' }>,
+  entries: readonly string[],
+): MemoryIndexCheck {
+  const entry = entries[parsed.index]
+  if (entry === undefined) {
+    return { ok: false, message: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
+  }
+  if (parsed.snapshot !== undefined && memorySnapshotOf(entry) !== parsed.snapshot) {
+    return { ok: false, message: `Memory ${parsed.source}[${parsed.index}] changed since the graph was rendered; run /graph again and retry.` }
+  }
+  return { ok: true, entry }
+}
+
+/**
+ * Parse a graph node id: skill names pass through; `memory:<source>:<index>`
+ * becomes a memory node. An optional trailing `:<snapshot>` (the E-21
+ * `memorySnapshotOf` token the builder embeds) is carried so edit/delete can
+ * detect index drift; a bare index id (hand-typed) still parses with no
+ * snapshot and skips the drift check.
+ */
 export function parseGraphNodeId(id: string): GraphNodeId | null {
-  const memory = /^memory:(memory|user):(\d+)$/.exec(id)
-  if (memory) return { kind: 'memory', source: memory[1] as 'memory' | 'user', index: Number(memory[2]) }
+  const memory = /^memory:(memory|user):(\d+)(?::([0-9a-f]{8}))?$/.exec(id)
+  if (memory) {
+    return {
+      kind: 'memory',
+      source: memory[1] as 'memory' | 'user',
+      index: Number(memory[2]),
+      ...(memory[3] !== undefined ? { snapshot: memory[3] } : {}),
+    }
+  }
   if (SKILL_NAME_RE.test(id)) return { kind: 'skill', name: id }
   return null
 }
@@ -147,6 +220,16 @@ export async function resolveGraphNode(
 interface MemoryLike {
   read(target: 'memory' | 'user'): Promise<string[]>
   applyBatch(target: 'memory' | 'user', operations: Array<{ action: 'replace' | 'remove'; old_text: string; facts?: string }>): Promise<{ ok: boolean; message: string }>
+}
+
+/**
+ * E-26 approval seam (soft-probed, mirrors tool-skill-manage): graph skill
+ * mutations route through the same `evolutionApproval.request` gate. The
+ * staged `args` use the skill_manage runner's shape so the runner tool-skill-
+ * manage registers for `kind: 'skill'` replays them on approve.
+ */
+interface ApprovalLike {
+  request(input: { kind: 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
 }
 
 export const name = 'evolution-learning-graph'
@@ -210,7 +293,12 @@ export function apply(ctx: Context): void {
         }
 
         function withSkills(): SkillLibrary {
-          return new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+          // 0.3.18 (S4.1, E-30): the graph read the COMMON root via undefined —
+          // a configured root in other members was silently ignored here,
+          // producing graph data from a DIFFERENT skills tree than the one the
+          // tools wrote to. Single resolution via resolveSkillsRoot (the graph
+          // mount exposes no own config channel; it follows the default root).
+          return new SkillLibrary(resolveSkillsRoot(), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
         }
 
         async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {
@@ -227,13 +315,42 @@ export function apply(ctx: Context): void {
           const parsed = parseGraphNodeId(id)
           if (parsed === null) return err(`Invalid node id "${id}". Skill names or memory:<source>:<index> expected.`)
           if (parsed.kind === 'skill') {
+            // E-26: the graph edit is a content mutation and must follow the
+            // same approval + telemetry path as skill_manage. Approval is a
+            // soft dependency (ctx.get); when absent the write executes
+            // directly, unchanged.
+            const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+            if (approval) {
+              const origins = resolveOrigins(undefined)
+              const decision = await approval.request({
+                kind: 'skill',
+                // The origin field is the approval surface vocabulary
+                // ('foreground' | 'background_review'); a command has no
+                // session origin channel, so it derives to 'foreground'. The
+                // graph surface is marked in the summary so the audit record
+                // names where the write came from.
+                summary: `graph edit ${parsed.name}`,
+                args: { operation: { action: 'update', name: parsed.name, content }, origin: origins.approval, libraryOrigin: origins.library },
+                origin: origins.approval,
+              })
+              if (decision.action === 'staged') return ok(decision.message)
+            }
             const result = await withSkills().update(parsed.name, content, 'foreground')
+            // E-26: a graph edit is a content patch — bump the patch counter
+            // exactly as skill_manage does (previously graph edits never
+            // entered the mutation-maturity signal).
+            if (result.ok) {
+              await (usageService as unknown as { record?(name: string, kind: 'patch'): Promise<void> }).record?.(parsed.name, 'patch')
+            }
             return result.ok ? ok(result.message) : err(result.message)
           }
+          // E-21 memory TOCTOU: re-read the current index and verify the
+          // snapshot token still matches before mutating, so a memory write
+          // between the last render and this edit cannot shift the target.
           const entries = await memory.read(parsed.source)
-          const entry = entries[parsed.index]
-          if (entry === undefined) return err(`Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).`)
-          const result = await memory.applyBatch(parsed.source, [{ action: 'replace', old_text: entry, facts: content }])
+          const check = readMemoryIndex(parsed, entries)
+          if (!check.ok) return err(check.message ?? 'Memory index check failed.')
+          const result = await memory.applyBatch(parsed.source, [{ action: 'replace', old_text: check.entry ?? '', facts: content }])
           return result.ok ? ok(result.message) : err(result.message)
         }
 
@@ -241,6 +358,20 @@ export function apply(ctx: Context): void {
           const parsed = parseGraphNodeId(id)
           if (parsed === null) return err(`Invalid node id "${id}". Skill names or memory:<source>:<index> expected.`)
           if (parsed.kind === 'skill') {
+            // E-26: same approval gate as edit/delete via skill_manage; the
+            // archived markArchived telemetry below was already written back
+            // (the audit's noted gap was approval + the edit patch counter).
+            const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+            if (approval) {
+              const origins = resolveOrigins(undefined)
+              const decision = await approval.request({
+                kind: 'skill',
+                summary: `graph delete ${parsed.name}`,
+                args: { operation: { action: 'delete', name: parsed.name }, origin: origins.approval, libraryOrigin: origins.library },
+                origin: origins.approval,
+              })
+              if (decision.action === 'staged') return ok(decision.message)
+            }
             const result = await withSkills().archive(parsed.name)
             if (result.ok) {
               const usageRegistry = usageService as unknown as { markArchived?(name: string): Promise<void> } | undefined
@@ -248,10 +379,11 @@ export function apply(ctx: Context): void {
             }
             return result.ok ? ok(result.message) : err(result.message)
           }
+          // E-21 memory TOCTOU guard (same as edit).
           const entries = await memory.read(parsed.source)
-          const entry = entries[parsed.index]
-          if (entry === undefined) return err(`Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).`)
-          const result = await memory.applyBatch(parsed.source, [{ action: 'remove', old_text: entry }])
+          const check = readMemoryIndex(parsed, entries)
+          if (!check.ok) return err(check.message ?? 'Memory index check failed.')
+          const result = await memory.applyBatch(parsed.source, [{ action: 'remove', old_text: check.entry ?? '' }])
           return result.ok ? ok(result.message) : err(result.message)
         }
       },

@@ -41,6 +41,14 @@ export interface EvolutionIoLike {
    * the path does not exist). Consumers treat `null` as "let it through".
    */
   isSymlink?(this: void, path: string): Promise<boolean | null>
+  /**
+   * Optional mtime-generation probe (0.3.18, E-71): the path's mtime in
+   * milliseconds since epoch, or `null` when unknown (unsupported backend,
+   * missing path, stat failure). Consumers use it as a cheap invalidation
+   * stamp for a cached directory listing; a backend without it keeps
+   * event-driven invalidation only.
+   */
+  mtime?(this: void, path: string): Promise<number | null>
 }
 
 /**
@@ -87,6 +95,12 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
     isSymlink: (path) => {
       const io = provider()
       return io.isSymlink ? io.isSymlink(path) : Promise.resolve(null)
+    },
+    // Never throws: a backend without the probe reports null (cache keeps its
+    // event-driven invalidation only — 0.3.18, E-71).
+    mtime: (path) => {
+      const io = provider()
+      return io.mtime ? io.mtime(path) : Promise.resolve(null)
     },
   }
 }
@@ -270,6 +284,12 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       try { return (await lstat(path)).isSymbolicLink() } catch {
         // Guard not applicable: missing path or an lstat failure never blocks.
         return null
+      }
+    },
+    async mtime(path) {
+      try { return (await stat(path)).mtimeMs } catch (error) {
+        if (isMissing(error)) return null
+        throw error
       }
     },
   }

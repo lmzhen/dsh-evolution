@@ -75,6 +75,12 @@ export class EvolutionState extends Service {
     return this.storage().saveCuratorState(record)
   }
 
+  /** Atomic read-modify-write the curator-state record (S5.5). See the
+   * storage seam contract for the task / delete semantics. */
+  transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void> {
+    return this.storage().transactCuratorState(task)
+  }
+
   listPending(status: PendingStatus = 'pending'): Promise<PendingRecord[]> {
     return this.storage().listPending(status)
   }

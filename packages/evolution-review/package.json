@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-review",
   "description": "Background review orchestration",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "publishConfig": {
     "access": "public"
   },
@@ -41,6 +41,7 @@
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-evolution-policy": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",

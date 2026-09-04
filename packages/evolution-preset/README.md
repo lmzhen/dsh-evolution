@@ -2,6 +2,12 @@
 
 Compatibility one-click bundle for the dsh-evolution plugin family
 
+> ⚠️ **Mutually exclusive install target.** `dsh-evolution-preset` is the
+> one-click bundle that exposes the model tools profile-wide. It shares its
+> infrastructure rows with `@deepseek-ai/dsh-evolution-host`; do **not** add both
+> bundles to the same profile — pick the layered host/agent layout (recommended)
+> or this preset bundle.
+
 
 ## Model Experience
 

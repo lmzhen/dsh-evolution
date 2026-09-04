@@ -54,15 +54,22 @@ export class EvolutionFeedback {
   private chain: Promise<unknown> = Promise.resolve()
   private readonly path?: string
   private readonly eventsPath?: string
-  private readonly io: IoLike | undefined
+  private io: IoLike | undefined
+  private warn: (message: string) => void
 
-  constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh'), pathOverride?: string) {
-    if (io) {
-      // rc.68 + K-6: BOTH paths derive from the constructor surface only —
-      // record() takes no backend io, so path and io backend can never disagree.
-      this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
-      this.eventsPath = eventsFile(home)
-    }
+  constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh'), pathOverride?: string, warn: (message: string) => void = () => {}) {
+    // rc.68 + K-6: BOTH paths derive from the constructor surface only —
+    // record() takes no backend io, so path and io backend can never disagree.
+    // They derive unconditionally so a late `attachIo` (S6.4) does not need to
+    // repopulate them; methods no-op on `this.io` being absent.
+    this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
+    this.eventsPath = eventsFile(home)
+    this.io = io
+    this.warn = warn
+  }
+
+  /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
+  attachIo(io: IoLike): void {
     this.io = io
   }
 
@@ -99,7 +106,7 @@ export class EvolutionFeedback {
         }
       }
       const { events } = await readEvolutionTimeline(io, eventsPath)
-      const cache = parseCache(await io.readText(path))
+      const cache = parseCache(await io.readText(path), this.warn)
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       const floor = events[0]?.seq ?? 0
       // rc.72 G-3: a cache whose lastSeq fell below the timeline floor is out
@@ -107,7 +114,7 @@ export class EvolutionFeedback {
       // fold; fall back to the full fold (an unrecoverable band stays lost,
       // but the result is never WRONG).
       const usableCache = cache && cache.lastSeq >= floor - 1 ? cache : null
-      const truth = usableCache ? foldWithDelta(usableCache, events) : foldFeedbackState(events)
+      const truth = usableCache ? foldWithDelta(usableCache, events, this.warn) : foldFeedbackState(events, this.warn)
       // Memory wins per record (rc.66 semantics): a record() that landed
       // optimistically before this restore settled must survive.
       this.state = {
@@ -132,6 +139,7 @@ export class EvolutionFeedback {
     // Optimistic in-memory update: score()/quality read it synchronously.
     const table = this.state[mode]
     const current = table[target] ?? { positive: 0, negative: 0 }
+    const previousNote = current.lastNote
     current[rating] += 1
     if (note !== undefined) current.lastNote = note
     table[target] = current
@@ -140,16 +148,28 @@ export class EvolutionFeedback {
     if (!recordIo || !eventsPath) return
     // rc.68: the increment is an EVENT APPEND under the write lock — the log
     // is the truth, the aggregate is derived. A malformed log refuses the
-    // append (rc.65 posture) and the optimistic count stays.
+    // append (rc.65 posture). S6.4 E-8: a failed append reclaims the optimistic
+    // count — the log is the truth, so a count that never landed must not
+    // linger in memory (it would silently diverge and be dropped next boot).
     void this.mutate(async () => {
       try {
         const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
         // rc.72 G-3: cadence snapshot keeps the boot cache inside the retention
         // window (see CACHE_SNAP_EVERY); best-effort inside the same task.
+        // writeCacheNow swallows its own errors and never throws, so this catch
+        // is reached only when the append itself failed.
         if (seq % CACHE_SNAP_EVERY === 0) await this.writeCacheNow()
       } catch (error: unknown) {
-        // Best-effort: the optimistic count stays (recoverable on the next
-        // successful record); a persistence failure must not throw.
+        const rollback = table[target]
+        if (rollback) {
+          rollback[rating] -= 1
+          if (note !== undefined) {
+            if (previousNote === undefined) delete rollback.lastNote
+            else rollback.lastNote = previousNote
+          }
+        }
+        // Best-effort: the rollback keeps memory aligned with the log truth; a
+        // persistence failure must not throw.
         void error
       }
     })
@@ -186,7 +206,8 @@ export class EvolutionFeedback {
       const { events } = await readEvolutionTimeline(recordIo, eventsPath)
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       if (maxSeq === 0) return
-      await recordIo.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events) }, null, 2))
+      const body = JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events, this.warn) }, null, 2)
+      await recordIo.writeText(path, body)
     } catch {
       // Best-effort: the cache is disposable.
     }
@@ -261,19 +282,55 @@ function parseAggregate(raw: string | null): FeedbackState | null {
   }
 }
 
-function parseCache(raw: string | null): { lastSeq: number; state: FeedbackState } | null {
+function parseCache(raw: string | null, warn: (message: string) => void = () => {}): { lastSeq: number; state: FeedbackState } | null {
   if (raw === null) return null
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; lastSeq?: unknown; skills?: unknown; sessions?: unknown }
-    if (parsed.version !== CACHE_VERSION || typeof parsed.lastSeq !== 'number') return null
+    if (parsed.version !== CACHE_VERSION || typeof parsed.lastSeq !== 'number' || !Number.isFinite(parsed.lastSeq)) return null
     if (!isRecord(parsed.skills) || !isRecord(parsed.sessions)) return null
     return {
       lastSeq: parsed.lastSeq,
-      state: { skills: parsed.skills as FeedbackState['skills'], sessions: parsed.sessions as FeedbackState['sessions'] },
+      state: {
+        skills: sanitizeCacheRecords(parsed.skills, 'skill', warn),
+        sessions: sanitizeCacheRecords(parsed.sessions, 'session', warn),
+      },
     }
   } catch {
     return null
   }
+}
+
+/** Per-record numeric-domain validation (S6.4): a record whose `positive` or
+ * `negative` is not a finite number >= 0, or whose `lastNote` is not a string,
+ * would fold as NaN into the usage aggregate — skip it with a warn instead of
+ * corrupting the state. A record with no valid count is dropped entirely. */
+function sanitizeCacheRecords(input: Record<string, unknown>, kind: 'skill' | 'session', warn: (message: string) => void): Record<string, FeedbackRecord> {
+  const out: Record<string, FeedbackRecord> = {}
+  for (const [target, value] of Object.entries(input)) {
+    const record = sanitizeFeedbackRecord(value, target, kind, warn)
+    if (record) out[target] = record
+  }
+  return out
+}
+
+function sanitizeFeedbackRecord(value: unknown, target: string, kind: 'skill' | 'session', warn: (message: string) => void): FeedbackRecord | null {
+  if (!isRecord(value)) {
+    warn(`evolution-feedback: skipping cache record for ${kind} "${target}": not a record`)
+    return null
+  }
+  const positive = value.positive
+  const negative = value.negative
+  const note = value.lastNote
+  const validCount = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0
+  if (!validCount(positive) || !validCount(negative)) {
+    warn(`evolution-feedback: skipping cache record for ${kind} "${target}": positive/negative must be finite numbers >= 0`)
+    return null
+  }
+  if (note !== undefined && typeof note !== 'string') {
+    warn(`evolution-feedback: skipping cache record for ${kind} "${target}": lastNote must be a string`)
+    return null
+  }
+  return { positive, negative, ...(note !== undefined ? { lastNote: note } : {}) }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -281,28 +338,39 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Fold all feedback events from zero (the truth view). */
-function foldFeedbackState(events: EvolutionEvent[]): FeedbackState {
+function foldFeedbackState(events: EvolutionEvent[], warn: (message: string) => void = () => {}): FeedbackState {
   const state: FeedbackState = { skills: {}, sessions: {} }
-  for (const event of events) applyFeedbackEvent(state, event)
+  for (const event of events) applyFeedbackEvent(state, event, warn)
   return state
 }
 
 /** Fold events after the cache's lastSeq onto the cached aggregates. */
-function foldWithDelta(cache: { lastSeq: number; state: FeedbackState }, events: EvolutionEvent[]): FeedbackState {
+function foldWithDelta(
+  cache: { lastSeq: number; state: FeedbackState },
+  events: EvolutionEvent[],
+  warn: (message: string) => void = () => {},
+): FeedbackState {
   const state: FeedbackState = {
     skills: { ...cache.state.skills },
     sessions: { ...cache.state.sessions },
   }
   for (const event of events) {
-    if (event.seq > cache.lastSeq) applyFeedbackEvent(state, event)
+    if (event.seq > cache.lastSeq) applyFeedbackEvent(state, event, warn)
   }
   return state
 }
 
-function applyFeedbackEvent(state: FeedbackState, event: EvolutionEvent): void {
+function applyFeedbackEvent(state: FeedbackState, event: EvolutionEvent, warn: (message: string) => void = () => {}): void {
   if (event.type !== 'feedback') return
+  // S6.4: only 'positive'/'negative' are valid ratings. Any other value
+  // (NaN or an arbitrary string from a malformed log) would fold
+  // `record[value] += 1` as NaN into the usage aggregate, so skip with a warn.
+  if (event.rating !== 'positive' && event.rating !== 'negative') {
+    warn(`evolution-feedback: skipping feedback event with invalid rating: ${String(event.rating)}`)
+    return
+  }
   const target = event.target
-  if (target === undefined || event.rating === undefined) return
+  if (target === undefined) return
   const table = event.kind === 'skill' ? state.skills : state.sessions
   const record = table[target] ?? { positive: 0, negative: 0 }
   record[event.rating] += 1
@@ -310,7 +378,9 @@ function applyFeedbackEvent(state: FeedbackState, event: EvolutionEvent): void {
   table[target] = record
 }
 
-/** Synthesize one event per aggregate count unit, lastNote on the final event (migration). */
+/** Synthesize one event per aggregate count unit, lastNote on the final event
+ * (migration). A zero-count record still carrying a lastNote would otherwise
+ * drop the note — emit a dedicated note event (S6.4) so it survives. */
 function synthesizeFeedbackEvents(aggregate: FeedbackState): EvolutionEvent[] {
   const events: EvolutionEvent[] = []
   const at = new Date().toISOString()
@@ -322,10 +392,17 @@ function synthesizeFeedbackEvents(aggregate: FeedbackState): EvolutionEvent[] {
     for (let index = 0; index < record.negative; index += 1) {
       events.push({ seq: events.length + 1, at, type: 'feedback', kind, target, rating: 'negative' })
     }
-    if (record.lastNote !== undefined && events.length >= first) {
-      const last = events.length - 1
-      const final = events[last]
-      if (final) events[last] = { ...final, note: record.lastNote }
+    if (record.lastNote !== undefined) {
+      if (events.length >= first) {
+        const last = events.length - 1
+        const final = events[last]
+        if (final) events[last] = { ...final, note: record.lastNote }
+      } else {
+        // Zero-count record with a note: the event model only folds notes via a
+        // rated feedback event, so preserve the note as a single positive event
+        // (the record had no count to attach it to; the note is not lost).
+        events.push({ seq: events.length + 1, at, type: 'feedback', kind, target, rating: 'positive', note: record.lastNote })
+      }
     }
   }
   for (const [target, record] of Object.entries(aggregate.skills)) emitTarget('skill', target, record)
@@ -354,32 +431,47 @@ interface SkillUsageLike {
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-  const io = ioRegistry ? evolutionIoAdapter(() => ioRegistry.provider()) : undefined
-  const feedback = new EvolutionFeedback(io, process.env.DSH_HOME ?? join(homedir(), '.dsh'), rawConfig.path || undefined)
-  if (io) {
-    void feedback.restore(io).catch((error: unknown) => {
-      ctx.logger.warn(error)
-    })
-  }
-
+  // Deferred binding (S6.4, tool-* pattern): the feedback service is provided
+  // with no backend first; evolutionIo/skillUsage wire themselves once the
+  // providers mount. Apply-time `ctx.get` probes were startup-order sensitive —
+  // a provider registered after this plugin was skipped entirely.
+  const feedback = new EvolutionFeedback(
+    undefined,
+    process.env.DSH_HOME ?? join(homedir(), '.dsh'),
+    rawConfig.path || undefined,
+    (message) => {
+      ctx.logger.warn(message)
+    },
+  )
   // Make the service available first; restoration settles in the background.
   ctx.provide('evolutionFeedback', feedback)
 
-  const skillUsage = ctx.get('skillUsage') as SkillUsageLike | undefined
-  if (skillUsage) {
-    const original = feedback.record.bind(feedback)
+  ctx.inject(['evolutionIo'], (ioCtx) => {
+    const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(): EvolutionIoLike } }).evolutionIo
+    const io = evolutionIoAdapter(() => ioRegistry.provider())
+    feedback.attachIo(io)
+    void feedback.restore(io).catch((error: unknown) => {
+      ioCtx.logger.warn(error)
+    })
+  })
+
+  const baseRecord = feedback.record.bind(feedback)
+  let qualityWired = false
+  ctx.inject(['skillUsage'], (skillCtx) => {
+    if (qualityWired) return
+    qualityWired = true
+    const skillUsage = (skillCtx as unknown as { skillUsage: SkillUsageLike }).skillUsage
     feedback.record = (target, rating, note, kind) => {
-      original(target, rating, note, kind ?? 'session')
+      baseRecord(target, rating, note, kind ?? 'session')
       if (kind === 'skill') {
         const score = feedback.score(target, 'skill')
         const warn = score < (rawConfig.qualityWarnThreshold ?? -0.25)
         void skillUsage.setQuality(target, score, warn).catch((error: unknown) => {
-          ctx.logger.warn(error)
+          skillCtx.logger.warn(error)
         })
       }
     }
-  }
+  })
 
   ctx.effect(() => () => {
     // rc.68: the event log is the only durable write, but the boot cache is

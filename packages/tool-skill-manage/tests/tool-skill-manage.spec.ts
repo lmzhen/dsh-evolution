@@ -39,8 +39,7 @@ async function setup() {
 }
 
 describe('tool-skill-manage', () => {
-  it('registers the skill_manage tool', async () => {
-    const ctx = new Context()
+  it('registers the skill_manage tool', async () => {    const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -312,6 +311,19 @@ Use it.
       else process.env.DSH_HOME = previousHome
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('T-13: limit schemas reject zero/negative values at configuration time (0.3.18)', () => {
+    const validate = (value: unknown): boolean => {
+      const result = (ToolSkillManage.Config as unknown as { ['~standard']: { validate(input: unknown): { value?: unknown; issues?: unknown } } })['~standard'].validate(value)
+      return result.issues === undefined
+    }
+    expect(validate({ maxSkillNameLength: 0 })).toBe(false)
+    expect(validate({ maxDescriptionLength: -1 })).toBe(false)
+    expect(validate({ maxSkillContentChars: 0 })).toBe(false)
+    expect(validate({ maxSkillFileBytes: -5 })).toBe(false)
+    expect(validate({})).toBe(true)
+    expect(validate({ maxSkillNameLength: 1 })).toBe(true)
   })
 })
 

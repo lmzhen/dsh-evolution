@@ -11,7 +11,7 @@
  * Distinct from `signals.ts` — the session-level review signal gate.
  */
 
-import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from './skill-health.ts'
+import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, MIN_STAMP_BODY_CHARS } from './skill-health.ts'
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
 import { AUTHORING_DESCRIPTION_BAR } from './constants.ts'
 
@@ -194,7 +194,7 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
     const density = health.dims.stampDensityPerKb
     signals.push(
       density === null
-        ? sig('stamp_density', 'pass', body.length < 2_000 ? 'below-min-body' : 'not-assessed')
+        ? sig('stamp_density', 'pass', body.length < MIN_STAMP_BODY_CHARS ? 'below-min-body' : 'not-assessed')
         : sig(
           'stamp_density',
           density >= DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb ? 'over' : 'pass',

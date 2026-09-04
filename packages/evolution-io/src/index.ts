@@ -36,6 +36,13 @@ export interface EvolutionIo {
    * "let it through". Mirrors `EvolutionIoLike.isSymlink`.
    */
   isSymlink?(this: void, path: string): Promise<boolean | null>
+  /**
+   * Optional mtime-generation probe (0.3.18, E-71): milliseconds since epoch
+   * of the path's mtime, or `null` when unknown (unsupported backend, missing
+   * path, stat failure). Consumers use it as a cheap invalidation stamp for a
+   * cached listing. Mirrors `EvolutionIoLike.mtime`.
+   */
+  mtime?(this: void, path: string): Promise<number | null>
 }
 
 declare module '@deepseek-ai/cordis' {

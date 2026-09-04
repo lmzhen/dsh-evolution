@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
@@ -32,6 +32,10 @@ Run the same generic workflow. Capture the standard result. Report the common ou
 `
 }
 
+/** S5.5: curator-state mock record shape and its atomic RMW task signature. */
+type StateRecord = { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }
+type StateTransactTask = (current: StateRecord | null) => StateRecord | null
+
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-'))
@@ -46,6 +50,7 @@ describe('evolution-curator', () => {
     ctx.provide('evolutionState', {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
     await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
     ctx.evolutionCurator.start()
@@ -164,6 +169,7 @@ describe('evolution-curator', () => {
     ctx.provide('evolutionState', {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
     // This fake state is anchored at epoch — DUE — so the auto-start boot
     // check must be off: this test own the snapshot/restore flow, not the
@@ -196,6 +202,7 @@ describe('evolution-curator', () => {
     ctx.provide('evolutionState', {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
     await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, intervalHours: 24 })
     // The boot check is deferred (never synchronous with the half-built host);
@@ -223,6 +230,7 @@ describe('evolution-curator', () => {
     ctx.provide('evolutionState', {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
     // intervalHours = 336: a 1-day-old run is NOT due → no pass may fire.
     await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, intervalHours: 336 })
@@ -445,6 +453,44 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('E-15: a crashed archive (dir gone, usage not folded) heals to archived with no failed entry (S5.4)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e15-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+    await skills.create('ancient-skill', body('ancient-skill', 'Ancient body.'), 'background_review')
+    // Seed an agent usage record far past the archive threshold.
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['ancient-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    // Simulate a crash AFTER the archive rename but BEFORE the usage fold: the
+    // skill directory is gone while the usage record is still 'active'. The
+    // previous code re-attempted the (doomed) rename every run, reported a
+    // permanent failed entry, and never folded the record.
+    await rm(join(skills.root, 'ancient-skill'), { recursive: true, force: true })
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(result.errors).toEqual([])
+    // No permanent failed entry for a skill whose directory is already gone.
+    expect(result.report.failed).toEqual([])
+    // The crash-window record is folded to archived (state migration, no
+    // counter bump), not reported as a freshly archived skill.
+    expect(result.archived).toEqual([])
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('ancient-skill')?.state).toBe('archived')
+    expect(usage.get('ancient-skill')?.archived_at).toBeTruthy()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('seeds baseline records for tree skills the sidecar has not seen (F8)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-seed-'))
     const previous = process.env.DSH_HOME
@@ -514,7 +560,9 @@ describe('evolution-curator', () => {
     // normalization makes undefined behave exactly like "no state yet".
     await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
     const result = await ctx.evolutionCurator.run()
-    expect(result.skipped).toBe('first-run-deferred')
+    // 0.3.18 (E-18): the stateless annotation distinguishes this defer;
+    // the second due run proceeds (see the E-18 test) instead of deferring forever.
+    expect(result.skipped).toBe('first-run-deferred(stateless)')
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
@@ -569,6 +617,7 @@ Aging body.
     ctx.provide('evolutionState', {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
     await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
     const skills = ctx.evolutionCurator.skills
@@ -611,6 +660,7 @@ Ancient body.
     ctx.provide('evolutionState', {
       loadCuratorState: async () => saved,
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
     await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
     expect(await ctx.evolutionCurator.status()).toBeNull()
@@ -647,6 +697,8 @@ Ancient body.
       loadCuratorState: async () => saved,
 
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
+
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
 
     })
 
@@ -704,6 +756,81 @@ Ancient body.
 
     await rm(home, { recursive: true, force: true })
 
+  })
+
+  it('E-16: a manual run finishing and a setPaused both persist atomically (S5.5)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e16-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved: StateRecord = { lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: StateRecord) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('ancient-skill', `---
+name: ancient-skill
+description: Ancient body.
+---
+Ancient body.
+`, 'background_review')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['ancient-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    // setPaused and the run-finish bookkeeping write are independent atomic
+    // read-modify-writes. Racing them must preserve BOTH the operator pause
+    // and the run's lastRunAt/runCount; the old load→save pair would drop one.
+    const [, runResult] = await Promise.all([
+      ctx.evolutionCurator.setPaused(true),
+      ctx.evolutionCurator.run({ ignoreGates: true }),
+    ])
+    expect(runResult.archived).toContain('ancient-skill')
+    expect(saved.paused).toBe(true)
+    expect(saved.runCount).toBe(2)
+    expect(saved.lastSummary).toMatch(/^auto:/)
+    // The run anchored the baseline at its own time (not the process clock).
+    expect(Date.now() - saved.lastRunAt).toBeLessThan(60_000)
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('E-51: a fresh-install manual run anchors the baseline at run time (S5.6)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e51-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // Fresh install: the state service exists but has never persisted a record.
+    let saved: StateRecord | null = null
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: StateRecord) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    const startedAt = Date.now()
+    // Manual (ignoreGates) run on a record-less install must curate and persist
+    // a baseline anchored NOW (>= test start), not the process-construction.
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    const persisted = await (ctx.get('evolutionState') as { loadCuratorState(): Promise<StateRecord | null> }).loadCuratorState()
+    expect(persisted).not.toBeNull()
+    expect(persisted!.lastRunAt).toBeGreaterThanOrEqual(startedAt)
+    expect(persisted!.lastSummary).toMatch(/^auto:/)
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
   })
 
   it('control-plane consolidate enforces the full gate set (P1-8)', async () => {
@@ -806,6 +933,7 @@ Body of ${name}.
     ctx.provide('evolutionState', {
       loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
       saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
     })
     await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
 
@@ -932,6 +1060,7 @@ Body of ${name}.
       ctx.provide('evolutionState', {
         loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
         saveCuratorState: async () => {},
+        transactCuratorState: async () => {},
       })
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
       const skills = ctx.evolutionCurator.skills
@@ -980,6 +1109,7 @@ Body of ${name}.
       ctx.provide('evolutionState', {
         loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
         saveCuratorState: async () => {},
+        transactCuratorState: async () => {},
       })
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
       const skills = ctx.evolutionCurator.skills
@@ -1034,6 +1164,7 @@ Body of ${name}.
       ctx.provide('evolutionState', {
         loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
         saveCuratorState: async () => {},
+        transactCuratorState: async () => {},
       })
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
       const skills = ctx.evolutionCurator.skills
@@ -1077,6 +1208,7 @@ Body of ${name}.
       ctx.provide('evolutionState', {
         loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
         saveCuratorState: async () => {},
+        transactCuratorState: async () => {},
       })
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
       const skills = ctx.evolutionCurator.skills
@@ -1150,6 +1282,7 @@ Body of ${name}.
       ctx.provide('evolutionState', {
         loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
         saveCuratorState: async () => {},
+        transactCuratorState: async () => {},
       })
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
       const skills = ctx.evolutionCurator.skills
@@ -1172,7 +1305,7 @@ Body of ${name}.
     }
   })
 
-  it('latestReport picks the newest by startedAt, not by filename order (M-4)', { timeout: 20_000 }, async () => {
+  it('latestReport orders by file mtime, not by filename or startedAt (E-54)', { timeout: 20_000 }, async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-latest-'))
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = home
@@ -1190,19 +1323,113 @@ Body of ${name}.
         archived: [],
         failed: [],
       }
-      // Filenames sort "z" BEFORE "a" lexicographically; the newer run carries
-      // the "a" name — latestReport must follow startedAt, not the file names.
-      await nodeEvolutionIo().writeText(join(reportsRoot, 'curator-zzzz.json'), JSON.stringify({ ...base, runId: 'older', startedAt: '2026-08-29T01:00:00.000Z', finishedAt: '2026-08-29T01:00:00.000Z' }))
-      await nodeEvolutionIo().writeText(join(reportsRoot, 'curator-aaaa.json'), JSON.stringify({ ...base, runId: 'newer', startedAt: '2026-08-29T10:00:00.000Z', finishedAt: '2026-08-29T10:00:00.000Z' }))
+      // Filename order ('aaaa' first) AND startedAt order ('aaaa' newer) both
+      // point at 'aaaa', but the mtime probe is the ordering authority (E-54):
+      // 'zzzz' carries the NEWER mtime, so latestReport must return it despite
+      // the lexicographic and startedAt disagreement (filenames are
+      // randomUUIDs — never chronological).
+      const aPath = join(reportsRoot, 'curator-aaaa.json')
+      const zPath = join(reportsRoot, 'curator-zzzz.json')
+      await nodeEvolutionIo().writeText(aPath, JSON.stringify({ ...base, runId: 'startedat-new-but-mtime-old', startedAt: '2026-08-30T01:00:00.000Z', finishedAt: '2026-08-30T01:00:00.000Z' }))
+      await nodeEvolutionIo().writeText(zPath, JSON.stringify({ ...base, runId: 'mtime-new', startedAt: '2026-08-29T01:00:00.000Z', finishedAt: '2026-08-29T01:00:00.000Z' }))
+      await utimes(aPath, new Date('2026-08-29T00:00:00.000Z'), new Date('2026-08-29T00:00:00.000Z'))
+      await utimes(zPath, new Date('2026-08-30T00:00:00.000Z'), new Date('2026-08-30T00:00:00.000Z'))
       await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
       const report = await ctx.evolutionCurator.latestReport()
-      expect(report?.runId).toBe('newer')
+      expect(report?.runId).toBe('mtime-new')
       ctx.evolutionCurator.stop()
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
       await rm(home, { recursive: true, force: true })
     }
+  })
+
+  it('minIdleFailOpen (default true) lets the run through when the agents service is missing (E-54)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-idle-open-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    // Due state + no `agents` service: the idle gate would otherwise block the
+    // run forever on a headless/scheduled composition — the default fails open.
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false, intervalHours: 24, minIdleHours: 2 })
+    const open = await ctx.evolutionCurator.run()
+    expect(open.skipped).toBeUndefined()
+    expect(open.report.runId).toBeTruthy()
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('minIdleFailOpen=false fails closed: a missing agents service defers the run (E-54)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-idle-closed-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false, intervalHours: 24, minIdleHours: 2, minIdleFailOpen: false })
+    const closed = await ctx.evolutionCurator.run()
+    expect(closed.skipped).toBe('active-session')
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('E-18: stateless composition defers FIRST sight only; the next due run actually curates (0.3.18)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-stateless-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // NO evolutionState service: stateless composition.
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+    const first = await ctx.evolutionCurator.run()
+    expect(first.skipped).toBe('first-run-deferred(stateless)')
+    const second = await ctx.evolutionCurator.run()
+    expect(second.skipped).toBeUndefined()
+    expect(second.report.runId).toBeTruthy()
+    ctx.evolutionCurator.stop()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  })
+
+  it('E-7: a throwing automatic check is contained and leaves an error report (0.3.18)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e7-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => { throw new Error('state store boom') },
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: false })
+    const curator = ctx.evolutionCurator as unknown as { autoCheck(): Promise<void> }
+    await expect(curator.autoCheck()).resolves.toBeUndefined()
+    const files = await readdir(join(home, 'evolution', 'reports'))
+    expect(files.some(name => name.startsWith('curator-error-'))).toBe(true)
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
   })
 
 })

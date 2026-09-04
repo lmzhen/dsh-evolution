@@ -22,7 +22,7 @@ import {
   MAINTAIN_PROMPT,
   computeDriftSignals,
 } from '@deepseek-ai/dsh-evolution-core'
-import { PROBE_SIGNALS, computeProbe, renderMaintainTemplate as render, validateAndNormalizeMaintainPlan } from '../src/index.ts'
+import { PROBE_SIGNALS, computeProbe, renderMaintainTemplate as render, snapshotFromLibrary, validateAndNormalizeMaintainPlan } from '../src/index.ts'
 
 function templateSignalRefs(): Set<string> {
   const refs = new Set<string>()
@@ -103,5 +103,59 @@ describe('011 self-consistency', () => {
     const result = validateAndNormalizeMaintainPlan(raw, report, new Set(['body_size']))
     expect(result.ok).toBe(false)
     expect(result.errors.some(error => error.includes('not in the facts block'))).toBe(true)
+  })
+
+  it('⑤ usage_observed and stamp_density agree between probe and facts (E-36/E-36a)', async () => {
+    // One construction = never disagree. Before the fix the probe read
+    // snapshot.usageObserved directly (always undefined → 'unknown') while the
+    // facts block injected the enrichment value; and the probe computed stamp
+    // density on bodies below the min-stamp size while the facts block
+    // reported below-min-body. These scenarios pin the agreement.
+    const library = {
+      async list() {
+        return [{ name: 'obs-skill', body: '# A\n\n' + 'x'.repeat(100) }]
+      },
+      async read() {
+        return '# A\n\n' + 'x'.repeat(100)
+      },
+    }
+
+    // usage_observed=observed (enrichment true)
+    const observedSnaps = await snapshotFromLibrary(library, { usageObserved: true })
+    const observedFact = computeDriftSignals(observedSnaps).library.find(signal => signal.id === 'usage_observed')
+    const observedProbe = computeProbe('usage_observed', undefined, observedSnaps).detail[0]
+    expect(observedFact?.value).toBe('observed')
+    expect(observedProbe).toBe('usage_observed=observed')
+
+    // usage_observed=unobserved (enrichment false) — must NOT read 'unknown'
+    const unobservedSnaps = await snapshotFromLibrary(library, { usageObserved: false })
+    const unobservedFact = computeDriftSignals(unobservedSnaps).library.find(signal => signal.id === 'usage_observed')
+    const unobservedProbe = computeProbe('usage_observed', undefined, unobservedSnaps).detail[0]
+    expect(unobservedFact?.value).toBe('unobserved')
+    expect(unobservedProbe).toBe('usage_observed=unobserved')
+
+    // missing enrichment → unknown on both sides
+    const unknownSnaps = await snapshotFromLibrary(library, {})
+    const unknownFact = computeDriftSignals(unknownSnaps).library.find(signal => signal.id === 'usage_observed')
+    const unknownProbe = computeProbe('usage_observed', undefined, unknownSnaps).detail[0]
+    expect(unknownFact?.verdict).toBe('unknown')
+    expect(unknownProbe).toBe('usage_observed=unknown')
+
+    // stamp_density below the min-stamp body size → below-min-body on both
+    const smallBody = '# A\n\n'
+    const smallSnaps = await snapshotFromLibrary({ async list() { return [{ name: 'small-skill', body: smallBody }] }, async read() { return smallBody } }, {})
+    const smallProbe = computeProbe('stamp_density', 'small-skill', smallSnaps).detail[0]
+    expect(smallProbe).toBe('stamp_density=below-min-body')
+    const smallFact = computeDriftSignals(smallSnaps).skills[0]?.signals.find(signal => signal.id === 'stamp_density')
+    expect(smallFact?.value).toBe('below-min-body')
+
+    // and a body above the threshold reproduces the same numeric density
+    const stamps = Array.from({ length: 6 }, (_, index) => `rc.${index + 1}`).join('\n')
+    const bigBody = '# D\n\n' + stamps + '\n\n' + 'x'.repeat(2_000)
+    const bigSnaps = await snapshotFromLibrary({ async list() { return [{ name: 'big-skill', body: bigBody }] }, async read() { return bigBody } }, {})
+    const bigProbe = computeProbe('stamp_density', 'big-skill', bigSnaps).detail[0]
+    expect(bigProbe).toContain('/KB')
+    const bigFact = computeDriftSignals(bigSnaps).skills[0]?.signals.find(signal => signal.id === 'stamp_density')
+    expect(bigFact?.value).toContain('/KB')
   })
 })

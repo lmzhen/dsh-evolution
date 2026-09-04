@@ -5,6 +5,13 @@
  * approved/staged background writes are replayed by the registered runner.
  * The skill library itself never hard-deletes: archive is the maximum
  * destructive action and every curator mutation is snapshot-reversible.
+ *
+ * 0.3.18 (E-70) — pin/unpin are deliberately OUTSIDE the approval seam:
+ * pinning only lifts/restores the curator-lifecycle freeze and is fully
+ * reversible by the same tool; routing it through `policy:'ask'` would let a
+ * staged-then-stale request hold the library in a pinned state invisibly.
+ * The tradeoff (no approval on a lifecycle-flag flip) is accepted and
+ * documented in the README Safety model section.
  * @module @deepseek-ai/dsh-tool-skill-manage
  */
 
@@ -12,12 +19,16 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
+
+/** 0.3.18 (E-70): review output lists at most this many near-duplicate groups
+ * (a cap, not a per-group limit) — the one named bound for the slice below. */
+const MAX_DEDUP_GROUPS_IN_REVIEW = 3
 
 export interface Config {
   /** Skill tree root; empty uses $DSH_HOME/skills. Align with skill-usage/catalog rows. */
@@ -32,10 +43,12 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   root: z.string().default(''),
-  maxSkillNameLength: z.number().default(DEFAULT_SKILL_LIMITS.maxNameLength),
-  maxDescriptionLength: z.number().default(DEFAULT_SKILL_LIMITS.maxDescriptionLength),
-  maxSkillContentChars: z.number().default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
-  maxSkillFileBytes: z.number().default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
+  // 0.3.18 (S4.6, T-13): lower bound 1 — a 0/negative limit rejected every
+  // write with a meaningless message instead of failing at configuration time.
+  maxSkillNameLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxNameLength),
+  maxDescriptionLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxDescriptionLength),
+  maxSkillContentChars: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+  maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
   descriptionStrict: z.boolean().default(false),
 })
 
@@ -89,7 +102,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: 900, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-  const library = new SkillLibrary(rawConfig.root || undefined, io, {
+  const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io, {
     maxNameLength: rawConfig.maxSkillNameLength ?? DEFAULT_SKILL_LIMITS.maxNameLength,
     maxDescriptionLength: rawConfig.maxDescriptionLength ?? DEFAULT_SKILL_LIMITS.maxDescriptionLength,
     maxSkillContentChars: rawConfig.maxSkillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
@@ -154,14 +167,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // Authorship, not a content patch (rc.44 M3-3.3): the record must
         // EXIST from birth (created_at anchors now, quality surfaces read it)
         // but patch_count stays 0. Agent-authored creations additionally mark
-        // created_by so the curator owns them.
-        await ctx.skillUsage.ensureRecord(name)
-        if (origin !== 'foreground') await ctx.skillUsage.markAgentCreated(name)
+        // created_by so the curator owns them. 0.3.18 (E-70): both in one
+        // atomic transact — no null window between ensure and mark.
+        await ctx.skillUsage.ensureRecordCreated(name, origin !== 'foreground')
       }
       if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
       // Create is authorship, not a content patch (rc.44 M3-3.3): it must not
       // inflate patch_count (and through it the mutation-maturity factor).
-      else if (name && mutating && action !== 'create') await ctx.skillUsage.record(name, 'patch')
+      // 0.3.18 (E-68): a no-op patch (old===new) must not count either.
+      else if (name && mutating && action !== 'create' && result.noop !== true) await ctx.skillUsage.record(name, 'patch')
       // The mutation event is emitted by SkillLibrary itself (decision C):
       // every write path — tool, curator, graph, restore — now covers the
       // catalog invalidation from a single sink.
@@ -186,7 +200,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${summary.protectedBy ? ` [${summary.protectedBy}]` : ''}`
     })
     const groups = computeDedupGroups({ contents: new Map(await Promise.all(list.map(async summary => [summary.name, (await library.read(summary.name)) ?? ''] as const))) })
-    const dedupLines = groups.slice(0, 3).map(group => `- ${group.join(' ~ ')}`)
+    const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
     const warned = list
       .filter(summary => report.get(summary.name)?.quality_warn === true)
       .map(summary => summary.name)
@@ -260,7 +274,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {
-          return { ok: true, message: decision.message, skills: [], pending_id: decision.pendingId ?? '' }
+          // 0.3.18 (E-70): no `pending_id ?? ''` — an absent id must stay absent.
+          return {
+            ok: true,
+            message: decision.message,
+            skills: [],
+            ...decision.pendingId !== undefined ? { pending_id: decision.pendingId } : {},
+          }
         }
       }
       return await executeCore(args, libraryOrigin)

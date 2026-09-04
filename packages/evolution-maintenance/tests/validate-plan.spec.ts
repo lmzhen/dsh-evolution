@@ -105,6 +105,19 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(result.plan.plan[0].undo_path).toBe('n/a')
   })
 
+  it('does not mutate the caller\'s structured input (E-56)', () => {
+    const item = validItem({ reversibility: 'none' })
+    delete item.undo_path
+    const root = validPlan([item])
+    const result = validateAndNormalizeMaintainPlan(root, report, SIGNALS)
+    expect(result.ok).toBe(true)
+    // The normalized plan carries the truthful 'n/a' ...
+    expect(result.plan.plan[0].undo_path).toBe('n/a')
+    // ... WITHOUT writing it back onto the caller's input object (no in-place
+    // `undo_path = 'n/a'` — the old code mutated the raw plan element).
+    expect((root.plan as Record<string, unknown>[])[0]?.undo_path).toBeUndefined()
+  })
+
   it('keeps undo_path required for reversible items (0.3.6)', () => {
     const item = validItem({ reversibility: 'restructure' })
     delete item.undo_path

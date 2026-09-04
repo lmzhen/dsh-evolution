@@ -14,7 +14,7 @@ export const name = 'tool-memory'
 
 /** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
 const DEFAULT_ENTRY_PREVIEW_CHARS = 200
-export const inject = ['tools', 'systemPrompt', 'memory']
+export const inject = ['tools', 'memory']
 
 /**
  * System-prompt memory guidance, aligned with Hermes `MEMORY_GUIDANCE`.
@@ -112,36 +112,57 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   memoryEnabled: z.boolean().default(true),
-  entryPreviewChars: z.number().default(DEFAULT_ENTRY_PREVIEW_CHARS),
+  // 0.3.18 (S4.6, T-13): lower bound 1 — `slice(0, negative)` returned the
+  // entry TAIL (semantics inversion) instead of an empty/full preview.
+  entryPreviewChars: z.number().min(1).default(DEFAULT_ENTRY_PREVIEW_CHARS),
 })
 
 export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
   if (!rawConfig.memoryEnabled) return
-  let snapshotText = await ctx.memory.renderContext()
-
-  ctx.systemPrompt.section({
-    name: 'evolution:memory-guidance',
-    order: 150,
-    text: MEMORY_GUIDANCE,
-  })
-  ctx.systemPrompt.context({
-    name: 'evolution:memory-snapshot',
-    order: 150,
-    text: () => snapshotText,
-  })
-  // P2 fix: the snapshot refresh moved to the write sink (MemoryRegistry
-  // emits evolution/memory-applied after ANY successful write). Bypass paths —
-  // `/graph edit|delete memory:`, background review direct writes — refresh the
-  // model-visible snapshot here, not only the foreground tool's own callback.
-  const refreshSnapshot = async (): Promise<void> => {
-    try {
-      snapshotText = await ctx.memory.renderContext()
-    } catch {
-      // Snapshot refresh is best-effort; a stale snapshot self-corrects at the
-      // next successful refresh (the write itself already landed).
-    }
+  // 0.3.18 (S4.3, E-67): systemPrompt is an OPTIONAL service (soft probe, the
+  // M-7 doctrine — align with tool-skill-manage). A host without it still boots
+  // and gets the working memory tool; only guidance/snapshot are skipped.
+  // The mount-time renderContext() is also failure-tolerant: without a
+  // registered memory provider the snapshot degrades to empty (self-corrects
+  // at the first successful write through the applied-event listener).
+  const systemPrompt = ctx.get('systemPrompt') as {
+    section(section: { name: string; order: number; text: string }): () => void
+    context(context: { name: string; order: number; text: () => string }): () => void
+  } | undefined
+  let snapshotText = ''
+  try {
+    snapshotText = await ctx.memory.renderContext()
+  } catch (error) {
+    ctx.logger.warn(`tool-memory: memory provider not ready at mount; snapshot starts empty until the first write: ${error instanceof Error ? error.message : String(error)}`)
   }
-  ctx.effect(() => ctx.on('evolution/memory-applied', () => { void refreshSnapshot() }), 'tool-memory.snapshot-refresh')
+
+  if (systemPrompt) {
+    ctx.effect(() => systemPrompt.section({
+      name: 'evolution:memory-guidance',
+      order: 150,
+      text: MEMORY_GUIDANCE,
+    }), 'tool-memory.memory-guidance')
+    ctx.effect(() => systemPrompt.context({
+      name: 'evolution:memory-snapshot',
+      order: 150,
+      text: () => snapshotText,
+    }), 'tool-memory.memory-snapshot')
+    // P2 fix: the snapshot refresh moved to the write sink (MemoryRegistry
+    // emits evolution/memory-applied after ANY successful write). Bypass paths —
+    // `/graph edit|delete memory:`, background review direct writes — refresh the
+    // model-visible snapshot here, not only the foreground tool's own callback.
+    const refreshSnapshot = async (): Promise<void> => {
+      try {
+        snapshotText = await ctx.memory.renderContext()
+      } catch {
+        // Snapshot refresh is best-effort; a stale snapshot self-corrects at the
+        // next successful refresh (the write itself already landed).
+      }
+    }
+    ctx.effect(() => ctx.on('evolution/memory-applied', () => { void refreshSnapshot() }), 'tool-memory.snapshot-refresh')
+  } else {
+    ctx.logger.warn('tool-memory: systemPrompt service not mounted; memory guidance and snapshot are not injected (the write tool still works)')
+  }
 
   async function executeCore(normalized: MemoryWriteArgs): Promise<{
     ok: boolean
@@ -154,7 +175,10 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     const result = normalized.operations
       ? await ctx.memory.applyBatch(normalized.target, normalized.operations)
       : await ctx.memory.applyBatch(normalized.target, [{ action: normalized.action ?? 'add', facts: normalized.facts, old_text: normalized.old_text }])
-    if (result.ok) snapshotText = await ctx.memory.renderContext()
+    // 0.3.18 (S4.2, E-20): the snapshot refresh happens ONLY in the
+    // memory-applied listener (single sink — MemoryRegistry emits after every
+    // successful write). A render here raced the listener's render and could
+    // leave a stale snapshot in the prompt.
     return {
       ok: result.ok,
       message: result.message,

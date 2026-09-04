@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-maintenance",
   "description": "Deterministic maintenance-scan surface: skill-library snapshot assembly, drift signals and mechanical-facts rendering (design 011)",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "publishConfig": {
     "access": "public"
   },
@@ -43,7 +43,6 @@
     "@deepseek-ai/dsh-tools": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/dsh-invariants": "workspace:^"
   }
 }

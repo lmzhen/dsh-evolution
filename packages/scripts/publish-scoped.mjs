@@ -8,8 +8,7 @@
  * fails the run. There is no rollback for npm publishes.
  *
  * Usage:
- *   node packages/evolution/scripts/publish-scoped.mjs            (tag auto: prerelease->next, stable->latest)
- *   node packages/evolution/scripts/publish-scoped.mjs --tag next (explicit override)
+ *   node packages/evolution/scripts/publish-scoped.mjs --tag next
  *   node packages/evolution/scripts/publish-scoped.mjs --dry-run
  *   node packages/evolution/scripts/publish-scoped.mjs --no-provenance
  */
@@ -24,10 +23,7 @@ const distRoot = join(evolutionRoot, 'dist')
 const argv = process.argv.slice(2)
 
 function hasFlag(name) { return argv.includes(name) }
-/** Explicit --tag wins; otherwise the dist tag is auto-selected per version:
- * a prerelease version (`-rc.x` etc.) publishes to `next`, a STABLE semver
- * publishes to `latest` (the 0.1.0 formal-release rule). */
-const explicitTag = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : undefined
+const tag = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')
@@ -59,8 +55,8 @@ function viewIntegrity(name, version) {
   }
 }
 
-function publish(tarball, distTag) {
-  const args = ['publish', tarball, '--access', 'public', '--tag', distTag]
+function publish(tarball) {
+  const args = ['publish', tarball, '--access', 'public', '--tag', tag]
   if (otp) args.push('--otp', otp)
   if (provenance) args.push('--provenance')
   if (interactive) {
@@ -99,8 +95,6 @@ for (const group of publishOrder) {
     const releaseVersion = match?.[1] ?? ''
     if (!releaseVersion) throw new Error(`cannot parse a semver from ${file}; non-tag builds must pack with a semver-safe version (e.g. 0.0.0-main)`)
 
-    const distTag = explicitTag ?? (releaseVersion.includes('-') ? 'next' : 'latest')
-
     const local = integrityOf(tarball)
     const remote = viewIntegrity(name, releaseVersion)
     if (remote !== undefined) {
@@ -111,11 +105,11 @@ for (const group of publishOrder) {
       throw new Error(`${name}@${releaseVersion} exists with different integrity; refusing to overwrite`)
     }
 
-    console.log(`publish ${name}@${releaseVersion}${dryRun ? ' (dry-run)' : ''} -> tag ${distTag}`)
+    console.log(`publish ${name}@${releaseVersion}${dryRun ? ' (dry-run)' : ''}`)
     if (dryRun) continue
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        publish(tarball, distTag)
+        publish(tarball)
         break
       } catch (error) {
         const text = `${error?.stderr ?? ''}${error?.message ?? ''}`

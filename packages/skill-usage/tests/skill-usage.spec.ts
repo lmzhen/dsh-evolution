@@ -128,4 +128,45 @@ describe('skill-usage', () => {
     expect((await ctx.skillUsage.report()).has('never-created')).toBe(false)
     await rm(root, { recursive: true, force: true })
   })
+
+  it('skips malformed tool/call events without throwing and without counting (E-65)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-malformed-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.ensureRecord('malformed-demo')
+    // `data` absent entirely — an external emitter can inject a broken event.
+    ctx.emit('session/event', {} as never, { type: 'tool/call' } as never)
+    // `data` present but carries no `name`.
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c1', arguments: JSON.stringify({ name: 'malformed-demo' }) },
+    } as never)
+    // `name` is present but not a string.
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c2', name: 42, arguments: JSON.stringify({ name: 'malformed-demo' }) },
+    } as never)
+    await ctx.skillUsage.invalidate()
+    const seen = (await ctx.skillUsage.report()).get('malformed-demo')
+    expect(seen?.view_count).toBe(0)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('E-70: ensureRecordCreated creates and marks authorship in one atomic write (0.3.18)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-e70-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.ensureRecordCreated('agent-skill', true)
+    await ctx.skillUsage.ensureRecordCreated('user-skill', false)
+    const report = await ctx.skillUsage.report()
+    expect(report.get('agent-skill')?.created_by).toBe('agent')
+    expect(report.get('agent-skill')?.patch_count).toBe(0)
+    expect(report.get('user-skill')).toBeDefined()
+    expect(report.get('user-skill')?.created_by).toBeNull()
+    await rm(root, { recursive: true, force: true })
+  })
 })

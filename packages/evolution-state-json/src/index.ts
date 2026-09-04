@@ -123,6 +123,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
       })
     },
 
+    async transactCuratorState(task) {
+      await mutate(async () => {
+        await jsonTransact<Record<string, CuratorStateRecord>>('curator-state.json', (current) => {
+          const next = task(current?.primary ?? null)
+          if (next === null) {
+            if (current !== null) delete current.primary
+            return current ?? {}
+          }
+          return { ...(current ?? {}), primary: next }
+        })
+      })
+    },
+
     async listPending(status: PendingStatus = 'pending') {
       return await mutate(async () => {
         const map = await loadPendingMap()

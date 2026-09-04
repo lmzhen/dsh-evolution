@@ -8,6 +8,7 @@ const provider = (name: string) => ({
   saveReviewState: async () => {},
   loadCuratorState: async () => null,
   saveCuratorState: async () => {},
+  transactCuratorState: async () => {},
   listPending: async () => [],
   savePending: async () => {},
   tryResolvePending: async () => ({ record: null, applied: false }),

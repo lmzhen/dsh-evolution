@@ -12,6 +12,7 @@ import {
   computePrefixClusters,
   duplicateHeadings,
   HEALTH_STAMP_RE,
+  MIN_STAMP_BODY_CHARS,
   missingSupportPointers,
   narrowNameMatches,
   overlongLines,
@@ -74,8 +75,15 @@ export function computeProbe(
   }
 
   if (signal === 'usage_observed') {
+    // Same source as the facts block (computeDriftSignals): all snapshots
+    // carrying a definite value decide observed/unobserved; a missing value
+    // (no enrichment) is 'unknown' — the probe must not conflate a definite
+    // 'unobserved' with 'unknown' (E-36).
+    const allProvided = snapshots.length > 0
+      && snapshots.every(snapshot => snapshot.usageObserved !== null && snapshot.usageObserved !== undefined)
+    if (!allProvided) return result(signal, ['usage_observed=unknown'])
     const observed = snapshots.every(snapshot => snapshot.usageObserved === true)
-    return result(signal, [`usage_observed=${observed ? 'observed' : 'unknown'}`])
+    return result(signal, [`usage_observed=${observed ? 'observed' : 'unobserved'}`])
   }
 
   if (!target) return result(signal, ['skill-level signal requires a target skill name'])
@@ -85,6 +93,16 @@ export function computeProbe(
   const body = snapshot.body
   switch (signal) {
     case 'stamp_density': {
+      // Same gate as the facts block (MIN_STAMP_BODY_CHARS): a short body with
+      // a few dates/shas is ordinary documentation, not log-like content — the
+      // probe must report below-min-body instead of a misleading numeric
+      // density (E-36/E-36a).
+      if (body.length < MIN_STAMP_BODY_CHARS) {
+        return result(signal, [
+          'stamp_density=below-min-body',
+          `body=${body.length} chars below MIN_STAMP_BODY_CHARS=${MIN_STAMP_BODY_CHARS}`,
+        ], target)
+      }
       const kb = Math.max(1, body.length / 1024)
       const stamps = (body.match(HEALTH_STAMP_RE) ?? [])
       const density = stamps.length / kb

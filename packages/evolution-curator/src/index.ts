@@ -19,7 +19,7 @@ import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLD
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
-import type {} from '@deepseek-ai/dsh-evolution-state'
+import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
 
 
 /** Quality-warned skills may turn stale after this many idle days (package-private tunable, P2-8). */
@@ -45,6 +45,10 @@ export interface Config {
   qualityWarnStaleAfterDays?: number
   /** Skip automatic runs while any session was active within this many hours (0 disables). */
   minIdleHours?: number
+  /** When true (default), a missing `agents` service is treated as "no active
+   * session" (fail-open — the idle gate lets the run proceed); when false the
+   * gate fails closed and defers the run until activity can be measured. */
+  minIdleFailOpen?: boolean
   /** Skill names excluded from the automated lifecycle. */
   excludeSkillNames?: string[]
   /** Include usage records whose created_by is not 'agent' in lifecycle decisions. */
@@ -78,14 +82,13 @@ export interface CuratorRunOutcome {
   nominations?: CuratorNominations
 }
 
-/** Persisted curator-state record shape (schemaVersion optional for legacy reads). */
-export interface CuratorStateRecordShape {
-  schemaVersion?: number
-  lastRunAt: number
-  runCount: number
-  lastSummary: string
-  paused: boolean
-}
+/**
+ * Persisted curator-state record. The base fields are the authoritative
+ * `CuratorStateRecord` from evolution-state-storage; `schemaVersion` is an
+ * optional on-disk shape marker the storage seam leaves untyped (kept for
+ * legacy reads — 0.3.18, E-53).
+ */
+export type CuratorStateRecordShape = CuratorStateRecord & { schemaVersion?: number }
 
 /**
  * Block LLM-nominated consolidations that would touch a gate-protected name:
@@ -103,7 +106,8 @@ export function gateConsolidations(
   return consolidations.filter(n => !gateSet.isBlocked(n.from) && !gateSet.isBlocked(n.into))
 }
 
-export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
+export class EvolutionCurator extends Service {
+  static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
     enabled: z.boolean().default(true),
     intervalHours: z.number().default(DEFAULT_CURATOR_INTERVAL_HOURS),
@@ -113,6 +117,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     curatorProvider: z.string().default('deepseek-official'),
     qualityWarnStaleAfterDays: z.number().default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
     minIdleHours: z.number().default(DEFAULT_MIN_IDLE_HOURS),
+    minIdleFailOpen: z.boolean().default(true),
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
     pruneBuiltins: z.boolean().default(false),
@@ -135,6 +140,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   private readonly curatorProvider: string
   private readonly qualityWarnStaleAfterDays: number
   private readonly minIdleHours: number
+  private readonly minIdleFailOpen: boolean
   private readonly excludeSkillNames: ReadonlySet<string>
   private readonly manageUnmanaged: boolean
   private readonly pruneBuiltins: boolean
@@ -148,6 +154,10 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
   private timer: NodeJS.Timeout | undefined
   private bootCheck: NodeJS.Timeout | undefined
   private running = false
+  /** 0.3.18 (E-18): stateless first-run defer fires ONCE per process — the
+   * in-memory clock is seeded and later due runs must proceed, or the
+   * persisted===null defer repeats forever (no state service to persist). */
+  private statelessFirstRunDeferred = false
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
@@ -161,6 +171,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
     this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS
     this.minIdleHours = config.minIdleHours ?? DEFAULT_MIN_IDLE_HOURS
+    this.minIdleFailOpen = config.minIdleFailOpen ?? true
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
@@ -230,14 +241,16 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
    */
   async setPaused(paused: boolean): Promise<void> {
     const stateService = this.curatorStateService()
-    const persisted = (await stateService?.loadCuratorState()) ?? null
-    await stateService?.saveCuratorState({
+    // E-16 (S5.5): one atomic read-modify-write instead of the previous
+    // load→save pair, so a concurrent run-core bookkeeping write can never
+    // interleave a stale load with a newer save (or vice versa).
+    await stateService?.transactCuratorState(current => ({
       schemaVersion: 1,
-      lastRunAt: persisted?.lastRunAt ?? Date.now(),
-      runCount: persisted?.runCount ?? 0,
-      lastSummary: persisted?.lastSummary ?? (paused ? 'paused' : 'resumed'),
+      lastRunAt: current?.lastRunAt ?? Date.now(),
+      runCount: current?.runCount ?? 0,
+      lastSummary: current?.lastSummary ?? (paused ? 'paused' : 'resumed'),
       paused,
-    })
+    }))
   }
 
   /** Current persisted curator state (read-only view for /evolution curator status). */
@@ -254,10 +267,29 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
    * wake it, and never duplicates gate logic.
    */
   private async autoCheck(): Promise<void> {
-    const persisted = await this.curatorStateService()?.loadCuratorState()
-    const last = persisted?.lastRunAt ?? this.lastRun
-    if (Date.now() - last >= this.lifecycle().intervalHours * 3_600_000) {
-      await this.run()
+    // 0.3.18 (E-7): the unattended tick (boot catch-up / hourly interval) must
+    // be self-contained — a transient filesystem error (Windows EBUSY/EPERM,
+    // lock contention) inside loadCuratorState/run used to surface as an
+    // unhandled rejection and crash the host. Catch, log, persist a failed
+    // report (leave a trace), never propagate.
+    try {
+      const persisted = await this.curatorStateService()?.loadCuratorState()
+      const last = persisted?.lastRunAt ?? this.lastRun
+      if (Date.now() - last >= this.lifecycle().intervalHours * 3_600_000) {
+        await this.run()
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      this.ctx.logger.warn(`evolution-curator: automatic check failed: ${reason}`)
+      try {
+        const runId = randomUUID()
+        await this.io.writeText(
+          join(evolutionHome(), 'reports', `curator-error-${runId}.json`),
+          JSON.stringify({ runId, failed: true, error: reason, at: new Date().toISOString() }, null, 2),
+        )
+      } catch (persistenceError) {
+        this.ctx.logger.warn(`evolution-curator: failed to persist auto-check error report: ${persistenceError instanceof Error ? persistenceError.message : String(persistenceError)}`)
+      }
     }
   }
 
@@ -279,8 +311,8 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       }): AsyncIterable<StreamChunk>
     } | undefined
     if (!llm) return empty
-    const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } } | undefined
-    const model = policy?.get().curatorModel ?? 'deepseek-v4-pro'
+    const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } | undefined } | undefined
+    const model = policy?.get()?.curatorModel ?? 'deepseek-v4-pro'
     const clusters = computePrefixClusters(candidates)
     const clusterLines = clusters.length === 0
       ? ['Prefix clusters observed in the candidate list: (none)']
@@ -292,7 +324,7 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
       options.dryRun ? CURATOR_DRY_RUN_BANNER : '',
       CURATOR_PROMPT,
       '',
-      `Stale candidates observed by the deterministic lifecycle scanner:${candidates.length === 0 ? ' (none)' : ''}`,
+      'Stale candidates observed by the deterministic lifecycle scanner:',
       ...candidates.map(name => `- ${name}`),
       '',
       ...clusterLines,
@@ -316,20 +348,25 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
         // authority (the engine runs only names it presented to the model).
         consolidations: parsed.consolidations.filter(item => candidates.includes(item.from)),
       }
-    } catch {
-      // LLM curation is advisory. The deterministic scanner still owns the decision.
+    } catch (error) {
+      // LLM curation is advisory. The deterministic scanner still owns the
+      // decision — but the swallow must be observable (E-52): a silent catch
+      // once hid a whole-channel failure behind an empty nomination set.
+      this.ctx.logger.warn(`evolution-curator: LLM nomination pass failed: ${error instanceof Error ? error.message : String(error)}`)
       return empty
     }
   }
 
   /** Optional curator-state service (evolution-state-json / storage-domain). */
   private curatorStateService(): {
-    loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
+    loadCuratorState(): Promise<CuratorStateRecordShape | null>
     saveCuratorState(record: CuratorStateRecordShape): Promise<void>
+    transactCuratorState(task: (current: CuratorStateRecordShape | null) => CuratorStateRecordShape | null): Promise<void>
   } | undefined {
     const service = this.ctx.get('evolutionState') as {
-      loadCuratorState(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null>
+      loadCuratorState(): Promise<CuratorStateRecordShape | null>
       saveCuratorState(record: CuratorStateRecordShape): Promise<void>
+      transactCuratorState(task: (current: CuratorStateRecordShape | null) => CuratorStateRecordShape | null): Promise<void>
     } | undefined
     return service
   }
@@ -452,18 +489,28 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     // First-sight defer (Hermes `should_run_now` parity): a fresh install with
     // no persisted state seeds the clock and defers instead of running — the
     // interval baseline must start now, not at process construction.
-    if (!ignoreGates && persisted === null) {
-      await stateService?.saveCuratorState({
-        schemaVersion: 1,
-        lastRunAt: Date.now(),
-        runCount: 0,
-        lastSummary: 'first-run-deferred',
-        paused: false,
-      })
+    // 0.3.18 (E-18): in a STATELESS composition (no state service) nothing was
+    // persisted AND `this.lastRun` stayed stale, so every hourly tick re-entered
+    // the defer — the automatic pass never ran (the docstring's in-memory clock
+    // fallback was contradicted by the implementation). Advance the in-memory
+    // baseline here so the NEXT tick compares against a fresh clock.
+    if (!ignoreGates && persisted === null && (stateService !== undefined || !this.statelessFirstRunDeferred)) {
+      if (stateService) {
+        await stateService.saveCuratorState({
+          schemaVersion: 1,
+          lastRunAt: Date.now(),
+          runCount: 0,
+          lastSummary: 'first-run-deferred',
+          paused: false,
+        })
+      } else {
+        this.lastRun = Date.now()
+        this.statelessFirstRunDeferred = true
+      }
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport(runId, startedAt),
-        skipped: 'first-run-deferred',
+        skipped: stateService ? 'first-run-deferred' : 'first-run-deferred(stateless)',
       }
     }
     const root = this.skills.root
@@ -583,16 +630,23 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     // Preserve an operator pause (rc.43 G2 regression fix): the paused gate
     // read `persisted` at run start, but the operator may pause while this
     // pass is in flight — and a manual run is ALLOWED while paused. Either
-    // way the run's bookkeeping write must not clear the flag, so the current
-    // value is re-read at save time instead of the stale run-start snapshot.
-    const pausedNow = (await stateService?.loadCuratorState())?.paused ?? false
-    await stateService?.saveCuratorState({
-      schemaVersion: 1,
-      // A dry-run is a preview: it must not push the next scheduled pass out.
-      lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : this.lastRun,
-      runCount: dryRun ? (persisted?.runCount ?? 0) : (persisted?.runCount ?? 0) + 1,
-      lastSummary: summary,
-      paused: pausedNow,
+    // way the run's bookkeeping write must not clear the flag. E-16 (S5.5):
+    // the whole read → transform → write now runs as ONE atomic
+    // transactCuratorState, and `current` is the value at its queue slot, so a
+    // concurrent setPaused's update is never overwritten by a stale snapshot.
+    await stateService?.transactCuratorState((current) => {
+      const pausedNow = current?.paused ?? false
+      return {
+        schemaVersion: 1,
+        // E-51 (S5.6): a fresh-install manual run must anchor the interval
+        // baseline at the run's OWN time, not the process-construction clock
+        // (`this.lastRun`); take Date.now() at the save point. A dry-run is a
+        // preview: it must not push the next scheduled pass out.
+        lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : Date.now(),
+        runCount: dryRun ? (persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
+        lastSummary: summary,
+        paused: pausedNow,
+      }
     })
     return {
       stale: result.markStale,
@@ -704,6 +758,29 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     // never be reverted by this run's stale snapshot.
     const stateOwned = new Set(input.stateOwned ?? [])
     for (const name of archiveCandidates) {
+      // E-15 (S5.4) two-phase self-heal: the archive rename (skills.archive
+      // moves the directory into .archive) and the usage sidecar fold
+      // (mutateUsage → foldCuratorFields) are TWO phases with no joint
+      // commit — rename lands first, the fold lands second. A crash between
+      // them leaves a usage record (state stale/active, archived_at null)
+      // whose directory is gone. The next candidate pass must not re-attempt
+      // the doomed rename and report a permanent failed entry: the rename
+      // already committed, so fold the record to archived directly (state
+      // migration only — no counter bump) and let the final mutateUsage
+      // persist it. `treeNames` is the CURRENT tree (from skills.list()); a
+      // candidate missing from it has no valid directory, so it is exactly
+      // the crash-window shape. Fully-archived skills never reach this loop
+      // (lifecycleCandidate excludes state='archived'), so a missing-dir
+      // candidate always represents an unflushed earlier rename.
+      if (!treeNames.has(name)) {
+        const record = usage.get(name)
+        if (record) {
+          record.state = 'archived'
+          record.archived_at = record.archived_at ?? new Date().toISOString()
+          stateOwned.add(name)
+        }
+        continue
+      }
       const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
         // A failed archive must roll back to the pre-transition state: a
@@ -814,7 +891,13 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
     const agents = this.ctx.get('agents') as {
       list(): Array<{ session: { events: ReadonlyArray<{ time: number }> } }>
     } | undefined
-    if (!agents) return false
+    if (!agents) {
+      // E-54: fail-open is the shipped default — an always-off `agents` service
+      // (headless/scheduled composition) must not defer automatic curation
+      // forever merely because activity cannot be measured. Set
+      // minIdleFailOpen: false to fail closed (defer the run instead).
+      return !this.minIdleFailOpen
+    }
     let latest = 0
     for (const agent of agents.list()) {
       const events = agent.session.events
@@ -868,21 +951,18 @@ export class EvolutionCurator extends Service {  static inject = ['evolutionIo']
 
   async latestReport(): Promise<CuratorRunReport | null> {
     const reportsRoot = join(evolutionHome(), 'reports')
-    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json')).sort()
-    // v3-round self-check: filenames carry randomUUIDs — lexicographic order
-    // is NOT chronological. Read each report's own startedAt (retention keeps 20).
-    let latest: { name: string; startedAt: number } | null = null
+    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json'))
+    // E-54: filenames carry randomUUIDs — lexicographic order is NOT
+    // chronological, and the old `.sort()` was a misleading no-op. Order by
+    // each file's mtime (the report write time, from the optional mtime probe);
+    // a report whose mtime is unavailable is never the latest (sorts last).
+    let latest: { name: string; mtime: number } | null = null
     for (const name of names) {
-      const raw = await this.io.readText(join(reportsRoot, name))
-      if (raw === null) continue
-      try {
-        const parsed = JSON.parse(raw) as { startedAt?: string }
-        const startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : 0
-        if (!Number.isFinite(startedAt)) continue
-        if (latest === null || startedAt > latest.startedAt) latest = { name, startedAt }
-      } catch {
-        // Unreadable reports are skipped (retention refuses to classify them too).
-      }
+      // mtime is an OPTIONAL probe (0.3.18, E-71): a backend without one
+      // reports null via the adapter — such a report is never the latest.
+      const mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
+      if (mtime === null) continue
+      if (latest === null || mtime > latest.mtime) latest = { name, mtime }
     }
     if (latest === null) return null
     const raw = await this.io.readText(join(reportsRoot, latest.name))

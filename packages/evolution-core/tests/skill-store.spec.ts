@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authoringFeedback, SkillLibrary, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback, resolveSkillsRoot, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -186,6 +186,12 @@ it('consolidate rollback reports sources it could not restore instead of silentl
   // The failed-to-restore source is still archived — and the message says so.
   expect(await io.exists(join(root, '.archive', 'src-a'))).toBe(true)
   await rm(root, { recursive: true, force: true })
+})
+
+it('resolveSkillsRoot: config wins, empty falls through to the default (S4.1, E-30 — 0.3.18)', () => {
+  expect(resolveSkillsRoot({ root: '/custom/skills' })).toBe('/custom/skills')
+  expect(resolveSkillsRoot({ root: '   ' })).toBe(skillsRoot())
+  expect(resolveSkillsRoot({})).toBe(skillsRoot())
 })
 
 it('restoring a skill never picks a sibling-prefixed archive (E-3, 0.3.16)', async () => {
@@ -542,5 +548,35 @@ it('update and patch normalize frontmatter the same way (0.3.11)', async () => {
   expect(patched.normalizedFrontmatterFields).toEqual(['description'])
   const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('description: "Deep search: arXiv and journals."')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('E-68: an old===new patch is a noop — no write, no audit, no mutation event (0.3.18)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-noop-'))
+  const events: string[] = []
+  const lib = new SkillLibrary(root, nodeEvolutionIo(), undefined, e => events.push(`${e.action}:${e.skillName}`))
+  const created = await lib.create('python-testing', SKILL, 'background_review')
+  expect(created.ok).toBe(true)
+  events.length = 0
+  const before = await lib.read('python-testing')
+  const mutationsBefore = (await lib.listMutations()).length
+  const noop = await lib.patch('python-testing', 'Run tests with pytest.', 'Run tests with pytest.')
+  expect(noop.ok).toBe(true)
+  expect(noop.noop).toBe(true)
+  expect(await lib.read('python-testing')).toBe(before)
+  expect((await lib.listMutations()).length).toBe(mutationsBefore)
+  expect(events).toEqual([])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('E-69: an archived skill cannot absorb into itself (0.3.18)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-selfabs-'))
+  const lib = new SkillLibrary(root)
+  const created = await lib.create('python-testing', SKILL, 'background_review')
+  expect(created.ok).toBe(true)
+  const result = await lib.archive('python-testing', { absorbedInto: 'python-testing' })
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('cannot absorb into itself')
+  expect((await lib.list()).some(s => s.name === 'python-testing')).toBe(true)
   await rm(root, { recursive: true, force: true })
 })
