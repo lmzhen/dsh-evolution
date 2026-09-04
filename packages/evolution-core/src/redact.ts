@@ -16,8 +16,9 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
   ['slack token', /xox[baprs]-[A-Za-z0-9-]{10,}/g],
   ['jwt', /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g],
   ['bearer credential', /Bearer [A-Za-z0-9._~+/=\-]{16,}/g],
-  ['inline assignment', /(\b(?:token|api[_-]?key|secret|password|passwd)\b[\s]*[:=][\s]*["']?)([A-Z0-9._~+/=\-]{12,})/gi],
 ]
+
+const INLINE_ASSIGNMENT_PATTERN = /(\b(?:token|api[_-]?key|secret|password|passwd)\b[\s]*[:=][\s]*["']?)([A-Z0-9._~+/=\-]{12,})/gi
 
 /**
  * Mask credential-shaped text before it crosses a session boundary.
@@ -25,9 +26,16 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
  * @returns the text with matched secrets replaced by `<redacted>`.
  */
 export function redactSecrets(text: string): string {
+  // 0.3.16 (E-1): the generic replacer once keyed on `p1 === undefined` to
+  // distinguish "no capture group" — but for a capture-group-free regex the
+  // second callback argument is the match OFFSET (a number), so the output
+  // carried the offset (e.g. 'use 4<redacted> tomorrow'). The seven plain
+  // patterns now take a literal replacement; only the inline-assignment
+  // pattern has a real capture group (the label prefix) and keeps its part.
   let out = text
   for (const [, pattern] of SECRET_PATTERNS) {
-    out = out.replace(pattern, (_match, p1?: string) => (p1 === undefined ? '<redacted>' : `${p1}<redacted>`))
+    out = out.replace(pattern, '<redacted>')
   }
+  out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, p1?: string) => `${p1 ?? ''}<redacted>`)
   return out
 }

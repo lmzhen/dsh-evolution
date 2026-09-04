@@ -50,7 +50,7 @@ const PATTERNS: ThreatPattern[] = [
   // Persistence / backdoor / harness-config tampering.
   { label: 'ssh_backdoor', category: 'persistence', scope: 'strict', regex: /authorized_keys/i },
   { label: 'agent_config_mod', category: 'persistence', scope: 'strict', regex: /(?:update|modify|edit|write|change|append|add\s+to)\s+(?:AGENTS\.md|CLAUDE\.md|\.cursorrules|\.clinerules)/i },
-  { label: 'hermes_env', category: 'persistence', scope: 'strict', regex: /\$?HOME\/\.hermes|~\/\.hermes|\.hermes\/\.env/i },
+  { label: 'hermes_env', category: 'persistence', scope: 'strict', regex: /\$?HOME\/\.hermes|~\/\.hermes|\.hermes\/\.env|%USERPROFILE%[\\/]\.hermes/i },
 
   // C2 / promptware vocabulary.
   { label: 'c2_node_registration', category: 'c2_promptware', scope: 'context', regex: /register\s+(?:as\s+)?a?\s*node/i },
@@ -82,9 +82,17 @@ export interface ScanOptions {
 
 const NO_SCAN_OPTIONS: ScanOptions = {}
 
+/** Window overlap for the full-coverage scan: far larger than the longest
+ * pattern span (~530 chars: `curl [^\n]{0,512} ...`), so a match straddling a
+ * window boundary is fully inside at least one window (E-12, 0.3.16). */
+const PATTERN_OVERLAP = 4096
+
 /**
  * Scan text at `scope`. Patterns are cumulative: `strict` includes all scopes.
  * `options.excludeLabels` removes matching patterns without changing `scope`.
+ * `maxScanChars` is the WINDOW SIZE, not a total cap (E-12, 0.3.16): the whole
+ * text is always scanned in overlapping windows, so content beyond 65,536
+ * characters (skill files may run to 100,000) is no longer a blind zone.
  */
 export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): ThreatFinding[] {
   const findings: ThreatFinding[] = []
@@ -94,16 +102,32 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   if (BIDI_CHARS.test(text)) {
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope })
   }
-  const normalized = text.normalize('NFKC').slice(0, maxScanChars)
+  const normalized = text.normalize('NFKC')
+  const windows: string[] = []
+  if (normalized.length <= maxScanChars) {
+    windows.push(normalized)
+  } else {
+    const step = Math.max(1, maxScanChars - PATTERN_OVERLAP)
+    for (let start = 0; start < normalized.length; start += step) {
+      windows.push(normalized.slice(start, start + maxScanChars))
+    }
+  }
   const excluded = new Set(options.excludeLabels ?? [])
-  for (const pattern of PATTERNS) {
-    if (SCOPE_ORDER[pattern.scope] > SCOPE_ORDER[scope]) continue
-    if (excluded.has(pattern.label)) continue
-    if (pattern.regex.test(normalized)) findings.push({
-      label: pattern.label,
-      category: pattern.category,
-      scope: pattern.scope,
-    })
+  const seen = new Set<string>()
+  for (const window of windows) {
+    for (const pattern of PATTERNS) {
+      if (SCOPE_ORDER[pattern.scope] > SCOPE_ORDER[scope]) continue
+      if (excluded.has(pattern.label)) continue
+      if (!pattern.regex.test(window)) continue
+      const key = `${pattern.label}|${pattern.scope}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      findings.push({
+        label: pattern.label,
+        category: pattern.category,
+        scope: pattern.scope,
+      })
+    }
   }
   return findings
 }

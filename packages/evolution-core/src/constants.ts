@@ -67,3 +67,10 @@ export const DEFAULT_USER_CHAR_LIMIT = 1375
 /** Consolidation-failure backoff cap, shared by MemoryStore and memory-files' Config default. */
 export const DEFAULT_CONSOLIDATION_FAILURES = 3
 export const DEFAULT_SKILL_CONTENT_CHARS = 100_000
+
+/** Hermes authoring quality bar for descriptions (the 60-char Rule). The
+ * platform's own index limit stays in validateFrontmatter; this bar is the
+ * target the authoring standard names, enforced as ADVISORY feedback.
+ * 0.3.16 (T-4): moved here from skill-store.ts so drift-signals (pure, no IO)
+ * can reference it without importing the skill-store module. */
+export const AUTHORING_DESCRIPTION_BAR = 60

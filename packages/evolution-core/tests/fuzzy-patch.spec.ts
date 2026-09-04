@@ -116,6 +116,40 @@ describe('fuzzy patch P0-5 guards', () => {
     expect(readBack).toBe('alpha beta-beta gamma\n')
   })
 
+  it('exact-match replacement is literal — no $&/$`/$’/$$ expansion (E-2, 0.3.16)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    // String.replace would expand `$'` (text after the match) and `$$` (a
+    // literal $) — the file content would silently change shape.
+    const file = await setupSkill(lib, 'a foo b\n')
+    const result = await lib.patch('fuzz-skill', 'foo', "100$'", file, false, 'background_review')
+    expect(result.ok).toBe(true)
+    expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe('a 100$\' b\n')
+    const wroteDollar = await lib.writeSupportFile('fuzz-skill', 'references/dollar.md', 'a foo b\n', 'background_review')
+    expect(wroteDollar.ok).toBe(true)
+    const dollar = await lib.patch('fuzz-skill', 'foo', '$$bar', 'references/dollar.md', false, 'background_review')
+    expect(dollar.ok).toBe(true)
+    expect(await io.readText('/skills/fuzz-skill/references/dollar.md')).toBe('a $$bar b\n')
+  })
+
+  it('fuzzy-drift path is equally literal on $ patterns (E-2, 0.3.16)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    const file = await setupSkill(lib, 'a  foo  b\n') // double spaces → fuzzy stage
+    const result = await lib.patch('fuzz-skill', 'foo', "100$'", file, false, 'background_review')
+    expect(result.ok).toBe(true)
+    expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe('a  100$\'  b\n')
+  })
+
+  it('replaceAll stays literal on $ patterns (E-2, 0.3.16)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    const file = await setupSkill(lib, 'x foo y foo\n')
+    const result = await lib.patch('fuzz-skill', 'foo', '1$&2', file, true, 'background_review')
+    expect(result.ok).toBe(true)
+    expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe('x 1$&2 y 1$&2\n')
+  })
+
   it('replaceAll rewrites every exact match', async () => {
     const io = fakeIo()
     const lib = new SkillLibrary('/skills', io)

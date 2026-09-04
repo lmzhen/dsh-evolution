@@ -59,10 +59,11 @@ function fakeIo(withTransact: boolean): EvolutionIoLike {
   if (withTransact) {
     io.transact = (_path, task) => {
       // Backend lock: serialize task entry, then run the RMW inside it.
-      const run = tail.then(() => task(content).then((next) => {
+      const run = tail.then(async () => {
+        const next = await task(content)
         if (next === null) content = null
         else content = next
-      }))
+      })
       tail = run.then(() => undefined, () => undefined)
       return run
     }

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-curator",
   "description": "Deterministic skill lifecycle and recovery",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "publishConfig": {
     "access": "public"
   },

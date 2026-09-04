@@ -220,10 +220,13 @@ export function markAgentCreated(map: UsageMap, name: string): void {
 }
 
 export function latestActivityAt(record: UsageRecord): string | null {
+  // 0.3.16 (E-46): lexical ISO sorting misorders numeric offsets (+08:00 vs Z
+  // for the same instant) — compare by Date.parse; unparseable values count
+  // as absent.
   const values = [record.last_used_at, record.last_viewed_at, record.last_patched_at]
-    .filter((value): value is string => typeof value === 'string')
+    .filter((value): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value)))
   if (values.length === 0) return null
-  return values.sort().reverse()[0] ?? null
+  return values.reduce((latest, value) => (Date.parse(value) > Date.parse(latest) ? value : latest))
 }
 
 /**

@@ -31,8 +31,10 @@ export interface EvolutionIoLike {
    * (`null` when missing) and returns the next content; returning `null`
    * deletes the file. A backend without it falls back to plain read+write and
    * the caller keeps its single-process chain as the second layer.
+   * 0.3.16: sync returns are allowed (0.3.16 S1.14 X-1 — mutated callers with
+   * no await in the task need no Promise residue).
    */
-  transact?(this: void, path: string, task: (current: string | null) => Promise<string | null>): Promise<void>
+  transact?(this: void, path: string, task: (current: string | null) => string | null | Promise<string | null>): Promise<void>
   /**
    * Optional symlink probe (G7). `true` = the path is a symlink, `false` = a
    * real entry, `null` = guard not applicable (backend without the probe or
@@ -49,7 +51,7 @@ export interface EvolutionIoLike {
 export async function transactIo(
   io: EvolutionIoLike,
   path: string,
-  task: (current: string | null) => Promise<string | null>,
+  task: (current: string | null) => string | null | Promise<string | null>,
 ): Promise<void> {
   if (io.transact) {
     await io.transact(path, task)
@@ -92,6 +94,10 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
 export function nodeEvolutionIo(): EvolutionIoLike {
   const isMissing = (error: unknown): boolean => {
     const code = (error as NodeJS.ErrnoException | undefined)?.code
+    // EISDIR deliberately stays OUT: a directory squatting on a file path is
+    // not "absent" — rotation and event reads must still see it as malformed
+    // (rc.72 G-2), while the SkillLibrary.read boundary absorbs EISDIR into
+    // "absent" for its own surface (E-43).
     return code === 'ENOENT' || code === 'ENOTDIR'
   }
   /** True when the pid is alive (EPERM = alive but unowned; ESRCH = gone). */

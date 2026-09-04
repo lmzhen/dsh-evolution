@@ -250,15 +250,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
           // 0.3.14 (P2-1): set the in-flight flag BEFORE the first await
-          // (enrichment is the slowest segment). Check and set are now
-          // adjacent across synchronous code only — two re-triggers arriving
-          // during the enrich window can no longer both pass the guard.
-          maintainInFlightSince = Date.now()
-          const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
-          const enrichment = await buildEnrichment(ctx, library)
-          let outcome: Awaited<ReturnType<typeof runMaintain>>
+          // (enrichment is the slowest segment) so two re-triggers cannot both
+          // pass the guard. 0.3.16 (S6.1, E-5/E-39): the flag set, the
+          // enrichment and the scan are all INSIDE one try/finally — a thrown
+          // enrichment (IO error, unreadable root) previously left the flag
+          // non-zero forever (every later call: "already running", no log) and
+          // skipped the cooldown update. A throw is translated to a structured
+          // command error; finally resets the flag and the cooldown on success
+          // AND failure.
           try {
-            outcome = await runMaintain(
+            maintainInFlightSince = Date.now()
+            const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+            const enrichment = await buildEnrichment(ctx, library)
+            const outcome = await runMaintain(
               { library, subagents, parent: invocation.agent },
               {
                 timeoutMs: runTimeoutMs,
@@ -270,26 +274,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 usageObserved: () => enrichment.usageObservedValue,
               },
             )
+            lastMaintainRunId = outcome.runId ?? ''
+            if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
+            const eventIo = ioRegistry.provider()
+            const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+            void appendEvolutionEvent(eventIo, eventsFile(home), {
+              type: 'maintain',
+              source: 'manual',
+              runId: outcome.runId,
+              verdict: outcome.verdict,
+              recommendations: outcome.text?.split('\n').filter(line => line.startsWith('- [')).length ?? 0,
+            }).catch((error: unknown) => {
+              ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
+            })
+            return ok(`Maintenance scan ${outcome.runId}:\n${outcome.text ?? ''}`)
+          } catch (error) {
+            return err(`Maintenance scan failed: ${error instanceof Error ? error.message : String(error)}`)
           } finally {
             maintainInFlightSince = 0
+            lastMaintainAt = Date.now()
           }
-          // Update the cooldown on success AND failure: repeated failing
-          // scans must not refire either.
-          lastMaintainAt = Date.now()
-          lastMaintainRunId = outcome.runId ?? ''
-          if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
-          const eventIo = ioRegistry.provider()
-          const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-          void appendEvolutionEvent(eventIo, eventsFile(home), {
-            type: 'maintain',
-            source: 'manual',
-            runId: outcome.runId,
-            verdict: outcome.verdict,
-            recommendations: outcome.text?.split('\n').filter(line => line.startsWith('- [')).length ?? 0,
-          }).catch((error: unknown) => {
-            ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
-          })
-          return ok(`Maintenance scan ${outcome.runId}:\n${outcome.text ?? ''}`)
         }
         if (/^maintain\b/.test(input)) {
           // 0.3.14 (P3-2): an input that STARTS with maintain but did not

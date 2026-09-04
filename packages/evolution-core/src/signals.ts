@@ -48,6 +48,9 @@ const FIX_PATTERNS = [
 /** Fold one session event into the current turn observation. */
 export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
   if (event.type === 'user/message') {
+    // 0.3.16 (E-49): a malformed content (not an array) used to throw here and
+    // break the whole signal pipeline — guard and skip instead.
+    if (!Array.isArray(event.data.content)) return
     const text = event.data.content
       .map(block => block.type === 'text' ? block.text : '')
       .join(' ')

@@ -66,7 +66,7 @@ export interface MemoryApplyResult {
 }
 
 export function memoryRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.DSH_HOME ?? join(homedir(), '.dsh'), 'memories')
+  return join(env.DSH_HOME || join(homedir(), '.dsh'), 'memories')
 }
 
 function fileFor(root: string, target: MemoryTarget): string {
@@ -141,9 +141,9 @@ export class MemoryStore {
     return raw === null ? [] : [...new Set(normalizeEntries(raw))]
   }
 
-  async write(target: MemoryTarget, entries: string[]): Promise<void> {
-    await this.io.writeText(fileFor(this.root, target), render(entries))
-  }
+  // 0.3.16 (S1.10, D-2): `write()` was a bare public write path bypassing
+  // transact/threat-scan/drift checks, with ZERO callers in the family —
+  // removed. Memory mutations go through `applyBatch` only.
 
   resetFailures(): void {
     this.failureCount = 0

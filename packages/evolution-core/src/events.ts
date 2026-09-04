@@ -40,7 +40,11 @@ export interface EvolutionPlanAppliedEvent {
 export interface EvolutionSkillMutatedEvent {
   action: string
   name: string
-  filePath?: string
+  /** 0.3.16 (E-50): was `filePath` with mixed semantics — skill-directory ops
+   * carried the DIRECTORY while file ops (write_file/remove_file) carried the
+   * FILE path. Split into explicit fields so a subscriber can distinguish. */
+  skillDir?: string
+  file?: string
   archivedPath?: string
 }
 

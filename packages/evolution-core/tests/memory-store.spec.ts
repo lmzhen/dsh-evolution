@@ -270,10 +270,11 @@ function memoryFakeIo(withTransact: boolean): EvolutionIoLike {
   }
   if (withTransact) {
     io.transact = (_path, task) => {
-      const run = tail.then(() => task(files.get(_path) ?? null).then((next) => {
+      const run = tail.then(async () => {
+        const next = await task(files.get(_path) ?? null)
         if (next === null) files.delete(_path)
         else files.set(_path, next)
-      }))
+      })
       tail = run.then(() => undefined, () => undefined)
       return run
     }

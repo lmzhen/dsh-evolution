@@ -22,8 +22,10 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_ID = 'dsh-evolution@13'
 export const PROMPT_BUNDLE_VERSION = 13
+// 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
+// can no longer drift the two apart.
+export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -299,8 +301,12 @@ export const SKILL_REVIEW_PLAN_PROMPT = `${SKILL_REVIEW_PROMPT}${PLAN_CHANNEL_NO
 export const COMBINED_REVIEW_PLAN_PROMPT = `${COMBINED_REVIEW_PROMPT}${PLAN_CHANNEL_NOTE}`
 
 export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', channel: 'agent' | 'plan' = 'agent'): string {
-  if (kind === 'memory') return MEMORY_REVIEW_PROMPT
+  // 0.3.16 (E-48): kind==='memory' + channel==='plan' used to fall through to
+  // MEMORY_REVIEW_PROMPT (the agent-channel prompt whose guidance tells the
+  // model to use the memory TOOL) while the plan channel has no memory tool —
+  // a silent wrong-channel contract. The plan channel is never memory-only.
   if (channel === 'plan') return kind === 'skill' ? SKILL_REVIEW_PLAN_PROMPT : COMBINED_REVIEW_PLAN_PROMPT
+  if (kind === 'memory') return MEMORY_REVIEW_PROMPT
   if (kind === 'skill') return SKILL_REVIEW_PROMPT
   return COMBINED_REVIEW_PROMPT
 }

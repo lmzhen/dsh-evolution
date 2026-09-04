@@ -490,6 +490,42 @@ describe('evolution-commands', () => {
     }
   })
 
+  it('maintain survives a throwing enrichment: flag resets, cooldown updates, no naked reject (0.3.16 S6.1, E-5/E-39)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-enrichfail-'))
+    const root = join(dir, 'skills')
+    await mkdir(root, { recursive: true })
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      // A library whose first list() throws models an unreadable skills root —
+      // the 0.3.14 shape left the single-flight flag set forever here; every
+      // later re-trigger got "already running" with no log.
+      ctx.provide('evolutionIo', {
+        provider: () => ({
+          list: async () => { throw new Error('unreadable library root') },
+        }) as unknown as ReturnType<typeof nodeEvolutionIo>,
+      })
+      ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
+      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 60_000 })
+      const first = await handler!.handler({ rawInput: 'maintain' })
+      expect(first.kind).toBe('error')
+      expect(first.text).toContain('Maintenance scan failed')
+      // The flag was reset (no "already running") AND the failure updated the
+      // cooldown (E-39) — the second trigger is cooldown-blocked, not in-flight-blocked.
+      const second = await handler!.handler({ rawInput: 'maintain' })
+      expect(second.kind).toBe('success')
+      expect(second.text).toContain('cooldown active')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('maintain rejects unknown arguments explicitly instead of falling into help (P3-2)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'evo-commands-reject-'))
     const root = join(dir, 'skills')

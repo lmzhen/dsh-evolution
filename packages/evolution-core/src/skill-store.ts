@@ -15,7 +15,12 @@ import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
-import { MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+import { AUTHORING_DESCRIPTION_BAR, MAX_SKILL_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+
+/** 0.3.16 (S1.13, T-6): the pointer-line prefix written into a body when a
+ * section is moved to references/ — single literal, both restructure and
+ * append-mode consolidation emit the same discoverability line. */
+const POINTER_LINE_PREFIX = '> 详见 references/'
 import type { EvolutionSkillMutatedEvent } from './events.ts'
 
 export interface SkillLimits {
@@ -106,7 +111,7 @@ export interface ArchiveOptions {
 }
 
 export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.DSH_HOME ?? join(homedir(), '.dsh'), 'skills')
+  return join(env.DSH_HOME || join(homedir(), '.dsh'), 'skills')
 }
 
 /**
@@ -190,21 +195,26 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; b
 
 /** YAML plain-scalar hazards that make an UNQUOTED frontmatter value
  * unloadable to the platform catalog (strict YAML parser): `: ` (mapping
- * separator), ` #` (comment start), or a leading YAML indicator. The
- * evolution `parseFrontmatter` is deliberately lenient, so violations
- * silently split family-visibility from platform-visibility (0.3.11
- * inkos-harness case: the description carried "…: " and the catalog dropped
- * the whole skill). Already-quoted values and well-formed flow collections
- * (`[a, b]` / `{a: b}`) are considered safe. This rule is only the FAST
- * PATH — the write path re-verifies every rewrite with the real YAML parser
- * (see normalizeFrontmatter), so an incomplete approximation can never
- * corrupt a multiline flow value (P3-4). */
+ * separator), ` #` (comment start), a trailing `:` (a mapping marker),
+ * or a leading YAML indicator. The evolution `parseFrontmatter` is
+ * deliberately lenient, so violations silently split family-visibility from
+ * platform-visibility (0.3.11 inkos-harness case: the description carried
+ * "…: " and the catalog dropped the whole skill). Already-quoted values and
+ * well-formed flow collections (`[a, b]` / `{a: b}`) are considered safe.
+ * 0.3.16 (E-47): null/bool/number-shaped plain scalars are flagged too — they
+ * parse as booleans/numbers on the platform while the family keeps the string
+ * (a `description: true` split-brain).
+ * This rule is only the FAST PATH — the write path re-verifies every rewrite
+ * with the real YAML parser (see normalizeFrontmatter), so an incomplete
+ * approximation can never corrupt a multiline flow value (P3-4). */
 export function yamlPlainScalarNeedsQuotes(value: string): boolean {
   if (value.length === 0) return false
   if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) return false
   if (/^\[.*\]$/.test(value) || /^\{.*\}$/.test(value)) return false
   if (value.includes(': ')) return true
   if (value.includes(' #')) return true
+  if (value.endsWith(':')) return true
+  if (/^(?:null|true|false|~|[-+]?\d+(?:\.\d+)?)$/i.test(value)) return true
   if (/^[-?:,[\]{}#&*!|>'\"%@`\s]/.test(value)) return true
   return false
 }
@@ -349,10 +359,9 @@ export function validateFrontmatter(content: string, expectedName?: string, limi
   return null
 }
 
-/** Hermes authoring quality bar for descriptions (the 60-char Rule). The
- * platform's own index limit stays in `validateFrontmatter`; this bar is the
- * target the authoring standard names, enforced as ADVISORY feedback. */
-export const AUTHORING_DESCRIPTION_BAR = 60
+/** Hermes authoring quality bar for descriptions — see constants.ts
+ * (0.3.16 T-4 moved the single source there; the public re-export sits behind
+ * the package root, which re-exports constants anyway). */
 
 export interface AuthoringFeedback {
   /** Frontmatter description length in characters (0 when absent). */
@@ -485,7 +494,13 @@ function fuzzyPatch(content: string, oldString: string, newString: string, repla
   // between every character; refuse it at the boundary (P0-5).
   if (oldString === '') return null
   if (content.includes(oldString)) {
-    return replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
+    // 0.3.16 (E-2): a STRING replacement expands $&/$`/$'/$$ special
+    // sequences even in the exact-match fast path — a model writing a shell
+    // replacement (`100$'`) silently corrupted the file, and the fuzzy path
+    // (string concat, literal) disagreed with the fast path. The replacement
+    // function returns the newString verbatim; the replaceAll branch's
+    // split/join is already literal.
+    return replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, () => newString)
   }
   const boundary = trimPatternBoundaries(oldString)
   // A whitespace-only pattern has no non-whitespace footprint; matching it
@@ -607,7 +622,7 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
   for (let i = 0; i < lines.length; i += 1) {
     const span = byStart.get(i)
     if (span) {
-      rebuilt.push(`> 详见 references/${span.rel.split('/').at(-1)}`)
+      rebuilt.push(`${POINTER_LINE_PREFIX}${span.rel.split('/').at(-1)}`)
       i = span.end - 1
     } else {
       rebuilt.push(lines[i] ?? '')
@@ -682,7 +697,16 @@ export class SkillLibrary {
 
     // Defensive: an invalid name must never escape the skills root via join().
     if (this.badName(name) !== null) return null
-    return this.io.readText(join(this.dirOf(name), 'SKILL.md'))
+    // 0.3.16 (E-43): a DIRECTORY squatting on SKILL.md (EISDIR) reads as
+    // absent for the library surface — but readText itself keeps throwing so
+    // the event-log rotation can still FLAG a malformed archive slot (rc.72
+    // G-2). Only this read boundary absorbs it.
+    try {
+      return await this.io.readText(join(this.dirOf(name), 'SKILL.md'))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code === 'EISDIR') return null
+      throw error
+    }
   }
 
   /**
@@ -932,7 +956,7 @@ export class SkillLibrary {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
     await this.audit(normalized, 'create', null, finalContent, 'created')
-    this.notifyMutation({ action: 'create', name: normalized, filePath: dir })
+    this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
@@ -962,7 +986,7 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     await this.io.writeText(join(dir, 'SKILL.md'), finalContent.trimEnd() + '\n')
     await this.audit(name, 'update', md, finalContent, 'updated')
-    this.notifyMutation({ action: 'update', name, filePath: dir })
+    this.notifyMutation({ action: 'update', name, skillDir: dir })
     return { ok: true, message: `Skill "${name}" updated.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
@@ -1019,7 +1043,7 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     await this.io.writeText(target, writeContent.trimEnd() + '\n')
     await this.audit(name, 'patch', md, writeContent, `patched ${patchLabel}`)
-    this.notifyMutation({ action: 'patch', name, filePath: dir })
+    this.notifyMutation({ action: 'patch', name, skillDir: dir })
     return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) }
   }
 
@@ -1064,7 +1088,21 @@ export class SkillLibrary {
       // Some IO providers cannot rename across media. Copy the whole tree
       // first so support files are never lost during archival fallback.
       await this.io.copy(dir, dest)
-      await this.io.remove(dir)
+      try {
+        await this.io.remove(dir)
+      } catch (error) {
+        // 0.3.16 (E-14): a failed remove left the skill in BOTH the active
+        // root and .archive, and the source was never counted as archived so
+        // consolidate rollback would not clean it. Undo the copy we just made;
+        // if even that fails, say so instead of rethrowing the remove error.
+        const reason = error instanceof Error ? error.message : String(error)
+        try {
+          await this.io.remove(dest)
+          return { ok: false, message: `Archive copy succeeded but the source could not be removed (${reason}); the copied archive was rolled back.` }
+        } catch {
+          return { ok: false, message: `Archive copy succeeded but the source could not be removed (${reason}) and the archive copy could not be rolled back — the skill now exists in BOTH the active root and .archive; clean up manually.` }
+        }
+      }
     }
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
     await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
@@ -1153,7 +1191,7 @@ export class SkillLibrary {
         writes.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
       }
       // Discoverability: the umbrella's body gains one pointer per demoted source.
-      const pointerLines = normalizedSources.map(source => `\n> 详见 references/${source}.md`).join('')
+      const pointerLines = normalizedSources.map(source => `\n${POINTER_LINE_PREFIX}${source}.md`).join('')
       const extended = targetMd.trimEnd() + pointerLines + '\n'
       const validation = validateFrontmatter(extended, targetName, this.limits)
       if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
@@ -1181,11 +1219,26 @@ export class SkillLibrary {
       })
       if (!result.ok) throw new Error(result.message)
     } catch (error) {
-      // Bring back any source we already archived so the merge is fully undone.
+      // Bring back every source we already archived so the merge is fully
+      // undone. 0.3.16 (T-14): a failed restore used to be swallowed by
+      // `.catch(() => {})` while the message still claimed a full rollback —
+      // the source stayed in .archive silently. Surface it.
+      const reason = error instanceof Error ? error.message : String(error)
+      const failedRestores: string[] = []
       for (const source of archived.reverse()) {
-        await this.restoreFromArchive(source).catch(() => {})
+        try {
+          const restored = await this.restoreFromArchive(source)
+          if (!restored.ok) failedRestores.push(source)
+        } catch {
+          // restoreFromArchive never rejects by contract; if it ever does,
+          // count the source as unrestored rather than replacing the report.
+          failedRestores.push(source)
+        }
       }
-      return { ok: false, message: `Consolidation failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
+      if (failedRestores.length > 0) {
+        return { ok: false, message: `Consolidation failed (${reason}); rolled back EXCEPT ${failedRestores.join(', ')} — still in .archive, restore them with /evolution skill restore.` }
+      }
+      return { ok: false, message: `Consolidation failed and was rolled back: ${reason}` }
     }
     return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
   }
@@ -1219,20 +1272,29 @@ export class SkillLibrary {
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
-    const normalized = md.replace(/\r\n/g, '\n')
-    const frontmatterEnd = normalized.indexOf('\n---', 3)
-    if (frontmatterEnd < 0) return { ok: false, message: 'SKILL.md has no valid frontmatter; refusing to restructure.' }
+    // 0.3.16 (E-38/E-38a): the block boundary once used the loose
+    // indexOf('\n---', 3) form, which matched a `----` line and leaked
+    // frontmatter into the body — frontmatterBlock owns the strict line rule
+    // (P3-3). Planning runs on a \n-normalized body, but the final SKILL.md
+    // re-uses the file's own line ending so a CRLF file keeps them (E-38a).
+    // The body slice is byte-based (md.slice(header.length)) so the newline
+    // AFTER the closing `---` stays with the body — a line-based slice would
+    // consume it as the separator and splice the first body line onto the
+    // closing fence.
+    const block = frontmatterBlock(md)
+    if (!block) return { ok: false, message: 'SKILL.md has no valid frontmatter; refusing to restructure.' }
     // P1-1 (v7 audit): the planner must receive the BODY ONLY — its rebuilt
     // body is spliced after the frontmatter header, so feeding it the full
     // text duplicated the frontmatter on every successful restructure (a
     // second `---` block the lenient parser tolerated but strict YAML
     // consumers read as duplicate name/description keys).
-    const header = normalized.slice(0, frontmatterEnd + 4)
-    const bodyRaw = normalized.slice(frontmatterEnd + 4)
-    const plan = planRestructureSections(bodyRaw, moves)
+    const header = block.lines.slice(0, block.end + 1).join(block.nl)
+    const bodyRaw = md.slice(header.length)
+    const plan = planRestructureSections(bodyRaw.replace(/\r\n/g, '\n'), moves)
     if ('error' in plan) return { ok: false, message: `Restructure rejected: ${plan.error}` }
-    const newMd = header + plan.body
-    const newMdCheck = validateFrontmatter(newMd, name, this.limits)
+    const newMd = `${header}${plan.body}`.replace(/\r\n/g, '\n')
+    const finalMd = block.nl === '\r\n' ? newMd.replace(/\n/g, '\r\n') : newMd
+    const newMdCheck = validateFrontmatter(finalMd, name, this.limits)
     if (newMdCheck) return { ok: false, message: `Restructure rejected: ${newMdCheck}` }
     for (const section of plan.sections) {
       const refs = supportRefs(section.text)
@@ -1257,7 +1319,7 @@ export class SkillLibrary {
         content: base === '' ? entry.texts.join('\n\n') : `${base}\n\n${entry.texts.join('\n\n')}`,
       })
     }
-    writes.push({ target: join(dir, 'SKILL.md'), content: newMd })
+    writes.push({ target: join(dir, 'SKILL.md'), content: finalMd })
     const result = await this.applyTreeChange({
       name,
       origin,
@@ -1329,8 +1391,8 @@ export class SkillLibrary {
       }
       return { ok: false, message: `Tree change failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
     }
-    await this.audit(name, plan.auditAction, md, landing.find(entry => entry.target.endsWith('SKILL.md'))?.content ?? md, plan.auditSummary)
-    this.notifyMutation({ action: plan.eventAction, name, filePath: dir })
+    await this.audit(name, plan.auditAction, md, landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')?.content ?? md, plan.auditSummary)
+    this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
     return { ok: true, message: `${plan.eventAction} "${name}" succeeded.`, path: dir }
   }
 
@@ -1348,8 +1410,18 @@ export class SkillLibrary {
     const archiveRoot = join(this.root, '.archive')
     let entries: string[]
     try { entries = await this.io.list(archiveRoot) } catch { return { ok: false, message: 'No skill archive available.' } }
+    // 0.3.16 (E-3): `${name}-` also matches a SIBLING skill's archive entry
+    // (restoring `foo` used to pick `foo-bar` after a lexical sort: foo got
+    // foo-bar's content and foo-bar's archive vanished). The directory stamp
+    // makes the name unique, not the owner — verify each candidate's own
+    // SKILL.md frontmatter name before restoring.
     const candidates = entries.filter(entry => entry === name || entry.startsWith(`${name}-`)).sort().reverse()
-    const chosen = candidates[0]
+    let chosen: string | undefined
+    for (const candidate of candidates) {
+      const md = await this.io.readText(join(archiveRoot, candidate, 'SKILL.md')).catch(() => null)
+      const parsed = parseFrontmatter(md ?? '')
+      if (parsed?.frontmatter.name === name) { chosen = candidate; break }
+    }
     if (!chosen) return { ok: false, message: `Skill "${name}" is not in .archive.` }
     const source = join(archiveRoot, chosen)
     const dest = this.dirOf(name)
@@ -1362,13 +1434,20 @@ export class SkillLibrary {
     try {
       await this.io.rename(source, dest)
     } catch {
-      await this.io.copy(source, dest)
-      await this.io.remove(source)
+      try {
+        await this.io.copy(source, dest)
+        await this.io.remove(source)
+      } catch (error) {
+        // 0.3.16 (E-13 follow-up): the fallback failure must come back as a
+        // structured result, never a rejection — consolidates call this in a
+        // rollback loop and a throw there would replace the rollback report.
+        return { ok: false, message: `Restore of "${name}" from .archive failed: ${error instanceof Error ? error.message : String(error)}` }
+      }
     }
     if (await this.io.exists(join(dest, '.archive-reason'))) {
       await this.io.remove(join(dest, '.archive-reason'))
     }
-    this.notifyMutation({ action: 'restore', name, filePath: dest })
+    this.notifyMutation({ action: 'restore', name, skillDir: dest })
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
 
@@ -1392,7 +1471,7 @@ export class SkillLibrary {
     const existing = await this.io.readText(target).catch(() => null)
     await this.io.writeText(target, content)
     await this.audit(name, 'write_file', existing, content, `wrote ${filePath}`)
-    this.notifyMutation({ action: 'write_file', name, filePath: target })
+    this.notifyMutation({ action: 'write_file', name, skillDir: dir, file: target })
     return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
   }
 
@@ -1414,7 +1493,7 @@ export class SkillLibrary {
     const before = await this.io.readText(target).catch(() => null)
     await this.io.remove(target)
     await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
-    this.notifyMutation({ action: 'remove_file', name, filePath: target })
+    this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
   }
 
@@ -1553,51 +1632,22 @@ export class SkillLibrary {
     const snapshots = await this.listSnapshots()
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
-    await this.snapshotAll('pre-rollback', extras)
-    // Whole-tree replacement (rc.50 P2-14): the manifest is the only restore
-    // authority, so every NON-system entry in the active root is cleared first
-    // — a stray directory the manifest never declared must not survive a
-    // restore. System entries (sidecars/.archive/.backups, all dot-prefixed)
-    // are untouched here and restored/reconciled by the manifest below. The
-    // same clear runs for legacy manifests: their "restore everything" branch
-    // below repopulates from the snapshot, so no entry is lost either way.
-    let rootEntries: string[]
+    const preRollbackPath = await this.snapshotAll('pre-rollback', extras)
     try {
-      rootEntries = await this.io.list(this.root)
-    } catch {
-      rootEntries = []
-    }
-    for (const entry of rootEntries) {
-      if (entry.startsWith('.')) continue
-      await this.io.remove(join(this.root, entry))
-    }
-    const manifest = await this.readSnapshotManifest(latest.path)
-    if (manifest === null) {
-      // Legacy snapshot without a readable manifest: restore every entry
-      // except the manifest and extras (extras are owner state, never
-      // skills-root content).
-      for (const entry of await this.io.list(latest.path)) {
-        if (entry === 'manifest.json' || entry === 'extras') continue
-        await this.io.copy(join(latest.path, entry), join(this.root, entry))
-      }
-    } else {
-      for (const name of manifest.skills) {
-        await this.io.copy(join(latest.path, name), join(this.root, name))
-      }
-      for (const sidecar of manifest.sidecars) {
-        await this.io.copy(join(latest.path, sidecar), join(this.root, sidecar))
-      }
-      // Archive is part of the whole-state rollback: a snapshot that carried
-      // `.archive/` replaces the current one; a snapshot with no archive
-      // means the archive content post-dates it, so it is rolled away too
-      // (the pre-rollback snapshot above preserved it). Legacy manifests
-      // without the field leave `.archive` untouched.
-      const archiveRoot = join(this.root, '.archive')
-      if (manifest.hasArchive === true) {
-        await this.io.remove(archiveRoot)
-        await this.io.copy(join(latest.path, '.archive'), archiveRoot)
-      } else if (manifest.hasArchive === false) {
-        await this.io.remove(archiveRoot)
+      await this.restoreSnapshotIntoRoot(latest.path)
+    } catch (error) {
+      // 0.3.16 (E-13): the old shape cleared the active root and then restored
+      // with NO protection — a damaged/incomplete snapshot left the tree
+      // empty and the caller received a raw rejection. Roll back to the
+      // pre-rollback snapshot just taken; if that fails too, name both paths
+      // so the operator can rescue by hand.
+      const reason = error instanceof Error ? error.message : String(error)
+      try {
+        await this.restoreSnapshotIntoRoot(preRollbackPath)
+        return { ok: false, message: `Snapshot restore failed (${reason}); the active tree was rolled back to the pre-rollback snapshot.` }
+      } catch (rollbackError) {
+        const rb = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+        return { ok: false, message: `Snapshot restore failed (${reason}) AND pre-rollback restore failed (${rb}). Rescue manually from: ${preRollbackPath} (pre-rollback), ${latest.path} (target).` }
       }
     }
     const snapshotExtras = await this.readSnapshotExtras(latest.path)
@@ -1609,6 +1659,54 @@ export class SkillLibrary {
       message: `Restored skill tree from ${latest.path}`,
       path: latest.path,
       ...snapshotExtras.length === 0 ? {} : { extras: snapshotExtras },
+    }
+  }
+
+  /**
+   * Whole-tree replacement from one snapshot path (rc.50 P2-14): every
+   * NON-system entry in the active root is cleared first, then the manifest
+   * drives the repopulation (skills, sidecars, `.archive`). Extracted from
+   * restoreLatestSnapshot so a failed restore can roll itself back (E-13).
+   */
+  private async restoreSnapshotIntoRoot(snapshotPath: string): Promise<void> {
+    let rootEntries: string[]
+    try {
+      rootEntries = await this.io.list(this.root)
+    } catch {
+      rootEntries = []
+    }
+    for (const entry of rootEntries) {
+      if (entry.startsWith('.')) continue
+      await this.io.remove(join(this.root, entry))
+    }
+    const manifest = await this.readSnapshotManifest(snapshotPath)
+    if (manifest === null) {
+      // Legacy snapshot without a readable manifest: restore every entry
+      // except the manifest and extras (extras are owner state, never
+      // skills-root content).
+      for (const entry of await this.io.list(snapshotPath)) {
+        if (entry === 'manifest.json' || entry === 'extras') continue
+        await this.io.copy(join(snapshotPath, entry), join(this.root, entry))
+      }
+    } else {
+      for (const name of manifest.skills) {
+        await this.io.copy(join(snapshotPath, name), join(this.root, name))
+      }
+      for (const sidecar of manifest.sidecars) {
+        await this.io.copy(join(snapshotPath, sidecar), join(this.root, sidecar))
+      }
+      // Archive is part of the whole-state rollback: a snapshot that carried
+      // `.archive/` replaces the current one; a snapshot with no archive
+      // means the archive content post-dates it, so it is rolled away too
+      // (the pre-rollback snapshot above preserved it). Legacy manifests
+      // without the field leave `.archive` untouched.
+      const archiveRoot = join(this.root, '.archive')
+      if (manifest.hasArchive === true) {
+        await this.io.remove(archiveRoot)
+        await this.io.copy(join(snapshotPath, '.archive'), archiveRoot)
+      } else if (manifest.hasArchive === false) {
+        await this.io.remove(archiveRoot)
+      }
     }
   }
 }

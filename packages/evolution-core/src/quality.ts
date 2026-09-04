@@ -136,8 +136,7 @@ export function computeDedupGroups(input: {
     const [ra, rb] = [find(a), find(b)]
     if (ra !== rb) parent.set(rb, ra)
   }
-  for (const [hash, bucketNames] of hashes) {
-    void hash
+  for (const [, bucketNames] of hashes) {
     const first = bucketNames[0]
     if (first === undefined || bucketNames.length === 1) continue
     for (let index = 1; index < bucketNames.length; index += 1) {

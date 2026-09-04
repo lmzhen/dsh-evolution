@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseFrontmatter, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
@@ -156,6 +156,50 @@ it('refuses pinned skills from the background review (origin gate)', async () =>
   expect(result.ok).toBe(false)
   expect(result.message).toContain('protected')
   expect(await lib.read('demo-skill')).toBe(BODY)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('a `----` line inside frontmatter does not truncate the header (E-38, 0.3.16)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-restructure-'))
+  const lib = new SkillLibrary(root)
+  const dodge = `---
+name: demo-skill
+description: demonstrate restructure.
+----
+---
+
+# Demo
+
+Intro.
+
+## Details log
+
+- rc.67 fixed X
+`
+  await lib.create('demo-skill', dodge, 'foreground')
+  const result = await lib.restructure('demo-skill', [{ heading: 'Details log', toFile: 'references/log.md' }], 'background_review')
+  expect(result.ok).toBe(true)
+  const md = await lib.read('demo-skill') ?? ''
+  expect(md).toContain('name: demo-skill')
+  // The `----` line stayed inside the frontmatter block; the body starts at
+  // the real `---` closer (the old indexOf cut the header on the 4-dash line).
+  expect(md.slice(0, md.indexOf('# Demo'))).toContain('----')
+  expect(md).toContain('> 详见 references')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('keeps CRLF line endings on every untouched line (E-38a, 0.3.16)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-restructure-'))
+  const lib = new SkillLibrary(root)
+  // Write the CRLF file directly: create() assembles content with LF.
+  await mkdir(join(root, 'crlf-skill'), { recursive: true })
+  await writeFile(join(root, 'crlf-skill', 'SKILL.md'), BODY.replaceAll('demo-skill', 'crlf-skill').replace(/\n/g, '\r\n'), 'utf8')
+  const result = await lib.restructure('crlf-skill', [{ heading: 'Details log', toFile: 'references/log.md' }], 'background_review')
+  expect(result.ok).toBe(true)
+  const raw = await readFile(join(root, 'crlf-skill', 'SKILL.md'), 'utf8')
+  expect(raw.includes('\r\n')).toBe(true)
+  // No lone LF remains: untouched lines kept their original ending.
+  expect(raw.replace(/\r\n/g, '').includes('\n')).toBe(false)
   await rm(root, { recursive: true, force: true })
 })
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.16 (patch) — audit v13 修复批（阶段 0+1：7 项 P1/P2/P3 修复 + 债务批）
+
+外部审计（dsh-evolution-mirror-audit-report.md，5 路分包全量通读 + 实测复现）的第一批落地，每步先核验问题属实再修。
+
+- **E-1 redact 偏移量污染**：无捕获组模式改用字面量替换（旧 replacer 把 match offset 数字写进输出，如 `'use 4<redacted>'`）；仅 inline-assignment 保留前缀拼接；core 新增 redact 测试网（8 模式 + 无污染 + 幂等）。
+- **E-2 fuzzyPatch `$` 展开**：精确匹配路径改用替换函数（字符串替换串会展开 `$&`/`$'`/`$$`，LLM 写 shell 替换文本会静默损坏文件）；快速/模糊/replaceAll 三条路径字面量语义一致 + 测试。
+- **E-3 归档恢复前缀误伤**：`startsWith(\`${name}-\`)` 会把兄弟技能归档（foo-bar）误认为 foo——恢复前校验候选归档内 SKILL.md 的 frontmatter name；恢复回退失败 fail-soft（返回结构化结果，不裸抛）。
+- **E-4 preset 未声明依赖**：删除 `evolution-preset/cordis.patch.yml` 的 evolution-capability 挂载行（与 D-9 注释矛盾、依赖未声明）+ 新增 dependency-contract 契约测试——**顺带抓到第二个**：patch 挂了 `evolution-state` 行而依赖未声明，已补（host 此前已正确声明）。
+- **E-5/E-39 maintain 卡死与冷却**：单飞标志、富化与扫描整体移入一个 try/finally——富化抛错不再永久卡住 "already running" 且无日志；冷却在成功/失败时都更新；异常翻译为结构化命令错误 + 回归测试。
+- **E-12 威胁扫描盲区**：`slice(0, 65_536)` 让 65K 之后的技能内容全部漏扫（内容上限 100K）——改为整文本重叠窗口扫描（重叠 4K >> 最长模式跨度），同一模式跨窗口命中去重。
+- **E-13 快照恢复无保护**：restoreLatestSnapshot 抽取 `restoreSnapshotIntoRoot` 并包 try/catch——恢复失败自动回滚到 pre-rollback 快照（双失败时给出双路径救援提示），不再清空 root + 裸抛。
+- **E-14 archive 跨介质双份**：copy 成功而 remove 失败时先回滚已拷贝的归档，再回滚失败也给出"双份待清理"明确消息。
+- **T-14 consolidate 回滚静默**：`restoreFromArchive(source).catch(() => {})` 不再吞——回滚失败清单写入结果（"rolled back EXCEPT …"）。
+- **E-38/E-38a restructure 定位与行尾**：改用 frontmatterBlock 严格闭合行（旧 `indexOf('\n---')` 匹配 `----` 行导致 frontmatter 泄漏进正文）；body 按字节切片保留闭合行后的换行符；CRLF 文件保留原行尾（不再整体 LF 化）。
+- **E-42..E-50 P3 批**：`DSH_HOME ??` → `||`（空串视为未设置，3 处）；SKILL.md 为目录时 SkillLibrary.read 视为 absent（readText 保持 EISDIR——rotation 的损坏归档检测不松动）；afterHash 选 SKILL.md 改 basename 判断；hermes_env 补 `%USERPROFILE%` 变体；latestActivityAt 改 Date.parse 数值比较；yaml plain-scalar 补 null/bool/number/结尾冒号；reviewPrompt('memory','plan') 返回合并计划提示词（旧为错误通道）；observeEvent 内容形状守卫；mutation 事件 `filePath` 拆为 `skillDir`+`file`。
+- **S1.10-S1.14 债务**：删除零调用 `MemoryStore.write()`（裸写路径，D-2）；`AUTHORING_DESCRIPTION_BAR` 迁 constants（drift-signals 不再 import skill-store）；`PROMPT_BUNDLE_ID` 由 VERSION 派生（T-5 双源消除）；指针行常量单点化（T-6）；X-1/X-2 随手修（transact 任务允许同步返回）。
+- 本地：vitest 68/68（429）、oxlint 0/0、tsc -b（core/commands/maintenance）0。
+
 ## 0.3.15 (patch) — preset install composes the runtime standard + delta (P1-1 follow-up)
 
 0.3.14's `/evolution preset install` copied the published `agent.cordis.yml` **delta-only** fragment into `$DSH_HOME/.agent-presets/evolution/`. The agent-preset registry mounts a preset's composition file **verbatim** (verified against `dsh-agent-presets` `mountPreset`), so the delta alone would have produced an agent carrying only the delta rows (no tools, no persona). The source installer path (`install-layered.mjs`) already generated the full composition — the 0.3.14 command skipped that step.

@@ -13,7 +13,7 @@
 
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from './skill-health.ts'
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
-import { AUTHORING_DESCRIPTION_BAR } from './skill-store.ts'
+import { AUTHORING_DESCRIPTION_BAR } from './constants.ts'
 
 /** One skill's library state; the assembler (not this module) reads IO. */
 export interface DriftSkillSnapshot {

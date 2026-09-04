@@ -111,6 +111,105 @@ it('skill consolidate merges sources into target and archives them', async () =>
   await rm(root, { recursive: true, force: true })
 })
 
+it('archive fallback rolls back the copied archive when the source cannot be removed (E-14, 0.3.16)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const real = nodeEvolutionIo()
+  // rename always fails on this provider (cross-media), and removing the
+  // ACTIVE source fails too — the old shape left the skill in both roots.
+  const io = {
+    ...real,
+    rename: async () => { throw new Error('cross-media rename not supported') },
+    remove: async (path: string) => {
+      if (path.includes(root) && !path.includes('.archive')) throw new Error('EBUSY')
+      return real.remove(path)
+    },
+  }
+  const lib = new SkillLibrary(root, io)
+  await lib.create('swap-skill', USABLE('swap-skill'), 'foreground')
+  const result = await lib.archive('swap-skill')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('rolled back')
+  expect(await lib.list().then(rows => rows.map(s => s.name))).toContain('swap-skill') // active kept
+  expect(await io.exists(join(root, '.archive', 'swap-skill'))).toBe(false) // archive copy cleaned
+  await rm(root, { recursive: true, force: true })
+})
+
+it('snapshot restore rolls back to the pre-rollback snapshot when the restore fails (E-13, 0.3.16)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('keep-skill', USABLE('keep-skill'), 'foreground')
+  const baseline = await lib.snapshotAll('baseline')
+  // Damage the restore target: its keep-skill entry is gone, so the
+  // manifest-driven copy throws mid-restore (after the root was cleared).
+  await rm(join(baseline, 'keep-skill'), { recursive: true, force: true })
+  await lib.create('other-skill', USABLE('other-skill'), 'foreground')
+  const result = await lib.restoreLatestSnapshot()
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('rolled back')
+  const names = (await lib.list()).map(s => s.name)
+  // The active root is the PRE-rollback state (both skills were present when
+  // the restore ran and failed) — never a cleared tree.
+  expect(names).toContain('other-skill')
+  expect(names).toContain('keep-skill')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('consolidate rollback reports sources it could not restore instead of silently swallowing (T-14, 0.3.16)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const real = nodeEvolutionIo()
+  let failTargetWrite = false
+  const io = {
+    ...real,
+    rename: async (src: string, dst: string) => {
+      if (src.split(/[\\/]/).includes('.archive')) throw new Error('restore rename blocked')
+      return real.rename(src, dst)
+    },
+    copy: async (src: string, dst: string) => {
+      // The rename-refusing provider falls back to copy+remove — block that too
+      // so a restore from .archive fails outright.
+      if (src.split(/[\\/]/).includes('.archive')) throw new Error('restore copy blocked')
+      return real.copy(src, dst)
+    },
+    writeText: async (path: string, content: string) => {
+      if (failTargetWrite && path.includes('target-skill')) throw new Error('target write blocked')
+      return real.writeText(path, content)
+    },
+  }
+  const lib = new SkillLibrary(root, io)
+  await lib.create('target-skill', USABLE('target-skill'), 'foreground')
+  await lib.create('src-a', USABLE('src-a'), 'foreground')
+  failTargetWrite = true
+  const result = await lib.consolidate('target-skill', ['src-a'])
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('EXCEPT')
+  expect(result.message).toContain('src-a')
+  // The failed-to-restore source is still archived — and the message says so.
+  expect(await io.exists(join(root, '.archive', 'src-a'))).toBe(true)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('restoring a skill never picks a sibling-prefixed archive (E-3, 0.3.16)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('foo', USABLE('foo'), 'foreground')
+  await lib.create('foo-bar', USABLE('foo-bar'), 'foreground')
+  expect((await lib.archive('foo')).ok).toBe(true)
+  expect((await lib.archive('foo-bar')).ok).toBe(true)
+  // Old code: `${name}-` matched foo-bar's stamp, lexical sort picked it, and
+  // restoring foo handed over foo-bar's content (its own archive vanished).
+  const restored = await lib.restoreFromArchive('foo')
+  expect(restored.ok).toBe(true)
+  const fooRead = await lib.read('foo') ?? ''
+  expect(fooRead).toContain('name: foo')
+  expect(fooRead).not.toContain('name: foo-bar')
+  // foo-bar's archive entry survived untouched and is still restorable.
+  const restoredBar = await lib.restoreFromArchive('foo-bar')
+  expect(restoredBar.ok).toBe(true)
+  const barRead = await lib.read('foo-bar') ?? ''
+  expect(barRead).toContain('name: foo-bar')
+  await rm(root, { recursive: true, force: true })
+})
+
 it('skill consolidate is atomic: a protected source aborts before any mutation', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
   const lib = new SkillLibrary(root)
