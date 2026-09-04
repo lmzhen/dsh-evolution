@@ -86,6 +86,16 @@ describe('computeProbe', () => {
     expect(without.detail[0]).toBe('description=missing')
   })
 
+  it('description_chars carries the text for the §5-B5 nature triage, truncated at 160 (0.3.11)', () => {
+    const withDesc = computeProbe('description_chars', 'align-test-ops', snapshots)
+    expect(withDesc.detail[1]).toBe('desc-text: Short.')
+    const long = computeProbe('description_chars', 'align-tools', [
+      { name: 'align-tools', body: '# A\n', description: 'x'.repeat(200) },
+    ])
+    expect(long.detail[0]).toBe('description=200 chars')
+    expect(long.detail[1]).toContain('…(truncated: 200 total)')
+  })
+
   it('probe detail crosses the same redaction policy as the facts block', () => {
     const probes = computeProbe('narrow_name', 'ghost', [])
     void probes

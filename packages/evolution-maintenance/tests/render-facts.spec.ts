@@ -27,6 +27,18 @@ describe('renderFacts', () => {
     expect(rendered).toContain('# skill=align-test-ops')
   })
 
+  it('always carries protection + catalog meta on every skill header (0.3.11)', () => {
+    const rendered = renderFacts(report, { signalsVersion: '1', signature: 's' })
+    expect(rendered).toContain('# skill=align-test-ops (protected=none catalog=visible)')
+    const withMeta = computeDriftSignals([
+      { name: 'pinned-skill', body: HEALTHY, protected: 'pinned' } satisfies DriftSkillSnapshot,
+      { name: 'bad-yaml-skill', body: '---\nname: bad-yaml-skill\ndescription: a: b\n---\n\n# B\n', catalogInvalid: true } satisfies DriftSkillSnapshot,
+    ])
+    const rendered2 = renderFacts(withMeta, { signalsVersion: '1', signature: 's' })
+    expect(rendered2).toContain('# skill=pinned-skill (protected=pinned catalog=visible)')
+    expect(rendered2).toContain('# skill=bad-yaml-skill (protected=none catalog=yaml-invalid)')
+  })
+
   it('redacts credential shapes from rendered values', () => {
     const secret = 'sk-proj-abcdefghijklmnop123456'
     const reportWithSecret = computeDriftSignals([{ name: 'leaky', body: `# A\n\nkey = ${secret}\n` }])

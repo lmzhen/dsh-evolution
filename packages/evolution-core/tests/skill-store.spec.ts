@@ -403,3 +403,45 @@ it('authoringFeedback reports the 60-char bar and colon rule without changing va
   expect(missing.descriptionChars).toBe(0)
   expect(missing.hasColon).toBe(false)
 })
+
+it('create normalizes unquoted YAML-unsafe frontmatter at the write point (0.3.11)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-norm-create-'))
+  const lib = new SkillLibrary(root)
+  const created = await lib.create('norm-skill', '---\nname: norm-skill\ndescription: Search: arXiv papers by keyword.\n---\n\n# Body\n', 'foreground')
+  expect(created.ok).toBe(true)
+  expect(created.normalizedFrontmatterFields).toEqual(['description'])
+  const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
+  expect(onDisk).toContain('description: "Search: arXiv papers by keyword."')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('create quotes quote/backslash values via single-quote fallback — no catch-22 (0.3.11 fix)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-norm-quote-'))
+  const lib = new SkillLibrary(root)
+  const content = '---\nname: norm-skill\ndescription: He said "hi" then: left\n---\n\n# Body\n'
+  const created = await lib.create('norm-skill', content, 'foreground')
+  expect(created.ok).toBe(true)
+  expect(created.normalizedFrontmatterFields).toEqual(['description'])
+  // The same file is updatable (the catch-22 regression: an inner quote must
+  // not deadlock the write path).
+  const updated = await lib.update('norm-skill', '---\nname: norm-skill\ndescription: He said "hi" then: left\n---\n\n# Body v2\n', 'foreground')
+  expect(updated.ok).toBe(true)
+  const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
+  expect(onDisk).toContain('description: \'He said "hi" then: left\'')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('update and patch normalize frontmatter the same way (0.3.11)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-norm-upd-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('norm-skill', '---\nname: norm-skill\ndescription: Run tests.\n---\n\n# Body\n', 'foreground')
+  const updated = await lib.update('norm-skill', '---\nname: norm-skill\ndescription: Search: arXiv papers by keyword.\n---\n\n# Body\n', 'foreground')
+  expect(updated.ok).toBe(true)
+  expect(updated.normalizedFrontmatterFields).toEqual(['description'])
+  const patched = await lib.patch('norm-skill', 'description: "Search: arXiv papers by keyword."', 'description: Deep search: arXiv and journals.', '')
+  expect(patched.ok).toBe(true)
+  expect(patched.normalizedFrontmatterFields).toEqual(['description'])
+  const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
+  expect(onDisk).toContain('description: "Deep search: arXiv and journals."')
+  await rm(root, { recursive: true, force: true })
+})

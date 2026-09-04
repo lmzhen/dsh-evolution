@@ -425,6 +425,63 @@ describe('evolution-commands', () => {
     }
   })
 
+  it('single-flight: a re-trigger during a running scan returns already-running and does not spawn (0.3.11)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-singleflight-'))
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let starts = 0
+    let resolveRun: (() => void) | undefined
+    let markSpawned: (() => void) | undefined
+    const spawned = new Promise<void>((resolve) => { markSpawned = resolve })
+    try {
+      const ctx = new Context()
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      ctx.provide('subagents', {
+        async start(_kind: string, _options: unknown) {
+          starts += 1
+          markSpawned?.()
+          // First spawn stays deferred (to hold the scan in flight); later
+          // spawns complete immediately so the post-settle re-trigger awaits.
+          const plan = { text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }
+          if (starts === 1) {
+            return {
+              result: new Promise((resolve) => {
+                resolveRun = () => { resolve(plan) }
+              }),
+            }
+          }
+          return { result: Promise.resolve(plan) }
+        },
+      })
+      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      const first = handler!.handler({ rawInput: 'maintain' }) // pends on the deferred run
+      await spawned // deterministic: wait for the spawn instead of a fixed sleep
+      expect(starts).toBe(1)
+      const second = await handler!.handler({ rawInput: 'maintain' })
+      expect(second.kind).toBe('success')
+      expect(second.text).toContain('already running')
+      expect(starts).toBe(1) // no second spawn
+      resolveRun!()
+      const settled = await first
+      expect(settled.kind).toBe('success')
+      // After settle the same invocation may run again.
+      const third = await handler!.handler({ rawInput: 'maintain' })
+      expect(third.kind).toBe('success')
+      expect(starts).toBe(2)
+    } finally {
+      if (resolveRun) resolveRun()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('maintain --facts renders the facts block with zero subagent calls and no cooldown', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'evo-commands-facts-'))
     const root = join(dir, 'skills')

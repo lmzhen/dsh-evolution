@@ -137,6 +137,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     else result = { ok: false, message: `Unknown action "${action}".` }
 
     if (result.ok) {
+      // 0.3.11: the write point auto-quoted unquoted YAML-unsafe frontmatter
+      // values (catalog-loadability) — surface it so the model can learn.
+      if (result.normalizedFrontmatterFields && result.normalizedFrontmatterFields.length > 0) {
+        feedbackLines.push(`frontmatter auto-quoted (YAML compatibility): ${result.normalizedFrontmatterFields.join(', ')}`)
+      }
       // Lifecycle scope: curator only manages usage records created by the
       // background review pipeline. Keep the native runner aligned with the
       // legacy facade here, or review-created skills silently escape the

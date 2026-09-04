@@ -33,7 +33,11 @@ export function renderFacts(report: DriftReport, options: RenderFactsOptions): s
     lines.push(...renderSignal(signal, redact))
   }
   for (const skill of report.skills) {
-    lines.push(`# skill=${skill.name}`)
+    // 0.3.11: always-present meta — protection marker and catalog loadability
+    // (never a conditional line: the auditor must see "none"/"visible" too).
+    // The header is the single place §7's protected rule can be exercised.
+    const meta = [`protected=${skill.protected ?? 'none'}`, `catalog=${skill.catalogInvalid === true ? 'yaml-invalid' : 'visible'}`]
+    lines.push(`# skill=${skill.name} (${meta.join(' ')})`)
     for (const signal of skill.signals) {
       lines.push(...renderSignal(signal, redact))
     }

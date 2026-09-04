@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto'
  * review workers, so a stale id across deployments must be distinguishable.
  */
 export const PROMPT_BUNDLE_ID = 'dsh-evolution@11'
-export const PROMPT_BUNDLE_VERSION = 11
+export const PROMPT_BUNDLE_VERSION = 12
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 Review the conversation above and consider saving to memory if appropriate.
@@ -237,10 +237,10 @@ A. 域·碎片化
 
 B. 层·分层错位
 - B1 {signal:stamp_density}（阈值 {signal:stamp_density.threshold}）或 {signal:body_size}（阈值 {signal:body_size.threshold}）=over：按**三问判据**判锚/残留——① 该编号/时间戳是否被库内其他文件引用？② 除"何时产生/为何存在"外是否还承载信息？③ 删除是否影响任何跨文档检索？（①是且③是→锚；否则→残留候选，人审）。锚→允许保留 + needs_human + semantic_reasoning 写三问结果；**锚不使用 is_override**（is_override 仅用于 §7 申诉；锚是 B1 的正常裁决路径）；残留→restructure 建议（movable headings 逐字引用）。**锚≠可读：单行 >4000 字符即使在锚类也必须拆分。**
-- B2 {signal:pointer_missing}=over：读支持文件后判性质——可复用模式→上移正文；会话专属实录→保留+补指针；形态=patch 指引。**未读内容仅凭文件名 → conf≤0.4 且措辞"先人工确认再执行"。**
+- B2 {signal:pointer_missing}=over：读支持文件后判性质——可复用模式→上移正文；会话专属实录→保留+补指针；形态=patch 指引。**未读内容仅凭文件名 → conf≤0.4 且措辞"先人工确认再执行"。** **缺失指针=支持文件存在、正文无引用（单向语义），finding 表述勿反向。**
 - B3 {signal:dup_heading}=over：删除多余标题行（保留一份），patch 指引。
 - B4 {signal:overlong_line}=over：>1500 拆行；>4000 判定可读性危机（内容合法也拆）；patch 指引。**finding 必须给全量口径：共 N 行超限，其中 >4000 的逐行列出。**
-- B5 {signal:description_chars}=over：先判**性质**三分类——事件性承诺（单次故障/incident 写入元数据）→裁剪建议；叙事性自我描述→压缩建议；丰富但合规（完整用例边界）→保留 + is_override + override_reason="合法密度"。**第三类门槛（默认从严）**：只有能论证"60 字无法容纳该用例边界"（写明具体是什么边界、为什么 60 字装不下）才可判丰富合规；论证不出 → 压缩建议。semantic_reasoning 必写三分类之一（若第三类，附边界论证）。
+- B5 {signal:description_chars}=over：先判**性质**三分类——事件性承诺（单次故障/incident 写入元数据）→裁剪建议；叙事性自我描述→压缩建议；丰富但合规（完整用例边界）→保留 + is_override + override_reason="合法密度"。**分类特征**：含"恢复/修复某次事故、日期快照"类一次性措辞→事件性承诺；"动词+对象"式任务说明→叙事性；枚举完整用例边界且不可拆分→丰富合规。**第三类门槛（默认从严，半机械）**：先自行试写一个 ≤60 字压缩方案——能保留全部路由关键项（触发词+域）→ 不可判第三类（按压缩建议）；只有试写失败（在 semantic_reasoning 列出试写方案与具体失败点）才可判丰富合规。描述文本可见（probe desc-text 或正文 frontmatter）时仍须三分类；仅长度可见 → conf≤0.4。semantic_reasoning 必写三分类之一。
 
 D. 库·整合纪律（计划形态约束）
 - D1 同类问题多处出现→合成一条 relationship-level 建议，不逐项输出。

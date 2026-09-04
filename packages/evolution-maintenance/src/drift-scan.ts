@@ -23,6 +23,10 @@ export interface SnapshotOptions {
   descriptions?: ReadonlyMap<string, string> | undefined
   /** Quality score per skill name, when the caller computed it. */
   quality?: ReadonlyMap<string, number> | undefined
+  /** Protection marker per skill name (0.3.11). */
+  protected?: ReadonlyMap<string, string> | undefined
+  /** Skills whose frontmatter the strict-YAML catalog cannot load (0.3.11). */
+  catalogInvalid?: ReadonlyMap<string, boolean> | undefined
 }
 
 /**
@@ -44,6 +48,8 @@ export async function snapshotFromLibrary(
       description: options.descriptions?.get(entry.name),
       supportFiles: options.supportFiles?.get(entry.name),
       quality: options.quality?.get(entry.name),
+      ...(options.protected?.get(entry.name) !== undefined ? { protected: options.protected.get(entry.name) } : {}),
+      ...(options.catalogInvalid?.get(entry.name) === true ? { catalogInvalid: true } : {}),
     })
   }
   return snapshots

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.11 (patch) — authoring normalization + review completeness batch (template v12)
+
+The inkos-harness case exposed a class defect: its frontmatter description carried an unquoted `: ` (YAML plain-scalar violation), so the **platform catalog silently dropped the whole skill** (strict YAML parse) while the family's lenient `parseFrontmatter` still scanned it — a skill invisible to the platform but "present" to the audit. This release fixes the class at the write point, surfaces it in the audit, and closes the review-completeness gaps found across four real runs (13:38 / A-B arms / 15:01).
+
+**Generation side (write-point enforcement — guidance already existed but was ignorable):**
+- core: `yamlPlainScalarNeedsQuotes` (single rule source) + `normalizeFrontmatter` — `SkillLibrary.create/update/patch` auto-quote YAML-unsafe frontmatter values before writing (double quotes; single-quote `''`-doubling fallback so `"`/`\` values stay fixable — no catch-22 on legacy descriptions); unfixable control characters reject instead of writing a broken skill; `normalizedFrontmatterFields` reported back, tool-skill-manage surfaces it as an `Authoring check` line.
+- `frontmatterYamlUnsafeValues` — raw-line scan shared by the normalizer and the audit detector (quotes included: a value normalized by the write path is never re-flagged).
+
+**Audit side:**
+- facts skill headers now always carry meta: `# skill=x (protected=none catalog=yaml-invalid)` — §7 "protected set → 0 recommendations" becomes executable from fact data; catalog-unloadable skills become a visible flag instead of the auditor's honest-but-silent read-failure.
+- `maintenance_probe` `description_chars` returns `desc-text:` (truncated at 160 with `(truncated: N total)`) — the §5-B5 nature triage (event-commitment/narrative/dense) becomes exercisable for skills the auditor cannot read.
+- template **v12**: §5-B2 pointer_missing one-way semantics (`支持文件存在、正文无引用` — fixes the 15:01 inverted finding); §5-B5 third-class gate is semi-mechanical now (write a ≤60-char compression attempt first; keeping all route keys disqualifies the third class; failure must show the attempt + failing point) + per-class text signatures + "text visible → still classify; length-only → conf≤0.4".
+
+**Command side:** single-flight guard — a re-trigger while a scan is running returns "already running" instead of spawning (0.3.5 discovered the cooldown never covers in-flight runs; a re-submit used to cancel the running scan at the platform level).
+
+**Data:** inkos-harness description double-quoted (the instance fix).
+
+Tests: frontmatter normalize (+ truth table, idempotence, no-touch, catch-22 regression, embedded-newline skip), write-path integration (create/update/patch), raw-line detector, facts meta, probe desc-text, single-flight four-state. Local: 63 files / 392 tests, oxlint 0/0, tsc 0; real-library render: inkos `catalog=yaml-invalid` → (after fix) 6/6 `catalog=visible`, zero-touch verified byte-identical.
+
 ## 0.3.10 (patch) — maintain default timeout 120s → 600s
 
 A bare `/evolution maintain` run (14:37, commandId cmd-adce9ea7-1) aborted with "Maintenance scan was aborted..." exactly **119.94s** after the subagent spawned — the `AbortSignal.timeout(120_000)` default, verified from session logs (child createdAt → turn/end kind:parent; no user interrupt, no duplicate submission). The child was mid-analysis (§4 step ②, B2/B5 with the inkos-harness read-failure being handled correctly per §4) and needed only more time — the 13:38 run with `--timeout 600000` completed the same scan. 0.3.4's flag was the workaround; the persistent default stayed too tight.

@@ -37,6 +37,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
   let lastMaintainAt = 0
   let lastMaintainRunId = ''
+  // 0.3.11 single-flight: 0.3.5 discovered the cooldown never covers in-flight
+  // runs (lastMaintainAt updates AFTER settle) — a re-submit during a run
+  // cancels it at the platform level. This flag answers re-triggers with
+  // "already running" instead of spawning a second scan.
+  let maintainInFlightSince = 0
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: CommandRuntimeLike }).commands
     commands.register({
@@ -209,6 +214,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             descriptions: enrichment.descriptions,
             supportFiles: enrichment.supportFiles,
             quality: enrichment.quality,
+            protected: enrichment.protected,
+            catalogInvalid: enrichment.catalogInvalid,
           })
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
           return ok(`Maintenance facts (0-token preview):\n${facts}`)
@@ -225,6 +232,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
             return err('Invalid --timeout value: expected a positive integer number of milliseconds (e.g. /evolution maintain --timeout 600000).')
           }
+          if (maintainInFlightSince > 0) {
+            const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
+            return ok(`Maintenance scan is already running (since ~${running}s ago) — re-submitting now would cancel it. Wait for it to settle; the result appears when it finishes.`)
+          }
           const cooldownMs = config.maintainCooldownMs ?? 30_000
           const sinceLast = Date.now() - lastMaintainAt
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
@@ -237,16 +248,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
           const enrichment = await buildEnrichment(ctx, library)
-          const outcome = await runMaintain(
-            { library, subagents, parent: invocation.agent },
-            {
-              timeoutMs: runTimeoutMs,
-              descriptions: () => enrichment.descriptions,
-              supportFiles: () => enrichment.supportFiles,
-              quality: () => enrichment.quality,
-              usageObserved: () => enrichment.usageObservedValue,
-            },
-          )
+          maintainInFlightSince = Date.now()
+          let outcome: Awaited<ReturnType<typeof runMaintain>>
+          try {
+            outcome = await runMaintain(
+              { library, subagents, parent: invocation.agent },
+              {
+                timeoutMs: runTimeoutMs,
+                descriptions: () => enrichment.descriptions,
+                supportFiles: () => enrichment.supportFiles,
+                quality: () => enrichment.quality,
+                protected: () => enrichment.protected,
+                catalogInvalid: () => enrichment.catalogInvalid,
+                usageObserved: () => enrichment.usageObservedValue,
+              },
+            )
+          } finally {
+            maintainInFlightSince = 0
+          }
           // Update the cooldown on success AND failure: repeated failing
           // scans must not refire either.
           lastMaintainAt = Date.now()

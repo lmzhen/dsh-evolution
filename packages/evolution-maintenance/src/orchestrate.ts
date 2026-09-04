@@ -46,6 +46,8 @@ export interface MaintainOptions {
   supportFiles?: () => ReadonlyMap<string, readonly string[]>
   descriptions?: () => ReadonlyMap<string, string>
   quality?: () => ReadonlyMap<string, number>
+  protected?: () => ReadonlyMap<string, string>
+  catalogInvalid?: () => ReadonlyMap<string, boolean>
   usageObserved?: () => boolean | undefined
 }
 
@@ -177,6 +179,8 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       supportFiles: options.supportFiles ? options.supportFiles() : undefined,
       descriptions: options.descriptions ? options.descriptions() : undefined,
       quality: options.quality ? options.quality() : undefined,
+      protected: options.protected ? options.protected() : undefined,
+      catalogInvalid: options.catalogInvalid ? options.catalogInvalid() : undefined,
     })
     if (snapshots.length === 0) {
       // Empty library: no facts to review — do not spend a model call.

@@ -28,6 +28,10 @@ export interface DriftSkillSnapshot {
   quality?: number | null | undefined
   /** Usage observation window status; null/undefined = unknown. */
   usageObserved?: boolean | null | undefined
+  /** Protection marker (`bundled`/`hub-installed`/`pinned`), when known (0.3.11). */
+  protected?: string | null | undefined
+  /** Frontmatter values the strict-YAML platform catalog cannot load (0.3.11). */
+  catalogInvalid?: boolean | undefined
 }
 
 /** verdict=over means "relatively positioned above the threshold", never a violation. */
@@ -47,6 +51,9 @@ export interface DriftSignal {
 export interface DriftSkillAssessment {
   name: string
   signals: ReadonlyArray<DriftSignal>
+  /** Passthrough from the snapshot (0.3.11): protection marker, catalog loadability. */
+  protected?: string | null | undefined
+  catalogInvalid?: boolean | undefined
 }
 
 export interface DriftReport {
@@ -253,7 +260,12 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
         : sig('quality_low', quality < LOW_QUALITY_THRESHOLD ? 'over' : 'pass', quality.toFixed(2), `${LOW_QUALITY_THRESHOLD}`),
     )
 
-    return { name: snapshot.name, signals }
+    return {
+      name: snapshot.name,
+      signals,
+      ...(snapshot.protected !== undefined && snapshot.protected !== null ? { protected: snapshot.protected } : {}),
+      ...(snapshot.catalogInvalid !== undefined ? { catalogInvalid: snapshot.catalogInvalid } : {}),
+    }
   })
 
   return { library, skills }

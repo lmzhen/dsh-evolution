@@ -83,6 +83,24 @@ describe('tool-skill-manage', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('reports the write-point frontmatter auto-quote on create (0.3.11)', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`norm-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: args,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    const created = await execute({ action: 'create', name: 'norm-skill', content: SKILL.replace('boundary-skill', 'norm-skill').replace('lifecycle boundary test', 'Search: arXiv papers by keyword.') })
+    expect(created.isError).toBe(false)
+    const message = (created.value as { message?: string } | undefined)?.message ?? ''
+    expect(message).toContain('frontmatter auto-quoted (YAML compatibility): description')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('refuses an over-bar description when descriptionStrict is enabled (P0)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-skill-strict-'))
     const previousHome = process.env.DSH_HOME

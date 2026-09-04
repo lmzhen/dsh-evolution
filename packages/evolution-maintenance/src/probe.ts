@@ -111,8 +111,16 @@ export function computeProbe(
       const matches = narrowNameMatches(snapshot.name)
       return result(signal, matches.map(shape => `narrow shape: ${shape}`), target)
     }
-    case 'description_chars':
-      return result(signal, [`description=${snapshot.description === undefined ? 'missing' : `${snapshot.description.length} chars`}`], target)
+    case 'description_chars': {
+      const desc = snapshot.description
+      if (desc === undefined) return result(signal, ['description=missing'], target)
+      // 0.3.11: the description text is the only way to exercise the §5-B5
+      // nature triage on a skill the auditor cannot read — truncate at 160
+      // chars with an explicit marker (truncated judgment must stay ≤0.4).
+      const truncated = desc.length > 160
+      const text = truncated ? `${desc.slice(0, 160)}…(truncated: ${desc.length} total)` : desc
+      return result(signal, [`description=${desc.length} chars`, `desc-text: ${text}`], target)
+    }
     case 'quality_low': {
       const quality = snapshot.quality
       return result(signal, [quality === null || quality === undefined ? 'quality=unknown' : `quality=${quality.toFixed(2)}`], target)

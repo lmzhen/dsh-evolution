@@ -59,7 +59,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(11)
+  expect(PROMPT_BUNDLE_VERSION).toBe(12)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {
@@ -68,7 +68,7 @@ it('maintain persona ships in the bundle with signal placeholders (011)', () => 
   expect(MAINTAIN_PROMPT).toContain('MECHANICAL_FACTS')
 })
 
-it('maintain persona v11 carries the guidance clauses pinned by the prompt loop (0.3.7)', () => {
+it('maintain persona v12 carries the guidance clauses pinned by the prompt loops (0.3.7 + 0.3.11)', () => {
   // §3 completeness contract: every over signal lands in an item or a note.
   expect(MAINTAIN_PROMPT).toContain('完整性契约')
   expect(MAINTAIN_PROMPT).toContain('禁止静默省略')
@@ -78,10 +78,15 @@ it('maintain persona v11 carries the guidance clauses pinned by the prompt loop 
   expect(MAINTAIN_PROMPT).toContain('三问判据')
   expect(MAINTAIN_PROMPT).toContain('锚≠可读')
   expect(MAINTAIN_PROMPT).toContain('锚不使用 is_override')
+  // §5-B2 pointer_missing one-way semantics (0.3.11).
+  expect(MAINTAIN_PROMPT).toContain('缺失指针=支持文件存在、正文无引用')
   // §5-B4 full-count reporting.
   expect(MAINTAIN_PROMPT).toContain('全量口径')
-  // §5-B5 nature classification with a strict third-class gate (boundary proof).
+  // §5-B5 nature classification with a strict semi-mechanical third-class gate (0.3.11).
   expect(MAINTAIN_PROMPT).toContain('第三类门槛')
+  expect(MAINTAIN_PROMPT).toContain('半机械')
+  expect(MAINTAIN_PROMPT).toContain('试写')
+  expect(MAINTAIN_PROMPT).toContain('分类特征')
   // §6 confidence downgrade rule + pre-submit checklist.
   expect(MAINTAIN_PROMPT).toContain('confidence 降档规则')
   expect(MAINTAIN_PROMPT).toContain('提交前自查')

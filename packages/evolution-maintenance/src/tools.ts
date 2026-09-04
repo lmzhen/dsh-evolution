@@ -65,6 +65,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             descriptions: enrichment.descriptions,
             supportFiles: enrichment.supportFiles,
             quality: enrichment.quality,
+            protected: enrichment.protected,
+            catalogInvalid: enrichment.catalogInvalid,
           })
           // Probe output crosses the session boundary to the maintenance
           // subagent — same redaction policy as the facts block (011 §8).

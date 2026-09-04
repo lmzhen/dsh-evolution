@@ -44,6 +44,9 @@ export interface SkillActionResult {
   ok: boolean
   message: string
   path?: string
+  /** Frontmatter keys auto-quoted for catalog-loadable YAML (0.3.11) — set
+   * only when the write path modified the block. */
+  normalizedFrontmatterFields?: string[]
 }
 
 /**
@@ -162,6 +165,119 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; b
     }
   }
   return { frontmatter, body }
+}
+
+/** YAML plain-scalar hazards that make an UNQUOTED frontmatter value
+ * unloadable to the platform catalog (strict YAML parser): `: ` (mapping
+ * separator), ` #` (comment start), or a leading YAML indicator. The
+ * evolution `parseFrontmatter` is deliberately lenient, so violations
+ * silently split family-visibility from platform-visibility (0.3.11
+ * inkos-harness case: the description carried "…: " and the catalog dropped
+ * the whole skill). Already-quoted values and well-formed flow collections
+ * (`[a, b]` / `{a: b}`) are considered safe. */
+export function yamlPlainScalarNeedsQuotes(value: string): boolean {
+  if (value.length === 0) return false
+  if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) return false
+  if (/^\[.*\]$/.test(value) || /^\{.*\}$/.test(value)) return false
+  if (value.includes(': ')) return true
+  if (value.includes(' #')) return true
+  if (/^[-?:,[\]{}#&*!|>'\"%@`\s]/.test(value)) return true
+  return false
+}
+
+/** Raw-line scan of the frontmatter block: entries whose UNQUOTED value is
+ * YAML-unsafe for the strict platform catalog. Operates on the ORIGINAL line
+ * value (quotes included), so a value already wrapped by
+ * `normalizeFrontmatter` is never re-flagged — one source with the write
+ * path. Single-line entries only; lines with embedded line breaks skip. */
+export function frontmatterYamlUnsafeValues(content: string): Array<{ key: string; value: string }> {
+  const found: Array<{ key: string; value: string }> = []
+  if (!content.trimStart().startsWith('---')) return found
+  const nl = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content.split(nl)
+  if ((lines[0] ?? '').trim() !== '---') return found
+  let end = -1
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line === undefined) continue
+    if (line.trim() === '---') { end = i; break }
+  }
+  if (end < 0) return found
+  for (let i = 1; i < end; i++) {
+    const line = lines[i]
+    if (line === undefined) continue
+    if (line.includes('\n') || line.includes('\r')) continue
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    if (!match) continue
+    const key = match[1]
+    const value = (match[2] ?? '').trim()
+    if (key === undefined) continue
+    if (yamlPlainScalarNeedsQuotes(value)) found.push({ key, value })
+  }
+  return found
+}
+
+export interface FrontmatterNormalizeResult {
+  content: string
+  changed: boolean
+  /** Frontmatter keys whose values were auto-quoted. */
+  fields: string[]
+  /** Values that cannot be auto-quoted safely (control characters only —
+   * double/single-quote fallback covers `"`/`\`/`'`, so a quote-containing
+   * value no longer traps the write path in an unfixable loop). */
+  issues: string[]
+}
+
+/**
+ * Normalize a SKILL.md frontmatter block into catalog-loadable YAML: values
+ * that YAML forbids unquoted get quotes — double quotes normally, single
+ * quotes (with `''` doubling) when the value contains `"` or `\` (both legal
+ * unescaped inside single-quoted YAML). Idempotent (a normalized block
+ * passes through unchanged); only single-line `key: value` entries are
+ * touched; body text is never modified; a key line carrying an embedded
+ * line break (mixed ending styles) is left untouched rather than risking
+ * continuation-line data loss. Line-ending style of the block is preserved.
+ */
+export function normalizeFrontmatter(content: string): FrontmatterNormalizeResult {
+  if (!content.trimStart().startsWith('---')) return { content, changed: false, fields: [], issues: [] }
+  const nl = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content.split(nl)
+  if ((lines[0] ?? '').trim() !== '---') return { content, changed: false, fields: [], issues: [] }
+  let end = -1
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line === undefined) continue
+    if (line.trim() === '---') { end = i; break }
+  }
+  if (end < 0) return { content, changed: false, fields: [], issues: [] }
+  // Detection is shared with the audit side (frontmatterYamlUnsafeValues):
+  // normalize and catalog-invalid detection can never disagree.
+  const unsafe = new Map(frontmatterYamlUnsafeValues(content).map(entry => [entry.key, entry.value]))
+  const fields: string[] = []
+  const issues: string[] = []
+  let changed = false
+  for (let i = 1; i < end; i++) {
+    const line = lines[i]
+    if (line === undefined) continue
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    if (!match) continue
+    const key = match[1]
+    const value = unsafe.get(key ?? '')
+    if (key === undefined || value === undefined) continue
+    if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value)) {
+      issues.push(`${key}: value contains control characters — clean them manually`)
+      continue
+    }
+    // 0.3.11 fix: single-quote fallback so a `"`/`\` value stays fixable
+    // through the write path (no catch-22 on legacy descriptions).
+    const quoted = value.includes('"') || value.includes('\\')
+      ? `'${value.replace(/'/g, "''")}'`
+      : `"${value}"`
+    lines[i] = `${key}: ${quoted}`
+    fields.push(key)
+    changed = true
+  }
+  return { content: changed ? lines.join(nl) : content, changed, fields, issues }
 }
 
 /**
@@ -764,19 +880,29 @@ export class SkillLibrary {
     }
     const validation = validateFrontmatter(content, normalized, this.limits)
     if (validation) return { ok: false, message: validation }
-    const threat = scanContentThreats(content)
+    // 0.3.11: frontmatter normalization happens at the write point — the
+    // platform catalog parses strict YAML, so unquoted plain scalars carrying
+    // `: ` (etc.) would silently make the skill invisible to the platform.
+    const norm = normalizeFrontmatter(content)
+    if (norm.issues.length > 0) return { ok: false, message: `Skill "${normalized}" frontmatter cannot be auto-fixed: ${norm.issues[0]} — wrap the value in double quotes and retry.` }
+    const finalContent = norm.changed ? norm.content : content
+    if (norm.changed) {
+      const revalidated = validateFrontmatter(finalContent, normalized, this.limits)
+      if (revalidated) return { ok: false, message: revalidated }
+    }
+    const threat = scanContentThreats(finalContent)
     if (threat) return { ok: false, message: threat }
     const dir = this.dirOf(normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
-    await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
+    await this.io.writeText(join(dir, 'SKILL.md'), finalContent.trimEnd() + '\n')
     // Any non-foreground writer (review channel OR delegated subagent) is an
     // agent-authored skill: mark it managed so the lifecycle owns it.
     if (origin !== 'foreground') {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
-    await this.audit(normalized, 'create', null, content, 'created')
+    await this.audit(normalized, 'create', null, finalContent, 'created')
     this.notifyMutation({ action: 'create', name: normalized, filePath: dir })
-    return { ok: true, message: `Skill "${normalized}" created.`, path: dir }
+    return { ok: true, message: `Skill "${normalized}" created.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
   async update(rawName: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
@@ -793,12 +919,20 @@ export class SkillLibrary {
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateFrontmatter(content, name, this.limits)
     if (validation) return { ok: false, message: validation }
-    const threat = scanContentThreats(content)
+    // 0.3.11: normalize at the write point (see create) — same reasoning.
+    const norm = normalizeFrontmatter(content)
+    if (norm.issues.length > 0) return { ok: false, message: `Skill "${name}" frontmatter cannot be auto-fixed: ${norm.issues[0]} — wrap the value in double quotes and retry.` }
+    const finalContent = norm.changed ? norm.content : content
+    if (norm.changed) {
+      const revalidated = validateFrontmatter(finalContent, name, this.limits)
+      if (revalidated) return { ok: false, message: revalidated }
+    }
+    const threat = scanContentThreats(finalContent)
     if (threat) return { ok: false, message: threat }
-    await this.io.writeText(join(dir, 'SKILL.md'), content.trimEnd() + '\n')
-    await this.audit(name, 'update', md, content, 'updated')
+    await this.io.writeText(join(dir, 'SKILL.md'), finalContent.trimEnd() + '\n')
+    await this.audit(name, 'update', md, finalContent, 'updated')
     this.notifyMutation({ action: 'update', name, filePath: dir })
-    return { ok: true, message: `Skill "${name}" updated.`, path: dir }
+    return { ok: true, message: `Skill "${name}" updated.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
@@ -828,22 +962,34 @@ export class SkillLibrary {
     const patched = fuzzyPatch(md, oldString, newString, replaceAll)
     // `null` means "no match"; an empty string is a legitimate replacement.
     if (patched === null) return { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }
+    let writeContent = patched
+    let normalizedFields: string[] | undefined
     if (target === skillMd) {
       const validation = validateFrontmatter(patched, name, this.limits)
       if (validation) return { ok: false, message: `Patch rejected: ${validation}` }
+      // 0.3.11: normalize at the write point (see create) — a patch may edit
+      // the frontmatter directly.
+      const norm = normalizeFrontmatter(patched)
+      if (norm.issues.length > 0) return { ok: false, message: `Patch rejected: frontmatter cannot be auto-fixed (${norm.issues[0]}).` }
+      if (norm.changed) {
+        writeContent = norm.content
+        normalizedFields = norm.fields
+        const revalidated = validateFrontmatter(writeContent, name, this.limits)
+        if (revalidated) return { ok: false, message: `Patch rejected: ${revalidated}` }
+      }
     }
-    if (Buffer.byteLength(patched, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
+    if (Buffer.byteLength(writeContent, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
       return { ok: false, message: `Patched file exceeds ${this.limits.maxSkillFileBytes} bytes.` }
     }
-    if (patched.length > this.limits.maxSkillContentChars && target === skillMd) {
+    if (writeContent.length > this.limits.maxSkillContentChars && target === skillMd) {
       return { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }
     }
-    const threat = scanContentThreats(patched)
+    const threat = scanContentThreats(writeContent)
     if (threat) return { ok: false, message: threat }
-    await this.io.writeText(target, patched.trimEnd() + '\n')
-    await this.audit(name, 'patch', md, patched, `patched ${patchLabel}`)
+    await this.io.writeText(target, writeContent.trimEnd() + '\n')
+    await this.audit(name, 'patch', md, writeContent, `patched ${patchLabel}`)
     this.notifyMutation({ action: 'patch', name, filePath: dir })
-    return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir }
+    return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) }
   }
 
   async archive(rawName: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
