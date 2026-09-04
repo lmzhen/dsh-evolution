@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.9 (patch) — maintain probe: single-source description/quality enrichment
+
+First real run (13:38) surfaced a source inconsistency as a B5 note: the facts block measured real `description_chars` (198/104/…) from SKILL.md frontmatter while `maintenance_probe` answered `description=missing` for the same skills. Root cause: the probe tool built **body-only** snapshots and never ran the scan's enrichment — two measurement sources for one signal (the 011 single-source violation).
+
+- `evolution-maintenance`: `buildEnrichment` (descriptions/supportFiles/quality/usageObserved over the live library) moved from `evolution-commands` into the maintenance package (`src/enrichment.ts`, re-exported by index) — enrichment construction is now owned next to the scanner and shared by the facts preview AND the probe tool.
+- `tools.ts` probe execute builds snapshots via `buildEnrichment(ctx, library)` + `snapshotFromLibrary(library, { descriptions, supportFiles, quality })` — the same construction the scan uses; `description_chars` can no longer disagree with the facts block.
+- `evolution-commands` imports the shared `buildEnrichment` (local copy removed, unused imports dropped).
+- Tests: probe contract test — enriched description → `${len} chars`, snapshot without one → `description=missing`. Local: evolution suite 62/62 (374 tests), oxlint 0/0.
+
 ## 0.3.8 (patch) — maintain cancelled-run translation
 
 A cancelled `/evolution maintain` surfaced misleading text: the platform's driver **resolves** (not rejects) a cancelled run with `structured: undefined, stopReason: "aborted"`, while the command-retry cancellation path can also reject with a plain `Error("This operation was aborted")` (name not AbortError). Both slipped past the 0.3.3 name-only detection and were reported raw/undefined-plan.

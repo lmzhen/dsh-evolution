@@ -5,7 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, eventsFile, parseFrontmatter, SkillLibrary, usageObserved, type EvolutionIoLike, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -29,37 +29,7 @@ export interface Config {
 }
 
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
-interface Enrichment {
-  descriptions: ReadonlyMap<string, string>
-  supportFiles: ReadonlyMap<string, readonly string[]>
-  quality: ReadonlyMap<string, number>
-  usageObservedValue: boolean | undefined
-}
-
-async function buildEnrichment(ctx: Context, library: SkillLibrary): Promise<Enrichment> {
-  // Enrichment hooks (011 §7, v11 P1-1): all four use existing APIs; a
-  // missing service degrades to unknown (never a fabricated pass).
-  const skillUsage = ctx.get('skillUsage') as { report?(): Promise<UsageMap> } | undefined
-  const usageMap = skillUsage?.report ? await skillUsage.report() : undefined
-  const usageObservedValue = usageMap ? usageObserved(usageMap) : undefined
-  const descriptions = new Map<string, string>()
-  const supportFiles = new Map<string, readonly string[]>()
-  const quality = new Map<string, number>()
-  for (const entry of await library.list()) {
-    const body = await library.read(entry.name)
-    if (body === null) continue
-    const parsed = parseFrontmatter(body)
-    const description = parsed?.frontmatter.description
-    if (typeof description === 'string' && description.trim().length > 0) {
-      descriptions.set(entry.name, description)
-    }
-    const files = await library.listSupportFiles(entry.name)
-    if (files.length > 0) supportFiles.set(entry.name, files)
-    const record = usageMap?.get(entry.name)
-    if (typeof record?.quality_score === 'number') quality.set(entry.name, record.quality_score)
-  }
-  return { descriptions, supportFiles, quality, usageObservedValue }
-}
+import { buildEnrichment } from '@deepseek-ai/dsh-evolution-maintenance'
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig

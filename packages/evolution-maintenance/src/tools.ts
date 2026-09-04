@@ -11,8 +11,10 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { SkillLibrary, redactSecrets, type DriftSkillSnapshot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, redactSecrets, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
+import { buildEnrichment } from './enrichment.ts'
+import { snapshotFromLibrary } from './drift-scan.ts'
 
 export const name = 'evolution-maintenance-tools'
 
@@ -54,13 +56,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return { signal, detail: ['evolution-io registry not mounted'], ...(target ? { target } : {}) }
           const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
-          const entries = await library.list()
-          const snapshots: DriftSkillSnapshot[] = []
-          for (const entry of entries) {
-            const body = await library.read(entry.name)
-            if (body === null) continue
-            snapshots.push({ name: entry.name, body })
-          }
+          // 0.3.9: build snapshots through the SAME enrichment the scan uses
+          // (descriptions/supportFiles/quality) — previously the probe fed
+          // body-only snapshots and answered "description=missing" while the
+          // facts block measured real lengths (review finding, 13:38 run).
+          const enrichment = await buildEnrichment(ctx, library)
+          const snapshots = await snapshotFromLibrary(library, {
+            descriptions: enrichment.descriptions,
+            supportFiles: enrichment.supportFiles,
+            quality: enrichment.quality,
+          })
           // Probe output crosses the session boundary to the maintenance
           // subagent — same redaction policy as the facts block (011 §8).
           const probe = computeProbe(signal, target, snapshots)

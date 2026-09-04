@@ -74,6 +74,18 @@ describe('computeProbe', () => {
     expect(probe.detail[0]).toBe('quality=unknown')
   })
 
+  it('description_chars measures the enriched description and answers missing when absent (0.3.9)', () => {
+    // Single-source contract: the facts block and the probe both read the
+    // enriched frontmatter description. A snapshot WITHOUT one must answer
+    // 'missing' explicitly — never a fabricated length.
+    const withDesc = computeProbe('description_chars', 'align-test-ops', snapshots)
+    expect(withDesc.detail[0]).toBe('description=6 chars') // 'Short.'
+    const without = computeProbe('description_chars', 'align-tools', [
+      { name: 'align-tools', body: '# A\n' },
+    ])
+    expect(without.detail[0]).toBe('description=missing')
+  })
+
   it('probe detail crosses the same redaction policy as the facts block', () => {
     const probes = computeProbe('narrow_name', 'ghost', [])
     void probes
