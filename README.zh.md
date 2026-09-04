@@ -44,15 +44,19 @@
 
 ## 快速开始
 
-在 DeepSeek Harness 源码目录中：
+> 社区 npm 包只发布在 `@lmzhen` scope 下。
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode oneclick
+dsh plugin --profile web add \
+  @lmzhen/dsh-evolution-host \
+  @lmzhen/dsh-evolution-activity \
+  @lmzhen/dsh-evolution-skill-catalog \
+  @lmzhen/dsh-tool-memory \
+  @lmzhen/dsh-tool-skill-manage
 ```
 
-安装后重启 profile，Agent 即拥有：
+安装后重启 profile，并为需要自进化工具的会话选择 **Evolution** 预设。
+Agent 即拥有：
 
 ```text
 持久记忆
@@ -84,57 +88,59 @@ curator
 
 ## 安装方式
 
-### 一键兼容安装
+两种受支持的安装方式，取决于你是安装发布包还是从源码 checkout 使用。
+**发布安装是最终用户推荐路径。**
+
+### 1. 发布安装（推荐）
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode oneclick
+dsh plugin --profile web add \
+  @lmzhen/dsh-evolution-host \
+  @lmzhen/dsh-evolution-activity \
+  @lmzhen/dsh-evolution-skill-catalog \
+  @lmzhen/dsh-tool-memory \
+  @lmzhen/dsh-tool-skill-manage
 ```
 
-适合快速体验：一次安装全部 host 服务和模型工具。
+安装效果：
 
-### 分层安装（推荐）
+```text
+host 基础设施   review、curator、审批、审计、可观测性、威胁检查……
+                 profile 内所有会话共享
+模型工具        memory / skill_manage / 技能目录 —— 只有选择 Evolution
+                 预设的会话才看得到
+```
+
+- `plugin add` 的 reconciler 会自动把完整依赖树（`@lmzhen` 家族其余包）装进 profile。
+- 版本：省略 `@<version>` 安装最新稳定版；预发布线需显式 `@<version>-rc.x`（发布在 `next` tag）。
+- 卸载：对同样五个包执行 `dsh plugin --profile web remove`（移除 rows 与包；记忆、技能、
+  状态、报告和审批历史保留）。
+
+之后给需要自进化工具的会话选择 **Evolution** 预设。其他预设仍获得 review、curator、
+审批和观测能力，但不会暴露模型侧的自进化工具。
+
+### 2. 源码安装（仅开发）
+
+适用于 DeepSeek Harness 源码 checkout 或本仓库的扁平源码树——该安装器把本地包
+拷贝进 profile，**不是**发布版 npm 安装：
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web \
   --mode layered
 ```
 
-安装内容：
+模式：`oneclick`（兼容 `dsh-evolution-preset` bundle）、`layered`（host bundle +
+Evolution agent preset，推荐）、`host`（仅基础设施，无模型工具）、`agent`（仅预设）。
+`--mode layered --uninstall` 移除安装器添加的所有内容但保留记忆、技能、状态、报告和
+审批历史。`EVOLUTION_SCOPE` 选择包 scope（源码树默认 `@deepseek-ai`；`@lmzhen` 需要
+`prepare-release` 产出的 `.release-staging`）。
 
-```text
-profile bundle
-  @deepseek-ai/dsh-evolution-host   共享基础设施，无模型工具
+### 3. 配置
 
-agent preset
-  ~/.dsh/.agent-presets/evolution   标准工具 + memory + skill_manage
-```
-
-之后只给需要自进化工具的会话选择 **Evolution** preset。
-
-### 仅安装基础设施
-
-```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode host
-```
-
-适合只需要后台自动化、审批和审计，但不希望模型看到工具的场景。
-
-### 卸载
-
-```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode layered \
-  --uninstall
-```
-
-卸载会移除 profile rows、复制的包和 agent preset，但保留记忆、技能、状态、
-报告和审批历史。
+默认部署零配置即可运行。生产建议三件事：打开分阶段审批（后台写入先审后写）、调整
+curator 节奏（`interval` / `minIdleHours`）、决定哪些会话选 Evolution 预设。完整
+配置面见 [配置](#配置)。
 
 完整说明见 [packages/INSTALL.md](packages/INSTALL.md)。
 

@@ -92,20 +92,20 @@ Everything else is control plane:
 
 ## Quick start
 
-> Community npm packages are published under `@lmzhen` only. For a published
-> install use `pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-host`
-> or `@lmzhen/dsh-evolution-preset`.
-
+> Community npm packages are published under `@lmzhen` only.
 
 ```bash
-# inside a DeepSeek Harness checkout
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode oneclick
+dsh plugin --profile web add \
+  @lmzhen/dsh-evolution-host \
+  @lmzhen/dsh-evolution-activity \
+  @lmzhen/dsh-evolution-skill-catalog \
+  @lmzhen/dsh-tool-memory \
+  @lmzhen/dsh-tool-skill-manage
 ```
 
-After install, restart the DSH profile. The agent now has durable memory,
-`skill_manage`, background review, curator, approval, and threat checks.
+Then restart the DSH profile and select the **Evolution** agent preset for the
+sessions that should expose self-evolution tools. The agent now has durable
+memory, `skill_manage`, background review, curator, approval, and threat checks.
 
 > [!WARNING]
 > Plugins run third-party code with your local permissions. Review this
@@ -137,74 +137,69 @@ files to storage-domain KV or another backend without changing policy code.
 
 ## Installation
 
-### 1. One-click compatibility install
+Two supported ways to install, depending on whether you consume the published
+npm packages or work from a source checkout. **The published install is the
+recommended path for end users.**
 
-Install into a DSH profile as a single bundle:
-
-```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode oneclick
-```
-
-This installs `@deepseek-ai/dsh-evolution-preset`: host services and model
-tools in one layer. Good for trying the plugin quickly.
-
-### 2. Layered install (recommended)
+### 1. Published install (recommended)
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode layered
+dsh plugin --profile web add \
+  @lmzhen/dsh-evolution-host \
+  @lmzhen/dsh-evolution-activity \
+  @lmzhen/dsh-evolution-skill-catalog \
+  @lmzhen/dsh-tool-memory \
+  @lmzhen/dsh-tool-skill-manage
 ```
 
-What this installs:
+What this gives you:
 
 ```text
-profile bundle
-  @deepseek-ai/dsh-evolution-host   shared infrastructure, no model tools
-
-agent preset
-  ~/.dsh/.agent-presets/evolution   standard tools + memory + skill_manage
+host infrastructure   review, curator, approval, audit, observability, threat
+                      checks... shared by every session in the profile
+model tools           memory / skill_manage / skill catalog — only sessions
+                      selecting the Evolution preset can see them
 ```
+
+- The `plugin add` reconciler pulls the full dependency tree (the rest of the
+  `@lmzhen` family) into the profile automatically.
+- Version handling: omitting `@<version>` installs the latest stable; pre-release
+  lines need an explicit `@<version>-rc.x` (published on the `next` tag).
+- Uninstall: `dsh plugin --profile web remove` the same five packages (removes
+  the rows and packages; memory, skills, state, reports and approval history
+  are preserved).
 
 Then select the **Evolution** preset for sessions that should expose
 self-evolution tools. Other presets still get review, curator, approval, and
 observability without exposing model-facing evolution tools.
 
-### 3. Host-only install
+### 2. Source-checkout install (development only)
+
+For a DeepSeek Harness source checkout or this repository's flat source tree —
+the installer copies local packages into the profile, so it is NOT a published
+npm install:
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web \
-  --mode host
+  --mode layered
 ```
 
-Use this when a deployment wants background automation and audit but wants no
-agent session to see `memory` or `skill_manage`.
+Modes: `oneclick` (compatibility `dsh-evolution-preset` bundle), `layered`
+(host bundle + Evolution agent preset, recommended), `host` (infrastructure
+only, no model tools), `agent` (preset only). `--mode layered --uninstall`
+removes everything the installer added while preserving memory, skills, state,
+reports, and approval history. `EVOLUTION_SCOPE` selects the package scope
+(default `@deepseek-ai` in source trees; `@lmzhen` requires the
+`.release-staging` output of `prepare-release`).
 
-### 4. Production-style install
+### 3. Configuration
 
-When the bundle package is published:
-
-```bash
-dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
-```
-
-Then copy `packages/evolution/evolution-agent/` to
-`$DSH_HOME/.agent-presets/evolution/`.
-
-### 5. Uninstall
-
-```bash
-node packages/evolution/scripts/install-layered.mjs \
-  --profile web \
-  --mode layered \
-  --uninstall
-```
-
-Removes rows and copied packages but preserves memory, skills, state, reports,
-and approval history.
+The default deployment works with zero configuration. Three production
+suggestions: enable staged approval (approve/reject before background writes
+land), tune the curator cadence (`interval` / `minIdleHours`), and choose which
+sessions select the Evolution preset. The full surface is under
+[Configuration](#configuration).
 
 See [packages/INSTALL.md](packages/INSTALL.md) for full details and profile
 override examples.
