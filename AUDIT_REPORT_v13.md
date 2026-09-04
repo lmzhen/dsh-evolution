@@ -111,3 +111,25 @@
 - 严重度分布的重心持续左移：本轮 7 项 P3 中 5 项是文档同步/边界一致性/纵深防御类，核心数据面（memory/skills/state/audit）本轮未发现任何正确性缺陷。
 - **建议处理顺序**：① P1-1 立即（发布自洽性——文档修正或补投递机制，随 0.3.14 携带）；② P2-1 一行修复 + 并发回归；③ P3-1/P3-2/P3-6 随手批；④ P3-3/P3-4 归入 frontmatter 规范化器的下一轮边界加固；⑤ P3-5（validator 消费 protected）与 P3-7 列入 0.4 候选。
 - **0.3.x 发布判定**：增量工程质量支持继续发布；P1-1 修复前，建议在 README 首页对 "Full family" 行加一条已知限制注记，避免发布态用户按文档走完安装后困惑于"选不到 Evolution preset"。
+
+---
+
+## 6. 实施状态（0.3.14，2026-09-04）
+
+用户批准"按升级后的批次开工"——**9 项全部随 0.3.14 携带**（超出 §5 建议的 ⑤ 拆分：P3-5/P3-7 未留给 0.4）。
+
+| 项 | 状态 | 落地 |
+|---|---|---|
+| P1-1 | ✅ 已修 | `evolution-all` 依赖 += `dsh-evolution-agent-preset`（预设文件进入发布闭包）+ 新 `/evolution preset install` 命令（幂等复制 agent.cordis.yml/preset.yml 到 `$DSH_HOME/.agent-presets/evolution/`）；README/README.zh/INSTALL.md 从"no manual copying"失实改为真实的 one-time 命令步骤 |
+| P2-1 | ✅ 已修 | `maintainInFlightSince` 提前到首个 await 之前（检查+置位隔同步代码）；并发窗口回归 |
+| P3-1 | ✅ 已修 | `011:207-208` 数值更正（600_000 / 30s + 撤回"≥超时"理由）+ "以 code 常量为准"注 |
+| P3-2 | ✅ 已修 | `^maintain\b` 显式拒绝分支（替代静默落帮助文本） |
+| P3-3 | ✅ 已修 | 共享 `frontmatterBlock`（严格闭合行）为 parse/normalize/detector 单源 |
+| P3-4 | ✅ 已修 | `normalizeFrontmatter` 用 js-yaml（平台目录同款解析器）验证每次重写；失败回滚 + issues fail-loud；evolution-core 新增 js-yaml 依赖 |
+| P3-5 | ✅ 已修 | `validate-plan` 从 `report.skills[].protected` 建 protectedNames → 命中即拒（§7 机械层） |
+| P3-6 | ✅ 已修 | abort 判定收紧（hoisted signal + 精确名称/消息，替换 `/abort/i`） |
+| P3-7 | ✅ 已修 | `normalize-mirror` 从 CHANGELOG 最新 `## x.y.z` 派生版本（31 manifest → 0.3.14）；dev twin 文档化 no-op；pack 版本仍以 tag + prepare-release 为单源 |
+
+观察项 1.-6.：未实施（维持现状；2/3 产品选择、4 记入下一轮审计盲区候选、5 留给真实运行观察、6 编号规则建议留存）。
+
+本地门禁：vitest 64/64（398）、oxlint 0/0、tsc -b（core/maintenance/commands/all）0。
