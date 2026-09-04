@@ -18,8 +18,10 @@ export interface Config {
   skillsRoot?: string | undefined
   /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
    * secondary calls inside the window return the previous runId instead of
-   * spending another model call. Default 130s (>= maintain timeout 120s, so
-   * the window also covers in-flight runs); transient (per-process). */
+   * spending another model call. Default 30s (0.3.5). NOTE: the window starts
+   * AFTER a run settles (lastMaintainAt updates post-run) — it does NOT dedupe
+   * in-flight runs, so the old 130s ">= timeout" rationale was a comment bug.
+   * Transient (per-process). */
   maintainCooldownMs?: number | undefined
   /** Subagent deadline for one maintenance scan (ms). Default 120s; raise on
    * slow providers or very large skill libraries (0.3.3). */
@@ -251,7 +253,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
             return err('Invalid --timeout value: expected a positive integer number of milliseconds (e.g. /evolution maintain --timeout 600000).')
           }
-          const cooldownMs = config.maintainCooldownMs ?? 130_000
+          const cooldownMs = config.maintainCooldownMs ?? 30_000
           const sinceLast = Date.now() - lastMaintainAt
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)

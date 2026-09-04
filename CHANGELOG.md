@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5 (patch) — maintain cooldown default 130s → 30s
+
+`maintainCooldownMs` default lowered to 30s. The old 130s rationale ("≥ maintain timeout, so the window also covers in-flight runs") was a comment bug: `lastMaintainAt` updates AFTER a run settles, so the window never deduped in-flight runs anyway — 130s only punished rapid legitimate retries (e.g. iterating a failing scan). 30s remains a sufficient misclick guard; the window still applies on success AND failure.
+
 ## 0.3.4 (patch) — per-run maintenance timeout flag
 
 `/evolution maintain --timeout <ms>` overrides the subagent deadline for THAT run only — no file edit, no restart (the runtime-facing answer to "keep timing out"). `maintainTimeoutMs` stays as the persistent default; the flag wins when present.
