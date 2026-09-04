@@ -59,13 +59,34 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(10)
+  expect(PROMPT_BUNDLE_VERSION).toBe(11)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {
   expect(PROMPT_BUNDLE.prompts['maintain']).toBe(MAINTAIN_PROMPT)
   expect(MAINTAIN_PROMPT).toContain('{signal:')
   expect(MAINTAIN_PROMPT).toContain('MECHANICAL_FACTS')
+})
+
+it('maintain persona v11 carries the guidance clauses pinned by the prompt loop (0.3.7)', () => {
+  // §3 completeness contract: every over signal lands in an item or a note.
+  expect(MAINTAIN_PROMPT).toContain('完整性契约')
+  expect(MAINTAIN_PROMPT).toContain('禁止静默省略')
+  // §4 workflow: mandatory reads + honest tool-fact reporting (not "无法读取").
+  expect(MAINTAIN_PROMPT).toContain('读取失败必须报告工具返回的事实')
+  // §5-B1 three-question anchor test + 锚≠可读 + no is_override on the anchor path.
+  expect(MAINTAIN_PROMPT).toContain('三问判据')
+  expect(MAINTAIN_PROMPT).toContain('锚≠可读')
+  expect(MAINTAIN_PROMPT).toContain('锚不使用 is_override')
+  // §5-B4 full-count reporting.
+  expect(MAINTAIN_PROMPT).toContain('全量口径')
+  // §5-B5 nature classification with a strict third-class gate (boundary proof).
+  expect(MAINTAIN_PROMPT).toContain('第三类门槛')
+  // §6 confidence downgrade rule + pre-submit checklist.
+  expect(MAINTAIN_PROMPT).toContain('confidence 降档规则')
+  expect(MAINTAIN_PROMPT).toContain('提交前自查')
+  // §7 reviewer perspective (independent judgment, no self-narrative as evidence).
+  expect(MAINTAIN_PROMPT).toContain('审查者视角')
 })
 
 it('channel variants carry the subagent deliverable limit (M-2)', () => {

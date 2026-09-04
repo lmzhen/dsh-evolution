@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.7 (patch) — maintain template v11: prompt-guidance rebuild (subagent-verified loop)
+
+MAINTAIN_PROMPT rewritten (PROMPT_BUNDLE v10→v11) after a three-round **rewrite → real-subagent run → review-against-standards → fix** loop on the real skill library. Guidance fixes that landed:
+
+- **§3 completeness contract** (validator-enforced): every `over` signal must land in an item's evidence or be declared in notes ("已审·无条款对应·不动作") — no silent omission (fixes the earlier 5-of-12 overlong-line underreporting shape).
+- **§4 workflow**: explicit 5-step order + honest tool-fact reporting on read failure (the previous run papered over an unreadable skill as "无法读取").
+- **§5-B1 three-question test** for anchor-vs-residue (cross-file reference / extra semantics / deletion impact), explicit *anchor ≠ readable* (a >4000-char line splits even when the anchor verdict holds), and **no is_override on the anchor path** (override is the §7 appeal channel only).
+- **§5-B5 nature triage with a strict third-class gate**: event-commitment → trim; narrative → compress; dense-but-compliant requires an explicit "60 chars cannot hold this use-case boundary" proof before an override grant (the first loop ran all six descriptions as "豁免" — the shortcut the gate now closes).
+- **§6 confidence downgrade rule** (semantic inference caps at 0.4) + **pre-submit checklist** (§7 reviewer perspective: independent judgment first, self-narrative as clue only, stricter bar for self-owned skills).
+- Verified by three subagent rounds: round 1 (broken input) executed the §1 contract refusal correctly; round 2 exposed the exemption shortcut + mechanism mixing; round 3 converged (4 of 6 descriptions diverge into compress/pending, B1 kept without override, honest tool-fact report). Local: prompts 12/12, maintenance 40, commands 16, anchored-smoke 2/2; oxlint 0/0.
+
 ## 0.3.6 (patch) — maintain plan: truthful undo_path default for irreversible items
 
 First real subagent plan hit `Maintain plan rejected by validator: plan[0].undo_path: required` — the model omitted/emptied `undo_path` on an item whose `reversibility` was `none`. The mechanical gate now normalizes that case instead of rejecting: `reversibility: none` + missing/empty `undo_path` → `'n/a'` (the display/audit contract's existing value). Reversible items (archive/restructure/patch/rename) keep the hard requirement — a fabricated undo path is never acceptable. Tests: missing undo_path + none → ok with `n/a`; missing + restructure → still rejected.
