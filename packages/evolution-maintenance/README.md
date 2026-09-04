@@ -1,7 +1,7 @@
 # @deepseek-ai/dsh-evolution-maintenance
 
 Skill-library drift-scanning determinism surface for the maintenance subagent
-(design `docs/design-review/011-maintenance-subagent-v2.md`).
+(design 011 — the maintenance-subagent design paper, archived in git history).
 
 - `snapshotFromLibrary` — assemble a plain skill snapshot from a SkillLibrary-like reader.
 - `renderFacts` — canonical `MECHANICAL_FACTS` block (version + joint signature + redaction).

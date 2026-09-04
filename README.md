@@ -336,11 +336,11 @@ evolution-capability  validate + stage Creator packages; never execute them
 > repository does not carry a runnable build/test scaffold of its own;
 > runtime scripts used during publication live under `scripts/` here and
 > document their canonical path as
-> `packages/evolution/scripts/...` in the dev tree. The `docs/` subtree
-> carries the design reviews and release decisions that code and tests cite;
-> maintenance-process artifacts (audit reports, release runbooks, checklists)
-> are kept in the maintainer skill docs instead of this repository, and
-> pre-release plans stay in git history.
+> `packages/evolution/scripts/...` in the dev tree. Maintainer-process
+> artifacts — audit reports, design reviews, release runbooks, decision
+> records — are kept in the maintainer skill docs and git history, not in
+> this repository; what remains here is user-facing documentation and the
+> package sources.
 
 ```text
 packages/

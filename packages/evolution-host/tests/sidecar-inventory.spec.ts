@@ -6,7 +6,8 @@ import { dirname } from 'node:path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
-// THE sidecar transaction inventory (docs/release/decisions.md, v2 §8.3):
+// THE sidecar transaction inventory (release decisions v2 §8.3; archived in
+// git history):
 // every read-modify-write sidecar must run through io.transact via transactIo.
 // Adding a new RMW sidecar requires a row here — this test is the door.
 // Known granularity (v4 K-1 / v5 F-7): the gate checks marker presence per
