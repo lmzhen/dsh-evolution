@@ -27,12 +27,28 @@ export const Config: z<Config> = z.object({
 // 0.3.19 (W1.3): the home path resolves via core evolutionHome() (single
 // source; also uses `||` so an EMPTY DSH_HOME falls back — the local
 // defaultRoot used `??` and inherited the E-74 empty-string hole).
+// 0.3.27 (V4-09): the config root is trimmed like resolveSkillsRoot so a
+// whitespace-only `root` (' ') is not truthy and does not resolve to a
+// CWD-relative path — empty or whitespace both fall through to evolutionHome().
 
 /** 0.3.22 (F-336): resolved (approved/rejected) audit records are capped in
  * the LIVE pending map so a long-running deployment never grows it without
  * bound; the oldest over the cap are archived (made package-private so the
  * archive sidecar and the provider enforce one number). */
 const PENDING_RESOLVED_CAP = 200
+
+/** 0.3.27 (V4-01): the audit sidecar (pending-state-archive.json) is bounded
+ * at this many resolved records. Past it the oldest history rotates to a
+ * `.bak` sidecar, so the file — and the full-array rewrite on every append —
+ * never grows without bound. */
+const ARCHIVE_RESOLVED_CAP = 5000
+
+/** 0.3.27 (V4-01): an archive entry's dedupe identity. The same audit record
+ * (id + status + resolvedAt) must never appear twice; the read-only legacy
+ * `pending.json` merge used to re-introduce an evicted record on the next
+ * resolve and archive it again, growing the sidecar without bound. */
+const pendingArchiveKey = (record: PendingRecord): string =>
+  `${record.id}\u0000${record.status}\u0000${record.resolvedAt ?? ''}`
 
 /** 0.3.22 (F-215): a record-map state file must parse to a non-null plain
  * object (a map of records) — valid JSON that is `null`/array/scalar is a
@@ -45,7 +61,7 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
 const RECORD_MAP_FILES = new Set(['review-state.json', 'curator-state.json', 'pending-state.json', 'pending.json'])
 
 export function apply(ctx: Context, rawConfig: Config): void {
-  const root = rawConfig.root || evolutionHome()
+  const root = (rawConfig.root ?? '').trim() || evolutionHome()
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
 
@@ -64,19 +80,23 @@ export function apply(ctx: Context, rawConfig: Config): void {
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
     if (raw === null) return null
+    let parsed: T
     try {
-      const parsed = JSON.parse(raw) as T
-      // 0.3.22 (F-215): a valid JSON that is the wrong top-level shape is a
-      // corrupt record map, not "empty" — fail loud so the operator notices
-      // instead of the next save silently wiping every other record.
-      if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
-        const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
-        return await quarantine(file, raw, `expected a plain JSON object (map of records), got ${kind}`)
-      }
-      return parsed
+      parsed = JSON.parse(raw) as T
     } catch (error) {
       return await quarantine(file, raw, error instanceof Error ? error.message : String(error))
     }
+    // 0.3.22 (F-215): a valid JSON that is the wrong top-level shape is a
+    // corrupt record map, not "empty" — fail loud so the operator notices
+    // instead of the next save silently wiping every other record.
+    // 0.3.27 (V4-06): this check lives OUTSIDE the parse try, so a wrong-shape
+    // quarantine (which throws) does not fall into the catch above and
+    // quarantine the file a SECOND time (two `.corrupt-*` copies per read).
+    if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
+      const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
+      return await quarantine(file, raw, `expected a plain JSON object (map of records), got ${kind}`)
+    }
+    return parsed
   }
 
   /**
@@ -92,12 +112,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
       if (current !== null) {
         try {
           parsed = JSON.parse(current) as T
-          if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
-            const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
-            return await quarantine(file, current, `expected a plain JSON object (map of records), got ${kind}`)
-          }
         } catch (error) {
           return await quarantine(file, current, error instanceof Error ? error.message : String(error))
+        }
+        // 0.3.27 (V4-06): outside the parse try — a wrong-shape quarantine must
+        // not fall into the catch and quarantine a second time.
+        if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
+          const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
+          return await quarantine(file, current, `expected a plain JSON object (map of records), got ${kind}`)
         }
       }
       const next = await task(parsed)
@@ -154,20 +176,37 @@ export function apply(ctx: Context, rawConfig: Config): void {
    * (top-level array, oldest-first). This is a best-effort audit aid: a
    * corrupt/unreadable archive is skipped and an archive write failure must
    * NEVER fail the resolve that triggered it — the live map is already
-   * trimmed, so the audit copy is allowed to fall behind. */
+   * trimmed, so the audit copy is allowed to fall behind.
+   * 0.3.27 (V4-01): dedupe by id+status+resolvedAt before appending (the
+   * read-only legacy `pending.json` re-introduces an evicted record on the
+   * next resolve) and rotate the sidecar to `.bak` past ARCHIVE_RESOLVED_CAP
+   * so neither the file nor the per-append full-array rewrite grows without
+   * bound. */
   async function appendArchive(records: PendingRecord[]): Promise<void> {
     try {
-      await transactIo(io(), pathOf('pending-state-archive.json'), (current) => {
-        let archive: unknown[] = []
+      await transactIo(io(), pathOf('pending-state-archive.json'), async (current) => {
+        let archive: PendingRecord[] = []
         if (current !== null) {
           try {
             const parsed = JSON.parse(current) as unknown
-            if (Array.isArray(parsed)) archive = parsed
+            if (Array.isArray(parsed)) archive = parsed as PendingRecord[]
           } catch {
             // unrecoverable archive — best-effort: start fresh
           }
         }
-        return JSON.stringify([...archive, ...records], null, 2)
+        const seen = new Set(archive.map(pendingArchiveKey))
+        const fresh = records.filter(record => !seen.has(pendingArchiveKey(record)))
+        if (fresh.length === 0) return current
+        const next = [...archive, ...fresh]
+        if (next.length > ARCHIVE_RESOLVED_CAP) {
+          // Rotate the full pre-rotation history to a `.bak` sidecar and restart
+          // the active sidecar from the batch that overflowed it (log-rotation
+          // style), so the file and its rewrite are bounded. Best-effort: a
+          // failed rotate only loses the rotated audit copy.
+          await io().writeText(pathOf('pending-state-archive.json.bak'), JSON.stringify(archive, null, 2)).catch(() => {})
+          return JSON.stringify(fresh, null, 2)
+        }
+        return JSON.stringify(next, null, 2)
       })
     } catch {
       // Audit aid only: never let an archive write failure surface as a resolve failure.

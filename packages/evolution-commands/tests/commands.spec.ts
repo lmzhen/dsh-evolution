@@ -132,9 +132,15 @@ describe('evolution-commands', () => {
       const injected: unknown[] = []
       await ctx.plugin(Commands)
       await captured!.handler({ rawInput: 'learn node packaging', agent: { inject: (message: unknown) => injected.push(message) } })
-      // The append is fire-and-forget; give the locked RMW a settle window.
-      await new Promise(resolve => setTimeout(resolve, 50))
-      const raw = await nodeEvolutionIo().readText(join(home, 'evolution', 'events.json'))
+      // The append is fire-and-forget; poll for the locked RMW to land — a
+      // fixed sleep is load-sensitive (the full parallel suite crossed 50ms).
+      const eventPath = join(home, 'evolution', 'events.json')
+      const deadline = Date.now() + 5000
+      let raw: string | null = null
+      while (raw === null && Date.now() < deadline) {
+        raw = await nodeEvolutionIo().readText(eventPath)
+        if (raw === null) await new Promise(resolve => setTimeout(resolve, 50))
+      }
       expect(raw).not.toBeNull()
       const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; source?: string; request?: string }> }
       expect(parsed.events).toHaveLength(1)

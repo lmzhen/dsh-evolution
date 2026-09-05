@@ -51,7 +51,7 @@ describe('layered installer', () => {
     expect(rowIds(patchRows)).toContain('evolution-review')
 
     await rm(home, { recursive: true, force: true })
-  }, 20_000)
+  }, 60_000)
 
   it('installs the compatibility one-click bundle', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-oneclick-'))

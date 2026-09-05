@@ -78,11 +78,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
     },
     snapshot: async (): Promise<MemorySnapshot> => {
       // 0.3.17 (E-73): serial reads — a concurrent write between the two
-      // Promise.all reads used to produce a mixed-generation snapshot. The
-      // cross-process window is documented as accepted (single-process chain
-      // is this family's second layer).
-      const memory = await store.read('memory')
-      const user = await store.read('user')
+      // Promise.all reads used to produce a mixed-generation snapshot. V4-12:
+      // reading memory and user as two separate awaited reads still lets a
+      // serializedWrite (an applyBatch) yield BETWEEN them, so the two reads
+      // now run inside one serializedWrite task: no write can interleave, the
+      // snapshot is a single generation, and the sha256 pins a state that truly
+      // existed. (The cross-process window is documented as accepted — the
+      // single-process chain is this family's second layer.)
+      const [memory, user] = await serializedWrite(async () => [
+        await store.read('memory'),
+        await store.read('user'),
+      ])
       const text = JSON.stringify([memory, user])
       return { version: 1, sha256: createHash('sha256').update(text).digest('hex'), memory, user }
     },

@@ -677,8 +677,11 @@ export class SkillLibrary {
   readonly limits: SkillLimits
   private readonly io: EvolutionIoLike
   private readonly onMutation: ((event: EvolutionSkillMutatedEvent) => void) | undefined
-  /** 0.3.21 (F-208): optional cross-process RMW transactor injected by callers.
-   * When unset each single-file write falls back to read→task→write. */
+  /** 0.3.21 (F-208) + V4-20: cross-process RMW transactor. An explicitly
+   * injected value wins; otherwise the IO backend's own `transact` is bound
+   * when it provides one (cross-process atomicity on by default for any
+   * transact-capable backend), and a backend without `transact` leaves this
+   * undefined (each write falls back to the plain read→task→write path). */
   private readonly transact: (typeof transactIo) | undefined
   /** 0.3.21 (F-208): in-process serialize queue so two concurrent mutators on
    * one skill never interleave their read-modify-write (the cross-process layer
@@ -696,7 +699,18 @@ export class SkillLibrary {
     this.io = io
     this.limits = limits
     this.onMutation = onMutation
-    this.transact = transact
+    // V4-20: bind the IO backend's own transact by default. Explicit injection
+    // stays first; a backend WITHOUT transact keeps the old plain read→write
+    // (the in-process serial chain is the second layer). The wrapper adapts the
+    // backend's `(path, task)` instance signature to the standard `(io, path,
+    // task)` form the rest of the core expects, guarding the optional method
+    // rather than asserting it.
+    this.transact = transact ?? (io.transact
+      ? (ioLike, path, task) => {
+        const t = ioLike.transact
+        return t ? t(path, task) : transactIo(ioLike, path, task)
+      }
+      : undefined)
     this.serial = makeSerialQueue()
   }
 

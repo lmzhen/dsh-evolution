@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, rename, rm, writeFile, readFile, utimes } from
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeEvolutionIo, renameWithRetry } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, pendingSelfCleanup, renameWithRetry } from '@deepseek-ai/dsh-evolution-core'
 
 // A genuinely alive foreign pid: the tests below need a LIVE holder that is NOT
 // this process (F-367 recycles our own pid leftover, and F-366 sweeps our own
@@ -176,18 +176,73 @@ it('two peers take over one stale dead lock without double-holding (F-101)', asy
   await rm(root, { recursive: true, force: true })
 })
 
-it('self-heals a stale lock carrying this process pid (F-367)', async () => {
+it('self-heals a leftover lock carrying this process pid (F-367)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-selfheal-'))
   const io = nodeEvolutionIo()
   const target = join(root, 'self.json')
-  // A leftover lock naming OUR pid (a failed release or a crash) is a stale
-  // leftover, not a live holder — the next write recycles it and succeeds.
-  await writeFile(`${target}.lock`, String(process.pid), 'utf8')
+  const lock = `${target}.lock`
+  // A leftover lock naming OUR pid, whose failed release was recorded in
+  // pendingSelfCleanup, is stale by definition — the next write recycles it.
+  // (V4-05: without the pendingSelfCleanup registration an old same-pid lock
+  // is treated as a live in-process task and deliberately NOT recycled.)
+  pendingSelfCleanup.add(lock)
+  await writeFile(lock, String(process.pid), 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(lock, old, old)
+  try {
+    await io.writeText(target, 'fresh')
+    expect(await readFile(target, 'utf8')).toBe('fresh')
+    expect(await io.readText(lock)).toBeNull()
+  } finally {
+    pendingSelfCleanup.delete(lock)
+  }
+  await rm(root, { recursive: true, force: true })
+})
+
+it('does not steal a same-pid lock held by a long-running task (V4-05)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-live-samepid-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'live.json')
+  const transact = io.transact!
+  // The first RMW acquires the lock and holds it well past the 1s takeover
+  // threshold — a genuinely in-flight same-process task.
+  const first = transact(target, async () => {
+    await new Promise(resolve => setTimeout(resolve, 1400))
+    return 'v1'
+  })
+  // Ensure the first task owns the lock before the second writer starts.
+  await new Promise(resolve => setTimeout(resolve, 60))
+  // The second writer starts while the first is still holding. An mtime>1s
+  // same-pid steal would rm the live lock and DOUBLE-EXECUTE (both think they
+  // hold it, one increment is dropped). The fix waits instead: after the first
+  // releases, the second reads its committed value and appends.
+  const second = transact(target, async current => `${current ?? ''}|v2`)
+  await Promise.all([first, second])
+  expect(await readFile(target, 'utf8')).toBe('v1|v2')
+  expect((await io.readText(`${target}.lock`))).toBeNull()
+  await rm(root, { recursive: true, force: true })
+})
+
+it('takeover claims a stale dead lock atomically and leaves no residue (V4-04)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-atomic-takeover-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'atomic.json')
+  await writeFile(`${target}.lock`, '999999', 'utf8')
   const old = new Date(Date.now() - 60_000)
   await utimes(`${target}.lock`, old, old)
-  await io.writeText(target, 'fresh')
-  expect(await readFile(target, 'utf8')).toBe('fresh')
-  expect((await io.readText(`${target}.lock`))).toBeNull()
+  // Six peers contend for one stale dead lock. The atomic rename takeover must
+  // leave exactly one live claim (no double-hold) and no `.takeover-*` residue.
+  const transact = io.transact!
+  await Promise.all(Array.from({ length: 6 }, () => transact(target, async (current) => {
+    const value = JSON.parse(current ?? '0') as number
+    return JSON.stringify(value + 1)
+  })))
+  expect(await readFile(target, 'utf8')).toBe('6')
+  expect(await io.readText(`${target}.lock`)).toBeNull()
+  const entries = await readdir(root)
+  expect(entries.filter(e => e.startsWith('atomic.json.takeover-'))).toEqual([])
+  expect(entries.filter(e => e.endsWith('.lock'))).toEqual([])
+  expect(entries).toEqual(['atomic.json'])
   await rm(root, { recursive: true, force: true })
 })
 

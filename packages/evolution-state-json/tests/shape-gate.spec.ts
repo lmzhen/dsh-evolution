@@ -70,4 +70,29 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
     await rm(root, { recursive: true, force: true })
   })
+
+  it('produces exactly one .corrupt copy and a non-nested message on a wrong shape (V4-06)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-single-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'review-state.json'), '[]')
+
+    let message = ''
+    try {
+      await provider.loadReviewState('s1')
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+    expect(message).toMatch(/not valid JSON/)
+    expect(message).toMatch(/expected a plain JSON object/)
+    // V4-06: a wrong-shape quarantine used to fall into the same function's
+    // parse catch and quarantine AGAIN — two .corrupt copies and a message that
+    // nests the previous quarantine text. It must appear exactly once.
+    expect(message.split('not valid JSON')).toHaveLength(2)
+    const entries = await io.list(root)
+    const corrupt = entries.filter(name => name.startsWith('review-state.json.corrupt-'))
+    expect(corrupt).toHaveLength(1)
+    await rm(root, { recursive: true, force: true })
+  })
 })

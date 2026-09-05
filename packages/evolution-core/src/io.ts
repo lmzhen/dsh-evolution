@@ -111,8 +111,12 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
  * us, so a leftover is stale by definition. Module-level by design: it must
  * survive across `nodeEvolutionIo()` instances for the self-heal to be
  * effective. (Not a pure function — the cross-call state is the intent.)
+ * V4-05: this set — not an mtime heuristic — is the ONLY signal that a
+ * same-pid lock is a leftover rather than a live in-process task, so it is the
+ * sole gate for the self-pid recycle branch. Exported (read-only in practice)
+ * so `io.spec.ts` can drive the self-heal path deterministically.
  */
-const pendingSelfCleanup = new Set<string>()
+export const pendingSelfCleanup = new Set<string>()
 
 /**
  * Retry a rename that a peer is temporarily holding on Windows (EPERM/EBUSY):
@@ -194,13 +198,19 @@ export function nodeEvolutionIo(): EvolutionIoLike {
    * retry budget (budget >= 2 x threshold), so a dead holder's lock is
    * actually recoverable within one budget instead of being arithmetically
    * unreachable.
-   * 0.3.21 (F-101): takeover re-reads the lock right before removing it and
-   * only removes it when the content still names the dead pid — a peer that
+   * 0.3.21 (F-101), V4-04: takeover re-reads the lock right before acting and
+   * only proceeds when the content still names the dead pid — a peer that
    * acquired the lock after our stale probe wrote its own pid, and deleting a
-   * LIVE lock is the double-hold (concurrent task) the probe must prevent.
-   * 0.3.21 (F-367): a self-pid lock is this process's own leftover (a failed
-   * release or a crash) and is recycled immediately regardless of age; a
-   * failure to release in finally is recorded so the next write self-heals.
+   * LIVE lock is the double-hold (concurrent task) the probe must prevent. The
+   * re-read is necessary but not sufficient: two peers can both pass it, so the
+   * commit itself is an atomic rename to a unique name (only one peer's rename
+   * can succeed; the loser's source is gone). A naive rm lets the later peer
+   * delete the winner's freshly re-acquired live lock.
+   * 0.3.21 (F-367), V4-05: a self-pid lock is recycled ONLY when the failed
+   * release was recorded in pendingSelfCleanup — never on age alone, because an
+   * mtime over 1s is indistinguishable from a long task still executing in this
+   * process, and recycling that live lock would double-hold it. A failure to
+   * release in finally is recorded so the next write self-heals.
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
@@ -219,12 +229,20 @@ export function nodeEvolutionIo(): EvolutionIoLike {
           const holderContent = await readFile(lock, 'utf8').catch(() => '')
           const holder = Number(holderContent)
           const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
-          // F-367 (①): a self-pid lock is OUR OWN leftover — a release recorded
-          // in pendingSelfCleanup (any age) or one left stuck for >1s — and is
-          // recycled. A same-process concurrent writer's LIVE lock stays fresh
-          // (<1s) and is NOT recorded, so it is never stolen: the 8-writer /
-          // transact serialization is preserved.
-          if (holder === process.pid && (pendingSelfCleanup.has(lock) || Date.now() - st.mtimeMs > 1000)) {
+          // F-367 (①), V4-05: a self-pid lock is recycled ONLY when the failed
+          // release was recorded in pendingSelfCleanup (a task that ended but
+          // could not rm in finally). A same-process lock is NEVER recycled on
+          // age alone: an mtime older than 1s is indistinguishable from a LONG
+          // task still executing in this very process, so the old mtime branch
+          // let a concurrent same-process writer steal a live lock (double-hold
+          // → double execution). An executing lock (of any age) is never
+          // stolen; a leftover-but-unrecorded same-pid lock is deliberately
+          // never recycled either (safe-conservative: the dead owner's
+          // cross-process takeover covers the common crash case; a leftover
+          // naming a REUSED live pid fails loud after the retry budget
+          // instead of ever double-holding; this process's own failed
+          // release is always recorded via pendingSelfCleanup).
+          if (holder === process.pid && pendingSelfCleanup.has(lock)) {
             const current = await readFile(lock, 'utf8').catch(() => '')
             if (current === holderContent) {
               try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
@@ -232,15 +250,28 @@ export function nodeEvolutionIo(): EvolutionIoLike {
             }
             continue
           }
-          // F-101: only a stale (>1s) lock NOT held by a live peer is taken
-          // over, and only after re-reading it to confirm the content still
-          // names the dead pid. A peer that acquired it after our stale probe
-          // wrote its own pid, so a naive rm would delete a LIVE lock
-          // (double-hold → concurrent task, double execution on approve).
+          // V4-04 / F-101: only a stale (>1s) lock NOT held by a live peer is
+          // taken over, and only after re-reading it to confirm the content
+          // still names the dead pid. Re-reading alone is not enough though: two
+          // peers can both pass that probe and both proceed to `rm`, and the
+          // later rm can delete a LIVE lock a peer has since re-acquired
+          // (double-hold → concurrent task, double execution on approve). So
+          // the takeover itself is an atomic rename to a unique name: among
+          // competing peers exactly ONE rename succeeds (the loser's source is
+          // already gone) and only the winner owns the claim. The renamed-side
+          // file is then deleted and the normal acquisition loop re-creates the
+          // lock, so mutual exclusion is never broken.
           if (Date.now() - st.mtimeMs > 1000 && !holderAlive) {
             const current = await readFile(lock, 'utf8').catch(() => '')
             if (current === holderContent) {
-              try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
+              const takeover = `${lock}.takeover-${process.pid}-${randomBytes(6).toString('hex')}`
+              try {
+                await rename(lock, takeover)
+                await rm(takeover, { force: true }).catch(() => {})
+              } catch {
+                // The source vanished (a peer won the takeover) or the rename
+                // hit a transient Windows EPERM — both just re-attempt.
+              }
             }
             continue
           }

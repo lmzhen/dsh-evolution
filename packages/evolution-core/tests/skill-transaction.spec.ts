@@ -123,3 +123,33 @@ it('F-208: an injected transact wraps the single-file write path (update/patch/w
   expect(await io.readText('/skills/tx-io-skill/SKILL.md')).toContain('body line 2 (patched).')
   expect(await io.readText('/skills/tx-io-skill/references/detail.md')).toBe('# Detail')
 })
+
+it('V4-20: binds the IO backend transact by default when none is injected', async () => {
+  const io = fakeIo()
+  const calls: string[] = []
+  // The backend ships a transact (as nodeEvolutionIo does) but the caller does
+  // not inject one — the library must bind it via the IO seam by default.
+  io.transact = async (path, task) => {
+    calls.push(path)
+    const current = await io.readText(path)
+    const next = await task(current)
+    if (next === null) await io.remove(path)
+    else await io.writeText(path, next)
+  }
+  const lib = new SkillLibrary('/skills', io)
+  const created = await lib.create('tx-default-skill', SKILL_TX('tx-default-skill', 'body line.\n\nbody line 2.'), 'foreground')
+  expect(created.ok).toBe(true)
+  calls.length = 0
+  await lib.update('tx-default-skill', SKILL_TX('tx-default-skill', 'body line (updated).\n\nbody line 2.'))
+  // The single-file write went through the backend transact (not the plain path).
+  expect(calls.map(p => p.replaceAll('\\', '/')).some(p => p.includes('SKILL.md'))).toBe(true)
+  expect(await io.readText('/skills/tx-default-skill/SKILL.md')).toContain('body line (updated).')
+})
+
+it('V4-20: a backend without transact keeps the plain read→write path', async () => {
+  const io = fakeIo() // no `transact` method at all
+  const lib = new SkillLibrary('/skills', io)
+  const created = await lib.create('tx-no-transact', SKILL_TX('tx-no-transact', 'alpha.\n\nbeta.'), 'foreground')
+  expect(created.ok).toBe(true)
+  expect(await io.readText('/skills/tx-no-transact/SKILL.md')).toContain('alpha.')
+})

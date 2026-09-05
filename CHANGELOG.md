@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.27 (patch) — v4 审计批 2：数据与并发完整性（V4-01/04/05/06/09/12/20）
+
+v4 审计（修复核验轮）新发现的批次 2（数据与并发完整性）；每项先核验属实再修（A/B 子代理分域实施，主代理逐项亲读验收）；transact 接线按用户裁决=构造默认绑定。
+
+- **V4-01 归档重复增长**：pending-state-archive.json 无去重且每次 append 全量重写（O(A²)）——只读合并的 legacy `pending.json` 会把已轮转记录重新引入再归档，无限膨胀 → append 按 id+status+resolvedAt 去重（fresh 空则短路返回 current 不重写）+ `ARCHIVE_RESOLVED_CAP=5000` 超限轮转 `.bak` 侧车（与 PENDING_RESOLVED_CAP 同款纪律）。
+- **V4-04 锁接管窗口**：stale 接管的「重读一致→rm」下，两 peer 同过探针时后完成者会删除对手刚重获的**活锁**（双持→并发执行）→ 接管改为 `rename` 原子独占（rename 源独占，仅一人成功；失败者 ENOENT 回环重试，绝不删他人活锁）；接管名与锁同目录（同文件系统保证原子）。
+- **V4-05 同 pid 活锁可被同进程写者抢占**：`pendingSelfCleanup.has(lock) || mtime>1000` 的 mtime 分支把「本进程另一任务执行>1s」误判为死锁 → 同 pid 分支只保留 `pendingSelfCleanup.has`：执行中的锁（任何时长）绝不回收，仅回收「任务已结束但 finally rm 失败并登记」的遗留锁（安全保守——遗留未登记的由跨进程接管路径覆盖）。
+- **V4-06 双重 quarantine**：readJson 的形状检查原在 parse try 内——wrong-shape 的 quarantine（throw）落入 catch 再 quarantine 一次（每读二份 `.corrupt-*`）→ 形状检查移出 parse try。
+- **V4-09 root 空白穿透**：state-json 配置 root 未 trim——whitespace-only `' '` truthy 落到 CWD 相对路径（与 resolveSkillsRoot 口径不一致）→ `(rawConfig.root ?? '').trim() || evolutionHome()`。
+- **V4-12 snapshot 两读让渡**：memory/user 两次独立 await 之间可插入 serializedWrite（applyBatch）——混合代快照 + sha256 钉在不存在的状态 → 两读收进同一 serializedWrite 任务（单代快照；跨进程窗口保留为已声明接受）。
+- **V4-20 SkillLibrary transact 默认绑定**：构造第 5 参未注入时默认 undefined（旧无锁行为；8 个生产实例化点均未注入）→ `transact ?? (io.transact ? 适配包装 : undefined)`——显式注入优先；后端 `(path, task)` 实例签名自动适配；无 transact 后端保留纯 read→write + 进程内 serial 链。**用户裁决（四性）**：构造默认绑定（单点优于 8 处注入）。
+- **测试确定性修复（发布前全量回归发现）**：全量首跑 3 例失败（并行负载下计时敏感）——feedback「persists across restarts」固定 20ms 等待 restore（改确定性轮询）、commands「records a learn event」固定 50ms 等待 fire-and-forget 写（改轮询）、installer「installs host bundle + agent preset」20s 超时被真实 npm 安装子进程越限（提至 60s 与兄弟测试一致）；隔离复跑 55/55 绿。
+- **回归**：全量 vitest **100 文件 / 647 测试** 全绿；oxlint 0/0（192 文件）；tsc 30 包 0；dependency-closure 30 包 OK；arch-guards strict 0（N4 70 项 warn-only——新增 2 项为 `resolvedAt?`/`root?` 类的合法可选字段兜底，行级启发式正则误报类）；event-pairing 0 orphan/0 dangling。
+- **核验说明**：V4-20 前生产 SkillLibrary 全未注入 transact；现在任何提供 transact 的 io 后端上的 SkillLibrary（commands/curator/review/maintenance/learning-graph/tool-skill-manage/skill-catalog 等）默认走跨进程 transact——本批以家族全量 vitest 覆盖。
+
 ## 0.3.26 (patch) — v4 审计批 1：门禁与修复有效性（V4-02/03/28-31）
 
 v4 审计（修复核验轮）P2 新发现的批次 1（门禁与修复有效性——先修护栏再修内容）；每项先核验属实再修（v4 行号为准）。

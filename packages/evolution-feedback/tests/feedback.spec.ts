@@ -52,8 +52,17 @@ describe('evolution-feedback', () => {
     await ctx2.plugin(EvolutionIoRegistry)
     await ctx2.plugin(NodeIo)
     await ctx2.plugin(Feedback)
-    await new Promise(resolve => setTimeout(resolve, 20))
-    expect(ctx2.evolutionFeedback.score('python-testing', 'skill')).toBeCloseTo(-1 / 3)
+    // ctx2's Feedback restores from disk on its fire-and-forget chain; a fixed
+    // sleep is load-sensitive (the full parallel suite crossed 20ms), so poll
+    // the restored score instead — 0.3.27 release gate.
+    const deadline = Date.now() + 5000
+    let restoredScore = 0
+    while (Date.now() < deadline) {
+      restoredScore = ctx2.evolutionFeedback.score('python-testing', 'skill')
+      if (Math.abs(restoredScore - -1 / 3) < 1e-9) break
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    expect(restoredScore).toBeCloseTo(-1 / 3)
     expect(ctx2.evolutionFeedback.snapshot().sessions).toEqual({})
     // 0.3.26 (release gate): ctx2's Feedback is a fresh instance mid-restore —
     // wait for its task chain before removing the temp home, otherwise the
