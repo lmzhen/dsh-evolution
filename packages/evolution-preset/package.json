@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle for the dsh-evolution plugin family",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "publishConfig": {
     "access": "public"
   },
@@ -16,10 +16,8 @@
     "cordis.yml",
     "cordis.patch.yml",
     "package.json",
-    "lib/invariant.js",
-    "lib/types/invariant.d.ts",
-    "lib/index.js",
-    "lib/types/index.d.ts"
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
   "dsh": {

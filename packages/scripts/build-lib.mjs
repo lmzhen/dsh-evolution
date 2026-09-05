@@ -4,8 +4,9 @@
  *
  * The root tsdown config treats the private @deepseek-ai/dsh-root workspace
  * package as a build target and fails on its missing entry points. This
- * script builds only packages/evolution/* using the package-local config:
- *   node packages/evolution/scripts/build-lib.mjs
+ * script builds only the evolution-family packages, resolving the local
+ * package tree from this script's own layout:
+ *   node packages/scripts/build-lib.mjs
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'

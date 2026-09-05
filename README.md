@@ -23,7 +23,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-threat` | `tools/pre-execute` content threat guard |
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
-| `evolution-activity` | Session projection over `evolution/plan-applied` |
+| `evolution-activity` | Durable activity store for self-evolution plan outcomes |
 | `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
@@ -31,8 +31,14 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-host` | Host-plane infrastructure bundle (no model tools) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
+| `evolution-all` | One-command aggregate entry (host + model tools, pure dependency package) |
+| `evolution-capability` | Staged Creator-mode capability adapter (validates + submits, never executes) |
+| `evolution-maintenance` | Maintenance subagent, drift scan and plan validation for the skill library |
 
 ## Installation
+
+> This repository uses **pnpm workspaces** (`pnpm-workspace.yaml`) — the npm
+> `workspaces` field is intentionally absent. Install with `pnpm install`.
 
 See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
 compatibility flow, and profile override examples.

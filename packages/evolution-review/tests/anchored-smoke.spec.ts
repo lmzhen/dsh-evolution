@@ -97,6 +97,7 @@ describe('anchored-standard review smoke', () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-review-g1-'))
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = root
+    let reviewFiber: { dispose(): Promise<void> } | undefined
     try {
       const ctx = new Context()
       await mountAgentLoopTestDependencies(ctx)
@@ -145,7 +146,7 @@ describe('anchored-standard review smoke', () => {
         get: () => ({ maxOpsPerPlan: 10, protectedSkillNames: [], skillContentChars: 100_000 }),
       })
 
-      await ctx.plugin(Review, {
+      reviewFiber = await ctx.plugin(Review, {
         reviewEnabled: true,
         reviewMode: 'subagent',
         memoryInterval: 1,
@@ -199,9 +200,22 @@ describe('anchored-standard review smoke', () => {
       expect(record?.archived_at).toBeTruthy()
       expect(record?.patch_count).toBe(0)
     } finally {
+      // Stop the 1ms review timer before removing the temp DSH_HOME: it keeps
+      // writing sidecars and can otherwise race the recursive rm with an
+      // ENOTEMPTY on Windows (observed once in the full parallel suite).
+      await reviewFiber?.dispose()
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true })
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await rm(root, { recursive: true, force: true })
+          break
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code
+          if (attempt >= 3 || (code !== 'ENOTEMPTY' && code !== 'EBUSY' && code !== 'EPERM')) throw error
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+      }
     }
   })
 })

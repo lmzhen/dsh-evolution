@@ -14,7 +14,7 @@
  * bundle package.
  */
 
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -38,9 +38,45 @@ const BUNDLES = {
 }
 const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
 
+function rootPackageVersion() {
+  // The release version the current tree is building toward lives in the repo
+  // root package.json (the mirror root carries the real 0.3.x). Walk up from
+  // the package dir so both layout shapes (packages/scripts and the upstream
+  // overlay packages/evolution/scripts) reach it.
+  let dir = PACKAGES_DIR
+  while (true) {
+    const candidate = join(dir, 'package.json')
+    if (existsSync(candidate)) {
+      try {
+        const version = JSON.parse(readFileSync(candidate, 'utf8')).version
+        if (typeof version === 'string' && version) return version
+      } catch {
+        // fall through to the next ancestor
+      }
+    }
+    const parent = dirname(dir)
+    if (parent === dir) return ''
+    dir = parent
+  }
+}
+
 function packageSourceRoot() {
   if (EVOLUTION_SCOPE === '@deepseek-ai') return PACKAGES_DIR
-  if (existsSync(STAGING_DIR)) return STAGING_DIR
+  if (existsSync(STAGING_DIR)) {
+    // F-213: refuse a stale staging built for an older release. The persistent
+    // .release-staging has historically leaked old package code (0.3.1-test)
+    // into a new install, and the old check only tested that the dir exists.
+    const manifestPath = join(STAGING_DIR, '.staging-manifest.json')
+    if (!existsSync(manifestPath)) {
+      throw new Error(`scoped installer: ${STAGING_DIR} is not a fresh prepare-release staging — missing .staging-manifest.json; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
+    }
+    const stagingVersion = JSON.parse(readFileSync(manifestPath, 'utf8')).version
+    const expected = rootPackageVersion()
+    if (!expected || stagingVersion !== expected) {
+      throw new Error(`scoped installer: ${STAGING_DIR} was built for ${stagingVersion || '(unknown)'} but this tree is ${expected || '(unknown)'} — the staging is stale; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
+    }
+    return STAGING_DIR
+  }
   throw new Error(`scoped installer requires ${STAGING_DIR}; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} first`)
 }
 
@@ -157,14 +193,14 @@ async function removeBundleFromProfile(profileDir, bundleName) {
   return true
 }
 
-async function removeCopiedEvolutionPackages(profileDir) {
+async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
   const scopeDir = join(profileDir, 'node_modules', EVOLUTION_SCOPE)
   if (!existsSync(scopeDir)) return 0
   let removed = 0
   for (const entry of await readdir(scopeDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     if (!EVOLUTION_PREFIXES.some(prefix => entry.name === prefix || entry.name.startsWith(`${prefix}`))) continue
-    await rm(join(scopeDir, entry.name), { recursive: true, force: true })
+    if (!dryRun) await rm(join(scopeDir, entry.name), { recursive: true, force: true })
     removed += 1
   }
   return removed
@@ -279,12 +315,19 @@ async function installAgentPreset(home, dryRun, force) {
   const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
   const deltaComposition = await readFile(deltaPath, 'utf8')
   const composition = generateAgentPreset(standardComposition, deltaComposition)
+  // The `exists && !force` result must be reported identically in dry-run and
+  // real mode — a dry-run always claiming installed:true hides an already
+  // present preset (F-354). Only the write is skipped in dry-run.
+  if (existsSync(destination) && !force) {
+    return { destination, installed: false, reason: 'exists; use --force to overwrite' }
+  }
   if (!dryRun) {
-    if (existsSync(destination) && !force) {
-      return { destination, installed: false, reason: 'exists; use --force to overwrite' }
-    }
     await mkdir(destination, { recursive: true })
-    await writeFile(join(destination, 'agent.cordis.yml'), composition)
+    // Atomic write (F-354): a crash mid-write must not leave a truncated
+    // agent.cordis.yml for the loader to parse.
+    const tmp = join(destination, 'agent.cordis.yml.tmp')
+    await writeFile(tmp, composition)
+    await rename(tmp, join(destination, 'agent.cordis.yml'))
     await cp(join(packageSourceRoot(), 'evolution-agent', 'preset.yml'), join(destination, 'preset.yml'), { force })
   }
   return { destination, installed: true }
@@ -303,7 +346,7 @@ export async function uninstall(options = {}) {
     const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
     result.removedBundle = bundleName
     if (!dryRun) await removeBundleFromProfile(profileDir, bundleName)
-    result.removedPackages = dryRun ? EVOLUTION_PREFIXES.length : await removeCopiedEvolutionPackages(profileDir)
+    result.removedPackages = await removeCopiedEvolutionPackages(profileDir, dryRun)
   }
   if (mode === 'agent' || mode === 'layered') {
     result.removedAgentPreset = true

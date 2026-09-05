@@ -19,7 +19,7 @@
  *   node packages/evolution/scripts/inject-evolution-paths.mjs \
  *     <target-tsconfig> <mirror-tsconfig>
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 
 const [, , target, mirror] = process.argv
 if (!target || !mirror) {
@@ -40,6 +40,10 @@ if (evolutionLines.length === 0) {
 }
 
 let content = readFileSync(target, 'utf8')
+// Preserve the target's byte-level conventions (F-352): keep its BOM and reuse
+// its line ending so the single inserted block does not leave mixed EOLs.
+const hasBom = content.startsWith('\uFEFF')
+const eol = content.includes('\r\n') ? '\r\n' : '\n'
 const noBom = content.replace(/^\uFEFF/, '')
 
 // Existing evolution keys in the UPSTREAM file mean the platform absorbed the
@@ -60,8 +64,12 @@ if (index < 0) {
   process.exit(1)
 }
 
-const injected = evolutionLines.map(line => `      ${line.trim()}`).join('\n')
-const next = noBom.slice(0, index + marker.length) + '\n' + injected + '\n' + noBom.slice(index + marker.length)
-writeFileSync(target, next)
+const injected = evolutionLines.map(line => `      ${line.trim()}`).join(eol)
+const next = noBom.slice(0, index + marker.length) + eol + injected + eol + noBom.slice(index + marker.length)
+// Atomic write (F-352): write a sibling temp and rename so a crash never
+// leaves a half-written tsconfig, and re-attach the original BOM.
+const tmp = `${target}.tmp`
+writeFileSync(tmp, (hasBom ? '\uFEFF' : '') + next)
+renameSync(tmp, target)
 
 console.log(`inject-evolution-paths: injected ${evolutionLines.length} evolution alias line(s) into ${target} (N-7)`)

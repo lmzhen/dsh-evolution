@@ -30,12 +30,23 @@ function hasFlag(name) { return argv.includes(name) }
 // (manual repair scenarios only); release.yml runs bare so the choice is the
 // script's.
 const tagArg = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : undefined
+if (argv.includes('--tag') && (tagArg === undefined || tagArg === '')) {
+  throw new Error('--tag requires a value (e.g. --tag latest or --tag next); a bare --tag would silently fall back to the version-driven tag')
+}
 let tag = 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')
-const groupLimit = argv.includes('--groups') ? Number(argv[argv.indexOf('--groups') + 1]) : undefined
-const onlyNames = argv.includes('--only') ? argv[argv.indexOf('--only') + 1].split(',').map(name => name.trim()).filter(Boolean) : []
+const groupRaw = argv.includes('--groups') ? argv[argv.indexOf('--groups') + 1] : undefined
+const groupLimit = groupRaw === undefined ? undefined : Number(groupRaw)
+if (groupLimit !== undefined && !Number.isInteger(groupLimit)) {
+  throw new Error(`--groups requires a positive integer, got ${groupRaw} — a non-numeric value slices the publish order to nothing yet still reports complete`)
+}
+const onlyArg = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : undefined
+if (argv.includes('--only') && (onlyArg === undefined || onlyArg === '')) {
+  throw new Error('--only requires a comma-separated package list')
+}
+const onlyNames = onlyArg ? onlyArg.split(',').map(name => name.trim()).filter(Boolean) : []
 const otp = argv.includes('--otp') ? argv[argv.indexOf('--otp') + 1] : ''
 
 function npm(args, options = {}) {
@@ -88,6 +99,14 @@ const expected = Object.keys(manifest).sort()
 const listed = order.flat().sort()
 if (JSON.stringify(expected) !== JSON.stringify(listed)) {
   throw new Error('manifest and publish-order disagree on the package set')
+}
+
+// --only must name a real package: an unknown name would match nothing and the
+// run would silently "complete" without publishing anything.
+for (const name of onlyNames) {
+  if (!expected.includes(name)) {
+    throw new Error(`--only unknown package: ${name} (not in the staged manifest)`)
+  }
 }
 
 const publishOrder = groupLimit === undefined ? order : order.slice(0, groupLimit)

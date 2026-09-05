@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.21 (patch) — G0 发布工程 + G1 锁协议 v2 + G7 门禁（3 组）
+
+外部审计优化计划（audit-report-v3 / optimization-plan-v3）的首批落地；每项先按报告行号核对现状再修，修复后逐条交叉验证。
+
+- **G0.1 依赖闭包守卫**：新增 `verify-dependency-closure.mjs`——30 包的 value import 必须已声明（type-only 感知，混合 import 按 value 上报）；补 feedback/state-json/tool-memory/evolution-review 缺失的 workspace 依赖；清除 11 处幽灵依赖（io/io-node/memory/learning-graph/commands 移除未用 schemastery；state 移除 dsh-storage-domain / dsh-evolution-state-domain）。
+- **G0.2 平台范围守卫修复**：`verify-platform-ranges.mjs` 此前扫描数为空时静默通过（vacuous-pass）——改为 `scanned===0` fail-loud；action.yml 的 `--manifest-dir` 指向 `packages/evolution/.release-staging`；platform-range.spec.ts 重钉。
+- **G0.3 重写补丁覆盖 .d.ts**：`rewriteScopedJs` 覆盖 `lib/types/**/*.d.ts`；29 个包 `files` 列表改为 `["lib/*.js","lib/types/**/*.d.ts"]`；守卫校验 `packed.files`，避免发布包留上游 scope 痕迹。
+- **G0.4 暂存清单与版本一致**：`.staging-manifest.json`（包/版本/来源声明）+ install-layered 版本比较 fail-loud（防回滚安装）；`.release-staging` 生命周期清理。
+- **G0.5 发布链 fail-fast**：publish-scoped 任一包失败即停；prepare-release `.next` 原子切换（tmp+rename+BOM 写回）；install-layered 原子写 + dry-run 不落盘。
+- **G0.6 布局文档与元数据**：INSTALL/README 路径与 package-map 更新；build-lib 头注释；镜像根 package.json 移除 `workspaces`（扁平发布载体不再伪装工作区）。
+- **G1 锁协议 v2（io.ts 单点）**：takeover 前重读锁内容（`current === holderContent` 才删除，防持锁者已换内容误删）；同 pid 锁回收改双条件（`pendingSelfCleanup.has(lock) || mtime > 1000`——同 pid 并发写者不可互相"治愈"，根治回收锁截胡）；`commitTmp` 失败主动删 tmp、renameWithRetry（EPERM/EBUSY ≤3 次重试 50ms）、同 pid 失败即时 sweep；io.spec +6 用例（203 全绿）。
+- **G7.1 架构守卫**：新增 `verify-arch-guards.mjs`——DSH_HOME 只允许 evolution-core 解析（N1）+ ApprovalPolicyLike / effectiveSessionPolicy 单源（N2）；本版 warn 模式（5 处遗留 = G3.2/G4.8 收敛 TODO，收敛后翻 `--strict`）。
+- **G7.3 事件配对守卫**：新增 `verify-event-pairing.mjs`——生产 src 的 `evolution/*` emit/on 配对核验：0 孤儿 0 悬空（`review-scheduled`/`review-error` 为 README 声明的外部属主豁免）。
+- **回归检查**：vitest 全量 80 文件 / 523 测试全绿（+6 个 G1 io 用例；修复 anchored-smoke teardown `ENOTEMPTY` 竞态——先 dispose review fiber 再 rm、rm 带重试；修复 io.spec `transact` 可选成员调用类型）；oxlint 0/0（170 文件 89 规则）；tsc -b evolution-core 0；改动 specs 定向 typecheck 0 错；11 个脚本 `node --check` 全过。
+- **未在此批收敛（顺延 0.3.22+）**：G2 数据完整性、G3 架构收敛（arch-guards 5 处）、G7.4 其余门禁。
+
 ## 0.3.20 (patch) — v2 审计复核修复批（外审新发现 N-1..N-5 + 行级卫生，6 组）
 
 v2 再审计报告（audit-report-v2）经修复方逐条交叉验证后的处置批次；每项先按报告行号核对现状再修。

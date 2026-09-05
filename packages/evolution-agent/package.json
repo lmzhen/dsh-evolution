@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-agent-preset",
   "description": "Agent preset exposing memory and skill evolution tools to a session",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "publishConfig": {
     "access": "public"
   },
@@ -15,10 +15,8 @@
     "agent.cordis.yml",
     "preset.yml",
     "package.json",
-    "lib/invariant.js",
-    "lib/types/invariant.d.ts",
-    "lib/index.js",
-    "lib/types/index.d.ts"
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
   "dependencies": {

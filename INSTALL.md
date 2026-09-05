@@ -27,7 +27,7 @@ The layered layout is recommended for production.
 ## 1. Layered install (local development)
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web \
   --mode layered \
   --home "$DSH_HOME"
@@ -52,14 +52,14 @@ Published-bundle installs are unaffected.
 Dry run:
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web --mode layered --dry-run
 ```
 
 Uninstall the layered layout while keeping user data:
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs --profile web --mode layered --uninstall
+node packages/scripts/install-layered.mjs --profile web --mode layered --uninstall
 ```
 
 Only the profile rows, copied packages, and the agent preset directory are
@@ -68,7 +68,7 @@ removed. Memory, skills, state, reports, and approval history remain.
 ## 2. Host-only install
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web --mode host
 ```
 
@@ -78,7 +78,7 @@ observability, but no `memory`/`skill_manage` tools.
 ## 3. Agent-only install
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web --mode agent --force
 ```
 
@@ -88,7 +88,7 @@ another source.
 ## 4. One-click compatibility install
 
 ```bash
-node packages/evolution/scripts/install-layered.mjs \
+node packages/scripts/install-layered.mjs \
   --profile web --mode oneclick
 ```
 
@@ -112,7 +112,7 @@ pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 > Community-published `@lmzhen/*` packages are not official DeepSeek
 > releases.
 
-Then copy `packages/evolution/evolution-agent/` to:
+Then copy `packages/evolution-agent/` to:
 
 ```text
 $DSH_HOME/.agent-presets/evolution/
@@ -181,9 +181,9 @@ dsh --profile <profile> --dump-config
 Runtime tests:
 
 ```bash
-vitest run packages/evolution/evolution-host/tests/installation-matrix.spec.ts
-vitest run packages/evolution/tool-memory/tests/anchored-compat.spec.ts
-vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
+vitest run packages/evolution-host/tests/installation-matrix.spec.ts
+vitest run packages/tool-memory/tests/anchored-compat.spec.ts
+vitest run packages/evolution-review/tests/anchored-smoke.spec.ts
 ```
 
 Uninstalling only removes the profile row or preset directory; memory, skills,

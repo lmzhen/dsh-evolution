@@ -22,9 +22,9 @@
  *   node packages/evolution/scripts/prepare-release.mjs \
  *     --scope @lmzhen --version 0.1.0-rc.NN --platform-version 0.1.1-rc.NN
  */
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const evolutionRoot = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -69,6 +69,17 @@ function registryVersion(name) {
     : ['npm', ['view', name, 'version']]
   try {
     return execFileSync(command[0], command[1], { encoding: 'utf8' }).trim().split(String.fromCharCode(10)).pop() ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function currentGitSha() {
+  const command = process.platform === 'win32'
+    ? ['cmd.exe', ['/c', 'git', 'rev-parse', 'HEAD']]
+    : ['git', ['rev-parse', 'HEAD']]
+  try {
+    return execFileSync(command[0], command[1], { encoding: 'utf8' }).trim()
   } catch {
     return ''
   }
@@ -134,7 +145,13 @@ function rewriteScopedJs(stagedDir, names) {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
       const path = join(current, entry.name)
       if (entry.isDirectory()) stack.push(path)
-      else if (entry.isFile() && path.endsWith('.js')) {
+      // F-104: published `files` whitelists carry `lib/types/**/*.d.ts` (e.g.
+      // evolution-approval), so a published .d.ts that re-exports a family
+      // package under its original `@deepseek-ai/dsh-*` name surfaces a TS2307
+      // in the consumer. Rewrite .d.ts with the SAME scope replacement used for
+      // .js (`export type X from '@deepseek-ai/...'`, `import type` and source
+      // lines all reduce to the same text substitution).
+      else if (entry.isFile() && (path.endsWith('.js') || path.endsWith('.d.ts'))) {
         writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names))
       }
     }
@@ -160,11 +177,25 @@ function libBundles(libRoot) {
   return out
 }
 
-rmSync(distRoot, { recursive: true, force: true })
-mkdirSync(distRoot, { recursive: true })
+/** The exact paths npm resolved into the tarball (from `npm pack --json`
+ * `files`), normalized to posix with any leading `./` stripped so they line up
+ * with `exports` targets, `main`/`types` and `lib/...` bundle imports. */
+function shippedPaths(packed) {
+  return (packed.files ?? []).map(f => (typeof f === 'string' ? f : f.path).replace(/^\.\//, '').replace(/\\/g, '/'))
+}
+
 const staging = join(evolutionRoot, '.release-staging')
-rmSync(staging, { recursive: true, force: true })
-mkdirSync(staging, { recursive: true })
+// Build into `.next` dirs and swap at the end (F-350): the live dist/staging
+// are only touched once the whole build AND its guard pass, so a mid-build or
+// mid-pack failure never leaves a partial `dist` or a partially-populated
+// `.release-staging` for a later step (e.g. verify-platform-ranges or the
+// scoped installer) to pick up.
+const distNext = `${distRoot}.next`
+const stagingNext = `${staging}.next`
+rmSync(distNext, { recursive: true, force: true })
+rmSync(stagingNext, { recursive: true, force: true })
+mkdirSync(distNext, { recursive: true })
+mkdirSync(stagingNext, { recursive: true })
 
 const names = new Map(sourceDirs.map(dir => [readJson(join(evolutionRoot, dir, 'package.json')).name, dir]))
 const externalNames = new Set()
@@ -182,7 +213,7 @@ for (const name of externalNames) publishedVersions[name] = registryVersion(name
 const tarballs = []
 for (const dir of sourceDirs) {
   const original = join(evolutionRoot, dir)
-  const staged = join(staging, dir)
+  const staged = join(stagingNext, dir)
   cpSync(original, staged, {
     recursive: true,
     force: true,
@@ -215,17 +246,28 @@ for (const dir of sourceDirs) {
     process.exit(1)
   }
   const tarball = join(staged, packed.filename)
-  cpSync(tarball, join(distRoot, packed.filename))
-  tarballs.push({ name: packed.name, dir, file: packed.filename, size: packed.size, files: packed.files.length })
-  console.log(`${packed.name}  ${packed.size} bytes  ${packed.files.length} files`)
+  cpSync(tarball, join(distNext, packed.filename))
+  const shipped = shippedPaths(packed)
+  tarballs.push({ name: packed.name, dir, file: packed.filename, size: packed.size, files: shipped.length, shipped })
+  console.log(`${packed.name}  ${packed.size} bytes  ${shipped.length} files`)
 }
 
 const failures = []
 for (const item of tarballs) {
-  const staged = join(staging, item.dir)
+  const staged = join(stagingNext, item.dir)
   const manifest = readJson(join(staged, 'package.json'))
-  if (typeof manifest.main === 'string' && !existsSync(join(staged, manifest.main))) {
+  // F-356: validate the ACTUAL tarball contents (packed.files), not staging
+  // disk — the `files` whitelist can exclude a bundle/chunk that exists on
+  // disk, so a staging-disk check silently passes a tarball that ships a
+  // broken module. Every entry point and every bundle import must exist in the
+  // packed file list.
+  const shipped = new Set(item.shipped)
+  const inShipped = (rel) => shipped.has(rel.replace(/^\.\//, '').replace(/\\/g, '/'))
+  if (typeof manifest.main === 'string' && !inShipped(manifest.main)) {
     failures.push(`${item.name}: packed ${manifest.main} is missing`)
+  }
+  if (typeof manifest.types === 'string' && !inShipped(manifest.types)) {
+    failures.push(`${item.name}: packed ${manifest.types} (types) is missing`)
   }
   const libRoot = join(staged, 'lib')
   for (const rel of libBundles(libRoot)) {
@@ -237,13 +279,13 @@ for (const item of tarballs) {
     }
     for (const match of text.matchAll(/from\s+"(\.\/[^"]+\.js)"/g)) {
       const local = join(libRoot, match[1].slice(2))
-      if (!existsSync(local)) {
+      if (!inShipped(relative(staged, local).replace(/\\/g, '/'))) {
         failures.push(`${item.name}: lib/${rel} imports ${match[1]} which is missing from the tarball`)
       }
     }
   }
   for (const [name, target] of Object.entries(manifest.exports ?? {})) {
-    if (typeof target === 'string' && !existsSync(join(staged, target))) {
+    if (typeof target === 'string' && !inShipped(target)) {
       failures.push(`${item.name}: export ${name} -> ${target} is missing from the tarball`)
     }
   }
@@ -253,7 +295,17 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-writeFileSync(join(distRoot, 'manifest.json'), JSON.stringify(Object.fromEntries(tarballs.map(item => [item.name, item.file])), null, 2) + '\n')
+// F-213 freshness credential: record exactly what this staging run was built
+// for, so install-layered can refuse a stale `.release-staging` — the
+// persistent dir has historically leaked old package code (0.3.1-test) into a
+// new install. `.version` is the guard; `createdAt`/`gitSha` are provenance.
+writeFileSync(join(stagingNext, '.staging-manifest.json'), JSON.stringify({
+  version: releaseVersion,
+  createdAt: new Date().toISOString(),
+  gitSha: currentGitSha(),
+}, null, 2) + '\n')
+
+writeFileSync(join(distNext, 'manifest.json'), JSON.stringify(Object.fromEntries(tarballs.map(item => [item.name, item.file])), null, 2) + '\n')
 
 const nameByDir = Object.fromEntries(tarballs.map(item => [item.dir, item.name]))
 const publishGroups = [
@@ -270,18 +322,26 @@ const publishGroups = [
   ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog', 'evolution-capability'],
   ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
-writeFileSync(join(distRoot, 'publish-order.json'), JSON.stringify(publishGroups.map(group => group.map(dir => nameByDir[dir])), null, 2) + '\n')
+writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups.map(group => group.map(dir => nameByDir[dir])), null, 2) + '\n')
 
 const smokeDeps = {}
 for (const item of tarballs) smokeDeps[item.name] = `file:${distRoot.split(String.fromCharCode(92)).join('/')}/${item.file}`
 const ourNameSet = new Set(names.keys())
 for (const name of externalNames) smokeDeps[name] = releaseSpec(name, ourNameSet, publishedVersions)
-writeFileSync(join(distRoot, 'smoke-package.json'), JSON.stringify({
+writeFileSync(join(distNext, 'smoke-package.json'), JSON.stringify({
   name: 'evo-release-smoke',
   private: true,
   version: '0.0.0',
   dependencies: smokeDeps,
 }, null, 2) + '\n')
+
+// Atomic swap: only now that the whole build (and its guard) passed do the
+// live `.release-staging` and `dist` replace their `.next` siblings. A failed
+// build never disturbs a previously good dist or a previously fresh staging.
+rmSync(staging, { recursive: true, force: true })
+renameSync(stagingNext, staging)
+rmSync(distRoot, { recursive: true, force: true })
+renameSync(distNext, distRoot)
 
 console.log(`packed ${tarballs.length} packages -> ${distRoot}`)
 

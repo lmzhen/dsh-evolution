@@ -105,6 +105,58 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
   }
 }
 
+/**
+ * F-367 (②): lock paths whose release (the finally `rm`) failed. The next write
+ * to the same file proactively recycles our own leftover lock — the holder is
+ * us, so a leftover is stale by definition. Module-level by design: it must
+ * survive across `nodeEvolutionIo()` instances for the self-heal to be
+ * effective. (Not a pure function — the cross-call state is the intent.)
+ */
+const pendingSelfCleanup = new Set<string>()
+
+/**
+ * Retry a rename that a peer is temporarily holding on Windows (EPERM/EBUSY):
+ * a short 50ms backoff, at most 3 retries (~150ms budget), matching the
+ * write-lock cadence. A non-transient code surfaces immediately. `fn` is the
+ * rename primitive, injectable for deterministic tests.
+ *
+ * @param tmp - the source path to rename.
+ * @param target - the destination path.
+ * @param fn - the rename primitive (defaults to `node:fs/promises.rename`).
+ * @returns a promise that resolves once the rename succeeds.
+ */
+export async function renameWithRetry(
+  tmp: string,
+  target: string,
+  fn: (from: string, to: string) => Promise<void> = rename,
+): Promise<void> {
+  for (let retry = 0; ; retry += 1) {
+    try {
+      await fn(tmp, target)
+      return
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code
+      if (code !== 'EPERM' && code !== 'EBUSY') throw error
+      if (retry >= 3) throw error
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+  }
+}
+
+/**
+ * F-366: commit a freshly-written tmp to its target inside the write lock. On a
+ * still-failing rename the tmp is deleted immediately rather than left for the
+ * (1h + dead-pid) sweep, so a live writer never leaks a tmp it abandoned.
+ */
+async function commitTmp(tmp: string, target: string): Promise<void> {
+  try {
+    await renameWithRetry(tmp, target)
+  } catch (error) {
+    await rm(tmp, { force: true }).catch(() => {})
+    throw error
+  }
+}
+
 export function nodeEvolutionIo(): EvolutionIoLike {
   const isMissing = (error: unknown): boolean => {
     const code = (error as NodeJS.ErrnoException | undefined)?.code
@@ -142,6 +194,13 @@ export function nodeEvolutionIo(): EvolutionIoLike {
    * retry budget (budget >= 2 x threshold), so a dead holder's lock is
    * actually recoverable within one budget instead of being arithmetically
    * unreachable.
+   * 0.3.21 (F-101): takeover re-reads the lock right before removing it and
+   * only removes it when the content still names the dead pid — a peer that
+   * acquired the lock after our stale probe wrote its own pid, and deleting a
+   * LIVE lock is the double-hold (concurrent task) the probe must prevent.
+   * 0.3.21 (F-367): a self-pid lock is this process's own leftover (a failed
+   * release or a crash) and is recycled immediately regardless of age; a
+   * failure to release in finally is recorded so the next write self-heals.
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
@@ -157,13 +216,33 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         if (code !== 'EEXIST' && code !== 'EPERM') throw error
         try {
           const st = await stat(lock)
-          if (Date.now() - st.mtimeMs > 1000) {
-            const holder = Number((await readFile(lock, 'utf8').catch(() => '')))
-            const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
-            if (!holderAlive) {
+          const holderContent = await readFile(lock, 'utf8').catch(() => '')
+          const holder = Number(holderContent)
+          const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
+          // F-367 (①): a self-pid lock is OUR OWN leftover — a release recorded
+          // in pendingSelfCleanup (any age) or one left stuck for >1s — and is
+          // recycled. A same-process concurrent writer's LIVE lock stays fresh
+          // (<1s) and is NOT recorded, so it is never stolen: the 8-writer /
+          // transact serialization is preserved.
+          if (holder === process.pid && (pendingSelfCleanup.has(lock) || Date.now() - st.mtimeMs > 1000)) {
+            const current = await readFile(lock, 'utf8').catch(() => '')
+            if (current === holderContent) {
               try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
-              continue
+              pendingSelfCleanup.delete(lock)
             }
+            continue
+          }
+          // F-101: only a stale (>1s) lock NOT held by a live peer is taken
+          // over, and only after re-reading it to confirm the content still
+          // names the dead pid. A peer that acquired it after our stale probe
+          // wrote its own pid, so a naive rm would delete a LIVE lock
+          // (double-hold → concurrent task, double execution on approve).
+          if (Date.now() - st.mtimeMs > 1000 && !holderAlive) {
+            const current = await readFile(lock, 'utf8').catch(() => '')
+            if (current === holderContent) {
+              try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
+            }
+            continue
           }
         } catch {
           continue // the lock vanished between fails
@@ -176,7 +255,9 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       try {
         return await task()
       } finally {
-        await rm(lock, { force: true }).catch(() => {})
+        // F-367 (②): a failed release is no longer silently swallowed — record
+        // the path so the NEXT write to the same file self-heals it.
+        await rm(lock, { force: true }).catch(() => { pendingSelfCleanup.add(lock) })
       }
     }
     throw new Error(`could not acquire write lock for ${path} after 40 attempts`)
@@ -199,7 +280,11 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       try {
         const st = await stat(tmpPath)
         const deadHolder = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
-        if (Date.now() - st.mtimeMs > 3_600_000 && deadHolder) {
+        // F-366 (③): this process's own leftover tmp is recycled immediately (a
+        // live writer's tmp is a current write, not a crash artifact); foreign
+        // live pids keep the >1h protection so an in-flight write is not reaped.
+        const selfLeftover = holder === process.pid
+        if (selfLeftover || (Date.now() - st.mtimeMs > 3_600_000 && deadHolder)) {
           await rm(tmpPath, { force: true })
         }
       } catch {
@@ -223,7 +308,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         await sweepStaleTmps(path)
         const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
         await writeFile(tmp, content, 'utf8')
-        await rename(tmp, path)
+        await commitTmp(tmp, path)
       })
     },
     async transact(path, task) {
@@ -246,7 +331,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         }
         const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
         await writeFile(tmp, next, 'utf8')
-        await rename(tmp, path)
+        await commitTmp(tmp, path)
       })
     },
     async remove(path) {

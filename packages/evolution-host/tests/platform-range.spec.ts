@@ -65,11 +65,14 @@ describe('verify-platform-ranges (N-2 guard)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  it('tolerates missing manifests and empty manifest dirs', async () => {
+  it('fails loud when no manifest is actually scanned (empty/unreadable dirs)', async () => {
     const root = await stagedDir([{ name: '@lmzhen/dsh-evolution-host' }])
     await writeFile(join(root, 'pkg-0', 'package.json'), '{not json')
-    const { stdout } = await run(process.execPath, [guard, '--platform-version', '0.1.1-rc.2', '--manifest-dir', root], { encoding: 'utf8' })
-    expect(stdout).toContain('OK')
+    const error = await run(process.execPath, [guard, '--platform-version', '0.1.1-rc.2', '--manifest-dir', root], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('no package manifest found')
     await rm(root, { recursive: true, force: true })
   })
 })

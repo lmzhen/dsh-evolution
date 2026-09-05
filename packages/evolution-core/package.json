@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-core",
   "description": "Shared stores, prompts, signals and lifecycle logic for the dsh-evolution plugin family",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "publishConfig": {
     "access": "public"
   },
@@ -26,10 +26,8 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/index.js",
-    "lib/invariant.js",
-    "lib/types/**/*.d.ts",
-    "lib/types/invariant.d.ts"
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
   "dependencies": {

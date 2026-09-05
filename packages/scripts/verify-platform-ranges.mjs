@@ -51,6 +51,7 @@ if (ourScope === '@deepseek-ai') {
 
 const failures = []
 let checked = 0
+let scanned = 0
 
 function isPlatformDep(name) {
   return name.startsWith('@deepseek-ai/dsh-') && !name.startsWith(familyPrefixes)
@@ -65,6 +66,7 @@ for (const dir of readdirSync(manifestDir, { withFileTypes: true })) {
   } catch {
     continue
   }
+  scanned += 1
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, range] of Object.entries(manifest[section] ?? {})) {
       if (!isPlatformDep(name)) continue
@@ -76,9 +78,18 @@ for (const dir of readdirSync(manifestDir, { withFileTypes: true })) {
   }
 }
 
+// F-103: a flat tarball dir (or a missing path) has no package.json subdirs, so
+// the old guard scanned `packages/evolution/dist` and counted 0 ranges —
+// a vacuous pass that never validated anything. Fail loud when no manifest was
+// actually scanned rather than letting an unvalidated build go green.
+if (scanned === 0) {
+  console.error(`verify-platform-ranges: no package manifest found under ${manifestDir} (0 directories with a readable package.json) — checked 0 packages and the guard would pass vacuously. Point --manifest-dir at the staged per-package tree (e.g. ${manifestDir}/../.release-staging) that actually holds one package.json per package.`)
+  process.exit(1)
+}
+
 if (failures.length > 0) {
   console.error(`verify-platform-ranges: ${failures.length} platform dependency range(s) drifted from ^${platformVersion}:`)
   console.error(failures.join('\n'))
   process.exit(1)
 }
-console.log(`verify-platform-ranges: OK — ${checked} @deepseek-ai/dsh-* platform range(s) all ^${platformVersion}`)
+console.log(`verify-platform-ranges: OK — scanned ${scanned} package manifest(s), ${checked} @deepseek-ai/dsh-* platform range(s) all ^${platformVersion}`)
