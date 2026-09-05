@@ -137,6 +137,24 @@ describe('evolution-review', () => {
     expect(injected).toHaveLength(1)
   })
 
+  it('F-203: a skill tool/call with JSON-null arguments does not crash read-name collection', async () => {
+    const { ctx, emitEnd } = await mountReviewFixture({ skillArguments: 'null' })
+    const applied: string[] = []
+    ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
+    ctx.provide('subagents', {
+      start: async () => ({
+        result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'no-op' } }),
+        dispose: async () => {},
+      }),
+    })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1)
+    // The review reaches read-name collection and completes, proving
+    // `arguments: 'null'` no longer throws inside collectReadSkillNames.
+    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
+  })
+
   it('E-41: review-scheduled is not emitted when the subagent review does not start (0.3.19)', async () => {
     const injected: unknown[] = []
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
@@ -156,7 +174,7 @@ describe('evolution-review', () => {
 })
 
 /** Shared mounting: one fake session/agent registered, one turn/end emitter. */
-async function mountReviewFixture(options: { failState?: boolean; onInject?: (message: unknown) => void } = {}) {
+async function mountReviewFixture(options: { failState?: boolean; onInject?: (message: unknown) => void; skillArguments?: string } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   ctx.provide('evolutionState', {
@@ -172,7 +190,7 @@ async function mountReviewFixture(options: { failState?: boolean; onInject?: (me
     seq: 1,
     header: { origin: undefined },
     events: [
-      { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } },
+      { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: options.skillArguments ?? '{}' } },
     ],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
   } as unknown as Session

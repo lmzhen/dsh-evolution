@@ -76,12 +76,17 @@ export class MemoryRegistry extends Service {
   }
 
   /** 0.3.17 (E-73): named lookup like the io/state-storage registries; no
-   * name = first registered (backward compatible). */
+   * name = first registered (backward compatible). A named miss throws (F-333,
+   * 0.3.23) instead of silently falling back to the first provider, so a wrong
+   * name surfaces rather than writing to the wrong memory store. */
   provider(name?: string): MemoryProvider {
-    const byName = name ? this.providers.get(name) : undefined
-    if (byName) return byName
+    if (name) {
+      const byName = this.providers.get(name)
+      if (!byName) throw new Error(`memory provider "${name}" is not registered`)
+      return byName
+    }
     const first = this.providers.values().next().value
-    if (!first) throw new Error(`memory: no provider registered${name ? ` named "${name}"` : ''}`)
+    if (!first) throw new Error('memory: no provider registered')
     return first
   }
 

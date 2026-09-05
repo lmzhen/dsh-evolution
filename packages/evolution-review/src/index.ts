@@ -500,13 +500,19 @@ function collectReadSkillNames(session: Session): Set<string> {
     if (event.type !== 'tool/call') continue
     if (event.data.name !== 'skill') continue
     const raw = (event.data as unknown as { arguments?: string | Record<string, unknown> }).arguments
-    let parsed: Record<string, unknown> = {}
+    let parsed: unknown = {}
     if (typeof raw === 'string') {
-      try { parsed = JSON.parse(raw) as Record<string, unknown> } catch { continue }
+      try {
+        // F-203 (0.3.23): `JSON.parse('null')` yields null; guard before `.name`.
+        parsed = JSON.parse(raw) as unknown
+      } catch {
+        continue
+      }
     } else {
       parsed = raw ?? {}
     }
-    const name = typeof parsed.name === 'string' ? parsed.name : typeof parsed.skill === 'string' ? parsed.skill : ''
+    const parsedObj = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+    const name = typeof parsedObj.name === 'string' ? parsedObj.name : typeof parsedObj.skill === 'string' ? parsedObj.skill : ''
     if (name) names.add(name)
   }
   return names

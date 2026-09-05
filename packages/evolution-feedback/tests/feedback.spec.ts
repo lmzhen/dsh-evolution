@@ -489,4 +489,35 @@ describe('evolution-feedback', () => {
       await rm(home, { recursive: true, force: true })
     }
   })
+
+  it('clamps the quality warn threshold to its [-1, 1] domain (G3.1 matrix)', () => {
+    const cases: Array<[value: number | undefined, expected: number]> = [
+      [undefined, -0.25],
+      [0, 0],
+      [-0.5, -0.5],
+      [0.25, 0.25],
+      [-1, -1],
+      [1, 1],
+      [NaN, -0.25],
+      [Infinity, -0.25],
+      [-Infinity, -0.25],
+      [1.5, -0.25],
+      [-1.5, -0.25],
+    ]
+    for (const [value, expected] of cases) {
+      expect(Feedback.resolveQualityWarnThreshold({ qualityWarnThreshold: value }), `qualityWarnThreshold=${String(value)}`).toBe(expected)
+    }
+  })
+
+  it('rejects out-of-domain quality warn threshold at the schema level (G3.1 .min(-1).max(1))', () => {
+    const parse = (input: unknown): unknown => (Feedback.Config as unknown as (i: unknown) => unknown)(input)
+    expect(() => parse({ qualityWarnThreshold: 1.5 })).toThrow()
+    expect(() => parse({ qualityWarnThreshold: -1.5 })).toThrow()
+    // 0 and -0.25 are legal; NaN/Infinity sneak through and are clamped at the
+    // assembly layer instead.
+    expect((parse({ qualityWarnThreshold: 0 }) as { qualityWarnThreshold: number }).qualityWarnThreshold).toBe(0)
+    expect((parse({ qualityWarnThreshold: -0.5 }) as { qualityWarnThreshold: number }).qualityWarnThreshold).toBe(-0.5)
+    const nanResult = parse({ qualityWarnThreshold: NaN }) as { qualityWarnThreshold: number }
+    expect(Number.isNaN(nanResult.qualityWarnThreshold)).toBe(true)
+  })
 })

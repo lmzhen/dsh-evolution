@@ -112,7 +112,9 @@ runs:
       shell: bash
       working-directory: upstream
       run: |
-        node packages/evolution/scripts/verify-arch-guards.mjs packages/evolution
+        # 0.3.23: strict mode is on — N1/N2 are zero-tolerance (single-source
+        # contracts); N3/N4 stay warn-only listings inside the script.
+        node packages/evolution/scripts/verify-arch-guards.mjs packages/evolution --strict
 
     - name: Verify event pairing (G7.3)
       shell: bash

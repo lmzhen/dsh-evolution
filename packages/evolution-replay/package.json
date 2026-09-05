@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-replay",
   "description": "Replay/A-B evaluation primitives for evolution plans",
-  "version": "0.3.22",
+  "version": "0.3.23",
   "publishConfig": {
     "access": "public"
   },

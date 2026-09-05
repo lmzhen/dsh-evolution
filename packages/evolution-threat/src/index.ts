@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
-import { EVOLUTION_WRITE_TOOLS, scanContentThreats, scanMemoryThreats } from '@deepseek-ai/dsh-evolution-core'
+import { EVOLUTION_WRITE_TOOLS, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-threat'
 export const inject = ['tools']
@@ -19,7 +19,7 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(true),
-  maxScanChars: z.number().default(65_536),
+  maxScanChars: z.number().min(1).default(65_536),
 })
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -65,9 +65,23 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
   return null
 }
 
+/** Resolve the effective `maxScanChars`, clamping invalid values to the
+ * default (G3.1: 0/negative/NaN/±Infinity → 65_536). Exported so the clamp is
+ * directly testable; `apply` warns when a user-supplied value was corrected. */
+export function resolveMaxScanChars(config: Config): number {
+  return clampedNumber(config.maxScanChars ?? 65_536, 65_536, { min: 1 })
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (!(rawConfig.enabled ?? true)) return
-  const maxScanChars = rawConfig.maxScanChars ?? 65_536
+  // G3.1 (0.3.23): clamp maxScanChars to at least 1. A 0 would silently disable
+  // scanning; NaN/±Infinity (the number schema lets them through) would corrupt
+  // the scan window. The schema `.min(1)` rejects 0/negative; this clamp is the
+  // net that also covers NaN/±Infinity.
+  const maxScanChars = resolveMaxScanChars(rawConfig)
+  if (maxScanChars !== (rawConfig.maxScanChars ?? 65_536)) {
+    ctx.logger.warn(`evolution-threat: maxScanChars=${String(rawConfig.maxScanChars)} is invalid; falling back to the default 65_536`)
+  }
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
     const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars)
     if (hit) return { kind: 'deny', reason: hit }

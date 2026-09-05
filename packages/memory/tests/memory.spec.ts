@@ -31,4 +31,19 @@ describe('MemoryRegistry', () => {
     expect(result.ok).toBe(true)
     expect(seen).toEqual([{ target: 'memory', chars: 1, entries: 1 }])
   })
+
+  it('F-333: a named provider miss throws instead of silently falling back to the first', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    const first: MemoryProvider = { ...provider, name: 'first' }
+    const second: MemoryProvider = { ...provider, name: 'second' }
+    ctx.memory.registerProvider(first)
+    ctx.memory.registerProvider(second)
+    // Named miss surfaces — never writes to the wrong store.
+    expect(() => ctx.memory.provider('missing')).toThrow(/memory provider "missing" is not registered/)
+    // A named hit returns exactly that provider.
+    expect(ctx.memory.provider('second')).toBe(second)
+    // No name keeps the backward-compatible first-registered behavior.
+    expect(ctx.memory.provider()).toBe(first)
+  })
 })

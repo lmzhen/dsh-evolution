@@ -8,9 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { evolutionIoAdapter, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, evolutionRoot, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { appendEvolutionEvent, eventsFile } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -31,13 +29,21 @@ const READ_TOOL_KIND: Record<string, 'view'> = {
  * `name` wins over `skill`. Empty when unparseable or anonymous.
  */
 function skillNameFromToolCall(raw: unknown): string {
-  let parsed: Record<string, unknown> = {}
+  let parsed: unknown = {}
   if (typeof raw === 'string') {
-    try { parsed = JSON.parse(raw) as Record<string, unknown> } catch { return '' }
+    try {
+      // F-203 (0.3.23): `JSON.parse('null')`/`JSON.parse('123')` succeed but
+      // yield a null/primitive, so guard the result before reading `name`.
+      parsed = JSON.parse(raw) as unknown
+    } catch {
+      return ''
+    }
   } else if (raw && typeof raw === 'object') {
-    parsed = raw as Record<string, unknown>
+    parsed = raw
   }
-  return typeof parsed.name === 'string' ? parsed.name : typeof parsed.skill === 'string' ? parsed.skill : ''
+  if (!parsed || typeof parsed !== 'object') return ''
+  const obj = parsed as Record<string, unknown>
+  return typeof obj.name === 'string' ? obj.name : typeof obj.skill === 'string' ? obj.skill : ''
 }
 
 /** Cumulative library-wide usage totals (C observation-window event counts). */
@@ -84,7 +90,10 @@ export class SkillUsageRegistry extends Service {
     // 0.3.18 (S4.1, E-30): single root resolution shared with the other three
     // members that read the skills tree.
     this.root = resolveSkillsRoot(config)
-    this.eventsHome = config.eventsHome || process.env.DSH_HOME || join(homedir(), '.dsh')
+    // 0.3.23 (G7.1 N1): DSH_HOME resolution routes through core's single
+    // source (evolutionRoot, `||` empty-string fallback) — a raw probe here
+    // would let an empty DSH_HOME mint a CWD-relative events home.
+    this.eventsHome = config.eventsHome || evolutionRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // A2 observation: `session/event` tool/call records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This

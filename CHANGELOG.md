@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.23 (patch) — G3 配置治理 + G4.7 + G1.3 seam 单源 + G7.1 门禁生效（4 组）
+
+审计优化计划批次 3（配置治理）；每项先按报告行号核对现状再修（14 项核验中 1 项部分属实——F-340 的 `this: void` 两边已一致，transact 宽度与 size 文档措辞为真实漂移）。
+
+- **G3.1 数值配置统一钳制管道**：core 新增纯值助手 `clampedNumber(value, fallback, {min?, max?})`（core 保持零 schemastery 分层——校验器留在各包 Config 内联）；policy 12 数值字段、threat `maxScanChars`、replay `maxPlans/weights`（accepted/rejectedPenalty/evidence min 1、cost min 0）、feedback `qualityWarnThreshold`（[-1,1]，0/负合法）全部接入——schema `.min()/.max()` 装载期硬校验 + 装配期钳制（authoritative）+ 修正时一次性 warn。**schemastery 实测**：`.min(1)` 拒绝 0/负（fail loud），NaN/±Infinity 穿透由 clamp 兜底——决策点 3「0 回落默认」以「schema fail-loud + clamp 兜底」双保险实现（与家族 T-13 先例一致）；memory 内部 `limit<=0=unbounded` 保留为库内防御并在 README 声明。
+- **G3.3 注册表 fail-fast**：`MemoryRegistry.provider(name)` 命名未命中由静默回退 first 改 throw（对齐 io/state-storage 注册表；grep 确认无调用方依赖旧回退）。
+- **G3.4 redact 覆盖扩展**：bearer 改 `i` 大小写不敏感 + `\s+` 空白宽容；inline 赋值模式支持下划线/连字符连接键（`auth_token=`/`client_secret=`/`access_token=`）——连接前缀 `[\w-]+[_\-]` 设计保持 `monkey=` 负例不误伤（node 实测样例钉住）。
+- **G4.7 JSON null 原始值防御**：skill-usage `skillNameFromToolCall` 与 review `collectReadSkillNames` 对 `JSON.parse('null')` 成功返回 null 的场景补非对象守卫（此前 `parsed.name` 抛 TypeError 击穿 E-65 防御）。
+- **G1.3 seam 类型单源**：`EvolutionIo` 从 core `EvolutionIoLike` 派生（`Omit<...,'transact'> & { name; transact 窄化 }`）——size/isSymlink/mtime 契约与 `this: void` 全部单源继承，唯一有意差异（transact task 宽度）注释说明；双向编译断言（seam⊆core + node provider⊆seam）；evolution-io 新增 core 依赖与 tsconfig 引用。
+- **G4.8 本地收敛（G7.1 前置）**：approval 包导出权威 `ApprovalPolicyLike` + `effectiveSessionPolicy`（单源）；tool-memory/tool-skill-manage 删除逐字节相同的本地副本改 import；approval 5 单测（override 优先/config 兜底/都无→'ask'）。
+- **G7.1 门禁生效**：arch-guards N1/N2 **零违规 + `--strict` 上线**（action.yml 调用加 `--strict`）；N2 豁免区随权威移动（core→approval）；本次顺带修补 N1 漏网（skill-usage 的 `DSH_HOME` 裸读——F-207 清单外、0.3.21 起就在的第三处）；N3 上线（warn-only 清单，28→25 项外部包 G3.1 TODO）、N4 上线（warn-only `?? ''`/`?? id` 死回退列示，67 处多为合法兜底）。
+- **回归**：全量 vitest **91 文件 / 593 测试**（+27）；oxlint 0/0（183 文件）；tsc 13 包 0；verify-dependency-closure 30 包 OK；arch-guards strict 干跑 0。
+- **未在此批收敛（顺延 0.3.24+）**：G3.1 剩余 25 处（activity/capability/curator/review/memory-files 数值字段）、G4 其余控制面、G5/G6。
+
 ## 0.3.22 (patch) — G2 数据完整性 + G3.2 解析单源 + G7.4 一致性基座（3 组）
 
 外部审计优化计划（optimization-plan-v3）第二批（批次 2：数据完整性）；每项先按报告行号核对现状再修，15 处核验全部属实后落地。

@@ -13,6 +13,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
 
 export interface ReplayPlan {
@@ -52,14 +53,30 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  maxPlans: z.number().default(50),
+  maxPlans: z.number().min(1).default(50),
   weights: z.object({
-    accepted: z.number().default(10),
-    rejectedPenalty: z.number().default(15),
-    evidence: z.number().default(2),
-    cost: z.number().default(0.001),
+    accepted: z.number().min(1).default(10),
+    rejectedPenalty: z.number().min(1).default(15),
+    evidence: z.number().min(1).default(2),
+    cost: z.number().min(0).default(0.001),
   }).default(DEFAULT_WEIGHTS),
 })
+
+/**
+ * Clamp a weights object to its per-field domain (G3.1). `accepted`,
+ * `rejectedPenalty` and `evidence` are positive multipliers (min 1 — a zero or
+ * negative weight would silently drop a scoring term or reverse its sign);
+ * `cost` may be 0 (0 means "no cost penalty"), so its min is 0. NaN, ±Infinity
+ * and out-of-range values fall back to the default for that field.
+ */
+export function clampReplayWeights(weights: ReplayWeights | undefined, fallback: ReplayWeights = DEFAULT_WEIGHTS): ReplayWeights {
+  return {
+    accepted: clampedNumber(weights?.accepted, fallback.accepted, { min: 1 }),
+    rejectedPenalty: clampedNumber(weights?.rejectedPenalty, fallback.rejectedPenalty, { min: 1 }),
+    evidence: clampedNumber(weights?.evidence, fallback.evidence, { min: 1 }),
+    cost: clampedNumber(weights?.cost, fallback.cost, { min: 0 }),
+  }
+}
 
 function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): number {
   return plan.acceptedOps * weights.accepted
@@ -94,9 +111,17 @@ export class EvolutionReplayDriver {
   private readonly maxPlans: number
   private readonly weights: ReplayWeights
 
-  constructor(config: Config = {}) {
-    this.maxPlans = config.maxPlans ?? 50
-    this.weights = config.weights ?? DEFAULT_WEIGHTS
+  constructor(config: Config = {}, warn: (message: string) => void = () => {}) {
+    // G3.1 (0.3.23): clamp maxPlans and weights. A 0/negative/NaN/±Infinity
+    // maxPlans would break the size bound; the weights clamp keeps every term
+    // in its valid domain. The schema `.min(1)` rejects 0/negative; these
+    // clamps also cover NaN/±Infinity (the number schema lets them through).
+    const maxPlans = clampedNumber(config.maxPlans ?? 50, 50, { min: 1 })
+    this.maxPlans = maxPlans
+    if (config.maxPlans !== undefined && maxPlans !== config.maxPlans) {
+      warn(`evolution-replay: maxPlans=${String(config.maxPlans)} is invalid; falling back to the default 50`)
+    }
+    this.weights = clampReplayWeights(config.weights)
   }
 
   record(plan: EvolutionPlanAppliedEvent): void {
@@ -127,7 +152,9 @@ export class EvolutionReplayDriver {
 export const name = 'evolution-replay'
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  const driver = new EvolutionReplayDriver(rawConfig)
+  const driver = new EvolutionReplayDriver(rawConfig, (message) => {
+    ctx.logger.warn(message)
+  })
   ctx.provide('evolutionReplay', driver)
   ctx.on('evolution/plan-applied', (event) => {
     driver.record(event)

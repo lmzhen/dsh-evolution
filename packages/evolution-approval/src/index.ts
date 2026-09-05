@@ -65,6 +65,24 @@ export type ApprovalLike = {
   reject(id: string): Promise<{ ok: boolean; message: string }>
 }
 
+/** 0.3.23 (G4.8): the ONE shape of the platform approval-policy probe that
+ * `effectiveSessionPolicy` reads. The model tools used to copy this view
+ * locally (F-341). */
+export interface ApprovalPolicyLike {
+  overrideOf(session: unknown): 'ask' | 'never' | undefined
+  config: { policy?: 'ask' | 'never' }
+}
+
+/** The requesting session's effective policy (override ?? configured default);
+ * undefined when the approval service is not mounted or no session is
+ * available — callers keep their previous behavior. Single source (G4.8,
+ * F-341): the model tools each copied this helper; it lives here now. */
+export function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 'never' | undefined {
+  const approval = ctx.get('approval') as ApprovalPolicyLike | undefined
+  if (!approval || session === undefined) return undefined
+  return approval.overrideOf(session) ?? approval.config.policy ?? 'ask'
+}
+
 interface EvolutionStateLike {
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>

@@ -13,6 +13,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
 
+// Compile-time satisfiability (G1.3, F-340): the node backend (with its
+// `name`) must satisfy the narrowed seam. A backend/seam drift fails `tsc`.
+const _nodeProviderIsSeam: EvolutionIo = { name: 'node', ...nodeEvolutionIo() }
+void _nodeProviderIsSeam
+
 export const name = 'evolution-io-node'
 export const inject = ['evolutionIo']
 

@@ -154,6 +154,25 @@ describe('skill-usage', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('F-203: JSON-null arguments do not throw and do not count as a read', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-null-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.ensureRecord('null-args-demo')
+    // `arguments` is the literal JSON value `null`: JSON.parse succeeds and
+    // yields null, which must not throw on `.name` access nor mint a view.
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: 'null' },
+    } as never)
+    await ctx.skillUsage.invalidate()
+    const seen = (await ctx.skillUsage.report()).get('null-args-demo')
+    expect(seen?.view_count).toBe(0)
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('E-70: ensureRecordCreated creates and marks authorship in one atomic write (0.3.18)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-usage-e70-'))
     const ctx = new Context()

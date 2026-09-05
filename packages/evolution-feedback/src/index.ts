@@ -17,7 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, evolutionRoot, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, evolutionRoot, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
@@ -421,15 +421,32 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  qualityWarnThreshold: z.number().default(-0.25),
+  qualityWarnThreshold: z.number().min(-1).max(1).default(-0.25),
   path: z.string().default(''),
 })
+
+/** Resolve the effective quality warn threshold, clamped to its [-1, 1] domain
+ * (G3.1). 0 and negative values are legal (a lower threshold is stricter); NaN,
+ * ±Infinity and out-of-range values fall back to the default -0.25. Exported so
+ * the clamp is directly testable; `apply` warns when a value was corrected. */
+export function resolveQualityWarnThreshold(config: Config): number {
+  return clampedNumber(config.qualityWarnThreshold ?? -0.25, -0.25, { min: -1, max: 1 })
+}
 
 interface SkillUsageLike {
   setQuality(name: string, score: number, warn: boolean): Promise<void>
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
+  // G3.1 (0.3.23): clamp the quality threshold to its [-1, 1] domain. A NaN or
+  // ±Infinity (which `z.number()` lets through) would make every `warn`
+  // comparison wrong; a value outside [-1, 1] is out of domain. 0 is valid
+  // (a neutral/lenient threshold) — only out-of-range/non-finite falls back.
+  const configuredThreshold = rawConfig.qualityWarnThreshold ?? -0.25
+  const qualityWarnThreshold = resolveQualityWarnThreshold(rawConfig)
+  if (qualityWarnThreshold !== configuredThreshold) {
+    ctx.logger.warn(`evolution-feedback: qualityWarnThreshold=${String(configuredThreshold)} is invalid; falling back to the default -0.25`)
+  }
   // Deferred binding (S6.4, tool-* pattern): the feedback service is provided
   // with no backend first; evolutionIo/skillUsage wire themselves once the
   // providers mount. Apply-time `ctx.get` probes were startup-order sensitive —
@@ -464,7 +481,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       baseRecord(target, rating, note, kind ?? 'session')
       if (kind === 'skill') {
         const score = feedback.score(target, 'skill')
-        const warn = score < (rawConfig.qualityWarnThreshold ?? -0.25)
+        const warn = score < qualityWarnThreshold
         void skillUsage.setQuality(target, score, warn).catch((error: unknown) => {
           skillCtx.logger.warn(error)
         })

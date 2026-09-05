@@ -15,10 +15,23 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
   ['gitlab token', /glpat-[A-Za-z0-9_-]{16,}/g],
   ['slack token', /xox[baprs]-[A-Za-z0-9-]{10,}/g],
   ['jwt', /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g],
-  ['bearer credential', /Bearer [A-Za-z0-9._~+/=\-]{16,}/g],
+  // F-335 (0.3.23): case-insensitive (`bearer`), and `\s+` so a tab or run of
+  // spaces between `Bearer` and the token is still masked (`Bearer\t...`).
+  ['bearer credential', /Bearer[\s]+[a-z0-9._~+/=\-]{16,}/gi],
 ]
 
-const INLINE_ASSIGNMENT_PATTERN = /(\b(?:token|api[_-]?key|secret|password|passwd)\b[\s]*[:=][\s]*["']?)([A-Z0-9._~+/=\-]{12,})/gi
+// F-335 (0.3.23): the older `\b(?:token|...)\b` missed connected keys such as
+// `auth_token=`, `client_secret=`, `access_token=` — `_` is a word char, so
+// `\btoken\b` found no boundary inside `auth_token`. The core word now accepts
+// a `[\w-]+[_\-]` prefix and a `[_\-][\w-]+` suffix, but a *bare* substring is
+// still not a key: `monkey=` stays untouched because its core would start at
+// `m`/`key`, and the prefix alternative needs a `_`/`-` separator (no match).
+// p1 (= label prefix incl. separator, quoted or not) is preserved verbatim.
+const INLINE_ASSIGNMENT_PATTERN = new RegExp(
+  '((?:\\b|[\\w-]+[_\\-])(?:token|api[_-]?key|secret|password|passwd)' +
+  '(?:[_\\-][\\w-]+)?\\b[\\s]*[:=][\\s]*["\']?)([A-Z0-9._~+/=\\-]{12,})',
+  'gi',
+)
 
 /**
  * Mask credential-shaped text before it crosses a session boundary.

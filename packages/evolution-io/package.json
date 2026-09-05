@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-io",
   "description": "IO seam for evolution providers",
-  "version": "0.3.22",
+  "version": "0.3.23",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,9 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"

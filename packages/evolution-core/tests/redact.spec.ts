@@ -21,6 +21,23 @@ describe('redactSecrets (E-1, 0.3.16)', () => {
     expect(redactSecrets('api_key = abcdEFGH12345678')).toBe('api_key = <redacted>')
   })
 
+  it('F-335: masks connected keys and case/whitespace bearer variants', () => {
+    // Connected keys (underscore/hyphen prefix or suffix) now match.
+    expect(redactSecrets('auth_token=abcdefghijklmnop')).toBe('auth_token=<redacted>')
+    expect(redactSecrets('client_secret=abcdefghijklmnop')).toBe('client_secret=<redacted>')
+    expect(redactSecrets('access_token=abcdefghijklmnop')).toBe('access_token=<redacted>')
+    expect(redactSecrets('token_id=abcdefghijklmnop')).toBe('token_id=<redacted>')
+    // Bearer is case-insensitive and tolerates tab / multiple spaces.
+    expect(redactSecrets('bearer abcdefghijklmnopqrstuv')).toBe('<redacted>')
+    expect(redactSecrets('Authorization: Bearer\tabcdefghijklmnopqrstuv')).toBe('Authorization: <redacted>')
+  })
+
+  it('F-335: a bare core-word substring is not a key (monkey= stays)', () => {
+    // `monkey` contains "key" but no `_`/`-` separator, so it must NOT be masked.
+    expect(redactSecrets('monkey=abcdefghijklmnop')).toBe('monkey=abcdefghijklmnop')
+    expect(redactSecrets('The monkey=abcdefghijklmnop was loud')).toBe('The monkey=abcdefghijklmnop was loud')
+  })
+
   it('leaves plain prose untouched', () => {
     const prose = 'The administrator left a note about the pipeline deadline.'
     expect(redactSecrets(prose)).toBe(prose)

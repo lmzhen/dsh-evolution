@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
+import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -67,24 +67,8 @@ export const MEMORY_TOOL_DESCRIPTION =
   + 'memory.'
 
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
-// authoritative consumer shape) instead of this local view.
-
-interface ApprovalPolicyLike {
-  overrideOf(session: unknown): 'ask' | 'never' | undefined
-  config: { policy?: 'ask' | 'never' }
-}
-
-/**
- * The requesting session's effective approval policy, mirroring
- * `dsh-user-approval` (override ?? configured default). Returns undefined when
- * the approval service is not mounted or no session is available — callers
- * keep their previous behavior.
- */
-function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 'never' | undefined {
-  const approval = ctx.get('approval') as ApprovalPolicyLike | undefined
-  if (!approval || session === undefined) return undefined
-  return approval.overrideOf(session) ?? approval.config.policy ?? 'ask'
-}
+// authoritative consumer shape) instead of this local view. 0.3.23 (G4.8,
+// F-341): effectiveSessionPolicy is imported there too — the local copy is gone.
 
 type MemoryAction = 'add' | 'replace' | 'remove'
 

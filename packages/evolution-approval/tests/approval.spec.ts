@@ -9,6 +9,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
 import EvolutionState from '@deepseek-ai/dsh-evolution-state'
 import EvolutionApproval from '../src/index.ts'
+import { effectiveSessionPolicy } from '../src/index.ts'
 
 describe('evolution-approval', () => {
   it('ignores a self-reported "never" when the platform service is mounted without a never stance (S3.1, E-22)', async () => {
@@ -225,6 +226,37 @@ describe('evolution-approval', () => {
     dispose()
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(false)
     await rm(home, { recursive: true, force: true })
+  })
+
+  describe('effectiveSessionPolicy (G4.8, F-341)', () => {
+    it('returns undefined when the platform approval service is not mounted', () => {
+      const ctx = new Context()
+      expect(effectiveSessionPolicy(ctx, {})).toBeUndefined()
+    })
+
+    it('returns undefined when no session is available even with the service mounted', () => {
+      const ctx = new Context()
+      ctx.provide('approval', { overrideOf: () => 'never', config: { policy: 'ask' } })
+      expect(effectiveSessionPolicy(ctx, undefined)).toBeUndefined()
+    })
+
+    it('lets the override win over the configured default', () => {
+      const ctx = new Context()
+      ctx.provide('approval', { overrideOf: () => 'never', config: { policy: 'ask' } })
+      expect(effectiveSessionPolicy(ctx, {})).toBe('never')
+    })
+
+    it('falls back to config.policy when the override is absent', () => {
+      const ctx = new Context()
+      ctx.provide('approval', { overrideOf: () => undefined, config: { policy: 'never' } })
+      expect(effectiveSessionPolicy(ctx, {})).toBe('never')
+    })
+
+    it('defaults to ask when neither override nor config policy is present', () => {
+      const ctx = new Context()
+      ctx.provide('approval', { overrideOf: () => undefined, config: {} })
+      expect(effectiveSessionPolicy(ctx, {})).toBe('ask')
+    })
   })
 
 })
