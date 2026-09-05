@@ -4,6 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createHash, randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -79,13 +80,8 @@ interface MemoryLike {
   applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
 }
 
-interface ApprovalLike {
-  request(input: { kind: 'memory' | 'skill'; summary: string; args: unknown; origin: WriteOrigin; sessionId?: string }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
-  run(kind: 'memory' | 'skill', args: unknown, intent?: { interface: 'background_review' }): Promise<{ ok: boolean; message: string }>
-  /** P1-9 pre-check surface: can this kind be replayed at all? */
-  hasRunner(kind: 'memory' | 'skill'): boolean
-  isEnabled?: boolean
-}
+// 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
+// authoritative consumer shape) instead of this local view.
 
 export function apply(ctx: Context, rawConfig: Config): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {

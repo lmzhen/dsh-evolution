@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.19 (patch) — audit 计划收尾（W1 契约单点化 + T-10 文档对齐 + D-10 死通道清理，4 组）
+
+外部审计计划的收尾批次；每步先核验问题属实再修。
+
+- **W1.2 ApprovalLike 权威化**：evolution-approval 新增导出权威 `ApprovalLike`（按公共方法面构造：request/run/hasRunner/registerRunner/list/approve/reject + 可选 isEnabled）；tool-memory、tool-skill-manage、evolution-review、evolution-commands、evolution-learning-graph 五处本地内联视图删除改 import（曾漂移：learning-graph 版漏 isEnabled、commands 版 status 联合更宽）——核验时发现第 5 处（learning-graph，0.3.18 E-26 新增）一并收敛；五包补 dependencies + tsconfig reference。
+- **W1.3 home 解析单点**：evolution-state-json 删除本地 `defaultRoot`（`??` 写法带 DSH_HOME 空串穿透缺陷），改 import core `evolutionHome()`（`||` 兜底单源）。
+- **D-10 AbortSignal 死通道清理**：evolution-io 的 `EvolutionIo` 与 memory 的 `MemoryProvider`/`MemoryRegistry` 删掉从未被任何调用方使用/转发的 `signal?` 参数（接口 6 处 + 实现 3 处；memory-files provider 同步收窄）；subagent 的 `AbortSignal.timeout`（review/maintain）不属死通道，保留。
+- **S7.4 文档与元数据对齐（T-10）**：evolution-activity README 重写为现实现（durable plan-outcome store；退役的 session projection 双注册说明已失实删除，补 maxItems 配置与单进程局限）；evolution-review README 更正（审核工具面 = `skill` 单工具，Hermes 谱系的 `skill_search/skill_load` 允许清单在本平台不存在）；evolution-approval README 更正 runner 注册方（tool-memory / tool-skill-manage，而非已退役的 core evolution 插件；与 0.3.18 E-70 的声明确认一致）；approval-precheck 测试标题与 review.spec 断言核对一致、test-support 头注释核对无失实（两项记录为已就绪）。
+- 回归验证：全量 vitest 80 文件/515 测试全绿；oxlint 0/0；tsc 涉改 14 包 0。（0.3.18 遗留说明：0.3.18 曾因 publish-scoped 默认 --tag next 进入 next tag；release.yml 已修复显式 --tag latest，本版起 latest 自动指向 0.3.19。）
+
 ## 0.3.18 (patch) — 审计 v13 修复批（阶段 4-6：工具面 + 后台通道 + 命令观测，31 组修复）
 
 外部审计（dsh-evolution-mirror-audit-report.md）的第三批落地（S4.1-S4.6、S5.1-S5.11、S6.1-S6.6 全量 + L7 批次），每步先核验问题属实再修。

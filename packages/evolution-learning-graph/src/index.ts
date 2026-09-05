@@ -9,6 +9,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
@@ -228,9 +229,8 @@ interface MemoryLike {
  * staged `args` use the skill_manage runner's shape so the runner tool-skill-
  * manage registers for `kind: 'skill'` replays them on approve.
  */
-interface ApprovalLike {
-  request(input: { kind: 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
-}
+// 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
+// authoritative consumer shape) instead of this local view.
 
 export const name = 'evolution-learning-graph'
 

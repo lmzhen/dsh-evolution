@@ -48,9 +48,9 @@ export interface MemorySnapshot {
 
 export interface MemoryProvider {
   readonly name: string
-  read(target: MemoryTarget, signal?: AbortSignal): Promise<string[]>
-  applyBatch(target: MemoryTarget, operations: MemoryOperation[], signal?: AbortSignal): Promise<MemoryApplyResult>
-  snapshot(signal?: AbortSignal): Promise<MemorySnapshot>
+  read(target: MemoryTarget): Promise<string[]>
+  applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult>
+  snapshot(): Promise<MemorySnapshot>
   renderContext(): Promise<string>
 }
 
@@ -85,12 +85,12 @@ export class MemoryRegistry extends Service {
     return first
   }
 
-  read(target: MemoryTarget, signal?: AbortSignal): Promise<string[]> {
-    return this.provider().read(target, signal)
+  read(target: MemoryTarget): Promise<string[]> {
+    return this.provider().read(target)
   }
 
-  async applyBatch(target: MemoryTarget, operations: MemoryOperation[], signal?: AbortSignal): Promise<MemoryApplyResult> {
-    const result = await this.provider().applyBatch(target, operations, signal)
+  async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
+    const result = await this.provider().applyBatch(target, operations)
     // P2 fix: every successful write refreshes whatever listens — the snapshot
     // subscriber (tool-memory) re-renders the model-visible context. This is
     // the single write sink, so bypass paths are covered without per-path fixes.
@@ -102,8 +102,8 @@ export class MemoryRegistry extends Service {
     return result
   }
 
-  snapshot(signal?: AbortSignal): Promise<MemorySnapshot> {
-    return this.provider().snapshot(signal)
+  snapshot(): Promise<MemorySnapshot> {
+    return this.provider().snapshot()
   }
 
   renderContext(): Promise<string> {

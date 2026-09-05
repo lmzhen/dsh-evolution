@@ -4,6 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
@@ -479,9 +480,5 @@ interface CommandInvocation {
   rawInput?: string
   agent: { inject(message: unknown): void }
 }
-
-interface ApprovalLike {
-  list(status: 'pending' | 'executing' | 'approved' | 'rejected'): Promise<Array<{ id: string; kind: string; summary: string; status?: string }>>
-  approve(id: string): Promise<{ ok: boolean; message: string }>
-  reject(id: string): Promise<{ ok: boolean; message: string }>
-}
+// 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
+// authoritative consumer shape) instead of this local view.

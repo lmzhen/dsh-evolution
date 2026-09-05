@@ -7,8 +7,8 @@ import { Context, Service } from '@deepseek-ai/cordis'
 
 export interface EvolutionIo {
   readonly name: string
-  readText(path: string, signal?: AbortSignal): Promise<string | null>
-  writeText(path: string, content: string, signal?: AbortSignal): Promise<void>
+  readText(path: string): Promise<string | null>
+  writeText(path: string, content: string): Promise<void>
   remove(path: string): Promise<void>
   list(path: string): Promise<string[]>
   exists(path: string): Promise<boolean>
@@ -19,7 +19,7 @@ export interface EvolutionIo {
    * bytes, or `null` when unknown (unsupported backend, missing file, stat
    * failure). An implementation without this probe gets no read guard.
    */
-  size?(path: string, signal?: AbortSignal): Promise<number | null>
+  size?(path: string): Promise<number | null>
   /**
    * Optional atomic read-modify-write (rc.50 P2-2): the read and the write run
    * inside a single cross-process lock so two processes sharing DSH_HOME

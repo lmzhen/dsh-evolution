@@ -9,9 +9,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { makeSerialQueue, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, makeSerialQueue, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { canClaimPending, canResolvePending, CLAIM_EXPIRY_MS, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 export const name = 'evolution-state-json'
@@ -25,12 +24,12 @@ export const Config: z<Config> = z.object({
   root: z.string().default(''),
 })
 
-function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.DSH_HOME ?? join(homedir(), '.dsh'), 'evolution')
-}
+// 0.3.19 (W1.3): the home path resolves via core evolutionHome() (single
+// source; also uses `||` so an EMPTY DSH_HOME falls back — the local
+// defaultRoot used `??` and inherited the E-74 empty-string hole).
 
 export function apply(ctx: Context, rawConfig: Config): void {
-  const root = rawConfig.root || defaultRoot()
+  const root = rawConfig.root || evolutionHome()
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
 

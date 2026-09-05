@@ -46,6 +46,23 @@ export interface ApprovalDecision {
   message: string
 }
 
+/** 0.3.19 (W1.2): the ONE consumer-facing shape of the approval seam. Every
+ * package that probes `ctx.get('evolutionApproval')` imports this instead of
+ * declaring a local sub-interface (previously 5 duplicated local views that
+ * drifted — the learning-graph one omitted isEnabled, commands' used a wider
+ * status union). Optional members stay optional: capabilities that need the
+ * fail-closed distinction read `isEnabled`, others may ignore it. */
+export type ApprovalLike = {
+  request(input: ApprovalRequest): Promise<ApprovalDecision>
+  run(kind: PendingKind, args: unknown, intent?: { interface: 'background_review' }): Promise<{ ok: boolean; message: string }>
+  hasRunner(kind: PendingKind): boolean
+  isEnabled?: boolean
+  registerRunner(kind: PendingKind, runner: WriteRunner): () => void
+  list(status?: PendingStatus): Promise<PendingRecord[]>
+  approve(id: string): Promise<{ ok: boolean; message: string }>
+  reject(id: string): Promise<{ ok: boolean; message: string }>
+}
+
 interface EvolutionStateLike {
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>

@@ -52,7 +52,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
   })
   const provider: MemoryProvider = {
     name: config.providerName,
-    read: (target, _signal) => store.read(target),
+    read: (target: MemoryTarget) => store.read(target),
     applyBatch: async (target: MemoryTarget, operations: MemoryOperation[]) => {
       const normalized = operations.map(op => ({ action: op.action, facts: op.facts ?? op.content, old_text: op.old_text }))
       return await serializedWrite(() => store.applyBatch(target, normalized))

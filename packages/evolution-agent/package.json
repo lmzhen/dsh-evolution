@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-agent-preset",
   "description": "Agent preset exposing memory and skill evolution tools to a session",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "publishConfig": {
     "access": "public"
   },

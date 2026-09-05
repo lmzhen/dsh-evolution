@@ -16,6 +16,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
@@ -52,10 +53,8 @@ export const Config: z<Config> = z.object({
   descriptionStrict: z.boolean().default(false),
 })
 
-interface ApprovalLike {
-  request(input: { kind: 'skill'; summary: string; args: unknown; origin: 'foreground' | 'background_review'; sessionPolicy?: 'ask' | 'never' }): Promise<{ action: 'allow' | 'staged'; pendingId?: string; message: string }>
-  registerRunner(kind: 'skill', runner: (args: unknown) => Promise<{ ok: boolean; message: string }>): () => void
-}
+// 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
+// authoritative consumer shape) instead of this local view.
 
 interface ApprovalPolicyLike {
   overrideOf(session: unknown): 'ask' | 'never' | undefined
