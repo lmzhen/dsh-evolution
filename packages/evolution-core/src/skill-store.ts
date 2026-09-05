@@ -1839,8 +1839,10 @@ export class SkillLibrary {
     // `startsWith('.')` skip, leaving a ghost record that disagrees with the
     // restored tree (E-15 self-heal could converge, but the intermediate state
     // is observable). Usage is derived data — the next curator run seeds
-    // empty records — so it is dropped with the tree; the mutation audit and
-    // the suppression state are real history and stay.
+    // empty records — so it is dropped with the tree; the mutation audit is
+    // real history and stays. `.curator-suppressed.json` is a co-snapshotted
+    // sidecar and comes back with the snapshot (a later suppression made after
+    // the snapshot is rolled back with it — the correct rollback semantics).
     for (const entry of rootEntries) {
       if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json') continue
       await this.io.remove(join(this.root, entry))
