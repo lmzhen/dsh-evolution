@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLearningGraph, graphDensity, memorySnapshotOf, parseGraphNodeId, readMemoryIndex, resolveGraphNode } from '../src/index.ts'
+import { buildLearningGraph, graphDensity, memorySnapshotOf, parseGraphNodeId, readMemoryIndex, renderNodeLine, resolveGraphNode } from '../src/index.ts'
 
 describe('learning graph', () => {
   it('links memory entries to skills by token overlap', () => {
@@ -139,6 +139,33 @@ describe('learning graph', () => {
 
     expect(graphDensity(buildLearningGraph(new Map(), [], []))).toEqual({ skillNodes: 0, relatedEdges: 0, edgesPerNode: 0, isolatedPct: 0 })
 
+  })
+  it('renders a skill line bare and a memory line with its copyable, parseable id (F-322)', () => {
+    // A skill's id is its name, so the bare line already addresses it — no id
+    // suffix needed (isolated skills are addressable by name alone).
+    expect(renderNodeLine({ id: 'python-testing', kind: 'skill', label: 'python-testing' })).toBe('● python-testing')
+    // A memory node line appends the full id (with its E-21 snapshot) so an
+    // isolated node is addressable; the exposed id round-trips through the
+    // parser the detail/edit/delete branches use.
+    const line = renderNodeLine({ id: 'memory:memory:0:abc12345', kind: 'memory', label: 'memory fact A' })
+    expect(line).toBe('◆ memory fact A  [id: memory:memory:0:abc12345]')
+    expect(parseGraphNodeId('memory:memory:0:abc12345')).toEqual({ kind: 'memory', source: 'memory', index: 0, snapshot: 'abc12345' })
+  })
+
+  it('addresses every memory node from its rendered line, including isolated nodes (F-322)', () => {
+    const usage = new Map([['python-testing', {}]])
+    // memory fact A links a memory_skill edge; user fact B is isolated (no
+    // edge) — its id must still be visible on the node line, not only on edges.
+    const graph = buildLearningGraph(usage, ['Project uses python-testing'], ['user fact B'])
+    const memoryNodes = graph.nodes.filter(node => node.kind === 'memory')
+    expect(memoryNodes.length).toBe(2)
+    for (const node of memoryNodes) {
+      const line = renderNodeLine(node)
+      expect(line).toContain(`[id: ${node.id}]`)
+      const parsed = parseGraphNodeId(node.id)
+      if (parsed === null) throw new Error(`memory node id ${node.id} did not round-trip`)
+      expect(parsed.kind).toBe('memory')
+    }
   })
 
 })

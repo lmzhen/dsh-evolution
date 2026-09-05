@@ -62,6 +62,25 @@ export function graphDensity(graph: LearningGraph): GraphDensity {
 }
 
 /**
+ * Render one node's display line for `/evolution graph`.
+ *
+ * A skill node's id IS its name, so `● <name>` already addresses it — an
+ * isolated skill (no edge) is addressable by name alone. A memory node's id
+ * is the `memory:<source>:<index>:<snapshot>` string `buildLearningGraph`
+ * emits, so the id is appended in brackets: an isolated memory node (no edge
+ * carrying its id) is otherwise unaddressable from the render. The full id is
+ * shown (not the bare `memory:<source>:<index>` prefix) so it matches the id
+ * form the edge lines render and so the trailing snapshot — the E-21 token the
+ * mutation commands use to reject a stale index — survives the copy/paste
+ * (F-322). A bare prefix would round-trip through `parseGraphNodeId` but would
+ * silently skip the E-21 drift guard in `readMemoryIndex`.
+ */
+export function renderNodeLine(node: GraphNode): string {
+  if (node.kind === 'skill') return '● ' + node.label
+  return '◆ ' + node.label + '  [id: ' + node.id + ']'
+}
+
+/**
  * Build a small deterministic graph from usage records and memory entries.
  * Memory node ids follow `memory:<source>:<index>` (source = memory|user,
  * index = position in that file's entries) — the SAME rule the parser
@@ -285,7 +304,7 @@ export function apply(ctx: Context): void {
             related.set(name, relatedSkillNames(content, name))
           }
           const graph = buildLearningGraph(usageMap, memoryEntries, userEntries, related)
-          const lines = graph.nodes.map(node => (node.kind === 'memory' ? '◆' : '●') + ' ' + node.label)
+          const lines = graph.nodes.map(node => renderNodeLine(node))
           const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
           const density = graphDensity(graph)
           const densityLine = `\n\nSkills: ${density.skillNodes} · related edges: ${density.relatedEdges} (${density.edgesPerNode}/node) · isolated: ${density.isolatedPct}%`

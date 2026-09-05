@@ -158,6 +158,57 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('reject on an executing record races an in-flight approve: audit stays honest, write still runs once (S3.3, F-204)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-race-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+
+    let executions = 0
+    let releaseRunner: (() => void) | undefined
+    // Gate the runner so a reject can interleave while it is "in flight".
+    const gate = new Promise<void>((resolve) => { releaseRunner = resolve })
+    ctx.evolutionApproval.registerRunner('memory', async () => {
+      executions += 1
+      await gate
+      return { ok: true, message: 'memory applied' }
+    })
+
+    const decision = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'race', args: { action: 'add', facts: 'x' }, origin: 'background_review',
+    })
+    const id = decision.pendingId!
+    // Start the approve runner (claims → 'executing', then blocks on the gate).
+    const approve = ctx.evolutionApproval.approve(id)
+    // Wait until the record is actually 'executing' so reject hits the
+    // executing-rescue path (the claim is held by the in-flight approve).
+    for (let i = 0; i < 500; i++) {
+      if ((await ctx.evolutionApproval.list('executing')).some(record => record.id === id)) break
+      await new Promise(resolve => setTimeout(resolve, 2))
+    }
+    // The operator rejects while the runner is still in flight.
+    const rejected = await ctx.evolutionApproval.reject(id)
+    expect(rejected.ok).toBe(true)
+    // The message is honest about the race window, not "crashed approve cleaned up".
+    expect(rejected.message).toContain('no claim held')
+    expect(rejected.message).toMatch(/verify the write state manually/i)
+    // Release the runner: the write completes AFTER reject already resolved it.
+    releaseRunner!()
+    const approved = await approve
+    expect(approved.ok).toBe(false) // the resolve is refused — already rejected
+    expect(approved.message).toContain('already resolved')
+    // The write ran exactly once (it did land even though the audit reads rejected).
+    expect(executions).toBe(1)
+    expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
+    expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('allows writes without staging when the session policy is never', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-never-'))
     const ctx = new Context()

@@ -83,6 +83,13 @@ interface MemoryLike {
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.
 
+// G4.5 (F-209): the evolution-state service is optional. When it is absent the
+// memory/skill cadence state is not persisted and every turn restarts from a
+// clean baseline — a silent "memory/skill review never adapts across turns".
+// Surface the loss ONCE per process (a per-turn warn on an intentionally
+// stateless deployment is noise).
+let statelessReviewStateWarned = false
+
 export function apply(ctx: Context, rawConfig: Config): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
@@ -152,6 +159,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
       loadReviewState(id: string): Promise<ReviewState | null>
       saveReviewState(id: string, record: ReviewState): Promise<void>
     } | undefined
+    if (!stateService && !statelessReviewStateWarned) {
+      statelessReviewStateWarned = true
+      ctx.logger.warn('dsh-evolution-review: evolution-state service not mounted — memory/skill review cadence is not persisted and resets every turn (see README Known Limitations).')
+    }
     const state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     const snapshot = policy()
     const kind = advanceReview(state, event.data.turn, signal, {
@@ -200,6 +211,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
+    agent.inject(createUserMessage({
+      content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
+      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },
+    }))
+    // G4.4 (F-334): emit the schedule confirmation only after the completion
+    // review inject actually dispatches (E-41 ordering: record-schedule once the
+    // review was truly sent, not before a dispatch that may fail).
     ctx.emit('evolution/review-scheduled', {
       sessionId: session.id,
       kind: 'skill',
@@ -207,10 +225,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
       userChars: signal.userChars,
       assistantChars: signal.assistantChars,
     })
-    agent.inject(createUserMessage({
-      content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
-      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },
-    }))
   }
 
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean> {
@@ -305,8 +319,30 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const actions = executed.actions
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
+        if (actions.length > 0) {
+          const applied = actions.join(' · ')
+          // E-59d: on partial failure the model must know which ops already
+          // landed so it does not repeat them; the applied list stays explicit.
+          const note = executed.ok ? '' : '\n部分操作失败。以下操作已应用，请勿重复执行。'
+          // G4.4 (F-334): the result-notice inject is NOT a review-failure — the
+          // plan already landed in memory/skill, so a notification error must not
+          // fall through to the outer "review failed" catch and flip started to
+          // false (which would re-trigger a review inject → double review). Log
+          // and continue; the durable plan-applied emit below still records the
+          // execution truth.
+          try {
+            agent.inject(createUserMessage({
+              content: [{ type: 'text', text: `💾 Self-improvement review: ${applied}${note}` }],
+              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
+            }))
+          } catch (injectError) {
+            ctx.logger.warn(`dsh-evolution-review: result notice inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+          }
+        }
         // Process event, payload v2 (sessionId) — plan-outcome durability is the
         // evolution-activity store's job; the session log stays native-only.
+        // Emitted AFTER the result-notice inject (E-41 ordering: record the
+        // outcome only once the model was told what landed).
         ctx.emit('evolution/plan-applied', {
           sessionId: session.id,
           planId: randomUUID(),
@@ -317,16 +353,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
           evidenceQuotes,
           estimatedInputChars: reviewText.length,
         })
-        if (actions.length > 0) {
-          const applied = actions.join(' · ')
-          // E-59d: on partial failure the model must know which ops already
-          // landed so it does not repeat them; the applied list stays explicit.
-          const note = executed.ok ? '' : '\n部分操作失败。以下操作已应用，请勿重复执行。'
-          agent.inject(createUserMessage({
-            content: [{ type: 'text', text: `💾 Self-improvement review: ${applied}${note}` }],
-            source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
-          }))
-        }
         return true
       } finally {
         // Dispose on EVERY exit (rc.42 audit P1-3): a timed-out / aborted run

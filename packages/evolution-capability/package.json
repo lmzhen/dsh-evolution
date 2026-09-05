@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-capability",
   "description": "Explicit staged governance adapter for Creator-mode capability packages",
-  "version": "0.3.23",
+  "version": "0.3.24",
   "publishConfig": {
     "access": "public"
   },

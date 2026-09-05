@@ -26,6 +26,8 @@ Independent of request-prefix construction. This package does not alter the asse
 - The review request text is redacted for credential-shaped patterns before it reaches the subagent, but redaction is pattern-based and best-effort, not a security boundary.
 - Read-before-write tracks only reads through the `skill` tool. `skill_manage` has no per-skill read action (`list`/`review` are whole-library, not targeted at one name), so a skill that was only listed via `skill_manage` is not marked as read — a background review may still reject a patch to it until it is actually loaded.
 - The completion-channel counters (`cumulativeToolCalls` / `completionInjected`) are in-memory only. A process restart resets them, which is accepted behavior: the completion review is a one-per-session post-task adaptation and a restart is treated as a fresh conversation boundary. The cadence state (`turnsSinceMemory` / `turnsSinceSkill`) is persisted via `ReviewState` and survives restart.
+- `evolution/review-scheduled` and `evolution/review-error` are emitted for platform/user wiring only — this family has no in-repo production `ctx.on` consumer for them. They are declared externally owned (the platform side wires consumption), which matches the `EXEMPT_ORPHANS` set in `scripts/verify-event-pairing.mjs`.
+- When the `evolution-state` service is not mounted, the memory/skill cadence state is not persisted and every turn restarts from a clean `{ turnsSinceMemory: 0, turnsSinceSkill: 0 }` baseline — the review schedule is stateless and re-decided each turn rather than accumulating across the conversation. The loss is surfaced once per process as a logger warning at the first turn/end.
 
 ## Configuration
 

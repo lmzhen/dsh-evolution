@@ -87,7 +87,12 @@ export function advanceReview(
     || signal.assistantChars >= config.substantiveMinAgentChars
   if (!signal.substantive) return null
 
-  state.turnsSinceMemory += signal.memorySignal ? 1 : 0
+  // Decision point 2 (0.3.24 G4.6): turnsSinceMemory is now ACTIVITY-weighted,
+  // symmetric with turnsSinceSkill below — a turn without a memory signal
+  // advances by the turn's tool-call count, so memory fires on accumulated
+  // work rather than raw turn count. The field name is kept for on-disk
+  // record compatibility; the semantic is documented here.
+  state.turnsSinceMemory += signal.memorySignal ? 1 : Math.max(1, signal.toolCalls)
   // P3 (v3 audit): turnsSinceSkill is an ACTIVITY-weighted counter — a turn
   // without a skill signal advances by the turn's tool-call count (so skills
   // fire on accumulated work, not turn count). The field name is kept for

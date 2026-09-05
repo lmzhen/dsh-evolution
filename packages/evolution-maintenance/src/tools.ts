@@ -32,7 +32,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // the service is reachable directly via `get`, so the context object never
     // needs to be re-shaped. Mirrors evolution-policy's tool-injection cast.
     const tools = toolCtx.get('tools') as { register(definition: unknown): () => void }
-    tools.register(
+    // G4.2 (F-210): bind the register disposer to this plugin's fiber so an HMR
+    // reload actually removes the tool. Mirrors evolution-policy's tools-guard
+    // effect (evolution-policy/index.ts:107).
+    toolCtx.effect(() => tools.register(
       defineTool({
         name: 'maintenance_probe',
         description:
@@ -80,6 +83,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return { ...probe, detail: redacted.split('\n') }
         },
       }),
-    )
+    ), 'evolution-maintenance.tools')
   })
 }

@@ -171,19 +171,72 @@ describe('evolution-review', () => {
     await vi.waitFor(() => { expect(injected).toHaveLength(1) })
     expect(scheduled).toEqual([])
   })
+
+  it('G4.5: warns once when the evolution-state service is absent (stateless cadence)', async () => {
+    const { ctx, emitEnd } = await mountReviewFixture({ noState: true })
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1)
+    await vi.waitFor(() => {
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('evolution-state service not mounted'))
+    })
+    warnSpy.mockRestore()
+  })
+
+  it('G4.4: a result-notice inject failure does not re-trigger a review (double-review)', async () => {
+    const onInjectCalls: string[] = []
+    const { ctx, emitEnd } = await mountReviewFixture({
+      onInject: () => { onInjectCalls.push('inject'); throw new Error('inject boom') },
+    })
+    const applied: string[] = []
+    const errors: string[] = []
+    ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
+    ctx.on('evolution/review-error', event => errors.push(event.sessionId))
+    ctx.provide('subagents', {
+      start: async () => ({
+        result: Promise.resolve({
+          structured: {
+            memoryOps: [{ target: 'memory', action: 'add', facts: 'G4.4-fact', evidence: [{ event_seq: 0 }] }],
+            skillOps: [],
+            summary: 'apply a memory op',
+          },
+        }),
+        dispose: async () => {},
+      }),
+    })
+    ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1)
+    // The plan applied (executePlan landed the memory op), so plan-applied is
+    // recorded even though the result-notice inject threw.
+    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
+    // The inject failure is NOT a review failure: no fallback review prompt was
+    // injected (single inject call = the result-notice attempt) and no
+    // review-error surfaced — the double-review window is closed.
+    expect(onInjectCalls).toHaveLength(1)
+    expect(errors).toEqual([])
+  })
 })
 
 /** Shared mounting: one fake session/agent registered, one turn/end emitter. */
-async function mountReviewFixture(options: { failState?: boolean; onInject?: (message: unknown) => void; skillArguments?: string } = {}) {
+async function mountReviewFixture(options: {
+  failState?: boolean
+  onInject?: (message: unknown) => void
+  skillArguments?: string
+  noState?: boolean
+} = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  ctx.provide('evolutionState', {
-    loadReviewState: async () => {
-      if (options.failState) throw new Error('state store boom')
-      return null
-    },
-    saveReviewState: async () => {},
-  })
+  if (!options.noState) {
+    ctx.provide('evolutionState', {
+      loadReviewState: async () => {
+        if (options.failState) throw new Error('state store boom')
+        return null
+      },
+      saveReviewState: async () => {},
+    })
+  }
   const session = {
     id: SessionId('e19-fixture-session'),
     // seq=1 ⇒ foldTurn starts at 0 and scans the tool/call below (substantive).

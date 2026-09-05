@@ -222,19 +222,27 @@ export class EvolutionApproval extends Service {
 
   async reject(id: string): Promise<{ ok: boolean; message: string }> {
     return await this.dedupe(`reject:${id}`, async () => {
-      // Reject claims the record like approve does, so it can never race an
-      // in-flight approve runner: the claim table is the single resolution gate.
+      // Reject claims the record like approve does, so a pending write resolves
+      // on a single gate (F-204). The executing-rescue branch below does NOT
+      // hold a claim: an 'executing' record may be an approve runner still in
+      // flight, and resolving it to 'rejected' without a claim can race that
+      // runner (the write may land after reject; the audit then reads
+      // rejected). This is a documented best-effort operator cleanup, not a
+      // second resolution gate.
       const claimId = randomUUID()
       const record = await this.state().claimPending(id, claimId)
       if (!record) {
         // 0.3.17 (S3.3): operator cleanup for a crashed approve — rejecting an
         // 'executing' record resolves it WITHOUT running any runner (the write
-        // may already have landed; approval never replays it).
+        // may already have landed; approval never replays it). This branch does
+        // NOT hold the claim (F-204): if the approve runner is genuinely still
+        // in flight, the reject can race it, so the message is honest about the
+        // write effect standing as-is.
         const stuck = (await this.state().listPending('executing')).find(item => item.id === id)
         if (stuck) {
           const resolution = await this.state().tryResolvePending(id, 'rejected')
           return resolution.applied
-            ? { ok: true, message: `Rejected executing write "${id}" (crashed approve cleaned up; verify the write state manually).` }
+            ? { ok: true, message: `Rejected executing write "${id}" (no claim held — this may race an in-flight approve runner; if the write already landed its effect stands as-is. Verify the write state manually).` }
             : { ok: false, message: `Pending write "${id}" could not be rejected: it resolved concurrently.` }
         }
         return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
@@ -280,7 +288,9 @@ export class EvolutionApproval extends Service {
       // resolving, or the record sits 'executing' (a previous approve may have
       // run then crashed). NEVER auto-replay an executing record: the write
       // may already have landed, and re-running it duplicates a non-idempotent
-      // operation.
+      // operation. Side effect (F-204): approve's stuck branch refuses WITHOUT
+      // claiming, while reject's executing-cleanup resolves WITHOUT a claim, so
+      // a concurrent reject can set an in-flight runner's record to 'rejected'.
       const stuck = (await this.state().listPending('executing')).find(item => item.id === id)
       if (stuck) {
         return { ok: false, message: `Pending write "${id}" is executing (a previous approve may have run before a crash). Verify its effect manually, then reject it — /evolution pending shows it as EXECUTING.` }

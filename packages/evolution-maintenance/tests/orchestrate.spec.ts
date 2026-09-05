@@ -264,6 +264,46 @@ describe('runMaintain', () => {
     // stays OUT of the static schema list while the validator enforces it.
     expect(planRequired).not.toContain('override_reason')
   })
+
+  it('disposes the subagent run on the success path (G4.1)', async () => {
+    let disposed = 0
+    const okRuntime: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start() {
+          return {
+            result: Promise.resolve({ text: 'x', structured: validResult }),
+            dispose: async () => { disposed += 1 },
+          }
+        },
+      },
+    }
+    const outcome = await runMaintain(okRuntime)
+    expect(outcome.ok).toBe(true)
+    expect(disposed).toBe(1)
+  })
+
+  it('warns on dispose failure without masking the success outcome (G4.1)', async () => {
+    const warns: string[] = []
+    const failingDisposeRuntime: MaintainRuntime = {
+      library: fakeLibrary(),
+      logger: { warn: (message: string) => { warns.push(message) } },
+      subagents: {
+        async start() {
+          return {
+            result: Promise.resolve({ text: 'x', structured: validResult }),
+            dispose: async () => { throw new Error('dispose boom') },
+          }
+        },
+      },
+    }
+    const outcome = await runMaintain(failingDisposeRuntime)
+    expect(outcome.ok).toBe(true)
+    expect(outcome.verdict).toBe('issues')
+    expect(warns).toHaveLength(1)
+    expect(warns[0] ?? '').toContain('dispose failed')
+    expect(warns[0] ?? '').toContain('dispose boom')
+  })
 })
 
 describe('renderMaintainTemplate', () => {

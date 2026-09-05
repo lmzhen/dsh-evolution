@@ -796,4 +796,45 @@ describe('evolution-commands', () => {
     expect(Commands.countMaintainRecommendations('no bullets here')).toBe(0)
   })
 
+  it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    const pendingRecord = {
+      id: 'a1', kind: 'skill' as const, status: 'pending' as const, summary: 'create demo',
+      args: { operation: { action: 'create', name: 'demo' }, content: 'x'.repeat(700) },
+      createdAt: '', origin: 'background_review',
+    }
+    const executingRecord = {
+      id: 'b2', kind: 'memory' as const, status: 'executing' as const, summary: 'remember',
+      args: { action: 'add', facts: 'user name ada' }, createdAt: '', origin: 'background_review',
+    }
+    ctx.provide('evolutionApproval', {
+      list: async (status?: string) => status === 'pending' ? [pendingRecord] : status === 'executing' ? [executingRecord] : [],
+    })
+    await ctx.plugin(Commands)
+    const detail = await captured!.handler({ rawInput: 'pending --detail' })
+    expect(detail.kind).toBe('success')
+    expect(detail.text).toContain('a1  skill  pending  create demo')
+    expect(detail.text).toContain('b2  memory  EXECUTING  remember')
+    expect(detail.text).toContain('staged args:')
+    const argsJson = JSON.stringify(pendingRecord.args)
+    // The staged args are rendered (truncated to 500 chars), so the operator
+    // can see what approve will actually replay rather than "blind-approving".
+    expect(detail.text).toContain(`a1  skill  pending  create demo\n  staged args: ${argsJson.slice(0, 500)}`)
+    // Truncation: the full args JSON is NOT rendered (only the 500-char prefix).
+    expect(detail.text).not.toContain(argsJson.slice(500))
+    // The default (collapsed) view is unchanged: no staged args, and the
+    // executing-status marker keeps its trailing-space form.
+    const bare = await captured!.handler({ rawInput: 'pending' })
+    expect(bare.kind).toBe('success')
+    expect(bare.text).toContain('a1  skill  create demo')
+    expect(bare.text).toContain('b2  memory  EXECUTING remember')
+    expect(bare.text).not.toContain('staged args:')
+  })
 })

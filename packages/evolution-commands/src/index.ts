@@ -63,19 +63,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        hint: 'pending | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | mutations | restore | consolidate <target> <sources...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout ms | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay',
+        hint: 'pending [--detail] | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | mutations | restore | consolidate <target> <sources...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout ms | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay',
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
-        if (input === 'pending') {
+        const pendingMatch = /^pending(?: --detail)?$/.exec(input)
+        if (pendingMatch) {
           // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
           // mid-run) stay visible — approve will refuse to re-run them.
           const pending = approval ? [...await approval.list('pending'), ...await approval.list('executing')] : []
           if (pending.length === 0) return ok('No pending evolution writes.')
-          const body = pending.map(p => `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}`).join('\n')
+          // F-328: `--detail` renders each record's staged args so an operator
+          // reviews what approve will actually replay (the summary alone is a
+          // 120-char label). The default (collapsed) view is unchanged.
+          const detailed = pendingMatch[0] === 'pending --detail'
+          const body = pending.map((p) => {
+            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}`
+            const status = p.status === 'executing' ? 'EXECUTING' : p.status
+            const line = `${p.id}  ${p.kind}  ${status}  ${p.summary}`
+            return p.args === undefined ? line : `${line}\n  staged args: ${safeStagedArgs(p.args)}`
+          }).join('\n')
           const hint = pending.some(p => p.status === 'executing')
             ? '\n(EXECUTING: a previous approve may have crashed after running; verify the write manually, then reject — approve will not re-run it)'
             : ''
@@ -285,7 +295,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const outcome = await runMaintain(
               // E-55 (0.3.18): same-source model routing — the maintain subagent
               // reads evolutionPolicy.get().curatorModel exactly like the curator.
-              { library, subagents, parent: invocation.agent, evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() } },
+              { library, subagents, parent: invocation.agent, evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() }, logger: { warn: (message: string) => { ctx.logger.warn(message) } } },
               {
                 timeoutMs: runTimeoutMs,
                 descriptions: () => enrichment.descriptions,
@@ -425,38 +435,85 @@ function resolveAgentPresetDir(importMetaUrl: string): string {
   }
 }
 
+/** F-211: the fs surface atomicWriteFiles uses — injectable so the commit-phase
+ * rename-failure path is deterministically testable. Defaults to node:fs. */
+interface FsOps {
+  writeFileSync(path: string, data: string | Uint8Array): void
+  existsSync(path: string): boolean
+  copyFileSync(from: string, to: string): void
+  renameSync(from: string, to: string): void
+  rmSync(path: string, options?: { force?: boolean; recursive?: boolean }): void
+}
+
+const defaultFs: FsOps = {
+  writeFileSync: (path, data) => { writeFileSync(path, data) },
+  existsSync: path => existsSync(path),
+  copyFileSync: (from, to) => { copyFileSync(from, to) },
+  renameSync: (from, to) => { renameSync(from, to) },
+  rmSync: (path, options) => { rmSync(path, options) },
+}
+
 /**
  * S6.3 (E-40): atomically replace a set of files within one directory.
  * Each file is staged to a sibling `<name>.tmp`, then renamed into place
  * (atomic on the same filesystem); a pre-existing file keeps a single
  * `<name>.bak`. A failure at ANY staging step removes the staged temps and
- * leaves the previous files untouched — a half-written target is impossible.
+ * leaves the previous files untouched — a half-written target is impossible
+ * up to the staging and backup phases.
+ *
+ * F-211: the rename COMMIT phase does not carry the same guarantee. When a
+ * filesystem refuses to overwrite the destination, the code removes it and
+ * retries the rename; if the retry ALSO fails the destination is gone. The
+ * single `.bak` created above still holds the previous content, so the target
+ * is restored from it (best-effort) before the original rename error is
+ * rethrown, so a failed commit never leaves the file missing.
  */
-function atomicWriteFiles(targetDir: string, writes: Array<{ name: string; content: string | Uint8Array }>): void {
+export function atomicWriteFiles(
+  targetDir: string,
+  writes: Array<{ name: string; content: string | Uint8Array }>,
+  fs: FsOps = defaultFs,
+): void {
   const stage = (name: string): string => join(targetDir, `${name}.tmp`)
   try {
-    for (const { name, content } of writes) writeFileSync(stage(name), content)
+    for (const { name, content } of writes) fs.writeFileSync(stage(name), content)
     for (const { name } of writes) {
       const finalPath = join(targetDir, name)
       const bakPath = join(targetDir, `${name}.bak`)
       // Back up the currently installed file once, so an interrupted commit can
       // fall back to the previous usable composition.
-      if (existsSync(finalPath) && !existsSync(bakPath)) copyFileSync(finalPath, bakPath)
+      if (fs.existsSync(finalPath) && !fs.existsSync(bakPath)) fs.copyFileSync(finalPath, bakPath)
     }
     for (const { name } of writes) {
       const finalPath = join(targetDir, name)
+      const bakPath = join(targetDir, `${name}.bak`)
+      const tmp = stage(name)
       try {
-        renameSync(stage(name), finalPath)
+        fs.renameSync(tmp, finalPath)
       } catch {
         // Some filesystems refuse to overwrite the destination; the single
         // .bak above already holds the previous file, so remove-then-rename is
         // safe here.
-        rmSync(finalPath, { force: true })
-        renameSync(stage(name), finalPath)
+        fs.rmSync(finalPath, { force: true })
+        try {
+          fs.renameSync(tmp, finalPath)
+        } catch (renameError) {
+          // F-211: the retry failed AFTER the target was removed — restore it
+          // from .bak before surfacing the error, so the file is not left
+          // missing. Best-effort: if the restore also fails, note that and
+          // throw the original rename error so the caller still knows why.
+          if (fs.existsSync(bakPath)) {
+            try {
+              fs.copyFileSync(bakPath, finalPath)
+            } catch {
+              throw new Error(`atomicWriteFiles: "${name}" was removed but recovery from ${bakPath} failed (${renameError instanceof Error ? renameError.message : String(renameError)}); verify the file manually`)
+            }
+          }
+          throw renameError
+        }
       }
     }
   } catch (error) {
-    for (const { name } of writes) rmSync(stage(name), { force: true, recursive: true })
+    for (const { name } of writes) fs.rmSync(stage(name), { force: true, recursive: true })
     throw error
   }
 }
@@ -483,3 +540,18 @@ interface CommandInvocation {
 }
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.
+
+/** F-328: render staged args for `pending --detail`, truncated to 500 chars.
+ * args may be non-JSON (a tool produced garbage), so the render is fail-safe. */
+function safeStagedArgs(args: unknown): string {
+  try {
+    // JSON.stringify's static type is `string`, so `.slice` is fine; a
+    // top-level undefined/function/symbol returns undefined at runtime and
+    // throws here, falling into the catch below.
+    return JSON.stringify(args).slice(0, 500)
+  } catch {
+    // args is not JSON-serializable (circular refs, BigInt, …) — render a stub
+    // so the pending surface never crashes on a malformed staged payload.
+    return '(unserializable)'
+  }
+}

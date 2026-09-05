@@ -29,12 +29,17 @@ import { validateAndNormalizeMaintainPlan, type ValidationResult } from './valid
 export interface MaintainRuntime {
   /** SkillLibrary-like reader for snapshot assembly. */
   library: SkillLibraryLike
-  /** Subagent spawner (platform `subagents` service — minimal shape for injection). */
+  /** Subagent spawner (platform `subagents` service — minimal shape for injection).
+   * `dispose` is optional: not every provider exposes it, so the run is only
+   * disposed when the platform provides the handle (rc.42 P1-3 parity with review). */
   subagents: {
-    start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }>
+    start(kind: string, options: unknown): Promise<{ result: Promise<unknown>; dispose?: () => Promise<void> }>
   }
   /** Parent agent/session handle passed through to the subagent, when available. */
   parent?: unknown
+  /** Optional logger for dispose-failure traces; when absent the failure is
+   * swallowed without surfacing (the orchestrator is a pure function). */
+  logger?: { warn(message: string): void } | undefined
   /** Evolution-policy reader for model routing (same source as the curator:
    * `policy.get().curatorModel`). Optional — a missing service falls back to
    * the default model (E-55). `get()` may RESOLVE to undefined (a soft probe
@@ -286,35 +291,49 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       },
     })
 
-    const runResult = (await run.result) as { structured?: unknown; stopReason?: string } | null | undefined
-    const raw = runResult?.structured
-    if (raw === undefined) {
-      // 0.3.8: a CANCELLED run settles by RESOLVING (driver readResult) with
-      // structured=undefined and stopReason="aborted" — distinguish that from
-      // "the model produced no structured plan" instead of reporting a bare
-      // error (evidence: command retry cancels the previous invocation, which
-      // surfaced as both "This operation was aborted" and the no-plan text).
-      if (runResult?.stopReason === 'aborted') {
-        return { ok: false, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
+    // G4.1 (F-102): dispose the subagent run on every exit path after a
+    // successful startup — success, the abort settle, the no-plan settle and
+    // the validator-rejected path all route through this finally. Aligns the
+    // maintain orchestrator with the review subagent's rc.42 P1-3 treatment.
+    try {
+      const runResult = (await run.result) as { structured?: unknown; stopReason?: string } | null | undefined
+      const raw = runResult?.structured
+      if (raw === undefined) {
+        // 0.3.8: a CANCELLED run settles by RESOLVING (driver readResult) with
+        // structured=undefined and stopReason="aborted" — distinguish that from
+        // "the model produced no structured plan" instead of reporting a bare
+        // error (evidence: command retry cancels the previous invocation, which
+        // surfaced as both "This operation was aborted" and the no-plan text).
+        if (runResult?.stopReason === 'aborted') {
+          return { ok: false, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
+        }
+        // Platform contract: the subagent channel wraps its output as
+        // `{ structured }` — a missing structured payload means no usable plan.
+        return { ok: false, error: 'Maintain subagent returned no structured plan (the model did not emit the structured plan, or the run ended without one) — retry; if it repeats, raise --timeout or check the model output shape.' }
       }
-      // Platform contract: the subagent channel wraps its output as
-      // `{ structured }` — a missing structured payload means no usable plan.
-      return { ok: false, error: 'Maintain subagent returned no structured plan (the model did not emit the structured plan, or the run ended without one) — retry; if it repeats, raise --timeout or check the model output shape.' }
-    }
-    const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
-    if (!validated.ok) {
+      const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
+      if (!validated.ok) {
+        return {
+          ok: false,
+          error: `Maintain plan rejected by validator: ${validated.errors.slice(0, 5).join('; ')}`,
+        }
+      }
+      const runId = randomUUID()
       return {
-        ok: false,
-        error: `Maintain plan rejected by validator: ${validated.errors.slice(0, 5).join('; ')}`,
+        ok: true,
+        runId,
+        verdict: validated.plan.verdict,
+        forcedHuman: validated.forcedHuman,
+        text: formatPlan(validated, runId),
       }
-    }
-    const runId = randomUUID()
-    return {
-      ok: true,
-      runId,
-      verdict: validated.plan.verdict,
-      forcedHuman: validated.forcedHuman,
-      text: formatPlan(validated, runId),
+    } finally {
+      // Dispose failures stay observable without masking the outcome that
+      // caused the exit (rc.42 P1-3 parity with the review subagent).
+      try {
+        await run.dispose?.()
+      } catch (disposeError) {
+        runtime.logger?.warn(`dsh-evolution-maintenance: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
+      }
     }
   } catch (error) {
     // 0.3.3/0.3.8/0.3.14: translate platform abort results instead of surfacing

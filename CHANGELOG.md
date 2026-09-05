@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.24 (patch) — G4 控制面 + G5.3/G5.4 命令面（批次 4，5 组）
+
+审计优化计划批次 4（控制面与命令面）；每项先按报告行号核对现状再修（12 项核验中 3 项已满足：G4.8 本地收敛已于 0.3.23 完成、G7.3 事件配对门禁已于 0.3.21 接入 CI、F-323 计数已行首锚定排除 notes）。
+
+- **G4.1 maintain 子代理 dispose 对齐 review**：runMaintain 的 subagents.start 返回类型加可选 `dispose?`；start 后全部 return/throw 路径 try/finally 统一 dispose，失败经 `logger?.warn` 留痕不遮主结果；commands 生产路径接入 logger（dispose 失败在生产可见）。
+- **G4.2 maintenance_probe disposer 绑定**：tools.register 经 `toolCtx.effect(..., 'evolution-maintenance.tools')` 绑定（HMR 卸载真移除——新测试证明 fiber dispose 后工具移除）。
+- **G4.4 review emit 时序与双审查窗口**：①结果通知 inject 独立 try/catch（失败不再误判整条 pipeline 失败→修复「计划落地后 fallback 再注入」的双重审查）；②plan-applied emit 移到结果通知之后（E-41 同类原则；inject 失败仍记录 plan-applied——计划确已落地）；③completion 通道的 review-scheduled 后移到完成注入之后。
+- **G4.5 review stateless 可观测性**：state 服务缺失时进程级一次性 warn（不每回合刷屏）+ README 已知限制声明。
+- **G4.6 memory 计数活动加权（决策点 2）**：advanceReview 的 memory 行对齐 skill 行——无 memory 信号回合按 toolCalls 推进（`signal.memorySignal ? 1 : Math.max(1, signal.toolCalls)`）；memoryInterval=10 下高活动会话的记忆评审节奏加快（预期）；新增 5 用例（纯活动触发/混合累积/重置/skill 对称）；activity/feedback 零回退。
+- **G4.3 reject executing 分支语义如实化**：注释与消息改为「best-effort 操作员清理、不持 claim、可能与在途 approve runner 竞争、写效果以实际为准」（不再误称 "crashed approve cleaned up"）；approval README 补并发 approve+reject 窗口声明；新增受控 gate 并发测试（executions==1、audit 如实）。
+- **G4.9 /evolution pending --detail**：`pending [--detail]` 渲染每条记录的 staged args（500 字符截断、fail-safe）；默认折叠视图不变；消除「盲批」。
+- **G4.10 挂空事件归属声明**：review README 声明 `review-scheduled`/`review-error` 为外部属主（宿主/平台消费方接线），与 verify-event-pairing 的 EXEMPT_ORPHANS 对齐（脚本注释与文档失配收口）。
+- **G5.3 atomicWriteFiles 提交段自愈**：二次 rename 失败后从 `.bak` 恢复被删目标（best-effort、恢复失败注明、抛原始错误）——失败提交不再留下缺失文件；函数导出 + fs 注入（rename 失败路径确定性单测 2 用例）。
+- **G5.4 /graph 节点可寻址**：memory 节点行渲染完整 id 含 snapshot token（`[id: memory:<source>:<index>:<8hex>]`）——copy/paste 保留 E-21 漂移守卫（裸前缀会静默跳过）；新增 2 用例（渲染形态 + 往返）。
+- **回归**：全量 vitest **94 文件 / 609 测试**（+16）；oxlint 0/0（186 文件）；tsc 6 包 0；arch-guards strict 0（N1/N2 零违规；N3 25 项 G3.1 TODO warn-only 不变）；commands logger 接线后 tsc 复验。
+- **未在此批收敛（顺延 0.3.25+）**：G3.1 剩余 25 处数值钳制、G5 其余（preset 行集/碰撞契约/tsconfig 治理/zod 别名）、G6 清扫、G7.2 文档化；F-328 完整 hash 方案（需放宽 PendingRecord 共享契约）。
+
 ## 0.3.23 (patch) — G3 配置治理 + G4.7 + G1.3 seam 单源 + G7.1 门禁生效（4 组）
 
 审计优化计划批次 3（配置治理）；每项先按报告行号核对现状再修（14 项核验中 1 项部分属实——F-340 的 `this: void` 两边已一致，transact 宽度与 size 文档措辞为真实漂移）。
