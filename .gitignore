@@ -8,3 +8,5 @@ src/**/*.map
 
 dist/
 packages/dist/
+packages/.release-staging/
+packages/docs/
