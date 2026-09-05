@@ -5,7 +5,9 @@
  * Hermes-style staged queue: background review/curator writes are stored in
  * `ctx.evolutionState`, and a human approves or rejects them later. A runner
  * registry replays the exact mutation without passing through the gate a
- * second time. Resolved records are KEPT as audit history.
+ * second time. Resolved records are kept as audit history up to
+ * PENDING_RESOLVED_CAP (the most recent N; the state provider archives the
+ * older ones to pending-state-archive.json).
  *
  * @module @deepseek-ai/dsh-evolution-approval
  */

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.22 (patch) — G2 数据完整性 + G3.2 解析单源 + G7.4 一致性基座（3 组）
+
+外部审计优化计划（optimization-plan-v3）第二批（批次 2：数据完整性）；每项先按报告行号核对现状再修，15 处核验全部属实后落地。
+
+- **G2.1 transactCuratorState null=keep 统一**：seam 文档与 json 实现统一为「task 返回 null = 保留原记录」（与 domain 原语能力一致；生产调用方从不依赖 null=delete，json 曾删 primary 是唯一分歧点）；json/domain 两 provider 补直接测试（missing-key 种子 / null 入参 / 覆盖）。
+- **G2.2 state-json 形状门**：readJson 与 jsonTransact 的 parse 后加每文件顶层形状校验（review-state/curator-state/pending-state/pending 的 map-of-record 结构），合法 JSON 但错误形状（`[]`/`42`/`"str"`）走既有 quarantine（原字节备份 + throw）——不再被当空状态无备份覆盖；归档侧车（数组）显式豁免。
+- **G2.3 domain pendingSchema 补齐**：加 `origin`/`sessionId` 可选字段——zod 默认 strip 曾把审计归因字段在 domain 后端静默剥离；补「写→重开→读回字段保留」往返测试。
+- **G2.4 MemoryStore 分隔符防御**：add/applyBatchCore（add+replace 分支）拒绝含 `ENTRY_DELIMITER`（`\n§\n`）或尾 `\n§` 片段的 facts（明确错误消息含操作+position）——根治「末尾 § 砖化永久 drift」与「中部 § 静默裂分」两种形态。
+- **G2.5 SkillLibrary 事务化**：构造加可选 `transact` 注入（默认旧行为，向后兼容零改动）+ 私有 `makeSerialQueue` 串行链——update/patch/restructure/writeSupportFile 的整段 read→validate→write 进程内串行、单文件写在注入时走跨进程 transactIo；create/archive/consolidate 保留既有两阶段提交；README 补并发模型声明（进程内串行 + 跨进程锁 + 多写面 last-writer-wins）。
+- **G2.6 审计哈希同源**：create/update/patch 把落盘字节（`trimEnd()+'\n'`）算一次作为 onDisk，writeText 与 audit 同源——审计 afterHash 与磁盘实际字节一致（可 reviewable/replayable）。
+- **G2.7 审批存储治理**：pending-state.json 的 resolved 记录 cap 200 + 归档轮转（最老记录移入 `pending-state-archive.json`，best-effort 永不 fail resolve；只裁 approved/rejected）；approval 注释同步修订「KEPT as audit history」承诺；domain releasePendingClaim 的 missing-key 对齐 json 的 no-op 语义（良性/恶性区分与 claim/tryResolve 一致）。
+- **G2.8 事件日志 version 校验**：读取端 v1-only——非 v1 读作空且不被误解析；appendEvolutionEvent 对非 v1 body 拒绝重写（保留原字节），版本不匹配消息与 malformed 区分。
+- **G3.2 解析单源收尾**：core 新增 `evolutionRoot()`（`||` 空串回退单源；`evolutionHome()` 改由它派生——弃 `dirname(evolutionHome())` 派生的「DSH_HOME 恰以 evolution 结尾剥真实后缀」陷阱）；feedback×2 与 commands×3 的 `DSH_HOME ?? homedir()` 全部替换；commands×3 的 `new SkillLibrary(config.skillsRoot, …)` → `resolveSkillsRoot({ root: config.skillsRoot })`（空串/空白配置不再落到 CWD 相对根）。
+- **G7.4 跨 provider 一致性基座**：test-support 新增 `runStateProviderConsistency(provider)`（review 往返 / claim→resolve / claim→release / transactCuratorState null 入参 / listPending 状态过滤——时间戳字段剔除比较）；json 与 domain 各调用一次。
+- **回归**：全量 vitest **90 文件 / 566 测试**（+43：core 225 / provider 46 / consumer 108 等）；oxlint 0/0（181 文件）；tsc 7 包 0（含修复 G3.2 引入的 exactOptionalPropertyTypes 真 bug——`resolveSkillsRoot` 参数显式 `| undefined`）；策划/审批零回退。
+- **未在此批收敛（顺延 0.3.23+）**：G3 其余（数值钳制管道/注册表 fail-fast/redact 扩展）、G4 控制面、G5/G6、arch-guards 翻 strict。
+
 ## 0.3.21 (patch) — G0 发布工程 + G1 锁协议 v2 + G7 门禁（3 组）
 
 外部审计优化计划（audit-report-v3 / optimization-plan-v3）的首批落地；每项先按报告行号核对现状再修，修复后逐条交叉验证。

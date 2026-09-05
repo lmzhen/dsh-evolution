@@ -85,6 +85,13 @@ function isEventRecord(event: unknown): event is EvolutionEvent {
  * rebuildable, NOT malformed) or a corrupt one reads as empty; corrupt content
  * is still refused on append, never overwritten.
  *
+ * This reader is **v1-only** (F-338): a body carrying a `version` other than
+ * `EVENT_LOG_VERSION` is a future-format log this reader cannot interpret, so
+ * it reads as an EMPTY timeline rather than being mis-parsed as v1. The read
+ * side never overwrites it on its own — `appendEvolutionEvent` rejects a
+ * version mismatch up front and preserves the original bytes, so a newer log
+ * is never silently downgraded here.
+ *
  * Per-entry normalization (rc.70 F-1): entries without a numeric `seq` are
  * skipped here and dropped at the next append — valid entries survive, the
  * damaged record is the only loss (self-heal semantics, matching the usage
@@ -94,6 +101,10 @@ export function parseEvolutionEvents(raw: string | null): EvolutionEvent[] {
   if (raw === null || raw.trim() === '') return []
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
+    // v1-only reader: an explicit non-current version is a future format (or a
+    // corrupt version field) and must not be shaped as v1. A missing `version`
+    // is tolerated as legacy v1.
+    if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return []
     if (!Array.isArray(parsed.events)) return []
     return parsed.events.filter(isEventRecord)
   } catch {
@@ -139,11 +150,25 @@ export async function listEventArchives(io: EvolutionIoLike, path: string): Prom
  */
 export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, event: Omit<EvolutionEvent, 'seq' | 'at'>, rotateAt = EVENT_LOG_ROTATE_AT): Promise<number> {
   let assigned = 0
+  // Empty when the append was refused as malformed; set when it was refused
+  // because the log carries a future `version` (F-338). Kept as a prebuilt
+  // message so a closure-side assignment is never narrowed to `never` by the
+  // outer control flow.
+  let refuseMessage = ''
   await transactIo(io, path, async (current) => {
     // rc.69: a whitespace-only log (crash residue) is rebuildable — treat it
     // as missing; a genuinely corrupt body is still refused.
     if (current !== null && current.trim() !== '') {
-      try { JSON.parse(current) } catch { return current }
+      let shape: { version?: unknown }
+      try { shape = JSON.parse(current) as { version?: unknown } } catch { return current }
+      // F-338: a non-v1 body is a FUTURE format. This v1 writer must never
+      // rewrite it back down to v1 — refuse and keep the original bytes. (The
+      // reader treats it as an empty timeline; only the append refuses.)
+      if (shape.version !== undefined && shape.version !== EVENT_LOG_VERSION) {
+        const found = typeof shape.version === 'number' || typeof shape.version === 'string' ? String(shape.version) : 'unknown'
+        refuseMessage = `evolution event log version mismatch (found ${found}, expected ${EVENT_LOG_VERSION}) and was not touched`
+        return current
+      }
     }
     const events = parseEvolutionEvents(current)
     const nextEvents = await rotateIfDue(io, path, events, rotateAt)
@@ -160,7 +185,9 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
     assigned = record.seq
     return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...nextEvents, record] }, null, 2)
   })
-  if (assigned === 0) throw new Error(`evolution event log is malformed and was not touched: ${path}`)
+  if (assigned === 0) {
+    throw new Error(`${refuseMessage || 'evolution event log is malformed and was not touched'}: ${path}`)
+  }
   return assigned
 }
 
@@ -213,7 +240,10 @@ export interface EventLogRead {
 }
 
 /** Read the event log; a missing/whitespace-only file reads as empty,
- * corrupt content is flagged (and refused on append). */
+ * corrupt content is flagged (and refused on append). A well-formed future-
+ * version body is v1-incompatible and reads as empty, NOT malformed (F-338:
+ * the reader must never mis-shape a newer format; the append path refuses it
+ * up front so the original bytes survive). */
 export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Promise<EventLogRead> {
   let raw: string | null
   try {
@@ -224,6 +254,10 @@ export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Pr
   if (raw === null || raw.trim() === '') return { events: [], malformed: false }
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
+    // v1-only reader (F-338): a non-current `version` is a future format that
+    // must not be shaped as v1. Reads as empty (replaceable in principle) but
+    // the append path rejects it before writing, so nothing is overwritten.
+    if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return { events: [], malformed: false }
     // Shape damage is replaceable garbage (read as empty, rebuilt on append);
     // only syntax-level damage is "malformed" (never overwritten).
     if (!Array.isArray(parsed.events)) return { events: [], malformed: false }

@@ -177,6 +177,45 @@ describe('fuzzy patch P0-5 guards', () => {
     expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe('header\n  baz qux\nfooter\n')
   })
 
+  it('F-317: an indented-anchor identity replacement is a no-op, not "no match"', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    const content = 'header\n  foo bar\nfooter\n'
+    const file = await setupSkill(lib, content)
+    const before = await io.readText(`/skills/fuzz-skill/${file}`)
+    // The model cites the line with MORE leading indent than the file, so the
+    // exact path misses and the boundary-trim stage matches. The replacement
+    // equals the trimmed boundary (identity) — this used to be reported as
+    // "Could not find old_string"; it must be a no-op instead.
+    const result = await lib.patch('fuzz-skill', '    foo bar\n', 'foo bar', file, false, 'background_review')
+    expect(result.ok).toBe(true)
+    expect(result.noop).toBe(true)
+    expect(result.message).toContain('unchanged')
+    expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe(before)
+  })
+
+  it('F-318 (①): a genuinely-missing old_string is still reported as "no match"', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    const file = await setupSkill(lib, 'header\n  foo bar\nfooter\n')
+    const result = await lib.patch('fuzz-skill', '    totally absent text\n', 'x', file, false, 'background_review')
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('Could not find old_string')
+  })
+
+  it('F-318 (①): an identical patch on a file without a trailing newline keeps its bytes', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    const content = 'no trailing newline content'
+    const file = await setupSkill(lib, content)
+    const before = await io.readText(`/skills/fuzz-skill/${file}`)
+    const result = await lib.patch('fuzz-skill', 'trailing newline', 'trailing newline', file, false, 'background_review')
+    expect(result.ok).toBe(true)
+    expect(result.noop).toBe(true)
+    // The legacy file is left byte-identical (no trailing-newline rewrite).
+    expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe(before)
+  })
+
   it('random fuzz never throws and patches only the matched span', async () => {
     const rnd = mulberry32(0xC0FFEE)
     for (let round = 0; round < 500; round += 1) {
@@ -200,7 +239,14 @@ describe('fuzzy patch P0-5 guards', () => {
       expect(result.ok).toBe(true)
       const readBack = await io.readText(`/skills/fuzz-skill/${file}`)
       const expected = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
-      expect(readBack).toBe(expected.trimEnd() + '\n')
+      // E-68 / F-318 (①): an identity replacement (newString === oldString) is
+      // a no-op — the file keeps its ORIGINAL bytes (no trailing-newline
+      // normalization). Otherwise the write normalizes to trimEnd()+'\n'.
+      if (result.noop) {
+        expect(readBack).toBe(content)
+      } else {
+        expect(readBack).toBe(expected.trimEnd() + '\n')
+      }
     }
   })
 

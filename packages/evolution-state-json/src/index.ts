@@ -28,6 +28,22 @@ export const Config: z<Config> = z.object({
 // source; also uses `||` so an EMPTY DSH_HOME falls back — the local
 // defaultRoot used `??` and inherited the E-74 empty-string hole).
 
+/** 0.3.22 (F-336): resolved (approved/rejected) audit records are capped in
+ * the LIVE pending map so a long-running deployment never grows it without
+ * bound; the oldest over the cap are archived (made package-private so the
+ * archive sidecar and the provider enforce one number). */
+const PENDING_RESOLVED_CAP = 200
+
+/** 0.3.22 (F-215): a record-map state file must parse to a non-null plain
+ * object (a map of records) — valid JSON that is `null`/array/scalar is a
+ * corrupt map that used to read as "empty" and was silently overwritten by
+ * the next save. Only these four files are record maps; the archive sidecar
+ * is a top-level ARRAY and must NOT be gated by this predicate. */
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const RECORD_MAP_FILES = new Set(['review-state.json', 'curator-state.json', 'pending-state.json', 'pending.json'])
+
 export function apply(ctx: Context, rawConfig: Config): void {
   const root = rawConfig.root || evolutionHome()
   const io = () => ctx.evolutionIo.provider()
@@ -48,7 +64,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
     if (raw === null) return null
-    try { return JSON.parse(raw) as T } catch (error) {
+    try {
+      const parsed = JSON.parse(raw) as T
+      // 0.3.22 (F-215): a valid JSON that is the wrong top-level shape is a
+      // corrupt record map, not "empty" — fail loud so the operator notices
+      // instead of the next save silently wiping every other record.
+      if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
+        const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
+        return await quarantine(file, raw, `expected a plain JSON object (map of records), got ${kind}`)
+      }
+      return parsed
+    } catch (error) {
       return await quarantine(file, raw, error instanceof Error ? error.message : String(error))
     }
   }
@@ -64,7 +90,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
     await transactIo(ctx.evolutionIo.provider(), pathOf(file), async (current) => {
       let parsed: T | null = null
       if (current !== null) {
-        try { parsed = JSON.parse(current) as T } catch (error) {
+        try {
+          parsed = JSON.parse(current) as T
+          if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
+            const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
+            return await quarantine(file, current, `expected a plain JSON object (map of records), got ${kind}`)
+          }
+        } catch (error) {
           return await quarantine(file, current, error instanceof Error ? error.message : String(error))
         }
       }
@@ -91,6 +123,55 @@ export function apply(ctx: Context, rawConfig: Config): void {
       readJson<Record<string, PendingRecord>>('pending.json'),
     ])
     return { ...(legacy ?? {}), ...(current ?? {}) }
+  }
+
+  /** 0.3.22 (F-336): when the live pending map holds more than
+   * `PENDING_RESOLVED_CAP` resolved records, drop the oldest (by resolvedAt,
+   * then insertion order on ties) from the map and return them for archiving.
+   * Only approved/rejected records are candidates — pending/executing are
+   * live work and are never trimmed. Returns the pruned map (rather than
+   * mutating in place) plus the evicted records. */
+  function enforceResolvedCap(map: Record<string, PendingRecord>): { map: Record<string, PendingRecord>; evicted: PendingRecord[] } {
+    const resolved = Object.values(map).filter(record => record.status === 'approved' || record.status === 'rejected')
+    if (resolved.length <= PENDING_RESOLVED_CAP) return { map, evicted: [] }
+    const overflow = resolved.length - PENDING_RESOLVED_CAP
+    const oldest = resolved
+      .sort((a, b) => {
+        const at = a.resolvedAt ? Date.parse(a.resolvedAt) : Number.MAX_SAFE_INTEGER
+        const bt = b.resolvedAt ? Date.parse(b.resolvedAt) : Number.MAX_SAFE_INTEGER
+        return at - bt
+      })
+      .slice(0, overflow)
+    const evictIds = new Set(oldest.map(record => record.id))
+    const kept: Record<string, PendingRecord> = {}
+    for (const [key, value] of Object.entries(map)) {
+      if (!evictIds.has(key)) kept[key] = value
+    }
+    return { map: kept, evicted: oldest }
+  }
+
+  /** 0.3.22 (F-336): append evicted resolved records to an audit sidecar
+   * (top-level array, oldest-first). This is a best-effort audit aid: a
+   * corrupt/unreadable archive is skipped and an archive write failure must
+   * NEVER fail the resolve that triggered it — the live map is already
+   * trimmed, so the audit copy is allowed to fall behind. */
+  async function appendArchive(records: PendingRecord[]): Promise<void> {
+    try {
+      await transactIo(io(), pathOf('pending-state-archive.json'), (current) => {
+        let archive: unknown[] = []
+        if (current !== null) {
+          try {
+            const parsed = JSON.parse(current) as unknown
+            if (Array.isArray(parsed)) archive = parsed
+          } catch {
+            // unrecoverable archive — best-effort: start fresh
+          }
+        }
+        return JSON.stringify([...archive, ...records], null, 2)
+      })
+    } catch {
+      // Audit aid only: never let an archive write failure surface as a resolve failure.
+    }
   }
 
   const provider: EvolutionStateStorage = {
@@ -125,11 +206,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async transactCuratorState(task) {
       await mutate(async () => {
         await jsonTransact<Record<string, CuratorStateRecord>>('curator-state.json', (current) => {
+          // 0.3.22 (F-202): null = keep the current record unchanged (the
+          // domain update primitive cannot delete; json aligns). The record
+          // is ADD-only via the seam — a truly deletable empty is expressed
+          // by `current` being null, which jsonTransact turns into "no file".
           const next = task(current?.primary ?? null)
-          if (next === null) {
-            if (current !== null) delete current.primary
-            return current ?? {}
-          }
+          if (next === null) return current
           return { ...(current ?? {}), primary: next }
         })
       })
@@ -197,6 +279,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async tryResolvePending(id, status): Promise<PendingResolution> {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
+        let evicted: PendingRecord[] = []
         await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
@@ -211,8 +294,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
           const resolved = { ...record, status, resolvedAt: new Date().toISOString() }
           map[id] = resolved
           result = { record: resolved, applied: true }
-          return map
+          // 0.3.22 (F-336): after the write-back, keep the LIVE map bounded by
+          // archiving the oldest resolved records above the cap.
+          const pruned = enforceResolvedCap(map)
+          evicted = pruned.evicted
+          return pruned.map
         })
+        if (evicted.length > 0) await appendArchive(evicted)
         return result
       })
     },

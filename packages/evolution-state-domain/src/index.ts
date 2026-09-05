@@ -44,6 +44,11 @@ export const pendingSchema = z.object({
   resolvedAt: z.string().optional(),
   claimedBy: z.string().optional(),
   claimedAt: z.string().optional(),
+  // 0.3.22 (F-214): origin/sessionId were missing, so zod's default strip
+  // dropped them on the domain read path — a resolved audit record reopened
+  // from the medium lost its attribution. Added so the round-trip keeps them.
+  origin: z.string().optional(),
+  sessionId: z.string().optional(),
 })
 
 export const EVOLUTION_DOMAIN = defineDomain({
@@ -177,14 +182,22 @@ export function apply(ctx: Context): void {
 
     async releasePendingClaim(id, claimId) {
       const table = (await ensure()).table('pending')
-      await table.update(id, (current) => {
-        if (current.status !== 'pending' && current.status !== 'executing') return current
-        if (current.claimedBy !== claimId) return current
-        const released = { ...current, status: releasedStatus(current.status) }
-        delete released.claimedBy
-        delete released.claimedAt
-        return released
-      })
+      try {
+        await table.update(id, (current) => {
+          if (current.status !== 'pending' && current.status !== 'executing') return current
+          if (current.claimedBy !== claimId) return current
+          const released = { ...current, status: releasedStatus(current.status) }
+          delete released.claimedBy
+          delete released.claimedAt
+          return released
+        })
+      } catch (error: unknown) {
+        // 0.3.22 (F-332): release is a no-op on a record that never existed,
+        // matching the json provider (and the claimPending/tryResolvePending
+        // benign-vs-malign split); a closed/backend error still surfaces.
+        if (error instanceof DomainError && error.code === 'missing-key') return
+        throw error
+      }
     },
 
     async tryResolvePending(id, status): Promise<PendingResolution> {

@@ -6,11 +6,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -18,7 +17,9 @@ export const name = 'evolution-commands'
 
 export interface Config {
   /** Skill-tree root for maintain/restructure; empty uses skillsRoot().
-   * Align with tool-skill-manage/skill-usage/evolution-skill-catalog rows (A7). */
+   * Align with tool-skill-manage/skill-usage/evolution-skill-catalog rows (A7).
+   * 0.3.22 (G3.2, F-342): resolved through resolveSkillsRoot() so an empty/
+   * whitespace value falls back to the default instead of a CWD-relative root. */
   skillsRoot?: string | undefined
   /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
    * secondary calls inside the window return the previous runId instead of
@@ -218,7 +219,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const registry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           const eventIo = registry?.provider()
           if (eventIo) {
-            const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+            const home = evolutionRoot()
             void appendEvolutionEvent(eventIo, eventsFile(home), { type: 'learn', source: 'manual', ...(request ? { request } : {}) }).catch((error: unknown) => {
               ctx.logger.warn(`evolution-commands: failed to record learn event: ${String(error)}`)
             })
@@ -230,7 +231,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // no subagent call, no cooldown (the cooldown guards LLM calls).
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
-          const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
           const enrichment = await buildEnrichment(ctx, library)
           const snapshots = await snapshotFromLibrary(library, {
             descriptions: enrichment.descriptions,
@@ -279,7 +280,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // AND failure.
           try {
             maintainInFlightSince = Date.now()
-            const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+            const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
             const enrichment = await buildEnrichment(ctx, library)
             const outcome = await runMaintain(
               // E-55 (0.3.18): same-source model routing — the maintain subagent
@@ -298,7 +299,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             lastMaintainRunId = outcome.runId ?? ''
             if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
             const eventIo = ioRegistry.provider()
-            const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+            const home = evolutionRoot()
             void appendEvolutionEvent(eventIo, eventsFile(home), {
               type: 'maintain',
               source: 'manual',
@@ -334,7 +335,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // be the runtime `standard` composition + the delta — 0.3.14 copied
           // the delta alone, which would produce an agent with only the delta
           // rows (no tools, no persona).
-          const target = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), '.agent-presets', 'evolution')
+          const target = join(evolutionRoot(), '.agent-presets', 'evolution')
           try {
             const source = resolveAgentPresetDir(import.meta.url)
             const deltaPath = join(source, 'agent.cordis.yml')
@@ -377,7 +378,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!toFile.startsWith('references/')) return err('to_file must live under references/ (log/detail destination).')
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
-          const library = new SkillLibrary(config.skillsRoot, ioRegistry.provider())
+          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
           if (!result.ok) return err(result.message)
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)

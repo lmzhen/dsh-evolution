@@ -11,7 +11,8 @@ import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats } from './threats.ts'
-import { nodeEvolutionIo, type EvolutionIoLike } from './io.ts'
+import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
@@ -121,8 +122,10 @@ export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
  * the skills tree — tool-skill-manage / evolution-skill-catalog / skill-usage
  * / evolution-learning-graph used to each resolve `config.root || skillsRoot()`
  * (and the graph ignored config entirely). Empty/whitespace config falls
- * through to the default; callers pass their raw Config. */
-export function resolveSkillsRoot(config: { root?: string } = {}): string {
+ * through to the default; callers pass their raw Config. The optional field is
+ * declared `| undefined` so a config object whose root field is explicitly
+ * `string | undefined` still assignable under exactOptionalPropertyTypes. */
+export function resolveSkillsRoot(config: { root?: string | undefined } = {}): string {
   return (config.root ?? '').trim() || skillsRoot()
 }
 
@@ -524,7 +527,12 @@ function fuzzyPatch(content: string, oldString: string, newString: string, repla
   if (boundary !== oldString) {
     if (fuzzyIndexOf(content, boundary) !== null) {
       const patched = fuzzyReplace(content, boundary, newString, replaceAll)
-      return patched === content ? null : patched
+      // F-317: patched === content is an IDENTITY replacement (the effective
+      // old/new text are equal), NOT "no match". Return the original so the
+      // caller's noop judgment (patch()) reports it as unchanged — returning
+      // null here made patch() say "Could not find old_string" for a patch
+      // that was actually a no-op. `null` remains exclusively "no match".
+      return patched
     }
   }
   // Stage 2: whitespace-plus-escape tolerance (pattern `\n`/`\t`/`\r` literals
@@ -532,7 +540,7 @@ function fuzzyPatch(content: string, oldString: string, newString: string, repla
   // only, so file indentation/formatting survives.
   if (fuzzyIndexOf(content, oldString) !== null) {
     const patched = fuzzyReplace(content, oldString, newString, replaceAll)
-    return patched === content ? null : patched
+    return patched
   }
   return null
 }
@@ -643,22 +651,80 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
   return { body: rebuilt.join('\n'), sections: spans.map(({ rel, heading, text }) => ({ rel, heading, text })) }
 }
 
+/**
+ * One single-file read-modify-write outcome: the caller-facing result, the
+ * next bytes to write (`write: null` = leave the file untouched), the audit
+ * record and the mutation event. Audit/notify fire only when `write` landed.
+ */
+interface SingleWriteOutcome {
+  result: SkillActionResult
+  write: string | null
+  audit?: { skillName: string; action: string; before: string | null; after: string | null; summary: string }
+  event?: EvolutionSkillMutatedEvent
+}
+
 export class SkillLibrary {
   readonly root: string
   readonly limits: SkillLimits
   private readonly io: EvolutionIoLike
   private readonly onMutation: ((event: EvolutionSkillMutatedEvent) => void) | undefined
+  /** 0.3.21 (F-208): optional cross-process RMW transactor injected by callers.
+   * When unset each single-file write falls back to read→task→write. */
+  private readonly transact: (typeof transactIo) | undefined
+  /** 0.3.21 (F-208): in-process serialize queue so two concurrent mutators on
+   * one skill never interleave their read-modify-write (the cross-process layer
+   * is the IO backend's transact lock; this chain is the second layer). */
+  private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
 
   constructor(
     root = skillsRoot(),
     io: EvolutionIoLike = nodeEvolutionIo(),
     limits: SkillLimits = DEFAULT_SKILL_LIMITS,
     onMutation?: (event: EvolutionSkillMutatedEvent) => void,
+    transact?: typeof transactIo,
   ) {
     this.root = root
     this.io = io
     this.limits = limits
     this.onMutation = onMutation
+    this.transact = transact
+    this.serial = makeSerialQueue()
+  }
+
+  /**
+   * Run one single-file read-modify-write for a mutator. When `transact` was
+   * injected the read and the write run inside it (cross-process atomicity);
+   * otherwise a plain read → task → write sequence runs (the process-level
+   * `serial` chain is the second layer). `task` receives the current content
+   * (null when missing) and returns a {@link SingleWriteOutcome}. Audit and the
+   * mutation event are issued ONLY when a write actually lands, so a no-op
+   * never inflates the mutation-maturity counter.
+   */
+  private async runSingleWrite(
+    path: string,
+    task: (current: string | null) => SingleWriteOutcome | Promise<SingleWriteOutcome>,
+  ): Promise<SkillActionResult> {
+    let outcome: SingleWriteOutcome | undefined
+    const run = async (current: string | null) => {
+      const o = await task(current ?? null)
+      outcome = o
+      // write: null = "leave the file untouched" — return the current bytes so
+      // an existing file is preserved and a missing one stays missing (M-4).
+      return o.write ?? (current ?? null)
+    }
+    if (this.transact) {
+      await this.transact(this.io, path, run)
+    } else {
+      const current = await this.io.readText(path)
+      const next = await run(current)
+      if (next !== null && next !== current) await this.io.writeText(path, next)
+    }
+    const o = outcome as SingleWriteOutcome
+    if (o.write !== null && o.audit) {
+      await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary)
+    }
+    if (o.write !== null && o.event) this.notifyMutation(o.event)
+    return o.result
   }
 
   /** Notify the mutation observer after a successful write; observers must never fail the mutation. */
@@ -961,27 +1027,33 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     const dir = this.dirOf(normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
-    await this.io.writeText(join(dir, 'SKILL.md'), finalContent.trimEnd() + '\n')
+    // F-337: hash the bytes that actually land on disk (write uses
+    // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
+    const onDisk = finalContent.trimEnd() + '\n'
+    await this.io.writeText(join(dir, 'SKILL.md'), onDisk)
     // Any non-foreground writer (review channel OR delegated subagent) is an
     // agent-authored skill: mark it managed so the lifecycle owns it.
     if (origin !== 'foreground') {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
     }
-    await this.audit(normalized, 'create', null, finalContent, 'created')
+    await this.audit(normalized, 'create', null, onDisk, 'created')
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
     return { ok: true, message: `Skill "${normalized}" created.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
   async update(rawName: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
-
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    // F-208: the whole read→validate→write runs under the in-process serialize
+    // queue so two concurrent updates on one skill never interleave.
+    return await this.serial(() => this.updateCore(name, content, origin))
+  }
 
+  private async updateCore(name: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
+    const dir = this.dirOf(name)
+    const path = join(dir, 'SKILL.md')
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = this.dirOf(name)
-    const md = await this.io.readText(join(dir, 'SKILL.md'))
-    if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateFrontmatter(content, name, this.limits)
@@ -996,19 +1068,42 @@ export class SkillLibrary {
     }
     const threat = scanContentThreats(finalContent)
     if (threat) return { ok: false, message: threat }
-    await this.io.writeText(join(dir, 'SKILL.md'), finalContent.trimEnd() + '\n')
-    await this.audit(name, 'update', md, finalContent, 'updated')
-    this.notifyMutation({ action: 'update', name, skillDir: dir })
-    return { ok: true, message: `Skill "${name}" updated.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
+    return await this.runSingleWrite(path, (current) => {
+      if (current === null) return { result: { ok: false, message: `Skill "${name}" not found.` }, write: null }
+      // F-318 (②): a byte-equivalent rewrite (same content modulo trailing
+      // newlines) is a no-op — no write, no audit, no mutation event, so the
+      // mutation-maturity counter is not inflated by a redundant re-save.
+      if (finalContent.trimEnd() === current.trimEnd()) {
+        return { result: { ok: true, message: `Skill "${name}" unchanged: the supplied content already matches the current file; nothing written.`, noop: true, path: dir }, write: null }
+      }
+      // F-337: hash the BYTES that actually land on disk (write uses
+      // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
+      const onDisk = finalContent.trimEnd() + '\n'
+      return {
+        result: { ok: true, message: `Skill "${name}" updated.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) },
+        write: onDisk,
+        audit: { skillName: name, action: 'update', before: current, after: onDisk, summary: 'updated' },
+        event: { action: 'update', name, skillDir: dir },
+      }
+    })
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
-
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    // F-208: the whole read→patch→write runs under the in-process serialize
+    // queue so two concurrent patches on one skill never interleave.
+    return await this.serial(() => this.patchCore(name, oldString, newString, filePath, replaceAll, origin))
+  }
 
-    const badName = this.badName(name)
-    if (badName) return { ok: false, message: badName }
+  private async patchCore(
+    name: string,
+    oldString: string,
+    newString: string,
+    filePath: string,
+    replaceAll: boolean,
+    origin: WriteOrigin,
+  ): Promise<SkillActionResult> {
     const dir = this.dirOf(name)
     const skillMd = join(dir, 'SKILL.md')
     if (!await this.io.exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
@@ -1023,47 +1118,58 @@ export class SkillLibrary {
       target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
       patchLabel = filePath
     }
-    const md = await this.io.readText(target)
-    if (!md) return { ok: false, message: `File not found: ${patchLabel}` }
+    return await this.runSingleWrite(target, (current) => {
+      const md = current
+      if (md === null) return { result: { ok: false, message: `File not found: ${patchLabel}` }, write: null }
 
-    const patched = fuzzyPatch(md, oldString, newString, replaceAll)
-    // `null` means "no match"; an empty string is a legitimate replacement.
-    if (patched === null) return { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }
-    let writeContent = patched
-    let normalizedFields: string[] | undefined
-    if (target === skillMd) {
-      const validation = validateFrontmatter(patched, name, this.limits)
-      if (validation) return { ok: false, message: `Patch rejected: ${validation}` }
-      // 0.3.11: normalize at the write point (see create) — a patch may edit
-      // the frontmatter directly.
-      const norm = normalizeFrontmatter(patched)
-      if (norm.issues.length > 0) return { ok: false, message: `Patch rejected: frontmatter cannot be auto-fixed (${norm.issues[0]}).` }
-      if (norm.changed) {
-        writeContent = norm.content
-        normalizedFields = norm.fields
-        const revalidated = validateFrontmatter(writeContent, name, this.limits)
-        if (revalidated) return { ok: false, message: `Patch rejected: ${revalidated}` }
+      const patched = fuzzyPatch(md, oldString, newString, replaceAll)
+      // `null` means "no match"; an empty string is a legitimate replacement.
+      if (patched === null) return { result: { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }, write: null }
+      let writeContent = patched
+      let normalizedFields: string[] | undefined
+      if (target === skillMd) {
+        const validation = validateFrontmatter(patched, name, this.limits)
+        if (validation) return { result: { ok: false, message: `Patch rejected: ${validation}` }, write: null }
+        // 0.3.11: normalize at the write point (see create) — a patch may edit
+        // the frontmatter directly.
+        const norm = normalizeFrontmatter(patched)
+        if (norm.issues.length > 0) return { result: { ok: false, message: `Patch rejected: frontmatter cannot be auto-fixed (${norm.issues[0]}).` }, write: null }
+        if (norm.changed) {
+          writeContent = norm.content
+          normalizedFields = norm.fields
+          const revalidated = validateFrontmatter(writeContent, name, this.limits)
+          if (revalidated) return { result: { ok: false, message: `Patch rejected: ${revalidated}` }, write: null }
+        }
       }
-    }
-    if (Buffer.byteLength(writeContent, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
-      return { ok: false, message: `Patched file exceeds ${this.limits.maxSkillFileBytes} bytes.` }
-    }
-    if (writeContent.length > this.limits.maxSkillContentChars && target === skillMd) {
-      return { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }
-    }
-    const threat = scanContentThreats(writeContent)
-    if (threat) return { ok: false, message: threat }
-    // 0.3.18 (E-68): old_string === replacement reaches fuzzyPatch's exact
-    // path and yields patched === md. Previously the file was rewritten, the
-    // patch counter bumped and the whole catalog invalidated for zero change.
-    // Byte-identical-to-write means a true no-op: skip write/audit/notify.
-    if (writeContent.trimEnd() + '\n' === md) {
-      return { ok: true, message: `Skill "${name}" unchanged: old_string already equals the replacement (${patchLabel}); nothing written.`, noop: true, path: dir }
-    }
-    await this.io.writeText(target, writeContent.trimEnd() + '\n')
-    await this.audit(name, 'patch', md, writeContent, `patched ${patchLabel}`)
-    this.notifyMutation({ action: 'patch', name, skillDir: dir })
-    return { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) }
+      if (Buffer.byteLength(writeContent, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
+        return { result: { ok: false, message: `Patched file exceeds ${this.limits.maxSkillFileBytes} bytes.` }, write: null }
+      }
+      if (writeContent.length > this.limits.maxSkillContentChars && target === skillMd) {
+        return { result: { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }, write: null }
+      }
+      const threat = scanContentThreats(writeContent)
+      if (threat) return { result: { ok: false, message: threat }, write: null }
+      // 0.3.18 (E-68): old_string === replacement reaches fuzzyPatch's exact
+      // path and yields patched === md. Previously the file was rewritten, the
+      // patch counter bumped and the whole catalog invalidated for zero change.
+      // Byte-identical-to-write means a true no-op: skip write/audit/notify.
+      // F-318 (①): normalize BOTH sides — a legacy file without a trailing
+      // newline (or with multiple trailing newlines) used to fail this check for
+      // an identical replacement, rewriting + auditing + invalidating the catalog
+      // for zero change.
+      if (writeContent.trimEnd() === md.trimEnd()) {
+        return { result: { ok: true, message: `Skill "${name}" unchanged: old_string already equals the replacement (${patchLabel}); nothing written.`, noop: true, path: dir }, write: null }
+      }
+      // F-337: hash the bytes that actually land on disk (write uses
+      // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
+      const onDisk = writeContent.trimEnd() + '\n'
+      return {
+        result: { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
+        write: onDisk,
+        audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
+        event: { action: 'patch', name, skillDir: dir },
+      }
+    })
   }
 
   async archive(rawName: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
@@ -1282,6 +1388,12 @@ export class SkillLibrary {
    */
   async restructure(rawName: string, moves: SkillRestructureMove[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const name = rawName.trim()
+    // F-208: the whole read→plan→write runs under the in-process serialize
+    // queue so two concurrent restructures on one skill never interleave.
+    return await this.serial(() => this.restructureCore(name, moves, origin))
+  }
+
+  private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     if (moves.length === 0) return { ok: false, message: 'Restructure requires at least one section move.' }
@@ -1477,13 +1589,17 @@ export class SkillLibrary {
   }
 
   async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
-
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    // F-208: the whole read→validate→write runs under the in-process serialize
+    // queue so two concurrent writers to one support file never interleave.
+    return await this.serial(() => this.writeSupportFileCore(name, filePath, content, origin))
+  }
 
+  private async writeSupportFileCore(name: string, filePath: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
+    const dir = this.dirOf(name)
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    const dir = this.dirOf(name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
@@ -1493,11 +1609,14 @@ export class SkillLibrary {
     const threat = scanContentThreats(content)
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
-    const existing = await this.io.readText(target).catch(() => null)
-    await this.io.writeText(target, content)
-    await this.audit(name, 'write_file', existing, content, `wrote ${filePath}`)
-    this.notifyMutation({ action: 'write_file', name, skillDir: dir, file: target })
-    return { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target }
+    return await this.runSingleWrite(target, (current) => {
+      return {
+        result: { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target },
+        write: content,
+        audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}` },
+        event: { action: 'write_file', name, skillDir: dir, file: target },
+      }
+    })
   }
 
   async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {

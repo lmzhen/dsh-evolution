@@ -569,6 +569,23 @@ it('E-68: an old===new patch is a noop — no write, no audit, no mutation event
   await rm(root, { recursive: true, force: true })
 })
 
+it('F-318 (②): update with a byte-equivalent content is a noop — no write, no audit (E-68)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-upd-noop-'))
+  const lib = new SkillLibrary(root)
+  const created = await lib.create('python-testing', SKILL, 'background_review')
+  expect(created.ok).toBe(true)
+  const before = await lib.read('python-testing')
+  const mutationsBefore = (await lib.listMutations()).length
+  const result = await lib.update('python-testing', SKILL)
+  expect(result.ok).toBe(true)
+  expect(result.noop).toBe(true)
+  expect(result.message).toContain('unchanged')
+  expect(await lib.read('python-testing')).toBe(before)
+  // No audit record was appended (mutation-maturity is not inflated).
+  expect((await lib.listMutations()).length).toBe(mutationsBefore)
+  await rm(root, { recursive: true, force: true })
+})
+
 it('E-69: an archived skill cannot absorb into itself (0.3.18)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-selfabs-'))
   const lib = new SkillLibrary(root)

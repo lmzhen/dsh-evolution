@@ -17,8 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { homedir } from 'node:os'
+import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, evolutionRoot, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
@@ -57,7 +56,7 @@ export class EvolutionFeedback {
   private io: IoLike | undefined
   private warn: (message: string) => void
 
-  constructor(io?: IoLike, home = process.env.DSH_HOME ?? join(homedir(), '.dsh'), pathOverride?: string, warn: (message: string) => void = () => {}) {
+  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
     // record() takes no backend io, so path and io backend can never disagree.
     // They derive unconditionally so a late `attachIo` (S6.4) does not need to
@@ -437,7 +436,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // a provider registered after this plugin was skipped entirely.
   const feedback = new EvolutionFeedback(
     undefined,
-    process.env.DSH_HOME ?? join(homedir(), '.dsh'),
+    evolutionRoot(),
     rawConfig.path || undefined,
     (message) => {
       ctx.logger.warn(message)

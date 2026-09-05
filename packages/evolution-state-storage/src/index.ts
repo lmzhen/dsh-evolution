@@ -86,9 +86,11 @@ export interface EvolutionStateStorage {
   /**
    * Atomically read-modify-write the curator-state record (S5.5): `task`
    * receives the current record (or null when none exists) and returns the
-   * next record (or null to delete). The whole read → transform → write runs
-   * inside one provider transact, so a setPaused racing the run-core
-   * bookkeeping write can never interleave a stale load with a newer save.
+   * next record; returning null keeps the current record unchanged (the
+   * domain update primitive cannot delete, and json aligns with it). The
+   * whole read → transform → write runs inside one provider transact, so a
+   * setPaused racing the run-core bookkeeping write can never interleave a
+   * stale load with a newer save.
    */
   transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void>
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
