@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { computeDedupGroups, computeLifecycleTransitions, emptyRecord, getRecord, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, computeLifecycleTransitions, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 
 /** Plain skill body used by the merge-chain fixtures. */
 function basicBody(name: string): string {
@@ -486,6 +486,44 @@ describe('evolution-curator', () => {
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     expect(usage.get('ancient-skill')?.state).toBe('archived')
     expect(usage.get('ancient-skill')?.archived_at).toBeTruthy()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('F-330 (V4-02): a bundled crashed archive self-heals AND persists suppression from the archive copy marker (0.3.26)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-f330-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true, pruneBuiltins: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+    await skills.create('bundled-skill', body('bundled-skill', 'Bundled body.'), 'foreground')
+    await writeFile(join(skills.root, 'bundled-skill', '.bundled'), '', 'utf8')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['bundled-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    // Crashed archive shape: the rename COMMITTED (the directory — markers
+    // included — is in .archive), the usage fold did not, and the active root
+    // no longer lists the skill. Before 0.3.26 the bundled guard checked
+    // `bundledNames.has(name)` (a construction subset of treeNames, hence
+    // unreachable here) and the suppression never landed — a bundled ghost
+    // (dir alive + record archived) re-seeded forever.
+    await rm(join(skills.root, 'bundled-skill'), { recursive: true, force: true })
+    await mkdir(join(skills.root, '.archive', 'bundled-skill'), { recursive: true })
+    await writeFile(join(skills.root, '.archive', 'bundled-skill', '.bundled'), '', 'utf8')
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(result.errors).toEqual([])
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('bundled-skill')?.state).toBe('archived')
+    const suppressed = await loadSuppressedNames(skills.root, nodeEvolutionIo())
+    expect(suppressed.has('bundled-skill')).toBe(true)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })

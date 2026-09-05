@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.26 (patch) — v4 审计批 1：门禁与修复有效性（V4-02/03/28-31）
+
+v4 审计（修复核验轮）P2 新发现的批次 1（门禁与修复有效性——先修护栏再修内容）；每项先核验属实再修（v4 行号为准）。
+
+- **V4-03 依赖闭包守卫接入 CI**：`verify-dependency-closure` 此前零调用点（F-105 防回归半边落空——「守卫正确但无人运行」）→ action.yml 在打包前插入该步骤（与 arch-guards 同款接线）。
+- **V4-29 守卫自族 fail-loud**：closure 脚本补 `inspected===0` 真空 fail（原「打印 OK across 0 package(s)」真空通过）；头注释矛盾修正（type-only import 同样必须声明——d.ts 引用走同一声明，发布包无 tsconfig paths）；动态 import 不可见注明为文档限制。
+- **V4-30 空转保护 + 守卫自测**：arch-guards 与 event-pairing 补「扫描文件/事件为 0 时失败/告警」（F-103 真空守卫类）；新增 `guard-scripts.spec.ts`（5 个哨兵用例：三守卫 × 正例+故意违规——真实树 OK、真空根失败、未声明 import 失败、DSH_HOME 违规失败、孤儿 emit 标记——门禁必须被门禁覆盖）。
+- **V4-02 F-330 修复有效性（死代码→真修复）**：原补丁的 `bundledNames.has(name)` 在 `!treeNames.has(name)` 分支**不可达**（`bundledNames ⊆ treeNames` 构造不变量——同一次 `list()` 填充）——bundled 幽灵场景从未闭环；改为**归档副本 marker 探针**（`.archive/<name>/.bundled`——崩溃归档的 rename 已随目录携带 marker；`markerEntryName` 因跨包消费而导出，保持 N-1 单源）；补「bundled 崩溃自愈→suppression 落盘」专项用例（此前 E-15 测试全部用非 bundled 技能）。
+- **V4-28/31 守卫注释与识别修正**：action.yml 的「N3/N4 stay warn-only」注释更正（0.3.25 起 N3 已翻 gate）；event-pairing 的 `ctx.on` 接收器正则修正为 `\w*ctx.on`（`ioCtx.on(...)` 的 plan-applied 消费此前不被计数——单一消费者的 `xCtx.on` 形态会误报 orphan）。
+- **回归（发布前检查发现并修复真 bug）**：全量首跑 feedback.spec「persists across restarts」**2/2 连续复现** ENOTEMPTY（§56 模式：ctx2 的 Feedback 恢复链未 settle 就 rm 临时 home；负载变化使其从偶发变必现）→ teardown 补 `waitIdle()`（两处同类测试）；全量复跑 **99 文件 / 636 测试** 全绿；oxlint 0/0（191 文件）；tsc core/curator/host 0。
+- **裁决记录（用户授权，四性权衡）**：①transact 生产接线（V4-20）=**构造默认绑定 `io.transact`**（0.3.27 实施——单点优于 8 处注入）；②F-328 完整 hash=**维持申报**（契约迁移复杂度 > 罕见场景收益，`--detail` + 声明已充分缓解）。
+- **未在此批（顺延 0.3.27）**：V4-01（归档重复增长）、V4-04/05（锁残余 + 同 pid 抢锁）、V4-20（transact 默认绑定）、V4-06/09/12（state 域小修）。
+
 ## 0.3.25 (patch) — G5 其余 + G6 清扫 + G7.2 文档化 + N3 门禁翻转（批次 5，计划收官）
 
 审计优化计划最后一批（批次 5：装配与清扫）；每项先核验再修（B 组发现计划 F 编号系统性错位——以审计报告原文机制描述为准核验；3 项核验为已满足/仅报告）。

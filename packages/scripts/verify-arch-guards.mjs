@@ -35,6 +35,7 @@ const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', 'tsdown'])
 const DSH_HOME_RE = /process\.env\.DSH_HOME/
 const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolicy/
+let checkedCount = 0
 
 const violations = []
 /** N3 (gate, 0.3.25): Config numeric fields must carry a value clamp
@@ -58,6 +59,7 @@ function walk(dir) {
       if (SKIP.has(entry.name)) continue
       walk(path)
     } else if (entry.name.endsWith('.ts')) {
+      checkedCount += 1
       const rel = relative(root, path).split('\\').join('/')
       const text = readFileSync(path, 'utf8')
       // N1: production routing — only files under a package's src/ are
@@ -94,6 +96,17 @@ function walk(dir) {
 }
 
 walk(root)
+
+if (checkedCount === 0) {
+  // V4-30 (0.3.26): the guard must never pass on an unscanned tree (the F-103
+  // vacant-guard class) — a wrong root or an empty overlay fails loud.
+  const message = `verify-arch-guards: no .ts file(s) scanned under ${root} — check the packages root (a vacuum pass is not a pass)`
+  if (strict) {
+    console.error(`verify-arch-guards [strict]: ${message}`)
+    process.exit(1)
+  }
+  console.warn(`verify-arch-guards [warn]: ${message}`)
+}
 
 if (violations.length > 0) {
   const summary = `${violations.length} architecture guard violation(s)`

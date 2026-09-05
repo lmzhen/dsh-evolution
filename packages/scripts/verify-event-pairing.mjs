@@ -28,7 +28,11 @@ const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git',
 // production consumer — expected orphans.
 const EXEMPT_ORPHANS = new Set(['evolution/review-scheduled', 'evolution/review-error'])
 const EMIT_RE = /ctx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
-const ON_RE = /ctx\.on\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
+// V4-31 (0.3.26): not every consumer listens on bare `ctx` — activity watches
+// plan-applied through `ioCtx.on(...)` (and commandCtx/approvalCtx/toolCtx
+// follow the same naming). `\w*ctx` covers every `<x>ctx` receiver without
+// widening to generic `.on(` calls.
+const ON_RE = /\w*ctx\.on\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
 
 const emitted = new Map()
 const listened = new Map()
@@ -58,6 +62,13 @@ function walk(dir) {
 }
 
 walk(root)
+
+if (emitted.size === 0 && listened.size === 0) {
+  // V4-30 (0.3.26): a zero-event scan is either a truly empty tree or a wrong
+  // root — the vacuum pass says nothing about pairing, so it must not be
+  // reported as a clean "0 orphan" pass.
+  console.warn(`verify-event-pairing: no evolution event(s) found under ${root} — check the packages root (a vacuum scan is not a pairing result)`)
+}
 
 const orphans = [...emitted.keys()].filter(name => !listened.has(name) && !EXEMPT_ORPHANS.has(name))
 const exemptOrphans = [...emitted.keys()].filter(name => !listened.has(name) && EXEMPT_ORPHANS.has(name))

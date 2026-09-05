@@ -91,6 +91,14 @@ runs:
         node node_modules/vitest/vitest.mjs run packages/evolution
         node node_modules/oxlint/bin/oxlint packages/evolution
 
+    - name: Verify dependency closure (G0.1 guard)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # 0.3.26 (V4-03): F-105's guard was only run locally — wire it into the
+        # chain before packing so a new undeclared cross-package import fails CI.
+        node packages/evolution/scripts/verify-dependency-closure.mjs packages/evolution
+
     - name: Pack scoped release
       shell: bash
       working-directory: upstream
@@ -113,7 +121,8 @@ runs:
       working-directory: upstream
       run: |
         # 0.3.23: strict mode is on — N1/N2 are zero-tolerance (single-source
-        # contracts); N3/N4 stay warn-only listings inside the script.
+        # contracts); 0.3.25 flipped N3 into the gate too (numeric clamps); N4
+        # stays a warn-only listing (many `?? xId` are legitimate defaults).
         node packages/evolution/scripts/verify-arch-guards.mjs packages/evolution --strict
 
     - name: Verify event pairing (G7.3)

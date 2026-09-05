@@ -55,6 +55,11 @@ describe('evolution-feedback', () => {
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(ctx2.evolutionFeedback.score('python-testing', 'skill')).toBeCloseTo(-1 / 3)
     expect(ctx2.evolutionFeedback.snapshot().sessions).toEqual({})
+    // 0.3.26 (release gate): ctx2's Feedback is a fresh instance mid-restore —
+    // wait for its task chain before removing the temp home, otherwise the
+    // background restore write races the recursive rm (ENOTEMPTY at the
+    // `evolution/` dir; the §56 fire-and-forget teardown rule).
+    await ctx2.evolutionFeedback.waitIdle()
 
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
@@ -81,6 +86,9 @@ describe('evolution-feedback', () => {
     const snapshot = feedback.snapshot()
     expect(snapshot.skills['new-skill']).toBeDefined()
     expect(snapshot.skills['old-skill']?.positive).toBe(1)
+    // 0.3.26: the record chain must settle before the temp home goes away
+    // (same ENOTEMPTY teardown race as the restart test above).
+    await feedback.waitIdle()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })

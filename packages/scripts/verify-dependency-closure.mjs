@@ -1,21 +1,22 @@
 #!/usr/bin/env node
 /**
- * Dependency-closure guard (0.3.21, G0.1/F-105): every value import of an
+ * Dependency-closure guard (0.3.21, G0.1/F-105): every import of an
  * @deepseek-ai/* package from a package's `src/` MUST be declared in its
  * package.json dependencies or peerDependencies. Type-only imports are
- * exempt (they strip at compile time but keep the d.ts reference — the
- * consumer must still be able to resolve the TYPE, which the same
- * declaration provides).
+ * counted too — the d.ts reference resolves through the same declaration,
+ * and the published package has no tsconfig paths, so a missing declaration
+ * breaks `dsh plugin add <pkg>` installs with ERR_MODULE_NOT_FOUND either
+ * way.
  *
- * Severe (fail): missing declaration for a VALUE import or a type-only
- * import whose target is not declared in dependencies|peerDependencies.
- * (In-src imports via tsconfig paths masked this for CI — the published
- * package has no such aliases, so a missing declaration breaks `dsh plugin
- * add <pkg>` installs with ERR_MODULE_NOT_FOUND.)
+ * Severe (fail): missing declaration for any import whose target is not
+ * declared in dependencies|peerDependencies. The multi-line type-only form
+ * over-reports as a value import (safe direction); dynamic `import()` calls
+ * are invisible to the line scanner (documented limitation).
  *
  * Usage: node verify-dependency-closure.mjs <packages-root>
- * Exit 0 when every package's value imports are declared; exit 1 listing the
- * offenders.
+ * Exit 0 when every package's imports are declared; exit 1 listing the
+ * offenders — also when ZERO packages were inspected (a vacuous pass is the
+ * F-103 class of silent guard; 0.3.26 V4-29).
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -85,6 +86,13 @@ for (const dir of readdirSync(root)) {
       offenders.push(`${dir}: value-import "${name}" (${usage.value ? 'value' : 'type-only'}) not declared in dependencies/peerDependencies`)
     }
   }
+}
+
+if (inspected === 0) {
+  // V4-29 (0.3.26): no package manifests/src were inspected — a wrong root or
+  // an empty tree must fail loud, never print an empty "OK" (F-103 class).
+  console.error(`verify-dependency-closure: no package(s) inspected under ${root} — check the packages-root argument`)
+  process.exit(1)
 }
 
 if (offenders.length > 0) {

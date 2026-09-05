@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { EvolutionGateSet, evolutionIoAdapter, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -806,12 +806,17 @@ export class EvolutionCurator extends Service {
           record.archived_at = record.archived_at ?? new Date().toISOString()
           stateOwned.add(name)
         }
-        // F-330: the crashed rename already committed but the suppression write
-        // is the second phase — this self-heal path folded the record to
-        // archived without it. A bundled skill would then be re-seeded (dir
-        // alive + record archived = ghost, permanently outside the lifecycle).
-        // Mirror the success path below so suppression is persisted too.
-        if (bundledNames.has(name)) {
+        // F-330 (0.3.26, v4 V4-02): the old guard checked `bundledNames.has(name)`,
+        // but `bundledNames ⊆ treeNames` is a construction invariant (both are
+        // filled from the same list()) — the branch was unreachable, so a
+        // bundled skill whose crashed archive rename landed without the
+        // suppression write stayed a ghost (dir alive + record archived). The
+        // reliable bundled signal here is the ARCHIVE COPY's marker: the rename
+        // moved the whole skill directory (markers included) into `.archive`,
+        // so a `.bundled` marker there proves the crashed archive was a bundled
+        // skill — mirror the success path's suppression write.
+        const wasBundled = await this.io.exists(join(this.skills.root, '.archive', name, markerEntryName('bundled'))).catch(() => false)
+        if (wasBundled) {
           suppressedNames.add(name)
           suppressedAdded.add(name)
           suppressedChanged = true

@@ -155,8 +155,10 @@ function skillDir(root: string, name: string): string {
 /** Dot-prefixed on-disk marker name. SINGLE source: `list()` matches directory
  * entries against this name, and path builders must never hardcode a marker
  * literal (N-1: the rc.49 exists()-probe convergence dropped the dot,
- * poisoning every protectedBy/managed report). */
-function markerEntryName(marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
+ * poisoning every protectedBy/managed report). Exported for cross-package
+ * consumers that must probe markers without re-deriving the name (curator's
+ * archive-copy bundled probe, 0.3.26 V4-02). */
+export function markerEntryName(marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
   return `.${marker}`
 }
 
