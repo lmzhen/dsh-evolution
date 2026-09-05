@@ -29,4 +29,4 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- The sidecar is single-process safe only; two processes sharing `$DSH_HOME` can interleave append-merge cycles (same posture as `feedback.json` — a cross-process lock is deferred until a multi-process deployment exists).
+- Each event lands through `transactIo` (like `feedback.json`), so append cycles are cross-process atomic at the single-write granularity; the read-modify-write of one event is serialized in-process and atomic on disk. A multi-record batch is still one event at a time — no batch transaction exists.

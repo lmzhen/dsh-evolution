@@ -249,7 +249,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],
     },
     isConcurrencySafe: () => false,
-    async execute(args: SkillWriteArgs, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
+    async execute(args: SkillWriteArgs, exec: {
+      agent?: { session: { id: string; header: { origin?: string }; events?: readonly unknown[] } }
+    }) {
       // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
       // every delegated subagent as the review channel, while the LIBRARY
       // surface keeps the Hermes distinction - a delegated subagent write is
@@ -270,6 +272,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // pinned-guard distinction instead of folding subagent to review.
           args: { operation: args, origin: reviewOrigin, libraryOrigin },
           origin: reviewOrigin,
+          // 0.3.20 (N-1): session id rides along so the approval service can
+          // derive the platform override (see tool-memory for the rationale).
+          ...exec.agent?.session.id ? { sessionId: exec.agent.session.id } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {

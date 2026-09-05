@@ -951,7 +951,7 @@ export class EvolutionCurator extends Service {
 
   async latestReport(): Promise<CuratorRunReport | null> {
     const reportsRoot = join(evolutionHome(), 'reports')
-    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json'))
+    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
     // E-54: filenames carry randomUUIDs — lexicographic order is NOT
     // chronological, and the old `.sort()` was a misleading no-op. Order by
     // each file's mtime (the report write time, from the optional mtime probe);

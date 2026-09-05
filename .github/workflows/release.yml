@@ -109,7 +109,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p packages/evolution/dist
-          # --tag latest is REQUIRED (0.3.18 lesson): publish-scoped.mjs defaults
-          # to 'next'; the 0.3.18 release went out as next=0.3.18 / latest=stale
-          # and needed manual dist-tag repair. Explicitly pin stable releases.
-          node packages/evolution/scripts/publish-scoped.mjs --tag latest
+          # NO explicit --tag (0.3.20, N-4): publish-scoped.mjs now selects the
+          # tag by version (prerelease → next, stable → latest) — the explicit
+          # hard-coded --tag latest broke prerelease tags and the 0.3.18
+          # incident's hardcoded default was the root cause.
+          node packages/evolution/scripts/publish-scoped.mjs

@@ -226,7 +226,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
     },
     isConcurrencySafe: () => false,
-    async execute(args, exec: { agent?: { session: { header: { origin?: string }; events?: readonly unknown[] } } }) {
+    async execute(args, exec: { agent?: { session: { id: string; header: { origin?: string }; events?: readonly unknown[] } } }) {
       // facts and content are the same field under two names; a differing pair
       // is ambiguous input, so fail loud instead of silently dropping one.
       const conflict = (a: { facts?: string; content?: string }): boolean => {
@@ -255,10 +255,25 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
           summary: `memory ${target} ${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
           args: normalized,
           origin,
+          // 0.3.20 (N-1): the session id rides along so the approval service can
+          // DERIVE the platform override ('never' for unattended sessions); the
+          // tool previously sent only the self-reported policy, which the
+          // mounted platform approval service discards in favour of its own
+          // derivation — leaving CI/cron writes stuck in staging.
+          ...exec.agent?.session.id ? { sessionId: exec.agent.session.id } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {
-          return { ok: true, message: decision.message, entries: [], chars: 0, limit: 0, pending_id: decision.pendingId ?? '' }
+          // 0.3.20 (N-1-followup): no `pending_id ?? ''` — absent stays absent
+          // (mirrors the tool-skill-manage E-70 shape).
+          return {
+            ok: true,
+            message: decision.message,
+            entries: [],
+            chars: 0,
+            limit: 0,
+            ...decision.pendingId !== undefined ? { pending_id: decision.pendingId } : {},
+          }
         }
       }
       return await executeCore(normalized)

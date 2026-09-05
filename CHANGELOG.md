@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.20 (patch) — v2 审计复核修复批（外审新发现 N-1..N-5 + 行级卫生，6 组）
+
+v2 再审计报告（audit-report-v2）经修复方逐条交叉验证后的处置批次；每项先按报告行号核对现状再修。
+
+- **N-1 前台工具 sessionId 透传（P2 行为回归）**：tool-memory / tool-skill-manage 的 approval request 此前只传自报 `sessionPolicy` 不传 `sessionId`，平台 approval 服务挂载时服务端派生（`deriveSessionPolicy(undefined)`）恒不触发——无人值守（override 'never'）会话的写全部滞留 staging，与 approval docstring 矛盾。两工具补传 `sessionId`（exec 类型与 review 侧对齐）。
+- **N-3 预算并集（P2 旁路）**：plan-validator 的 patch 预算从 `file_content ?? content ?? new_string ?? ''` fallback 链改为三字段取 max——空 `content` 不再遮蔽巨大 `new_string`；新增回归测试（N-3 用例）。
+- **N-4 发布管线版本驱动 tag（发布前置）**：`publish-scoped.mjs` 恢复版本驱动的自动 tag 选择（prerelease→next / stable→latest；显式 `--tag` 仅覆盖）——0.3.18 删除该自动选择正是"latest 缺位"事故根因；release.yml 恢复裸跑（去掉硬编码 `--tag latest`，防止首个 `v0.4.0-rc.x` 被标成 latest）。
+- **N-5 工具名单单源化兑现**：`EVOLUTION_WRITE_TOOLS`（core constants）此前零引用死导出——threat 与 policy 的本地硬编码写工具二元组改为引用该常量（S3.10 承诺补齐）。
+- **行级卫生**：curator `latestReport` 的 glob 排除 `curator-error-*.json`（伪报告 + retainReports 永不回收）；tool-memory staged 返回改条件展开（消灭 `pending_id ?? ''`，与 tool-skill-manage E-70 对齐）；activity README 纠正 0.3.19 引入的低估表述（实现已用 `transactIo` 跨进程原子，原文"single-process safe only"过保守）。
+- 门禁：vitest 全量（80 文件 / 515+ 测试，本轮涉改 8 包全绿）、oxlint 0/0、tsc 8 包 0。
+- 未在此批闭环（需上游定谳）：**N-2**（`overrideOf` 签名在 approval 侧 string 与工具侧 session 对象矛盾——平台包不在镜像）；E-45/E-49 半边、E-59 中途异常路径、E-73 混代收窄等 v2 报告的 PARTIAL 项按优先级列入后续批次。
+
 ## 0.3.19 (patch) — audit 计划收尾（W1 契约单点化 + T-10 文档对齐 + D-10 死通道清理，4 组）
 
 外部审计计划的收尾批次；每步先核验问题属实再修。

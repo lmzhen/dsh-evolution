@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
-import { scanContentThreats, scanMemoryThreats } from '@deepseek-ai/dsh-evolution-core'
+import { EVOLUTION_WRITE_TOOLS, scanContentThreats, scanMemoryThreats } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-threat'
 export const inject = ['tools']
@@ -29,7 +29,9 @@ function asRecord(value: unknown): Record<string, unknown> {
 /** Scan one tool invocation for threat-shaped payload text. Exported so the
  * guard contract is testable directly (0.3.17). */
 export function scanToolArgs(toolName: string, args: unknown, maxScanChars: number): string | null {
-  if (toolName !== 'memory' && toolName !== 'skill_manage') return null
+  // 0.3.20 (N-5): the write-tool set is the core single source — the local
+  // hardcoded pair drifted into the S3.10 dead-constant trap.
+  if (!EVOLUTION_WRITE_TOOLS.includes(toolName as (typeof EVOLUTION_WRITE_TOOLS)[number])) return null
   const record = asRecord(args)
   if (toolName === 'memory') {
     for (const text of [record.facts, record.content]) {

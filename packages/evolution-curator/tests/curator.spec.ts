@@ -491,6 +491,36 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('E-15 regression: a dry-run heal must NOT persist the archived fold (0.3.19 review)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e15-dry-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+    await skills.create('ancient-skill', body('ancient-skill', 'Ancient body.'), 'background_review')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['ancient-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    await rm(join(skills.root, 'ancient-skill'), { recursive: true, force: true })
+    // Dry-run computes on a CLONE of the usage map: the self-heal fold must stay
+    // in-memory only (the crash-window record remains 'active' on disk until a
+    // REAL run folds it).
+    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('ancient-skill')?.state).toBe('active')
+    expect(usage.get('ancient-skill')?.archived_at).toBeNull()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('seeds baseline records for tree skills the sidecar has not seen (F8)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-seed-'))
     const previous = process.env.DSH_HOME

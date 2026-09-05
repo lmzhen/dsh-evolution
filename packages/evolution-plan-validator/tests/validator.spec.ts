@@ -40,6 +40,15 @@ describe('evolution-plan-validator', () => {
     expect(result.rejected[0]?.reason).toContain('exceeds skill budget')
   })
 
+  it('N-3: an empty content field must not shadow a giant new_string (0.3.20)', () => {
+    const giant = 'x'.repeat(100_001)
+    const result = validateEvolutionPlan({
+      skillOps: [{ action: 'patch', name: 'fat-skill', old_string: 'old', content: '', new_string: giant, evidence: [{ event_seq: 4 }] }],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected[0]?.reason).toContain('exceeds skill budget')
+  })
+
   it('rejects a background delete without absorbed_into (Hermes fail-closed guard)', () => {
     const result = validateEvolutionPlan({
       skillOps: [{ action: 'delete', name: 'narrow-skill', evidence: [{ event_seq: 4 }] }],

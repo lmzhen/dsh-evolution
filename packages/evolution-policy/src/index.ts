@@ -17,6 +17,7 @@ import {
   DEFAULT_MAX_OPS_PER_PLAN,
   DEFAULT_CURATOR_INTERVAL_HOURS,
   DEFAULT_STALE_AFTER_DAYS,
+  EVOLUTION_WRITE_TOOLS,
   DEFAULT_ARCHIVE_AFTER_DAYS,
   DEFAULT_MEMORY_CHAR_LIMIT,
   DEFAULT_USER_CHAR_LIMIT,
@@ -136,7 +137,9 @@ export class EvolutionPolicy extends Service {
     // (the atomic-batch shape the threat scanner already treats as real)
     // carried control-plane keys unchecked. Both fixed via the core constant
     // (S3.10) and the inner scan (E-28).
-    if (toolName === 'memory' || toolName === 'skill_manage') {
+    // 0.3.20 (N-5): the write-tool set is the core single source (was a local
+    // hardcoded pair that drifted from the S3.10 constant).
+    if (EVOLUTION_WRITE_TOOLS.includes(toolName as (typeof EVOLUTION_WRITE_TOOLS)[number])) {
       const scan = (candidate: Record<string, unknown>): string | undefined => {
         for (const forbidden of FORBIDDEN_CONTROL_KEYS) {
           if (forbidden in candidate) return `evolution-policy: tool call may not mutate ${forbidden}`

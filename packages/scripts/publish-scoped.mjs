@@ -23,7 +23,14 @@ const distRoot = join(evolutionRoot, 'dist')
 const argv = process.argv.slice(2)
 
 function hasFlag(name) { return argv.includes(name) }
-const tag = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : 'next'
+// 0.3.20 (N-4): a version-driven tag selection replaces the hardcoded 'next'
+// default (0.3.18 removed the 0.1.0 automatic choice — the direct cause of
+// the next-tagged 0.3.18 incident). Per the manifest version: prerelease
+// (contains '-') → next, stable → latest. An explicit --tag always overrides
+// (manual repair scenarios only); release.yml runs bare so the choice is the
+// script's.
+const tagArg = argv.includes('--tag') ? argv[argv.indexOf('--tag') + 1] : undefined
+let tag = 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')
@@ -94,6 +101,9 @@ for (const group of publishOrder) {
     const match = file.match(/-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)\.tgz$/)
     const releaseVersion = match?.[1] ?? ''
     if (!releaseVersion) throw new Error(`cannot parse a semver from ${file}; non-tag builds must pack with a semver-safe version (e.g. 0.0.0-main)`)
+    // N-4: the tag follows the release version; one version per run so the
+    // assignment is idempotent across the package loop.
+    tag = tagArg ?? (releaseVersion.includes('-') ? 'next' : 'latest')
 
     const local = integrityOf(tarball)
     const remote = viewIntegrity(name, releaseVersion)

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-learning-graph",
   "description": "Learning graph over skills and memory",
-  "version": "0.3.19",
+  "version": "0.3.20",
   "publishConfig": {
     "access": "public"
   },

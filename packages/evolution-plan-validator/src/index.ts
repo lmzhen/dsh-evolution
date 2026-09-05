@@ -157,9 +157,14 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   if (action === 'delete' && !(op.absorbed_into ?? '').trim()) return `skill op ${index}: delete requires absorbed_into`
   // 0.3.17 (E-27): a patch's new_string IS the write payload — the budget
   // must see it too (threat scanning already treats it as real field).
-  const writeContent = op.file_content ?? op.content ?? op.new_string ?? ''
-  if (action === 'write_file' && !writeContent.trim()) return `skill op ${index}: write_file requires file_content`
-  if (writeContent.length > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
+  // 0.3.20 (N-3): the three payload fields are ALTERNATIVES (the executor
+  // writes file_content / content / new_string depending on the action), so
+  // the budget checks the MAX — the previous `??` chain let an empty earlier
+  // field (e.g. content:'') shadow a huge new_string.
+  const writeBytes = [op.file_content ?? '', op.content ?? '', op.new_string ?? '']
+    .reduce((max, value) => Math.max(max, value.length), 0)
+  if (action === 'write_file' && !(op.file_content ?? op.content ?? '').trim()) return `skill op ${index}: write_file requires file_content`
+  if (writeBytes > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
   if (action === 'restructure') {
     if (!Array.isArray(op.restructure) || op.restructure.length === 0) return `skill op ${index}: restructure requires a non-empty restructure list`
     if (op.restructure.length > MAX_RESTRUCTURE_MOVES) return `skill op ${index}: restructure exceeds ${MAX_RESTRUCTURE_MOVES} moves`
