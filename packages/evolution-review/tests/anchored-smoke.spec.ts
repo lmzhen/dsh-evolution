@@ -181,22 +181,26 @@ describe('anchored-standard review smoke', () => {
       }), { surfaceOp: 'append' })
       session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
-      await new Promise(resolve => setTimeout(resolve, 100))
-      expect(capturedRequest).toBeDefined()
+      // The schedule fires on a 1ms interval and the plan applies asynchronously:
+      // a fixed sleep can snapshot the window where the disk archive landed but
+      // markArchived has not run yet (observed once in the full parallel suite).
+      // Poll each contract signal instead — the contract is final consistency.
+      await expect.poll(() => capturedRequest !== undefined, { timeout: 3000, interval: 50 }).toBe(true)
       // The actual archive landed (schedule-review ran executePlan → direct path).
-      expect((await library.list()).some(s => s.name === 'doomed-skill')).toBe(false)
+      await expect.poll(async () => (await library.list()).some(s => s.name === 'doomed-skill'), { timeout: 3000, interval: 50 }).toBe(false)
       // In-memory registry view (what markArchived mutated — first signal).
-      const registryReport = await (ctx.get('skillUsage') as { report(): Promise<Map<string, { state?: string; archived_at?: string | null; patch_count?: number }>> }).report()
+      const memory = ctx.get('skillUsage') as { report(): Promise<Map<string, { state?: string; archived_at?: string | null; patch_count?: number }>> }
+      await expect.poll(async () => (await memory.report()).get('doomed-skill')?.state, { timeout: 3000, interval: 50 }).toBe('archived')
+      const registryReport = await memory.report()
       const memoryRecord = registryReport.get('doomed-skill')
-      expect(memoryRecord?.state).toBe('archived')
       expect(memoryRecord?.archived_at).toBeTruthy()
       expect(memoryRecord?.patch_count).toBe(0)
       // G1 regression: the usage record must be archived like every other
       // delete path — otherwise the next curator run re-proposes the name and
       // errors forever ("not found" + failedFrom rollback).
+      await expect.poll(async () => (await loadUsage(library.root, nodeEvolutionIo())).get('doomed-skill')?.state, { timeout: 3000, interval: 50 }).toBe('archived')
       const usage = await loadUsage(library.root, nodeEvolutionIo())
       const record = usage.get('doomed-skill')
-      expect(record?.state).toBe('archived')
       expect(record?.archived_at).toBeTruthy()
       expect(record?.patch_count).toBe(0)
     } finally {
