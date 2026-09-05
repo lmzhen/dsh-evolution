@@ -163,8 +163,16 @@ export class EvolutionFeedback {
         if (rollback) {
           rollback[rating] -= 1
           if (note !== undefined) {
-            if (previousNote === undefined) delete rollback.lastNote
-            else rollback.lastNote = previousNote
+            // F-324: revert the note only when THIS call's note is still the
+            // current one. A concurrent record() that landed a newer note must
+            // not be clobbered by this failed append's rollback — the log is
+            // the truth and self-heals on the next restore (note is the only
+            // field at risk). Without the guard, a failed call reset a later
+            // call's note to the stale pre-call value.
+            if (rollback.lastNote === note) {
+              if (previousNote === undefined) delete rollback.lastNote
+              else rollback.lastNote = previousNote
+            }
           }
         }
         // Best-effort: the rollback keeps memory aligned with the log truth; a
@@ -397,9 +405,14 @@ function synthesizeFeedbackEvents(aggregate: FeedbackState): EvolutionEvent[] {
         const final = events[last]
         if (final) events[last] = { ...final, note: record.lastNote }
       } else {
-        // Zero-count record with a note: the event model only folds notes via a
-        // rated feedback event, so preserve the note as a single positive event
-        // (the record had no count to attach it to; the note is not lost).
+        // Zero-count record with a note (legacy migration, F-325). The event
+        // model only folds a note via a rated feedback event, so the note is
+        // preserved as a single `positive` event. DELIBERATE side effect: this
+        // bumps the skill's positive count by one even though the record had no
+        // count — the note is kept at the price of a synthetic positive. A
+        // bare `note` event type has no aggregation semantics, so this is the
+        // chosen tradeoff (the old changelog wording "independent note event"
+        // understated that it changes count; the count change is intended).
         events.push({ seq: events.length + 1, at, type: 'feedback', kind, target, rating: 'positive', note: record.lastNote })
       }
     }

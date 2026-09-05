@@ -9,7 +9,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import type {} from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-review', () => {
-  it('defaults review subagent tools to the Anchored Standard discovery pair', () => {
+  it('defaults review subagent tools to the plain skill tool only (E-59e: no discovery pair on this platform)', () => {
     const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { reviewToolAllow: string[] } } } })['~standard'].validate({}).value
     expect(value.reviewToolAllow).toEqual(['skill'])
   })
@@ -217,6 +217,39 @@ describe('evolution-review', () => {
     expect(onInjectCalls).toHaveLength(1)
     expect(errors).toEqual([])
   })
+
+  it('F-363: the completion channel fires through runOnTurnEnd on a proven-long session', async () => {
+    const toolCalls = Array.from({ length: 25 }, (_, i) => ({
+      type: 'tool/call' as const,
+      data: { turn: 1, step: i + 2, callId: `c${i}`, name: 'skill', arguments: '{}' },
+    }))
+    const injected: unknown[] = []
+    const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message), events: toolCalls })
+    let scheduled = false
+    ctx.on('evolution/review-scheduled', () => { scheduled = true })
+    ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 1_000_000, reviewSkillInterval: 1_000_000 }) })
+    await ctx.plugin(Review, {
+      reviewEnabled: true,
+      reviewMode: 'subagent',
+      memoryInterval: 1_000_000,
+      skillInterval: 1_000_000,
+      skillReviewTrigger: 'completion',
+      skillReviewCompletionMinToolCalls: 20,
+    })
+    // A proven-long session: ≥20 tool/call events on this turn (the cadence
+    // counters are starved by the huge intervals, so ONLY the completion gate
+    // can fire). The completion channel is an INJECT channel — the prompt is
+    // sent to the parent session, not a subagent spawn.
+    emitEnd(1)
+    await vi.waitFor(() => {
+      const texts = injected.map((message) => {
+        const box = message as { content?: Array<{ type: string; text: string }> } | null
+        return typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
+      })
+      expect(texts.some(text => text.includes('Auto-review'))).toBe(true)
+    })
+    expect(scheduled).toBe(true)
+  })
 })
 
 /** Shared mounting: one fake session/agent registered, one turn/end emitter. */
@@ -225,6 +258,7 @@ async function mountReviewFixture(options: {
   onInject?: (message: unknown) => void
   skillArguments?: string
   noState?: boolean
+  events?: Array<Record<string, unknown>>
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
@@ -244,6 +278,7 @@ async function mountReviewFixture(options: {
     header: { origin: undefined },
     events: [
       { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: options.skillArguments ?? '{}' } },
+      ...(options.events ?? []),
     ],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
   } as unknown as Session

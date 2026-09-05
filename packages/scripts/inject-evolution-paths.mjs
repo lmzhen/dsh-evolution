@@ -27,7 +27,14 @@ if (!target || !mirror) {
   process.exit(1)
 }
 
-const EVOLUTION_KEY = /^\s*"(@deepseek-ai\/dsh-(evolution|memory|tool-memory|skill-usage|tool-skill-manage)[^"]*|zod|@lmzhen[^"]*)"\s*:/
+// `zod` is deliberately NOT in the evolution alias set (G5.6, F-345/F-353):
+// it is not an `@deepseek-ai/dsh-*` package, its dev-tree path value is a
+// machine-specific pnpm store path (`./node_modules/.pnpm/zod@4.4.3/...`),
+// and the released upstream resolves zod from its own node_modules. Injecting
+// that store path both breaks when the upstream's pnpm store differs and
+// trips the "already declares an evolution alias" guard the moment the
+// upstream carries its own `zod` key — so exclude it from the injection set.
+const EVOLUTION_KEY = /^\s*"(@deepseek-ai\/dsh-(evolution|memory|tool-memory|skill-usage|tool-skill-manage)[^"]*|@lmzhen[^"]*)"\s*:/
 
 const mirrorContent = readFileSync(mirror, 'utf8').replace(/^\uFEFF/, '')
 const evolutionLines = mirrorContent

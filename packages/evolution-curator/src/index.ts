@@ -15,7 +15,7 @@ import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deeps
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
@@ -110,24 +110,28 @@ export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
     enabled: z.boolean().default(true),
-    intervalHours: z.number().default(DEFAULT_CURATOR_INTERVAL_HOURS),
-    staleAfterDays: z.number().default(DEFAULT_STALE_AFTER_DAYS),
-    archiveAfterDays: z.number().default(DEFAULT_ARCHIVE_AFTER_DAYS),
+    intervalHours: z.number().min(1).default(DEFAULT_CURATOR_INTERVAL_HOURS),
+    staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
+    archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS),
     llmReview: z.boolean().default(false),
     curatorProvider: z.string().default('deepseek-official'),
-    qualityWarnStaleAfterDays: z.number().default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
-    minIdleHours: z.number().default(DEFAULT_MIN_IDLE_HOURS),
+    qualityWarnStaleAfterDays: z.number().min(1).default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
+    // minIdleHours 0 is a legitimate "no idle gate" (the gate guard is `> 0`),
+    // so its min is 0; negative values are rejected.
+    minIdleHours: z.number().min(0).default(DEFAULT_MIN_IDLE_HOURS),
     minIdleFailOpen: z.boolean().default(true),
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
     pruneBuiltins: z.boolean().default(false),
     referencedSkillNames: z.array(z.string()).default([]),
     autoStart: z.boolean().default(true),
-    bootGraceSeconds: z.number().default(10),
-    curatorReviewMaxTokens: z.number().default(2048),
-    healthSoftBodyChars: z.number().default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
-    healthStampDensityPerKb: z.number().default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
-    healthChurnMinPatches: z.number().default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
+    // bootGraceSeconds 0 is a legitimate "no grace" (setTimeout(0)); negative
+    // values are rejected.
+    bootGraceSeconds: z.number().min(0).default(10),
+    curatorReviewMaxTokens: z.number().min(1).default(2048),
+    healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
+    healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
+    healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
   })
 
   readonly skills: SkillLibrary
@@ -164,23 +168,40 @@ export class EvolutionCurator extends Service {
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     this.skills = new SkillLibrary(undefined, this.io, undefined, (event) => { this.ctx.emit('evolution/skill-mutated', event) })
     this.enabled = config.enabled ?? true
-    this.intervalHours = config.intervalHours ?? DEFAULT_CURATOR_INTERVAL_HOURS
-    this.staleAfterDays = config.staleAfterDays ?? DEFAULT_STALE_AFTER_DAYS
-    this.archiveAfterDays = config.archiveAfterDays ?? DEFAULT_ARCHIVE_AFTER_DAYS
+    // G3.1 (0.3.23): numeric config is clamped at assembly so a 0/negative/NaN/
+    // ±Infinity value falls back to the package default instead of folding as a
+    // "disabled" special value (a 0 interval/stale/archive flag would transition
+    // everything; NaN folds as NaN into a comparison). The schema `.min()`/`.min(0)`
+    // guards the loader path; this clamp also covers NaN/±Infinity (which
+    // schemastery lets through) and direct construction. `minIdleHours` and
+    // `bootGraceSeconds` legitimately allow 0; every other numeric field clamps
+    // to at least 1. Warn once when a user-supplied value had to be corrected.
+    const clamped: string[] = []
+    const field = (name: string, value: number | undefined, fallback: number, min: number): number => {
+      const result = clampedNumber(value, fallback, { min })
+      if (value !== undefined && result !== value) clamped.push(name)
+      return result
+    }
+    this.intervalHours = field('intervalHours', config.intervalHours, DEFAULT_CURATOR_INTERVAL_HOURS, 1)
+    this.staleAfterDays = field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS, 1)
+    this.archiveAfterDays = field('archiveAfterDays', config.archiveAfterDays, DEFAULT_ARCHIVE_AFTER_DAYS, 1)
     this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
-    this.qualityWarnStaleAfterDays = config.qualityWarnStaleAfterDays ?? DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS
-    this.minIdleHours = config.minIdleHours ?? DEFAULT_MIN_IDLE_HOURS
+    this.qualityWarnStaleAfterDays = field('qualityWarnStaleAfterDays', config.qualityWarnStaleAfterDays, DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS, 1)
+    this.minIdleHours = field('minIdleHours', config.minIdleHours, DEFAULT_MIN_IDLE_HOURS, 0)
     this.minIdleFailOpen = config.minIdleFailOpen ?? true
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
-    this.bootGraceSeconds = config.bootGraceSeconds ?? 10
-    this.curatorReviewMaxTokens = config.curatorReviewMaxTokens ?? 2048
-    this.healthSoftBodyChars = config.healthSoftBodyChars ?? DEFAULT_HEALTH_THRESHOLDS.softBodyChars
-    this.healthStampDensityPerKb = config.healthStampDensityPerKb ?? DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb
-    this.healthChurnMinPatches = config.healthChurnMinPatches ?? DEFAULT_HEALTH_THRESHOLDS.churnMinPatches
+    this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, 10, 0)
+    this.curatorReviewMaxTokens = field('curatorReviewMaxTokens', config.curatorReviewMaxTokens, 2048, 1)
+    this.healthSoftBodyChars = field('healthSoftBodyChars', config.healthSoftBodyChars, DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1)
+    this.healthStampDensityPerKb = field('healthStampDensityPerKb', config.healthStampDensityPerKb, DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1)
+    this.healthChurnMinPatches = field('healthChurnMinPatches', config.healthChurnMinPatches, DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1)
+    if (clamped.length > 0) {
+      this.ctx.logger.warn(`evolution-curator: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
+    }
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
@@ -534,9 +555,15 @@ export class EvolutionCurator extends Service {
       const text = await this.skills.read(name)
       if (text) contents.set(name, text)
     }
+    // F-331: the consolidation candidate pool must exclude marker-protected
+    // skills (pinned/bundled/hub-installed). Nominating them into the LLM pool
+    // is guaranteed to fail at the execution gate and only adds fixed report
+    // noise — M-3 narrowed the PRUNING pool; this is the consolidation
+    // counterpart.
+    const protectedNames = await this.protectedNameMap()
     const dedupMembers = [...new Set(
       computeDedupGroups({ contents }).filter(group => group.length >= 2).flat(),
-    )]
+    )].filter(name => !protectedNames.has(name))
     // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
     // engine reads `quality_warn` to apply the shorter quality-warn stale
     // window, so it must see THIS run's freshly computed scores — the old
@@ -779,6 +806,16 @@ export class EvolutionCurator extends Service {
           record.archived_at = record.archived_at ?? new Date().toISOString()
           stateOwned.add(name)
         }
+        // F-330: the crashed rename already committed but the suppression write
+        // is the second phase — this self-heal path folded the record to
+        // archived without it. A bundled skill would then be re-seeded (dir
+        // alive + record archived = ghost, permanently outside the lifecycle).
+        // Mirror the success path below so suppression is persisted too.
+        if (bundledNames.has(name)) {
+          suppressedNames.add(name)
+          suppressedAdded.add(name)
+          suppressedChanged = true
+        }
         continue
       }
       const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
@@ -927,7 +964,15 @@ export class EvolutionCurator extends Service {
         const raw = await this.io.readText(join(reportsRoot, name))
         if (raw === null) continue
         const parsed = JSON.parse(raw) as { startedAt?: string }
-        const startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN
+        let startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN
+        // F-327: error reports (`curator-error-*.json`) carry no `startedAt`,
+        // so the old code never ordered them and the sweep kept them forever.
+        // Fall back to the file mtime (the write time) so they age into the
+        // retention window too and no longer accumulate unbounded.
+        if (!Number.isFinite(startedAt)) {
+          const mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
+          if (mtime !== null) startedAt = mtime
+        }
         if (Number.isFinite(startedAt)) dated.push({ name, startedAt })
       } catch {
         // Unclassifiable report: keep it — never delete what we cannot order.

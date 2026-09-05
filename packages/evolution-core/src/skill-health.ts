@@ -29,8 +29,18 @@ export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
   churnMinPatches: 20,
 }
 
-/** Stamp regex shared by health assessment and the maintenance probe (single source, 011). */
-export const HEALTH_STAMP_RE = /\brc\.\d+\b|\b[0-9a-f]{7,40}\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z)?\b/g
+/**
+ * Stamp regex shared by health assessment and the maintenance probe (single
+ * source, 011). Two refinements over the naive form (F-320): the hex branch
+ * requires at least one digit so coincidental all-letter English words
+ * (`defaced`, `feedback`) are not counted as commit shas; the ISO branch
+ * accepts a UTC `Z`, a numeric UTC offset (`+08:00`), or no timezone at all —
+ * non-UTC timestamps used to escape detection (log-like content missed).
+ */
+export const HEALTH_STAMP_RE = new RegExp(
+  String.raw`\brc\.\d+\b|\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*[0-9][0-9a-f]*\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+(?:Z|[+-]\d{2}:?\d{2})?)?\b`,
+  'g',
+)
 
 /**
  * Bodies below this size skip stamp-density assessment: a few dates or shas

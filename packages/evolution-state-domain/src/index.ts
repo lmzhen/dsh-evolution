@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
-import { canClaimPending, canResolvePending, CLAIM_EXPIRY_MS, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import { canClaimPending, canResolvePending, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 
 export const name = 'evolution-state-domain'
 export const inject = ['evolutionStateStorage', 'storageDomain']
@@ -165,8 +165,6 @@ export function apply(ctx: Context): void {
           // (state-storage helpers) — claim atomically moves to 'executing' so
           // a crash mid-approve can never double-execute the runner.
           if (!canClaimPending(current.status)) return current
-          const claimedAt = typeof current.claimedAt === 'string' ? Date.parse(current.claimedAt) : 0
-          if (current.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < CLAIM_EXPIRY_MS) return current
           slot.record = { ...current, status: 'executing', claimedBy: claimId, claimedAt: new Date(now).toISOString() }
           return slot.record
         })

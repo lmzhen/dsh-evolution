@@ -23,7 +23,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-threat` | `tools/pre-execute` content threat guard |
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
-| `evolution-activity` | Durable activity store for self-evolution plan outcomes |
+| `evolution-activity` | Session projection over `evolution/plan-applied` |
 | `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
@@ -31,14 +31,8 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-host` | Host-plane infrastructure bundle (no model tools) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
-| `evolution-all` | One-command aggregate entry (host + model tools, pure dependency package) |
-| `evolution-capability` | Staged Creator-mode capability adapter (validates + submits, never executes) |
-| `evolution-maintenance` | Maintenance subagent, drift scan and plan validation for the skill library |
 
 ## Installation
-
-> This repository uses **pnpm workspaces** (`pnpm-workspace.yaml`) — the npm
-> `workspaces` field is intentionally absent. Install with `pnpm install`.
 
 See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
 compatibility flow, and profile override examples.
@@ -68,7 +62,11 @@ Use the legacy preset overlay on a standard DSH host:
   name: '@deepseek-ai/dsh-evolution-preset'
 ```
 
-Or compose manually — order matters because provider rows declare `inject`:
+Or compose manually — order matters because provider rows declare `inject`.
+This mirrors the row set shipped by the two bundles (evolution-host infra +
+evolution-agent model tools); the DSH profile HOST provides the storage
+facility (`storage`/`storage-json`/`storage-domain`), which this preset never
+owns — `evolution-state-domain` joins it only when mounted (D-30):
 
 ```yaml
 - id: evolution-policy
@@ -81,6 +79,9 @@ Or compose manually — order matters because provider rows declare `inject`:
   name: '@deepseek-ai/dsh-evolution-state-storage'
 - id: evolution-state-domain
   name: '@deepseek-ai/dsh-evolution-state-domain'
+  # Opt-in: joins the HOST storage-domain facility when mounted; disabled by
+  # default so evolution-state-json stays the portable backend.
+  disabled: true
 - id: evolution-state-json
   name: '@deepseek-ai/dsh-evolution-state-json'
 - id: evolution-state
@@ -89,12 +90,17 @@ Or compose manually — order matters because provider rows declare `inject`:
   name: '@deepseek-ai/dsh-memory'
 - id: memory-files
   name: '@deepseek-ai/dsh-memory-files'
-- id: tool-memory
-  name: '@deepseek-ai/dsh-tool-memory'
 - id: skill-usage
   name: '@deepseek-ai/dsh-skill-usage'
+# model-facing tools (evolution-agent preset layer)
+- id: tool-memory
+  name: '@deepseek-ai/dsh-tool-memory'
 - id: tool-skill-manage
   name: '@deepseek-ai/dsh-tool-skill-manage'
+- id: tool-session-query
+  name: '@deepseek-ai/dsh-tool-session-query'
+- id: evolution-skill-catalog
+  name: '@deepseek-ai/dsh-evolution-skill-catalog'
 - id: evolution-approval
   name: '@deepseek-ai/dsh-evolution-approval'
   config:
@@ -104,10 +110,14 @@ Or compose manually — order matters because provider rows declare `inject`:
   name: '@deepseek-ai/dsh-evolution-threat'
 - id: evolution-review
   name: '@deepseek-ai/dsh-evolution-review'
+  config:
+    reviewToolAllow: [skill]
 - id: evolution-curator
   name: '@deepseek-ai/dsh-evolution-curator'
 - id: evolution-commands
   name: '@deepseek-ai/dsh-evolution-commands'
+- id: evolution-maintenance-tools
+  name: '@deepseek-ai/dsh-evolution-maintenance/tools'
 - id: evolution-activity
   name: '@deepseek-ai/dsh-evolution-activity'
 - id: evolution-feedback
@@ -116,6 +126,17 @@ Or compose manually — order matters because provider rows declare `inject`:
   name: '@deepseek-ai/dsh-evolution-learning-graph'
 - id: evolution-replay
   name: '@deepseek-ai/dsh-evolution-replay'
+
+# Cross-session recall (base `session-query-sqlite` override) and the Hermes
+# 60-char catalog cap (base `tool-skill` override) — both also carried by the
+# evolution-host bundle.
+- id: session-query-sqlite
+  config:
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
+    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY || 'startup'
+- id: tool-skill
+  config:
+    catalogDescriptionMaxLength: 60
 ```
 
 ## Control-plane invariants
@@ -133,3 +154,16 @@ Or compose manually — order matters because provider rows declare `inject`:
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media
    decisions out of policy code; native packages perform no node:fs IO of
    their own.
+
+## Development: the two layouts and their tsconfigs
+
+Dev source lives at `packages/evolution/*`; the mirrored publication repo uses
+the flat form `packages/evolution-*`. The repo `tsconfig.base.json` /
+`tsconfig.host.json` carry the `@deepseek-ai/dsh-evolution*`/`@lmzhen` alias
+lines and project references as `./packages/evolution/<pkg>` paths. Those
+`packages/evolution/...` paths resolve ONLY in the full upstream checkout (the
+dev tree or the CI overlay built against it) — they are not resolvable as a
+standalone flat mirror, where the packages live as `packages/evolution-*`.
+When a config in the published repo is copied into the flat tree for a
+stand-alone build, its project references therefore remain
+CI-overlay-only and must not be expected to resolve independently (G5.5).

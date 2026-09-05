@@ -37,15 +37,14 @@ const DSH_HOME_RE = /process\.env\.DSH_HOME/
 const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolicy/
 
 const violations = []
-/** N3 (warn-only listing, not a gate): Config numeric fields must carry a
- * value clamp (`.min(`/`.max(`/`.finite(`/`.nonnegative(`) — schemastery lets
- * NaN and ±Infinity through a bare `z.number()`, so the assembly-time
- * clampedNumber() fallback is the authoritative guard (G3.1). Field-level
- * single-line heuristic: a line containing `z.number()` without any clamp
- * call on it is reported. The outstanding set (capability/curator/review/
- * memory-files/activity Config) is the G3.1 convergence TODO; once it lands,
- * flip this check into `violations` with strict. */
-const nNumeric = []
+/** N3 (gate, 0.3.25): Config numeric fields must carry a value clamp
+ * (`.min(`/`.max(`/`.finite(`/`.nonnegative(`) — schemastery lets NaN and
+ * ±Infinity through a bare `z.number()`, so the assembly-time clampedNumber()
+ * fallback is the authoritative guard (G3.1). Field-level single-line
+ * heuristic: a line containing `z.number()` without any clamp call is a
+ * violation. 0.3.23 held the remaining fields as a warn-only TODO; 0.3.25
+ * clamped them all (N3 = 0), so the check flipped into the violations gate.
+ * */
 /** N4 (warn-only listing, not a gate): dead-fallback returns — a `?? ''` or
  * `?? <identifier>Id` after a value that is already supplied makes the branch
  * dead. Reported as a smell rather than an error because many `?? xId` are a
@@ -71,7 +70,7 @@ function walk(dir) {
       if (rel.includes('/src/') && COPY_RE.test(text) && !rel.startsWith(`${APPROVAL_SRC}/`) && !rel.startsWith(`${CORE_SRC}/`)) {
         violations.push(`${rel}: local copy of ApprovalPolicyLike/effectiveSessionPolicy (single-source in ${APPROVAL_SRC})`)
       }
-      // N3 (warn-only): bare Config numeric fields (see comment above).
+      // N3 (gate): bare Config numeric fields (see comment above).
       if (rel.includes('/src/')) {
         // Split on CRLF so `\r` is not left on the line end — otherwise the
         // comment strip below (`/\/\/.*$/`) cannot match a `//` comment on a
@@ -81,7 +80,7 @@ function walk(dir) {
           const code = (lines[i] ?? '').replace(/\/\/.*$/, '').trim()
           if (!/z\.number\(\)/.test(code)) continue
           if (/\.(?:min|max|finite|nonnegative)\(/.test(code)) continue
-          nNumeric.push(`${rel}:${i + 1}: numeric field without a value clamp (G3.1 TODO — assembly-time clampedNumber() is the guard)`)
+          violations.push(`${rel}:${i + 1}: numeric field without a value clamp (route through clampedNumber + a .min/.max schema bound)`)
         }
         // N4 (warn-only): dead-fallback returns (see comment above).
         for (let i = 0; i < lines.length; i += 1) {
@@ -108,10 +107,6 @@ if (violations.length > 0) {
   console.warn(violations.join('\n'))
 } else {
   console.log(`verify-arch-guards: OK — no DSH_HOME reads outside ${CORE_SRC}, no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC}`)
-}
-if (nNumeric.length > 0) {
-  console.warn(`verify-arch-guards [warn]: ${nNumeric.length} unclamped numeric Config field(s) (G3.1 convergence TODO — warn-only for now):`)
-  console.warn(nNumeric.join('\n'))
 }
 if (nDeadFallback.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${nDeadFallback.length} dead-fallback return(s) ('?? ...' — value already supplied):`)

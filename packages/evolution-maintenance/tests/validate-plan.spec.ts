@@ -162,6 +162,16 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(result.plan.plan[0]?.needs_human).toBe(true)
     expect(result.forcedHuman).toContain('no-quality-skill')
   })
+
+  it('F-326: rejects a plan item naming a skill not in the facts report', () => {
+    const item = validItem({ names: ['ghost-skill'] })
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
+    expect(result.ok).toBe(false)
+    expect(result.errors.some(e => e.includes('not in the facts report'))).toBe(true)
+    // A name that IS in the facts report passes the anchoring check.
+    const ok = validateAndNormalizeMaintainPlan(validPlan([validItem({ names: ['healthy-skill'] })]), report, SIGNALS)
+    expect(ok.ok).toBe(true)
+  })
 })
 
 describe('validation result shape', () => {

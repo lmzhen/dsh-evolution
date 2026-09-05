@@ -24,9 +24,6 @@
       "path": "../evolution-approval"
     },
     {
-      "path": "../evolution-curator"
-    },
-    {
       "path": "../evolution-maintenance"
     }
   ]

@@ -336,7 +336,12 @@ function normalizeSummary(input: { kind: PendingKind; summary: string; args: unk
   if (input.kind === 'memory') {
     const candidate = input.args as { operations?: unknown[]; target?: string } | undefined
     if (Array.isArray(candidate?.operations) && candidate.operations.length > 1) {
-      return `memory ${candidate.target ?? 'memory'} batch of ${candidate.operations.length} operations`
+      // F-329: a batch whose target defaulted to 'memory' used to render as
+      // "memory memory batch of N operations". Only qualify the batch with the
+      // target when it differs from the default, so the label stays single-word.
+      const targetLabel = candidate.target ?? 'memory'
+      const qualifier = targetLabel === 'memory' ? '' : `${targetLabel} `
+      return `memory ${qualifier}batch of ${candidate.operations.length} operations`
     }
   }
   if (input.kind === 'skill' && /^skill delete /.test(trimmed)) return `${trimmed} (warning: archive)`

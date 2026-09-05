@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.25 (patch) — G5 其余 + G6 清扫 + G7.2 文档化 + N3 门禁翻转（批次 5，计划收官）
+
+审计优化计划最后一批（批次 5：装配与清扫）；每项先核验再修（B 组发现计划 F 编号系统性错位——以审计报告原文机制描述为准核验；3 项核验为已满足/仅报告）。
+
+- **G5.1 preset 行集统一**：agent delta 行集核验后按实际处理（tool-session-query 已在；60-char/maintenance-tools 由 host 拥有——delta 加入会双挂载）→ delta 注释显式声明最小集差异；standalone cordis.yml 与 README 按决策点 8 声明「storage 为 host-plane、preset 不拥有、standalone 无 host 时显式声明依赖」；README 手工组合示例与两 bundle 行集同步（补 session-query-sqlite/tool-skill override/reviewToolAllow/domain disabled）。
+- **G5.2 碰撞契约统一**：core `composePresetComposition` 与 install-layered 接受同一 `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` env（默认 fail、=1 warn+keep-both）——头注释「Same contract」由虚改实；core 与 installer.spec 补碰撞路径对偶用例。
+- **G5.5 tsconfig 治理**：删除幽灵 references（commands→curator、learning-graph→memory/skill-usage——grep 证实无 import）；plan-validator 引用改兄弟式；README 声明「packages/evolution paths/refs 仅在完整 upstream checkout 可解析」（CI overlay）。
+- **G5.6 zod 别名出域**：inject-evolution-paths 的注入列表**排除 zod**（其 pnpm-store 路径机器特定；且上游自带 zod 键会误触发 already-declares fail）——inject-paths 测试同步（2 条注入 + zod 负断言）；zod `^3.0.0` 声明 vs 实际解析 4.4.3 的偏差记录为已知项。
+- **G6.1 死代码清零批**：PENDING_STATUSES 删除（类型内联字面量联合）、CLAIM_EXPIRY 死逻辑删除（**决策点 6**——expiry 分支不可达：canClaim 只放行 pending；executing 永不自动重放=E-24 安全语义真相化）、ensureRecord 删除（测试调用改 ensureRecordCreated）、skill_load 幻影键删除（读工具名单与 review 侧对齐）；**moved-twice 分支核验不符未删**（可达且有测试）；registryVersion/smoke-package/verify-layout-sync 核验后报告（脚本层，附主代理裁决）；core 死导出扫描=已满足（无 refs=1 真死 value 导出）。
+- **G6.2 边界缺陷批（12 项）**：HEALTH_STAMP_RE 支持偏移/无时区 + hex 词强制含数字（`defaced` 不再误计）、relatedSkillNames 词边界（CamelCase 垃圾词元清零——如 `MySkill`→`y`）、feedback lastNote 回滚仅在本轮 note 时还原、零计数迁移注释、maintain names ∈ facts 校验、curator-error 纳入 retainReports（mtime 回退）、E-15 自愈补 bundled suppression、consolidations 候选池 marker 预过滤、normalizeSummary 杜绝「memory memory」叠词、plan-validator 容器级畸形逐项拒绝（Array.isArray 前置）、activity serializeActivity 单源、snapshot 恢复清理快照后点文件（F-316——`.usage.json` 幽灵清零，审计/抑制态保留）。
+- **G6.3 契约对齐**：pinned 前台归档 → 守卫消息明确指引（决策点 5：改提示词——「移除 .pinned marker 后重试」）；io.spec 5s→1s 注释修正。
+- **G6.4 测试缺口批**：FORBIDDEN_CONTROL_KEYS 专项覆盖、review.spec 名实修正、completion 通道集成（F-363——通过 runOnTurnEnd 的 inject 通道，非 subagent spawn）、recommend 抛错路径（F-364——E-52 warn+空提名）、note 灌水负例（F-365——Notes 段先截除再计数）；并发 approve+reject 已于 0.3.24 满足（报告跳过）。
+- **G7.2 对偶形态 checklist**：落点=技能库（维护过程资产不进公开仓库）——清单固化于技能库正文（数值矩阵/JSON 三态/seam 字段/退出路径/提示词承诺矩阵）。
+- **N3 门禁翻转**：剩余 25 项数值字段全部钳制（activity/capability/curator/review/memory-files——决策表：仅 curator `minIdleHours`/`bootGraceSeconds` 允许 0（`.min(0)`），其余 `.min(1)`；`reviewTimeoutMs` 0 不是 no-timeout——`AbortSignal.timeout(0)` 立即中止；`executionTimeoutMs` 判定为未消费的声明字段）；arch-guards N3 从 warn-only **翻转为 gate**（strict 失败）。
+- **回归**：全量 vitest **98 文件 / 630 测试**；oxlint 0/0（190 文件）；tsc 28 包 0；arch-guards strict 0（N4 68 项 warn-only 保持——多为合法兜底）；dependency-closure 30 包 OK。
+- **闭环声明**：v3 优化计划 **G0-G7 全部批次落地**。剩余非本地项：①上游平台议题（G4.8 的 config 全局默认策略服务端派生分歧 + N-2 overrideOf 签名——待平台包可考）；②F-328 完整 hash 方案（需放宽 PendingRecord 共享契约——申报为已知限制）。
+
 ## 0.3.24 (patch) — G4 控制面 + G5.3/G5.4 命令面（批次 4，5 组）
 
 审计优化计划批次 4（控制面与命令面）；每项先按报告行号核对现状再修（12 项核验中 3 项已满足：G4.8 本地收敛已于 0.3.23 完成、G7.3 事件配对门禁已于 0.3.21 接入 CI、F-323 计数已行首锚定排除 notes）。

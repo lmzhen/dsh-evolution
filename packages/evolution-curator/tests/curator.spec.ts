@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -1462,4 +1462,20 @@ Body of ${name}.
     await rm(home, { recursive: true, force: true })
   })
 
+  it('F-364: a throwing LLM stream is contained by recommend (E-52 warn, empty nomination set)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('llm', {
+      stream: async function* () { throw new Error('llm provider down') },
+    })
+    ctx.provide('evolutionPolicy', { get: () => ({ curatorModel: 'model-x' }) })
+    await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, intervalHours: 24 })
+    const spy = vi.spyOn(ctx.logger, 'warn')
+    const nominations = await (ctx.evolutionCurator as unknown as { recommend(names: string[]): Promise<{ prunings: string[]; consolidations: unknown[] }> }).recommend(['sql-backup', 'SQL-restore'])
+    // E-52: the swallow must be observable — warn + empty nomination set, no throw.
+    expect(nominations).toEqual({ prunings: [], consolidations: [] })
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('LLM nomination pass failed'))
+    spy.mockRestore()
+  })
 })

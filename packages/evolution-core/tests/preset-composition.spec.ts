@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { composePresetComposition } from '@deepseek-ai/dsh-evolution-core'
 
 describe('composePresetComposition (0.3.15)', () => {
@@ -18,6 +18,25 @@ describe('composePresetComposition (0.3.15)', () => {
     const standard = '- id: zzz\n  name: "@deepseek-ai/dsh-zzz"\n\n- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
     const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
     expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-memory/)
+  })
+
+  it('warns and keeps both rows under DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1 (0.3.25)', () => {
+    const previous = process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
+    process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = '1'
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const standard = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    try {
+      // Keeps both rows (mounts twice) instead of failing loud.
+      expect(composePresetComposition(standard, delta)).toBe(
+        '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n',
+      )
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('collide with standard rows'))
+    } finally {
+      warn.mockRestore()
+      if (previous === undefined) delete process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
+      else process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = previous
+    }
   })
 
   it('reads only `- id:` rows and ignores comments/sections', () => {

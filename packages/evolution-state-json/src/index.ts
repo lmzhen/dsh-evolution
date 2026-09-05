@@ -10,7 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionHome, makeSerialQueue, transactIo } from '@deepseek-ai/dsh-evolution-core'
-import { canClaimPending, canResolvePending, CLAIM_EXPIRY_MS, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import { canClaimPending, canResolvePending, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 import { join } from 'node:path'
 
 export const name = 'evolution-state-json'
@@ -243,8 +243,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
           const record = map[id] ?? null
           if (record === null || !canClaimPending(record.status)) return map
           const now = Date.now()
-          const claimedAt = typeof record.claimedAt === 'string' ? Date.parse(record.claimedAt) : 0
-          if (record.claimedBy !== undefined && Number.isFinite(claimedAt) && now - claimedAt < CLAIM_EXPIRY_MS) return map
           // 0.3.17 (S3.3, E-24): claiming moves the record to 'executing'
           // atomically — a crash after the runner executed but before the
           // resolve can no longer be re-claimed into a SECOND execution (the
@@ -266,7 +264,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
           const record = map[id]
           // 0.3.17 (S3.3): releasing a CLAIMED-EXECUTING record rolls it back to
           // pending (a runner FAILURE is retryable); a crash leaves it
-          // executing + claimed until expiry, then operator-resolvable.
+          // executing + claimed for only the operator to resolve (reject or
+          // release + re-stage) — it is never automatically re-claimed.
           if (!record || record.claimedBy !== claimId) return map
           record.status = releasedStatus(record.status)
           delete record.claimedBy

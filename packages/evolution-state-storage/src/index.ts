@@ -16,8 +16,7 @@ export type PendingKind = 'memory' | 'skill' | 'capability'
 /** 0.3.17 (S3.3, E-24): 'executing' = claimed, runner in flight — a fresh
  * claim only takes 'pending', and resolve accepts 'pending'/'executing', so a
  * crash mid-approve can never double-execute the runner. */
-export const PENDING_STATUSES = ['pending', 'executing', 'approved', 'rejected'] as const
-export type PendingStatus = (typeof PENDING_STATUSES)[number]
+export type PendingStatus = 'pending' | 'executing' | 'approved' | 'rejected'
 
 /** 0.3.17 (S3.3): the claim lifecycle as ONE transition table — BOTH
  * providers (json/domain) must use these, never a hand-written copy (a second
@@ -31,17 +30,12 @@ export const releasedStatus = (status: PendingStatus): PendingStatus => status =
 /**
  * Claim lifecycle (S3.3): pending →(claim)→ executing →(resolve)→ approved/rejected.
  * release() rolls executing back to pending (failure path). A crash between
- * the runner execution and the resolve leaves the record executing+claimed:
- * until expiry another claim is refused (no double execution), and after
- * expiry only the operator acts — approval NEVER auto-replays an executing
- * record (the write may already have landed; a non-idempotent replay would
- * duplicate it). Operator options: reject (cleanup, no runner) or release +
- * re-stage after manual verification. Release command surface is deferred.
+ * the runner execution and the resolve leaves the record executing+claimed,
+ * and NO later claim is ever accepted (claim only takes pending, so a crashed
+ * approve can never double-execute a non-idempotent runner). Only the operator
+ * acts on such a record: reject (cleanup, no runner) or release + re-stage
+ * after manual verification. Release command surface is deferred.
  */
-
-/** 0.3.17 (E-75): claim expiry single source — both providers (json/domain)
- * previously hardcoded `10 * 60_000` independently. */
-export const CLAIM_EXPIRY_MS = 10 * 60_000
 
 export interface ReviewStateRecord {
   turnsSinceMemory: number

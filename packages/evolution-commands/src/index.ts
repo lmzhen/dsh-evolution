@@ -531,7 +531,13 @@ export function atomicWriteFiles(
  * evolution-maintenance outcome change (out of this package's scope).
  */
 export function countMaintainRecommendations(text: string | undefined): number {
-  return text?.match(/^- \[/gm)?.length ?? 0
+  if (!text) return 0
+  // F-365: the `Notes:` section renders as `- <note>` bullets; one that
+  // happens to OPEN with a bracket would match `^- [` and inflate the count.
+  // Drop the notes section before counting so a note can never be a
+  // recommendation (formatPlan emits `Notes:` on its own line).
+  const planSection = text.split('\nNotes:')[0] ?? ''
+  return planSection.match(/^- \[/gm)?.length ?? 0
 }
 
 interface CommandInvocation {

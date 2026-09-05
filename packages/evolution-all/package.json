@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-all",
   "description": "One-command aggregate entry for the dsh-evolution plugin family (host + model tools)",
-  "version": "0.3.24",
+  "version": "0.3.25",
   "publishConfig": {
     "access": "public"
   },

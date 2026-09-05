@@ -350,7 +350,14 @@ export function relatedSkillNames(content: string, exclude?: string): string[] {
   const raw = parsed.frontmatter['related_skills']
   if (typeof raw !== 'string') return []
   const names = new Set<string>()
-  for (const match of Array.from(raw.matchAll(/[a-z0-9][a-z0-9-]*/g))) {
+  // F-321 (0.3.25): the old bare `[a-z0-9][a-z0-9-]*` scan matched an inner
+  // fragment of a CamelCase word — `MySkill` produced the junk token `y` (and
+  // would match `kill` in `Skill`-suffixed names), which then fed the quality
+  // references factor and learning-graph edges. A name token is only a real
+  // reference when it is delimited (no letter/digit/hyphen/underscore on
+  // either side), so a camel/underscored word is skipped wholesale instead of
+  // leaking fragments.
+  for (const match of Array.from(raw.matchAll(/(?<![A-Za-z0-9_-])[a-z0-9][a-z0-9-]*(?![A-Za-z0-9_-])/g))) {
     const target = match[0]
     if (target && SKILL_NAME_RE.test(target) && target !== exclude) names.add(target)
   }
@@ -1183,7 +1190,14 @@ export class SkillLibrary {
     const md = await this.io.readText(join(dir, 'SKILL.md'))
     if (!md) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.deleteProtection(name, options.allowBundled === undefined ? {} : { allowBundled: options.allowBundled })
-    if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
+    if (protection) {
+      return {
+        ok: false,
+        message: protection === 'pinned'
+          ? `Skill "${name}" is pinned and cannot be archived. Remove the \`.pinned\` marker in its directory, then retry.`
+          : `Skill "${name}" is protected (${protection}).`,
+      }
+    }
     if (options.absorbedInto) {
       // 0.3.18 (E-69): `delete X absorbed_into=X` used to pass the existence
       // check (it read the archived skill's own still-present file) and
@@ -1819,8 +1833,16 @@ export class SkillLibrary {
     } catch {
       rootEntries = []
     }
+    // F-316 (0.3.25): only the system directories and the durable sidecars are
+    // survived by a snapshot restore. A dot-entry that appeared AFTER the
+    // snapshot (e.g. a fresh `.usage.json`) used to be kept by the blanket
+    // `startsWith('.')` skip, leaving a ghost record that disagrees with the
+    // restored tree (E-15 self-heal could converge, but the intermediate state
+    // is observable). Usage is derived data — the next curator run seeds
+    // empty records — so it is dropped with the tree; the mutation audit and
+    // the suppression state are real history and stay.
     for (const entry of rootEntries) {
-      if (entry.startsWith('.')) continue
+      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json') continue
       await this.io.remove(join(this.root, entry))
     }
     const manifest = await this.readSnapshotManifest(snapshotPath)

@@ -74,6 +74,14 @@ export function applyActivityEvent(
 }
 
 /** Parse a raw sidecar into records; malformed content reads as empty (best-effort telemetry). */
+/** Single-source activity sidecar serialization (F-304): both `saveActivity`
+ * and the `apply()` listener emit the versioned envelope through this one
+ * function, so a format change cannot drift across two hand-written writers.
+ * `parseActivityContent` is the matching single reader. */
+export function serializeActivity(items: EvolutionActivityRecord[]): string {
+  return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
+}
+
 export function parseActivityContent(raw: string | null): EvolutionActivityRecord[] {
   if (raw === null) return []
   try {
@@ -96,7 +104,7 @@ export async function loadActivity(root: string, io: EvolutionIoLike): Promise<E
 }
 
 export async function saveActivity(root: string, items: EvolutionActivityRecord[], io: EvolutionIoLike): Promise<void> {
-  await io.writeText(activityFile(root), JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2))
+  await io.writeText(activityFile(root), serializeActivity(items))
 }
 
 export const name = 'evolution-activity'
@@ -107,7 +115,11 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  maxItems: z.number().default(DEFAULT_MAX_ITEMS),
+  // G3.1 (0.3.23): a non-positive bound would disable the retention window
+  // (`slice(-0)` keeps everything), so 0/negative fail loud at the schema. The
+  // assembly-time S6.4 clamp (non-finite -> default) covers NaN/±Infinity,
+  // which a bare `z.number()` lets through.
+  maxItems: z.number().min(1).default(DEFAULT_MAX_ITEMS),
 })
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -138,7 +150,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const run = chain.then(() =>
         transactIo(io, activityFile(root), (current) => {
           const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
-          return Promise.resolve(JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2))
+          return Promise.resolve(serializeActivity(items))
         }),
       )
       chain = run.then(() => undefined, () => undefined)

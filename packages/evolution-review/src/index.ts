@@ -12,7 +12,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
@@ -52,19 +52,26 @@ export interface Config {
 export const Config: z<Config> = z.object({
   reviewEnabled: z.boolean().default(true),
   reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
-  memoryInterval: z.number().default(DEFAULT_REVIEW_MEMORY_INTERVAL),
-  skillInterval: z.number().default(DEFAULT_REVIEW_SKILL_INTERVAL),
+  memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
+  skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),
-  reviewTimeoutMs: z.number().default(120_000),
-  executionTimeoutMs: z.number().default(30_000),
-  reviewContextMessages: z.number().default(60),
-  reviewMessageChars: z.number().default(2000),
-  reviewMaxDepth: z.number().default(1),
+  reviewTimeoutMs: z.number().min(1).default(120_000),
+  // executionTimeoutMs is declared but has no read point in this package (no
+  // consumer uses it); `.min(1)` is applied for G3.1 schema consistency, and the
+  // field is flagged for the removal review (it is dead as a clamp target today).
+  executionTimeoutMs: z.number().min(1).default(30_000),
+  reviewContextMessages: z.number().min(1).default(60),
+  reviewMessageChars: z.number().min(1).default(2000),
+  // reviewMaxDepth 0 is the historical 0.3.1 maximum-depth defect (a 0 rejects
+  // the spawn outright), so its min is 1. `reviewTimeoutMs` 0 is not a "no
+  // timeout" meaning — AbortSignal.timeout(0) aborts immediately (and there is
+  // no disable-timeout branch), so it clamps to at least 1.
+  reviewMaxDepth: z.number().min(1).default(1),
   // (rc.66 note) schemastery fields are optional by default — the interface
   // `reviewProvider?` and this schema agree; "Omit to inherit" holds.
   reviewProvider: z.string(),
   skillReviewTrigger: z.string().default(DEFAULT_SKILL_REVIEW_TRIGGER),
-  skillReviewCompletionMinToolCalls: z.number().default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
+  skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
 })
 
 interface SubagentLike {
@@ -90,11 +97,44 @@ interface MemoryLike {
 // stateless deployment is noise).
 let statelessReviewStateWarned = false
 
+/**
+ * G3.1 (0.3.23): clamp the numeric review config at assembly so a 0/negative/
+ * NaN/±Infinity value falls back to the package default instead of folding as a
+ * "disabled" special value (a 0 interval would fire a review every turn; NaN
+ * folds as NaN into the cadence/timeout). The schema `.min(1)` guards the
+ * loader path; this clamp also covers NaN/±Infinity (which schemastery lets a
+ * bare number schema through) and direct construction. `reviewMaxDepth` clamps
+ * to at least 1 because 0 is the historical 0.3.1 maximum-depth defect (a 0
+ * rejects the spawn outright). Warn once when a user-supplied value had to be
+ * corrected.
+ */
+function clampReviewConfig(rawConfig: Config, ctx: Context): Required<Config> {
+  const clamped: string[] = []
+  const field = (name: keyof Config, value: number | undefined, fallback: number, min: number): number => {
+    const result = clampedNumber(value, fallback, { min })
+    if (value !== undefined && result !== value) clamped.push(name)
+    return result
+  }
+  const config = Object.assign({}, rawConfig, {
+    memoryInterval: field('memoryInterval', rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
+    skillInterval: field('skillInterval', rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+    reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, 120_000, 1),
+    reviewContextMessages: field('reviewContextMessages', rawConfig.reviewContextMessages, 60, 1),
+    reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, 2000, 1),
+    reviewMaxDepth: field('reviewMaxDepth', rawConfig.reviewMaxDepth, 1, 1),
+    skillReviewCompletionMinToolCalls: field('skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
+  }) as Required<Config>
+  if (clamped.length > 0) {
+    ctx.logger.warn(`dsh-evolution-review: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
+  }
+  return config
+}
+
 export function apply(ctx: Context, rawConfig: Config): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
   }
-  const config = rawConfig as Required<Config>
+  const config = clampReviewConfig(rawConfig, ctx)
   const turnStarts = new Map<SessionId, number>()
   // Completion-channel state (E-59f): these two are deliberately NOT persisted
   // to ReviewState. A process restart resets the "session is proven-long"

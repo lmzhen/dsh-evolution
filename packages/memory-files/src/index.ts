@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, makeSerialQueue, MemoryStore } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
 
@@ -25,15 +25,34 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   providerName: z.string().default('files'),
-  memoryCharLimit: z.number().default(DEFAULT_MEMORY_CHAR_LIMIT),
-  userCharLimit: z.number().default(DEFAULT_USER_CHAR_LIMIT),
+  memoryCharLimit: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
+  userCharLimit: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
   addDatePrefix: z.boolean().default(false),
   root: z.string().default(''),
-  maxConsolidationFailures: z.number().default(DEFAULT_CONSOLIDATION_FAILURES),
+  maxConsolidationFailures: z.number().min(1).default(DEFAULT_CONSOLIDATION_FAILURES),
 })
 
 export function apply(ctx: Context, rawConfig: Config): void {
-  const config = rawConfig as Required<Config>
+  // G3.1 (0.3.23): clamp the numeric memory limit at assembly so a 0/negative/
+  // NaN/±Infinity value falls back to the package default. A 0 limit is never an
+  // "unbounded" meaning (MemoryStore keeps its own internal defense); the schema
+  // `.min(1)` rejects 0/negative at load, this clamp also covers NaN/±Infinity
+  // (which schemastery lets a bare number schema through) and direct
+  // construction. Warn once when a user-supplied value had to be corrected.
+  const clamped: string[] = []
+  const field = (name: string, value: number | undefined, fallback: number): number => {
+    const result = clampedNumber(value, fallback, { min: 1 })
+    if (value !== undefined && result !== value) clamped.push(name)
+    return result
+  }
+  const config = Object.assign({}, rawConfig, {
+    memoryCharLimit: field('memoryCharLimit', rawConfig.memoryCharLimit, DEFAULT_MEMORY_CHAR_LIMIT),
+    userCharLimit: field('userCharLimit', rawConfig.userCharLimit, DEFAULT_USER_CHAR_LIMIT),
+    maxConsolidationFailures: field('maxConsolidationFailures', rawConfig.maxConsolidationFailures, DEFAULT_CONSOLIDATION_FAILURES),
+  }) as Required<Config>
+  if (clamped.length > 0) {
+    ctx.logger.warn(`memory-files: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
+  }
   // The IO provider is resolved lazily so `memory-files` does not depend on
   // row order: the first write happens only after the preset has fully mounted.
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())

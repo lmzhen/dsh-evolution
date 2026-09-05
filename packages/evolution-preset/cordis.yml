@@ -5,6 +5,14 @@
 #   ctx.evolutionStateStorage  -> storage-domain KV provider, with a JSON
 #                                provider mounted as fallback/portable audit
 #
+# Storage ownership (D-30): the storage stack (`storage`, `storage-json`,
+# `storage-domain`) is HOST-plane in DSH — a preset must not own it. This
+# STANDALONE composition lists it only because a hand-composed file has no
+# host bundle behind it; the overlay form (cordis.patch.yml) relies on the
+# host providing the facility and therefore does not list these rows. When
+# composing manually, include the host storage rows yourself (or use the
+# patch overlay on a host that already provides them).
+#
 # The legacy `@deepseek-ai/dsh-evolution` facade was retired from publishing
 # after the v0.1.0-rc.18 release tag (see docs/codebase-audit-rc16.md); this
 # composition uses the smaller native packages instead.

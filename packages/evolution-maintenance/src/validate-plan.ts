@@ -112,8 +112,10 @@ export function validateAndNormalizeMaintainPlan(
   // the only component that audits a plan. `protected` flows into the report
   // since 0.3.11 (facts meta), so the data is already present.
   const protectedNames = new Set<string>()
+  const factNames = new Set<string>()
   for (const skill of report.skills) {
     if (skill.protected) protectedNames.add(skill.name)
+    factNames.add(skill.name)
   }
 
   if (!isRecord(raw)) return { ok: false, errors: ['plan root: must be an object'], plan: { verdict: 'no_issues', plan: [], notes: [] }, forcedHuman }
@@ -141,6 +143,12 @@ export function validateAndNormalizeMaintainPlan(
       if (typeof item.kind !== 'string' || !KINDS.has(item.kind)) errors.push(`${path}.kind: invalid`)
       if (!Array.isArray(item.names) || item.names.length === 0 || !item.names.every(isNonEmptyString)) {
         errors.push(`${path}.names: non-empty string array required`)
+      } else if (item.names.some(nm => !factNames.has(nm))) {
+        // F-326: a hallucinated skill name can carry a format-perfect evidence
+        // block and sail through the facts-anchoring claim. Every name must be
+        // a skill the facts report actually scanned.
+        const missing = item.names.find(nm => !factNames.has(nm))
+        errors.push(`${path}.names: references skill "${String(missing)}" not in the facts report — names must come from the scanned skill set`)
       } else if (item.names.some(nm => protectedNames.has(nm))) {
         const hit = item.names.find(nm => protectedNames.has(nm))
         errors.push(`${path}.names: references protected skill "${String(hit)}" — §7 forbids recommendations for bundled/hub-installed/pinned skills`)

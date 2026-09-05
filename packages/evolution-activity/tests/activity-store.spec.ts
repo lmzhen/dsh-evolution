@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, type EvolutionActivityRecord } from '../src/index.ts'
+import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
 
 function payload(overrides: Partial<EvolutionPlanAppliedEvent> = {}): EvolutionPlanAppliedEvent {
   return {
@@ -245,6 +245,17 @@ describe('evolution-activity store', () => {
       else process.env.DSH_HOME = previous
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('F-304: serializeActivity is the single-source envelope writers share (round-trips with the reader)', () => {
+    const items: EvolutionActivityRecord[] = [
+      { sessionId: 's-a', planId: 'p-1', memoryApplied: 1, skillApplied: 2, rejectedOps: 0, at: 123 },
+    ]
+    const raw = serializeActivity(items)
+    // The versioned envelope is the one format both saveActivity and apply() emit.
+    expect(JSON.parse(raw)).toEqual({ version: ACTIVITY_FILE_VERSION, items })
+    // The matching reader decodes it back to the same records (no drift).
+    expect(parseActivityContent(raw)).toEqual(items)
   })
 
 })

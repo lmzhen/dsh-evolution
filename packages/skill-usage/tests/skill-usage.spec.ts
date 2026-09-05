@@ -66,24 +66,25 @@ describe('skill-usage', () => {
     expect(ctx.skillUsage.root).toBe(skillsRoot())
   })
 
-  it('observes skill/skill_load reads through session/event and records views (A2)', async () => {
+  it('observes the skill tool read through session/event and records a view (A2)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-usage-observe-'))
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
-    await ctx.skillUsage.ensureRecord('demo-read')
+    await ctx.skillUsage.ensureRecordCreated('demo-read', false)
     const toolCall = (name: string, args: unknown) => ({
       type: 'tool/call',
       data: { turn: 1, step: 1, callId: 'c1', name, arguments: JSON.stringify(args) },
     }) as never
     ctx.emit('session/event', {} as never, toolCall('skill', { name: 'demo-read' }))
+    // The catalog has no skill_load/skill_search discovery pair (0.3.18 E-59e),
+    // so only the real `skill` tool is a read — phantom tools must not count.
     ctx.emit('session/event', {} as never, toolCall('skill_load', { skill: 'demo-read' }))
-    // A non-read tool must not count.
     ctx.emit('session/event', {} as never, toolCall('skill_search', { name: 'demo-read' }))
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('demo-read')
-    expect(seen?.view_count).toBe(2)
+    expect(seen?.view_count).toBe(1)
     await rm(root, { recursive: true, force: true })
   })
 
@@ -93,7 +94,7 @@ describe('skill-usage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
-    await ctx.skillUsage.ensureRecord('anchor-skill')
+    await ctx.skillUsage.ensureRecordCreated('anchor-skill', false)
     const read = (step: number) => {
       ctx.emit('session/event', {} as never, {
         type: 'tool/call',
@@ -135,7 +136,7 @@ describe('skill-usage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.skillUsage.ensureRecord('malformed-demo')
+    await ctx.skillUsage.ensureRecordCreated('malformed-demo', false)
     // `data` absent entirely — an external emitter can inject a broken event.
     ctx.emit('session/event', {} as never, { type: 'tool/call' } as never)
     // `data` present but carries no `name`.
@@ -160,7 +161,7 @@ describe('skill-usage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.skillUsage.ensureRecord('null-args-demo')
+    await ctx.skillUsage.ensureRecordCreated('null-args-demo', false)
     // `arguments` is the literal JSON value `null`: JSON.parse succeeds and
     // yields null, which must not throw on `.name` access nor mint a view.
     ctx.emit('session/event', {} as never, {

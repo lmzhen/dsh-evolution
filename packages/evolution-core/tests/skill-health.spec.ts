@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core'
+import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, HEALTH_STAMP_RE } from '@deepseek-ai/dsh-evolution-core'
 
 it('a small dense body with support files is healthy', () => {
   const assessment = assessStructureHealth({
@@ -89,4 +89,13 @@ it('churn dimension ignores usage when counts are absent or the skill is read', 
   }, thresholds)
   expect(read.verdict).toBe('healthy')
   expect(read.reasons.some(reason => reason.includes('never read'))).toBe(false)
+})
+
+it('F-320: HEALTH_STAMP_RE counts offset/non-UTC timestamps and hex-with-digits, not English hex words', () => {
+  // Offset and no-timezone ISO timestamps must be counted; the old regex only
+  // matched a UTC `Z` suffix (or a bare date), so +08:00 log lines were missed.
+  expect((('line 2026-08-31T12:00:00+08:00 and 2026-08-31T12:00:00 and 2026-08-30').match(HEALTH_STAMP_RE) ?? []).length).toBe(3)
+  // Commit shas have digits; coincidental all-letter hex words must not count.
+  const body = 'commit abc1234 did work; the word defaced and feedback appeared; rc.41 done'
+  expect((body.match(HEALTH_STAMP_RE) ?? []).length).toBe(2) // abc1234 + rc.41
 })

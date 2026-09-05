@@ -11,6 +11,13 @@
 #
 # The host bundle provides memory/skill services; this preset only exposes
 # the model-facing entry points and the native skill-catalog bridge.
+#
+# This delta deliberately keeps the MINIMAL model-facing set and does NOT
+# duplicate host-bundle rows: `evolution-maintenance/tools` (maintenance_probe),
+# the `session-query-sqlite` index override and the `tool-skill` 60-char
+# catalog cap are evolution-host-owned, so repeating them here would mount the
+# row twice in a layered install. The delta rows are also the only evolution-
+# owned text in the composed preset, so it tracks every platform version.
 - id: tool-memory
   name: '@deepseek-ai/dsh-tool-memory'
 

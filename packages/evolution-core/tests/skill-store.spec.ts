@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { authoringFeedback, resolveSkillsRoot, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
@@ -596,4 +596,31 @@ it('E-69: an archived skill cannot absorb into itself (0.3.18)', async () => {
   expect(result.message).toContain('cannot absorb into itself')
   expect((await lib.list()).some(s => s.name === 'python-testing')).toBe(true)
   await rm(root, { recursive: true, force: true })
+})
+
+it('F-316: a drop-in root dot-file created AFTER the snapshot is cleaned on restore, while the audit sidecar survives', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-dotrestore-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('python-testing', SKILL, 'foreground')
+  const snapshot = await lib.snapshotAll('before-dotfile')
+  expect(typeof snapshot).toBe('string')
+  // Simulate state written after the snapshot: usage is derived data and
+  // must go with the tree; the mutation audit is real history and stays.
+  await writeFile(join(root, '.usage.json'), '{"python-testing":{"use_count":9}}', 'utf8')
+  await writeFile(join(root, '.mutations.json'), '["old-audit"]', 'utf8')
+  await writeFile(join(root, '.backups', 'skills-keep.me'), 'x', 'utf8')
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(true)
+  expect(await readFile(join(root, '.usage.json'), 'utf8').then(() => false, () => true)).toBe(true)
+  expect(await readFile(join(root, '.mutations.json'), 'utf8')).toBe('["old-audit"]')
+  expect(await readFile(join(root, '.backups', 'skills-keep.me'), 'utf8')).toBe('x')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('F-321: relatedSkillNames skips CamelCase fragments and only takes delimited lowercase names', async () => {
+  const content = '---\nname: demo\nrelated_skills: MySkill,Something python-testing\n---\nbody'
+  const names = relatedSkillNames(content, 'demo')
+  // CamelCase 'MySkill'/'Something' must produce no fragment ('y', 'kill',
+  // 'omething'); the delimited lowercase name is the only reference.
+  expect(names).toEqual(['python-testing'])
 })

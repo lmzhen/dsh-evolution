@@ -254,10 +254,14 @@ describe('evolution-approval', () => {
     await ctx.evolutionApproval.request({
       kind: 'skill', summary: 'skill delete old-skill', args: { operation: { action: 'delete' }, origin: 'background_review' }, origin: 'background_review',
     })
+    await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'memory batch', args: { operations: [{ action: 'add' }, { action: 'add' }, { action: 'remove' }] }, origin: 'background_review',
+    })
     const pending = await ctx.evolutionApproval.list('pending')
     const bySummary = (suffix: string) => pending.find(item => item.summary.endsWith(suffix))?.summary
     expect(bySummary('...')).toHaveLength(120)
     expect(pending.some(item => item.summary === 'memory user batch of 3 operations')).toBe(true)
+    expect(pending.some(item => item.summary === 'memory batch of 3 operations')).toBe(true)
     expect(pending.some(item => item.summary === 'skill delete old-skill (warning: archive)')).toBe(true)
 
     await rm(home, { recursive: true, force: true })

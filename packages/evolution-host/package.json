@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-host",
   "description": "Host-plane self-evolution infrastructure bundle for DeepSeek Harness",
-  "version": "0.3.24",
+  "version": "0.3.25",
   "publishConfig": {
     "access": "public"
   },

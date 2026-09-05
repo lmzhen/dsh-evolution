@@ -31,7 +31,7 @@ it('nodeEvolutionIo.writeText serializes concurrent writers and cleans its lock'
   await rm(root, { recursive: true, force: true })
 })
 
-it('nodeEvolutionIo.writeText takes over a stale lock (5s) and still writes', async () => {
+it('nodeEvolutionIo.writeText takes over a stale lock (1s, E-8a) and still writes', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-stale-'))
   const io = nodeEvolutionIo()
   const target = join(root, 'stale.txt')
@@ -45,7 +45,7 @@ it('nodeEvolutionIo.writeText takes over a stale lock (5s) and still writes', as
   await rm(root, { recursive: true, force: true })
 })
 
-it('nodeEvolutionIo never steals a lock from a LIVE holder older than 5s (rc.66)', async () => {
+it('nodeEvolutionIo never steals a lock from a LIVE holder older than 1s (rc.66)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-live-lock-'))
   const io = nodeEvolutionIo()
   const target = join(root, 'live.txt')

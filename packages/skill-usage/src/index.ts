@@ -19,8 +19,10 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
  * its call arguments name a skill.
  */
 const READ_TOOL_KIND: Record<string, 'view'> = {
+  // Only the real `skill` tool is a read (0.3.18 E-59e): the DSH catalog has no
+  // `skill_load`/`skill_search` discovery pair, so the former phantom key was
+  // removed to keep this table aligned with evolution-review's read-instrument.
   skill: 'view',
-  skill_load: 'view',
 }
 
 /**
@@ -219,23 +221,12 @@ export class SkillUsageRegistry extends Service {
   }
 
   /**
-   * Ensure a usage record exists for `name` without bumping any counter
-   * (rc.46 M3-3.3 companion): skill creation is authorship — the record must
-   * exist from birth (created_at anchors now) but `patch_count` stays 0 so
-   * mutation maturity is not inflated by mere creation.
-   */
-  async ensureRecord(name: string): Promise<void> {
-    await this.mutate((map) => {
-      getRecord(map, name)
-    })
-  }
-
-  /**
-   * 0.3.18 (E-70): create-path telemetry in ONE atomic RMW. The former
-   * prepare→markAgentCreated pair ran two full transacts (doubled lock
-   * traffic) and left a window where `created_by=null` was on disk between
-   * them. `agentCreated` picks the authorship marking at the same commit
-   * point where the record is created.
+   * 0.3.18 (E-70): ensure a usage record exists in ONE atomic read-modify-write,
+   * picking the authorship marking at the same commit point where the record is
+   * created. The former prepare→markAgentCreated pair ran two full transacts
+   * (doubled lock traffic) and left a window where `created_by=null` was on disk
+   * between them. `agentCreated=false` creates the record without authorship
+   * (the plain "record exists from birth" path).
    */
   async ensureRecordCreated(name: string, agentCreated: boolean): Promise<void> {
     await this.mutate((map) => {

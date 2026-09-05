@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -144,5 +144,24 @@ describe('layered installer', () => {
     ].join('\n')
     const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
     expect(Buffer.from(stdout, 'base64').toString('utf8')).toBe(composePresetComposition(standard, delta))
+  })
+
+  it('core composePresetComposition honors the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (0.3.25 collision-path pin)', async () => {
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const standard = '- id: persona\n- id: tool-session-query\n'
+    const delta = '- id: tool-memory\n- id: tool-session-query\n'
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const previous = process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
+    process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = '1'
+    try {
+      // Matches install-layered's generateAgentPreset escape: fail loud by
+      // default (pinned above), keep both + warn when the env says so.
+      expect(composePresetComposition(standard, delta)).toContain('- id: tool-session-query')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('collide with standard rows'))
+    } finally {
+      warn.mockRestore()
+      if (previous === undefined) delete process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
+      else process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = previous
+    }
   })
 })

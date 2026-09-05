@@ -12,6 +12,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
+import { clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type {} from '@deepseek-ai/dsh-evolution-approval'
 import type {} from '@deepseek-ai/dsh-evolution-state'
@@ -56,19 +57,33 @@ export class EvolutionCapability extends Service {
   static inject = ['evolutionApproval', 'evolutionState']
 
   static Config: Schema<Config> = z.object({
-    maxNameLength: z.number().default(64),
-    maxPurposeLength: z.number().default(200),
-    maxCodeChars: z.number().default(65_536),
+    maxNameLength: z.number().min(1).default(64),
+    maxPurposeLength: z.number().min(1).default(200),
+    maxCodeChars: z.number().min(1).default(65_536),
   })
 
   private readonly limits: Required<Config>
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCapability')
+    // G3.1 (0.3.23): every numeric limit is clamped to at least 1. 0/negative
+    // fall back to the package default (a 0 is never a "disabled" meaning — a 0
+    // limit would reject every package). NaN/±Infinity (which schemastery lets
+    // a bare number schema through) and an out-of-range value also fall back.
+    // Warn once when a user-supplied value had to be corrected.
+    const clamped: string[] = []
+    const field = (name: string, value: number | undefined, fallback: number): number => {
+      const result = clampedNumber(value, fallback, { min: 1 })
+      if (value !== undefined && result !== value) clamped.push(name)
+      return result
+    }
     this.limits = {
-      maxNameLength: config.maxNameLength ?? 64,
-      maxPurposeLength: config.maxPurposeLength ?? 200,
-      maxCodeChars: config.maxCodeChars ?? 65_536,
+      maxNameLength: field('maxNameLength', config.maxNameLength, 64),
+      maxPurposeLength: field('maxPurposeLength', config.maxPurposeLength, 200),
+      maxCodeChars: field('maxCodeChars', config.maxCodeChars, 65_536),
+    }
+    if (clamped.length > 0) {
+      ctx.logger.warn(`evolution-capability: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
     }
   }
 

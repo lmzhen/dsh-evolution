@@ -36,13 +36,16 @@ describe('inject-evolution-paths (N-7 purity)', () => {
     await writeFile(target, TARGET)
     await writeFile(mirror, MIRROR)
     const { stdout } = await run(process.execPath, [injector, target, mirror], { encoding: 'utf8' })
-    expect(stdout).toContain('injected 3 evolution alias line(s)')
+    expect(stdout).toContain('injected 2 evolution alias line(s)')
     const next = await readFile(target, 'utf8')
     // Upstream rows survive, evolution lines land inside the paths block.
     expect(next).toContain('"@deepseek-ai/dsh-session"')
     expect(next).toContain('"@deepseek-ai/dsh-evolution-core"')
     expect(next).toContain('"@deepseek-ai/dsh-tool-memory"')
-    expect(next).toContain('"zod"')
+    // G5.6: `zod` is deliberately NOT injected — its pnpm-store path is
+    // machine-specific, and a target that already declares it must not fail
+    // the "already declares an evolution alias" check.
+    expect(next).not.toContain('"zod"')
     await rm(root, { recursive: true, force: true })
   })
 

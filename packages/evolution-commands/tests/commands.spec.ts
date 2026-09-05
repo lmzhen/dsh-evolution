@@ -794,6 +794,9 @@ describe('evolution-commands', () => {
     expect(Commands.countMaintainRecommendations(undefined)).toBe(0)
     expect(Commands.countMaintainRecommendations('')).toBe(0)
     expect(Commands.countMaintainRecommendations('no bullets here')).toBe(0)
+    // F-365: a note that opens with a bracket must not count as a
+    // recommendation — the Notes: section is dropped before counting.
+    expect(Commands.countMaintainRecommendations((text.split('Notes:')[0] ?? '') + 'Notes:\n- [note-like] priority reminder')).toBe(2)
   })
 
   it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {

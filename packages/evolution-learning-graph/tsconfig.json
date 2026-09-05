@@ -19,12 +19,6 @@
     },
     {
       "path": "../evolution-core"
-    },
-    {
-      "path": "../memory"
-    },
-    {
-      "path": "../skill-usage"
     }
   ]
 }

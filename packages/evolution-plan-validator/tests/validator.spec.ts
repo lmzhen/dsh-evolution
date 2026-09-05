@@ -13,12 +13,27 @@ describe('evolution-plan-validator', () => {
     expect(result.rejected.some(r => r.kind === 'skill' && r.reason.includes('protected'))).toBe(true)
   })
 
-  it('rejects forbidden policy fields and invalid evidence', () => {
+  it('rejects ops with invalid evidence', () => {
     const result = validateEvolutionPlan({
       memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 999 }] } satisfies MemoryOp],
     }, { sessionSeq: 10 })
     expect(result.ok).toBe(false)
-    expect(result.rejected[0]?.reason).toMatch(/forbidden|evidence/)
+    expect(result.rejected[0]?.reason).toMatch(/evidence/)
+  })
+
+  it('rejects operations carrying forbidden control keys (F-361)', () => {
+    // `policy`/`threshold` are FORBIDDEN_CONTROL_KEYS — the checker refuses any
+    // op that smuggles a control-plane field through the model plan.
+    const mem = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }], policy: 'x' }],
+    } as never, { sessionSeq: 10 })
+    expect(mem.ok).toBe(false)
+    expect(mem.rejected[0]?.reason).toContain('forbidden field policy')
+    const skill = validateEvolutionPlan({
+      skillOps: [{ action: 'patch', name: 'a', old_string: 'x', new_string: 'y', evidence: [{ event_seq: 1 }], threshold: 1 }],
+    } as never, { sessionSeq: 10 })
+    expect(skill.ok).toBe(false)
+    expect(skill.rejected[0]?.reason).toContain('forbidden field threshold')
   })
 
   it('rejects malformed ops per-item instead of throwing (E-60, 0.3.17)', () => {
@@ -83,5 +98,20 @@ describe('evolution-plan-validator', () => {
       skillOps: [{ ...base, restructure: Array.from({ length: 6 }, (_, i) => ({ heading: `h${i}`, to_file: `references/${i}.md` })) }],
     }, { sessionSeq: 10 })
     expect(tooMany.rejected[0]?.reason).toContain('exceeds')
+  })
+
+  it('F-319: a non-array ops container with a length is rejected per-container, never thrown', () => {
+    const result = validateEvolutionPlan({ memoryOps: { length: 2 } } as never, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected.some(r => r.kind === 'memory' && r.reason.includes('memoryOps: must be an array'))).toBe(true)
+    expect(result.accepted.memoryOps).toEqual([])
+    // A malformed skill container alongside valid memory ops: the valid memory
+    // ops still get per-item treatment and the malformed container is rejected.
+    const mixed = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }],
+      skillOps: { length: 2 },
+    } as never, { sessionSeq: 10 })
+    expect(mixed.ok).toBe(false)
+    expect(mixed.rejected.some(r => r.kind === 'skill' && r.reason.includes('skillOps: must be an array'))).toBe(true)
   })
 })

@@ -87,8 +87,21 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
   const skillOps: SkillOp[] = []
   const accepted: EvolutionPlan = { memoryOps, skillOps, ...plan.summary === undefined ? {} : { summary: plan.summary } }
 
-  const allOps = (plan.memoryOps?.length ?? 0) + (plan.skillOps?.length ?? 0)
-  if (allOps === 0) {
+  // F-319: `plan.memoryOps`/`plan.skillOps` can be a non-array container with
+  // a truthy `.length` (e.g. `{"length":2}`); the old code counted that length,
+  // passed the empty/maxOps gates, then threw on `.entries()`. Resolve the
+  // array-ness up front — absent is empty, present-but-not-an-array is a
+  // per-container rejection (E-60's per-item contract, never a throw).
+  const rawMemoryOps = Array.isArray(plan.memoryOps) ? plan.memoryOps : undefined
+  const rawSkillOps = Array.isArray(plan.skillOps) ? plan.skillOps : undefined
+  const allOps = (rawMemoryOps?.length ?? 0) + (rawSkillOps?.length ?? 0)
+  if (plan.memoryOps !== undefined && !Array.isArray(plan.memoryOps)) {
+    rejected.push({ index: 0, kind: 'memory', reason: 'memoryOps: must be an array' })
+  }
+  if (plan.skillOps !== undefined && !Array.isArray(plan.skillOps)) {
+    rejected.push({ index: 0, kind: 'skill', reason: 'skillOps: must be an array' })
+  }
+  if (allOps === 0 && rejected.length === 0) {
     rejected.push({ index: 0, kind: 'memory', reason: 'plan contains no operations' })
     return { accepted, rejected, ok: false }
   }
@@ -97,7 +110,10 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
     return { accepted, rejected, ok: false }
   }
 
-  for (const [index, rawOp] of ((plan.memoryOps ?? []) as unknown[]).entries()) {
+  // Items stay `unknown` (cast below) so the per-item malformed guards remain
+  // meaningful to the type-aware linter: an array's ELEMENTS may still be
+  // scalars even though the container itself is a well-formed array.
+  for (const [index, rawOp] of ((rawMemoryOps ?? []) as unknown[]).entries()) {
     // 0.3.17 (E-60): a malformed entry (null/string/array) used to throw a
     // TypeError from the validator — the caller hands it MODEL OUTPUT; a
     // deterministic validator rejects per-item instead.
@@ -111,7 +127,7 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
     else memoryOps.push(op)
   }
 
-  for (const [index, rawOp] of ((plan.skillOps ?? []) as unknown[]).entries()) {
+  for (const [index, rawOp] of ((rawSkillOps ?? []) as unknown[]).entries()) {
     if (rawOp === null || typeof rawOp !== 'object' || Array.isArray(rawOp)) {
       rejected.push({ index, kind: 'skill', reason: `skill op ${index}: malformed operation (expected an object)` })
       continue
