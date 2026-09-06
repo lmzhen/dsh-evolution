@@ -35,6 +35,37 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
     }
   })
 
+  it('V5-17: a mid-commit failure discloses which files already landed', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-atomic-partial-'))
+    try {
+      writeFileSync(join(dir, 'a'), 'OLD-A', 'utf8')
+      writeFileSync(join(dir, 'b'), 'OLD-B', 'utf8')
+      // First file commits, second fails: the caller must learn that 'a'
+      // already landed (a partial install is not "nothing happened").
+      let calls = 0
+      const fsOps = {
+        ...baseFs,
+        renameSync: (from: string, to: string) => {
+          calls += 1
+          // Both of b's rename attempts (first and the remove-then-rename
+          // retry) must fail for the partial-commit window to surface.
+          if (calls >= 2) throw new Error('EPERM: rename failed')
+          renameSync(from, to)
+        },
+      }
+      let message = ''
+      try {
+        Commands.atomicWriteFiles(dir, [{ name: 'a', content: 'NEW-A' }, { name: 'b', content: 'NEW-B' }], fsOps)
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error)
+      }
+      expect(message).toContain('already committed: a')
+      expect(readFileSync(join(dir, 'a'), 'utf8')).toBe('NEW-A')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('renames into place after a single refusal: remove-then-rename recovers (E-40 contract)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'evo-commands-atomic-ok-'))
     try {

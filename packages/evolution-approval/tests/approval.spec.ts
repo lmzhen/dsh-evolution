@@ -65,6 +65,11 @@ describe('evolution-approval', () => {
     const retry = await ctx.evolutionApproval.approve(staged.id)
     expect(retry.ok).toBe(false)
     expect(retry.message).toContain('executing')
+    // V5-18 (0.3.31): the message attributes the execution to a CONCURRENT
+    // in-flight approve as well and steers away from rejecting it — the old
+    // crash-only wording could misdirect the operator into rejecting a live
+    // approve another writer is running.
+    expect(retry.message).toContain('do not reject')
     expect(executions).toBe(0) // ALWAYS zero duplication
     // Operator cleanup: reject resolves the executing record without a runner.
     const cleanup = await ctx.evolutionApproval.reject(staged.id)

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-state-domain",
   "description": "storage-domain provider for evolution state",
-  "version": "0.3.30",
+  "version": "0.3.31",
   "publishConfig": {
     "access": "public"
   },

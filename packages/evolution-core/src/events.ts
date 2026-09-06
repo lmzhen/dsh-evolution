@@ -33,6 +33,13 @@ export interface EvolutionPlanAppliedEvent {
   memoryApplied: number
   skillApplied: number
   rejectedOps: number
+  /** 0.3.31 (V5-19): execution-layer failures — ops that reached execution but
+   * did not land (non-throw `ok:false` results). `rejectedOps` counts only
+   * VALIDATION rejects; a consumer that treats rejectedOps as "work not done"
+   * would otherwise miss a partial application. */
+  executionFailures?: number | undefined
+  /** First execution-layer failure message (abort reason or op failure). */
+  executionError?: string | undefined
   evidenceQuotes?: number | undefined
   estimatedInputChars?: number | undefined
 }

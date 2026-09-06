@@ -254,8 +254,13 @@ describe('evolution-review', () => {
   it('V4-21: a mid-plan execute throw is a partial application, never a re-inject (F-334)', async () => {
     const injected: unknown[] = []
     const applied: string[] = []
+    const appliedEvents: Array<{ executionFailures?: number; executionError?: string }> = []
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
-    ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
+    ctx.on('evolution/plan-applied', (event) => {
+      applied.push(event.sessionId)
+      // V5-19: the event carries the execution-failure dimension (abort reason).
+      appliedEvents.push(event as unknown as { executionFailures?: number; executionError?: string })
+    })
     ctx.provide('subagents', {
       start: async () => ({
         result: Promise.resolve({
@@ -293,6 +298,9 @@ describe('evolution-review', () => {
     expect(texts.some(text => text.includes('Review kind:'))).toBe(false)
     // The partial failure is surfaced — the model is told what landed.
     expect(texts.some(text => text.includes('部分操作失败'))).toBe(true)
+    // V5-19: the durable event names the abort so observability can tell an
+    // execution failure from a validation rejection.
+    expect(appliedEvents[0]?.executionError).toContain('io boom')
   })
 
   it('V4-21: a failing completion inject rolls the flag back so the next completion re-triggers (F-334)', async () => {

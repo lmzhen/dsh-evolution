@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.31 (patch) — v5 审计批 3：失败可观测性与发布链卫生（V5-13/14/17/18/19/29/32/33）
+
+v5 审计（0.3.28 修复核验轮）批次 3（失败可观测性 + 发布链卫生）；每项先核验属实再修。
+
+- **V5-19 执行失败可观测性（review 三缺口）**：① `plan-applied` payload 新增 `executionFailures`/`executionError` 维度（`rejectedOps` 只计校验拒绝——消费方不再把执行层失败当成「没有工作发生」；abort 或首个非 throw 失败都会命名）；② `executePlan` 记录每个非 throw 失败（`failedOps`）——任何失败都发 operator warn，**全部落空时更是显式断言**（旧代码零落地完全静默）；③ `plan-applied` 与 `review-error` emit 均移入保护域——同步抛错的监听器不再经外层 catch 把 `started` 翻 false 触发重复注入（V4-21① 封闭形态的换位复发，达性低但同类）。
+- **V5-17 多文件部分提交披露**：atomicWriteFiles 的 commit 中途失败现在披露「已落盘文件清单」（`already committed: a, b`——旧代码只报失败文件，调用方把部分安装当「没发生」）；收尾 `.bak` 刷新循环 best-effort per-file（失败 console.warn、**不再把成功安装报成失败、不再中途劈开 bak 对**）。
+- **V5-18 approve 归因诚实化**：executing 分支消息改为「并发在途/崩溃后遗留」双归因 + 明确「非你发起的 approve 不要 reject」（旧文案只怪崩溃并指引 reject——跨进程并发时后到者会被误导杀掉在途 approve；reject 侧早有诚实口径，现两侧对齐）。
+- **V5-29 feedback 回滚回推**：失败 append 回滚内存计数/note 后，新 `onRollback` 钩子触发——apply 层用它重推 `skillUsage.setQuality`（旧行为：按 rollback 前乐观值推给 usage，usage 侧长期持有从未落盘的分数/quality_warn）。
+- **V5-32 warn once 闸**：append 失败 warn 按**失败原因**去重（version-mismatch 类持续拒绝不再随每条 feedback 刷屏——消息含 target 会规避简单去重，故按 cause 键）；家族「进程级一次」模式对齐。
+- **V5-33 policy 字符串面 warn**：非法 `reviewMode` 静默落 `'subagent'` 无 warn（数值字段钳制必 warn——字符串面不对称）→ 加入 clamped 列表、走同一条一次性 fallback warn。
+- **V5-13/14 发布链卫生**：`atomicSwap` 重跑恢复——中断态（target 缺失、`.previous`=唯一 good copy）在重跑首句被无条件删除的窗口闭合（恢复 `.previous`→target 再走换入）；`.gitignore` 补 `dist.previous/.next`、`.release-staging.previous/.next` 规则（中断残留不再被 `git add -A` 误提交，`git check-ignore` 实测）。
+- **回归**：全量 vitest **688/688**（+3：V5-17 部分披露 / V5-29 onRollback / V5-33 reviewMode warn；V5-18/19/32 断言扩展）；oxlint 0/0（194 文件）；tsc 0；mjs --check 过。
+
 ## 0.3.30 (patch) — v5 审计批 2：守卫与验证盲区（V5-01/05/15/16/21/22/26/28/30）
 
 v5 审计（0.3.28 修复核验轮）批次 2（守卫/门禁自身与测试精度）；每项先核验属实再修。

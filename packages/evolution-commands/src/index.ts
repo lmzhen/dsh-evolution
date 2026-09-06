@@ -494,12 +494,14 @@ export function atomicWriteFiles(
       // fall back to the previous usable composition.
       if (fs.existsSync(finalPath) && !fs.existsSync(bakPath)) fs.copyFileSync(finalPath, bakPath)
     }
+    const committed: string[] = []
     for (const { name } of writes) {
       const finalPath = join(targetDir, name)
       const bakPath = join(targetDir, `${name}.bak`)
       const tmp = stage(name)
       try {
         fs.renameSync(tmp, finalPath)
+        committed.push(name)
       } catch {
         // Some filesystems refuse to overwrite the destination; the single
         // .bak above already holds the previous file, so remove-then-rename is
@@ -507,24 +509,29 @@ export function atomicWriteFiles(
         fs.rmSync(finalPath, { force: true })
         try {
           fs.renameSync(tmp, finalPath)
+          committed.push(name)
         } catch (renameError) {
           // F-211: the retry failed AFTER the target was removed — restore it
           // from .bak before surfacing the error, so the file is not left
           // missing. Best-effort: if the restore also fails, note that and
           // throw the original rename error so the caller still knows why.
+          // V5-17 (0.3.31): a multi-file commit that fails midway is PARTIAL —
+          // the error must disclose which files already landed (the caller is
+          // otherwise told only about the file that failed).
+          const already = committed.length > 0 ? `; already committed: ${committed.join(', ')}` : ''
           if (fs.existsSync(bakPath)) {
             try {
               fs.copyFileSync(bakPath, finalPath)
             } catch {
-              throw new Error(`atomicWriteFiles: "${name}" was removed but recovery from ${bakPath} failed (${renameError instanceof Error ? renameError.message : String(renameError)}); verify the file manually`)
+              throw new Error(`atomicWriteFiles: "${name}" was removed but recovery from ${bakPath} failed (${renameError instanceof Error ? renameError.message : String(renameError)}); verify the file manually${already}`)
             }
             // V4-17: recovery succeeded — name the source generation so a caller
             // is not misled into thinking the attempt actually landed.
             const bakMtime = fs.mtime?.(bakPath)
             const when = bakMtime !== null && bakMtime !== undefined && Number.isFinite(bakMtime) ? ` (bak mtime ${new Date(bakMtime).toISOString()})` : ''
-            throw new Error(`atomicWriteFiles: "${name}" was removed during commit and restored from the last good generation ${bakPath}${when}; original error: ${renameError instanceof Error ? renameError.message : String(renameError)}`)
+            throw new Error(`atomicWriteFiles: "${name}" was removed during commit and restored from the last good generation ${bakPath}${when}; original error: ${renameError instanceof Error ? renameError.message : String(renameError)}${already}`)
           }
-          throw renameError
+          throw new Error(`${renameError instanceof Error ? renameError.message : String(renameError)}${already}`)
         }
       }
     }
@@ -532,9 +539,16 @@ export function atomicWriteFiles(
     // landed, so a later failed commit recovers to the most recent good
     // generation rather than one several installs ago (the backup phase above
     // only ever created a .bak on first install).
+    // V5-17 (0.3.31): the refresh is best-effort maintenance — a failure here
+    // must NOT turn a successful install into a reported failure, and must not
+    // abort mid-loop (which would split the bak pair: some fresh, some old).
     for (const { name } of writes) {
       const finalPath = join(targetDir, name)
-      if (fs.existsSync(finalPath)) fs.copyFileSync(finalPath, join(targetDir, `${name}.bak`))
+      try {
+        if (fs.existsSync(finalPath)) fs.copyFileSync(finalPath, join(targetDir, `${name}.bak`))
+      } catch (refreshError) {
+        console.warn(`atomicWriteFiles: committed "${name}" but failed to refresh its .bak (${refreshError instanceof Error ? refreshError.message : String(refreshError)}); a later failed commit will recover to an OLDER generation`)
+      }
     }
   } catch (error) {
     for (const { name } of writes) fs.rmSync(stage(name), { force: true, recursive: true })

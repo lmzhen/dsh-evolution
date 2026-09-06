@@ -299,7 +299,12 @@ export class EvolutionApproval extends Service {
       // a concurrent reject can set an in-flight runner's record to 'rejected'.
       const stuck = (await this.state().listPending('executing')).find(item => item.id === id)
       if (stuck) {
-        return { ok: false, message: `Pending write "${id}" is executing (a previous approve may have run before a crash). Verify its effect manually, then reject it — /evolution pending shows it as EXECUTING.` }
+        // V5-18 (0.3.31): the old message blamed "a previous approve may have
+        // run before a crash" and directed the operator to reject — but the
+        // executing state is also a CONCURRENT in-flight approve, and rejecting
+        // that would kill a live run. Keep the honest attribution (the reject
+        // side already had it) so a late approve is not steered into sabotage.
+        return { ok: false, message: `Pending write "${id}" is executing — either another writer is resolving it right now, or a previous approve ran then crashed. If you did not start this approve, do not reject it (the in-flight run completes on its own); verify the effect instead. A genuinely stuck record (no runner activity) can still be rejected — /evolution pending shows it as EXECUTING.` }
       }
       // 0.3.28 (V4-18): as in reject, a non-executing miss is a rotated/archived
       // id, not a live concurrent writer — keep the attribution honest.

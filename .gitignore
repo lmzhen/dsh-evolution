@@ -10,3 +10,9 @@ dist/
 packages/dist/
 packages/.release-staging/
 packages/docs/
+# 0.3.31 (V5-14): interrupted-swap residue and staging `next` dirs — a failed
+# or re-run prepare-release leaves multi-MB dirs a bare `git add -A` would commit.
+dist.previous/
+dist.next/
+.release-staging.previous/
+.release-staging.next/

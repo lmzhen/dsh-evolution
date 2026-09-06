@@ -61,6 +61,14 @@ export class EvolutionFeedback {
    * unpersisted note there, and reverting to it resurrects a value the log
    * never held). Seeded from the fold truth, updated on successful appends. */
   private readonly durableNote = new Map<string, string | undefined>
+  /** V5-32 (0.3.31): fire-and-forget append failures are warn-once per unique
+   * message — a persistent refusal (e.g. a future-version log) must not spam
+   * the log on every user feedback entry (family posture: process-level once). */
+  private readonly warnedMessages = new Set<string>()
+  /** V5-29 (0.3.31): invoked after a FAILED append rolled back, so a caller
+   * holding derived state (skillUsage quality score) can re-push it instead of
+   * keeping an optimistic value that never landed. */
+  onRollback?: (target: string, kind: 'skill' | 'session') => void
 
   constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
@@ -199,8 +207,21 @@ export class EvolutionFeedback {
         }
         // Best-effort (V4-50): the rollback keeps memory aligned with the log
         // truth; a persistence failure must not throw, but the reject is no
-        // longer SILENT — the injected warn channel observes it.
-        this.warn(`evolution-feedback: failed to append feedback event for ${kind} "${target}": ${error instanceof Error ? error.message : String(error)}`)
+        // longer SILENT — the injected warn channel observes it (V5-32: once
+        // per unique message).
+        const message = `evolution-feedback: failed to append feedback event for ${kind} "${target}": ${error instanceof Error ? error.message : String(error)}`
+        // V5-32: dedupe by the FAILURE CAUSE (not the target-bearing message) —
+        // a persistent refusal like a version mismatch must not spam on every
+        // user entry, regardless of which target triggered it.
+        const cause = error instanceof Error ? error.message : String(error)
+        if (!this.warnedMessages.has(cause)) {
+          this.warnedMessages.add(cause)
+          this.warn(message)
+        }
+        // V5-29: the rollback changed the score / note — derived state (the
+        // skill-usage quality channel) must be re-pushed, else it keeps the
+        // optimistic value indefinitely.
+        if (rollback) this.onRollback?.(target, kind)
       }
     })
   }
@@ -513,15 +534,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (qualityWired) return
     qualityWired = true
     const skillUsage = (skillCtx as unknown as { skillUsage: SkillUsageLike }).skillUsage
+    const pushQuality = (target: string, kind: 'skill' | 'session'): void => {
+      if (kind !== 'skill') return
+      const score = feedback.score(target, 'skill')
+      const warn = score < qualityWarnThreshold
+      void skillUsage.setQuality(target, score, warn).catch((error: unknown) => {
+        skillCtx.logger.warn(error)
+      })
+    }
+    // V5-29: a failed append rolls the memory count/note back — re-push the
+    // derived quality so the usage side never keeps an unpersisted score.
+    feedback.onRollback = (target, kind) => { pushQuality(target, kind) }
     feedback.record = (target, rating, note, kind) => {
       baseRecord(target, rating, note, kind ?? 'session')
-      if (kind === 'skill') {
-        const score = feedback.score(target, 'skill')
-        const warn = score < qualityWarnThreshold
-        void skillUsage.setQuality(target, score, warn).catch((error: unknown) => {
-          skillCtx.logger.warn(error)
-        })
-      }
+      pushQuality(target, kind ?? 'session')
     }
   })
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionPolicy, { Config } from '../src/index.ts'
 import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS } from '@deepseek-ai/dsh-evolution-core'
@@ -131,5 +131,14 @@ describe('evolution-policy', () => {
     expect(Number.isNaN(nanResult.reviewMemoryInterval)).toBe(true)
     const infResult = parse({ reviewMemoryInterval: Infinity }) as { reviewMemoryInterval: number }
     expect(infResult.reviewMemoryInterval).toBe(Infinity)
+  })
+
+  it('V5-33: an invalid reviewMode string warns once and falls back to subagent', async () => {
+    const ctx = new Context()
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    await ctx.plugin(EvolutionPolicy, { reviewMode: 'orchestrate' })
+    expect(ctx.evolutionPolicy.get().reviewMode).toBe('subagent')
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('reviewMode'))
+    warnSpy.mockRestore()
   })
 })

@@ -194,6 +194,11 @@ function shippedPaths(packed) {
  */
 function atomicSwap(next, target) {
   const previous = `${target}.previous`
+  // V5-13 (0.3.31): a rerun after an interrupted swap may find the target
+  // ABSENT with the previous good build still at `.previous` — the old code
+  // removed it first and destroyed the only recovery copy. Restore it before
+  // anything else (idempotent: a healthy run has no `.previous`).
+  if (!existsSync(target) && existsSync(previous)) renameSync(previous, target)
   rmSync(previous, { recursive: true, force: true })
   if (existsSync(target)) renameSync(target, previous)
   try {

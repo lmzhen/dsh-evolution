@@ -125,7 +125,14 @@ export class EvolutionPolicy extends Service {
       substantiveMinToolCalls: field('substantiveMinToolCalls', config.substantiveMinToolCalls, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS),
       substantiveMinUserChars: field('substantiveMinUserChars', config.substantiveMinUserChars, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS),
       substantiveMinAgentChars: field('substantiveMinAgentChars', config.substantiveMinAgentChars, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS),
-      reviewMode: config.reviewMode === 'inject' ? 'inject' : 'subagent',
+      reviewMode: (() => {
+        // V5-33 (0.3.31): an invalid reviewMode string fell silently to
+        // 'subagent' — the numeric fields beside it all warn once; the string
+        // surface gets the same posture (joined into the same fallback warn).
+        const mode = config.reviewMode
+        if (mode !== undefined && mode !== 'inject' && mode !== 'subagent') clamped.push('reviewMode')
+        return mode === 'inject' ? 'inject' : 'subagent'
+      })(),
       memoryReviewModel: config.memoryReviewModel ?? 'deepseek-v4-flash',
       skillReviewModel: config.skillReviewModel ?? 'deepseek-v4-pro',
       curatorModel: config.curatorModel ?? 'deepseek-v4-pro',

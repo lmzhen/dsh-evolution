@@ -585,10 +585,43 @@ describe('evolution-feedback', () => {
       const feedback = new Feedback.EvolutionFeedback(io, home, undefined, message => warns.push(message))
       await feedback.restore(io)
       feedback.record('session-1', 'positive')
+      feedback.record('session-2', 'positive')
       await feedback.waitIdle()
       // The reject is no longer silent — the injected warn channel observes it.
       expect(warns.some(message => message.includes('version mismatch'))).toBe(true)
+      // V5-32: the same refusal is warn-ONCE per cause — a persistent
+      // version-mismatch log must not spam on every user entry, even across
+      // different targets.
+      expect(warns.filter(message => message.includes('version mismatch'))).toHaveLength(1)
       expect(await io.readText(eventsPath)).toContain('"version": 2')
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('V5-29: a failed append invokes onRollback so derived quality is re-pushed', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-v5-29-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      await io.writeText(eventsPath, '{corrupt log')
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      const rollbacks: string[] = []
+      feedback.onRollback = (target, kind) => { rollbacks.push(`${kind}:${target}`) }
+      feedback.record('x', 'positive', 'note-A', 'skill')
+      await feedback.waitIdle()
+      // A failed append rolled back IN MEMORY — the derived-state hook fired
+      // so a caller (skill-usage quality) can re-push instead of keeping the
+      // optimistic score.
+      expect(rollbacks).toEqual(['skill:x'])
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous

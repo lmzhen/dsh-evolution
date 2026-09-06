@@ -340,7 +340,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
           // E-59c: a started subagent that produced no structured plan is NOT a
           // success — the review never happened, so surface review-error and
           // fall through to the synchronous inject path (caller sees false).
-          ctx.emit('evolution/review-error', { sessionId: session.id })
+          // V5-19 (0.3.31): the error signal is inside a protection domain — a
+          // throwing listener must not escape the failure path itself.
+          try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
+            ctx.logger.warn(`dsh-evolution-review: review-error emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+          }
           ctx.logger.warn('dsh-evolution-review: review subagent returned no structured plan')
           return false
         }
@@ -393,16 +397,28 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // evolution-activity store's job; the session log stays native-only.
         // Emitted AFTER the result-notice inject (E-41 ordering: record the
         // outcome only once the model was told what landed).
-        ctx.emit('evolution/plan-applied', {
-          sessionId: session.id,
-          planId: randomUUID(),
-          policyFingerprint,
-          memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
-          skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
-          rejectedOps: validation.rejected.length + skippedUnread,
-          evidenceQuotes,
-          estimatedInputChars: reviewText.length,
-        })
+        // V5-19 (0.3.31): the emit is inside a protection domain — a synchronous
+        // throwing listener must not flip `started` to false via the outer catch
+        // and re-trigger the same kind of review (the V4-21① shape, relocated);
+        // and the payload now carries the execution-failure dimension so a
+        // consumer can tell "rejected by validation" from "failed at execution".
+        try {
+          ctx.emit('evolution/plan-applied', {
+            sessionId: session.id,
+            planId: randomUUID(),
+            policyFingerprint,
+            memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
+            skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
+            rejectedOps: validation.rejected.length + skippedUnread,
+            executionFailures: executed.failedOps.length,
+            ...(executed.aborted !== undefined ? { executionError: executed.aborted } : {}),
+            ...(executed.failedOps[0] !== undefined && executed.aborted === undefined ? { executionError: executed.failedOps[0] } : {}),
+            evidenceQuotes,
+            estimatedInputChars: reviewText.length,
+          })
+        } catch (emitError) {
+          ctx.logger.warn(`dsh-evolution-review: plan-applied emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+        }
         return true
       } finally {
         // Dispose on EVERY exit (rc.42 audit P1-3): a timed-out / aborted run
@@ -426,12 +442,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }
   }
 
-  async function executePlan(plan: EvolutionPlan, sessionId?: string): Promise<{ actions: string[]; ok: boolean }> {
+  async function executePlan(
+    plan: EvolutionPlan,
+    sessionId?: string,
+  ): Promise<{ actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }> {
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
     const origins = resolveOrigins(undefined, true)
     const actions: string[] = []
+    const failedOps: string[] = []
     let ok = true
     // V4-21 (F-334 residual): an op can throw an IO exception (not return
     // ok:false). Some ops may already have landed before the throw, so the
@@ -439,6 +459,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // `actions` with ok:false rather than letting the throw escape to the
     // subagent-review catch (which would report started=false and make the
     // caller re-inject the same kind, re-requesting an already-landed change).
+    // V5-19 (0.3.31): non-throw op failures are recorded too — a plan where
+    // every op failed silently used to emit nothing but an empty-applied
+    // message; the failure dimension now surfaces on the event AND a warn.
     try {
       for (const op of plan.memoryOps ?? []) {
         if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
@@ -448,7 +471,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
           ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized)
           : await memory?.applyBatch(normalized.target, [normalized])
         if (result?.ok) actions.push('Memory updated')
-        else ok = false
+        else {
+          ok = false
+          failedOps.push(`memory ${normalized.action} ${normalized.target}: ${result?.message ?? 'service unavailable'}`)
+        }
       }
       for (const op of plan.skillOps ?? []) {
         if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
@@ -461,14 +487,23 @@ export function apply(ctx: Context, rawConfig: Config): void {
           ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
           : await executeSkillDirect(args)
         if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
-        else ok = false
+        else {
+          ok = false
+          failedOps.push(`skill ${op.action ?? 'patch'} ${op.name}: ${result?.message ?? 'service unavailable'}`)
+        }
       }
-      return { actions, ok }
+      // V5-19: a failed execution is observable on the operator side — every
+      // failure, and loudly so when NOTHING landed (the old code was silent).
+      if (failedOps.length > 0) {
+        ctx.logger.warn(`dsh-evolution-review: executePlan ${actions.length === 0 ? 'no op landed' : `${actions.length} op(s) landed, ${failedOps.length} failed`}: ${failedOps.join('; ')}`)
+      }
+      return { actions, ok, failedOps }
     } catch (error) {
       // Partial application: the ops that landed stay in `actions` so the caller
       // emits them (plan-applied) and tells the model what NOT to repeat.
-      ctx.logger.warn(`dsh-evolution-review: executePlan aborted mid-way after ${actions.length} ops landed: ${error instanceof Error ? error.message : String(error)}`)
-      return { actions, ok: false }
+      const reason = error instanceof Error ? error.message : String(error)
+      ctx.logger.warn(`dsh-evolution-review: executePlan aborted mid-way after ${actions.length} ops landed: ${reason}`)
+      return { actions, ok: false, failedOps, aborted: reason }
     }
 
     async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
