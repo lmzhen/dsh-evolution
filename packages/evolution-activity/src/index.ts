@@ -30,6 +30,10 @@ export interface EvolutionActivityRecord {
   memoryApplied: number
   skillApplied: number
   rejectedOps: number
+  /** V6-10 (0.3.36): execution-layer failures (not validation rejections) —
+   * optional so pre-0.3.36 sidecars keep parsing (missing = none recorded). */
+  executionFailures?: number | undefined
+  executionError?: string | undefined
   evidenceQuotes?: number | undefined
   estimatedInputChars?: number | undefined
   at: number
@@ -60,6 +64,10 @@ export function applyActivityEvent(
     memoryApplied: event.memoryApplied,
     skillApplied: event.skillApplied,
     rejectedOps: event.rejectedOps,
+    // V6-10 (0.3.36): a plan that failed entirely at execution must not fold
+    // into a clean "0/0" record — keep the failure dimension (V5-19 payload).
+    ...event.executionFailures !== undefined ? { executionFailures: event.executionFailures } : {},
+    ...event.executionError !== undefined ? { executionError: event.executionError } : {},
     evidenceQuotes: event.evidenceQuotes,
     estimatedInputChars: event.estimatedInputChars,
     at,

@@ -395,6 +395,31 @@ Use it.
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('V6-15: a byte-equivalent write_file is a no-op — no patch_count bump (0.3.36)', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`wf-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    await execute({ action: 'create', name: 'wf-skill', content: SKILL.replace('boundary-skill', 'wf-skill') })
+    const first = await execute({ action: 'write_file', name: 'wf-skill', file_path: 'references/notes.md', file_content: 'line one\n' })
+    expect((first.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((await ctx.skillUsage.report()).get('wf-skill')?.patch_count).toBe(1)
+    // A repeated write with identical content used to re-audit, re-emit the
+    // mutation event and bump patch_count (V4-27 discipline covers update/patch
+    // only). The noop must keep the counter — the sum is real modification.
+    const second = await execute({ action: 'write_file', name: 'wf-skill', file_path: 'references/notes.md', file_content: 'line one\n' })
+    expect((second.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((second.value as { message?: string } | undefined)?.message ?? '').toContain('unchanged')
+    expect((await ctx.skillUsage.report()).get('wf-skill')?.patch_count).toBe(1)
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
 })
 
 

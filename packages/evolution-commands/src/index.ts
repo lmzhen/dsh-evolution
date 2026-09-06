@@ -136,10 +136,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input === 'mutations') {
           const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
           if (!curator) return err('Curator service not mounted.')
-          const records = await curator.skills.listMutations()
-          if (records.length === 0) return ok('No mutation records yet.')
-          const recent = records.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
-          return ok(`Mutations: ${records.length} recorded (recent 5):\n${recent.join('\n')}`)
+          const records: unknown = await curator.skills.listMutations()
+          // V6-41 (0.3.36): the mutations file is out-of-band editable — a
+          // damaged record must not crash the command with a TypeError (the
+          // `curator status` command already has this posture).
+          const usable = Array.isArray(records)
+            ? records.filter((row): row is { at: string; skillName: string; action: string; summary: string } =>
+              typeof row === 'object' && row !== null
+              && typeof (row as { at?: unknown }).at === 'string'
+              && typeof (row as { skillName?: unknown }).skillName === 'string'
+              && typeof (row as { action?: unknown }).action === 'string'
+              && typeof (row as { summary?: unknown }).summary === 'string')
+            : []
+          if (usable.length === 0) return ok('No mutation records yet.')
+          const recent = usable.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
+          return ok(`Mutations: ${usable.length} recorded (recent 5):\n${recent.join('\n')}`)
         }
         if (input === 'curator scope') {
           const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
@@ -152,19 +163,43 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             line('Watched (stale / quality-warned)', view.watched),
             line('Quality-warned', view.qualityWarned),
             line('Exempted (exclude / referenced)', view.exempted),
-            line('Protected (pinned / bundled / hub)', view.protected),
+            line('Protected (pinned / bundled / hub / builtin)', view.protected),
           ].join('\n'))
         }
         if (input === 'curator report') {
           const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
           if (!curator) return err('Curator service not mounted.')
-          const report = await curator.latestReport()
+          const report: unknown = await curator.latestReport()
           if (!report) return ok('No curator report available.')
+          // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
+          // shape must render "report unreadable" instead of an uncaught
+          // TypeError (the `curator status` command already has this posture).
+          if (typeof report !== 'object'
+            || typeof (report as { runId?: unknown }).runId !== 'string'
+            || typeof (report as { startedAt?: unknown }).startedAt !== 'string'
+            || !Array.isArray((report as { archived?: unknown }).archived)
+            || !Array.isArray((report as { failed?: unknown }).failed)) {
+            return err('Report file unreadable.')
+          }
+          const reportAny = report as {
+            runId: string
+            startedAt: string
+            archived: unknown[]
+            failed: unknown[]
+          }
+          const nameOf = (item: unknown): string =>
+            typeof item === 'object' && item !== null && typeof (item as { name?: unknown }).name === 'string'
+              ? (item as { name: string }).name
+              : '?'
+          const reasonOf = (item: unknown): string =>
+            typeof item === 'object' && item !== null && typeof (item as { reason?: unknown }).reason === 'string'
+              ? (item as { reason: string }).reason
+              : '?'
           const lines = [
-            `runId=${report.runId}`,
-            `startedAt=${report.startedAt}`,
-            `archived=${report.archived.map(item => item.name).join(', ') || '(none)'}`,
-            `failed=${report.failed.map(item => `${item.name}: ${item.reason}`).join(', ') || '(none)'}`,
+            `runId=${reportAny.runId}`,
+            `startedAt=${reportAny.startedAt}`,
+            `archived=${reportAny.archived.map(nameOf).join(', ') || '(none)'}`,
+            `failed=${reportAny.failed.map(item => `${nameOf(item)}: ${reasonOf(item)}`).join(', ') || '(none)'}`,
           ]
           return ok(lines.join('\n'))
         }
@@ -262,8 +297,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // instead of silently swallowing them. `--timeout <ms>` (0.3.4)
           // overrides the deadline for THIS run — no file edit, no restart.
           const runTimeoutMs = maintainArgs[1] ? Number(maintainArgs[1]) : (config.maintainTimeoutMs ?? 600_000)
-          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
-            return err('Invalid --timeout value: expected a positive integer number of milliseconds (e.g. /evolution maintain --timeout 600000).')
+          // V6-29 (0.3.36): AbortSignal.timeout throws a RangeError above 2^32-1
+          // — reject the domain explicitly instead of surfacing the platform
+          // error from a `--timeout` typo.
+          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0 || runTimeoutMs > 0xFFFFFFFF) {
+            return err('Invalid --timeout value: expected a positive integer number of milliseconds up to 4294967295 (e.g. /evolution maintain --timeout 600000).')
           }
           if (maintainInFlightSince > 0) {
             const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
@@ -485,6 +523,15 @@ export function atomicWriteFiles(
   fs: FsOps = defaultFs,
 ): void {
   const stage = (name: string): string => join(targetDir, `${name}.tmp`)
+  // V6-42 (0.3.36): a duplicate name makes the commit re-visit the same
+  // target: the second rename ENOENTs (the tmp already moved), then the
+  // remove-then-rename recovery DELETES the file the first commit just
+  // installed and restores an old `.bak` generation — a self-referential,
+  // confusing failure. Fail loud on the input instead.
+  const dupes = [...new Set(writes.map(write => write.name).filter((name, index, all) => all.indexOf(name) !== index))]
+  if (dupes.length > 0) {
+    throw new Error(`atomicWriteFiles: duplicate input names: ${dupes.join(', ')}`)
+  }
   try {
     for (const { name, content } of writes) fs.writeFileSync(stage(name), content)
     for (const { name } of writes) {
@@ -506,7 +553,16 @@ export function atomicWriteFiles(
         // Some filesystems refuse to overwrite the destination; the single
         // .bak above already holds the previous file, so remove-then-rename is
         // safe here.
-        fs.rmSync(finalPath, { force: true })
+        try {
+          fs.rmSync(finalPath, { force: true })
+        } catch (removeError) {
+          // V6-28 (0.3.36): a failed remove must not escape WITHOUT the
+          // disclosure chain — `committed` is the only trace of a partial
+          // install and the recovery narration would be lost (Windows: rename
+          // and unlink often fail together with EPERM/EBUSY).
+          const already = committed.length > 0 ? `; already committed: ${committed.join(', ')}` : ''
+          throw new Error(`atomicWriteFiles: could not remove "${name}" to replace it (${removeError instanceof Error ? removeError.message : String(removeError)})${already}`)
+        }
         try {
           fs.renameSync(tmp, finalPath)
           committed.push(name)

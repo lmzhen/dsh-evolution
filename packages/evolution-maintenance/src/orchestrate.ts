@@ -146,6 +146,14 @@ export function buildMaintainFacts(
   return { report, facts, signalsVersion, signature }
 }
 
+/** V6-38 (0.3.36): a field value carrying its own standalone `Notes:` line is
+ * indistinguishable from the plan's section header in the RENDERED text —
+ * `beforeNotesHeader` cuts at the first standalone `Notes:` and undercounts
+ * recommendations. Mark such lines so they can never read as the header. */
+function sanitizeField(value: string): string {
+  return value.split('\n').map(line => line === 'Notes:' ? '> Notes: (inside the field above)' : line).join('\n')
+}
+
 function formatPlan(validated: ValidationResult, runId: string): string {
   const { plan, forcedHuman } = validated
   const lines: string[] = []
@@ -162,8 +170,8 @@ function formatPlan(validated: ValidationResult, runId: string): string {
       item.needs_human ? 'HUMAN' : '',
     ].filter(Boolean)
     lines.push(`- [${item.kind}] ${item.names.join(', ')} · rule=${item.rule} · ${flags.join(' ')}`)
-    lines.push(`  finding: ${item.finding}`)
-    lines.push(`  action: ${item.recommendation}`)
+    lines.push(`  finding: ${sanitizeField(item.finding)}`)
+    lines.push(`  action: ${sanitizeField(item.recommendation)}`)
     if (item.undo_path && item.undo_path !== 'n/a') lines.push(`  undo: ${item.undo_path}`)
     if (item.is_override && item.override_reason) lines.push(`  override: ${item.override_reason}`)
   }
@@ -215,6 +223,12 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
 按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。`
 
     const timeoutMs = options.timeoutMs ?? 600_000
+    // V6-29 (0.3.36): AbortSignal.timeout accepts up to 2^32-1 ms — a larger
+    // value throws a synchronous RangeError that only the outer catch would
+    // translate (obscuring the cause). Validate the domain up front.
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 0xFFFFFFFF) {
+      return { ok: false, error: `maintain: --timeout must be a positive integer in ms, at most 4294967295; got ${String(timeoutMs)}` }
+    }
     // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
     // hoisted so the catch can consult `signal.aborted` (our own timeout)
     // instead of matching error text. The narrow literals remain only for the

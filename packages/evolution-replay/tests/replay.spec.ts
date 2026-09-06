@@ -40,8 +40,7 @@ describe('evolution-replay', () => {
     expect(small.plansSnapshot().length).toBe(5)
   })
 
-  it('clamps replay weights to their per-field domains (G3.1 matrix)', () => {
-    // Every invalid value falls back to that field's default.
+  it('clamps replay weights to their per-field domains (G3.1 matrix)', () => {    // Every invalid value falls back to that field's default.
     const clamped = clampReplayWeights({ accepted: 0, rejectedPenalty: -1, evidence: NaN, cost: Infinity })
     expect(clamped).toEqual({ accepted: 10, rejectedPenalty: 15, evidence: 2, cost: 0.001 })
     // cost = 0 is legal (no cost penalty), so it is retained.
@@ -76,5 +75,17 @@ describe('evolution-replay', () => {
     const costWarns: string[] = []
     new EvolutionReplayDriver({ weights: { cost: 0 } }, message => costWarns.push(message))
     expect(costWarns).toEqual([])
+  })
+
+  it('V6-10: records and surfaces the execution-failure dimension (0.3.36)', () => {
+    const driver = new EvolutionReplayDriver()
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 0, skillApplied: 0, rejectedOps: 0, executionFailures: 3, executionError: 'staged (approval)' })
+    const plans = driver.plansSnapshot()
+    expect(plans[0]?.executionFailures).toBe(3)
+    expect(plans[0]?.executionError).toBe('staged (approval)')
+    // The leaderboard surface shows the failure dimension — a plan whose ops
+    // all failed must not read as a clean "0/0" plan.
+    const result = driver.compare()
+    expect(result.report).toContain('3 failed: staged (approval)')
   })
 })

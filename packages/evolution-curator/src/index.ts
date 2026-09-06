@@ -14,7 +14,7 @@ import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillName
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
-import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -333,7 +333,7 @@ export class EvolutionCurator extends Service {
    * any file move. `dryRun` prepends the report-only banner.
    */
   async recommend(candidates: string[], options: { dryRun?: boolean } = {}): Promise<CuratorNominations> {
-    const empty: CuratorNominations = { prunings: [], consolidations: [] }
+    const empty: CuratorNominations = { prunings: [], consolidations: [], warnings: [] }
     if (candidates.length === 0) return empty
     const llm = this.ctx.get('llm') as {
       stream(options: {
@@ -380,6 +380,9 @@ export class EvolutionCurator extends Service {
         // a nomination whose source is NOT a known candidate has no executability
         // authority (the engine runs only names it presented to the model).
         consolidations: parsed.consolidations.filter(item => candidates.includes(item.from)),
+        // V6-35 (0.3.36): lenient-parse shape notes flow into the run report —
+        // a dropped `mode:` or a section flip stays visible to the operator.
+        warnings: parsed.warnings,
       }
     } catch (error) {
       // LLM curation is advisory. The deterministic scanner still owns the
@@ -604,7 +607,7 @@ export class EvolutionCurator extends Service {
     const recommendPool = [...new Set([...result.markStale, ...dedupMembers])]
     const nominations = this.llmReview
       ? await this.recommend(recommendPool, { dryRun })
-      : { prunings: [], consolidations: [] }
+      : { prunings: [], consolidations: [], warnings: [] as string[] }
     // Automatic merge nominations must pass the same gates as the control
     // plane: excluded/referenced/suppressed skills are never merged (source
     // or target), even when the LLM nominates them. Prunings additionally
@@ -654,6 +657,9 @@ export class EvolutionCurator extends Service {
       consolidated,
       ...snapshotPath === undefined ? {} : { snapshotPath },
       llmReviewEnabled: this.llmReview,
+      // V6-35 (0.3.36): lenient-parse notes (mis-placed mode / section flip)
+      // surface in the run report instead of a silent shape change.
+      ...gatedNominations.warnings.length > 0 ? { nominationsWarnings: gatedNominations.warnings } : {},
     })
     const reportsRoot = join(evolutionHome(), 'reports')
     try {
@@ -843,12 +849,30 @@ export class EvolutionCurator extends Service {
         try {
           wasBundled = await this.io.exists(join(this.skills.root, '.archive', name, markerEntryName('bundled')))
           if (!wasBundled) {
-            const archiveEntries = await this.io.list(join(this.skills.root, '.archive')).catch(() => [])
+            // V6-09 (0.3.36): a listing failure must NOT read as "not bundled"
+            // (which would skip the suppression write) — let it throw into the
+            // probe catch below and warn instead of the silent `catch (() => [])`.
+            const archiveEntries = await this.io.list(join(this.skills.root, '.archive'))
             for (const entry of archiveEntries) {
-              if (entry.startsWith(`${name}-`)) {
-                wasBundled = await this.io.exists(join(this.skills.root, '.archive', entry, markerEntryName('bundled')))
-                if (wasBundled) break
+              // V6-08 (0.3.36): match the PRECISE archive destination shape
+              // `<name>-<stamp>` / `<name>-<stamp>-<rand>` (skill-store: stamp =
+              // 14 chars from ISO, rand = 1-6 base36 chars) — never a bare
+              // `<name>-` prefix, so a bundled SIBLING (e.g. `foo-bar`) cannot
+              // make a crashed non-bundled `foo` a false positive (which would
+              // suppress the lifecycle gate on the next rebuild of `foo`).
+              // The name charset validates the anchor; no escaping needed.
+              if (!new RegExp(`^${name}-\\d{14}(-[0-9a-z]{1,6})?$`).test(entry)) continue
+              wasBundled = await this.io.exists(join(this.skills.root, '.archive', entry, markerEntryName('bundled')))
+              // E-3 precedent: confirm the archive is OURS by its frontmatter
+              // name — a name-shaped directory from an unrelated skill must not
+              // carry the bundled verdict for `name`. Only when the SKILL.md is
+              // READABLE: a crashed archive without a body keeps the marker as
+              // the signal (a missing body must not under-suppress).
+              if (wasBundled) {
+                const archivedBody = await this.io.readText(join(this.skills.root, '.archive', entry, 'SKILL.md')).catch(() => null)
+                if (archivedBody !== null && parseFrontmatter(archivedBody)?.frontmatter.name !== name) wasBundled = false
               }
+              if (wasBundled) break
             }
           }
         } catch (probeError) {

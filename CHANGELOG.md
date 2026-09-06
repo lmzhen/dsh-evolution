@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.36 (patch) — v6 审计 M3：观测与治理精度（V6-10/15/23/24/28/29/35/36/38/41/42/08/09）
+
+v6 审计（0.3.33 全量复审轮）M3 里程碑；每项先核验属实再修（全部 12 项经源码复读确认——其中 V4-26 的「字段内嵌独立 Notes: 行」为残余真实缺陷、V6-09 的 `.catch(()=>[])` 与 V5-20「不再静默」声明相抵）。
+
+- **V6-10 [P3] 失败可观测闭环（activity/replay）**：V5-19① 的事件维度是「半接线」——`EvolutionActivityRecord` 折叠白名单与 `ReplayPlan`/`record()` 都丢弃 `executionFailures`/`executionError`，全执行失败的 plan 在持久观测与 replay 记分中呈现为「0/0 干净空计划」。修复：activity 记录/折叠保留两字段（旧 sidecar 缺字段按缺失读取）；replay 入 record、记分板报表追加 `N failed(: 原因)`（历史/测试构造的 plan 无该字段按 0 显示——可选字段兼容）。
+- **V6-15 [P3] writeSupportFile noop 纪律**：对同一支持文件重复写相同内容时 IO 层被 V5-03 物理短路，但 audit、mutation event 与 tool 侧 patch_count 照涨（update/patch/memory-add 的同根收敛漏了 write_file）。修复：`writeSupportFileCore` 字节等同（trimEnd 归一，update 同款判定）→ `noop: true, write: null`——`runSingleWrite` 既有 write:null 语义自动跳过 audit/event；tool-skill-manage 既有 `result.noop !== true` 门自动不计数。
+- **V6-23 [P3] onTurnEnd catch 内 review-error 裸奔**：turn-end 失败路径的 `ctx.emit('evolution/review-error')` 无保护域（cordis emit 同步直呼监听器——抛错监听器变 unhandledRejection，V5-19③ 同类漏网）；与 trySubagentReview 内已保护的 emit 对齐：包 try/catch + warn。
+- **V6-24 [P3] 零落地计划对模型零反馈**：`if (actions.length > 0)` 门使全部 op 被 stage/拒绝/吞跳的 plan 无任何 inject——「部分失败有通知、全失败无反馈」不对称。修复：零落地也 inject「0 ops landed + 原因摘要（validation 拒绝数 / 未读跳过数 / 执行失败数+细节 / abort）/ 500 字符预算」，与已落地通知同通道。
+- **V6-28 [P3] atomicWriteFiles commit 段 rmSync 裸露**：rename 与 unlink 常同因 EPERM/EBUSY 双败——rm 抛错穿透外层 catch，`already committed` 披露链整条丢失（node 实测 T4: discloses? false）。修复：rmSync 包 try/catch，失败消息携带 `already committed: ...` 披露（部分安装对操作者可见）。
+- **V6-29 [P3] maintain timeout 缺域上界**：`--timeout 5000000000` 超 `AbortSignal.timeout` 上限（2^32-1）同步 RangeError，被外层 catch 转译不崩溃但校验缺域。修复：命令门 + `runMaintain` 双处校验（≤ 4294967295，显式拒绝消息）。
+- **V6-35 [P3] lenient 提名解析器两处静默语义丢失**：`mode:` 出现在 `into:`（或 from）之后被静默丢弃（demote 降级为 append）与 `- name:` 在 consolidations 段内使 section 翻转为 prunings（名变归档提名）。修复：`CuratorNominations` 增 `warnings`（解析器**补 YAML 段标题行跟踪**以区分「prunings 段正常首行」与「真错位」——首次实现曾误告警 canonical 形状，自测抓出）；warning 流经 recommend → run report 新字段 `nominationsWarnings`（build/render 同步），归因对操作者可见、解析保持 lenient。
+- **V6-36 [P3] computeScopeView 漏 builtin 桶**：`PROTECTED_BUILTIN_SKILLS`（'plan'）命中被共享门挡下却不在 exempted/protected/managed 任何桶——视图少一个解释维度、「视图总能预测 curator 可触碰」承诺破口。修复：builtin 归 protected 桶；`/evolution curator scope` 标签补 `/ builtin`。
+- **V6-38 [P3] 字段内嵌独立 Notes: 行仍截断**：V4-26 的 standalone-header 匹配对「finding 值自带 `\nNotes:\n`」仍提前截断（node 实测 2 条建议计 1）。修复：`formatPlan` 渲染前对 finding/recommendation **字段值预处理**（内嵌独立 `Notes:` 行改写为 `> Notes: (inside the field above)`）——渲染层不可能再把它当段头。
+- **V6-41 [P3] mutations/curator report 无防崩加固**：`curator status` 有显式姿态而这两处无——形状受损的审计/报告文件让命令抛未捕获 TypeError。修复：raw 数据先降 unknown 再形状守卫（Array.isArray / typeof 校验，损坏行丢弃或「Report file unreadable.」）；**注**：守卫直接写类型化数组上会触发 oxlint no-unnecessary-condition（声明类型已非空）——先 `const records: unknown = ...` 是正确形态。
+- **V6-42 [P3] atomicWriteFiles 重复 name 自我指涉**：第二次 rename ENOENT → rm 掉刚提交的新文件 → 从 .bak 恢复旧内容、报错自我指涉。修复：入口唯一性校验 fail-loud（`duplicate input names: ...`）。
+- **V6-08 [P3] stamp 探针前缀匹配兄弟技能假阳性**：`.archive` 枚举 `entry.startsWith(\`${name}-\`)` 命中 bundled 兄弟（`foo-bar-<stamp>`）→ 崩溃归档的非 bundled `foo` 被假阳性 suppression（日后同名重建静默脱离生命周期门）。修复：按 skill-store 归档命名的**精确形态**匹配（`^<name>-\d{14}(-[0-9a-z]{1,6})?$`——名称字符集保证锚点无需转义）+ 命中后 frontmatter 名称复核（E-3 先例；**SKILL.md 缺失时不复核**——崩溃态 marker 保持为信号，缺失正文不得反向漏 suppression，delta 复核发现的收紧）。
+- **V6-09 [P3] `.archive` 枚举失败仍静默**：`.catch(() => [])` 把失败降级为「非 bundled」（与 V5-20「probe 失败 warn 不再静默」声明相抵，exists 抛错有 warn、list 抛错没有）。修复：去掉内联 catch，让失败流入外层 probe catch 统一 warn。
+- **回归**：全量 vitest **717**（+12 新用例：V6-10×2 / V6-15 / V6-23 / V6-24 / V6-28 / V6-29×1 命令门+orchestrate / V6-35 / V6-36 / V6-38×2 / V6-41 / V6-42；curator.spec 两处 recommend 断言补 warnings）；oxlint 0/0（194 文件）；包级 tsc 0；本机并行下 5 例已知 Windows 负载 flake（guard 5s 超时 / ENOTEMPTY×3 / 32-way 预算边缘）隔离复跑全绿——以 CI Linux 为准。
+
 ## 0.3.35 (patch) — v6 审计 M2：并发自愈与配置防御（V6-04/05/06/18/39/40）
 
 v6 审计（0.3.33 全量复审轮）M2 里程碑；每项先核验属实再修（全部 6 项均经源码复读确认：V6-04/18 的「空体锁/票永久锁死」、V6-05 的扫描窗口悬崖为确定性缺陷，V6-06/39/40 为配置/口径穿透）。

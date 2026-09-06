@@ -9,6 +9,7 @@
 import type { UsageMap, UsageRecord } from './usage.ts'
 import { latestActivityAt } from './usage.ts'
 import { EvolutionGateSet, createGateSet } from './gates.ts'
+import { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
 export { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
@@ -72,6 +73,8 @@ export interface CuratorRunReport {
   snapshotPath?: string
   /** Whether the LLM nomination pass was enabled for this run (decision visibility). */
   llmReviewEnabled?: boolean
+  /** V6-35 (0.3.36): lenient-parse shape notes from the LLM nomination block. */
+  nominationsWarnings?: string[]
 }
 
 export interface CuratorReportInput {
@@ -86,6 +89,7 @@ export interface CuratorReportInput {
   consolidated?: readonly CuratorConsolidation[]
   snapshotPath?: string
   llmReviewEnabled?: boolean
+  nominationsWarnings?: readonly string[]
 }
 
 export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunReport {
@@ -102,6 +106,7 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
     ...input.consolidated === undefined ? {} : { consolidated: [...input.consolidated] },
     ...input.snapshotPath === undefined ? {} : { snapshotPath: input.snapshotPath },
     ...input.llmReviewEnabled === undefined ? {} : { llmReviewEnabled: input.llmReviewEnabled },
+    ...input.nominationsWarnings === undefined ? {} : { nominationsWarnings: [...input.nominationsWarnings] },
   }
 }
 
@@ -122,6 +127,7 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
     `- **Failed**: ${report.failed.length}`,
     ...report.snapshotPath === undefined ? [] : [`- **Snapshot**: ${report.snapshotPath}`],
     ...report.llmReviewEnabled === undefined ? [] : [`- **llmReview**: ${report.llmReviewEnabled}`],
+    ...report.nominationsWarnings === undefined || report.nominationsWarnings.length === 0 ? [] : [`- **Nomination warnings**: ${report.nominationsWarnings.join('; ')}`],
   ]
   const section = (title: string, items: string[]): string[] => items.length === 0 ? [] : ['', `## ${title}`, '', ...items.map(item => `- ${item}`)]
   return [
@@ -148,6 +154,11 @@ export interface CuratorConsolidation {
 export interface CuratorNominations {
   prunings: string[]
   consolidations: CuratorConsolidation[]
+  /** V6-35 (0.3.36): lenient-parse shape notes (an entry the lenient logic
+   * silently dropped or re-routed). Parsing stays lenient — these are advisory
+   * and flow into the run report so the operator sees why a mode or a pruning
+   * went somewhere unexpected. */
+  warnings: string[]
 }
 
 const NOMINATION_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
@@ -160,10 +171,18 @@ const NOMINATION_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 export function parseCuratorNominations(text: string): CuratorNominations {
   const prunings: string[] = []
   const consolidations: CuratorConsolidation[] = []
+  const warnings: string[] = []
   let section: 'consolidations' | 'prunings' | null = null
   let currentFrom = ''
   let currentMode: 'append' | 'reference' | undefined
   for (const line of text.split('\n')) {
+    // V6-35: the YAML section HEADERS are tracked so a `- name:` under the
+    // prunings header (the normal shape) is not mistaken for a misplaced one.
+    const header = /^\s*(consolidations|prunings)\s*:\s*$/.exec(line)
+    if (header) {
+      section = header[1] === 'consolidations' ? 'consolidations' : 'prunings'
+      continue
+    }
     const consolidated = /^\s*-\s*from:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
     if (consolidated) {
       section = 'consolidations'
@@ -174,6 +193,11 @@ export function parseCuratorNominations(text: string): CuratorNominations {
     const mode = /^\s*mode:\s*(append|reference)\s*$/.exec(line)
     if (mode) {
       if (currentFrom !== '') currentMode = mode[1] === 'reference' ? 'reference' : 'append'
+      // V6-35: a `mode:` with no preceding `- from:` (or after the `into:` that
+      // closed it) is silently dropped — the consolidation stays 'append'.
+      // Warn instead so a mis-formed `mode: reference` (demote intent) is
+      // visible in the run report instead of degrading to an append.
+      else warnings.push(`mode: ${mode[1]} ignored — no preceding "- from:" entry (the consolidation falls back to append)`)
       continue
     }
     const into = /^\s*into:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
@@ -192,6 +216,10 @@ export function parseCuratorNominations(text: string): CuratorNominations {
     }
     const pruned = /^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
     if (pruned) {
+      // V6-35: a `- name:` inside the consolidations section flips the parse
+      // to prunings — every later entry is re-read as a pruning. Warn so the
+      // mis-placement is visible; parsing stays lenient.
+      if (section === 'consolidations') warnings.push('"- name:" inside the consolidations section flips the parse to prunings')
       section = 'prunings'
       const name = pruned[1]
       if (name) prunings.push(name)
@@ -201,6 +229,7 @@ export function parseCuratorNominations(text: string): CuratorNominations {
   return {
     prunings: prunings.filter(valid),
     consolidations: consolidations.filter(item => valid(item.from) && valid(item.into)),
+    warnings,
   }
 }
 
@@ -268,7 +297,12 @@ export function computeScopeView(
     }
     const bundled = config.bundledNames?.has(name) === true
     const suppressed = gateSet.suppressed.has(name)
-    if (record.pinned || bundled || suppressed || protectedNames?.has(name) === true) protectedSet.add(name)
+    // V6-36 (0.3.36): a builtin (PROTECTED_BUILTIN_SKILLS — e.g. 'plan') is
+    // blocked by the shared gate, so it lands in NO bucket — the view lost an
+    // explanation dimension for the skills it must never touch. Bucket it as
+    // protected so the view always predicts what a curator pass may touch.
+    const isBuiltin = PROTECTED_BUILTIN_SKILLS.has(name)
+    if (record.pinned || bundled || suppressed || protectedNames?.has(name) === true || isBuiltin) protectedSet.add(name)
     if (lifecycleCandidate(name, record, config, bundled, gateSet)) {
       managed.push(name)
       if (record.state === 'stale' || record.quality_warn === true) watched.push(name)

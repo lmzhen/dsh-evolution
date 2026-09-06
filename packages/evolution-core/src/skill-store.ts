@@ -1648,6 +1648,13 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     return await this.runSingleWrite(target, (current) => {
+      // V6-15 (0.3.36): a byte-equivalent (modulo trailing whitespace) rewrite
+      // is a no-op — no write, no audit, no mutation event — so a repeated
+      // write_file cannot inflate the mutation-maturity counter or churn the
+      // catalog (the update/patch/memory-add noop discipline, 0.3.29).
+      if (current !== null && content.trimEnd() === current.trimEnd()) {
+        return { result: { ok: true, message: `Support file "${filePath}" unchanged: the supplied content already matches the current file; nothing written.`, noop: true, path: target }, write: null }
+      }
       return {
         result: { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target },
         write: content,

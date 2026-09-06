@@ -184,7 +184,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
       await runOnTurnEnd(session, event)
     } catch (error) {
       ctx.logger.warn(`dsh-evolution-review: turn-end review pipeline failed: ${error instanceof Error ? error.message : String(error)}`)
-      ctx.emit('evolution/review-error', { sessionId: session.id })
+      // V6-23 (0.3.36): the error signal is its own protection domain — a
+      // synchronously-throwing listener (cordis emit calls listeners directly)
+      // must not replace the original failure with an unhandled rejection.
+      try {
+        ctx.emit('evolution/review-error', { sessionId: session.id })
+      } catch (emitError) {
+        ctx.logger.warn(`dsh-evolution-review: review-error emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+      }
     }
   }
 
@@ -391,6 +398,28 @@ export function apply(ctx: Context, rawConfig: Config): void {
             }))
           } catch (injectError) {
             ctx.logger.warn(`dsh-evolution-review: result notice inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+          }
+        } else {
+          // V6-24 (0.3.36): a zero-landing plan must not be silent — the model
+          // asked for a review and needs to know that nothing landed and WHY
+          // (staged by approval, rejected by validation, skipped as unread, or
+          // failed at execution). Same notification channel and budget as the
+          // applied notice (≤500 chars).
+          try {
+            const reasons: string[] = []
+            if (validation.rejected.length > 0) reasons.push(`${validation.rejected.length} op(s) rejected by validation`)
+            if (skippedUnread > 0) reasons.push(`${skippedUnread} op(s) skipped (skill not read this session)`)
+            if (executed.failedOps.length > 0) reasons.push(`${executed.failedOps.length} op(s) failed at execution: ${executed.failedOps.join('; ')}`)
+            if (executed.aborted !== undefined) reasons.push(`execution aborted: ${executed.aborted}`)
+            if (reasons.length === 0) reasons.push('the review plan contained nothing executable')
+            let text = `💾 Self-improvement review: 0 ops landed. ${reasons.join(' ')}`
+            if (text.length > 500) text = `${text.slice(0, 497)}…`
+            agent.inject(createUserMessage({
+              content: [{ type: 'text', text }],
+              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
+            }))
+          } catch (injectError) {
+            ctx.logger.warn(`dsh-evolution-review: zero-landing notice inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
         }
         // Process event, payload v2 (sessionId) — plan-outcome durability is the

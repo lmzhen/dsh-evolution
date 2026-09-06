@@ -180,6 +180,40 @@ describe('runMaintain', () => {
     expect(capturedOptions?.signal).toBeTruthy()
   })
 
+  it('V6-29: a timeout above the AbortSignal domain is rejected explicitly, never spawned (0.3.36)', async () => {
+    const never: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start() {
+          throw new Error('should not be reached')
+        },
+      },
+    }
+    // AbortSignal.timeout throws a synchronous RangeError above 2^32-1; the
+    // guard rejects the value up front with a readable message.
+    const outcome = await runMaintain(never, { timeoutMs: 5_000_000_000 })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error ?? '').toContain('--timeout must be a positive integer')
+    expect(outcome.error ?? '').toContain('4294967295')
+  })
+
+  it('V6-38: a field-embedded standalone Notes: line is sanitized so it can never read as the section header (0.3.36)', async () => {
+    const withEmbedded = {
+      ...validResult,
+      plan: [{
+        ...validResult.plan[0]!,
+        finding: 'The body has grown large.\nNotes:\nMore detail inside the finding value.',
+      }],
+    }
+    const outcome = await runMaintain(runtime(withEmbedded))
+    expect(outcome.ok).toBe(true)
+    const text = outcome.text ?? ''
+    // The embedded standalone `Notes:` line is marked inside the field, so the
+    // command-side count can never cut the plan section at it.
+    expect(text).toContain('> Notes: (inside the field above)')
+    expect(text).toContain('[skill-level] fix-alignment-bad')
+  })
+
   it('persona carries the template once; the prompt carries facts only (v11 P3-4)', async () => {
     let capturedOptions: { persona?: string; prompt?: Array<{ text: string }> } | undefined
     const runtimeWithCapture: MaintainRuntime = {

@@ -24,6 +24,10 @@ export interface ReplayPlan {
   skillOps: number
   evidenceQuotes: number
   estimatedInputChars: number
+  /** V6-10 (0.3.36): execution-layer failures — a plan must not read as a
+   * clean "0/0" when its ops all failed at execution (V5-19 payload). */
+  executionFailures?: number | undefined
+  executionError?: string | undefined
 }
 
 export interface ReplayResult {
@@ -99,7 +103,7 @@ export function comparePlans(plans: ReplayPlan[], weights: ReplayWeights = DEFAU
     winner: winner.plan.policyId,
     margin,
     plans,
-    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected)`).join('\n'),
+    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected${(plan.executionFailures ?? 0) > 0 ? `, ${plan.executionFailures} failed${plan.executionError !== undefined ? `: ${plan.executionError}` : ''}` : ''})`).join('\n'),
   }
 }
 
@@ -152,6 +156,10 @@ export class EvolutionReplayDriver {
       skillOps: plan.skillApplied,
       evidenceQuotes: typeof plan.evidenceQuotes === 'number' ? plan.evidenceQuotes : plan.memoryApplied + plan.skillApplied,
       estimatedInputChars: typeof plan.estimatedInputChars === 'number' ? plan.estimatedInputChars : 0,
+      // V6-10 (0.3.36): keep the failure dimension for the leaderboard —
+      // a plan whose ops all failed must not score as a clean empty plan.
+      executionFailures: typeof plan.executionFailures === 'number' ? plan.executionFailures : 0,
+      ...typeof plan.executionError === 'string' ? { executionError: plan.executionError } : {},
     })
     if (this.plans.length > this.maxPlans) this.plans.shift()
   }

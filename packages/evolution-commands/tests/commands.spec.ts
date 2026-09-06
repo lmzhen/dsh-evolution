@@ -173,7 +173,7 @@ describe('evolution-commands', () => {
     expect(result.text).toContain('warn-skill')
     expect(result.text).toContain('Exempted (exclude / referenced): 1')
     expect(result.text).toContain('scheduled')
-    expect(result.text).toContain('Protected (pinned / bundled / hub): 1')
+    expect(result.text).toContain('Protected (pinned / bundled / hub / builtin): 1')
   })
 
   it('restore dispatches the full-state snapshot restore to the curator', async () => {
@@ -863,5 +863,67 @@ describe('evolution-commands', () => {
     expect(bare.text).toContain('a1  skill  create demo')
     expect(bare.text).toContain('b2  memory  EXECUTING remember')
     expect(bare.text).not.toContain('staged args:')
+  })
+
+  it('V6-38: a sanitized embedded standalone Notes: line does not undercount recommendations (0.3.36)', () => {
+    // formatPlan (V6-38) marks a field-embedded standalone `Notes:` line as
+    // `> Notes: (inside the field above)` — the count helper must then see the
+    // REAL section header only and count both bullets.
+    const text = [
+      'Maintenance scan abc: verdict=issues (2 recommendations, 1 notes)',
+      '- [skill-level] demo-skill · rule=body_size · better rev=patch conf=0.90',
+      '  finding: The body has grown large.',
+      '> Notes: (inside the field above)',
+      '  More detail inside the finding value.',
+      '- [library-level] all · rule=pointer_missing',
+      'Notes:',
+      '- a real note',
+    ].join('\n')
+    expect(Commands.countMaintainRecommendations(text)).toBe(2)
+  })
+
+  it('V6-41: a damaged mutations/report shape renders unreadable instead of a TypeError (0.3.36)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    ctx.provide('evolutionCurator', {
+      skills: {
+        listMutations: async () => [
+          { at: '2026-01-01T00:00:00.000Z', skillName: 'good-skill', action: 'update', summary: 'ok' },
+          { at: 12345, skillName: 'bad-skill' },
+          null,
+        ],
+      },
+      latestReport: async () => ({ runId: 'r1', startedAt: 12345, archived: 'nope', failed: [{ name: 'a' }] }),
+    })
+    await ctx.plugin(Commands)
+    const mutations = await captured!.handler({ rawInput: 'mutations' })
+    expect(mutations.kind).toBe('success')
+    expect(mutations.text).toContain('good-skill')
+    expect(mutations.text).not.toContain('bad-skill')
+    const report = await captured!.handler({ rawInput: 'curator report' })
+    expect(report.kind).toBe('error')
+    expect(report.text).toContain('Report file unreadable.')
+  })
+
+  it('V6-29: maintain --timeout above the AbortSignal domain is rejected at the command gate (0.3.36)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    await ctx.plugin(Commands)
+    // 5e9 > 2^32-1: AbortSignal.timeout would throw a synchronous RangeError.
+    const result = await captured!.handler({ rawInput: 'maintain --timeout 5000000000' })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('Invalid --timeout value')
   })
 })

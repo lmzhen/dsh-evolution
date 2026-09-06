@@ -421,3 +421,61 @@ function reviewPolicy() {
     skillReviewModel: 'model-x',
   }
 }
+
+it('V6-23: a throwing review-error listener does not replace the turn-end failure (0.3.36)', async () => {
+  const { ctx, session, emitEnd } = await mountReviewFixture({ failState: true })
+  const errors: string[] = []
+  ctx.on('evolution/review-error', (event) => {
+    errors.push(event.sessionId)
+    // A synchronously-throwing listener (cordis emit calls listeners directly):
+    // without the protection domain this escapes the catch as an unhandled
+    // rejection and the original failure is masked.
+    throw new Error('listener boom')
+  })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 1,
+    skillInterval: 1,
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
+  // The thrown listener was contained: exactly one signal, no crash, and the
+  // pipeline is still alive for the next turn-end.
+  await new Promise(resolve => setTimeout(resolve, 50))
+  expect(errors).toEqual([session.id])
+})
+
+it('V6-24: a zero-landing plan still notifies the model with the reasons (0.3.36)', async () => {
+  const injected: string[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    onInject: (message) => {
+      const box = message as { content?: Array<{ type: string; text: string }> } | null
+      const text = typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
+      injected.push(text)
+    },
+  })
+  ctx.provide('subagents', {
+    start: async () => ({
+      result: Promise.resolve({
+        structured: {
+          memoryOps: [],
+          skillOps: [{ action: 'patch', name: 'unread-skill', old_string: 'a', new_string: 'b', evidence: [{ event_seq: 0 }] }],
+          summary: 'patch an unread skill',
+        },
+      }),
+      dispose: async () => {},
+    }),
+  })
+  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+  emitEnd(1)
+  // The plan lands ZERO ops (the only skill op is not read this session) but
+  // the model must still hear that nothing happened and why.
+  await vi.waitFor(() => {
+    expect(injected.some(text => text.includes('0 ops landed') && text.includes('1 op(s) skipped'))).toBe(true)
+  })
+})

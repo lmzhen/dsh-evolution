@@ -131,4 +131,56 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('V6-28: a failed post-rename remove keeps the partial-commit disclosure (0.3.36)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-atomic-rmfail-'))
+    try {
+      writeFileSync(join(dir, 'a'), 'OLD-A', 'utf8')
+      writeFileSync(join(dir, 'b'), 'OLD-B', 'utf8')
+      // `a` commits; for `b` the first rename fails AND the remove-then-rename
+      // recovery ALSO cannot remove the target (Windows: rename and unlink
+      // failing together with EPERM). The error must still disclose that `a`
+      // landed — the raw rm failure used to escape without the chain.
+      const fsOps = {
+        ...baseFs,
+        renameSync: (from: string) => {
+          if (from.endsWith('b.tmp')) throw new Error('EPERM: rename failed')
+          renameSync(from, join(dir, 'a'))
+        },
+        // Only the target-remove fails; the stage cleanup (.tmp) must still work.
+        rmSync: (path: string, options?: { force?: boolean; recursive?: boolean }) => {
+          if (path.endsWith('.tmp')) { rmSync(path, options); return }
+          throw new Error('EPERM: unlink failed')
+        },
+      }
+      let message = ''
+      try {
+        Commands.atomicWriteFiles(dir, [{ name: 'a', content: 'NEW-A' }, { name: 'b', content: 'NEW-B' }], fsOps)
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error)
+      }
+      expect(message).toContain('could not remove "b" to replace it')
+      expect(message).toContain('already committed: a')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('V6-42: duplicate input names fail loud instead of self-referentially removing the committed file (0.3.36)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-atomic-dup-'))
+    try {
+      writeFileSync(join(dir, 'f'), 'OLD', 'utf8')
+      let message = ''
+      try {
+        Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'NEW-1' }, { name: 'f', content: 'NEW-2' }])
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error)
+      }
+      expect(message).toContain('duplicate input names: f')
+      expect(readFileSync(join(dir, 'f'), 'utf8')).toBe('OLD')
+      expect(existsSync(join(dir, 'f.tmp'))).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

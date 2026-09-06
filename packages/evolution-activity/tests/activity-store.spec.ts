@@ -73,9 +73,7 @@ function fakeIo(withTransact: boolean): EvolutionIoLike {
 
 function serialize(items: EvolutionActivityRecord[]): string {
   return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
-}
-
-describe('evolution-activity store', () => {
+}describe('evolution-activity store', () => {
   it('folds plan-applied payloads into a bounded record list (pure fold)', () => {
     let items: EvolutionActivityRecord[] = []
     items = applyActivityEvent(items, payload(), 20, 100)
@@ -286,6 +284,16 @@ describe('evolution-activity store', () => {
     expect(JSON.parse(raw)).toEqual({ version: ACTIVITY_FILE_VERSION, items })
     // The matching reader decodes it back to the same records (no drift).
     expect(parseActivityContent(raw)).toEqual(items)
+  })
+
+  it('V6-10: folds the execution-failure dimension so a 0/0 plan is not a clean record (0.3.36)', () => {
+    const items = applyActivityEvent([], payload({ executionFailures: 3, executionError: 'staged (approval)' }), DEFAULT_MAX_ITEMS, 1000)
+    expect(items[0]?.executionFailures).toBe(3)
+    expect(items[0]?.executionError).toBe('staged (approval)')
+    // A payload without the dimension (pre-0.3.36 event shapes) stays clean.
+    const plain = applyActivityEvent([], payload(), DEFAULT_MAX_ITEMS, 1000)
+    expect(plain[0]?.executionFailures).toBeUndefined()
+    expect(plain[0]?.executionError).toBeUndefined()
   })
 
 })

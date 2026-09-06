@@ -153,3 +153,52 @@ it('lifecycleCandidate mirrors the transition gate for a bundled-prune mix', () 
   expect(lifecycleCandidate('manual', record, config, false)).toBe(false)
   expect(lifecycleCandidate('b', record, config, true)).toBe(true)
 })
+
+it('V6-35: lenient parse warns on a mode after into and on a name inside consolidations (0.3.36)', () => {
+  // `mode:` after `into:` has no preceding open entry (the prompt says mode
+  // goes BEFORE into) — the intent (demote) silently degraded to append.
+  const afterInto = [
+    'consolidations:',
+    '  - from: demo-a',
+    '    into: umbrella',
+    '    mode: reference',
+  ].join('\n')
+  const parsed = parseCuratorNominations(afterInto)
+  expect(parsed.consolidations).toEqual([{ from: 'demo-a', into: 'umbrella' }])
+  expect(parsed.warnings.some(w => w.includes('mode: reference ignored'))).toBe(true)
+  // A `- name:` inside the consolidations section flips the parse to prunings.
+  const flipped = [
+    'consolidations:',
+    '  - from: demo-b',
+    '    into: umbrella',
+    '  - name: late-stale',
+    '  - name: later-stale',
+  ].join('\n')
+  const parsedFlip = parseCuratorNominations(flipped)
+  expect(parsedFlip.prunings).toEqual(['late-stale', 'later-stale'])
+  expect(parsedFlip.warnings.some(w => w.includes('flips the parse to prunings'))).toBe(true)
+  // The canonical shape stays silent.
+  const canonical = [
+    'consolidations:',
+    '  - from: demo-c',
+    '    mode: reference',
+    '    into: umbrella',
+    'prunings:',
+    '  - name: stale-one',
+  ].join('\n')
+  expect(parseCuratorNominations(canonical).warnings).toEqual([])
+})
+
+it('V6-36: a protected builtin lands in the protected bucket of the scope view (0.3.36)', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const age = new Date(now.getTime() - 200 * 86_400_000)
+  const record: UsageRecord = {
+    created_by: 'agent', created_at: age.toISOString(), use_count: 1, view_count: 0, patch_count: 0,
+    last_used_at: age.toISOString(), last_viewed_at: null, last_patched_at: null,
+    state: 'active', pinned: false, archived_at: null,
+  }
+  const usage = new Map<string, UsageRecord>([['plan', record]])
+  const view = computeScopeView(usage, { staleAfterDays: 30, archiveAfterDays: 90 })
+  expect(view.managed).toEqual([])
+  expect(view.protected).toEqual(['plan'])
+})

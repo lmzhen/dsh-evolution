@@ -567,6 +567,82 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('V6-08: a bundled SIBLING archive no longer suppresses a crashed non-bundled skill (0.3.36)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v608-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+    await skills.create('foo', body('foo', 'Foo body.'), 'foreground')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['foo', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    // Crashed-archive shape for `foo` (tree dir gone, record still active) and
+    // a bundled SIBLING `foo-bar` archive whose name carries the `foo-` prefix.
+    await rm(join(skills.root, 'foo'), { recursive: true, force: true })
+    const stamp = '20260101120000'
+    await mkdir(join(skills.root, '.archive', `foo-bar-${stamp}`), { recursive: true })
+    await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}`, '.bundled'), '', 'utf8')
+    await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}`, 'SKILL.md'), body('foo-bar', 'Sibling body.'), 'utf8')
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(result.errors).toEqual([])
+    // `foo` is NOT bundled: the sibling's marker must not suppress it, else its
+    // next rebuild would silently escape the lifecycle gate.
+    const suppressed = await loadSuppressedNames(skills.root, nodeEvolutionIo())
+    expect(suppressed.has('foo')).toBe(false)
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('foo')?.state).toBe('archived')
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('V6-09: a FAILED .archive listing warns instead of silently reading as "not bundled" (0.3.36)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v609-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+    await skills.create('ghost-skill', body('ghost-skill', 'Ghost body.'), 'foreground')
+    const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['ghost-skill', {
+      created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: old, last_viewed_at: null, last_patched_at: null,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    await rm(join(skills.root, 'ghost-skill'), { recursive: true, force: true })
+    // Force the `.archive` listing to fail with a non-"missing" error.
+    const io = ctx.evolutionIo.provider()
+    const realList = io.list.bind(io)
+    vi.spyOn(io, 'list').mockImplementation(async (path: string) => {
+      if (path.endsWith(join('.archive'))) throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      return realList(path)
+    })
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(result.errors).toEqual([])
+    // The probe failure is observable, not a silent "not bundled".
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('bundled marker probe for "ghost-skill" failed'))
+    const suppressed = await loadSuppressedNames(skills.root, nodeEvolutionIo())
+    expect(suppressed.has('ghost-skill')).toBe(false)
+    warnSpy.mockRestore()
+    vi.restoreAllMocks()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('E-15 regression: a dry-run heal must NOT persist the archived fold (0.3.19 review)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e15-dry-'))
     const previous = process.env.DSH_HOME
@@ -1358,7 +1434,7 @@ Body of ${name}.
       await ctx.plugin(NodeIo)
       await ctx.plugin(EvolutionCurator, { llmReview: true })
       const nominations = await ctx.evolutionCurator.recommend(['sql-backup', 'SQL-restore', 'unrelated'])
-      expect(nominations).toEqual({ prunings: [], consolidations: [] })
+      expect(nominations).toEqual({ prunings: [], consolidations: [], warnings: [] })
       expect(captured).toContain('Prefix clusters observed')
       expect(captured).toContain("'sql'")
       expect(captured).toContain('SQL-restore')
@@ -1628,9 +1704,9 @@ Body of ${name}.
     ctx.provide('evolutionPolicy', { get: () => ({ curatorModel: 'model-x' }) })
     await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, intervalHours: 24 })
     const spy = vi.spyOn(ctx.logger, 'warn')
-    const nominations = await (ctx.evolutionCurator as unknown as { recommend(names: string[]): Promise<{ prunings: string[]; consolidations: unknown[] }> }).recommend(['sql-backup', 'SQL-restore'])
+    const nominations = await (ctx.evolutionCurator as unknown as { recommend(names: string[]): Promise<{ prunings: string[]; consolidations: unknown[]; warnings: string[] }> }).recommend(['sql-backup', 'SQL-restore'])
     // E-52: the swallow must be observable — warn + empty nomination set, no throw.
-    expect(nominations).toEqual({ prunings: [], consolidations: [] })
+    expect(nominations).toEqual({ prunings: [], consolidations: [], warnings: [] })
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('LLM nomination pass failed'))
     spy.mockRestore()
   })
