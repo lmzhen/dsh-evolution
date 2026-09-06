@@ -101,7 +101,10 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   // fold the window loop into an empty first window (or a NaN spin) and make
   // every in-scope pattern blind. Clamp to the default so an invalid caller
   // value still scans; the config layer is the first-line guard, this is
-  // depth. All in-repo call sites pass the default, so behavior is unchanged.
+  // depth. V5-27: in-repo callers pass valid/clamped values (the threat
+  // package pre-clamps its config-derived value), so behavior is unchanged —
+  // but the clamp is the guarantee for any third-party caller, not a promise
+  // about call sites.
   const windowSize = clampedNumber(maxScanChars, 65_536, { min: 1 })
   const findings: ThreatFinding[] = []
   if (ZERO_WIDTH_CHARS.test(text)) {

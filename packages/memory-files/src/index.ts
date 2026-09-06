@@ -61,12 +61,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // old entries and the last rename wins, silently dropping the other's ops.
   // 0.3.17 (S2.8, T-1): the queue factory is shared with state-json now.
   const serializedWrite = makeSerialQueue()
+  // V5-11 (0.3.32): a whitespace-only `root` was truthy and resolved to a
+  // CWD-relative path — trim like resolveSkillsRoot/state-json (V4-09 third
+  // occurrence); empty/whitespace both fall through to the default root.
+  const resolvedRoot = (config.root || '').trim()
   const store = new MemoryStore({
     memoryCharLimit: config.memoryCharLimit,
     userCharLimit: config.userCharLimit,
     addDatePrefix: config.addDatePrefix,
     maxConsolidationFailures: config.maxConsolidationFailures,
-    ...config.root ? { root: config.root } : {},
+    ...resolvedRoot !== '' ? { root: resolvedRoot } : {},
     io,
   })
   const provider: MemoryProvider = {

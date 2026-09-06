@@ -167,7 +167,9 @@ filter:
 ```yaml
 - id: evolution-review
   config:
-    reviewToolAllow: [skill, skill_search, skill_load, read]
+    # V5-25 (0.3.32): the DSH tool catalog exposes the plain `skill` tool only —
+    # `skill_search`/`skill_load` (Hermes-era) do not exist on this platform.
+    reviewToolAllow: [skill]
 ```
 
 ## Verification

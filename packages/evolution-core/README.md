@@ -31,12 +31,20 @@ two processes sharing `DSH_HOME` cannot interleave their RMW on one file.
 `create` writes a new file and `archive`/`consolidate` already own a two-phase
 commit, so they deliberately stay outside the serial chain.
 
-When no `transact` is injected (the current default callers), only the
-in-process serial chain protects the RMW; same-skill concurrent writes from
-different surfaces (foreground `skill_manage`, the review pipeline, the
-curator, `/evolution restructure`) still resolve **last writer wins**. Wire a
-`transact` at every SkillLibrary instantiation point to extend that guarantee
-across processes.
+When the backend provides `transact` (nodeEvolutionIo and the io adapter do),
+the constructor binds it BY DEFAULT since 0.3.27 — the single-file entry points
+(`update`, `patch`, `writeSupportFile`, and each per-file piece of
+`restructure`) run their read→write inside the cross-process lock for every
+instantiation, so same-file concurrent writes from different processes no
+longer resolve to last-writer-wins there. An explicit `transact` argument
+overrides the default binding. The two-phase paths deliberately stay outside
+that lock: `create` (exists probe + write) can still double-pass the probe
+across processes, `archive`/`consolidate` are rename-based with best-effort
+rollback (an archive loser's rollback surfaces the raw failure when the source
+vanished), and `restructure`'s multi-file swap can expose an interleaved tree
+to a concurrent reader. These residual windows are documented rather than
+locked — cross-process writers to the SAME skill file should serialize through
+the single-file paths above.
 
 ## Known Limitations and Deferred Work
 

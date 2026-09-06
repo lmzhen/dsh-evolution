@@ -834,7 +834,26 @@ export class EvolutionCurator extends Service {
         // moved the whole skill directory (markers included) into `.archive`,
         // so a `.bundled` marker there proves the crashed archive was a bundled
         // skill — mirror the success path's suppression write.
-        const wasBundled = await this.io.exists(join(this.skills.root, '.archive', name, markerEntryName('bundled'))).catch(() => false)
+        // V5-20 (0.3.32): the archive destination is `<name>` and, when a
+        // same-second archive already sits there, `<name>-<stamp>[-rand]`
+        // (skill-store archive naming) — probe BOTH shapes; and a probe
+        // failure is a warn, never a silent "not bundled" (which would skip
+        // the suppression write).
+        let wasBundled = false
+        try {
+          wasBundled = await this.io.exists(join(this.skills.root, '.archive', name, markerEntryName('bundled')))
+          if (!wasBundled) {
+            const archiveEntries = await this.io.list(join(this.skills.root, '.archive')).catch(() => [])
+            for (const entry of archiveEntries) {
+              if (entry.startsWith(`${name}-`)) {
+                wasBundled = await this.io.exists(join(this.skills.root, '.archive', entry, markerEntryName('bundled')))
+                if (wasBundled) break
+              }
+            }
+          }
+        } catch (probeError) {
+          this.ctx.logger.warn(`evolution-curator: bundled marker probe for "${name}" failed: ${probeError instanceof Error ? probeError.message : String(probeError)}`)
+        }
         if (wasBundled) {
           suppressedNames.add(name)
           suppressedAdded.add(name)

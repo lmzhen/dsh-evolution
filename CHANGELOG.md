@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.32 (patch) — v5 审计批 4（收口）：口径/文档与残余窗口（V5-06/11/12/20/23/24/25/27/31/35）
+
+v5 审计（0.3.28 修复核验轮）批次 4（口径/文档失实 + 残余窗口），v5 审计**收口版**；每项先核验属实再修。
+
+- **V5-06**：memory-store 批量 threat 拒绝（add/replace 两条）补齐 `current-entries` 预览——与同函数其余全部失败路径一致（V4-49 消息统一收尾）。
+- **V5-11**：memory-files 的 whitespace-only `root` 穿透（`config.root ?` 不 trim → CWD 相对根）——V4-09 同类第三处（state-json/maintenance 已修）→ trim 后与空串同落地默认根。
+- **V5-12**：state-json README 并发声明与实现相反（「cross-process locking is a storage-layer limitation」——本 provider 每次变更都走 transactIo 跨进程锁）→ 声明改为「进程内 + IO 后端跨进程锁」如实；「storage-json 无跨进程锁」的 caveat 限定到 domain provider（storage 侧原意保留）。
+- **V5-20**：curator 的 bundled marker 探针只查 `.archive/<name>/.bundled`——同名二次归档的 **`<name>-<stamp>[-rand]`** 目的地不识别（bundled 性在两次归档间变化时结论错向；exists 抛错被 `.catch(()=>false)` 静默降级为「非 bundled」→ suppression 不落盘）→ 双形态探针 + probe 失败 warn（不再静默）。
+- **V5-23**：validate-plan 的 canonical 归一在 facts 含**仅大小写不同的双名**时 last-wins 塌缩（`Foo`/`foo` 同存时重锚到另一真实技能）→ 歧义键显式 fail-loud（「use the exact spelling」），不再重锚。
+- **V5-24**：preset 三处矛盾——①standalone「mount twice」论据改为如实（60-char cap override 由 host 提供、preset 用平台默认；host/preset 互斥不得同装——共享行如 maintenance-tools/session-query 由各自载体自己持有）；②standalone review 行补 `reviewToolAllow: [skill]`（与 overlay/host 字节一致，消除三形态行为差）；③README 的「relies on the base host for the two overrides」改写为逐项事实（preset 自持 session-query override、60-char cap preset-alone 用平台默认并附自行添加指引）。
+- **V5-25**：INSTALL.md 的 `reviewToolAllow: [skill, skill_search, skill_load, read]` 示例列平台不存在的 skill_search/skill_load（与 0.3.18 幻影清扫相抵）→ `[skill]` + 注释。
+- **V5-27**：threats.ts 注释「All in-repo call sites pass the default」失实（threat 包下传配置派生值）→ 「callers pass valid/clamped values；钳制是第三方调用的保证」。
+- **V5-31**：tool-memory 的 `dsh-memory-files` 声明在 peerDependencies 但 src 零 import（仅 3 个 spec 使用）→ 从 peer 删除（测试归属已在 devDependencies）——闭合守卫抓不到的「反向虚增」。
+- **V5-35**：core README 并发模型段更新——0.3.27 起构造**默认绑定**后端 transact（update/patch/writeSupportFile/restructure 逐文件入跨进程锁——「current default callers 未注入」叙事过时）；两阶段路径（create 双探针/archive-consolidate rename/restructure 多文件半应用树）如实声明为**文档化残留**而非锁定；顺带修 archive 复制回退的裸 ENOENT（并发归档败者/源消失 → ok:false 如实消息，技能留在原地）。
+- **回归**：全量 vitest **688/688**；oxlint 0/0；tsc 0。
+- **v5 审计闭环声明**：V5-01~V6 全部批次（1 并发数据完整性 / 2 守卫验证盲区 / 3 失败可观测性 / 4 口径文档）落地（V5-04 已被 0.3.29 的 ticket 协议淘汰；V5-05/07/26 经修复收敛）；剩余挂账同 v5 §5（平台议题 G4.8/N-2、F-328 申报、F-309/310/311/354、capability 接线声明）。
+
 ## 0.3.31 (patch) — v5 审计批 3：失败可观测性与发布链卫生（V5-13/14/17/18/19/29/32/33）
 
 v5 审计（0.3.28 修复核验轮）批次 3（失败可观测性 + 发布链卫生）；每项先核验属实再修。

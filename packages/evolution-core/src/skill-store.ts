@@ -1248,7 +1248,15 @@ export class SkillLibrary {
     } catch {
       // Some IO providers cannot rename across media. Copy the whole tree
       // first so support files are never lost during archival fallback.
-      await this.io.copy(dir, dest)
+      // V5-35 (0.3.32): a concurrent archiver may have already moved the
+      // source (or the rename failed for another transcient reason) — surface
+      // the fallback failure as a result instead of a raw ENOENT.
+      try {
+        await this.io.copy(dir, dest)
+      } catch (copyError) {
+        const why = copyError instanceof Error ? copyError.message : String(copyError)
+        return { ok: false, message: `Skill "${name}" archive fell back to copy but failed (${why}); the skill stays where it is.` }
+      }
       try {
         await this.io.remove(dir)
       } catch (error) {

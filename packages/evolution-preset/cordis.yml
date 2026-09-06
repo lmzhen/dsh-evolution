@@ -20,10 +20,15 @@
 #     flow gets it from the Evolution agent preset), so it is not repeated
 #     here; a fully self-sufficient manual compose should add it (plus the
 #     host's `session-query-sqlite` index override) for cross-session recall.
-#   - `evolution-maintenance-tools`, the `session-query-sqlite` index override
-#     and the `tool-skill` 60-char catalog cap are evolution-host-owned; `host`
-#     and this one-click preset are ALTERNATIVE install targets (mutual
-#     exclusion, E-33), so repeating them here would mount the row twice.
+#   - `evolution-maintenance-tools` is listed by both the overlay form and the
+#     host bundle; `session-query-sqlite` override is carried by the overlay
+#     itself (it overrides the platform row the DSH profile already has). The
+#     `tool-skill` 60-char catalog cap override is evolution-host-owned — the
+#     host's base-row override and this one-click preset are ALTERNATIVE
+#     install targets (mutual exclusion, E-33) and the preset intentionally
+#     runs the platform catalog default instead; a manual compose wanting the
+#     cap adds the override itself. `host`/preset must never be installed
+#     together (either form), or shared rows would mount twice.
 #   - `evolution-capability` is held out of the composition too (D-9, rc.51) —
 #     a staged Creator-mode governance seam with no live consumer; adopters
 #     add the row on top.
@@ -92,6 +97,11 @@
 # ── review / curator / observability / human controls ───────────────────────
 - id: evolution-review
   name: '@deepseek-ai/dsh-evolution-review'
+  # V5-24 (0.3.32): keep the standalone review row byte-consistent with the
+  # overlay/host form — the tool allow-list narrows review subagents to the
+  # plain `skill` tool (the DSH catalog exposes it only).
+  config:
+    reviewToolAllow: [skill]
 - id: evolution-curator
   name: '@deepseek-ai/dsh-evolution-curator'
 - id: evolution-commands

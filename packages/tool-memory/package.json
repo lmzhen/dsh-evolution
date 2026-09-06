@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-memory",
   "description": "Model-facing memory tool and prompt context",
-  "version": "0.3.31",
+  "version": "0.3.32",
   "publishConfig": {
     "access": "public"
   },
@@ -39,7 +39,6 @@
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
-    "@deepseek-ai/dsh-memory-files": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^"
   },

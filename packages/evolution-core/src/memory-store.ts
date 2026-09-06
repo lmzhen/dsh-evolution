@@ -340,7 +340,7 @@ export class MemoryStore {
         const body = (op.facts ?? '').trim()
         if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = scanMemoryThreats(body)
-        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         if (hasEntryDelimiter(body)) {
           return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
@@ -365,7 +365,7 @@ export class MemoryStore {
         const body = (op.facts ?? '').trim()
         if (!body) return { result: { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = scanMemoryThreats(body)
-        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         if (hasEntryDelimiter(body)) {
           return { result: { ok: false, message: `Operation ${position} (replace): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }

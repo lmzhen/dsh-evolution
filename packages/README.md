@@ -67,10 +67,12 @@ Use the legacy preset overlay on a standard DSH host:
 
 This one-click preset and the layered `evolution-host` bundle are ALTERNATIVE
 install targets (mutual exclusion, E-33) — install one, not both, or the shared
-infra rows mount twice. The `evolution-maintenance-tools`, `session-query-sqlite`
-index override and the `tool-skill` 60-char catalog cap stay evolution-host-owned;
-the one-click preset lists its own `evolution-maintenance-tools` row and relies on
-the base host for the two overrides.
+infra rows mount twice. The one-click preset carries its own
+`evolution-maintenance-tools` row and its own `session-query-sqlite` index
+override; the `tool-skill` 60-char catalog cap override is evolution-host-owned
+and a preset-alone install runs the platform catalog default (add the override
+yourself if you want the cap — the 60-char authoring bar enforced by
+tool-skill-manage still applies regardless).
 
 Or compose manually — order matters because provider rows declare `inject`.
 This mirrors the row set shipped by the two bundles (evolution-host infra +

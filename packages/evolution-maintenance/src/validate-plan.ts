@@ -118,10 +118,20 @@ export function validateAndNormalizeMaintainPlan(
   const protectedNames = new Set<string>()
   const factNames = new Set<string>()
   const canonicalByName = new Map<string, string>()
+  const ambiguousNames = new Set<string>()
   for (const skill of report.skills) {
     const key = skill.name.trim().toLowerCase()
     factNames.add(key)
-    canonicalByName.set(key, skill.name)
+    const existing = canonicalByName.get(key)
+    if (existing !== undefined && existing !== skill.name) {
+      // V5-23 (0.3.32): a case-insensitive filesystem may hold BOTH `Foo` and
+      // `foo` — the lookup key then names two real skills and last-wins
+      // re-anchored recommendations to whichever scanned last. Anchoring must
+      // fail loud with the exact-spelling instruction instead.
+      ambiguousNames.add(key)
+    } else {
+      canonicalByName.set(key, skill.name)
+    }
     if (skill.protected) protectedNames.add(key)
   }
 
@@ -156,14 +166,25 @@ export function validateAndNormalizeMaintainPlan(
         // V4-24 (F-326): trim each name and resolve it to the canonical facts
         // name via a case-insensitive lookup. A name the facts report never
         // scanned stays as its trimmed self and fails the anchoring check below.
-        namesOut = rawNames.map(nm => canonicalByName.get(nm.trim().toLowerCase()) ?? nm.trim())
-        const missing = namesOut.find(nm => !factNames.has(nm.toLowerCase()))
-        if (missing !== undefined) {
-          errors.push(`${path}.names: references skill "${missing}" not in the facts report — names must come from the scanned skill set`)
+        namesOut = rawNames.map((nm) => {
+          const key = nm.trim().toLowerCase()
+          if (ambiguousNames.has(key)) return nm.trim()
+          return canonicalByName.get(key) ?? nm.trim()
+        })
+        // V5-23: a name that maps ambiguously (two real skills differing only
+        // in case) is refused outright — never re-anchored to one of them.
+        const ambiguousHit = namesOut.find(nm => ambiguousNames.has(nm.trim().toLowerCase()))
+        if (ambiguousHit !== undefined) {
+          errors.push(`${path}.names: "${ambiguousHit}" matches multiple differently-cased skill names in the facts report — use the exact spelling`)
         } else {
-          const hit = namesOut.find(nm => protectedNames.has(nm.toLowerCase()))
-          if (hit !== undefined) {
-            errors.push(`${path}.names: references protected skill "${hit}" — §7 forbids recommendations for bundled/hub-installed/pinned skills`)
+          const missing = namesOut.find(nm => !factNames.has(nm.toLowerCase()))
+          if (missing !== undefined) {
+            errors.push(`${path}.names: references skill "${missing}" not in the facts report — names must come from the scanned skill set`)
+          } else {
+            const hit = namesOut.find(nm => protectedNames.has(nm.toLowerCase()))
+            if (hit !== undefined) {
+              errors.push(`${path}.names: references protected skill "${hit}" — §7 forbids recommendations for bundled/hub-installed/pinned skills`)
+            }
           }
         }
       }
