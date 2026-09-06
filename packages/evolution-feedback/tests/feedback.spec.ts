@@ -5,7 +5,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import * as Feedback from '../src/index.ts'
 import { appendEvolutionEvent, readEvolutionEvents } from '@deepseek-ai/dsh-evolution-core'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -670,5 +670,58 @@ describe('evolution-feedback', () => {
     Feedback.apply(ctx, { qualityWarnThreshold: 1.5 })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
+  })
+
+  it('V6-40: re-wires quality pushes to a REPLACED skillUsage service (0.3.35)', async () => {
+    const ctx = new Context()
+    const callsA: string[] = []
+    const callsB: string[] = []
+    const stubA = { setQuality: async (name: string) => { callsA.push(name) } }
+    const stubB = { setQuality: async (name: string) => { callsB.push(name) } }
+    const fiberA = await ctx.plugin({ name: 'stub-skill-usage-a', apply: (c) => { c.provide('skillUsage', stubA) } })
+    Feedback.apply(ctx)
+    // Establish the wiring on the first instance (the inject fiber activates on
+    // a microtask, so record until the push lands).
+    const deadlineA = Date.now() + 5000
+    while (Date.now() < deadlineA && callsA.length === 0) {
+      ctx.evolutionFeedback.record('t', 'negative', undefined, 'skill')
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    expect(callsA.length).toBeGreaterThan(0)
+    // Replace the dependency: without the re-wire (the old one-time flag
+    // skipped the second inject run) quality pushes would keep going into the
+    // UNLOADED instance and the new one would never receive them.
+    await fiberA.dispose()
+    const fiberB = await ctx.plugin({ name: 'stub-skill-usage-b', apply: (c) => { c.provide('skillUsage', stubB) } })
+    const deadlineB = Date.now() + 5000
+    while (Date.now() < deadlineB && callsB.length === 0) {
+      ctx.evolutionFeedback.record('t2', 'negative', undefined, 'skill')
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    expect(callsB.length).toBeGreaterThan(0)
+    await fiberB.dispose()
+  })
+
+  it('V6-39: a whitespace-only path falls back to the default feedback path (0.3.35)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-path-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(Feedback, { path: '   ' })
+      ctx.evolutionFeedback.record('target', 'positive', 'note', 'session')
+      await ctx.evolutionFeedback.waitIdle()
+      await ctx.evolutionFeedback.persistCache()
+      // The boot cache lands on the DEFAULT path — a whitespace `path` was
+      // truthy pre-fix and produced a CWD-relative ' ' file instead.
+      expect(await readFile(join(home, 'evolution', 'feedback.json'), 'utf8')).toContain('"version": 2')
+      await expect(readFile(join(process.cwd(), '   '), 'utf8')).rejects.toThrow()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
   })
 })

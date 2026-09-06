@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.35 (patch) — v6 审计 M2：并发自愈与配置防御（V6-04/05/06/18/39/40）
+
+v6 审计（0.3.33 全量复审轮）M2 里程碑；每项先核验属实再修（全部 6 项均经源码复读确认：V6-04/18 的「空体锁/票永久锁死」、V6-05 的扫描窗口悬崖为确定性缺陷，V6-06/39/40 为配置/口径穿透）。
+
+- **V6-04 [P2] 空体锁/空体票的永久锁死闭环**：
+  - 建锁路径改为显式 `open('wx')` + 独立写体——**仅当本轮创建成功打开过文件**（`lockHandle` 非空）时，写/关闭阶段的失败先关闭并 `rm` 自身残留再 throw（O_EXCL 保证该文件属于本轮；此前 `writeFile('wx')` 在打开后的失败会留下 0 字节/半体锁，其体永不通过 pid 探针 → 接管永不触发 → 该路径所有后续写者 40 次预算耗尽后永久 fail-loud）。
+  - 接管条件扩展「**空体死锁**」（创建者死于 open 与写体之间）——空体无 pid 可探测，仅在 mtime > 1s（与接管阈值同值）时按死锁接管：在途创建者写体紧跟 open，>1s 无体即已死/挂起；1s 门防误删并行创建中的活锁。接管仍走单一执行门（`current === holderContent` 重读 + 票协议，BOTH 形态共用）。
+  - 空体 `.next` 票回收——`:290` 的 `ticketBody !== ''` 门放宽为「体非空走旧票规则 ∪ 空体且 mtime > 1s」：空体票此前永不被回收（空体 → pid 解析 0 → 旧「stale 且非空」门恒假）→ `writeFile(ticket,'wx')` 永远 EEXIST → 每次接管 40 次预算耗尽。**评审补强**：票错回收代价=接管者重试一轮；票无持有权（与「锁体 mtime 启发式」被 V4-05 证伪的本质区别——票回收不产生第二持有者）。
+- **V6-18 [P3] sweep 覆盖接管票残留**：`sweepStaleTmps` 的匹配集合从仅 `.tmp` 扩展为「`.tmp` + `<base>.lock.next`」；`<base>.lock` 明确跳过（sweep 运行于已持锁内部——该文件即本轮活锁，匹配=自杀）。票回收语义与逐次接管路径一致（死 pid 或 >1s 旧票；空体仅按年龄回收）。崩溃接管者留下的票此前只靠「下一次接管」顺带清，无人撮合则永存。
+- **V6-05 [P2] threats 扫描窗口下限与步长回退**：
+  - `clampedNumber` 下限从 `{min:1}` 提为 `PATTERN_OVERLAP + 1`（4097）——0.3.16 的「不成文约束」显式化；小于下界的值回退默认 65_536。
+  - `step` 改为**比例步长** `Math.max(Math.floor(windowSize/2), 1)`；任意合法窗口值下重叠 = `ceil(w/2)` ≥ 2049 > 最长模式跨窗 span（~530 字符，E-12 覆盖注记同步），全文本覆盖保证不变；扫描代价 O(n×2) 而非 O(n×w)（旧式 w≤4096 时 step 塌缩为 1——108KB 文本 4096 窗口实测 **5829ms**，修复后回落到个位毫秒）。
+  - evolution-threat：schema `.min(PATTERN_OVERLAP + 1)` + `resolveMaxScanChars` 同步下限；README 声明合法区间（`z.number()` 仍放行 NaN/±Infinity，由装配钳制兜底）。
+- **V6-06 [P2] 数值配置全部接入 clampedNumber 管道**：tool-skill-manage 的 maxSkillNameLength/maxDescriptionLength/maxSkillContentChars/maxSkillFileBytes 与 tool-memory 的 entryPreviewChars 从 `?? default` 改为装配期 `clampedNumber(…, {min:1})` + 一次性 warn（G3.1 同款——NaN/±Infinity 穿透 bare number schema 后 `limit > NaN` 恒假 → 沉默解除限长防线；entryPreviewChars NaN → `slice(0, NaN)` 空预览且 `slice(0,负)` 语义反转）。schemastery `.min(1)` 保留为装载期第一道；合法值行为零变化。
+- **V6-39 [P3] feedback path 空白串穿透**：`rawConfig.path || undefined` 把 truthy 的 `'   '` 当路径（写 CWD 相对空白文件名）→ `(rawConfig.path ?? '').trim() || undefined`（V5-11 同式）。
+- **V6-40 [P3] feedback 移除 qualityWired 一次性旗标**：`ctx.inject(['skillUsage'])` 在依赖被**替换**时重跑回调（cordis fiber 源码实证：epoch 按依赖 `impl.fiber.uid` 计算，提供方 fiber 变更即重装）——旗标使重挂后的新实例得不到接线（推送持续进入已卸载实例的闭包）。移除后每次重跑重包 `feedback.record`/`onRollback`（`baseRecord` 绑定位置保证幂等——重包是赋值替换、不叠加）。
+- **回归**：全量 vitest **701/701**（+10：io 空体锁自愈/空体票回收/sweep 票回收与保留 ×4、threats 覆盖下限与性能 ×2、skill-manage NaN、tool-memory NaN、feedback 重挂接线/path trim ×2；threat-guard 矩阵更新）；oxlint 0/0（194 文件）；tsc 0；32-way 票压测 ×3 稳定 0 丢；本机并行下 2 例已知 Windows 负载 flake（guard 脚本 5s 超时、ENOTEMPTY 清理竞态）隔离复跑全绿——以 CI Linux 为准。
+
 ## 0.3.34 (patch) — v6 审计 M1：数据与安装正确性（V6-01/02/03/07 + V5-23 用例）
 
 v6 审计（0.3.33 全量复审轮）M1 里程碑；每项先核验属实再修（V6-01/02 均为 v6 报告的确定性/高置信发现，主审复读确认）。

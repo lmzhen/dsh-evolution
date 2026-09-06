@@ -359,6 +359,42 @@ Use it.
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
   })
+
+  it('V6-06: NaN numeric limits fall back to the defaults and stay enforced (0.3.35)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-manage-nan-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      await mountAgentLoopTestDependencies(ctx)
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(SkillUsageRegistry, { root })
+      // NaN passes the number schema (`z.number().min(1)`), so the assembly
+      // clamp is the net that must keep the DEFAULT limits enforced — a NaN
+      // limit would make every comparison false and silently unlimit writes.
+      await ctx.plugin(ToolSkillManage, {
+        maxSkillNameLength: NaN,
+        maxDescriptionLength: NaN,
+        maxSkillContentChars: NaN,
+        maxSkillFileBytes: NaN,
+      })
+      const longName = 'n'.repeat(65)
+      const created = await ctx.tools.execute({
+        callId: CallId(`nan-${Math.random()}`),
+        name: 'skill_manage',
+        arguments: { action: 'create', name: longName, content: SKILL.replace('boundary-skill', longName) },
+        agent: fakeAgent(undefined),
+        signal: new AbortController().signal,
+      })
+      expect(created.isError).toBe(false)
+      expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(false)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 

@@ -84,10 +84,14 @@ export interface ScanOptions {
 
 const NO_SCAN_OPTIONS: ScanOptions = {}
 
-/** Window overlap for the full-coverage scan: far larger than the longest
- * pattern span (~530 chars: `curl [^\n]{0,512} ...`), so a match straddling a
- * window boundary is fully inside at least one window (E-12, 0.3.16). */
-const PATTERN_OVERLAP = 4096
+/** Minimum window size for the full-coverage scan (V6-05, 0.3.35). With the
+ * proportional half-window step below, the overlap is `ceil(w/2)` — only a
+ * window at or above this floor keeps the overlap above the longest pattern
+ * span (~530 chars: `curl [^\n]{0,512} ...`), so a match straddling a window
+ * boundary is fully inside at least one window (E-12, 0.3.16). The clamp
+ * falls back to the default for a smaller caller value instead of risking a
+ * blind zone. */
+export const PATTERN_OVERLAP = 4096
 
 /**
  * Scan text at `scope`. Patterns are cumulative: `strict` includes all scopes.
@@ -97,15 +101,16 @@ const PATTERN_OVERLAP = 4096
  * characters (skill files may run to 100,000) is no longer a blind zone.
  */
 export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): ThreatFinding[] {
-  // V4-43 self-defense: a non-finite (NaN/±Infinity) or <=0 window size would
-  // fold the window loop into an empty first window (or a NaN spin) and make
-  // every in-scope pattern blind. Clamp to the default so an invalid caller
-  // value still scans; the config layer is the first-line guard, this is
+  // V4-43 self-defense: a non-finite (NaN/±Infinity) or out-of-domain window
+  // size would fold the window loop into an empty first window (or a NaN spin)
+  // and make every in-scope pattern blind. Clamp to the default so an invalid
+  // caller value still scans; the config layer is the first-line guard, this is
   // depth. V5-27: in-repo callers pass valid/clamped values (the threat
   // package pre-clamps its config-derived value), so behavior is unchanged —
   // but the clamp is the guarantee for any third-party caller, not a promise
-  // about call sites.
-  const windowSize = clampedNumber(maxScanChars, 65_536, { min: 1 })
+  // about call sites. V6-05: the floor is now PATTERN_OVERLAP + 1 — a window
+  // below it cannot guarantee full coverage (see PATTERN_OVERLAP).
+  const windowSize = clampedNumber(maxScanChars, 65_536, { min: PATTERN_OVERLAP + 1 })
   const findings: ThreatFinding[] = []
   if (ZERO_WIDTH_CHARS.test(text)) {
     findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope })
@@ -118,7 +123,13 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   if (normalized.length <= windowSize) {
     windows.push(normalized)
   } else {
-    const step = Math.max(1, windowSize - PATTERN_OVERLAP)
+    // V6-05 (0.3.35): proportional half-window step. Overlap = `ceil(w/2)`, so
+    // every position is covered by ~2 windows and the scan cost is O(n × 2)
+    // instead of the O(n × w) cliff the old fixed-overlap step produced for
+    // small windows (w ≤ PATTERN_OVERLAP collapsed the step to 1). A wider
+    // overlap never drops a match — findings are per label/scope, not per
+    // location.
+    const step = Math.max(Math.floor(windowSize / 2), 1)
     for (let start = 0; start < normalized.length; start += step) {
       windows.push(normalized.slice(start, start + windowSize))
     }

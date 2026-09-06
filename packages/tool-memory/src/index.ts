@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -102,6 +102,15 @@ export const Config: z<Config> = z.object({
 
 export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
   if (!rawConfig.memoryEnabled) return
+  // V6-06 (0.3.35): assembly-time clamp — a 0/negative/NaN/±Infinity value
+  // falls back to the default instead of turning every echoed entry into a
+  // tail slice (`slice(0, negative)` inverted the preview) or an empty string
+  // (`slice(0, NaN)`). The schema `.min(1)` rejects 0/negative at load; this
+  // clamp also covers NaN/±Infinity.
+  const entryPreviewChars = clampedNumber(rawConfig.entryPreviewChars, DEFAULT_ENTRY_PREVIEW_CHARS, { min: 1 })
+  if (entryPreviewChars !== (rawConfig.entryPreviewChars ?? DEFAULT_ENTRY_PREVIEW_CHARS)) {
+    ctx.logger.warn(`tool-memory: entryPreviewChars=${String(rawConfig.entryPreviewChars)} is invalid; falling back to the default ${DEFAULT_ENTRY_PREVIEW_CHARS}`)
+  }
   // 0.3.18 (S4.3, E-67): systemPrompt is an OPTIONAL service (soft probe, the
   // M-7 doctrine — align with tool-skill-manage). A host without it still boots
   // and gets the working memory tool; only guidance/snapshot are skipped.
@@ -165,7 +174,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     return {
       ok: result.ok,
       message: result.message,
-      entries: result.entries.map(entry => entry.slice(0, rawConfig.entryPreviewChars ?? DEFAULT_ENTRY_PREVIEW_CHARS)),
+      entries: result.entries.map(entry => entry.slice(0, entryPreviewChars)),
       chars: result.chars,
       limit: result.limit,
     }

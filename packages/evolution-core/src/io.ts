@@ -5,7 +5,7 @@
  * consumers (and the core's own tests) can use `nodeEvolutionIo`.
  */
 
-import { cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { type FileHandle, cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
@@ -220,15 +220,34 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       // 0.3.28 (V4-04 32-way repro): the lock body carries `pid:token` so a
       // takeover probe can tell a stale claim from a freshly created one, and
       // release verifies identity before deleting. NB: creation MUST stay an
-      // exclusive `writeFile('wx')` — an atomic tmp+rename would be a
+      // exclusive `open('wx')` — an atomic tmp+rename would be a
       // REPLACE-on-Windows semantic (MOVEFILE_REPLACE_EXISTING), which
       // let every contender overwrite the winner's lock (9/9 double-held in
       // the 10-way repro — far worse than the gap it was meant to close).
+      let lockHandle: FileHandle | null = null
       try {
         myClaim = `${process.pid}:${randomBytes(4).toString('hex')}`
-        await writeFile(lock, myClaim, { flag: 'wx' })
+        // V6-04 (0.3.35): the exclusive create is opened explicitly so a failure
+        // AFTER the create (write/close) still knows the on-disk file is OURS
+        // (`lockHandle` set). An unhandled 0-byte lock would block every future
+        // writer forever — its body fails the pid probe, so no takeover could
+        // ever clear it.
+        lockHandle = await open(lock, 'wx')
+        await lockHandle.writeFile(myClaim)
+        await lockHandle.close()
+        lockHandle = null
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
+        // V6-04: our create opened the file, so the failure is post-create —
+        // remove OUR artifact before throwing (a leftover 0-byte/partial lock
+        // outlives this writer as a permanent deadlock). A wrong rm is
+        // impossible here: `open('wx')` is the exclusive create, and while the
+        // file exists no other process can have created that name.
+        if (lockHandle) {
+          await lockHandle.close().catch(() => {})
+          await rm(lock, { force: true }).catch(() => {})
+          throw error
+        }
         // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
         // when a peer's holder-lock delete races our create; treat it as the
         // same retryable contention as EEXIST (rc.67).
@@ -275,7 +294,15 @@ export function nodeEvolutionIo(): EvolutionIoLike {
           // file itself is ownership-free: a stale ticket (dead holder, or the
           // holder crashed) is removed by any prober (its removal is harmless —
           // the ticket grants no lock).
-          if (Number.isInteger(holder) && holder > 0 && Date.now() - st.mtimeMs > 1000 && !holderAlive) {
+          // V6-04: a 0-byte lock (a creator that died between open and write)
+          // carries no pid to probe — it is reclaimable only when also older
+          // than the takeover threshold (a live creator writes its body right
+          // after open, so a lingering empty lock is a crashed creator; the 1s
+          // gate keeps an in-flight create safe). The re-read + ticket flow
+          // below stays the single execution gate for BOTH shapes.
+          const staleDead = Number.isInteger(holder) && holder > 0 && Date.now() - st.mtimeMs > 1000 && !holderAlive
+          const staleEmpty = holderContent === '' && Date.now() - st.mtimeMs > 1000
+          if (staleDead || staleEmpty) {
             const current = await readFile(lock, 'utf8').catch(() => '')
             if (current === holderContent) {
               const ticket = `${lock}.next`
@@ -284,10 +311,18 @@ export function nodeEvolutionIo(): EvolutionIoLike {
               // free: a wrong removal only delays a takeover by one loop.
               try {
                 const ticketBody = await readFile(ticket, 'utf8').catch(() => '')
+                const ticketMtime = await stat(ticket).then(s => s.mtimeMs, () => 0)
                 const ticketHolder = Number(ticketBody.split(':')[0] ?? '')
                 const ticketStale = !Number.isInteger(ticketHolder) || ticketHolder <= 0
-                  || !isAlive(ticketHolder) || Date.now() - (await stat(ticket).then(s => s.mtimeMs, () => 0)) > 1000
-                if (ticketStale && ticketBody !== '') await rm(ticket, { force: true }).catch(() => {})
+                  || !isAlive(ticketHolder) || Date.now() - ticketMtime > 1000
+                // V6-04: an empty body carries no pid to probe — reclaim only an
+                // OLD ticket (a live creator writes its body right after open;
+                // >1s with no body = crashed between create and write). The
+                // ticket grants no lock, so a wrong reclaim costs the former
+                // owner one retry round — never a second holder.
+                if (ticketStale && (ticketBody !== '' || Date.now() - ticketMtime > 1000)) {
+                  await rm(ticket, { force: true }).catch(() => {})
+                }
               } catch { /* ticket vanished — nothing to do */ }
               try {
                 await writeFile(ticket, `${process.pid}:${randomBytes(4).toString('hex')}`, { flag: 'wx' })
@@ -347,8 +382,34 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     let entries: string[]
     try { entries = await readdir(dir) } catch { return }
     const prefix = `${base}.`
+    // V6-18 (0.3.35): the ticket name is a known transient too. `base.lock` is
+    // skipped — this sweep runs inside the held write lock, so that file IS
+    // our live lock; `base.lock.next` is an ownership-free ticket a crashed
+    // takeover leaves behind, reclaimed with the same dead-pid/old semantics
+    // as the per-attempt reclaim.
+    const lockName = `${base}.lock`
+    const ticketName = `${lockName}.next`
     for (const name of entries) {
-      if (!name.startsWith(prefix) || !name.endsWith('.tmp')) continue
+      if (!name.startsWith(prefix) || name === lockName) continue
+      if (!name.endsWith('.tmp')) {
+        if (name === ticketName) {
+          const ticketPath = join(dir, name)
+          try {
+            const body = await readFile(ticketPath, 'utf8').catch(() => '')
+            const holder = Number(body.split(':')[0] ?? '')
+            const st = await stat(ticketPath)
+            // Same semantics as the per-attempt reclaim: dead-pid or >1s-old
+            // tickets are reclaimable (an empty body has no pid to probe, so
+            // only its age proves a crashed creator — V6-04).
+            const dead = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
+            const old = Date.now() - st.mtimeMs > 1000
+            if (dead || old) await rm(ticketPath, { force: true })
+          } catch {
+            // The ticket vanished (or a race with its reaper); nothing to clean.
+          }
+        }
+        continue
+      }
       const tmpPath = join(dir, name)
       const holder = Number(name.slice(prefix.length, name.length - 4).split('.')[0] ?? '')
       try {

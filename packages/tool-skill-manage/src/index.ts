@@ -20,7 +20,7 @@ import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evol
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -85,11 +85,25 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: 900, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+  // V6-06 (0.3.35): the numeric limits go through the assembly-time clamp so a
+  // 0/negative/NaN/±Infinity value falls back to the package default instead
+  // of silently disabling the limit (`limit > NaN` is always false). The
+  // schema `.min(1)` rejects 0/negative at load; this clamp also covers
+  // NaN/±Infinity. Warn once when a user-supplied value had to be corrected.
+  const numericClamped: string[] = []
+  const limit = (name: string, value: number | undefined, fallback: number): number => {
+    const result = clampedNumber(value, fallback, { min: 1 })
+    if (value !== undefined && result !== value) numericClamped.push(name)
+    return result
+  }
+  if (numericClamped.length > 0) {
+    ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
+  }
   const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io, {
-    maxNameLength: rawConfig.maxSkillNameLength ?? DEFAULT_SKILL_LIMITS.maxNameLength,
-    maxDescriptionLength: rawConfig.maxDescriptionLength ?? DEFAULT_SKILL_LIMITS.maxDescriptionLength,
-    maxSkillContentChars: rawConfig.maxSkillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
-    maxSkillFileBytes: rawConfig.maxSkillFileBytes ?? DEFAULT_SKILL_LIMITS.maxSkillFileBytes,
+    maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
+    maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
+    maxSkillContentChars: limit('maxSkillContentChars', rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+    maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
   }, (event) => { ctx.emit('evolution/skill-mutated', event) })
 
   async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {

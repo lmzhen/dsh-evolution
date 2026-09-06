@@ -337,3 +337,63 @@ it('sweeps this process own tmp immediately regardless of age (F-366)', async ()
   expect(await readFile(target, 'utf8')).toBe('fresh')
   await rm(root, { recursive: true, force: true })
 })
+
+it('self-heals a 0-byte lock left by a crashed creator (V6-04, 0.3.35)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-emptylock-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'empty-lock.json')
+  // A creator that died between open and write leaves a 0-byte lock whose body
+  // never passes the pid probe — without the self-heal every future writer
+  // fails loud after the retry budget, forever.
+  await writeFile(`${target}.lock`, '', 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock`, old, old)
+  await io.writeText(target, 'fresh')
+  expect(await readFile(target, 'utf8')).toBe('fresh')
+  const entries = await readdir(root)
+  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('reclaims a 0-byte takeover ticket older than the takeover threshold (V6-04, 0.3.35)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-emptyticket-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'empty-ticket.json')
+  await writeFile(`${target}.lock`, '999999', 'utf8')
+  await writeFile(`${target}.lock.next`, '', 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock`, old, old)
+  await utimes(`${target}.lock.next`, old, old)
+  await io.writeText(target, 'fresh')
+  expect(await readFile(target, 'utf8')).toBe('fresh')
+  const entries = await readdir(root)
+  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
+  await rm(root, { recursive: true, force: true })
+})
+
+it('sweeps a stale `.lock.next` ticket left by a crashed takeover (V6-18, 0.3.35)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-ticketsweep-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'ticket-sweep.json')
+  // No lock present: the write acquires on the first attempt, so nothing in
+  // the contention path ever sees the ticket — only the sweep can clean it.
+  await writeFile(`${target}.lock.next`, '999999', 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock.next`, old, old)
+  await io.writeText(target, 'fresh')
+  expect(await readFile(target, 'utf8')).toBe('fresh')
+  expect(await io.readText(`${target}.lock.next`)).toBeNull()
+  await rm(root, { recursive: true, force: true })
+})
+
+it('keeps a fresh live-pid ticket in the sweep (V6-18, 0.3.35)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-ticketkeep-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'ticket-keep.json')
+  // A peer's in-flight takeover: a fresh ticket naming a LIVE pid is not a
+  // crash artifact, so the sweep must leave it alone.
+  await writeFile(`${target}.lock.next`, String(spawnLivePid()), 'utf8')
+  await io.writeText(target, 'fresh')
+  expect(await io.readText(`${target}.lock.next`)).not.toBeNull()
+  await rm(root, { recursive: true, force: true })
+})

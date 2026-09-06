@@ -511,7 +511,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const feedback = new EvolutionFeedback(
     undefined,
     evolutionRoot(),
-    rawConfig.path || undefined,
+    // V6-39 (0.3.35): a whitespace-only `path` was truthy and resolved to a
+    // CWD-relative file — trim like resolveSkillsRoot/state-json (V5-11);
+    // empty/whitespace both fall through to the default path.
+    (rawConfig.path ?? '').trim() || undefined,
     (message) => {
       ctx.logger.warn(message)
     },
@@ -529,10 +532,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   })
 
   const baseRecord = feedback.record.bind(feedback)
-  let qualityWired = false
+  // V6-40 (0.3.35): no one-time flag. `ctx.inject` re-runs this callback
+  // whenever the skillUsage dependency is REPLACED (its provider fiber id
+  // changes — e.g. an unload/re-mount), so a stale pushQuality bound to an
+  // unloaded instance must re-wire to the new one. Re-wrapping
+  // `feedback.record` over `baseRecord` (and reassigning `onRollback`) is
+  // idempotent — assignments replace, never stack.
   ctx.inject(['skillUsage'], (skillCtx) => {
-    if (qualityWired) return
-    qualityWired = true
     const skillUsage = (skillCtx as unknown as { skillUsage: SkillUsageLike }).skillUsage
     const pushQuality = (target: string, kind: 'skill' | 'session'): void => {
       if (kind !== 'skill') return

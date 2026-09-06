@@ -52,3 +52,25 @@ it('scanThreats self-guards a non-finite or non-positive window size (V4-43)', (
     expect(findings.some(f => f.label === payload)).toBe(true)
   }
 })
+
+it('clamps a window below the coverage floor so long-span patterns stay visible (V6-05, 0.3.35)', () => {
+  // The exfil_curl pattern can span ~530 chars; a raw 100-char window could
+  // never contain it (a blind zone), and the old fixed-overlap step collapsed
+  // to 1 for windows at/below the overlap (a severe cost cliff). The scan must
+  // clamp the window to the floor and still detect the payload.
+  const text = `curl ${'a'.repeat(500)}$API_KEY`
+  expect(evaluateThreat(text, 'strict', 100).blocked).toBe(true)
+})
+
+it('V6-05: 108KB text scans within budget at a small requested window (0.3.35)', () => {
+  // ~124KB of benign content; the pre-fix step=1 for a 100-char window meant
+  // ~124k windows of 100 chars (hundreds of ms of regex work for a value that
+  // can never cover a long-span pattern). Post-fix the window clamps to the
+  // floor, so the scan stays linear and fast.
+  const benign = 'User prefers concise answers.\n'.repeat(4000)
+  const start = Date.now()
+  const blocked = scanContentThreats(benign, 100)
+  const elapsed = Date.now() - start
+  expect(blocked).toBeNull()
+  expect(elapsed).toBeLessThan(1000)
+})

@@ -193,6 +193,25 @@ describe('tool-memory', () => {
     const snapshot = (assembled?.contexts ?? []).find(c => c.name === 'evolution:memory-snapshot')?.text ?? ''
     expect(snapshot).toContain('E67-late-provider-fact')
   })
+
+  it('V6-06: NaN entryPreviewChars falls back to the default at assembly (0.3.35)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    // NaN passes the schema; without the assembly clamp `slice(0, NaN)`
+    // echoed an EMPTY preview for every entry instead of the default cap.
+    await ctx.plugin(ToolMemory, { entryPreviewChars: NaN })
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: { session: { header: { version: 0, id: 's6', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'x'.repeat(300) }, execArg)
+    expect(result.ok).toBe(true)
+    const entries = result.entries as string[]
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toHaveLength(200)
+  })
 })
 
 async function makeTmp(): Promise<string> {

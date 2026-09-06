@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
-import { EVOLUTION_WRITE_TOOLS, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-threat'
 export const inject = ['tools']
@@ -19,7 +19,11 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(true),
-  maxScanChars: z.number().min(1).default(65_536),
+  // V6-05 (0.3.35): the legal range is [PATTERN_OVERLAP + 1, ∞) — a window
+  // below the overlap floor cannot guarantee full-coverage scanning (see
+  // evolution-core PATTERN_OVERLAP), so the schema rejects it at load and the
+  // assembly clamp falls back to the default.
+  maxScanChars: z.number().min(PATTERN_OVERLAP + 1).default(65_536),
 })
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -66,10 +70,12 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
 }
 
 /** Resolve the effective `maxScanChars`, clamping invalid values to the
- * default (G3.1: 0/negative/NaN/±Infinity → 65_536). Exported so the clamp is
- * directly testable; `apply` warns when a user-supplied value was corrected. */
+ * default (G3.1: 0/negative/NaN/±Infinity → 65_536; V6-05: a value below
+ * PATTERN_OVERLAP + 1 is out of the coverage-guarantee domain → default).
+ * Exported so the clamp is directly testable; `apply` warns when a
+ * user-supplied value was corrected. */
 export function resolveMaxScanChars(config: Config): number {
-  return clampedNumber(config.maxScanChars ?? 65_536, 65_536, { min: 1 })
+  return clampedNumber(config.maxScanChars ?? 65_536, 65_536, { min: PATTERN_OVERLAP + 1 })
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {

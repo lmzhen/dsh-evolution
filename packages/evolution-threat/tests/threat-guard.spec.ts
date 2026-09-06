@@ -30,11 +30,16 @@ describe('evolution-threat', () => {
     expect(hit).toContain('prompt_injection_ignore')
   })
 
-  it('clamps an invalid maxScanChars to the default (G3.1 matrix)', () => {
+  it('clamps an invalid maxScanChars to the default (G3.1 + V6-05 matrix)', () => {
+    // V6-05: a window below PATTERN_OVERLAP + 1 cannot guarantee full coverage,
+    // so it is invalid too (falls back to the default) — 1000 moved from
+    // "legal" to "fallback"; 5000 stays (still above the coverage floor).
     const cases: Array<[value: number | undefined, expected: number]> = [
       [undefined, 65_536],
       [65_536, 65_536],
-      [1000, 1000],
+      [5000, 5000],
+      [1000, 65_536],
+      [4096, 65_536],
       [0, 65_536],
       [-1, 65_536],
       [NaN, 65_536],
@@ -46,10 +51,13 @@ describe('evolution-threat', () => {
     }
   })
 
-  it('rejects 0/negative maxScanChars at the schema level but lets NaN/Infinity through (G3.1 .min(1))', () => {
+  it('rejects 0/negative/below-floor maxScanChars at the schema level but lets NaN/Infinity through (V6-05)', () => {
     const parse = (input: unknown): unknown => (ThreatGuard.Config as unknown as (i: unknown) => unknown)(input)
     expect(() => parse({ maxScanChars: 0 })).toThrow()
     expect(() => parse({ maxScanChars: -1 })).toThrow()
+    expect(() => parse({ maxScanChars: 1000 })).toThrow()
+    expect(() => parse({ maxScanChars: 4096 })).toThrow()
+    expect(() => parse({ maxScanChars: 4097 })).not.toThrow()
     const nanResult = parse({ maxScanChars: NaN }) as { maxScanChars: number }
     expect(Number.isNaN(nanResult.maxScanChars)).toBe(true)
     const infResult = parse({ maxScanChars: Infinity }) as { maxScanChars: number }
