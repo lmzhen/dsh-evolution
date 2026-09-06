@@ -221,6 +221,29 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('collapses historical duplicates inside the archive on load (V5-07)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-dup-collapse-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    // A pre-dedupe-key archive may hold the same id+status+resolvedAt twice —
+    // both counted toward the cap forever; a load-time collapse keeps one.
+    await io.writeText(join(root, 'pending-state-archive.json'), JSON.stringify([
+      { id: 'dup', kind: 'memory', summary: 'd', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+      { id: 'dup', kind: 'memory', summary: 'd', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+    ]))
+    const map: Record<string, PendingRecord> = {}
+    for (let i = 0; i < 200; i += 1) {
+      map[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
+    }
+    map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
+    await provider.tryResolvePending('to-resolve', 'approved')
+    const collapsed = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    expect(collapsed.filter(record => record.id === 'dup')).toHaveLength(1)
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('does not write an empty .bak when the archive was empty at rotation (V5-10)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-empty-bak-'))
     const ctx = await mount(root)

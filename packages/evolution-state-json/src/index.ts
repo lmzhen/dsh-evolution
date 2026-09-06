@@ -267,6 +267,18 @@ export function apply(ctx: Context, rawConfig: Config): void {
             // unrecoverable archive — best-effort: start fresh
           }
         }
+        // V5-07 (0.3.33): archives written before the dedupe key existed may
+        // carry duplicate entries (same id+status+resolvedAt) that counted
+        // toward the cap forever — collapse them on load (first occurrence
+        // wins, best-effort; the .bak may still hold them, audit is allowed
+        // to fall behind).
+        const archiveKeys = new Set<string>()
+        archive = archive.filter((entry) => {
+          const key = pendingArchiveKey(entry)
+          if (archiveKeys.has(key)) return false
+          archiveKeys.add(key)
+          return true
+        })
         const seen = new Set(archive.map(pendingArchiveKey))
         const fresh = records.filter(record => !seen.has(pendingArchiveKey(record)))
         if (fresh.length === 0) return current
