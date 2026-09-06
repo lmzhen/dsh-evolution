@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-host",
   "description": "Host-plane self-evolution infrastructure bundle for DeepSeek Harness",
-  "version": "0.3.36",
+  "version": "0.3.37",
   "publishConfig": {
     "access": "public"
   },
@@ -64,7 +64,6 @@
       "default": "./lib/index.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

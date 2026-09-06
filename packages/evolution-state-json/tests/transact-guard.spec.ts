@@ -40,7 +40,7 @@ describe('evolution-state-json jsonTransact record-map task-return guard (V4-08)
     await rm(root, { recursive: true, force: true })
   })
 
-  it('a null task return (keep) is allowed and persists no file', async () => {
+  it('a null task return (ensure-absent) is allowed and persists no file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-guard-null-'))
     const ctx = await mount(root)
     const io = () => ctx.evolutionIo.provider('node')

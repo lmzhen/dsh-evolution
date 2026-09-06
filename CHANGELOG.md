@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.37 (patch) — v6 审计 M4：契约对齐与发布卫生（V6-16~52 大项 + T.1 余项）
+
+v6 审计（0.3.33 全量复审轮）M4 里程碑（最后一批实质项；M5 收口随本版）；每项先核验属实再修。**行为/契约变更声明**：V6-26（缺省 action 归一为显式 patch）、V6-27（部署级 `config.policy='never'` 在 request() 内生效——此前静默 staged 堆积）、V6-25（enum 外 action fail-loud——此前静默按 replace 执行）、V6-45（发布包移除失效 `./src/*` 导出子路径——全仓零消费已证）。
+
+- **V6-16 [P3]**：MemoryStore 补进程内 serial 队列（SkillLibrary 同款）——无 transact 自定义后端上的同进程并发 RMW 裸 read→write 丢更新；add/applyBatch 走队列链（node 后端跨进程锁不变）。
+- **V6-17 [P3]**：patch 的 fuzzy 扫描 O(n·m) 无输入上限（实测 20k×20k 6.1s 阻塞事件循环）→ 非精确锚超预算（>4096 字符或 n·m > 8M）显式拒绝「too large for fuzzy match」；精确命中走快路径仍放行。
+- **V6-19 [P3]**：runSingleWrite 对 transact 契约违规（task 未被调用）返回结构化错误（原无条件解引用 TypeError）；带「write 字段」形状守卫。
+- **V6-20 [P3]**：parseUsage 顶层 Array 拒绝（原 `Object.entries([…])` 产生 "0"/"1" 幻影技能记录并被 RMW 持久化）——与其他入口的 shape 防御补齐。
+- **V6-21 [P3]**：signals 的 assistant/message 分支补 content 数组守卫（E-49 只修了 user 半边；malformed assistant content 曾 TypeError 且被 review catch 吞掉整个 turn 的信号）。
+- **V6-25 [P3]**：applyBatchCore 对 enum 外 action（'Add'/'upsert' 等）显式 fail-loud（原带 old_text 时**静默按 replace 执行**且 ok:true——语义漂移）；空 operations 的 approval 前置拒绝在 tool-memory 层已有（applyBatch 自身早已返回 ok:false）。**行为契约变更**。
+- **V6-26 [P3]**：缺省 action 归一——plan-validator 接受的 skill op 一律带显式 action（缺省 → 'patch'）；review 的 filterUnreadSkillOps 删除 `!== undefined` 前置条件（缺省 action 的未读技能不再靠下游"Unknown skill action"兜底逃过滤网）。**行为契约变更**。
+- **V6-27 [P3]**：approval 的 deriveSessionPolicy 补有效取值链 `overrideOf ?? config.policy ?? 'ask'`（与导出的 effectiveSessionPolicy 同口径——部署级 `policy:'never'` + 无会话 override 时写不再被 staged 堆积，方向 fail-closed 不变）。**行为契约变更**。
+- **V6-43 [P3]**：skill-usage 的 `session/event` 监听器改 `ctx.effect` 登记（家族 tool-memory/skill-catalog 惯用——插件卸载/重装不再残留无主观察者；HMR 归属测试钉住）。
+- **V6-44 [P3]**：`invalidate()` 与 `MemoryRegistry.snapshot()` 标注 test-support API（无生产消费方，按声明保留）。
+- **V6-45 [P3]**：30 包 package.json 移除 `"./src/*"` 导出（发布产物无 src——该子路径必然 404；全仓零 `@deepseek-ai/dsh-evolution-*/src/` 导入已 grep 实证）。**行为契约变更（发布面收紧）**。
+- **V6-46 [P3]**：verify-event-pairing 的 EMIT_RE 同步 `\w*[Cc]tx`（V5-01 只修了 ON 侧——ioCtx.emit 形态生产者对守卫自身盲区；哨兵用例新增 ioCtx.emit 负例）。
+- **V6-47 [P3]**：normalize-mirror 无 `## x.y.z` 标题时 **fail-loud exit 1**（原安全回退 '0.1.0-rc.1' 会把 31 个 manifest 版本全部降级改写——一次格式漂移即版本回退事故）。
+- **V6-48 [P3]**：publish-scoped Windows 分支弃 `cmd.exe /c`（重新分词——含空格的绝对路径被斩断）改 `npm.cmd` shell:false（仅本地手动 publish 路径）。
+- **V6-49 [P3]**：install-layered 的 install() 安装前检查同 profile 已有另一 bundle（host ⇄ preset 互斥）→ fail-loud（文档警告不是 enforcement——工具自身曾能把文档化事故变成现实）；`DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` 不豁免（互斥是安装面语义）；dry-run 不查（幻影 profile 无真实状态）。
+- **V6-50 [P3]**：prepare-release 未用 spawnSync 导入删除；install-layered `=== prefix` 被 startsWith 覆盖的冗余分支删除。
+- **V6-51 [P3]**：install-layered Windows APPDATA 未设时跳过该候选根（原 `join('', …)` 得 CWD 相对路径进入 existsSync 探测）。
+- **V6-52 [P3]**：agent.cordis.yml 头注释「agent/layered/oneclick modes」→ 实际两模式（oneclick 装 preset bundle 行不写该文件）；evolution-all 注释补第 5 项依赖（evolution-agent-preset）。
+- **V6-22/30/31/32 [P3]（state-json 残余边界）**：appendArchive 折叠发生且无新增时也落盘（磁盘残留自愈）；enforceResolvedCap 逐出按 **entry 键集**（同 id 双 entry 不再过逐出/漏归档——每条逐出必对应归档）；readArchivedIds 并入 `.bak` 键集（轮转后的旧 id 仍是幽灵排除依据）；jsonTransact 注释与 transact-guard/transact.spec 用例名「null = keep」→「null = ensure-absent」（文件存在即删除——与 seam 行为一致；provider 状态层 null=keep 语义不变，两层注释已区分）。
+- **V6-33 [P3]**：state-domain 的 claim/tryResolve 返回值浅拷贝（json provider 副本口径——调用方就地修改不再无声明污染 domain 内存 map）。
+- **V6-34/37 [P3]（口径小项）**：skill-health softBodyChars 注释对齐实现（>= 即 warn）；saveUsage 补 doc-comment「whole-file write，绕过 malformed 防御与 transact——prefer mutateUsage」（生产引用 0，保留为测试播种）。
+- **T.1 余项**：threats.spec 注释「28 patterns」→ 实计 26；prompts.spec 用例标题 v13 → v14（PROMPT_BUNDLE_VERSION 0.3.30 已升）；io.spec 补 V5-03 noop 短路直接回归（stat mtime 不变断言）。
+- **回归**：全量 vitest（本机并行下已知 Windows 负载 flake 隔离复跑全绿；CI Linux 为准）；oxlint 0/0（194 文件，首跑 3 差全为我改动区的 no-unnecessary-condition——按「unknown 先守卫」手法修正）；包级 tsc 0；mjs `node --check` 全过。
+
 ## 0.3.36 (patch) — v6 审计 M3：观测与治理精度（V6-10/15/23/24/28/29/35/36/38/41/42/08/09）
 
 v6 审计（0.3.33 全量复审轮）M3 里程碑；每项先核验属实再修（全部 12 项经源码复读确认——其中 V4-26 的「字段内嵌独立 Notes: 行」为残余真实缺陷、V6-09 的 `.catch(()=>[])` 与 V5-20「不再静默」声明相抵）。

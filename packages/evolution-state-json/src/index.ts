@@ -76,11 +76,12 @@ async function quarantine(io: () => EvolutionIoLike, root: string, file: string,
  * Cross-process JSON-file RMW (v3-audit M-8): every read-modify-write state
  * mutation runs inside the IO backend's transact lock (via transactIo) so a
  * second process sharing DSH_HOME cannot interleave its claim/resolve.
- * `task` returns the next value (null = keep); for a record-map file the
- * return must be null or a plain object map of records, and an array/scalar
- * would be persisted as a corrupt map — so it fails loud before any write
- * (0.3.28, V4-08). The legacy `pending.json` merge stays inside the task via
- * `readJson` where relevant.
+ * `task` returns the next value; null = ENSURE-ABSENT (the file is deleted
+ * when it exists — the parity of the transact seam, V6-32). For a record-map
+ * file the return must be null or a plain object map of records, and an
+ * array/scalar would be persisted as a corrupt map — so it fails loud before
+ * any write (0.3.28, V4-08). The legacy `pending.json` merge stays inside the
+ * task via `readJson` where relevant.
  */
 export async function jsonTransact<T>(
   io: () => EvolutionIoLike,
@@ -104,9 +105,10 @@ export async function jsonTransact<T>(
       }
     }
     const next = await task(parsed)
-    // 0.3.28 (V4-08): a record-map task's return must be null (keep) or a
-    // plain object map of records — an array/scalar would be stringified and
-    // persisted as a corrupt record map. Fail loud before any write.
+    // 0.3.28 (V4-08): a record-map task's return must be null (ensure-absent —
+    // the file is deleted when it exists) or a plain object map of records — an
+    // array/scalar would be stringified and persisted as a corrupt record map.
+    // Fail loud before any write.
     if (next !== null && RECORD_MAP_FILES.has(file) && !isPlainRecord(next)) {
       const kind = Array.isArray(next) ? 'an array' : typeof next
       throw new Error(`evolution state file "${file}" task returned ${kind} (expected null or a plain JSON object map of records); not written.`)
@@ -179,6 +181,18 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const rawArchive = await readJson<Array<{ id?: string } | null>>('pending-state-archive.json')
       if (Array.isArray(rawArchive)) {
         for (const entry of rawArchive) if (entry && typeof entry.id === 'string') ids.add(entry.id)
+      }
+      // V6-31 (0.3.37): after a rotation the older archive entries live in the
+      // .bak — read it too, so an archived id evicted to the bak keeps
+      // excluding its legacy twin (the retirement filter never loses its
+      // evidence). Best-effort: an unreadable bak only weakens the filter.
+      try {
+        const rawBak = await readJson<Array<{ id?: string } | null>>('pending-state-archive.json.bak')
+        if (Array.isArray(rawBak)) {
+          for (const entry of rawBak) if (entry && typeof entry.id === 'string') ids.add(entry.id)
+        }
+      } catch {
+        // Unreadable bak — the active archive still carries the newer ids.
       }
     } catch {
       // Corrupt/unreadable archive — best-effort: keep legacy copies (the
@@ -274,10 +288,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const oldest = resolved
       .sort((a, b) => entryTime(a) - entryTime(b))
       .slice(0, overflow)
-    const evictIds = new Set(oldest.map(record => record.id))
+    // V6-30 (0.3.37): eviction is by the map KEY of the oldest ENTRIES, not by
+    // their id — a hand-edited file with two entries sharing one id would
+    // evict BOTH keys while archiving only one (over-eviction + a missing
+    // archive line). Exactly the chosen entries leave, each archived once.
+    const oldestKeys = new Set<string>()
+    for (const [key, value] of Object.entries(map)) {
+      if (oldest.includes(value)) oldestKeys.add(key)
+    }
     const kept: Record<string, PendingRecord> = {}
     for (const [key, value] of Object.entries(map)) {
-      if (!evictIds.has(value.id)) kept[key] = value
+      if (!oldestKeys.has(key)) kept[key] = value
     }
     return { map: kept, evicted: oldest }
   }
@@ -310,15 +331,21 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // wins, best-effort; the .bak may still hold them, audit is allowed
         // to fall behind).
         const archiveKeys = new Set<string>()
-        archive = archive.filter((entry) => {
+        const collapsed = archive.filter((entry) => {
           const key = pendingArchiveKey(entry)
           if (archiveKeys.has(key)) return false
           archiveKeys.add(key)
           return true
         })
+        // V6-22 (0.3.37): when the load COLLAPSED duplicates, the disk must be
+        // rewritten even with no fresh record — a parse-time collapse that
+        // never lands left the duplicates on disk forever (each round folded
+        // them in memory, the cap accounting was correct, the residue wasn't).
+        const hadDuplicates = collapsed.length !== archive.length
+        archive = collapsed
         const seen = new Set(archive.map(pendingArchiveKey))
         const fresh = records.filter(record => !seen.has(pendingArchiveKey(record)))
-        if (fresh.length === 0) return current
+        if (fresh.length === 0 && !hadDuplicates) return current
         const next = [...archive, ...fresh]
         if (next.length > ARCHIVE_RESOLVED_CAP) {
           // Rotate the full pre-rotation history to a `.bak` sidecar and restart
@@ -329,11 +356,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
           // batch keeps only the newest CAP entries (the oldest of the batch
           // are dropped — best-effort audit, the live map already fell behind
           // first, and the legacy-retirement of V5-02 removed the cross-
-          // generation re-archive driver).
+          // generation re-archive driver). V6-22 (0.3.37) delta fix: a
+          // FRESH-EMPTY rotation (collapse-only pass over an over-cap residue)
+          // must keep the newest CAP of the COLLAPSED history — writing
+          // fresh.slice() (an empty batch) would blank the audit sidecar.
           if (archive.length > 0) {
             await io().writeText(pathOf('pending-state-archive.json.bak'), JSON.stringify(archive, null, 2)).catch(() => {})
           }
-          return JSON.stringify(fresh.slice(-ARCHIVE_RESOLVED_CAP), null, 2)
+          return JSON.stringify((fresh.length > 0 ? fresh : next).slice(-ARCHIVE_RESOLVED_CAP), null, 2)
         }
         return JSON.stringify(next, null, 2)
       })

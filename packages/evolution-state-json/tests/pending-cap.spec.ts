@@ -244,6 +244,61 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('V6-22: a collapse ALSO lands when the evicted record is already archived (fresh empty, 0.3.37)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v622-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    // The archive carries a collapsible duplicate pair AND the record this
+    // resolve will evict again (a pre-archived ghost still living in the map).
+    await io.writeText(join(root, 'pending-state-archive.json'), JSON.stringify([
+      { id: 'dup', kind: 'memory', summary: 'd', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+      { id: 'dup', kind: 'memory', summary: 'd', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+      { id: 'oldest', kind: 'memory', summary: 'o', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+    ]))
+    const map: Record<string, PendingRecord> = {}
+    map['oldest'] = { id: 'oldest', kind: 'memory', summary: 'o', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' }
+    for (let i = 0; i < 199; i += 1) {
+      map[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
+    }
+    map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
+    await provider.tryResolvePending('to-resolve', 'approved')
+    // The eviction appended nothing new (the record was archived already) —
+    // pre-fix the collapse-only round returned `current` and left the disk
+    // residue forever.
+    const once = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    expect(once.filter(record => record.id === 'dup')).toHaveLength(1)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('V6-30: eviction is by the oldest entry KEYS — a same-id twin keeps its own slot (0.3.37)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v630-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    const map: Record<string, PendingRecord> = {}
+    // Two entries SHARE one id under different keys; only the older one is in
+    // the eviction window — it must leave with its own key while the twin
+    // stays (pre-fix: both left, one was archived).
+    map['twin-old'] = { id: 'shared-id', kind: 'memory', summary: 'old', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' }
+    map['twin-new'] = { id: 'shared-id', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2021-01-01T00:00:00.000Z' }
+    for (let i = 0; i < 198; i += 1) {
+      map[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
+    }
+    map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
+    await provider.tryResolvePending('to-resolve', 'approved')
+    const after = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    expect('twin-new' in after).toBe(true)
+    expect('twin-old' in after).toBe(false)
+    const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const archivedShared = archive.filter(record => record.id === 'shared-id')
+    expect(archivedShared).toHaveLength(1)
+    expect(archivedShared[0]?.summary).toBe('old')
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('V6-01: a mutation BEFORE retirement cannot fixate an archived ghost twin', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-v601-'))
     const ctx = await mount(root)

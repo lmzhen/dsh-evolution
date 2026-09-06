@@ -87,6 +87,12 @@ describe('guard scripts (V4-30 sentry)', () => {
       await writeFile(join(pkg, 'src', 'consumer.ts'), "ioCtx.on('evolution/never-listened', () => {})\n", 'utf8')
       const paired = await run(process.execPath, [eventPairing, root], { encoding: 'utf8' })
       expect(paired.stdout).toContain('0 orphan')
+      // V6-46 (0.3.37): the EMIT side must see the same camelCase receivers —
+      // an `ioCtx.emit` producer used to be invisible to the emitter regex and
+      // counted as zero orphans while the receiver never ran.
+      await writeFile(join(pkg, 'src', 'emit.ts'), "ioCtx.emit('evolution/never-listened-twice', {})\n", 'utf8')
+      const unpaired = await run(process.execPath, [eventPairing, root], { encoding: 'utf8' })
+      expect(unpaired.stderr).toContain('evolution/never-listened-twice')
     } finally {
       await rm(root, { recursive: true, force: true })
     }

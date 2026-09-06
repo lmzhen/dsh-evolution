@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   advanceReview,
+  observeEvent,
   type ReviewState,
   type SignalConfig,
   type TurnSignals,
@@ -73,5 +74,16 @@ describe('advanceReview (activity-weighted memory counter, G4.6)', () => {
     const config = cfg({ memoryInterval: 999 })
     advanceReview(state, 1, sig(4), config)
     expect(state.turnsSinceSkill).toBe(4)
+  })
+
+  it('V6-21: a malformed assistant content skips instead of breaking the signal pipeline (0.3.37)', () => {
+    const signal = sig(0)
+    // `data.message.content` absent/non-array: the E-49 guard covered the user
+    // branch only — the assistant branch used to throw and lose the turn's
+    // signals to the review catch.
+    observeEvent(signal, { type: 'assistant/message', data: { message: {} } } as never)
+    expect(signal.assistantChars).toBe(0)
+    observeEvent(signal, { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: 'hello' }] } } } as never)
+    expect(signal.assistantChars).toBe(5)
   })
 })

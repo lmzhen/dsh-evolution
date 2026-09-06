@@ -60,6 +60,10 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     return
   }
   if (event.type === 'assistant/message') {
+    // V6-21 (0.3.37): the same content guard the user branch got in E-49 —
+    // a malformed assistant content must skip, not break the signal pipeline
+    // (the review E-6 catch used to swallow the whole turn's signals).
+    if (!Array.isArray(event.data.message.content)) return
     const text = event.data.message.content
       .map(block => block.type === 'text' ? block.text : '')
       .join(' ')

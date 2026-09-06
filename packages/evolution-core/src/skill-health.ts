@@ -11,8 +11,10 @@
  */
 
 export interface SkillHealthThresholds {
-  /** Soft body limit: body chars at/below stay 'healthy' by size; above ->
-   * 'warn'; >= 2x -> 'needs-restructure'. */
+  /** Soft body limit: a body of `softBodyChars` or MORE -> 'warn'; >= 2x ->
+   * 'needs-restructure'. V6-34 (0.3.37): the doc comment used to claim
+   * "at/below stay healthy" while the engine warns at `>=` — fixed to the
+   * implementation edge (the reason copy said "above"). */
   softBodyChars: number
   /** Stamp-density ceiling per KB of body text: rc.NN / commit shas / ISO
    * dates per KB at/above this -> 'warn' (log-like content living in the

@@ -1,5 +1,5 @@
 import { afterAll, expect, it } from 'vitest'
-import { mkdir, mkdtemp, readdir, rename, rm, writeFile, readFile, utimes } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile, readFile, utimes } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -395,5 +395,18 @@ it('keeps a fresh live-pid ticket in the sweep (V6-18, 0.3.35)', async () => {
   await writeFile(`${target}.lock.next`, String(spawnLivePid()), 'utf8')
   await io.writeText(target, 'fresh')
   expect(await io.readText(`${target}.lock.next`)).not.toBeNull()
+  await rm(root, { recursive: true, force: true })
+})
+
+it('V5-03: a byte-identical transact does not touch the file mtime (direct regression, 0.3.29)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-noop-mtime-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'noop.json')
+  await io.writeText(target, 'fixed')
+  const before = (await stat(target)).mtimeMs
+  await new Promise(resolve => setTimeout(resolve, 20))
+  await io.transact!(target, async () => 'fixed')
+  const after = (await stat(target)).mtimeMs
+  expect(after).toBe(before)
   await rm(root, { recursive: true, force: true })
 })

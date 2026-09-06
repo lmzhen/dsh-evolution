@@ -29,6 +29,25 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('V6-27: a deployment-level config.policy=never allows without a session override (0.3.37)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-v627-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    // Platform mounted with NO per-session override: the deployment default
+    // applies (overrideOf ?? config.policy ?? 'ask' — the exported chain).
+    ctx.provide('approval', { overrideOf: () => undefined, config: { policy: 'never' } })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const allowed = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'z', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
+    })
+    expect(allowed.action).toBe('allow')
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('allows when the platform service derives "never" even if the caller said "ask" (S3.1, E-22)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3b-'))
     const ctx = new Context()

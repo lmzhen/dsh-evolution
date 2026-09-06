@@ -154,7 +154,11 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
     const op = rawOp as SkillOp
     const reason = validateSkillOp(op, context, index)
     if (reason) rejected.push({ index, kind: 'skill', reason })
-    else skillOps.push(op)
+    // V6-26 (0.3.37): accept the op with an EXPLICIT action (missing defaults to
+    // 'patch' at the op level, not at the consumer) — every downstream check
+    // (read-before-write filter, execute dispatch) sees the same truth and the
+    // "both sides happen to default" fragility is gone.
+    else skillOps.push(op.action === undefined ? { ...op, action: 'patch' } : op)
   }
 
   return { accepted, rejected, ok: rejected.length === 0 && (memoryOps.length + skillOps.length > 0) }

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-policy",
   "description": "Immutable evolution policy service",
-  "version": "0.3.36",
+  "version": "0.3.37",
   "publishConfig": {
     "access": "public"
   },
@@ -22,7 +22,6 @@
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
     },
-    "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [

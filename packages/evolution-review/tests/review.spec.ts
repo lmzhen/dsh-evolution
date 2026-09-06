@@ -48,9 +48,12 @@ describe('evolution-review', () => {
       { action: 'restructure', name: 'unread-skill' },
       { action: 'create', name: 'brand-new-skill' },
       { action: 'patch' },
+      // V6-26 (0.3.37): a MISSING action is normalized to 'patch' by the
+      // validator — the filter must not silently exempt it either.
+      { name: 'unread-noaction' },
     ]
     const dropped = Review.filterUnreadSkillOps(ops, new Set(['read-skill']))
-    expect(dropped).toBe(6)
+    expect(dropped).toBe(7)
     expect(ops.map(op => op.name).filter(Boolean)).toEqual(['read-skill', 'brand-new-skill'])
   })
 

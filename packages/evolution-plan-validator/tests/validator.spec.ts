@@ -125,4 +125,14 @@ describe('evolution-plan-validator', () => {
     const ok = validateEvolutionPlan({ memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }] }, { sessionSeq: 10 })
     expect(ok.ok).toBe(true)
   })
+
+  it('V6-26: a missing skill action is normalized to an explicit "patch" on the accepted op (0.3.37)', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [],
+      skillOps: [{ name: 'demo', old_string: 'x', new_string: 'y', evidence: [{ event_seq: 1 }] }],
+    }, { sessionSeq: 10 } satisfies Parameters<typeof validateEvolutionPlan>[1])
+    expect(result.ok).toBe(true)
+    expect(result.accepted.skillOps).toHaveLength(1)
+    expect(result.accepted.skillOps[0]?.action).toBe('patch')
+  })
 })

@@ -164,4 +164,21 @@ describe('layered installer', () => {
       else process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = previous
     }
   })
+
+  it('V6-49: layered then oneclick on one profile fails loud (E-33 mutual exclusion, 0.3.37)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-v649-'))
+    await runInstaller(home, 'layered')
+    // The oneclick bundle is the preset package — host ⇄ preset cannot co-exist
+    // in one profile (shared rows would double-mount); the installer used to
+    // turn the documented accident into reality.
+    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
+    await rm(home, { recursive: true, force: true })
+  }, 30_000)
+
+  it('V6-49: oneclick then layered fails loud (reverse order)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-v649b-'))
+    await runInstaller(home, 'oneclick')
+    await expect(runInstaller(home, 'layered')).rejects.toThrow(/mutually exclusive/)
+    await rm(home, { recursive: true, force: true })
+  }, 30_000)
 })

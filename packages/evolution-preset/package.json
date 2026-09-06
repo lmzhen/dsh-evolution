@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle for the dsh-evolution plugin family",
-  "version": "0.3.36",
+  "version": "0.3.37",
   "publishConfig": {
     "access": "public"
   },
@@ -65,7 +65,6 @@
     },
     "./cordis.yml": "./cordis.yml",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

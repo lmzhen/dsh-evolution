@@ -30,7 +30,7 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     await rm(root, { recursive: true, force: true })
   })
 
-  it('returns null (keep) on a missing seed and writes no file', async () => {
+  it('returns null (ensure-absent) on a missing seed and writes no file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-tc2-'))
     const ctx = await mount(root)
     const provider = ctx.evolutionStateStorage.provider('json')

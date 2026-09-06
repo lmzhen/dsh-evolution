@@ -266,16 +266,22 @@ export class EvolutionApproval extends Service {
 
   /**
    * 0.3.17 (S3.1): platform-side session policy derivation — the platform's
-   * approval service (`overrideOf`) is the authority; a caller's self-reported
-   * sessionPolicy is a fallback only without it (E-22). The mount check is
-   * lazy: the platform service can start before or after this plugin.
+   * approval service (`overrideOf`) is the authority; a deployment-level
+   * `config.policy` is the fallback (V6-27, 0.3.37: the deploy default used to
+   * be ignored here, so a `policy: 'never'` deployment still staged writes for
+   * sessions without an override — same chain as the exported
+   * `effectiveSessionPolicy`, overrideOf ?? config.policy ?? 'ask'). The mount
+   * check is lazy: the platform service can start before or after this plugin.
    */
   private deriveSessionPolicy(sessionId?: string): 'ask' | 'never' | undefined {
     if (!sessionId) return undefined
-    const platformApproval = this.ctx.get('approval') as { overrideOf?(sessionId: string): unknown } | undefined
+    const platformApproval = this.ctx.get('approval') as ApprovalPolicyLike | undefined
     if (!platformApproval) return undefined
-    const override = platformApproval.overrideOf?.(sessionId)
-    return override === 'never' || override === 'ask' ? override : undefined
+    const override = platformApproval.overrideOf(sessionId)
+    if (override === 'never' || override === 'ask') return override
+    // The config field itself is optional at runtime (a bare platform stub) —
+    // read it through the optional shape.
+    return (platformApproval as Partial<ApprovalPolicyLike>).config?.policy ?? 'ask'
   }
 
   private dedupe(id: string, task: () => Promise<{ ok: boolean; message: string }>): Promise<{ ok: boolean; message: string }> {

@@ -706,7 +706,10 @@ export function filterUnreadSkillOps(ops: Array<{ action?: string; name?: string
   for (let index = ops.length - 1; index >= 0; index -= 1) {
     const op = ops[index]
     if (!op) continue
-    if (op.action !== undefined && READ_REQUIRED.includes(op.action) && op.name && !readNames.has(op.name)) {
+    // V6-26 (0.3.37): the validator normalizes a missing action to 'patch', so
+    // the check no longer needs the `!== undefined` precondition — a missing
+    // action is a patch (read-required), never silently exempt.
+    if (op.name && READ_REQUIRED.includes(op.action ?? 'patch') && !readNames.has(op.name)) {
       ops.splice(index, 1)
       dropped += 1
     }

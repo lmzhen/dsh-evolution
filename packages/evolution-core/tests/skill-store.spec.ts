@@ -624,3 +624,39 @@ it('F-321: relatedSkillNames skips CamelCase fragments and only takes delimited 
   // 'omething'); the delimited lowercase name is the only reference.
   expect(names).toEqual(['python-testing'])
 })
+
+it('V6-17: a non-exact anchor past the fuzzy budget is refused with an honest message (0.3.37)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-fuzzyguard-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('python-testing', SKILL, 'foreground')
+  // A 5000-char non-exact old_string would drive the O(n·m) fuzzy scan into
+  // seconds of event-loop blocking — refuse it up front.
+  const huge = 'x'.repeat(5000)
+  const result = await lib.patch('python-testing', `${huge}NEVER-MATCHES`, 'replacement')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('too large for fuzzy match')
+  // An exact large old_string is served by the fast includes path — still allowed.
+  const exact = await lib.patch('python-testing', 'Run tests with pytest.', 'Run tests with pytest v2.')
+  expect(exact.ok).toBe(true)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('V6-19: a transact contract violation returns a structured error, not a TypeError (0.3.37)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-shapeguard-'))
+  // A backend whose transact never invokes the task (contract violation).
+  const io = {
+    readText: async (path: string) => path.endsWith('SKILL.md') ? SKILL : null,
+    writeText: async () => {},
+    remove: async () => {},
+    list: async () => [],
+    exists: async (path: string) => path.endsWith('SKILL.md'),
+    rename: async () => {},
+    copy: async () => {},
+    transact: async () => {},
+  }
+  const lib = new SkillLibrary(root, io)
+  const result = await lib.update('python-testing', SKILL.replace('Run tests with pytest.', 'Updated.'))
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('did not invoke the task')
+  await rm(root, { recursive: true, force: true })
+})

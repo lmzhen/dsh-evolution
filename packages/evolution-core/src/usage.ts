@@ -95,8 +95,13 @@ function parseUsage(raw: string | null): UsageMap {
   const map: UsageMap = new Map()
   if (raw === null) return map
   try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    for (const [name, record] of Object.entries(parsed)) {
+    const parsed = JSON.parse(raw) as unknown
+    // V6-20 (0.3.37): a top-level ARRAY must not fold into "0"/"1" phantom
+    // skill records and be persisted as an object map (parseSuppressed /
+    // normalizeUsageRecord already guard their entry shapes — this is the
+    // missing top-level guard).
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return map
+    for (const [name, record] of Object.entries(parsed as Record<string, unknown>)) {
       map.set(name, normalizeUsageRecord(record))
     }
   } catch {
@@ -183,6 +188,10 @@ export function foldCuratorFields(disk: UsageMap, curated: UsageMap, stateOwned?
   }
 }
 
+/** Whole-file usage write (V6-37, 0.3.37): this is the ONE path that bypasses
+ * the malformed-defense and the transact lock — prefer `mutateUsage` for any
+ * read-modify-write so a concurrent writer cannot lose its update and a
+ * malformed sidecar stays recoverable. Kept for fixture/test seeding. */
 export async function saveUsage(root: string, map: UsageMap, io: EvolutionIoLike = nodeEvolutionIo()): Promise<void> {
   const obj = Object.fromEntries(map.entries())
   await io.writeText(usageFile(root), JSON.stringify(obj, null, 2))

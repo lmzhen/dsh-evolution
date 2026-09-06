@@ -199,7 +199,7 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
   let removed = 0
   for (const entry of await readdir(scopeDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    if (!EVOLUTION_PREFIXES.some(prefix => entry.name === prefix || entry.name.startsWith(`${prefix}`))) continue
+    if (!EVOLUTION_PREFIXES.some(prefix => entry.name.startsWith(prefix))) continue
     if (!dryRun) await rm(join(scopeDir, entry.name), { recursive: true, force: true })
     removed += 1
   }
@@ -243,7 +243,10 @@ async function resolveStandardComposition() {
       // spawn of npm.cmd is blocked on Windows (EINVAL); the default global
       // module root is derivable from the standard APPDATA layout instead.
       const roots = [
-        join(process.env.APPDATA ?? '', 'npm', 'node_modules'),
+        // V6-51 (0.3.37): an unset APPDATA produced `join('', …)` = a CWD-
+        // relative path that existsSync resolved against the process cwd —
+        // skip the empty candidate instead of probing a phantom.
+        ...(process.env.APPDATA ? [join(process.env.APPDATA, 'npm', 'node_modules')] : []),
         join(homedir(), 'AppData', 'Roaming', 'npm', 'node_modules'),
       ]
       for (const root of roots) {
@@ -371,6 +374,29 @@ export async function install(options = {}) {
 
   if (needsHost || needsCompat) {
     const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick
+    // V6-49 (0.3.37): E-33 — the host bundle and the preset bundle are
+    // mutually exclusive install targets (their shared rows would double-mount
+    // in one profile). A documented warning was not enforcement: the tool
+    // itself could turn the documented accident into reality. Fail loud when
+    // the other bundle is already present. DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
+    // does not exempt this check (mutual exclusion is install-surface
+    // semantics, not a row collision). Dry-run reads a phantom profile path —
+    // there is no real state to check.
+    if (!dryRun) {
+      const manifestPath = join(profileDir, 'package.json')
+      if (existsSync(manifestPath)) {
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        const existing = Array.isArray(manifest.dsh?.profile?.bundles)
+          ? manifest.dsh.profile.bundles
+          : []
+        const other = bundleName === BUNDLES.host ? BUNDLES.oneclick : BUNDLES.host
+        if (existing.includes(other)) {
+          throw new Error(
+            `install-layered: profile "${profile}" already carries the ${other} bundle — host and preset are mutually exclusive install targets (E-33). Uninstall it first or use dsh plugin add. DSH_EVOLUTION_ALLOW_ROW_COLLISIONS does not exempt this check.`,
+          )
+        }
+      }
+    }
     result.bundle = bundleName
     result.copied = await copyAllEvolutionPackages(profileDir, dryRun)
     if (!dryRun) await installBundlePackage(profileDir, bundleName)

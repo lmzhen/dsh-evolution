@@ -107,6 +107,9 @@ export class MemoryRegistry extends Service {
     return result
   }
 
+  /** V6-44 (0.3.37): test-support API — production consumers read the
+   * model-visible context via `renderContext()`; snapshot() has no production
+   * consumer (tests inspect the raw snapshot, kept by declaration). */
   snapshot(): Promise<MemorySnapshot> {
     return this.provider().snapshot()
   }

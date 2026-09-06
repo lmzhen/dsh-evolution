@@ -31,8 +31,14 @@ if (!existsSync(changelogPath)) {
 }
 
 const match = /^## (\d+\.\d+\.\d+)/m.exec(readFileSync(changelogPath, 'utf8'))
-const VERSION = match?.[1] ?? '0.1.0-rc.1'
-if (!match) console.warn(`normalize-mirror: no "## x.y.z" heading in CHANGELOG.md — keeping baseline ${VERSION}`)
+if (!match) {
+  // V6-47 (0.3.37): a missing "## x.y.z" heading used to fall back to the
+  // hardcoded '0.1.0-rc.1' and REWRITE every manifest DOWN (a dangerous
+  // version regression on a single format drift). Fail loud instead.
+  console.error('normalize-mirror: no "## x.y.z" heading at the top of CHANGELOG.md (format drift?) — refusing to touch manifests.')
+  process.exit(1)
+}
+const VERSION = match[1]
 
 let changed = 0
 for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {

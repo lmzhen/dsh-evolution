@@ -68,7 +68,7 @@ it('maintain persona ships in the bundle with signal placeholders (011)', () => 
   expect(MAINTAIN_PROMPT).toContain('MECHANICAL_FACTS')
 })
 
-it('maintain persona v13 carries the guidance clauses pinned by the prompt loops (0.3.7 + 0.3.11 + 0.3.13)', () => {
+it('maintain persona v14 carries the guidance clauses pinned by the prompt loops (0.3.7 + 0.3.11 + 0.3.13)', () => {
   // §3 completeness contract: every over signal lands in an item or a note.
   expect(MAINTAIN_PROMPT).toContain('完整性契约')
   expect(MAINTAIN_PROMPT).toContain('禁止静默省略')

@@ -488,6 +488,13 @@ function fuzzyIndexOf(content: string, pattern: string, from = 0): [number, numb
   return null
 }
 
+/** V6-17 (0.3.37): the fuzzy-patch scan is O(n·m) with no input bound; a
+ * non-exact anchor past these budgets would block the event loop (measured
+ * ~6s at 20k×20k). Exact matches go through the fast `includes` path and stay
+ * allowed regardless of size. */
+const FUZZY_MAX_PATTERN_CHARS = 4096
+const FUZZY_MAX_WORK = 8_000_000
+
 /** Trim leading whitespace of the first line and trailing whitespace of the last line. */
 function trimPatternBoundaries(pattern: string): string {
   const from = pattern.search(/\S/)
@@ -742,7 +749,14 @@ export class SkillLibrary {
       const next = await run(current)
       if (next !== null && next !== current) await this.io.writeText(path, next)
     }
-    const o = outcome as SingleWriteOutcome
+    const o = outcome
+    // V6-19 (0.3.37): a transact backend that violates the contract (never
+    // invokes the task — a value-imported transact promised inside guarantees)
+    // leaves `outcome` undefined; a structured error beats the TypeError the
+    // unconditional dereference used to raise.
+    if (o === undefined || typeof o !== 'object' || !Object.prototype.hasOwnProperty.call(o, 'write')) {
+      return { ok: false, message: 'internal error: the write transaction did not invoke the task; no write was performed' }
+    }
     if (o.write !== null && o.audit) {
       await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary)
     }
@@ -1145,6 +1159,13 @@ export class SkillLibrary {
       const md = current
       if (md === null) return { result: { ok: false, message: `File not found: ${patchLabel}` }, write: null }
 
+      // V6-17 (0.3.37): the fuzzy scan is O(n·m) with no input bound (a
+      // model-supplied 20k anchor over a 20k file measured ~6s with the event
+      // loop blocked). The exact `includes` path served an exact hit already;
+      // a NON-exact anchor past the budget is refused with an honest message.
+      if (!md.includes(oldString) && (oldString.length > FUZZY_MAX_PATTERN_CHARS || md.length * oldString.length > FUZZY_MAX_WORK)) {
+        return { result: { ok: false, message: `old_string too large for fuzzy match (${oldString.length} chars in ${patchLabel}); use update for a full rewrite or a narrower anchor.` }, write: null }
+      }
       const patched = fuzzyPatch(md, oldString, newString, replaceAll)
       // `null` means "no match"; an empty string is a legitimate replacement.
       if (patched === null) return { result: { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }, write: null }

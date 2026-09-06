@@ -25,6 +25,19 @@ it('memory add and batch (replace/remove semantics via applyBatch)', async () =>
   await rm(root, { recursive: true, force: true })
 })
 
+it('V6-25: an enum-outside action fails loud instead of silently executing a replace (0.3.37)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-enum-'))
+  const store = new MemoryStore({ root })
+  await store.add('memory', 'Original fact.')
+  // 'Add' (capitalized) used to fall into the REPLACE branch when old_text was
+  // present — a semantic drift that passed as ok:true.
+  const bad = await store.applyBatch('memory', [{ action: 'Add' as never, old_text: 'Original', facts: 'Silently replaced.' }])
+  expect(bad.ok).toBe(false)
+  expect(bad.message).toContain('unknown action "Add"')
+  expect(await store.read('memory')).toEqual(['Original fact.'])
+  await rm(root, { recursive: true, force: true })
+})
+
 it('memory enforces char limits with consolidation failure backoff', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-limit-'))
   const store = new MemoryStore({ root, memoryCharLimit: 20 })

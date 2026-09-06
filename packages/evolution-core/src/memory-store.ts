@@ -6,6 +6,7 @@
 import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { makeSerialQueue } from './serial.ts'
 import { scanMemoryThreats } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
@@ -112,6 +113,12 @@ export class MemoryStore {
   readonly root: string
   private readonly maxFailures: number
   private readonly io: EvolutionIoLike
+  /** V6-16 (0.3.37): same-process RMW serialization (the SkillLibrary queue) —
+   * on a backend WITHOUT a transact lock two concurrent callers compute on the
+   * same old content and the last rename wins, silently dropping one op's
+   * update. The node backend's cross-process lock already serializes; this
+   * chain covers the no-transact custom backends. */
+  private readonly serial = makeSerialQueue()
   private failureCount = 0
   private lastFailureAt = 0
 
@@ -230,6 +237,10 @@ export class MemoryStore {
   }
 
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
+    return await this.serial(() => this.addChained(target, facts))
+  }
+
+  private async addChained(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
     if (!facts.trim()) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const path = fileFor(this.root, target)
     // M-7 (v3 audit): the oversized read-guard must run BEFORE the transact —
@@ -302,6 +313,10 @@ export class MemoryStore {
   }
 
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
+    return await this.serial(() => this.applyBatchChained(target, operations))
+  }
+
+  private async applyBatchChained(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
     if (operations.length === 0) return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
     const path = fileFor(this.root, target)
     // M-7: oversized guard pre-lock (see add()).
@@ -348,6 +363,14 @@ export class MemoryStore {
           working.push(this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body)
         }
         continue
+      }
+      // V6-25 (0.3.37): an enum-outside action (e.g. 'Add'/'upsert') used to
+      // silently fall into the REPLACE branch — a semantic drift that passed
+      // as ok:true. Fail loud on the contract violation instead. The action is
+      // inspected through unknown (the caller's type can lie).
+      const rawAction: unknown = op.action
+      if (rawAction !== 'remove' && rawAction !== 'replace') {
+        return { result: { ok: false, message: `Operation ${position}: unknown action "${String(rawAction)}" (expected add/remove/replace). No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
       }
       const needle = (op.old_text ?? '').trim()
       if (!needle) return { result: { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }

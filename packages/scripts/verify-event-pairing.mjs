@@ -33,7 +33,7 @@ const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git',
 // Externally owned (README): emitted for platform/user wiring, no in-repo
 // production consumer — expected orphans.
 const EXEMPT_ORPHANS = new Set(['evolution/review-scheduled', 'evolution/review-error'])
-const EMIT_RE = /ctx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
+const EMIT_RE = /\w*[Cc]tx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
 // V4-31 (0.3.26) + V5-01 (0.3.30): receivers follow the camelCase `<x>ctx`
 // naming (ioCtx/commandCtx/approvalCtx/toolCtx — activity listens on
 // `ioCtx.on(...)`), and `\w*ctx` is case-SENSITIVE — it matched only bare

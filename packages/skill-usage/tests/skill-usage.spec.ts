@@ -20,6 +20,32 @@ describe('skill-usage', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-dispose-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const fiber = await ctx.plugin(SkillUsageRegistry, { root })
+    // The platform HMR-safety contract: registrations belong to effects, so
+    // dispose removes them — a bare ctx.on in the constructor is an
+    // unowned observer (the tool-memory/skill-catalog pattern).
+    expect(fiber.getEffects().some(effect => effect.label === 'skill-usage.telemetry')).toBe(true)
+    // Pre-dispose behavior: a session event read bumps the view counter.
+    const usage = ctx.skillUsage
+    await usage.record('demo', 'use')
+    ctx.emit('session/event', { id: 's1' } as never, { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{"name":"demo"}' } } as never)
+    let settled = 0
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
+      settled = (await usage.report()).get('demo')?.view_count ?? 0
+      if (settled > 0) break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    expect(settled).toBeGreaterThan(0)
+    await fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('markArchived sets state without bumping the patch counter', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-usage-archive-'))
     const ctx = new Context()

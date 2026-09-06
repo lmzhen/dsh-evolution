@@ -168,7 +168,11 @@ export function apply(ctx: Context): void {
           slot.record = { ...current, status: 'executing', claimedBy: claimId, claimedAt: new Date(now).toISOString() }
           return slot.record
         })
-        return slot.record
+        // V6-33 (0.3.37): return a copy — the update callback's no-change
+        // paths may hand back the internal record object; an in-place mutation
+        // by the caller would silently poison the domain map (the json
+        // provider returns copies).
+        return slot.record === null ? null : { ...slot.record }
       } catch (error: unknown) {
         // Missing key is the benign "no such pending record" outcome; a
         // closed domain or backend failure must surface so approval reports
@@ -207,8 +211,9 @@ export function apply(ctx: Context): void {
           resolved.record = { ...current, status, resolvedAt: new Date().toISOString() }
           return resolved.record
         })
-        if (resolved.record === null) return { record, applied: false }
-        return { record: resolved.record, applied: true }
+        const rawRecord: unknown = record
+        if (resolved.record === null) return { record: rawRecord === null ? null : { ...(rawRecord as PendingRecord) }, applied: false }
+        return { record: { ...resolved.record }, applied: true }
       } catch (error: unknown) {
         // v3-round self-check: only missing-key is benign; closed/backend errors propagate.
         if (error instanceof DomainError && error.code === 'missing-key') return { record: null, applied: false }

@@ -49,15 +49,17 @@ if (argv.includes('--only') && (onlyArg === undefined || onlyArg === '')) {
 const onlyNames = onlyArg ? onlyArg.split(',').map(name => name.trim()).filter(Boolean) : []
 const otp = argv.includes('--otp') ? argv[argv.indexOf('--otp') + 1] : ''
 
+/** V6-48 (0.3.37): `cmd.exe /c npm` re-splits the command line — an absolute
+ * tarball path containing SPACES is broken apart (local manual publish only;
+ * CI runs a Unix agent). Use the `npm.cmd` shim directly with shell:false. */
+const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+
 function npm(args, options = {}) {
-  if (process.platform === 'win32') {
-    return execFileSync('cmd.exe', ['/c', 'npm', ...args], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      ...options,
-    })
-  }
-  return execFileSync('npm', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options })
+  return execFileSync(npmExecutable, args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    ...options,
+  })
 }
 
 function integrityOf(tarball) {
@@ -78,7 +80,7 @@ function publish(tarball) {
   if (otp) args.push('--otp', otp)
   if (provenance) args.push('--provenance')
   if (interactive) {
-    execFileSync(process.platform === 'win32' ? 'cmd.exe' : 'npm', process.platform === 'win32' ? ['/c', 'npm', ...args] : args, { stdio: 'inherit' })
+    execFileSync(npmExecutable, args, { stdio: 'inherit' })
     return
   }
   const output = npm(args)

@@ -4,6 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { applyCuratorFields, emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 describe('usage sidecar field normalization (P2-3)', () => {
+  it('V6-20: a top-level ARRAY sidecar reads as empty — no phantom "0"/"1" records (0.3.37)', async () => {
+    // `Object.entries([...])` produced "0"/"1" phantom skill records and the
+    // RMW would persist them as an object map — the one guard the entry
+    // shapes all had but the top level lacked.
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-array-'))
+    await writeFile(join(root, 'usage.json'), JSON.stringify([{ created_by: 'agent' }, { created_by: 'agent' }]), 'utf8')
+    const map = await loadUsage(root, nodeEvolutionIo())
+    expect(map.size).toBe(0)
+    await rm(root, { recursive: true, force: true })
+  })
   it('falls back to the emptyRecord baseline for mistyped fields', () => {
     const record = normalizeUsageRecord({
       use_count: '3',

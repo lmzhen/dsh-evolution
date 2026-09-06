@@ -102,22 +102,28 @@ export class SkillUsageRegistry extends Service {
     // makes the sidecar's view counters live; names without a usage record are
     // skipped so unrelated reads never mint entries (records are authored by
     // creation / patch / seed, never by observation).
-    ctx.on('session/event', (_session, event) => {
-      if (event.type !== 'tool/call') return
-      // E-65: an external emitter can inject a malformed tool/call — `data`
-      // absent, `name` missing, or `name` not a string. None of these is a
-      // read this listener can attribute, so skip the event instead of
-      // throwing; the review side reads the same payload via `data?.name`.
-      const data = event.data as { name?: unknown; arguments?: string | Record<string, unknown> } | undefined
-      const kind = typeof data?.name === 'string' ? READ_TOOL_KIND[data.name] : undefined
-      if (!kind) return
-      const name = skillNameFromToolCall(data?.arguments)
-      if (!name) return
-      void this.observeRead(name).catch(() => {
-        // Observation is best-effort: a telemetry write failure must never
-        // surface in the conversation that just read a skill.
+    // V6-43 (0.3.37): the listener is registered through ctx.effect so a plugin
+    // unload/re-mount disposes it (the family's tool-memory/skill-catalog
+    // pattern) — a bare ctx.on here leaks a stale observer.
+    ctx.effect(() => {
+      const dispose = ctx.on('session/event', (_session, event) => {
+        if (event.type !== 'tool/call') return
+        // E-65: an external emitter can inject a malformed tool/call — `data`
+        // absent, `name` missing, or `name` not a string. None of these is a
+        // read this listener can attribute, so skip the event instead of
+        // throwing; the review side reads the same payload via `data?.name`.
+        const data = event.data as { name?: unknown; arguments?: string | Record<string, unknown> } | undefined
+        const kind = typeof data?.name === 'string' ? READ_TOOL_KIND[data.name] : undefined
+        if (!kind) return
+        const name = skillNameFromToolCall(data?.arguments)
+        if (!name) return
+        void this.observeRead(name).catch(() => {
+          // Observation is best-effort: a telemetry write failure must never
+          // surface in the conversation that just read a skill.
+        })
       })
-    })
+      return dispose
+    }, 'skill-usage.telemetry')
   }
 
   /**
@@ -254,6 +260,8 @@ export class SkillUsageRegistry extends Service {
    * Barrier for external writers: every mutate reads the sidecar fresh from
    * disk (rc.50 P2-2 transact), so a curator direct-write is visible on the
    * next call without a cache flush; this waits for queued work to drain.
+   * V6-44 (0.3.37): test-support API — no production consumer uses it
+   * (tests use it as a drain barrier); kept by declaration.
    */
   async invalidate(): Promise<void> {
     await this.chain
