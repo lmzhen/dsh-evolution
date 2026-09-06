@@ -118,20 +118,25 @@ export function validateAndNormalizeMaintainPlan(
   const protectedNames = new Set<string>()
   const factNames = new Set<string>()
   const canonicalByName = new Map<string, string>()
-  const ambiguousNames = new Set<string>()
+  // V5-23 (0.3.32): a case-insensitive filesystem may hold BOTH `Foo` and
+  // `foo` — the lookup key then names two real skills and last-wins
+  // re-anchored recommendations to whichever scanned last. Anchoring must
+  // fail loud with the exact-spelling instruction instead.
+  // 0.3.34 (V6-01 配套): the EXACT spelling stays legal — only a non-exact
+  // form of a multiple-spelling key is ambiguous; `Foo` must pass.
+  const spellingsByName = new Map<string, Set<string>>()
   for (const skill of report.skills) {
     const key = skill.name.trim().toLowerCase()
+    const trimmed = skill.name.trim()
     factNames.add(key)
-    const existing = canonicalByName.get(key)
-    if (existing !== undefined && existing !== skill.name) {
-      // V5-23 (0.3.32): a case-insensitive filesystem may hold BOTH `Foo` and
-      // `foo` — the lookup key then names two real skills and last-wins
-      // re-anchored recommendations to whichever scanned last. Anchoring must
-      // fail loud with the exact-spelling instruction instead.
-      ambiguousNames.add(key)
-    } else {
-      canonicalByName.set(key, skill.name)
+    let spellings = spellingsByName.get(key)
+    if (spellings === undefined) {
+      spellings = new Set<string>()
+      spellingsByName.set(key, spellings)
     }
+    spellings.add(trimmed)
+    const existing = canonicalByName.get(key)
+    if (existing === undefined) canonicalByName.set(key, trimmed)
     if (skill.protected) protectedNames.add(key)
   }
 
@@ -167,13 +172,26 @@ export function validateAndNormalizeMaintainPlan(
         // name via a case-insensitive lookup. A name the facts report never
         // scanned stays as its trimmed self and fails the anchoring check below.
         namesOut = rawNames.map((nm) => {
-          const key = nm.trim().toLowerCase()
-          if (ambiguousNames.has(key)) return nm.trim()
-          return canonicalByName.get(key) ?? nm.trim()
+          const trimmed = nm.trim()
+          const key = trimmed.toLowerCase()
+          const spellings = spellingsByName.get(key)
+          if (spellings === undefined) return trimmed
+          // The EXACT spelling is always legal (a real skill on a
+          // case-sensitive host); only a single spelling gets the canonical
+          // re-anchor; a multiple-spelling key keeps the trimmed input so the
+          // ambiguity check below can name it.
+          if (spellings.has(trimmed)) return trimmed
+          if (spellings.size === 1) return canonicalByName.get(key) ?? trimmed
+          return trimmed
         })
-        // V5-23: a name that maps ambiguously (two real skills differing only
-        // in case) is refused outright — never re-anchored to one of them.
-        const ambiguousHit = namesOut.find(nm => ambiguousNames.has(nm.trim().toLowerCase()))
+        // V5-23 (0.3.34): a name that maps ambiguously (two real skills
+        // differing only in case, and the input matches neither exactly) is
+        // refused outright — never re-anchored to one of them.
+        const ambiguousHit = namesOut.find((nm) => {
+          const key = nm.trim().toLowerCase()
+          const spellings = spellingsByName.get(key)
+          return spellings !== undefined && spellings.size > 1 && !spellings.has(nm.trim())
+        })
         if (ambiguousHit !== undefined) {
           errors.push(`${path}.names: "${ambiguousHit}" matches multiple differently-cased skill names in the facts report — use the exact spelling`)
         } else {

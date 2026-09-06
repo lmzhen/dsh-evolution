@@ -244,6 +244,29 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('V6-01: a mutation BEFORE retirement cannot fixate an archived ghost twin', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v601-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    // Upgrade shape: legacy holds the pending twin of an id the archive saw
+    // (its resolved copy was cap-rotated out). The FIRST state operation is a
+    // MUTATION (savePending) — before any listPending/retirement.
+    await io.writeText(join(root, 'pending.json'), JSON.stringify({
+      ghost: { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'pending' },
+    }))
+    await io.writeText(join(root, 'pending-state-archive.json'), JSON.stringify([
+      { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+    ]))
+    await provider.savePending({ id: 'fresh', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' })
+    // The write path applied the same archive exclusion: the ghost twin never
+    // reached current, so it can never be claimed + replayed.
+    const current = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    expect(Object.values(current).some(record => record.id === 'ghost')).toBe(false)
+    expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('does not write an empty .bak when the archive was empty at rotation (V5-10)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-empty-bak-'))
     const ctx = await mount(root)

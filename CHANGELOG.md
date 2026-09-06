@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.34 (patch) — v6 审计 M1：数据与安装正确性（V6-01/02/03/07 + V5-23 用例）
+
+v6 审计（0.3.33 全量复审轮）M1 里程碑；每项先核验属实再修（V6-01/02 均为 v6 报告的确定性/高置信发现，主审复读确认）。
+
+- **V6-01 [P1] 退休过滤被四条写路径绕过——根除**：savePending/claimPending/releasePendingClaim/tryResolvePending 的内层 legacy 合并此前**不带归档排除**——升级后首个状态操作若是 mutation（review staging 先于任何 list、操作员直接 `/approve`），归档集中的幽灵 pending 双胞胎会被写进活 map 并**永久化**（此后退休的 `id in current` 跳过使其不可再剔除）→ 可 claim → 重放数月前 staged args（V5-02 宣称根除的危害经修复自身写路径重新可达）。修复：提取**单源** `mergedWithFilteredLegacy`（`readArchivedIds` 缓存一次 + `filterLegacy` 双排除——与退休读路径同一逻辑），四路 mutation 全部改走该 merge；注释「merge result is identical anyway」随之删除（过滤存在后该叙述不成立）。
+- **V6-02 [P2] 退休 transact 锁内参数**：`retireLegacyOnce` 的合并任务改用 `(fresh) => ({ ...retired, ...(fresh ?? {}) })`——此前零参闭包捕获锁外快照，跨进程并发写（进程 A 在 B 的退休窗口落盘 staged/approved）会被陈旧快照整文件覆盖（Y 消失 or X 从 approved 回退 pending → 可再 claim）。current-wins 语义不变、retired 仅补缺。
+- **收敛记录**：V6-01 的「mutation 先于 list」场景同时是 0.3.29 V5-02 修复的真实遗漏——本批以确定性用例钉死（savePending 先行 → current 无幽灵 + claim null）；V6-02 依赖跨进程并发（单进程用例不可构造），以锁内参数语义 + 代码评审在案。
+- **V6-03 [P1] 安装文档**：INSTALL.md §5 删除「手工拷贝 `evolution-agent/` 到 `.agent-presets/evolution/`」指引——该文件是 DELTA-only（4 个模型工具行），上游 agent-presets discovery 把发现的 `agent.cordis.yml` 当**完整装配**原样挂载（无 standard 合并）——按文档操作的生产会话只挂 4 行、丢失 standard 全部行。改为「装配经 install-layered 或 `dsh plugin add` 生成；手工路径仅允许拷贝 standard+delta 合成产物」。
+- **V6-07 [P2] 中文文档**：README.zh.md 的 review 子代理允许列表仍写 `skill、skill_search、skill_load`（英文面 0.3.28/0.3.32 已修、中文漏改——V5-24/25 的镜像文档）→ 改为 `skill`（DSH 平台目录只存在 plain `skill`）。
+- **T.1(1) 判别力用例 + 实现修正**：V5-23（0.3.32）首次补专项用例时发现实现缺陷——**精确拼写（`Foo`）也被歧义误拒**（lowercase 后命中歧义键）→ 修正：`spellingsByName` 按拼写集合判定——精确拼写恒合法、单拼写保留 canonical 归一、多拼写键的非精确形式才 fail-loud「use the exact spelling」（用例：`FOO` 拒绝、`Foo` 通过）。
+- **回归**：全量 vitest **690/690**（+2：V6-01 用例子集 + V5-23 双用例）；oxlint 0/0；tsc 0。
+
 ## 0.3.33 (patch) — v5 审计补修：归档既有重复清理（V5-07 残余）
 
 v5 审计 0.3.32 收口后的**复核轮**（逐项检查「已修项是否真实到位」）；发现并补修唯一真实遗留。

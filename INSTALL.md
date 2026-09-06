@@ -112,11 +112,14 @@ pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 > Community-published `@lmzhen/*` packages are not official DeepSeek
 > releases.
 
-Then copy `packages/evolution/evolution-agent/` to:
-
-```text
-$DSH_HOME/.agent-presets/evolution/
-```
+The agent preset is assembled by the installer (`install-layered.mjs`) or the
+host-runner's preset generation — V6-03 (0.3.34): do NOT hand-copy
+`evolution-agent/agent.cordis.yml` into `$DSH_HOME/.agent-presets/evolution/`.
+That file is a DELTA (4 model-tool rows, see its own header) and the
+`.agent-presets` discovery mounts whichever `agent.cordis.yml` it finds as the
+COMPLETE composition — a hand-copied delta would mount an agent missing every
+standard row. Use `dsh plugin add` + the installer (or copy only a
+standard+delta SYNTHESIZED composition when a manual path is truly needed).
 
 ## Profile override examples
 

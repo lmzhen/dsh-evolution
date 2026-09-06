@@ -73,6 +73,26 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(result.plan.plan).toHaveLength(1)
   })
 
+  it('V5-23: an ambiguous case-only name fails loud with the exact-spelling instruction', () => {
+    // A case-insensitive host may hold BOTH spellings — the lookup key names
+    // two real skills and last-wins re-anchoring would be wrong.
+    const dualReport: DriftReport = {
+      library: report.library,
+      skills: [
+        { name: 'Foo', protected: undefined, signals: [{ id: 'stamp_density', verdict: 'over', value: '3/KB', threshold: '2/KB' }] },
+        { name: 'foo', protected: undefined, signals: [{ id: 'stamp_density', verdict: 'over', value: '3/KB', threshold: '2/KB' }] },
+      ],
+    }
+    const item = validItem()
+    item.names = ['FOO']
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), dualReport, SIGNALS)
+    expect(result.ok).toBe(false)
+    expect(result.errors?.some(e => e.includes('exact spelling'))).toBe(true)
+    // A distinct single-spelling name still anchors fine.
+    item.names = ['Foo']
+    expect(validateAndNormalizeMaintainPlan(validPlan([item]), dualReport, SIGNALS).ok).toBe(true)
+  })
+
   it('accepts no_issues with an empty plan and rejects a non-empty one', () => {
     expect(validateAndNormalizeMaintainPlan(validPlan([]), report, SIGNALS).ok).toBe(true)
     const badRoot = { verdict: 'no_issues', plan: [validItem()], notes: [] }

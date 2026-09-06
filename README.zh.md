@@ -222,7 +222,7 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
   - bootstrap 阶段隐藏 evolution 工具；
   - promoted 阶段仍隐藏；
   - 只有 `dev_tool_search` 解锁后出现。
-- review 子代理默认允许 `skill`、`skill_search`、`skill_load`。
+- review 子代理默认允许 `skill`（V6-07 修正：DSH 平台目录只存在 plain `skill`，`skill_search`/`skill_load` 不存在）。
 
 ## 配置
 

@@ -161,39 +161,64 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // the read path (listPending), where no jsonTransact is already held; the
   // in-memory flag stops per-call churn, and any failure (IO/rename) leaves
   // the flag unset so the next safe point retries (the merge is idempotent —
-  // the same combined map every time). The in-flight claim/save/release
-  // paths read the flag instead of the file: once retired the file is gone
-  // for every process; before that their merge result is identical anyway.
+  // the same combined map every time).
+  // 0.3.34 (V6-01): the same filtering applies to the FOUR mutation paths'
+  // inner merges — a mutation that runs before any list would otherwise
+  // merge the RAW legacy (no archive exclusion) and fixate a ghost twin in
+  // current where retirement can never remove it (id-in-current skip).
+  // The archive id set is read once and cached: it only strengthens the
+  // filter, and any stale-miss is covered by the current-wins half of the
+  // exclusion (the id was in current at the time it was archived before it
+  // could be rotated out).
   let legacyMigrated = false
+  let archivedIdsCache: Set<string> | null = null
+  async function readArchivedIds(): Promise<Set<string>> {
+    if (archivedIdsCache !== null) return archivedIdsCache
+    const ids = new Set<string>()
+    try {
+      const rawArchive = await readJson<Array<{ id?: string } | null>>('pending-state-archive.json')
+      if (Array.isArray(rawArchive)) {
+        for (const entry of rawArchive) if (entry && typeof entry.id === 'string') ids.add(entry.id)
+      }
+    } catch {
+      // Corrupt/unreadable archive — best-effort: keep legacy copies (the
+      // previous merge behavior) rather than dropping possibly-real work.
+    }
+    archivedIdsCache = ids
+    return ids
+  }
+  function filterLegacy(
+    legacy: Record<string, PendingRecord>,
+    current: Record<string, PendingRecord> | null,
+    archivedIds: Set<string>,
+  ): Record<string, PendingRecord> {
+    // V5-02: legacy copies of records the archive already saw are COMPLETED
+    // history — a stale `status:'pending'` twin must never be resurrected
+    // (the cap rotation may already have evicted the resolved twin from
+    // current, and a plain merge would fixate the pending copy). current
+    // wins for shared ids; legacy-only ids survive only when the archive has
+    // never seen them (genuinely unresolved work).
+    const retired: Record<string, PendingRecord> = {}
+    for (const [id, record] of Object.entries(legacy)) {
+      if (id in (current ?? {})) continue
+      if (archivedIds.has(id)) continue
+      retired[id] = record
+    }
+    return retired
+  }
   async function retireLegacyOnce(
     legacy: Record<string, PendingRecord>,
     current: Record<string, PendingRecord> | null,
   ): Promise<Record<string, PendingRecord>> {
     if (legacyMigrated) return {}
     try {
-      // V5-02: legacy copies of records the archive already saw are COMPLETED
-      // history — a stale `status:'pending'` twin must never be resurrected
-      // (the cap rotation may already have evicted the resolved twin from
-      // current, and a plain merge would fixate the pending copy). current
-      // wins for shared ids; legacy-only ids survive only when the archive has
-      // never seen them (genuinely unresolved work).
-      const archivedIds = new Set<string>()
-      try {
-        const rawArchive = await readJson<Array<{ id?: string } | null>>('pending-state-archive.json')
-        if (Array.isArray(rawArchive)) {
-          for (const entry of rawArchive) if (entry && typeof entry.id === 'string') archivedIds.add(entry.id)
-        }
-      } catch {
-        // Corrupt/unreadable archive — best-effort: keep legacy copies (the
-        // previous merge behavior) rather than dropping possibly-real work.
-      }
-      const retired: Record<string, PendingRecord> = {}
-      for (const [id, record] of Object.entries(legacy)) {
-        if (id in (current ?? {})) continue
-        if (archivedIds.has(id)) continue
-        retired[id] = record
-      }
-      await jsonTransact(io, root, 'pending-state.json', () => ({ ...retired, ...(current ?? {}) }))
+      const archivedIds = await readArchivedIds()
+      const retired = filterLegacy(legacy, current, archivedIds)
+      // V6-02 (0.3.34): the transact task takes the lock-INSIDE re-read as its
+      // argument — a closure over the pre-lock snapshot could overwrite a
+      // concurrent writer's newer state between the probe and the lock (Y
+      // staged → vanished, or X approved → reverted to pending → replayable).
+      await jsonTransact(io, root, 'pending-state.json', (fresh) => ({ ...retired, ...(fresh ?? {}) }))
       await io().rename(pathOf('pending.json'), pathOf('pending.json.migrated'))
       legacyMigrated = true
       return retired
@@ -213,6 +238,18 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return { ...retired, ...(current ?? {}) }
     }
     return { ...(current ?? {}) }
+  }
+  /** V6-01 (0.3.34): single-sourced legacy merge for the four mutation paths —
+   * the SAME exclusion as the retirement read path, so a mutation that runs
+   * before any retirement cannot fixate a ghost pending twin in current
+   * (the archive id set is cached once; current-wins covers stale misses). */
+  async function mergedWithFilteredLegacy(
+    legacy: Record<string, PendingRecord> | null,
+    current: Record<string, PendingRecord>,
+  ): Promise<Record<string, PendingRecord>> {
+    if (legacy === null) return current
+    const archivedIds = await readArchivedIds()
+    return { ...filterLegacy(legacy, current, archivedIds), ...current }
   }
 
   /** 0.3.22 (F-336): when the live pending map holds more than
@@ -359,7 +396,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
       await mutate(async () => {
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
-          const map = { ...(legacy ?? {}), ...(current ?? {}), [record.id]: record }
+          // V6-01 (0.3.34): same exclusion as the retirement read path.
+          const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})), [record.id]: record }
           return map
         })
       })
@@ -370,7 +408,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const slot = { claimed: null as PendingRecord | null }
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
-          const map = { ...(legacy ?? {}), ...(current ?? {}) }
+          // V6-01 (0.3.34): same exclusion as the retirement read path.
+          const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
           const record = map[id] ?? null
           if (record === null || !canClaimPending(record.status)) return map
           const now = Date.now()
@@ -391,7 +430,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
       await mutate(async () => {
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
-          const map = { ...(legacy ?? {}), ...(current ?? {}) }
+          // V6-01 (0.3.34): same exclusion as the retirement read path.
+          const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
           const record = map[id]
           // 0.3.17 (S3.3): releasing a CLAIMED-EXECUTING record rolls it back to
           // pending (a runner FAILURE is retryable); a crash leaves it
@@ -412,7 +452,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
         let evicted: PendingRecord[] = []
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
-          const map = { ...(legacy ?? {}), ...(current ?? {}) }
+          // V6-01 (0.3.34): same exclusion as the retirement read path.
+          const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
           const record = map[id] ?? null
           // 0.3.17 (S3.3): 'executing' (claimed but not yet resolved) is a
           // legal resolve source — a crash mid-approve leaves it there for the
