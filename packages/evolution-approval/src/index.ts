@@ -245,7 +245,13 @@ export class EvolutionApproval extends Service {
             ? { ok: true, message: `Rejected executing write "${id}" (no claim held — this may race an in-flight approve runner; if the write already landed its effect stands as-is. Verify the write state manually).` }
             : { ok: false, message: `Pending write "${id}" could not be rejected: it resolved concurrently.` }
         }
-        return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
+        // 0.3.28 (V4-18): the record was NOT found AND is not 'executing', so it
+        // is no longer in the active window — either it was already resolved
+        // (approved/rejected) and later rotated past PENDING_RESOLVED_CAP, or it
+        // never existed. The old "already being resolved by another writer"
+        // message mis-attributed a rotated/archived id to a live concurrent
+        // writer (the cap rotation magnified it into a misleading claim).
+        return { ok: false, message: `Pending write "${id}" is not in the pending window (rotated or resolved).` }
       }
       const resolution = await this.state().tryResolvePending(id, 'rejected')
       if (!resolution.applied || !resolution.record) {
@@ -295,7 +301,9 @@ export class EvolutionApproval extends Service {
       if (stuck) {
         return { ok: false, message: `Pending write "${id}" is executing (a previous approve may have run before a crash). Verify its effect manually, then reject it — /evolution pending shows it as EXECUTING.` }
       }
-      return { ok: false, message: `Pending write "${id}" is already being resolved by another writer.` }
+      // 0.3.28 (V4-18): as in reject, a non-executing miss is a rotated/archived
+      // id, not a live concurrent writer — keep the attribution honest.
+      return { ok: false, message: `Pending write "${id}" is not in the pending window (rotated or resolved).` }
     }
     const runner = this.runners.get(record.kind)
     if (!runner) {

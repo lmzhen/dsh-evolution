@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionCapability from '../src/index.ts'
 
@@ -29,5 +29,14 @@ describe('evolution-capability G3.1 numeric clamping', () => {
     const ok = new EvolutionCapability(new Context(), { maxNameLength: 40, maxPurposeLength: 80, maxCodeChars: 1000 })
     expect(ok.validate({ name: 'a'.repeat(41), purpose: 'purpose', code: { host: 'x' } }).ok).toBe(false)
     expect(ok.validate({ name: 'a'.repeat(40), purpose: 'purpose', code: { host: 'x' } }).ok).toBe(true)
+  })
+
+  it('V4-44: warns when a numeric capability limit must be clamped', () => {
+    const ctx = new Context()
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    // Direct construction bypasses the schema `.min(1)`; the clamp must warn.
+    new EvolutionCapability(ctx, { maxNameLength: 0 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
+    warnSpy.mockRestore()
   })
 })

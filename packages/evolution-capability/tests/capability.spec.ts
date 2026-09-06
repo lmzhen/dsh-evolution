@@ -61,4 +61,30 @@ describe('evolution-capability', () => {
     expect(pkg).toEqual(PACKAGE)
     await rm(root, { recursive: true, force: true })
   })
+
+  it('V4-45: a capability submission that would be allowed-direct is refused (staged-only gate)', async () => {
+    // The capability seam must ALWAYS stage: an allow-direct submission would
+    // dead-end capability evolution silently (P3). Simulate an approval that
+    // chose 'allow' and assert submit fails closed.
+    const ctx = new Context()
+    ;(ctx as unknown as { evolutionApproval: unknown }).evolutionApproval = {
+      isEnabled: true,
+      request: async () => ({ action: 'allow', message: 'allowed-direct' }),
+    }
+    const capability = new EvolutionCapability(ctx)
+    const result = await capability.submit(PACKAGE)
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('staged approval')
+  })
+
+  it('V4-45: an out-of-band tampered approved record is re-validated and refused on read-back', async () => {
+    // approvedPackage re-validates the persistent args (E-35): a malformed or
+    // out-of-band-edited record must never reach Creator-mode activation.
+    const ctx = new Context()
+    ;(ctx as unknown as { evolutionState: unknown }).evolutionState = {
+      listPending: async () => [{ id: 'tampered', kind: 'capability', args: { name: 'Bad Name', purpose: 'purpose', code: { host: 'x' } } }],
+    }
+    const capability = new EvolutionCapability(ctx)
+    expect(await capability.approvedPackage('tampered')).toBeNull()
+  })
 })

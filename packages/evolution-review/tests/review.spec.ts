@@ -250,6 +250,110 @@ describe('evolution-review', () => {
     })
     expect(scheduled).toBe(true)
   })
+
+  it('V4-21: a mid-plan execute throw is a partial application, never a re-inject (F-334)', async () => {
+    const injected: unknown[] = []
+    const applied: string[] = []
+    const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
+    ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
+    ctx.provide('subagents', {
+      start: async () => ({
+        result: Promise.resolve({
+          structured: {
+            memoryOps: [
+              { target: 'memory', action: 'add', facts: 'f1', evidence: [{ event_seq: 0 }] },
+              { target: 'memory', action: 'add', facts: 'f2', evidence: [{ event_seq: 0 }] },
+            ],
+            skillOps: [],
+            summary: 'two memory ops',
+          },
+        }),
+        dispose: async () => {},
+      }),
+    })
+    // The first op lands, the second throws an IO exception (not ok:false).
+    let calls = 0
+    ctx.provide('memory', {
+      applyBatch: async () => {
+        calls += 1
+        if (calls === 2) throw new Error('io boom')
+        return { ok: true, message: 'ok' }
+      },
+    })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1)
+    // The plan DID run (partially), so plan-applied fires once.
+    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
+    const texts = injected.map((message) => {
+      const box = message as { content?: Array<{ type: string; text: string }> } | null
+      return typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
+    })
+    // started=true (the review happened), so the SAME kind is NOT re-injected.
+    expect(texts.some(text => text.includes('Review kind:'))).toBe(false)
+    // The partial failure is surfaced — the model is told what landed.
+    expect(texts.some(text => text.includes('部分操作失败'))).toBe(true)
+  })
+
+  it('V4-21: a failing completion inject rolls the flag back so the next completion re-triggers (F-334)', async () => {
+    const toolCalls = Array.from({ length: 25 }, (_, i) => ({
+      type: 'tool/call' as const,
+      data: { turn: 1, step: i + 2, callId: `c${i}`, name: 'skill', arguments: '{}' },
+    }))
+    let injectCalls = 0
+    const injected: unknown[] = []
+    const { ctx, emitEnd } = await mountReviewFixture({
+      onInject: (message) => {
+        injectCalls += 1
+        if (injectCalls === 1) throw new Error('inject boom')
+        injected.push(message)
+      },
+      events: toolCalls,
+    })
+    const scheduled: string[] = []
+    ctx.on('evolution/review-scheduled', event => scheduled.push(event.sessionId))
+    ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 1_000_000, reviewSkillInterval: 1_000_000 }) })
+    await ctx.plugin(Review, {
+      reviewEnabled: true,
+      reviewMode: 'subagent',
+      memoryInterval: 1_000_000,
+      skillInterval: 1_000_000,
+      skillReviewTrigger: 'completion',
+      skillReviewCompletionMinToolCalls: 20,
+    })
+    emitEnd(1)
+    // First completion: the inject throws → the flag is rolled back, and no
+    // schedule signal is emitted (the review was never dispatched).
+    await vi.waitFor(() => { expect(injectCalls).toBe(1) })
+    expect(scheduled).toEqual([])
+    emitEnd(2)
+    // The flag was rolled back, so the next completion re-triggers and succeeds.
+    await vi.waitFor(() => { expect(injectCalls).toBe(2) })
+    expect(scheduled).toHaveLength(1)
+  })
+
+  it('F-102 (V4-27): an aborted run is disposed and the single-flight guard resets for the next turn', async () => {
+    const { ctx, emitEnd } = await mountReviewFixture()
+    let disposed = 0
+    let starts = 0
+    ctx.provide('subagents', {
+      start: async () => {
+        starts += 1
+        // Turn 1 aborts; turn 2 succeeds — a stale in-flight guard would block
+        // the second spawn (retry stacking / leak).
+        if (starts === 1) return { result: Promise.reject(new Error('abort')), dispose: async () => { disposed += 1 } }
+        return { result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'ok' } }), dispose: async () => { disposed += 1 } }
+      },
+    })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1)
+    await vi.waitFor(() => { expect(starts).toBe(1) })
+    await vi.waitFor(() => { expect(disposed).toBe(1) })
+    emitEnd(2)
+    await vi.waitFor(() => { expect(starts).toBe(2) })
+    expect(disposed).toBe(2)
+  })
 })
 
 /** Shared mounting: one fake session/agent registered, one turn/end emitter. */

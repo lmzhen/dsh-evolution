@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionHome, makeSerialQueue, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, makeSerialQueue, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { canClaimPending, canResolvePending, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 import { join } from 'node:path'
 
@@ -60,22 +60,65 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
 
 const RECORD_MAP_FILES = new Set(['review-state.json', 'curator-state.json', 'pending-state.json', 'pending.json'])
 
+/** 0.3.17 (E-9): a malformed state file used to parse to `null` and was then
+ * OVERWRITTEN by the next save — every other session's review state / the
+ * whole pending table vanished silently. Fail loud instead: preserve the
+ * original bytes beside it and throw, so the operator can rescue and the
+ * corruption is never accepted as "empty". */
+async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string): Promise<never> {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const dest = `${join(root, file)}.corrupt-${stamp}-${Math.random().toString(36).slice(2, 6)}`
+  await io().writeText(dest, raw).catch(() => {})
+  throw new Error(`evolution state file "${file}" is not valid JSON (${reason}); original preserved at ${dest} — inspect and fix it, then retry.`)
+}
+
+/**
+ * Cross-process JSON-file RMW (v3-audit M-8): every read-modify-write state
+ * mutation runs inside the IO backend's transact lock (via transactIo) so a
+ * second process sharing DSH_HOME cannot interleave its claim/resolve.
+ * `task` returns the next value (null = keep); for a record-map file the
+ * return must be null or a plain object map of records, and an array/scalar
+ * would be persisted as a corrupt map — so it fails loud before any write
+ * (0.3.28, V4-08). The legacy `pending.json` merge stays inside the task via
+ * `readJson` where relevant.
+ */
+export async function jsonTransact<T>(
+  io: () => EvolutionIoLike,
+  root: string,
+  file: string,
+  task: (current: T | null) => T | null | Promise<T | null>,
+): Promise<void> {
+  await transactIo(io(), join(root, file), async (current) => {
+    let parsed: T | null = null
+    if (current !== null) {
+      try {
+        parsed = JSON.parse(current) as T
+      } catch (error) {
+        return await quarantine(io, root, file, current, error instanceof Error ? error.message : String(error))
+      }
+      // 0.3.27 (V4-06): outside the parse try — a wrong-shape quarantine must
+      // not fall into the catch and quarantine a second time.
+      if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
+        const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
+        return await quarantine(io, root, file, current, `expected a plain JSON object (map of records), got ${kind}`)
+      }
+    }
+    const next = await task(parsed)
+    // 0.3.28 (V4-08): a record-map task's return must be null (keep) or a
+    // plain object map of records — an array/scalar would be stringified and
+    // persisted as a corrupt record map. Fail loud before any write.
+    if (next !== null && RECORD_MAP_FILES.has(file) && !isPlainRecord(next)) {
+      const kind = Array.isArray(next) ? 'an array' : typeof next
+      throw new Error(`evolution state file "${file}" task returned ${kind} (expected null or a plain JSON object map of records); not written.`)
+    }
+    return next === null ? null : JSON.stringify(next, null, 2)
+  })
+}
+
 export function apply(ctx: Context, rawConfig: Config): void {
   const root = (rawConfig.root ?? '').trim() || evolutionHome()
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
-
-  /** 0.3.17 (E-9): a malformed state file used to parse to `null` and was then
-   * OVERWRITTEN by the next save — every other session's review state / the
-   * whole pending table vanished silently. Fail loud instead: preserve the
-   * original bytes beside it and throw, so the operator can rescue and the
-   * corruption is never accepted as "empty". */
-  async function quarantine(file: string, raw: string, reason: string): Promise<never> {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const dest = `${pathOf(file)}.corrupt-${stamp}-${Math.random().toString(36).slice(2, 6)}`
-    await io().writeText(dest, raw).catch(() => {})
-    throw new Error(`evolution state file "${file}" is not valid JSON (${reason}); original preserved at ${dest} — inspect and fix it, then retry.`)
-  }
 
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
@@ -84,7 +127,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     try {
       parsed = JSON.parse(raw) as T
     } catch (error) {
-      return await quarantine(file, raw, error instanceof Error ? error.message : String(error))
+      return await quarantine(io, root, file, raw, error instanceof Error ? error.message : String(error))
     }
     // 0.3.22 (F-215): a valid JSON that is the wrong top-level shape is a
     // corrupt record map, not "empty" — fail loud so the operator notices
@@ -94,37 +137,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // quarantine the file a SECOND time (two `.corrupt-*` copies per read).
     if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
       const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
-      return await quarantine(file, raw, `expected a plain JSON object (map of records), got ${kind}`)
+      return await quarantine(io, root, file, raw, `expected a plain JSON object (map of records), got ${kind}`)
     }
     return parsed
-  }
-
-  /**
-   * Cross-process JSON-file RMW (v3-audit M-8): every read-modify-write state
-   * mutation runs inside the IO backend's transact lock (via transactIo) so a
-   * second process sharing DSH_HOME cannot interleave its claim/resolve.
-   * `task` returns the next value (null = delete); the legacy `pending.json`
-   * merge stays inside the task via `readJson` where relevant.
-   */
-  async function jsonTransact<T>(file: string, task: (current: T | null) => T | null | Promise<T | null>): Promise<void> {
-    await transactIo(ctx.evolutionIo.provider(), pathOf(file), async (current) => {
-      let parsed: T | null = null
-      if (current !== null) {
-        try {
-          parsed = JSON.parse(current) as T
-        } catch (error) {
-          return await quarantine(file, current, error instanceof Error ? error.message : String(error))
-        }
-        // 0.3.27 (V4-06): outside the parse try — a wrong-shape quarantine must
-        // not fall into the catch and quarantine a second time.
-        if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
-          const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
-          return await quarantine(file, current, `expected a plain JSON object (map of records), got ${kind}`)
-        }
-      }
-      const next = await task(parsed)
-      return next === null ? null : JSON.stringify(next, null, 2)
-    })
   }
 
   // All JSON-file state mutations share one queue: each read-modify-write is
@@ -225,7 +240,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async saveReviewState(sessionId, record) {
       await mutate(async () => {
-        await jsonTransact<Record<string, ReviewStateRecord>>('review-state.json', current => ({ ...(current ?? {}), [sessionId]: record }))
+        await jsonTransact<Record<string, ReviewStateRecord>>(io, root, 'review-state.json', current => ({ ...(current ?? {}), [sessionId]: record }))
       })
     },
 
@@ -238,13 +253,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async saveCuratorState(record) {
       await mutate(async () => {
-        await jsonTransact<Record<string, CuratorStateRecord>>('curator-state.json', current => ({ ...(current ?? {}), primary: record }))
+        await jsonTransact<Record<string, CuratorStateRecord>>(io, root, 'curator-state.json', current => ({ ...(current ?? {}), primary: record }))
       })
     },
 
     async transactCuratorState(task) {
       await mutate(async () => {
-        await jsonTransact<Record<string, CuratorStateRecord>>('curator-state.json', (current) => {
+        await jsonTransact<Record<string, CuratorStateRecord>>(io, root, 'curator-state.json', (current) => {
           // 0.3.22 (F-202): null = keep the current record unchanged (the
           // domain update primitive cannot delete; json aligns). The record
           // is ADD-only via the seam — a truly deletable empty is expressed
@@ -265,7 +280,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async savePending(record) {
       await mutate(async () => {
-        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}), [record.id]: record }
           return map
@@ -276,7 +291,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async claimPending(id, claimId) {
       return await mutate(async () => {
         const slot = { claimed: null as PendingRecord | null }
-        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id] ?? null
@@ -297,7 +312,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async releasePendingClaim(id, claimId) {
       await mutate(async () => {
-        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id]
@@ -318,7 +333,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
         let evicted: PendingRecord[] = []
-        await jsonTransact<Record<string, PendingRecord>>('pending-state.json', async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
           const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id] ?? null

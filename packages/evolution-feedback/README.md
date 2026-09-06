@@ -21,4 +21,4 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Persists through the IO seam; quality propagation into skill usage requires the `skillUsage` service.
+- Persists through the IO seam; quality propagation into skill usage requires the `skillUsage` service.

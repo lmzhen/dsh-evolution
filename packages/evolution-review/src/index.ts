@@ -108,7 +108,7 @@ let statelessReviewStateWarned = false
  * rejects the spawn outright). Warn once when a user-supplied value had to be
  * corrected.
  */
-function clampReviewConfig(rawConfig: Config, ctx: Context): Required<Config> {
+export function clampReviewConfig(rawConfig: Config, ctx: Context): Required<Config> {
   const clamped: string[] = []
   const field = (name: keyof Config, value: number | undefined, fallback: number, min: number): number => {
     const result = clampedNumber(value, fallback, { min })
@@ -251,10 +251,20 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
-    agent.inject(createUserMessage({
-      content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
-      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },
-    }))
+    try {
+      agent.inject(createUserMessage({
+        content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
+        source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },
+      }))
+    } catch (injectError) {
+      // V4-21 (F-334 residual ②): the flag was added BEFORE the inject; a
+      // failing inject left it set, so this session's completion review was
+      // permanently lost in-process. Roll it back so the next completion can
+      // re-trigger (the flag is one-per-session in-memory state, not durable).
+      completionInjected.delete(session.id)
+      ctx.logger.warn(`dsh-evolution-review: completion review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+      return
+    }
     // G4.4 (F-334): emit the schedule confirmation only after the completion
     // review inject actually dispatches (E-41 ordering: record-schedule once the
     // review was truly sent, not before a dispatch that may fail).
@@ -423,30 +433,43 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const origins = resolveOrigins(undefined, true)
     const actions: string[] = []
     let ok = true
-    for (const op of plan.memoryOps ?? []) {
-      if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
-      const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
-      const normalized = { target, action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text }
-      const result = approval
-        ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized)
-        : await memory?.applyBatch(normalized.target, [normalized])
-      if (result?.ok) actions.push('Memory updated')
-      else ok = false
+    // V4-21 (F-334 residual): an op can throw an IO exception (not return
+    // ok:false). Some ops may already have landed before the throw, so the
+    // whole plan is a PARTIAL application — catch and return the accrued
+    // `actions` with ok:false rather than letting the throw escape to the
+    // subagent-review catch (which would report started=false and make the
+    // caller re-inject the same kind, re-requesting an already-landed change).
+    try {
+      for (const op of plan.memoryOps ?? []) {
+        if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
+        const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
+        const normalized = { target, action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text }
+        const result = approval
+          ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized)
+          : await memory?.applyBatch(normalized.target, [normalized])
+        if (result?.ok) actions.push('Memory updated')
+        else ok = false
+      }
+      for (const op of plan.skillOps ?? []) {
+        if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
+        const args = { ...op, evidence: op.evidence }
+        // The registered skill runner expects the { operation, origin } wrapper;
+        // passing it on both the pending record and the replay keeps the
+        // background_review origin in the approval-disabled (default) path too.
+        const runnerArgs = { operation: args, origin: origins.library }
+        const result = approval
+          ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
+          : await executeSkillDirect(args)
+        if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
+        else ok = false
+      }
+      return { actions, ok }
+    } catch (error) {
+      // Partial application: the ops that landed stay in `actions` so the caller
+      // emits them (plan-applied) and tells the model what NOT to repeat.
+      ctx.logger.warn(`dsh-evolution-review: executePlan aborted mid-way after ${actions.length} ops landed: ${error instanceof Error ? error.message : String(error)}`)
+      return { actions, ok: false }
     }
-    for (const op of plan.skillOps ?? []) {
-      if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
-      const args = { ...op, evidence: op.evidence }
-      // The registered skill runner expects the { operation, origin } wrapper;
-      // passing it on both the pending record and the replay keeps the
-      // background_review origin in the approval-disabled (default) path too.
-      const runnerArgs = { operation: args, origin: origins.library }
-      const result = approval
-        ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
-        : await executeSkillDirect(args)
-      if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
-      else ok = false
-    }
-    return { actions, ok }
 
     async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
       // P1-9 pre-check: with approval ENABLED but no registered runner for

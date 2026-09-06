@@ -21,4 +21,4 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Local node:fs provider. Remote or shared media requires another `ctx.evolutionIo` provider.
+- Local node:fs provider. Remote or shared media requires another `ctx.evolutionIo` provider.

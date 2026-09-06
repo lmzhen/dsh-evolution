@@ -18,8 +18,8 @@
  * silently drift between the workflow and the pack step.
  *
  * Usage:
- *   node packages/evolution/scripts/build-lib.mjs
- *   node packages/evolution/scripts/prepare-release.mjs \
+ *   node packages/scripts/build-lib.mjs
+ *   node packages/scripts/prepare-release.mjs \
  *     --scope @lmzhen --version 0.1.0-rc.NN --platform-version 0.1.1-rc.NN
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -184,6 +184,27 @@ function shippedPaths(packed) {
   return (packed.files ?? []).map(f => (typeof f === 'string' ? f : f.path).replace(/^\.\//, '').replace(/\\/g, '/'))
 }
 
+/**
+ * Swap `next` into `target`, keeping the prior `target` recoverable until the
+ * new content is in place (0.3.28): the old rm-target-then-rename was two
+ * steps, so a failure between them destroyed the previous good staging/dist
+ * with no recovery. Moving the target aside first means an interrupted swap
+ * leaves the previous good build at `<target>.previous`. Re-runnable: a stale
+ * `.previous` from an earlier interrupted swap is removed first.
+ */
+function atomicSwap(next, target) {
+  const previous = `${target}.previous`
+  rmSync(previous, { recursive: true, force: true })
+  if (existsSync(target)) renameSync(target, previous)
+  try {
+    renameSync(next, target)
+  } catch (error) {
+    if (existsSync(previous)) renameSync(previous, target)
+    throw error
+  }
+  rmSync(previous, { recursive: true, force: true })
+}
+
 const staging = join(evolutionRoot, '.release-staging')
 // Build into `.next` dirs and swap at the end (F-350): the live dist/staging
 // are only touched once the whole build AND its guard pass, so a mid-build or
@@ -214,6 +235,13 @@ const tarballs = []
 for (const dir of sourceDirs) {
   const original = join(evolutionRoot, dir)
   const staged = join(stagingNext, dir)
+  // The staging copy keeps `lib/` (only node_modules/tests are excluded): the
+  // published tarball must ship the built runtime, so filtering `lib/` here
+  // would break the package. The freshness contract belongs to the caller —
+  // CI runs build-lib.mjs (tsc + tsdown) before prepare-release, so `lib/` is
+  // fresh there; a LOCAL prepare-release without a prior build copies whatever
+  // `lib/` is already on disk, so run build-lib.mjs first or accept a stale
+  // bundle.
   cpSync(original, staged, {
     recursive: true,
     force: true,
@@ -338,10 +366,10 @@ writeFileSync(join(distNext, 'smoke-package.json'), JSON.stringify({
 // Atomic swap: only now that the whole build (and its guard) passed do the
 // live `.release-staging` and `dist` replace their `.next` siblings. A failed
 // build never disturbs a previously good dist or a previously fresh staging.
-rmSync(staging, { recursive: true, force: true })
-renameSync(stagingNext, staging)
-rmSync(distRoot, { recursive: true, force: true })
-renameSync(distNext, distRoot)
+// Each swap keeps the prior target recoverable until the new content is in
+// place, so an interrupted swap can be re-run (see atomicSwap).
+atomicSwap(stagingNext, staging)
+atomicSwap(distNext, distRoot)
 
 console.log(`packed ${tarballs.length} packages -> ${distRoot}`)
 

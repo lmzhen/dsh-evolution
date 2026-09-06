@@ -325,6 +325,40 @@ Use it.
     expect(validate({})).toBe(true)
     expect(validate({ maxSkillNameLength: 1 })).toBe(true)
   })
+
+  it('V4-27: a no-op update/patch (byte-equivalent, noop:true) is not counted as a modification', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`noop-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    await execute({ action: 'create', name: 'noop-skill', content: SKILL.replace('boundary-skill', 'noop-skill') })
+    // Create is authorship (not a patch): the counter starts at 0.
+    expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
+    // An update with byte-equivalent content returns core noop:true; the tool
+    // gate `result.noop !== true` must NOT bump the mutation counter.
+    const onDisk = await readFile(join(root, 'skills', 'noop-skill', 'SKILL.md'), 'utf8')
+    const updated = await execute({ action: 'update', name: 'noop-skill', content: onDisk })
+    expect((updated.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((updated.value as { message?: string } | undefined)?.message ?? '').toContain('unchanged')
+    expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
+    // A patch whose old_string already equals the replacement is also noop.
+    const patched = await execute({ action: 'patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.' })
+    expect((patched.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((patched.value as { message?: string } | undefined)?.message ?? '').toContain('unchanged')
+    expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
+    // A real patch still counts exactly once (the gate is noop-only, not
+    // suppression of all patches).
+    const realPatch = await execute({ action: 'patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.\n\nNew content.' })
+    expect((realPatch.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(1)
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
 })
 
 

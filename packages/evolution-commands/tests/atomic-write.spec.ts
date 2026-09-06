@@ -57,4 +57,47 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('V4-17: a successful commit refreshes .bak so it tracks the latest generation', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-atomic-bak-'))
+    try {
+      // First install: no pre-existing file, so the backup phase creates nothing
+      // and the post-commit refresh seeds .bak with the first generation.
+      Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'GEN1' }])
+      expect(readFileSync(join(dir, 'f'), 'utf8')).toBe('GEN1')
+      expect(existsSync(join(dir, 'f.bak'))).toBe(true)
+      expect(readFileSync(join(dir, 'f.bak'), 'utf8')).toBe('GEN1')
+      // A second successful commit must refresh .bak to GEN2 — a once-created
+      // .bak would otherwise pin the very first generation forever.
+      Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'GEN2' }])
+      expect(readFileSync(join(dir, 'f.bak'), 'utf8')).toBe('GEN2')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('V4-17: a failed commit restores from the refreshed .bak (last good generation)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-atomic-rec-'))
+    try {
+      // Land two good generations so .bak is the latest (GEN2).
+      Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'GEN1' }])
+      Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'GEN2' }])
+      // A persistently-failing rename forces the F-211 post-remove window; the
+      // refreshed .bak must restore GEN2 — not a several-generations-old GEN1.
+      const fsOps = { ...baseFs, renameSync: () => { throw new Error('EPERM: rename failed') } }
+      let thrown: unknown
+      try {
+        Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'GEN3' }], fsOps)
+      } catch (error) {
+        thrown = error
+      }
+      expect(thrown).toBeInstanceOf(Error)
+      expect((thrown as Error).message).toContain('restored from the last good generation')
+      expect(readFileSync(join(dir, 'f'), 'utf8')).toBe('GEN2')
+      expect(existsSync(join(dir, 'f.bak'))).toBe(true)
+      expect(existsSync(join(dir, 'f.tmp'))).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

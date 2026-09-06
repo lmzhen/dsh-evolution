@@ -72,7 +72,7 @@ Two-tier deposition discipline (DSH addition, same spirit as the umbrella rule):
 Protected skills (DO NOT edit these):
   • Bundled skills (shipped with the platform).
   • Hub-installed skills (installed from a hub).
-Pinned skills are read-only to THIS background review pass — the pinned write guard refuses background changes, so only the foreground may update or archive them. Foreground and delegated-subagent writes to pinned skills remain allowed.
+Pinned skills are read-only to THIS background review pass — the pinned write guard refuses background changes, so this pass may not update them. They also cannot be archived by any writer (the foreground included): remove the .pinned marker first. Foreground and delegated-subagent update/patch writes to pinned skills remain allowed.
 If the only skills that need updating are protected, say 'Nothing to save.' and stop.
 
 Do NOT capture (these become persistent self-imposed constraints that bite you later when the environment changes):
@@ -117,7 +117,7 @@ If you notice overlapping existing skills, mention it — the background curator
 Protected skills (DO NOT edit these):
   • Bundled skills (shipped with the platform).
   • Hub-installed skills (installed from a hub).
-Pinned skills are read-only to THIS background review pass — the pinned write guard refuses background changes, so only the foreground may update or archive them. Foreground and delegated-subagent writes to pinned skills remain allowed.
+Pinned skills are read-only to THIS background review pass — the pinned write guard refuses background changes, so this pass may not update them. They also cannot be archived by any writer (the foreground included): remove the .pinned marker first. Foreground and delegated-subagent update/patch writes to pinned skills remain allowed.
 If the only skills that need updating are protected, say 'Nothing to save.' and stop.
 
 Do NOT capture as skills (these become persistent self-imposed constraints that bite you later when the environment changes):

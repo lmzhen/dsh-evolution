@@ -29,5 +29,5 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Host-only by design. It provides no model-facing tools; pair it with the Evolution agent preset to expose `memory`/`skill_manage`.
+- Host-only by design. It provides no model-facing tools; pair it with the Evolution agent preset to expose `memory`/`skill_manage`.
 

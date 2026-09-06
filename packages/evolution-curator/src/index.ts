@@ -311,6 +311,10 @@ export class EvolutionCurator extends Service {
       } catch (persistenceError) {
         this.ctx.logger.warn(`evolution-curator: failed to persist auto-check error report: ${persistenceError instanceof Error ? persistenceError.message : String(persistenceError)}`)
       }
+      // V4-22: a failing auto-check writes an error report AND must recycle
+      // history — otherwise a persistently throwing host accumulates
+      // curator-error-*.json unbounded (retention used to run only on success).
+      await this.retainReports()
     }
   }
 
@@ -469,6 +473,14 @@ export class EvolutionCurator extends Service {
       return await this.runCore(options)
     } finally {
       this.running = false
+      // V4-22: recycle the report history on EVERY run end (success or failure).
+      // Previously retention only ran on the successful report-write path, so a
+      // host that kept throwing accumulated curator-error-*.json unbounded.
+      try {
+        await this.retainReports()
+      } catch (error) {
+        this.ctx.logger.warn(`evolution-curator: failed to retain reports: ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
   }
 
@@ -641,7 +653,6 @@ export class EvolutionCurator extends Service {
       // Human-readable digest alongside the JSON (G6); pruned with the same
       // retention pass below.
       await this.io.writeText(join(reportsRoot, `curator-${runId}.md`), renderCuratorReportMarkdown(report))
-      await this.retainReports(20)
     } catch (error) {
       // Report persistence is best-effort; curation decisions already landed.
       this.ctx.logger.warn(`evolution-curator: failed to persist report ${runId}`)
@@ -955,7 +966,19 @@ export class EvolutionCurator extends Service {
    * like `retainSnapshots`: a failed removal must not fail the run that just
    * persisted its report. The paired `.md` digest is pruned with its JSON.
    */
-  private async retainReports(keep: number): Promise<void> {
+  /**
+   * Keep only the newest N curator run reports plus at most `errorKeep` error
+   * reports, ordered by the report's own `startedAt` (the runId is a UUID and
+   * cannot order history). Best-effort like `retainSnapshots`: a failed removal
+   * must not fail the run that just persisted its report. The paired `.md`
+   * digest is pruned with its JSON.
+   *
+   * V4-22: real reports (`curator-*.json`) and error reports
+   * (`curator-error-*.json`) are BUDGETED INDEPENDENTLY. Before this they shared
+   * one keep-20 window, so after 25 consecutive failures the next successful
+   * run's window held only a few real reports alongside the errors.
+   */
+  private async retainReports(keep = 20, errorKeep = 10): Promise<void> {
     const reportsRoot = join(evolutionHome(), 'reports')
     let entries: string[]
     try {
@@ -963,7 +986,8 @@ export class EvolutionCurator extends Service {
     } catch {
       return
     }
-    const dated: Array<{ name: string; startedAt: number }> = []
+    const real: Array<{ name: string; startedAt: number }> = []
+    const errors: Array<{ name: string; startedAt: number }> = []
     for (const name of entries.filter(entry => entry.startsWith('curator-') && entry.endsWith('.json'))) {
       try {
         const raw = await this.io.readText(join(reportsRoot, name))
@@ -978,12 +1002,19 @@ export class EvolutionCurator extends Service {
           const mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
           if (mtime !== null) startedAt = mtime
         }
-        if (Number.isFinite(startedAt)) dated.push({ name, startedAt })
+        if (Number.isFinite(startedAt)) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt })
       } catch {
         // Unclassifiable report: keep it — never delete what we cannot order.
       }
     }
-    dated.sort((a, b) => b.startedAt - a.startedAt)
+    real.sort((a, b) => b.startedAt - a.startedAt)
+    errors.sort((a, b) => b.startedAt - a.startedAt)
+    await this.pruneReportList(reportsRoot, real, keep)
+    await this.pruneReportList(reportsRoot, errors, errorKeep)
+  }
+
+  /** Remove the oldest reports beyond `keep` (each with its `.md` digest, best-effort). */
+  private async pruneReportList(reportsRoot: string, dated: Array<{ name: string; startedAt: number }>, keep: number): Promise<void> {
     for (const oldReport of dated.slice(keep)) {
       const stem = oldReport.name.replace(/\.json$/, '')
       try {

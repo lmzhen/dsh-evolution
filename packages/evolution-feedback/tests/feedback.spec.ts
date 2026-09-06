@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
@@ -507,6 +507,63 @@ describe('evolution-feedback', () => {
     }
   })
 
+  it('V4-41: a double failed append never resurrects an unpersisted note (F-324)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-v4-41-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      // A malformed log refuses BOTH appends — the A/B double-failure shape.
+      await io.writeText(eventsPath, '{corrupt log')
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      feedback.record('x', 'positive', 'note-A', 'skill')
+      feedback.record('x', 'positive', 'note-B', 'skill')
+      await feedback.waitIdle()
+      const record = feedback.snapshot().skills['x']
+      expect(record).toBeDefined()
+      // Neither count landed; the note must NOT be restored to the unpersisted
+      // 'note-A' (the old code resurrected a value the log never held).
+      expect(record?.positive).toBe(0)
+      expect(record?.lastNote).toBeUndefined()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('V4-50: a refused append by a future-version event log is reported through warn', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-v4-50-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      // F-338: a future `version` makes the v1 append refuse and keep bytes.
+      await io.writeText(eventsPath, JSON.stringify({ version: 2, events: [] }, null, 2))
+      const warns: string[] = []
+      const feedback = new Feedback.EvolutionFeedback(io, home, undefined, message => warns.push(message))
+      await feedback.restore(io)
+      feedback.record('session-1', 'positive')
+      await feedback.waitIdle()
+      // The reject is no longer silent — the injected warn channel observes it.
+      expect(warns.some(message => message.includes('version mismatch'))).toBe(true)
+      expect(await io.readText(eventsPath)).toContain('"version": 2')
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('clamps the quality warn threshold to its [-1, 1] domain (G3.1 matrix)', () => {
     const cases: Array<[value: number | undefined, expected: number]> = [
       [undefined, -0.25],
@@ -536,5 +593,16 @@ describe('evolution-feedback', () => {
     expect((parse({ qualityWarnThreshold: -0.5 }) as { qualityWarnThreshold: number }).qualityWarnThreshold).toBe(-0.5)
     const nanResult = parse({ qualityWarnThreshold: NaN }) as { qualityWarnThreshold: number }
     expect(Number.isNaN(nanResult.qualityWarnThreshold)).toBe(true)
+  })
+
+  it('V4-44: warns when the quality warn threshold must be clamped at apply time', async () => {
+    const ctx = new Context()
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    // Direct assembly bypasses the schema `.min(-1).max(1)`; the apply() clamp
+    // must warn loudly.
+    Feedback.apply(ctx, { qualityWarnThreshold: 1.5 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
+    warnSpy.mockRestore()
+    await ctx.fiber?.dispose()
   })
 })

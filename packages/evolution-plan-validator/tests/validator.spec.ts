@@ -114,4 +114,15 @@ describe('evolution-plan-validator', () => {
     expect(mixed.ok).toBe(false)
     expect(mixed.rejected.some(r => r.kind === 'skill' && r.reason.includes('skillOps: must be an array'))).toBe(true)
   })
+
+  it('V4-23: a null/array/primitive plan root is rejected explicitly, never a TypeError', () => {
+    for (const bad of [null, undefined, [], 'string', 0]) {
+      const result = validateEvolutionPlan(bad as never, { sessionSeq: 10 })
+      expect(result.ok, `root=${String(bad)}`).toBe(false)
+      expect(result.rejected.some(r => r.kind === 'memory' && r.reason === 'plan root: must be an object')).toBe(true)
+    }
+    // A well-formed plan still validates after the guard.
+    const ok = validateEvolutionPlan({ memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }] }, { sessionSeq: 10 })
+    expect(ok.ok).toBe(true)
+  })
 })

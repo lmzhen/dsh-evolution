@@ -6,9 +6,9 @@ Skill usage telemetry service
 
 `record(name, kind)` is the write API (`use` / `view` / `patch`). Reads are
 observed automatically: the service listens for `session/event` `tool/call`
-records of the read tools (`skill`, `skill_load`) and bumps `view` on
-EXISTING records only — an arbitrary read never mints a usage record
-(records are authored by skill creation, patching, or curator seeding).
+records of the read tool (`skill`) and bumps `view` on EXISTING records only —
+an arbitrary read never mints a usage record (records are authored by skill
+creation, patching, or curator seeding).
 
 ## Model Experience
 

@@ -228,6 +228,13 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
         ? { target, operations: args.operations }
         : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
+      // F-329 parity for single operations (V4-15): only qualify the summary's
+      // target when it differs from the default 'memory', so a lone add to the
+      // default target reads "memory add" instead of the redundant "memory
+      // memory add". The batch form already gets this through normalizeSummary
+      // (evolution-approval, only for operations.length > 1) — apply the same
+      // single-word rule here for the single-op summary.
+      const targetLabel = target === 'memory' ? '' : `${target} `
       // Single-source origin table (rc.44 M2-2.3): the approval surface reads
       // the delegated-subagent-as-review-channel mapping from core.
       const origin = resolveOrigins(exec.agent?.session.header.origin).approval
@@ -236,7 +243,7 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       if (approval) {
         const decision = await approval.request({
           kind: 'memory',
-          summary: `memory ${target} ${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
+          summary: `memory ${targetLabel}${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
           args: normalized,
           origin,
           // 0.3.20 (N-1): the session id rides along so the approval service can

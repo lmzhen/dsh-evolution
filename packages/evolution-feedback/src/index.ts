@@ -55,6 +55,12 @@ export class EvolutionFeedback {
   private readonly eventsPath?: string
   private io: IoLike | undefined
   private warn: (message: string) => void
+  /** V4-41 (F-324): the last note per target CONFIRMED on the event log. The
+   * in-memory `lastNote` is optimistic; a failed append must roll back to this,
+   * never to the in-memory `previousNote` (an earlier failed call can leave an
+   * unpersisted note there, and reverting to it resurrects a value the log
+   * never held). Seeded from the fold truth, updated on successful appends. */
+  private readonly durableNote = new Map<string, string | undefined>
 
   constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
@@ -70,6 +76,11 @@ export class EvolutionFeedback {
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
   attachIo(io: IoLike): void {
     this.io = io
+  }
+
+  /** Durable-note map key (V4-41): a target shares one record per mode. */
+  private noteKey(mode: 'skills' | 'sessions', target: string): string {
+    return `${mode}\u0000${target}`
   }
 
   private mutate<T>(task: () => Promise<T>): Promise<T> {
@@ -120,6 +131,10 @@ export class EvolutionFeedback {
         skills: { ...truth.skills, ...this.state.skills },
         sessions: { ...truth.sessions, ...this.state.sessions },
       }
+      // V4-41: seed the durable-note map from the persisted fold (the TRUTH),
+      // so a later failed append rolls back to what the log actually holds.
+      for (const [target, record] of Object.entries(truth.skills)) this.durableNote.set(this.noteKey('skills', target), record.lastNote)
+      for (const [target, record] of Object.entries(truth.sessions)) this.durableNote.set(this.noteKey('sessions', target), record.lastNote)
       // Refresh the boot cache from the TRUTH, never from the memory-merged
       // state — an optimistic record whose event is not yet on disk must not
       // double-count at the next boot.
@@ -138,7 +153,6 @@ export class EvolutionFeedback {
     // Optimistic in-memory update: score()/quality read it synchronously.
     const table = this.state[mode]
     const current = table[target] ?? { positive: 0, negative: 0 }
-    const previousNote = current.lastNote
     current[rating] += 1
     if (note !== undefined) current.lastNote = note
     table[target] = current
@@ -153,6 +167,9 @@ export class EvolutionFeedback {
     void this.mutate(async () => {
       try {
         const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
+        // A successfully persisted note becomes the durable truth for a later
+        // failed append's rollback (V4-41).
+        if (note !== undefined) this.durableNote.set(this.noteKey(mode, target), note)
         // rc.72 G-3: cadence snapshot keeps the boot cache inside the retention
         // window (see CACHE_SNAP_EVERY); best-effort inside the same task.
         // writeCacheNow swallows its own errors and never throws, so this catch
@@ -163,21 +180,27 @@ export class EvolutionFeedback {
         if (rollback) {
           rollback[rating] -= 1
           if (note !== undefined) {
-            // F-324: revert the note only when THIS call's note is still the
-            // current one. A concurrent record() that landed a newer note must
-            // not be clobbered by this failed append's rollback — the log is
-            // the truth and self-heals on the next restore (note is the only
-            // field at risk). Without the guard, a failed call reset a later
-            // call's note to the stale pre-call value.
+            // F-324 / V4-41: revert the note only when THIS call's note is still
+            // the current one — a concurrent record() that landed a newer note
+            // must not be clobbered by this failed append's rollback. Revert to
+            // the last CONFIRMED note (`durableNote`), never to the in-memory
+            // `previousNote`: the old code captured the pre-call in-memory note,
+            // and after an A/B double failure that value was itself an
+            // unpersisted optimistic note ('A'), so it resurrected a note the
+            // log never held. The log is the truth; the in-process restore uses
+            // memory-wins merge, so it does NOT self-heal this (only a restart
+            // does) — the rollback must be correct on its own.
             if (rollback.lastNote === note) {
-              if (previousNote === undefined) delete rollback.lastNote
-              else rollback.lastNote = previousNote
+              const durable = this.durableNote.get(this.noteKey(mode, target))
+              if (durable === undefined) delete rollback.lastNote
+              else rollback.lastNote = durable
             }
           }
         }
-        // Best-effort: the rollback keeps memory aligned with the log truth; a
-        // persistence failure must not throw.
-        void error
+        // Best-effort (V4-50): the rollback keeps memory aligned with the log
+        // truth; a persistence failure must not throw, but the reject is no
+        // longer SILENT — the injected warn channel observes it.
+        this.warn(`evolution-feedback: failed to append feedback event for ${kind} "${target}": ${error instanceof Error ? error.message : String(error)}`)
       }
     })
   }

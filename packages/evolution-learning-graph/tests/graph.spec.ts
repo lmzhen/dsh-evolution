@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as Graph from '../src/index.ts'
 import { buildLearningGraph, graphDensity, memorySnapshotOf, parseGraphNodeId, readMemoryIndex, renderNodeLine, resolveGraphNode } from '../src/index.ts'
 
 describe('learning graph', () => {
@@ -165,6 +171,53 @@ describe('learning graph', () => {
       const parsed = parseGraphNodeId(node.id)
       if (parsed === null) throw new Error(`memory node id ${node.id} did not round-trip`)
       expect(parsed.kind).toBe('memory')
+    }
+  })
+
+  it('V4-13: a no-op graph edit (byte-equivalent content) does not bump the patch counter, a real edit does', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-noop-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const skillDir = join(root, 'skills', 'demo-skill')
+      await mkdir(skillDir, { recursive: true })
+      const content = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n'
+      await writeFile(join(skillDir, 'SKILL.md'), content, 'utf8')
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      let recordCalls = 0
+      ctx.provide('skillUsage', {
+        record: async () => { recordCalls += 1 },
+        report: async () => new Map<string, unknown>(),
+      })
+      ctx.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      await ctx.plugin(Graph)
+      // Re-save the exact on-disk content: core update returns noop:true, so the
+      // graph branch must NOT count it (V4-13 — previously it counted on result.ok).
+      const noop = await handler!.handler({ rawInput: `edit demo-skill ${content}` })
+      expect(noop.kind).toBe('success')
+      expect(noop.text).toContain('unchanged')
+      expect(recordCalls).toBe(0)
+      // A real content edit still counts exactly once.
+      const changed = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody changed\n'
+      const real = await handler!.handler({ rawInput: `edit demo-skill ${changed}` })
+      expect(real.kind).toBe('success')
+      expect(real.text).toContain('updated')
+      expect(recordCalls).toBe(1)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true })
     }
   })
 

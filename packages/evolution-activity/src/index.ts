@@ -127,9 +127,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // `typeof NaN === 'number'`) would disable the window; resolve it once here,
   // warn when it was bad, and let the pure fold fall back for direct callers.
   const configuredMaxItems = rawConfig.maxItems ?? DEFAULT_MAX_ITEMS
-  const maxItems = Number.isFinite(configuredMaxItems) ? configuredMaxItems : DEFAULT_MAX_ITEMS
+  let maxItems: number
   if (!Number.isFinite(configuredMaxItems)) {
+    maxItems = DEFAULT_MAX_ITEMS
     ctx.logger.warn(`evolution-activity: maxItems is not a finite number; falling back to the default ${DEFAULT_MAX_ITEMS}`)
+  } else if (configuredMaxItems < 1) {
+    // V4-42: the schema `.min(1)` rejects 0/negative on the loader path, but a
+    // direct/programmatic assembly can bypass it. A non-positive bound would
+    // disable the window (`slice(-0)` keeps everything), so clamp to 1 and warn
+    // — the same loud posture the other family packages apply to a 0 config.
+    maxItems = 1
+    ctx.logger.warn(`evolution-activity: maxItems=${String(configuredMaxItems)} is invalid; falling back to 1`)
+  } else {
+    maxItems = configuredMaxItems
   }
   // Deferred binding (S6.4, tool-* pattern): subscribe only once the evolution
   // IO provider mounts, so a provider registered after this plugin still wires

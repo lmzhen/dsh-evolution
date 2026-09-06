@@ -24,7 +24,7 @@ Independent of request-prefix construction. This package does not alter the asse
 
 ## Configuration
 
-- `maxItems`: bound on the retained activity sidecar (default `DEFAULT_MAX_ITEMS = 200`). A non-finite value falls back to the default (0.3.19, S6.4 guard).
+- `maxItems`: bound on the retained activity sidecar (default `DEFAULT_MAX_ITEMS = 200`). A non-finite value (NaN/±Infinity) falls back to the default (0.3.19, S6.4 guard), while a non-positive value (0 or negative) fails loud at the schema — `z.number().min(1)` — because `slice(-0)` would keep everything and disable the retention window (G3.1, 0.3.23).
 
 ## Known Limitations and Deferred Work
 

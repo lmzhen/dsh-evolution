@@ -5,13 +5,28 @@
 #   ctx.evolutionStateStorage  -> storage-domain KV provider, with a JSON
 #                                provider mounted as fallback/portable audit
 #
-# Storage ownership (D-30): the storage stack (`storage`, `storage-json`,
-# `storage-domain`) is HOST-plane in DSH — a preset must not own it. This
-# STANDALONE composition lists it only because a hand-composed file has no
-# host bundle behind it; the overlay form (cordis.patch.yml) relies on the
-# host providing the facility and therefore does not list these rows. When
-# composing manually, include the host storage rows yourself (or use the
-# patch overlay on a host that already provides them).
+# Row-set differences from the layered / one-click flows (G5.1 decision).
+# This STANDALONE file is a hand-composed evolution row set, and it
+# deliberately omits the rows the platform or the host bundle already
+# provides, so it is NOT a faithful superset of the full composition:
+#   - storage ownership (D-30): the storage stack (`storage`, `storage-json`,
+#     `storage-domain`) is HOST-plane in DSH — a preset must not own it. This
+#     STANDALONE composition lists it only because a hand-composed file has no
+#     host bundle behind it; the overlay form (cordis.patch.yml) relies on the
+#     host providing the facility and therefore does not list these rows. When
+#     composing manually, include the host storage rows yourself (or use the
+#     patch overlay on a host that already provides them).
+#   - `tool-session-query` is carried by the agent/one-click delta (the layered
+#     flow gets it from the Evolution agent preset), so it is not repeated
+#     here; a fully self-sufficient manual compose should add it (plus the
+#     host's `session-query-sqlite` index override) for cross-session recall.
+#   - `evolution-maintenance-tools`, the `session-query-sqlite` index override
+#     and the `tool-skill` 60-char catalog cap are evolution-host-owned; `host`
+#     and this one-click preset are ALTERNATIVE install targets (mutual
+#     exclusion, E-33), so repeating them here would mount the row twice.
+#   - `evolution-capability` is held out of the composition too (D-9, rc.51) —
+#     a staged Creator-mode governance seam with no live consumer; adopters
+#     add the row on top.
 #
 # The legacy `@deepseek-ai/dsh-evolution` facade was retired from publishing
 # after the v0.1.0-rc.18 release tag (see docs/codebase-audit-rc16.md); this

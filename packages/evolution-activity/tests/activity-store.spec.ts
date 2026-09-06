@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -239,6 +239,33 @@ describe('evolution-activity store', () => {
       ctx.emit('evolution/plan-applied', payload({ planId: 'n3' }))
       const items = await pollUntil(root, 'n3')
       expect(items.map(item => item.planId)).toEqual(['n1', 'n2', 'n3'])
+      await ctx.fiber.dispose()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('V4-42: a zero maxItems warns and clamps to 1 in the programmatic assembly path', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-activity-zero-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const warnSpy = vi.spyOn(ctx.logger, 'warn')
+      // Direct assembly bypasses the schema `.min(1)`; the apply() clamp must
+      // warn loudly (a zero cap would disable the retention window).
+      await ctx.plugin(apply, { maxItems: 0 })
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('maxItems'))
+      warnSpy.mockRestore()
+      // The fold still caps at one record.
+      let items: EvolutionActivityRecord[] = []
+      items = applyActivityEvent(items, payload({ planId: 'p1' }), 0, 100)
+      items = applyActivityEvent(items, payload({ planId: 'p2' }), 0, 200)
+      expect(items.map(item => item.planId)).toEqual(['p2'])
       await ctx.fiber.dispose()
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME

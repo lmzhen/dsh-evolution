@@ -7,6 +7,8 @@
  * metadata for diagnostics only.
  */
 
+import { clampedNumber } from './numeric.ts'
+
 export type ThreatScope = 'all' | 'context' | 'strict'
 
 export interface ThreatFinding {
@@ -95,6 +97,12 @@ const PATTERN_OVERLAP = 4096
  * characters (skill files may run to 100,000) is no longer a blind zone.
  */
 export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): ThreatFinding[] {
+  // V4-43 self-defense: a non-finite (NaN/±Infinity) or <=0 window size would
+  // fold the window loop into an empty first window (or a NaN spin) and make
+  // every in-scope pattern blind. Clamp to the default so an invalid caller
+  // value still scans; the config layer is the first-line guard, this is
+  // depth. All in-repo call sites pass the default, so behavior is unchanged.
+  const windowSize = clampedNumber(maxScanChars, 65_536, { min: 1 })
   const findings: ThreatFinding[] = []
   if (ZERO_WIDTH_CHARS.test(text)) {
     findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope })
@@ -104,12 +112,12 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   }
   const normalized = text.normalize('NFKC')
   const windows: string[] = []
-  if (normalized.length <= maxScanChars) {
+  if (normalized.length <= windowSize) {
     windows.push(normalized)
   } else {
-    const step = Math.max(1, maxScanChars - PATTERN_OVERLAP)
+    const step = Math.max(1, windowSize - PATTERN_OVERLAP)
     for (let start = 0; start < normalized.length; start += step) {
-      windows.push(normalized.slice(start, start + maxScanChars))
+      windows.push(normalized.slice(start, start + windowSize))
     }
   }
   const excluded = new Set(options.excludeLabels ?? [])

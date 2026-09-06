@@ -58,6 +58,22 @@ describe('event log version guard (F-338)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('reports the version TYPE so a string body does not read as a numeric match (V4-48)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-ver-str-'))
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    // The SAME digit as a string is refused (v1-only guard compares the number);
+    // the message must name the type instead of saying "found 1, expected 1".
+    const body = JSON.stringify({ version: '1', events: v1Events }, null, 2)
+    await io.writeText(path, body)
+    await expect(appendEvolutionEvent(io, path, {
+      type: 'feedback', target: 'x', kind: 'skill', rating: 'positive',
+    })).rejects.toThrow(/got "1" \(string\)/)
+    // The bytes are untouched — never rewritten down to v1.
+    expect(await io.readText(path)).toBe(body)
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('a v1 body still appends normally (F-338 does not break the happy path)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-ver-happy-'))
     const io = nodeEvolutionIo()

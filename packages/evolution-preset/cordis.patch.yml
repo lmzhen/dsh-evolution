@@ -94,3 +94,12 @@
   config:
     path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
     openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY || 'startup'
+
+# ── Hermes 60-char catalog cap: evolution-host-owned, not repeated here ──────
+# The `tool-skill` `catalogDescriptionMaxLength: 60` override (the Hermes
+# authoring bar) is carried by the evolution-host bundle as a base row
+# override. `evolution-host` and this one-click preset are ALTERNATIVE install
+# targets (mutual exclusion, E-33), so this patch intentionally does NOT repeat
+# that row — it would mount `tool-skill` twice. A preset-alone install uses the
+# upstream DSH catalog default; the 60-char authoring bar enforced by
+# tool-skill-manage still applies regardless.

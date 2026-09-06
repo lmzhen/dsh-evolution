@@ -80,7 +80,26 @@ function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
   })
 }
 
+/** Object root guard (V4-23, symmetric with the maintain validator): null,
+ * primitives and arrays are not a plan record and must be rejected with an
+ * explicit message, never a raw TypeError from `.memoryOps`/`.summary`. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationContext): ValidationResult {
+  // V4-23 root guard (symmetric with the maintain validator): null, primitives
+  // and arrays are not a plan record and must be rejected explicitly, never a
+  // raw TypeError from `.memoryOps`/`.summary`. `plan` is typed non-null, so
+  // the check runs through an `unknown` local to stay TS-clean.
+  const root: unknown = plan
+  if (!isRecord(root)) {
+    return {
+      accepted: { memoryOps: [], skillOps: [] },
+      rejected: [{ index: 0, kind: 'memory', reason: 'plan root: must be an object' }],
+      ok: false,
+    }
+  }
   const maxOps = context.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN
   const rejected: RejectedOp[] = []
   const memoryOps: MemoryOp[] = []

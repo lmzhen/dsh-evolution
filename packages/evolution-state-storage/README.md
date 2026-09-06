@@ -22,5 +22,5 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Provider registry has no default medium. Mount `evolution-state-domain` or `evolution-state-json` before state reads.
+- Provider registry has no default medium. Mount `evolution-state-domain` or `evolution-state-json` before state reads.
 

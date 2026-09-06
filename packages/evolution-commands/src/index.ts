@@ -8,7 +8,7 @@ import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -436,13 +436,16 @@ function resolveAgentPresetDir(importMetaUrl: string): string {
 }
 
 /** F-211: the fs surface atomicWriteFiles uses — injectable so the commit-phase
- * rename-failure path is deterministically testable. Defaults to node:fs. */
+ * rename-failure path is deterministically testable. Defaults to node:fs.
+ * `mtime` (optional) probes a path's last-write time so the failed-commit
+ * recovery message can name the generation it restored from. */
 interface FsOps {
   writeFileSync(path: string, data: string | Uint8Array): void
   existsSync(path: string): boolean
   copyFileSync(from: string, to: string): void
   renameSync(from: string, to: string): void
   rmSync(path: string, options?: { force?: boolean; recursive?: boolean }): void
+  mtime?(path: string): number | null
 }
 
 const defaultFs: FsOps = {
@@ -451,6 +454,7 @@ const defaultFs: FsOps = {
   copyFileSync: (from, to) => { copyFileSync(from, to) },
   renameSync: (from, to) => { renameSync(from, to) },
   rmSync: (path, options) => { rmSync(path, options) },
+  mtime: (path) => { try { return statSync(path).mtimeMs } catch { return null } },
 }
 
 /**
@@ -467,6 +471,13 @@ const defaultFs: FsOps = {
  * single `.bak` created above still holds the previous content, so the target
  * is restored from it (best-effort) before the original rename error is
  * rethrown, so a failed commit never leaves the file missing.
+ *
+ * V4-17: the `.bak` is refreshed to the committed content after every
+ * successful commit, so a later failed commit always recovers to the most
+ * recent good generation (a once-at-first-install `.bak` could otherwise
+ * restore content several installs old). The recovery error names the `.bak`
+ * source (and mtime when available) so the caller knows the generation it
+ * restored from.
  */
 export function atomicWriteFiles(
   targetDir: string,
@@ -507,10 +518,23 @@ export function atomicWriteFiles(
             } catch {
               throw new Error(`atomicWriteFiles: "${name}" was removed but recovery from ${bakPath} failed (${renameError instanceof Error ? renameError.message : String(renameError)}); verify the file manually`)
             }
+            // V4-17: recovery succeeded — name the source generation so a caller
+            // is not misled into thinking the attempt actually landed.
+            const bakMtime = fs.mtime?.(bakPath)
+            const when = bakMtime !== null && bakMtime !== undefined && Number.isFinite(bakMtime) ? ` (bak mtime ${new Date(bakMtime).toISOString()})` : ''
+            throw new Error(`atomicWriteFiles: "${name}" was removed during commit and restored from the last good generation ${bakPath}${when}; original error: ${renameError instanceof Error ? renameError.message : String(renameError)}`)
           }
           throw renameError
         }
       }
+    }
+    // V4-17: a successful commit refreshes each .bak to the content that just
+    // landed, so a later failed commit recovers to the most recent good
+    // generation rather than one several installs ago (the backup phase above
+    // only ever created a .bak on first install).
+    for (const { name } of writes) {
+      const finalPath = join(targetDir, name)
+      if (fs.existsSync(finalPath)) fs.copyFileSync(finalPath, join(targetDir, `${name}.bak`))
     }
   } catch (error) {
     for (const { name } of writes) fs.rmSync(stage(name), { force: true, recursive: true })
@@ -536,8 +560,24 @@ export function countMaintainRecommendations(text: string | undefined): number {
   // happens to OPEN with a bracket would match `^- [` and inflate the count.
   // Drop the notes section before counting so a note can never be a
   // recommendation (formatPlan emits `Notes:` on its own line).
-  const planSection = text.split('\nNotes:')[0] ?? ''
+  // V4-26: the section header is matched as a STANDALONE line (`Notes:` alone,
+  // preceded by a newline/start and followed by a newline). The old
+  // `split('\nNotes:')[0]` cut at the FIRST `\nNotes:` anywhere, so a
+  // recommendation field whose value carried its own line break + `Notes:`
+  // truncated the plan section early and undercounted the recommendations.
+  const planSection = beforeNotesHeader(text)
   return planSection.match(/^- \[/gm)?.length ?? 0
+}
+
+/** Locate the maintain-plan `Notes:` section header as a standalone line.
+ * Returns everything before it (the plan section), or the whole text when the
+ * header is absent. formatPlan emits the header via `lines.push('Notes:')`, so
+ * it is always a line that is exactly `Notes:` (never an indented/embedded
+ * continuation), letting us ignore a `Notes:` that appears inside a field. */
+function beforeNotesHeader(text: string): string {
+  const header = /(^|\n)Notes:(?=\n)/.exec(text)
+  if (!header) return text
+  return text.slice(0, header.index)
 }
 
 interface CommandInvocation {
@@ -548,16 +588,22 @@ interface CommandInvocation {
 // authoritative consumer shape) instead of this local view.
 
 /** F-328: render staged args for `pending --detail`, truncated to 500 chars.
- * args may be non-JSON (a tool produced garbage), so the render is fail-safe. */
+ * args may be non-JSON (a tool produced garbage), so the render is fail-safe.
+ * V4-19: a truncation is marked with `…(truncated N chars)` so the operator is
+ * never silently shown a partial JSON payload that could even split an escape
+ * sequence — the marker makes the cut explicit rather than looking complete. */
 function safeStagedArgs(args: unknown): string {
   try {
-    // JSON.stringify's static type is `string`, so `.slice` is fine; a
+    // JSON.stringify's static type is `string` (.length/.slice are fine); a
     // top-level undefined/function/symbol returns undefined at runtime and
-    // throws here, falling into the catch below.
-    return JSON.stringify(args).slice(0, 500)
+    // throws here on `.length`/`.slice`, falling into the catch below.
+    const json = JSON.stringify(args)
+    if (json.length > 500) return `${json.slice(0, 500)}…(truncated ${json.length - 500} chars)`
+    return json
   } catch {
-    // args is not JSON-serializable (circular refs, BigInt, …) — render a stub
-    // so the pending surface never crashes on a malformed staged payload.
+    // args is not JSON-serializable (circular refs, BigInt, undefined at the
+    // top level, …) — render a stub so the pending surface never crashes on a
+    // malformed staged payload.
     return '(unserializable)'
   }
 }

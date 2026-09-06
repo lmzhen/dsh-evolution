@@ -57,4 +57,24 @@ describe('evolution-replay', () => {
     expect(() => parse({ weights: { accepted: -1 } })).toThrow()
     expect(() => parse({ weights: { cost: -0.5 } })).toThrow()
   })
+
+  it('V4-40: warns once when weights must be clamped, and stays silent for valid values', () => {
+    const warns: string[] = []
+    new EvolutionReplayDriver(
+      { weights: { accepted: 0, rejectedPenalty: -1, evidence: NaN, cost: Infinity } },
+      message => warns.push(message),
+    )
+    expect(warns.some(message => message.includes('weights') && message.includes('falling back'))).toBe(true)
+    // A fully valid custom weights object never warns.
+    const silent: string[] = []
+    new EvolutionReplayDriver(
+      { weights: { accepted: 20, rejectedPenalty: 30, evidence: 3, cost: 0.01 } },
+      message => silent.push(message),
+    )
+    expect(silent).toEqual([])
+    // cost = 0 is legal ("no cost penalty"), so it is not flagged.
+    const costWarns: string[] = []
+    new EvolutionReplayDriver({ weights: { cost: 0 } }, message => costWarns.push(message))
+    expect(costWarns).toEqual([])
+  })
 })

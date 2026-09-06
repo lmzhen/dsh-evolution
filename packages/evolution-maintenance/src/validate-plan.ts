@@ -111,11 +111,18 @@ export function validateAndNormalizeMaintainPlan(
   // 0.3.14 (P3-5): §7 "protected set → 0 recommendations" is enforced here —
   // the only component that audits a plan. `protected` flows into the report
   // since 0.3.11 (facts meta), so the data is already present.
+  // V4-24 (F-326): names are matched trimmed and case-insensitively so a model
+  // trailing-space or case difference cannot fail the whole scan. The output
+  // uses the canonical facts-report name so every later consumer (protected
+  // check, quality_low gate) stays consistent.
   const protectedNames = new Set<string>()
   const factNames = new Set<string>()
+  const canonicalByName = new Map<string, string>()
   for (const skill of report.skills) {
-    if (skill.protected) protectedNames.add(skill.name)
-    factNames.add(skill.name)
+    const key = skill.name.trim().toLowerCase()
+    factNames.add(key)
+    canonicalByName.set(key, skill.name)
+    if (skill.protected) protectedNames.add(key)
   }
 
   if (!isRecord(raw)) return { ok: false, errors: ['plan root: must be an object'], plan: { verdict: 'no_issues', plan: [], notes: [] }, forcedHuman }
@@ -141,17 +148,24 @@ export function validateAndNormalizeMaintainPlan(
         continue
       }
       if (typeof item.kind !== 'string' || !KINDS.has(item.kind)) errors.push(`${path}.kind: invalid`)
-      if (!Array.isArray(item.names) || item.names.length === 0 || !item.names.every(isNonEmptyString)) {
+      const rawNames = Array.isArray(item.names) ? (item.names as string[]) : []
+      let namesOut: string[] = []
+      if (rawNames.length === 0 || !rawNames.every(isNonEmptyString)) {
         errors.push(`${path}.names: non-empty string array required`)
-      } else if (item.names.some(nm => !factNames.has(nm))) {
-        // F-326: a hallucinated skill name can carry a format-perfect evidence
-        // block and sail through the facts-anchoring claim. Every name must be
-        // a skill the facts report actually scanned.
-        const missing = item.names.find(nm => !factNames.has(nm))
-        errors.push(`${path}.names: references skill "${String(missing)}" not in the facts report — names must come from the scanned skill set`)
-      } else if (item.names.some(nm => protectedNames.has(nm))) {
-        const hit = item.names.find(nm => protectedNames.has(nm))
-        errors.push(`${path}.names: references protected skill "${String(hit)}" — §7 forbids recommendations for bundled/hub-installed/pinned skills`)
+      } else {
+        // V4-24 (F-326): trim each name and resolve it to the canonical facts
+        // name via a case-insensitive lookup. A name the facts report never
+        // scanned stays as its trimmed self and fails the anchoring check below.
+        namesOut = rawNames.map(nm => canonicalByName.get(nm.trim().toLowerCase()) ?? nm.trim())
+        const missing = namesOut.find(nm => !factNames.has(nm.toLowerCase()))
+        if (missing !== undefined) {
+          errors.push(`${path}.names: references skill "${missing}" not in the facts report — names must come from the scanned skill set`)
+        } else {
+          const hit = namesOut.find(nm => protectedNames.has(nm.toLowerCase()))
+          if (hit !== undefined) {
+            errors.push(`${path}.names: references protected skill "${hit}" — §7 forbids recommendations for bundled/hub-installed/pinned skills`)
+          }
+        }
       }
       if (!isNonEmptyString(item.rule)) errors.push(`${path}.rule: required`)
       if (typeof item.finding !== 'string' || item.finding.trim().length === 0) errors.push(`${path}.finding: required`)
@@ -186,7 +200,7 @@ export function validateAndNormalizeMaintainPlan(
       const evidence = validateEvidence(item.evidence, validSignals, errors, path)
       plan.push({
         kind: isNonEmptyString(item.kind) ? (item.kind as MaintainPlanItemKind) : 'skill-level',
-        names: Array.isArray(item.names) ? (item.names as string[]) : [],
+        names: namesOut,
         rule: str(item.rule, ''),
         evidence,
         finding: str(item.finding, ''),

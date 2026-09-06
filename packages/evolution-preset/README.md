@@ -28,5 +28,5 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Compatibility one-click bundle exposes model tools profile-wide. Prefer the layered host/agent install for stricter session control.
+- Compatibility one-click bundle exposes model tools profile-wide. Prefer the layered host/agent install for stricter session control.
 

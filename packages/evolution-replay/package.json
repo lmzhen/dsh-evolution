@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-replay",
   "description": "Replay/A-B evaluation primitives for evolution plans",
-  "version": "0.3.27",
+  "version": "0.3.28",
   "publishConfig": {
     "access": "public"
   },
@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^"
+    "@deepseek-ai/dsh-invariants": "workspace:^"
   }
 }

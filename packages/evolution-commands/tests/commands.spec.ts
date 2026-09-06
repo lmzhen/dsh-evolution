@@ -805,6 +805,21 @@ describe('evolution-commands', () => {
     expect(Commands.countMaintainRecommendations((text.split('Notes:')[0] ?? '') + 'Notes:\n- [note-like] priority reminder')).toBe(2)
   })
 
+  it('V4-26: an embedded "\\nNotes:" inside a recommendation field does not undercount', () => {
+    const text = [
+      'Maintenance scan abc: verdict=issues (2 recommendations, 1 notes)',
+      '- [skill-level] demo-skill · rule=body_size · better rev=patch conf=0.90',
+      '  finding: The body has grown large.\nNotes: this is embedded inside the finding value, not the section header',
+      '- [library-level] all · rule=pointer_missing',
+      'Notes:',
+      '- a real note',
+    ].join('\n')
+    // The old `split('\nNotes:')[0]` cut at the embedded "\nNotes:" (inside the
+    // finding) and counted only 1 recommendation. The standalone-header match
+    // skips it and still counts both plan bullets.
+    expect(Commands.countMaintainRecommendations(text)).toBe(2)
+  })
+
   it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
@@ -835,7 +850,10 @@ describe('evolution-commands', () => {
     const argsJson = JSON.stringify(pendingRecord.args)
     // The staged args are rendered (truncated to 500 chars), so the operator
     // can see what approve will actually replay rather than "blind-approving".
-    expect(detail.text).toContain(`a1  skill  pending  create demo\n  staged args: ${argsJson.slice(0, 500)}`)
+    expect(detail.text).toContain(`a1  skill  pending  create demo\n  staged args: ${argsJson.slice(0, 500)}…(truncated ${argsJson.length - 500} chars)`)
+    // The truncation is explicitly marked — an oversized payload never reads as
+    // a complete-but-cut JSON, even when the cut lands mid-escape (V4-19).
+    expect(detail.text).toMatch(/\(truncated \d+ chars\)/)
     // Truncation: the full args JSON is NOT rendered (only the 500-char prefix).
     expect(detail.text).not.toContain(argsJson.slice(500))
     // The default (collapsed) view is unchanged: no staged args, and the

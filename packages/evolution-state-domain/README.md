@@ -22,5 +22,5 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - Requires the host-plane `storage-domain` facility. The bundle row stays dormant when it is absent.
+- Requires the host-plane `storage-domain` facility. The bundle row stays dormant when it is absent.
 

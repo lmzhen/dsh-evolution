@@ -166,7 +166,13 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
       // reader treats it as an empty timeline; only the append refuses.)
       if (shape.version !== undefined && shape.version !== EVENT_LOG_VERSION) {
         const found = typeof shape.version === 'number' || typeof shape.version === 'string' ? String(shape.version) : 'unknown'
-        refuseMessage = `evolution event log version mismatch (found ${found}, expected ${EVENT_LOG_VERSION}) and was not touched`
+        const kind = typeof shape.version === 'number' || typeof shape.version === 'string' ? typeof shape.version : 'unknown'
+        // V4-48: a version written as the STRING "1" is statically unequal to
+        // the number 1 and is refused, but the old message rendered both as
+        // "found 1, expected 1" — type-ambiguous and self-contradictory. Report
+        // the type so a manual-editer/heterogeneous writer sees the real cause.
+        const rendered = kind === 'string' ? `"${found}"` : found
+        refuseMessage = `evolution event log version mismatch (expected version ${EVENT_LOG_VERSION}, got ${rendered} (${kind})) and was not touched`
         return current
       }
     }

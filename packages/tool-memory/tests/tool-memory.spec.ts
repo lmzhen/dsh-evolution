@@ -68,6 +68,40 @@ describe('tool-memory', () => {
     expect(captured?.sessionPolicy).toBe('never')
   })
 
+  it('V4-15: a single add to the default memory target does not stage "memory memory" (F-329)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    const summaries: string[] = []
+    ctx.provide('evolutionApproval', {
+      request: async (input: { summary?: string }) => {
+        summaries.push(input.summary ?? '')
+        return { action: 'staged', message: 'staged' }
+      },
+      registerRunner: () => () => {},
+    })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: { session: { header: { version: 0, id: 's4', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    // A lone add to the default 'memory' target was previously staged as
+    // "memory memory add" (normalizeSummary only rewrote batches >1). F-329
+    // applies the single-word rule for a single op at the summary source.
+    const single = await tool.execute({ target: 'memory', action: 'add', facts: 'remember x' }, execArg)
+    expect(single.ok).toBe(true)
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]).toBe('memory add')
+    expect(summaries[0]).not.toMatch(/memory memory/)
+    // A single-element operations batch used to stage "memory memory 1 ops".
+    const batched = await tool.execute({ target: 'memory', operations: [{ action: 'add', facts: 'remember y' }] }, execArg)
+    expect(batched.ok).toBe(true)
+    expect(summaries).toHaveLength(2)
+    expect(summaries[1]).toBe('memory 1 ops')
+    expect(summaries[1]).not.toMatch(/memory memory/)
+  })
+
   it('bypass writes refresh the model-visible snapshot through the applied event (P2 fix)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)

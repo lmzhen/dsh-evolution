@@ -158,6 +158,37 @@ describe('evolution-curator', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('V4-27 (F-331): pinned/bundled skills are excluded from the LLM nomination prompt', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-f331-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // Capture the prompt the LLM nomination pass is shown.
+    let shown = ''
+    ctx.provide('llm', {
+      stream: async function* (options: { messages?: Array<{ content?: Array<{ text: string }> }> }) {
+        shown = options.messages?.[0]?.content?.[0]?.text ?? ''
+        // Yield nothing → no nominations, but the capture above ran.
+      },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, intervalHours: 24 })
+    const skills = ctx.evolutionCurator.skills
+    // Two near-duplicates form a consolidation candidate group.
+    await skills.create('alpha-skill', nearBody('alpha-skill'), 'foreground')
+    await skills.create('beta-skill', nearBody('beta-skill'), 'foreground')
+    // Pin one: F-331 excludes marker-protected skills from the LLM pool.
+    await skills.setPinned('alpha-skill', true, 'foreground')
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(shown).not.toContain('alpha-skill')
+    // The un-pinned near-duplicate is still presented to the LLM.
+    expect(shown).toContain('beta-skill')
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('snapshotFull captures curator state and restoreSnapshot rewinds tree + state', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-full-restore-'))
     const previous = process.env.DSH_HOME
@@ -715,7 +746,10 @@ Ancient body.
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
-  })
+    // 0.3.28 (release gate): the body itself is fast (~0.2s) but the full
+    // parallel suite starved this worker past the default 5s cap — give the
+    // test an explicit budget so a loaded CI run cannot flip it.
+  }, 15_000)
 
   it('setPaused seeds state when none exists; status() exposes it (G2)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-setpaused-'))
@@ -1498,6 +1532,68 @@ Body of ${name}.
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
+  })
+
+  it('V4-22: error reports are recycled on a failing auto-check and budgeted independently (F-327)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v4-22-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      // Seed 25 error reports (no startedAt — they age by mtime) and 5 real
+      // reports, simulating a host that has been failing repeatedly.
+      const reports = join(home, 'evolution', 'reports')
+      await mkdir(reports, { recursive: true })
+      for (let i = 0; i < 25; i += 1) {
+        await writeFile(join(reports, `curator-error-${i}.json`), JSON.stringify({ runId: `e${i}`, failed: true, error: 'x', at: new Date().toISOString() }))
+      }
+      for (let i = 0; i < 5; i += 1) {
+        await writeFile(join(reports, `curator-real-${i}.json`), JSON.stringify({ runId: `r${i}`, startedAt: new Date().toISOString() }))
+      }
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      let loads = 0
+      ctx.provide('evolutionState', {
+        // First load (autoCheck) throws; the later manual run() sees a valid state.
+        loadCuratorState: async () => {
+          loads += 1
+          if (loads === 1) throw new Error('state store boom')
+          return { lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }
+        },
+        saveCuratorState: async () => {},
+        transactCuratorState: async () => {},
+      })
+      await ctx.plugin(EvolutionCurator, { enabled: false })
+      // A failing auto-check writes an error report AND recycles history.
+      await (ctx.evolutionCurator as unknown as { autoCheck(): Promise<void> }).autoCheck()
+      // A subsequent SUCCESSFUL run also recycles (every run end, not only success).
+      await ctx.evolutionCurator.run({ ignoreGates: true })
+      const files = await readdir(reports)
+      const errors = files.filter(name => name.startsWith('curator-error-') && name.endsWith('.json'))
+      const real = files.filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
+      // Error reports get their own cap (≤10); real reports keep the 20 window.
+      expect(errors.length).toBeLessThanOrEqual(10)
+      expect(real.length).toBeLessThanOrEqual(20)
+      // The real window is NOT polluted by the error burst: at least 5 seeded
+      // real reports survive (well under the 20 cap).
+      expect(real.length).toBeGreaterThanOrEqual(5)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+    }
+  })
+
+  it('V4-44: warns when a numeric curator config must be clamped', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    // Direct construction bypasses the schema `.min(1)`; the assembly clamp
+    // must warn loudly.
+    new EvolutionCurator(ctx, { enabled: false, intervalHours: 0, staleAfterDays: NaN })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
+    warnSpy.mockRestore()
   })
 
   it('F-364: a throwing LLM stream is contained by recommend (E-52 warn, empty nomination set)', async () => {

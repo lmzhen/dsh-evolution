@@ -172,6 +172,31 @@ describe('validateAndNormalizeMaintainPlan', () => {
     const ok = validateAndNormalizeMaintainPlan(validPlan([validItem({ names: ['healthy-skill'] })]), report, SIGNALS)
     expect(ok.ok).toBe(true)
   })
+
+  it('V4-24 (F-326): trailing-space and case-mixed names resolve to the scanned skill', () => {
+    const mixed = validItem({ names: ['  Healthy-Skill  '] })
+    const result = validateAndNormalizeMaintainPlan(validPlan([mixed]), report, SIGNALS)
+    expect(result.ok).toBe(true)
+    // The output uses the canonical facts-report name so later consumers
+    // (protected check, quality_low gate) stay consistent.
+    expect(result.plan.plan[0].names).toEqual(['healthy-skill'])
+    // A mixed-case name on a protected skill is still rejected through the
+    // normalized key (the §7 rule is name-anchored, not formatting-anchored).
+    const protectedReport: DriftReport = {
+      library: report.library,
+      skills: [{ name: 'pinned-skill', protected: 'pinned', signals: [{ id: 'stamp_density', verdict: 'over', value: '3/KB', threshold: '2/KB' }] }],
+    }
+    const pinned = validItem({ names: ['  PINNED-Skill  '] })
+    const pinnedResult = validateAndNormalizeMaintainPlan(validPlan([pinned]), protectedReport, SIGNALS)
+    expect(pinnedResult.ok).toBe(false)
+    expect(pinnedResult.errors.some(e => e.includes('protected'))).toBe(true)
+    // A name the facts report never scanned is still rejected (the F-326
+    // hallucination guard is not weakened by the case-insensitive match).
+    const bad = validItem({ names: ['  ghost-skill  '] })
+    const badResult = validateAndNormalizeMaintainPlan(validPlan([bad]), report, SIGNALS)
+    expect(badResult.ok).toBe(false)
+    expect(badResult.errors.some(e => e.includes('not in the facts report'))).toBe(true)
+  })
 })
 
 describe('validation result shape', () => {

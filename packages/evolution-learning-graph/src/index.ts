@@ -357,8 +357,12 @@ export function apply(ctx: Context): void {
             const result = await withSkills().update(parsed.name, content, 'foreground')
             // E-26: a graph edit is a content patch — bump the patch counter
             // exactly as skill_manage does (previously graph edits never
-            // entered the mutation-maturity signal).
-            if (result.ok) {
+            // entered the mutation-maturity signal). V4-13: a no-op update
+            // (byte-equivalent content, `noop:true`) must NOT count — the
+            // skill_manage gate is `result.noop !== true` and the graph branch
+            // was only checking `result.ok`, so a redundant re-save inflated
+            // the mutation-maturity counter here but not in skill_manage.
+            if (result.ok && result.noop !== true) {
               await (usageService as unknown as { record?(name: string, kind: 'patch'): Promise<void> }).record?.(parsed.name, 'patch')
             }
             return result.ok ? ok(result.message) : err(result.message)

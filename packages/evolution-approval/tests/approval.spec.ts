@@ -283,6 +283,35 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('V4-18: a rotated/unknown id is reported out of the pending window, not as a live concurrent writer', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-v4-18-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    // A never-staged id (or one rotated past PENDING_RESOLVED_CAP) is NOT a
+    // live "another writer" — the old message mis-attributed it. Both approve
+    // and reject must name the real cause.
+    const missing = '00000000-0000-4000-8000-000000000000'
+    const approve = await ctx.evolutionApproval.approve(missing)
+    expect(approve.ok).toBe(false)
+    expect(approve.message).toContain('not in the pending window')
+    const reject = await ctx.evolutionApproval.reject(missing)
+    expect(reject.ok).toBe(false)
+    expect(reject.message).toContain('not in the pending window')
+    // The executing branch stays intact (the crashed-approve cleanup path).
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'x', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    await ctx.evolutionState.claimPending(id, 'crash-claim')
+    const executing = await ctx.evolutionApproval.approve(id)
+    expect(executing.ok).toBe(false)
+    expect(executing.message).toContain('executing')
+    await rm(home, { recursive: true, force: true })
+  })
+
   describe('effectiveSessionPolicy (G4.8, F-341)', () => {
     it('returns undefined when the platform approval service is not mounted', () => {
       const ctx = new Context()

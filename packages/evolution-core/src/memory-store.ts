@@ -271,8 +271,10 @@ export class MemoryStore {
       // F-201: a fact carrying the delimiter (or ending in `\n§`) would split
       // into multiple entries on read-back, and a delimiter-ending fact is
       // permanent drift. Refuse up front with the position so the model can
-      // rewrite it as separate facts.
-      return { result: { ok: false, message: 'Operation 1 (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
+      // rewrite it as separate facts. V4-49: no batch-style `Operation N`
+      // prefix here — this is a single add, and addCore's other rejections
+      // (drift/threat/limit) are likewise prefix-free.
+      return { result: { ok: false, message: 'Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     }
 
     const entries = [...new Set(normalizeEntries(raw))]
@@ -340,7 +342,7 @@ export class MemoryStore {
         const threat = scanMemoryThreats(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         if (hasEntryDelimiter(body)) {
-          return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+          return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
         if (!working.some(entry => stripDatePrefix(entry) === body)) {
           working.push(this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body)
@@ -365,7 +367,7 @@ export class MemoryStore {
         const threat = scanMemoryThreats(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         if (hasEntryDelimiter(body)) {
-          return { result: { ok: false, message: `Operation ${position} (replace): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+          return { result: { ok: false, message: `Operation ${position} (replace): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
         working[matchIndex] = body
       }

@@ -19,7 +19,8 @@ describe('memory entry-delimiter defense (F-201)', () => {
     const before = await readFile(join(root, 'MEMORY.md'), 'utf8')
     const result = await store.add('memory', `x${ENTRY_DELIMITER.trimEnd()}`) // "x\n§"
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('Operation 1 (add)')
+    // V4-49: a single add is prefix-free (no batch-style `Operation N` label).
+    expect(result.message).not.toContain('Operation')
     expect(result.message).toContain('entry delimiter (§)')
     expect(result.message).toContain('rewrite it as separate facts')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
@@ -31,7 +32,7 @@ describe('memory entry-delimiter defense (F-201)', () => {
     const store = new MemoryStore({ root })
     const result = await store.add('memory', `first${ENTRY_DELIMITER}second`)
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('Operation 1 (add)')
+    expect(result.message).not.toContain('Operation')
     expect(result.message).toContain('entry delimiter (§)')
     await rm(root, { recursive: true, force: true })
   })
@@ -48,6 +49,10 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.ok).toBe(false)
     expect(result.message).toContain('Operation 2 (add)')
     expect(result.message).toContain('entry delimiter (§)')
+    // V4-49: batch delimiter failures carry the current-entries preview that
+    // sibling batch failures already present.
+    expect(result.message).toContain('Current entries (preview):')
+    expect(result.message).toContain('- alpha')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
     await rm(root, { recursive: true, force: true })
   })
@@ -63,6 +68,8 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.ok).toBe(false)
     expect(result.message).toContain('Operation 1 (replace)')
     expect(result.message).toContain('entry delimiter (§)')
+    expect(result.message).toContain('Current entries (preview):')
+    expect(result.message).toContain('- alpha fact')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
     await rm(root, { recursive: true, force: true })
   })

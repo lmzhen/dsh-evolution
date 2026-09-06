@@ -8,9 +8,9 @@
  * fails the run. There is no rollback for npm publishes.
  *
  * Usage:
- *   node packages/evolution/scripts/publish-scoped.mjs --tag next
- *   node packages/evolution/scripts/publish-scoped.mjs --dry-run
- *   node packages/evolution/scripts/publish-scoped.mjs --no-provenance
+ *   node packages/scripts/publish-scoped.mjs --tag next
+ *   node packages/scripts/publish-scoped.mjs --dry-run
+ *   node packages/scripts/publish-scoped.mjs --no-provenance
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -39,8 +39,8 @@ const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')
 const groupRaw = argv.includes('--groups') ? argv[argv.indexOf('--groups') + 1] : undefined
 const groupLimit = groupRaw === undefined ? undefined : Number(groupRaw)
-if (groupLimit !== undefined && !Number.isInteger(groupLimit)) {
-  throw new Error(`--groups requires a positive integer, got ${groupRaw} — a non-numeric value slices the publish order to nothing yet still reports complete`)
+if (groupLimit !== undefined && (!Number.isInteger(groupLimit) || groupLimit <= 0)) {
+  throw new Error(`--groups requires a positive integer, got ${groupRaw} — a non-positive value slices the publish order to nothing (0) or drops trailing groups (negative) yet still reports complete`)
 }
 const onlyArg = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : undefined
 if (argv.includes('--only') && (onlyArg === undefined || onlyArg === '')) {

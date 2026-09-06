@@ -22,5 +22,6 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- - This adapter validates and stages capability packages only. It never executes model code; activation remains a manual Creator-mode operation.
+- This adapter validates and stages capability packages only. It never executes model code; activation remains a manual Creator-mode operation.
+- This service is a governance seam reserved for Creator-mode capability adoption: it has no live consumer in the production composition (not mounted by the host bundle or the presets), so deployments add the row on top when they enable staged capability governance.
 

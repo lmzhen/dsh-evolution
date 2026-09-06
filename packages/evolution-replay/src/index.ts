@@ -47,6 +47,9 @@ export const DEFAULT_WEIGHTS: ReplayWeights = {
   cost: 0.001,
 }
 
+/** The four clampable weight fields, in report order (V4-40 warn). */
+const WEIGHT_FIELDS: Array<keyof ReplayWeights> = ['accepted', 'rejectedPenalty', 'evidence', 'cost']
+
 export interface Config {
   maxPlans?: number
   weights?: ReplayWeights
@@ -121,7 +124,20 @@ export class EvolutionReplayDriver {
     if (config.maxPlans !== undefined && maxPlans !== config.maxPlans) {
       warn(`evolution-replay: maxPlans=${String(config.maxPlans)} is invalid; falling back to the default 50`)
     }
-    this.weights = clampReplayWeights(config.weights)
+    // V4-40: clamp the weights the same way, but surface a single warn when any
+    // field had to be corrected — the maxPlans clamp already warns, and a silent
+    // weights clamp would hide a mis-scored A/B comparison. cost's 0 is legal
+    // (no cost penalty), so it is only flagged when actually out of range.
+    const rawWeights = config.weights
+    this.weights = clampReplayWeights(rawWeights)
+    if (rawWeights !== undefined) {
+      // Only flag fields the caller EXPLICITLY provided that had to be clamped —
+      // an absent field defaults legitimately and must not warn.
+      const clampedFields = WEIGHT_FIELDS.filter(field => field in rawWeights && this.weights[field] !== rawWeights[field])
+      if (clampedFields.length > 0) {
+        warn(`evolution-replay: weights ${clampedFields.join(', ')} provided an invalid value; falling back to the default`)
+      }
+    }
   }
 
   record(plan: EvolutionPlanAppliedEvent): void {

@@ -32,3 +32,5 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Configuration
 
 `reviewProvider` selects the LLM provider for review subagents. When omitted, the subagent inherits the deployment default route instead of a hardcoded provider name. Model selection stays on the policy (`memoryReviewModel` / `skillReviewModel`).
+
+`reviewTimeoutMs` bounds each review subagent run (an `AbortSignal.timeout`; `0` aborts immediately). `executionTimeoutMs` is a leftover declaration and is **not consumed** — it is kept only as a code comment and has no effect; configure `reviewTimeoutMs` instead.
