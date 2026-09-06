@@ -599,10 +599,11 @@ describe('evolution-feedback', () => {
     const ctx = new Context()
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
     // Direct assembly bypasses the schema `.min(-1).max(1)`; the apply() clamp
-    // must warn loudly.
+    // must warn loudly. The ctx stays undisposed like the other unit tests —
+    // disposing a bare apply() fiber trips the test-invariants host's
+    // "settled without becoming active" guard (0.3.28 release gate).
     Feedback.apply(ctx, { qualityWarnThreshold: 1.5 })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
-    await ctx.fiber?.dispose()
   })
 })

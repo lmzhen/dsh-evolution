@@ -57,7 +57,10 @@ it('nodeEvolutionIo never steals a lock from a LIVE holder older than 1s (rc.66)
   await utimes(`${target}.lock`, old, old)
   await expect(io.writeText(target, 'fresh')).rejects.toThrow(/could not acquire write lock/)
   await rm(root, { recursive: true, force: true })
-})
+  // The probe loop spends ~2s nominal (40 x 50ms retry budget); a loaded
+  // machine crossed the default 5s cap in the full parallel run (0.3.28
+  // release gate) — explicit budget so the retry loop owns the unbounded part.
+}, 15_000)
 
 it('nodeEvolutionIo takes over a stale lock from a GONE pid (rc.66)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-gone-lock-'))
