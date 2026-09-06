@@ -65,7 +65,7 @@ describe('evolution-curator', () => {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
-  })
+  }, 15_000)
 
   it('records llmReview: true on the run report when the LLM channel is enabled', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-llm-'))

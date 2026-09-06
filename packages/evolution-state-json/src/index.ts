@@ -154,12 +154,65 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // a new pending record can never hide legacy records still awaiting
   // approval. Mutations write back to `pending-state.json`; a resolved or
   // deleted record therefore overrides the legacy copy on the next read.
+  // 0.3.29 (V5-02): the legacy copy is RETIRED once — merged into current and
+  // renamed aside — so a cap-rotated resolved record can never re-expose its
+  // stale `status:'pending'` legacy twin and get re-claimed + replayed (the
+  // approval runner replays the months-old staged args). Retirement runs on
+  // the read path (listPending), where no jsonTransact is already held; the
+  // in-memory flag stops per-call churn, and any failure (IO/rename) leaves
+  // the flag unset so the next safe point retries (the merge is idempotent —
+  // the same combined map every time). The in-flight claim/save/release
+  // paths read the flag instead of the file: once retired the file is gone
+  // for every process; before that their merge result is identical anyway.
+  let legacyMigrated = false
+  async function retireLegacyOnce(
+    legacy: Record<string, PendingRecord>,
+    current: Record<string, PendingRecord> | null,
+  ): Promise<Record<string, PendingRecord>> {
+    if (legacyMigrated) return {}
+    try {
+      // V5-02: legacy copies of records the archive already saw are COMPLETED
+      // history — a stale `status:'pending'` twin must never be resurrected
+      // (the cap rotation may already have evicted the resolved twin from
+      // current, and a plain merge would fixate the pending copy). current
+      // wins for shared ids; legacy-only ids survive only when the archive has
+      // never seen them (genuinely unresolved work).
+      const archivedIds = new Set<string>()
+      try {
+        const rawArchive = await readJson<Array<{ id?: string } | null>>('pending-state-archive.json')
+        if (Array.isArray(rawArchive)) {
+          for (const entry of rawArchive) if (entry && typeof entry.id === 'string') archivedIds.add(entry.id)
+        }
+      } catch {
+        // Corrupt/unreadable archive — best-effort: keep legacy copies (the
+        // previous merge behavior) rather than dropping possibly-real work.
+      }
+      const retired: Record<string, PendingRecord> = {}
+      for (const [id, record] of Object.entries(legacy)) {
+        if (id in (current ?? {})) continue
+        if (archivedIds.has(id)) continue
+        retired[id] = record
+      }
+      await jsonTransact(io, root, 'pending-state.json', () => ({ ...retired, ...(current ?? {}) }))
+      await io().rename(pathOf('pending.json'), pathOf('pending.json.migrated'))
+      legacyMigrated = true
+      return retired
+    } catch {
+      // Best-effort retirement — the file simply stays until a later safe
+      // point; the read keeps the legacy view (previous behavior).
+      return legacy
+    }
+  }
   async function loadPendingMap(): Promise<Record<string, PendingRecord>> {
     const [current, legacy] = await Promise.all([
       readJson<Record<string, PendingRecord>>('pending-state.json'),
       readJson<Record<string, PendingRecord>>('pending.json'),
     ])
-    return { ...(legacy ?? {}), ...(current ?? {}) }
+    if (legacy !== null) {
+      const retired = await retireLegacyOnce(legacy, current)
+      return { ...retired, ...(current ?? {}) }
+    }
+    return { ...(current ?? {}) }
   }
 
   /** 0.3.22 (F-336): when the live pending map holds more than
@@ -172,17 +225,22 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const resolved = Object.values(map).filter(record => record.status === 'approved' || record.status === 'rejected')
     if (resolved.length <= PENDING_RESOLVED_CAP) return { map, evicted: [] }
     const overflow = resolved.length - PENDING_RESOLVED_CAP
+    // V5-09 (0.3.29): an unparseable resolvedAt sorts as "oldest-unknown" (same
+    // as a missing one) instead of poisoning the sort with NaN; eviction is by
+    // record id — a hand-edited file whose key ≠ id must still leave the map
+    // (the old key-based filter archived the record but never evicted it).
+    const entryTime = (record: PendingRecord): number => {
+      if (!record.resolvedAt) return Number.MAX_SAFE_INTEGER
+      const parsed = Date.parse(record.resolvedAt)
+      return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed
+    }
     const oldest = resolved
-      .sort((a, b) => {
-        const at = a.resolvedAt ? Date.parse(a.resolvedAt) : Number.MAX_SAFE_INTEGER
-        const bt = b.resolvedAt ? Date.parse(b.resolvedAt) : Number.MAX_SAFE_INTEGER
-        return at - bt
-      })
+      .sort((a, b) => entryTime(a) - entryTime(b))
       .slice(0, overflow)
     const evictIds = new Set(oldest.map(record => record.id))
     const kept: Record<string, PendingRecord> = {}
     for (const [key, value] of Object.entries(map)) {
-      if (!evictIds.has(key)) kept[key] = value
+      if (!evictIds.has(value.id)) kept[key] = value
     }
     return { map: kept, evicted: oldest }
   }
@@ -217,9 +275,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
           // Rotate the full pre-rotation history to a `.bak` sidecar and restart
           // the active sidecar from the batch that overflowed it (log-rotation
           // style), so the file and its rewrite are bounded. Best-effort: a
-          // failed rotate only loses the rotated audit copy.
-          await io().writeText(pathOf('pending-state-archive.json.bak'), JSON.stringify(archive, null, 2)).catch(() => {})
-          return JSON.stringify(fresh, null, 2)
+          // failed rotate only loses the rotated audit copy. V5-10 (0.3.29): an
+          // empty archive is not rotated into a `[]` bak, and a single huge
+          // batch keeps only the newest CAP entries (the oldest of the batch
+          // are dropped — best-effort audit, the live map already fell behind
+          // first, and the legacy-retirement of V5-02 removed the cross-
+          // generation re-archive driver).
+          if (archive.length > 0) {
+            await io().writeText(pathOf('pending-state-archive.json.bak'), JSON.stringify(archive, null, 2)).catch(() => {})
+          }
+          return JSON.stringify(fresh.slice(-ARCHIVE_RESOLVED_CAP), null, 2)
         }
         return JSON.stringify(next, null, 2)
       })
@@ -281,7 +346,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async savePending(record) {
       await mutate(async () => {
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
-          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}), [record.id]: record }
           return map
         })
@@ -292,7 +357,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return await mutate(async () => {
         const slot = { claimed: null as PendingRecord | null }
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
-          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id] ?? null
           if (record === null || !canClaimPending(record.status)) return map
@@ -313,7 +378,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async releasePendingClaim(id, claimId) {
       await mutate(async () => {
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
-          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id]
           // 0.3.17 (S3.3): releasing a CLAIMED-EXECUTING record rolls it back to
@@ -334,7 +399,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         let result: PendingResolution = { record: null, applied: false }
         let evicted: PendingRecord[] = []
         await jsonTransact<Record<string, PendingRecord>>(io, root, 'pending-state.json', async (current) => {
-          const legacy = await readJson<Record<string, PendingRecord>>('pending.json')
+          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>('pending.json')
           const map = { ...(legacy ?? {}), ...(current ?? {}) }
           const record = map[id] ?? null
           // 0.3.17 (S3.3): 'executing' (claimed but not yet resolved) is a

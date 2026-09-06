@@ -158,4 +158,86 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(bak[4999].id).toBe('arch-4999')
     await rm(root, { recursive: true, force: true })
   })
+
+  it('retires a legacy pending.json on first list and never resurrects an archived twin (V5-02)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-retire-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+
+    // Upgrade shape: the legacy file holds a pending twin of an id the archive
+    // already saw (approved long ago, cap-rotated out of current). Without
+    // retirement the rotation re-exposes the stale `pending` copy — claimable
+    // and replayed with months-old staged args.
+    const legacy: Record<string, PendingRecord> = {
+      ghost: { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'pending' },
+    }
+    for (let i = 0; i < 199; i += 1) {
+      legacy[`seed-${i}`] = {
+        id: `seed-${i}`, kind: 'memory', summary: `s${i}`, args: {}, createdAt: 'now',
+        status: 'approved', resolvedAt: new Date(Date.UTC(2020, 0, 1, 0, 0, i)).toISOString(),
+      }
+    }
+    await io.writeText(join(root, 'pending.json'), JSON.stringify(legacy))
+    await io.writeText(join(root, 'pending-state-archive.json'), JSON.stringify([
+      { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
+    ]))
+    // The live map is already at the cap — no ghost twin resolved in current.
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ current: { id: 'current', kind: 'memory', summary: 'c', args: {}, createdAt: 'now', status: 'pending' } }))
+
+    const firstList = await provider.listPending('pending')
+    // Retirement ran and renamed the legacy file aside.
+    expect(await io.exists(join(root, 'pending.json'))).toBe(false)
+    expect(await io.exists(join(root, 'pending.json.migrated'))).toBe(true)
+    // The archived twin stays dead: no pending view, no claim.
+    expect(firstList.some(record => record.id === 'ghost')).toBe(false)
+    await provider.tryResolvePending('current', 'approved')
+    expect((await provider.listPending('pending')).some(record => record.id === 'ghost')).toBe(false)
+    expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('evicts by record id even when the map key differs from the id (V5-09)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-evict-key-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+
+    const map: Record<string, PendingRecord> = {}
+    // Hand-edited file: key != id for the oldest record.
+    map['odd-key-oldest'] = { id: 'real-oldest', kind: 'memory', summary: 'o', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' }
+    for (let i = 0; i < 199; i += 1) {
+      map[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
+    }
+    map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
+
+    await provider.tryResolvePending('to-resolve', 'approved')
+    const after = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    // The oldest record was archived AND actually left the map (key mismatch must not defeat eviction).
+    expect(Object.values(after).some(record => record.id === 'real-oldest')).toBe(false)
+    const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    expect(archive.some(record => record.id === 'real-oldest')).toBe(true)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('does not write an empty .bak when the archive was empty at rotation (V5-10)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-empty-bak-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+
+    const map: Record<string, PendingRecord> = {}
+    for (let i = 0; i < 200; i += 1) {
+      map[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
+    }
+    map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
+    await provider.tryResolvePending('to-resolve', 'approved')
+    // First rotation with an EMPTY archive: no `[]`-backed .bak residue.
+    expect(await io.exists(join(root, 'pending-state-archive.json.bak'))).toBe(false)
+    const active = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    expect(active).toHaveLength(1)
+    await rm(root, { recursive: true, force: true })
+  })
 })

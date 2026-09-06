@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-io",
   "description": "IO seam for evolution providers",
-  "version": "0.3.28",
+  "version": "0.3.29",
   "publishConfig": {
     "access": "public"
   },

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.29 (patch) — v5 审计批 1：并发与数据完整性（V4-04 残余根治 + V5-02/03/07/08/09/10）
+
+v5 审计（0.3.28 修复核验轮）批次 1（并发与数据完整性）；每项先核验属实再修。**方法论备注**：V4-04 在 v5 中被判「FIXED-VERIFIED」（静态推演不变量 + 6 路用例），但本批以运行压力实跑推翻——**6 路 0 复现、8 路 25% 丢、32 路 94% 丢**（writeFile open→write 空窗锁 + 探测→rename TOCTOU 双持级联）——并发类结论必须以「比生产最坏更坏的压力」验证为准（6 路 0 复现≠无缺陷）。
+
+- **V4-04 残余根治（ticket 预占票接管制）**：接管从「rename 移走死锁」改为 **`<lock>.next` 预占票（O_EXCL 独占）**——同一时刻只有一个接管者可删除死锁（他人循环等待），删后回环进入公平 O_EXCL 竞争——**双持在构造上不可能**；锁内容改 `pid:token`（探测端识别创建中的空锁永不接管——空内容≠无主死锁）；释放端**身份化**（只删自己的内体，连锁删锁根除）；票文件无持有权语义（死票/崩溃票由探测者无害回收）。实证：**32/16/8/6 路 100/60/60/60 轮 0 丢**；48 路 fail-loud 为 2s 预算数学极限（正确语义）。新增 io.spec「32-way ticket takeover」回归测试（含残留断言 + 15s 预算）。
+- **V5-03 noop 短路**：node 后端 `transact` 对**字节等同**结果（`next === current`）直接返回——不再 tmp+rename 重写（目录 mtime 搅动、「nothing written」消息失真）；noop update/patch、重复 memory add、state-json 去重回环等四处同根一并收敛（V5-08 的「不重写」口径顺带恢复）。
+- **V5-02 legacy 一次性退休**：`pending.json`（pre-0.3.22 只读合并）在首次 `listPending` 时**迁移并退休**——并入 current、**以归档键集排除「已完成历史的幽灵 pending 双胞胎」**（cap 轮转已逐出 resolved 副本时，legacy 的 `status:'pending'` 旧副本不再胜出→不可再 claim→不可重放数月前 staged args）、改名 `pending.json.migrated`（证据保留）；claim/save/release/tryResolve 内层 legacy 读取以迁移完成标志短路（迁移失败幂等重试——跨进程安全：rename 后他进程读 null）。V5-07 的「跨代反复归档」随退休根除（注释更新）。
+- **V5-09 逐出键集修正**：enforceResolvedCap 改按**记录 id** 逐出（手工文件 key≠id 不再「已归档却未逐出」造成 cap 静默失效）；畸形 `resolvedAt`（Date.parse NaN）按「最老未知」排序（不再不稳定排序）。
+- **V5-10 轮转边界**：空档案不写 `[]` 的 `.bak`；单批 fresh 超 cap 时截断保留最新 CAP 条（最旧丢弃——审计面 best-effort 语义）。
+- **回归**：全量 vitest **684/684**（+3 新回归：V5-02 退休链 / V5-09 键集 / V5-10 空 .bak）；oxlint 0/0；tsc state-json+core 0；32 路×30 轮压力 0 丢 0 错。
+
 ## 0.3.28 (patch) — v4 审计收口：口径/文档/后台缺陷批（V4-07~V4-50 剩余全部）
 
 v4 审计（修复核验轮）收口批次——批次 1（0.3.26）门禁与修复有效性 + 批次 2（0.3.27）数据与并发完整性之后的剩余 P3 全部 + V4-22 设计；5 组并行子代理（文件面互不相交）逐项先核验再修（A core 域 / B state 域 / C 工具命令面 / D 后台审计面 / E 发布文档预设面），主代理逐项复跑 + 亲读验收。

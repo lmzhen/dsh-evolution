@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-state-json",
   "description": "JSON-file evolution state provider over the IO seam",
-  "version": "0.3.28",
+  "version": "0.3.29",
   "publishConfig": {
     "access": "public"
   },

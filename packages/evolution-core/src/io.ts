@@ -214,10 +214,19 @@ export function nodeEvolutionIo(): EvolutionIoLike {
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
+    let myClaim = ''
     for (let attempt = 0; attempt < 40; attempt += 1) {
       // Phase 1 — acquire. ONLY acquisition errors are retryable contention.
+      // 0.3.28 (V4-04 32-way repro): the lock body carries `pid:token` so a
+      // takeover probe can tell a stale claim from a freshly created one, and
+      // release verifies identity before deleting. NB: creation MUST stay an
+      // exclusive `writeFile('wx')` — an atomic tmp+rename would be a
+      // REPLACE-on-Windows semantic (MOVEFILE_REPLACE_EXISTING), which
+      // let every contender overwrite the winner's lock (9/9 double-held in
+      // the 10-way repro — far worse than the gap it was meant to close).
       try {
-        await writeFile(lock, String(process.pid), { flag: 'wx' })
+        myClaim = `${process.pid}:${randomBytes(4).toString('hex')}`
+        await writeFile(lock, myClaim, { flag: 'wx' })
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
         // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
@@ -227,7 +236,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         try {
           const st = await stat(lock)
           const holderContent = await readFile(lock, 'utf8').catch(() => '')
-          const holder = Number(holderContent)
+          const holder = Number(holderContent.split(':')[0] ?? '')
           const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
           // F-367 (①), V4-05: a self-pid lock is recycled ONLY when the failed
           // release was recorded in pendingSelfCleanup (a task that ended but
@@ -251,29 +260,55 @@ export function nodeEvolutionIo(): EvolutionIoLike {
             continue
           }
           // V4-04 / F-101: only a stale (>1s) lock NOT held by a live peer is
-          // taken over, and only after re-reading it to confirm the content
-          // still names the dead pid. Re-reading alone is not enough though: two
-          // peers can both pass that probe and both proceed to `rm`, and the
-          // later rm can delete a LIVE lock a peer has since re-acquired
-          // (double-hold → concurrent task, double execution on approve). So
-          // the takeover itself is an atomic rename to a unique name: among
-          // competing peers exactly ONE rename succeeds (the loser's source is
-          // already gone) and only the winner owns the claim. The renamed-side
-          // file is then deleted and the normal acquisition loop re-creates the
-          // lock, so mutual exclusion is never broken.
-          if (Date.now() - st.mtimeMs > 1000 && !holderAlive) {
+          // taken over — with a TICKET. The probe's re-read and the removal are
+          // not atomic, and a naive rename/rm let N peers claim each other's
+          // mid-creation locks (cascade double-hold: 32-way repro lost 94% of
+          // RMWs, 8-way 25% — a peer that inserted a fresh claim between the
+          // probe and the rename got its live lock moved aside, and the former
+          // owner + insertor double-held). The ticket makes the dangerous step
+          // (removing the dead lock) single-owner: `lock.next` is an O_EXCL
+          // creation — exactly one contender holds it; contenders without it
+          // loop. The ticket holder re-verifies the dead body, removes it, then
+          // drops the ticket and RE-ENTERS the fair O_EXCL acquisition loop —
+          // every claim is then won by exactly one peer (whoever wins the
+          // create), so mutual exclusion can never be broken. NB the ticket
+          // file itself is ownership-free: a stale ticket (dead holder, or the
+          // holder crashed) is removed by any prober (its removal is harmless —
+          // the ticket grants no lock).
+          if (Number.isInteger(holder) && holder > 0 && Date.now() - st.mtimeMs > 1000 && !holderAlive) {
             const current = await readFile(lock, 'utf8').catch(() => '')
             if (current === holderContent) {
-              const takeover = `${lock}.takeover-${process.pid}-${randomBytes(6).toString('hex')}`
+              const ticket = `${lock}.next`
+              // First, reclaim a stale ticket (dead pid in its body, or simply
+              // older than the takeover threshold). Best-effort and ownership-
+              // free: a wrong removal only delays a takeover by one loop.
               try {
-                await rename(lock, takeover)
-                await rm(takeover, { force: true }).catch(() => {})
+                const ticketBody = await readFile(ticket, 'utf8').catch(() => '')
+                const ticketHolder = Number(ticketBody.split(':')[0] ?? '')
+                const ticketStale = !Number.isInteger(ticketHolder) || ticketHolder <= 0
+                  || !isAlive(ticketHolder) || Date.now() - (await stat(ticket).then(s => s.mtimeMs, () => 0)) > 1000
+                if (ticketStale && ticketBody !== '') await rm(ticket, { force: true }).catch(() => {})
+              } catch { /* ticket vanished — nothing to do */ }
+              try {
+                await writeFile(ticket, `${process.pid}:${randomBytes(4).toString('hex')}`, { flag: 'wx' })
               } catch {
-                // The source vanished (a peer won the takeover) or the rename
-                // hit a transient Windows EPERM — both just re-attempt.
+                // Another contender owns the ticket (or a stale one was just
+                // reclaimed by someone else's create) — re-attempt the loop.
+                continue
               }
+              // Ticket held: verify the dead body one more time, then remove
+              // it. Only the ticket owner reaches this line, and no OTHER
+              // contender can have re-created the lock name meanwhile (an
+              // exclusive create cannot succeed while the lock name exists,
+              // and same-pid self-heal never fires for a foreign dead pid) —
+              // so the removed file IS the dead lock, not a live claim.
+              const verify = await readFile(lock, 'utf8').catch(() => '')
+              if (verify === holderContent) {
+                await rm(lock, { force: true }).catch(() => {})
+              }
+              await rm(ticket, { force: true }).catch(() => {})
+              continue
             }
-            continue
           }
         } catch {
           continue // the lock vanished between fails
@@ -288,7 +323,15 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       } finally {
         // F-367 (②): a failed release is no longer silently swallowed — record
         // the path so the NEXT write to the same file self-heals it.
-        await rm(lock, { force: true }).catch(() => { pendingSelfCleanup.add(lock) })
+        // 0.3.28 (V4-04 follow-up): release ONLY a claim that is still OUR
+        // body — a takeover cascade may have moved our lock aside and another
+        // peer re-created the name; deleting it would remove a live peer's lock
+        // (cascade double-hold). A foreign body (or a vanished lock) is left
+        // untouched — the owner/rebuilder owns it.
+        const mine = await readFile(lock, 'utf8').catch(() => null)
+        if (mine === myClaim) {
+          await rm(lock, { force: true }).catch(() => { pendingSelfCleanup.add(lock) })
+        }
       }
     }
     throw new Error(`could not acquire write lock for ${path} after 40 attempts`)
@@ -358,6 +401,13 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         const next = await task(current)
         if (next === null) {
           await rm(path, { force: true })
+          return
+        }
+        // V5-03 (0.3.29): a byte-identical result is a no-op — do not rewrite
+        // the file (tmp+rename churn, mtime touch, and the misleading "nothing
+        // written" report on the caller side). noop update/patch, repeated
+        // memory adds and the state-json dedupe short-circuit all funnel here.
+        if (next === current) {
           return
         }
         const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`

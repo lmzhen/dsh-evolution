@@ -249,6 +249,34 @@ it('takeover claims a stale dead lock atomically and leaves no residue (V4-04)',
   await rm(root, { recursive: true, force: true })
 })
 
+it('ticket takeover survives 32-way contention on one dead lock — no lost RMW (V4-04 follow-up)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-ticket-takeover-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'ticket.json')
+  await writeFile(`${target}.lock`, '999999', 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock`, old, old)
+  // 32 peers contend for one stale dead lock. Before the ticket protocol the
+  // probe→rename TOCTOU let multiple peers claim each other's mid-creation
+  // locks (cascade double-hold: 32-way lost ~1-4 of 32 RMWs, 8-way 25%).
+  // The ticket (`<lock>.next`, O_EXCL) makes the dead-lock removal single-
+  // owner, so every claim is won by exactly one peer via the fair create.
+  const transact = io.transact!
+  await Promise.all(Array.from({ length: 32 }, () => transact(target, async (current) => {
+    const value = JSON.parse(current ?? '0') as number
+    return JSON.stringify(value + 1)
+  })))
+  expect(await readFile(target, 'utf8')).toBe('32')
+  expect(await io.readText(`${target}.lock`)).toBeNull()
+  const entries = await readdir(root)
+  expect(entries.filter(e => e.startsWith('ticket.json.takeover-'))).toEqual([])
+  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
+  expect(entries).toEqual(['ticket.json'])
+  await rm(root, { recursive: true, force: true })
+  // 32 serialized acquisitions take ~3-5s nominal; a loaded full-suite run
+  // crossed the default 5s cap (0.3.28 follow-up gate) — explicit budget.
+}, 15_000)
+
 it('renameWithRetry recovers from a transient EPERM and still commits (F-366)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-renameretry-'))
   const src = join(root, 'src.txt')
