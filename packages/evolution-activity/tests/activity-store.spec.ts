@@ -150,8 +150,11 @@ describe('evolution-activity store', () => {
       ctx.emit('evolution/plan-applied', payload({ planId: 'p2' }))
       ctx.emit('evolution/plan-applied', payload({ planId: 'p3' }))
       // maxItems=2: the fold keeps the most recent two; the sidecar never
-      // grows past the cap, so poll for the steady-state 2 records.
-      const items = await pollUntil(root, 'plan-2')
+      // grows past the cap, so poll for the steady-state 2 records. V5-30:
+      // poll the LAST emitted plan (p3) — 'plan-2' was a leftover name that
+      // never matched (p2 is quickly superseded) and burned the full 8s
+      // deadline before asserting.
+      const items = await pollUntil(root, 'plan-3')
       expect(items.map(item => item.planId)).toEqual(['p2', 'p3'])
 
 

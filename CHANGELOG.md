@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.30 (patch) — v5 审计批 2：守卫与验证盲区（V5-01/05/15/16/21/22/26/28/30）
+
+v5 审计（0.3.28 修复核验轮）批次 2（守卫/门禁自身与测试精度）；每项先核验属实再修。
+
+- **V5-01 守卫失明根治**：event-pairing 的 `\w*ctx\.on\(` 大小写敏感——ioCtx/commandCtx/approvalCtx/toolCtx 全不匹配（v5 三项 node 实测复现；旧的「0 orphan」报告纯靠 replay 裸 `ctx.on` 兜底）→ 正则改 `\w*[Cc]tx` + 注释如实；**修复后实跑 6 emitted/4 listened/0 orphan/0 dangling——本次 0 orphan 是真实的**（activity 的 ioCtx 消费被计数、与 replay 冗余监听解耦）。
+- **V5-15 真空/孤儿 strict 化**：event-pairing 新增 `--strict`（真空扫描 exit 1、orphan/dangling exit 1——与 arch-guards 口径一致）；action.yml 的 CI 调用补 `--strict`；非 strict 保持 WARN 报告形态（README 声明 EXEMPT 语义不变）。
+- **V5-16 哨兵补盲**：guard-scripts.spec 新增「emit + `ioCtx.on` → 0 orphan」用例（正是 V5-01 漏网形态——门禁必须覆盖门禁）。
+- **V5-26 计数与注释**：CHANGELOG 0.3.28 的「12 包」修正为「13 包」（git stat 实证，state-storage 含入）；verify-arch-guards 与 verify-event-pairing 头注释 Usage 改双布局说明（dev `packages/evolution/scripts/…` / 镜像 `packages/scripts/…`，按字面执行不再失败）。
+- **V5-05 prompt 版本履约**：`PROMPT_BUNDLE_VERSION` 13→14（0.3.28 V4-39 语义性修改了 SKILL_REVIEW/COMBINED 文案但未按自订契约升版——混布部署版本层不可区分）；prompts.spec 断言同步。
+- **V5-21 F-331 bundled 断言**：curator.spec 的 F-331 用例此前只造 pinned（标题写 pinned/bundled）——补树内 `.bundled` marker 技能 + 「LLM 提名不含 bundled」断言。
+- **V5-22 最老淘汰钉死 + 防御对称**：V4-22 用例 seed 报告 mtime 拉开（同秒并列时淘汰对象原本不确定）→ 断言「最老 15 个 error 被淘汰、最新 10 个保留」；curator autoCheck catch 内的 `retainReports()` 补 try/catch（恢复路径唯一裸露调用点——provider 畸形输出的 unhandled rejection 消除，与持久化防御姿势一致）。
+- **V5-28 durableNote 主分支用例**：V4-41 此前只测双失败（durable=undefined）——补「note-A 落盘成功 → 事件日志升版 → note-B 失败 → 还原为 note-A（最后已确认）且失败计数回滚」。
+- **V5-30 死轮询修正**：activity-store.spec 的 `pollUntil(root,'plan-2')` 永不匹配（emit p1/p2/p3、稳态只剩 p2/p3）——每跑烧满 8s deadline——改 poll 'plan-3'。
+- **回归**：全量 vitest **685/685**（+1）；oxlint 0/0；tsc core/curator/host 0；三守卫 strict 全过（closure 30 包 OK / arch strict 0——N4 71 warn-only 保持，+2 为票协议解析的合法 `?? ''` 兜底启发式误报类 / pairing 0 orphan + 真空 exit 1 实测）；mjs --check 过。
+
 ## 0.3.29 (patch) — v5 审计批 1：并发与数据完整性（V4-04 残余根治 + V5-02/03/07/08/09/10）
 
 v5 审计（0.3.28 修复核验轮）批次 1（并发与数据完整性）；每项先核验属实再修。**方法论备注**：V4-04 在 v5 中被判「FIXED-VERIFIED」（静态推演不变量 + 6 路用例），但本批以运行压力实跑推翻——**6 路 0 复现、8 路 25% 丢、32 路 94% 丢**（writeFile open→write 空窗锁 + 探测→rename TOCTOU 双持级联）——并发类结论必须以「比生产最坏更坏的压力」验证为准（6 路 0 复现≠无缺陷）。
@@ -15,7 +30,7 @@ v5 审计（0.3.28 修复核验轮）批次 1（并发与数据完整性）；�
 
 v4 审计（修复核验轮）收口批次——批次 1（0.3.26）门禁与修复有效性 + 批次 2（0.3.27）数据与并发完整性之后的剩余 P3 全部 + V4-22 设计；5 组并行子代理（文件面互不相交）逐项先核验再修（A core 域 / B state 域 / C 工具命令面 / D 后台审计面 / E 发布文档预设面），主代理逐项复跑 + 亲读验收。
 
-- **state/接缝**：V4-07 一致性基座扩为逐字段比对（claimedAt/resolvedAt 类型级——json/domain 两 provider 无既有差异故零豁免、零实现缺陷）；V4-08 jsonTransact 写侧形状守卫（task 返数组/标量 fail-loud 且不落盘；quarantine/jsonTransact 模块级化仅供测试直调——函数插件仍无 default 导出）；V4-10 注释如实（seam 无 delete 语义）；V4-11 **+ 全仓扫描 12 包** tsconfig 幽灵 schemastery references 清扫（G5.5 同类，零 import 证实，逐包 tsc 0）。
+- **state/接缝**：V4-07 一致性基座扩为逐字段比对（claimedAt/resolvedAt 类型级——json/domain 两 provider 无既有差异故零豁免、零实现缺陷）；V4-08 jsonTransact 写侧形状守卫（task 返数组/标量 fail-loud 且不落盘；quarantine/jsonTransact 模块级化仅供测试直调——函数插件仍无 default 导出）；V4-10 注释如实（seam 无 delete 语义）；V4-11 **+ 全仓扫描 13 包** tsconfig 幽灵 schemastery references 清扫（G5.5 同类，零 import 证实，逐包 tsc 0）。
 - **core 口径**：V4-38 **核验推翻「test-only export」**——标称 11 符号（saveUsage/saveSuppressedNames/5 个 review prompt 常量/retainEventArchives/readEvolutionEvents/memoryRoot/QUALITY_WEIGHTS/ENTRY_DELIMITER）全有生产或跨文件消费方，无一 refs≤1（全仓 refs 计数口径，零删除、不占 V4-38 的改动面）；V4-39 prompts pinned 文案如实（任何 writer 无法归档——先移除 .pinned marker；foreground/delegated 的 update/patch 仍允许）；V4-43 scanThreats 自卫（maxScanChars 0/NaN/负 → clampedNumber 钳制）；V4-48 version 类型消息（`got "1" (string)`，数字/字符串歧义消除）；V4-49 分隔符拒绝消息形态统一（单条去 `Operation 1` 前缀、批量补 current-entries 预览）。
 - **工具/命令面**：V4-13 graph noop 不计 patch（对齐 tool-skill-manage 口径）；V4-14 skill-usage README 监听面如实（skill_load 已删）；V4-15 单操作叠词（"memory add"——F-329 规则扩展到单操作）；V4-16 maintenance 探针 resolveSkillsRoot（''/' ' 不再落 CWD 相对根）；V4-17 atomicWriteFiles `.bak` 每次成功提交刷新（恢复回最新代）+ 消息含来源；V4-19 `--detail` 截断附 `…(truncated N chars)`；V4-24 names 校验 trim + 大小写不敏感（canonical 名，未知名字仍拒）；V4-26 行首独立 `Notes:` 定位（字段内嵌换行不再击穿推荐计数）；V4-27 测试缺口（noop 计数消费实测 src 正确仅补测 / F-331 pinned+bundled 不入 LLM 提示 / F-102 abort dispose 同构）。
 - **后台/审计**：V4-18 轮转误导消息区分（「记录不在 pending 窗口」vs 正在被执行——归因不再误导）；V4-21 executePlan 中途 IO throw 改 **{actions, ok:false} 返回**——已应用项显式 + 「部分操作失败，以下操作已应用，请勿重复执行」提示，不再重复注入同 kind；completionInjected 在 inject 抛错时回滚（错误恢复后 completion 可重触发）；V4-22 curator-error **独立预算**（真报告 keep-20 / 错误 cap-10，F-327 排序）+ 每次 run 结束（成功或失败）都触发回收——持续抛错宿主 error 报告不再无界累积、真报告保留窗口不被挤占；V4-23 validateEvolutionPlan 根守卫（null/数组/标量显式拒绝而非 TypeError，与 maintain 对称）；V4-25 review README 声明 executionTimeoutMs 无效（未消费——配置 reviewTimeoutMs）；V4-40 replay weights 钳制 warn（与 maxPlans 一致）；V4-41 feedback **durableNote**（双失败回滚还原到最后一个已确认落盘的 note，绝不复现从未落盘值；注释如实：进程内 restore 不自愈、仅重启可自愈——由 durableNote 消除该边界）；V4-42 activity maxItems:0 钳制 warn（程序化装配面）；V4-44 钳制 warn 断言补齐（review 精确钳制值 + `AbortSignal.timeout(0)` 行为级 + capability/feedback/curator warn 断言）；V4-45 capability 负例双测（非 staged allow 拒收、approved 记录带外篡改 re-validate 拒绝——逻辑本就正确只补测）；V4-46 replay `dsh-session` devDep 幽灵删除；V4-50 feedback 拒绝经已注入 warn 通道（未来版本事件不再无痕丢失）。

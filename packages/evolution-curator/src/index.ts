@@ -314,7 +314,15 @@ export class EvolutionCurator extends Service {
       // V4-22: a failing auto-check writes an error report AND must recycle
       // history — otherwise a persistently throwing host accumulates
       // curator-error-*.json unbounded (retention used to run only on success).
-      await this.retainReports()
+      // V5-22: this is the one unprotected call in the recovery path — a
+      // provider that throws here (malformed reports listing) must stay
+      // observable and NOT become an unhandled rejection (the persistence
+      // path above wraps the same class of failure).
+      try {
+        await this.retainReports()
+      } catch (retentionError) {
+        this.ctx.logger.warn(`evolution-curator: failed to recycle auto-check error reports: ${retentionError instanceof Error ? retentionError.message : String(retentionError)}`)
+      }
     }
   }
 

@@ -21,9 +21,10 @@
  * 0.3.22 (G4.8): N2 single-source moved to evolution-approval/src — the
  * exemption list follows the authority.
  *
- * Usage (CI overlays the flat mirror into the upstream tree, so it runs at
- * packages/evolution):
- *   node packages/scripts/verify-arch-guards.mjs packages/evolution [--strict]
+ * Usage (works from BOTH layouts — dev `packages/evolution/scripts/…`, flat
+ * mirror `packages/scripts/…`; the packages root argument is the evolution
+ * tree regardless of layout):
+ *   node <scripts-dir>/verify-arch-guards.mjs <packages/evolution-root> [--strict]
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'

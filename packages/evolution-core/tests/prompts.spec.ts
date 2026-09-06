@@ -59,7 +59,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(13)
+  expect(PROMPT_BUNDLE_VERSION).toBe(14)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {

@@ -180,10 +180,17 @@ describe('evolution-curator', () => {
     await skills.create('beta-skill', nearBody('beta-skill'), 'foreground')
     // Pin one: F-331 excludes marker-protected skills from the LLM pool.
     await skills.setPinned('alpha-skill', true, 'foreground')
+    // V5-21: the bundled claim was untested — add a tree skill carrying the
+    // `.bundled` marker and assert it is excluded too (the same marker the
+    // crashed-archive probe reads).
+    await skills.create('gamma-skill', nearBody('gamma-skill'), 'foreground')
+    await writeFile(join(skills.root, 'gamma-skill', '.bundled'), '', 'utf8')
     await ctx.evolutionCurator.run({ ignoreGates: true })
     expect(shown).not.toContain('alpha-skill')
     // The un-pinned near-duplicate is still presented to the LLM.
     expect(shown).toContain('beta-skill')
+    // The bundled marker is not part of the nomination pool (V5-21).
+    expect(shown).not.toContain('gamma-skill')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true })
@@ -1540,14 +1547,22 @@ Body of ${name}.
     process.env.DSH_HOME = home
     try {
       // Seed 25 error reports (no startedAt — they age by mtime) and 5 real
-      // reports, simulating a host that has been failing repeatedly.
+      // reports, simulating a host that has been failing repeatedly. mtimes
+      // are spread so the OLDEST eviction is deterministic (V5-22: same-second
+      // mtimes used to leave the eviction target undefined).
       const reports = join(home, 'evolution', 'reports')
       await mkdir(reports, { recursive: true })
       for (let i = 0; i < 25; i += 1) {
-        await writeFile(join(reports, `curator-error-${i}.json`), JSON.stringify({ runId: `e${i}`, failed: true, error: 'x', at: new Date().toISOString() }))
+        const path = join(reports, `curator-error-${i}.json`)
+        await writeFile(path, JSON.stringify({ runId: `e${i}`, failed: true, error: 'x', at: new Date().toISOString() }))
+        const stamp = new Date(Date.now() - (25 - i) * 60_000)
+        await utimes(path, stamp, stamp)
       }
       for (let i = 0; i < 5; i += 1) {
-        await writeFile(join(reports, `curator-real-${i}.json`), JSON.stringify({ runId: `r${i}`, startedAt: new Date().toISOString() }))
+        const path = join(reports, `curator-real-${i}.json`)
+        await writeFile(path, JSON.stringify({ runId: `r${i}`, startedAt: new Date().toISOString() }))
+        const stamp = new Date(Date.now() - (5 - i) * 60_000)
+        await utimes(path, stamp, stamp)
       }
       const ctx = new Context()
       await ctx.plugin(EvolutionIoRegistry)
@@ -1577,6 +1592,13 @@ Body of ${name}.
       // The real window is NOT polluted by the error burst: at least 5 seeded
       // real reports survive (well under the 20 cap).
       expect(real.length).toBeGreaterThanOrEqual(5)
+      // V5-22: the OLDEST 15 error reports are the eviction targets (25 → 10
+      // cap), so the newest 10 survive and the oldest is deterministically gone.
+      expect(errors).toContain('curator-error-24.json')
+      expect(errors).not.toContain('curator-error-0.json')
+      for (let i = 0; i < 15; i += 1) {
+        expect(errors).not.toContain(`curator-error-${i}.json`)
+      }
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous

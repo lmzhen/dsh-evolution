@@ -16,23 +16,30 @@
  * count as a consumer, and tests that emit into a spy don't count as a
  * producer of the product contract.
  *
- * Usage (CI overlays the flat mirror into the upstream tree):
- *   node packages/scripts/verify-event-pairing.mjs packages/evolution
+ * Usage (works from BOTH layouts: dev `packages/evolution/scripts/…`, flat
+ * mirror `packages/scripts/…`; the packages root argument is the evolution
+ * tree regardless of layout):
+ *   node <scripts-dir>/verify-event-pairing.mjs <packages/evolution-root> [--strict]
+ * `--strict` (CI) fails on a vacuum scan or any orphan/dangling listener —
+ * the same posture as verify-arch-guards; without it the run is the
+ * WARN + summary report described above.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const root = process.argv[2] ?? 'packages/evolution'
+const strict = process.argv.includes('--strict')
 const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', 'tsdown'])
 // Externally owned (README): emitted for platform/user wiring, no in-repo
 // production consumer — expected orphans.
 const EXEMPT_ORPHANS = new Set(['evolution/review-scheduled', 'evolution/review-error'])
 const EMIT_RE = /ctx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
-// V4-31 (0.3.26): not every consumer listens on bare `ctx` — activity watches
-// plan-applied through `ioCtx.on(...)` (and commandCtx/approvalCtx/toolCtx
-// follow the same naming). `\w*ctx` covers every `<x>ctx` receiver without
-// widening to generic `.on(` calls.
-const ON_RE = /\w*ctx\.on\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
+// V4-31 (0.3.26) + V5-01 (0.3.30): receivers follow the camelCase `<x>ctx`
+// naming (ioCtx/commandCtx/approvalCtx/toolCtx — activity listens on
+// `ioCtx.on(...)`), and `\w*ctx` is case-SENSITIVE — it matched only bare
+// `ctx` and lowercase `…xctx`, so the very receivers the comment claimed
+// were covered were never counted. `(\w*[Cc]tx)` covers both spellings.
+const ON_RE = /\w*[Cc]tx\.on\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
 
 const emitted = new Map()
 const listened = new Map()
@@ -66,8 +73,13 @@ walk(root)
 if (emitted.size === 0 && listened.size === 0) {
   // V4-30 (0.3.26): a zero-event scan is either a truly empty tree or a wrong
   // root — the vacuum pass says nothing about pairing, so it must not be
-  // reported as a clean "0 orphan" pass.
+  // reported as a clean "0 orphan" pass. V5-15 (0.3.30): strict mode fails
+  // like verify-arch-guards instead of warn-and-exit-0.
   console.warn(`verify-event-pairing: no evolution event(s) found under ${root} — check the packages root (a vacuum scan is not a pairing result)`)
+  if (strict) {
+    console.error('verify-event-pairing [strict]: a vacuum scan is not a pairing result — check the packages root')
+    process.exit(1)
+  }
 }
 
 const orphans = [...emitted.keys()].filter(name => !listened.has(name) && !EXEMPT_ORPHANS.has(name))
@@ -87,3 +99,9 @@ if (exemptOrphans.length > 0) {
   console.log(`verify-event-pairing: exempt external-owner orphan(s) (README): ${exemptOrphans.sort().join(', ')}`)
 }
 console.log(`verify-event-pairing: summary — ${orphans.length} orphan(s), ${dangling.length} dangling listener(s), ${exemptOrphans.length} declared exempt`)
+// V5-15 (0.3.30): strict = the arch-guards posture — any orphan or dangling
+// listener is a broken wiring contract the review would otherwise miss.
+if (strict && (orphans.length > 0 || dangling.length > 0)) {
+  console.error(`verify-event-pairing [strict]: ${orphans.length} orphan(s), ${dangling.length} dangling listener(s) — fix the wiring (or declare an exempt owner in README)`)
+  process.exit(1)
+}

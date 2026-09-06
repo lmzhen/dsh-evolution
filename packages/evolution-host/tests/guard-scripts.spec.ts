@@ -80,6 +80,13 @@ describe('guard scripts (V4-30 sentry)', () => {
       // orphan name must appear on stderr.
       const out = await run(process.execPath, [eventPairing, root], { encoding: 'utf8' })
       expect(out.stderr).toContain('evolution/never-listened')
+      // V5-16: a camelCase `<x>ctx.on` receiver must count as a consumer — the
+      // old `\w*ctx` regex was case-sensitive and missed ioCtx entirely (the
+      // very shape activity uses for plan-applied), so this sibling of the
+      // emit-only tree must flip the report to zero orphans.
+      await writeFile(join(pkg, 'src', 'consumer.ts'), "ioCtx.on('evolution/never-listened', () => {})\n", 'utf8')
+      const paired = await run(process.execPath, [eventPairing, root], { encoding: 'utf8' })
+      expect(paired.stdout).toContain('0 orphan')
     } finally {
       await rm(root, { recursive: true, force: true })
     }

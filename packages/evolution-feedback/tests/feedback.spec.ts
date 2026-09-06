@@ -537,6 +537,38 @@ describe('evolution-feedback', () => {
     }
   })
 
+  it('V5-28: a later failed append rolls back to the last CONFIRMED note (main branch)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-v5-28-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      // note-A lands on the log (the confirmed durable truth)…
+      feedback.record('x', 'positive', 'note-A', 'skill')
+      await feedback.waitIdle()
+      // …then the log is "upgraded" so the next append is refused.
+      await io.writeText(eventsPath, JSON.stringify({ version: 2, events: [] }, null, 2))
+      feedback.record('x', 'positive', 'note-B', 'skill')
+      await feedback.waitIdle()
+      const record = feedback.snapshot().skills['x']
+      // The rollback must restore note-A (last CONFIRMED), never an in-memory
+      // optimistic value of a call that never persisted; the failed append's
+      // count is rolled back too, leaving exactly the confirmed increment.
+      expect(record?.lastNote).toBe('note-A')
+      expect(record?.positive).toBe(1)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('V4-50: a refused append by a future-version event log is reported through warn', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-v4-50-'))
     const previous = process.env.DSH_HOME
