@@ -218,7 +218,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // argument — a closure over the pre-lock snapshot could overwrite a
       // concurrent writer's newer state between the probe and the lock (Y
       // staged → vanished, or X approved → reverted to pending → replayable).
-      await jsonTransact(io, root, 'pending-state.json', (fresh) => ({ ...retired, ...(fresh ?? {}) }))
+      await jsonTransact(io, root, 'pending-state.json', fresh => ({ ...retired, ...(fresh ?? {}) }))
       await io().rename(pathOf('pending.json'), pathOf('pending.json.migrated'))
       legacyMigrated = true
       return retired
