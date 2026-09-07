@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.45 (patch) — v8 审计批 0：V8-01 平台契约 P1 — review 子代理 outputSchema 去 `'json'` 方言
+
+**来源**：v8 审计报告批次 0（最高优先 P1——独立先行发布）。
+
+- **V8-01 [P1·接口冲突/平台契约]**：review 子代理的 `outputSchema` 使用了 `defineTool` 作者 DSL 方言 `items: { type: 'json' }`——而 `subagents.start` 的 outputSchema 走 **raw JSON Schema 校验边界**（上游 `assertObjectJsonSchema`，dsh-tools json-schema.ts 的 SCHEMA_TYPES 七个类型无 'json'）——**默认部署（reviewMode='subagent'）的评审通道在真实平台 100% start 失败**，每次静默降级为 inject 回退；结构化计划管线（validate→read-before-write→approve→execute）自初始开源发布起从未运行过。8 轮审计未发现的原因 = mock 化测试（10 处 `ctx.provide('subagents')`） + `SubagentLike` 把 request 声明为 `unknown`（TS 无法拦截） + 无跨仓 schema 对照。**修复**：
+  1. `REVIEW_OUTPUT_SCHEMA` 单源常量（模块级导出）——数组节点改为 `{ type: 'array' }` **省略 items**（上游语义 "absent accepts any JSON item"；per-op 结构校验由 plan-validator 分层承担）；
+  2. `SubagentLike.start` 的 `request` 从 `unknown` 收窄为 `SubagentStartRequestLike`（outputSchema 按 raw JSON-Schema 子集字面量类型化——`'json'` 若再入在 TS 层即报错）；
+  3. **契约测试**（review.spec V8-01）：以上游 SCHEMA_TYPES 白名单**递归遍历** REVIEW_OUTPUT_SCHEMA 断言每个 `type` 值合法——并做**红转绿判别力验证**（临时注入 `'json'` → 测试红 → 还原绿）——防 mock 化测试再次放行同类漂移（本缺陷潜伏 8 轮的直接原因）。
+- **对照核验**：evolution-maintenance 的 outputSchema（orchestrate.ts）本就合法未动；review 其余 start 字段面与上游一致（v8 报告 3.0 平台对照表）。
+- **门禁**：review.spec 26/26（+1 契约用例）；oxlint 0/0；tsc 0（review --force）；全量以 CI Linux 为准。
+
 ## 0.3.44 (patch) — v7 收尾批：P3 清扫（V7-08/09/11/15/16/18）+ 测试专项补齐（V7-20）
 
 **来源**：v7 审计轮最后一批（P3 清扫 + 四项测试缺口）。

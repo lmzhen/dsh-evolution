@@ -87,8 +87,55 @@ export const Config: z<Config> = z.object({
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
 })
 
+/** V8-01 (0.3.45): the review subagent's structured-output contract. The
+ * `subagents.start` outputSchema is RAW JSON Schema validated by
+ * assertObjectJsonSchema (upstream dsh-tools json-schema.ts — SCHEMA_TYPES
+ * has no 'json'; 'json' is a defineTool-author DSL-only value). The arrays
+ * deliberately use `{ type: 'array' }` with NO items node — absent items
+ * accepts any JSON item (upstream semantics, json-schema.ts "Item schema
+ * (type: 'array' only); absent accepts any JSON item"), and plan-validator
+ * owns the per-op structure proof. The whitelist contract test (review.spec
+ * V8-01) forbids a DSL value slipping back in. */
+export const REVIEW_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    memoryOps: { type: 'array' },
+    skillOps: { type: 'array' },
+    summary: { type: 'string' },
+  },
+} as const
+
+/** V8-01 (0.3.45): the minimal start() request shape the review passes — the
+ * OUTPUT SCHEMA part is typed against the raw JSON-Schema subset vocabulary,
+ * so a defineTool DSL value like `'json'` fails at the type surface instead
+ * of silently rejecting every spawn at runtime (the historical defect the
+ * mock-based tests and the previous `unknown` request type could not see). */
+interface ReviewOutputSchemaLike {
+  type: 'object'
+  additionalProperties?: boolean
+  properties?: Record<string, {
+    type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null'
+    items?: { type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null' }
+    properties?: Record<string, { type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null' }>
+  }>
+}
+
+interface SubagentStartRequestLike {
+  label?: string
+  prompt?: unknown
+  parent?: unknown
+  signal?: unknown
+  maxDepth?: number
+  agentOptions?: Record<string, string>
+  persona?: unknown
+  toolFilter?: { allow?: string[] }
+  outputSchema?: ReviewOutputSchemaLike
+  [key: string]: unknown
+}
+
 interface SubagentLike {
-  start(name: string, request: unknown): Promise<{
+  start(name: string, request: SubagentStartRequestLike): Promise<{
     result: Promise<{ structured?: unknown }>
     dispose(): Promise<void>
     /** The published in-process child when the provider runs locally (own session). */
@@ -451,15 +498,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // operative wording that contradicts the tool filter.
         persona: reviewPrompt(kind, 'plan'),
         toolFilter: { allow: [...config.reviewToolAllow] },
-        outputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            memoryOps: { type: 'array', items: { type: 'json' } },
-            skillOps: { type: 'array', items: { type: 'json' } },
-            summary: { type: 'string' },
-          },
-        },
+        // V8-01 (0.3.45): the single-sourced constant — `'json'` DSL values
+        // in items would be rejected by the upstream raw-schema boundary.
+        outputSchema: REVIEW_OUTPUT_SCHEMA,
       })
       // Read-before-write must see what the REVIEW subagent itself loaded: it
       // runs in its own session, and the parent session's events never contain

@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { Config } from '../src/index.ts'
+import { Config, REVIEW_OUTPUT_SCHEMA } from '../src/index.ts'
 import * as Review from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -610,6 +610,26 @@ it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires 
   // turn7: after the second zero the new segment is silent again.
   emitEnd(7); await settle()
   expect(injected).toHaveLength(2)
+})
+
+it('0.3.45: the review output schema stays inside the raw JSON-Schema type whitelist (V8-01)', () => {
+  // Upstream facts (dsh-tools json-schema.ts:87 SCHEMA_TYPES + the
+  // assertObjectJsonSchema injection at subagent src:434): a defineTool DSL
+  // value like 'json' violates the raw-schema subset and rejects EVERY spawn,
+  // silently degrading the default subagent review to the inject fallback —
+  // the historical P1 that mock-based tests could never see. The review
+  // array nodes deliberately omit `items` (absent accepts any JSON item).
+  const SCHEMA_TYPES = new Set(['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'])
+  expect(SCHEMA_TYPES.has('json')).toBe(false) // the DSL value that caused the P1 is NOT legal here
+  const visit = (node: unknown): void => {
+    if (typeof node !== 'object' || node === null) return
+    const type = (node as { type?: unknown }).type
+    if (type !== undefined) expect(SCHEMA_TYPES.has(type as string)).toBe(true)
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      if (typeof value === 'object' && value !== null) visit(value)
+    }
+  }
+  visit(REVIEW_OUTPUT_SCHEMA)
 })
 
 it('0.3.41: interval=1 waking delivery cannot self-drive — the injected wake turn fires once suppressed (V7-02)', async () => {
