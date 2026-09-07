@@ -48,7 +48,7 @@ describe('tool-skill-manage', () => {
     const s = (ToolSkillManage.Config as unknown as { ['~standard']: { validate(input: unknown): { value?: { maxSkillNameLength?: number } } } })['~standard']
     for (const candidate of [Number.NaN, 0, Number.POSITIVE_INFINITY]) {
       const result = s.validate({ maxSkillNameLength: candidate })
-      const value = result.value?.maxSkillNameLength as number | undefined
+      const value = result.value?.maxSkillNameLength
       expect(Number.isFinite(value)).toBe(false) // never a legal number reaches the plugin
     }
   })
