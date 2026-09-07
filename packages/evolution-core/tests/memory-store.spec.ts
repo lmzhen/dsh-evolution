@@ -68,7 +68,7 @@ it('memory detects external file drift before mutation', async () => {
   // refusal, so an external edit stays recoverable.
   expect(result.message).toMatch(/backup was saved/)
   const { readdir, readFile } = await import('node:fs/promises')
-  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak.'))
+  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak'))
   expect(backups.length).toBe(1)
   expect(await readFile(join(root, backups[0]!), 'utf8')).toContain('alpha')
   await rm(root, { recursive: true, force: true })
@@ -133,7 +133,7 @@ it('memory read guard skips oversized files and refuses writes with a byte-exact
   expect(refused.message).toContain('5000 bytes (limit 4000)')
   expect(refused.message).toContain('skipping read')
   expect(refused.message).toMatch(/backup was saved/)
-  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak.'))
+  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak'))
   expect(backups.length).toBe(1)
   expect((await readFile(join(root, backups[0]!), 'utf8')).length).toBe(5000)
   // Injection side: the skipped block announces itself instead of vanishing.
@@ -180,7 +180,7 @@ it('memory drift flags a single entry above the store limit', async () => {
   expect(denied.ok).toBe(false)
   expect(denied.message).toContain('drift')
   expect(denied.message).toMatch(/backup was saved/)
-  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak.'))
+  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak'))
   expect(backups.length).toBe(1)
   await rm(root, { recursive: true, force: true })
 })

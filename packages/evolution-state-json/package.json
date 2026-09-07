@@ -42,6 +42,7 @@
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
+    "@deepseek-ai/dsh-evolution-io-node": "workspace:^"
   }
 }

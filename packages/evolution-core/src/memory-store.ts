@@ -199,19 +199,21 @@ export class MemoryStore {
   }
 
   /**
-   * Best-effort raw-copy backup of the on-disk file to `<file>.bak.<stamp>`
-   * before a refusal, so an externally modified (or oversized) file stays
-   * recoverable. Copies bytes instead of reading them so a pathologically
-   * large file is never loaded just to back it up. Failure to back up does
-   * not change the refusal semantics.
+   * Best-effort raw-copy backup of the on-disk file to `<file>.bak` before a
+   * refusal, so an externally modified (or oversized) file stays recoverable.
+   * Copies bytes instead of reading them so a pathologically large file is
+   * never loaded just to back it up. Failure to back up does not change the
+   * refusal semantics. V8-23⑫ (0.3.49): ONE fixed backup name per target —
+   * a fresh refusal overwrites it (the previous timestamped names accumulated
+   * per drift incident with no retention policy).
    */
   private async backupFile(target: MemoryTarget): Promise<string | null> {
     const path = fileFor(this.root, target)
-    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
-    const unique = `${stamp}-${Math.random().toString(36).slice(2, 8)}`
+    const backup = `${path}.bak`
     try {
-      await this.io.copy(path, `${path}.bak.${unique}`)
-      return `${path}.bak.${unique}`
+      await this.io.remove(backup).catch(() => {})
+      await this.io.copy(path, backup)
+      return backup
     } catch {
       return null
     }

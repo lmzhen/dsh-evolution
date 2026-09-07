@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { authoringFeedback, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
@@ -447,6 +447,33 @@ it('names normalize at the path choke point so padded aliases cannot fork a skil
   expect(restored.ok).toBe(true)
   expect((await lib.list()).map(s => s.name)).toEqual(['spaced'])
   await rm(root, { recursive: true, force: true })
+})
+
+it('V7-11: a replaceAll beyond the CUMULATIVE fuzzy budget is refused whole (0.3.44)', async () => {
+  // V7-11 (0.3.44) test gap: the single-scan budget was covered from the
+  // beginning, but a multi-hit replaceAll whose per-scan cost stays below the
+  // limit yet sums past it used to run unbounded. Each fuzzy hit re-scans the
+  // whole (shrinking) content: 300 sections × ~1M work per scan ≈ 300M ≫ 8M.
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-v711-'))
+  const lib = new SkillLibrary(root)
+  const section = '## Section title\n\ncontent line one two three\n'
+  const body = `---
+name: fuzzy-budget
+description: A skill for the cumulative fuzzy budget test.
+---
+\n
+` + section.repeat(300)
+  await mkdir(join(root, 'fuzzy-budget'), { recursive: true })
+  await writeFile(join(root, 'fuzzy-budget', 'SKILL.md'), body, 'utf8')
+  try {
+    // Double-space old string: NOT an exact hit — the fuzzy matcher tolerates
+    // the whitespace run, so every section is a fuzzy match → replaceAll.
+    const result = await lib.patch('fuzzy-budget', '## Section  title', '## Renamed section', undefined, true)
+    expect(result.ok).toBe(false)
+    expect(result.message).toMatch(/fuzzy budget was exceeded/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 it('relatedSkillNames is the single related_skills parser (G3)', () => {

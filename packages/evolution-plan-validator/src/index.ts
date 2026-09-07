@@ -143,7 +143,10 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
     const op = rawOp as MemoryOp
     const reason = validateMemoryOp(op, context, index)
     if (reason) rejected.push({ index, kind: 'memory', reason })
-    else memoryOps.push(op)
+    // V8-23⑪ (0.3.49): the V6-26 explicit-action normalization applied to
+    // skillOps only — a memory op without `action` was written to `accepted`
+    // raw, so every new consumer had to guess the 'add' default itself.
+    else memoryOps.push(op.action === undefined ? { ...op, action: 'add' } : op)
   }
 
   for (const [index, rawOp] of ((rawSkillOps ?? []) as unknown[]).entries()) {

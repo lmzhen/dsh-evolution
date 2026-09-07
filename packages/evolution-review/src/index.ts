@@ -43,7 +43,6 @@ export interface Config {
   reviewMaxDepth?: number
   /** LLM provider for review subagents. Omit to inherit the deployment default route. */
   reviewProvider?: string
-  /** Skill-review trigger: cadence (interval) | completion (once after a proven-long task) | both. */
   /** Which channel runs the end-of-conversation summary: the cadence latch
    * ('cadence'), the long-session completion gate ('completion'), or both. */
   skillReviewTrigger?: 'cadence' | 'completion' | 'both'

@@ -13,7 +13,6 @@ import {
   redactSecrets,
   type DriftReport,
   type DriftSignal,
-  type DriftSkillAssessment,
 } from '@deepseek-ai/dsh-evolution-core'
 
 export interface RenderFactsOptions {
@@ -53,10 +52,4 @@ function renderSignal(signal: DriftSignal, redact: (text: string) => string): st
   if (signal.threshold !== undefined) parts.push(`threshold=${signal.threshold}`)
   if (signal.detail !== undefined) parts.push(`detail=${redact(signal.detail)}`)
   return [parts.join(' ')]
-}
-
-/** Convenience for tests and replays: summarize a skill assessment. */
-export function summarizeAssessment(assessment: DriftSkillAssessment): string {
-  const over = assessment.signals.filter(signal => signal.verdict === 'over').map(signal => signal.id)
-  return over.length === 0 ? `${assessment.name}: clean` : `${assessment.name}: ${over.join(',')}`
 }

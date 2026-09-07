@@ -81,10 +81,9 @@ export function applyActivityEvent(
   return [...items, record].slice(-cap)
 }
 
-/** Parse a raw sidecar into records; malformed content reads as empty (best-effort telemetry). */
-/** Single-source activity sidecar serialization (F-304): both `saveActivity`
- * and the `apply()` listener emit the versioned envelope through this one
- * function, so a format change cannot drift across two hand-written writers.
+/** Single-source activity sidecar serialization (F-304): the `apply()`
+ * listener emits the versioned envelope through this one function, so a
+ * format change cannot drift across hand-written writers.
  * `parseActivityContent` is the matching single reader. */
 export function serializeActivity(items: EvolutionActivityRecord[]): string {
   return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
@@ -109,10 +108,6 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
 
 export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
   return parseActivityContent(await io.readText(activityFile(root)))
-}
-
-export async function saveActivity(root: string, items: EvolutionActivityRecord[], io: EvolutionIoLike): Promise<void> {
-  await io.writeText(activityFile(root), serializeActivity(items))
 }
 
 export const name = 'evolution-activity'

@@ -1,5 +1,8 @@
 # Evolution plugin family
 
+> **V8-22 (0.3.49):** `packages/README.md` is a copy of this file — change
+> both together (the packages copy carries the same note at its top).
+
 Hermes-style self-evolution for DeepSeek Harness, implemented as composable
 Cordis plugins. The model may only propose and write **memory** and **skills**;
 policy, prompts, routing, state, and audit history are control-plane data.

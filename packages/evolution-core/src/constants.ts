@@ -50,7 +50,6 @@ export const MAX_SKILL_FILE_BYTES = 1_048_576
 
 export const DEFAULT_REVIEW_MEMORY_INTERVAL = 10
 export const DEFAULT_REVIEW_SKILL_INTERVAL = 10
-/** Skill-review completion channel trigger mode: 'cadence' | 'completion' | 'both'. */
 /** Skill-review completion channel trigger mode: 'cadence' | 'completion' | 'both'.
  * 0.3.39 (V6-53 follow-up): default is 'cadence' — since 0.3.38 the cadence
  * channel's review is executed at conversation END (deferred), so 'both' would

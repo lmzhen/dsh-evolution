@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-evolution-state
 
-Durable storage-domain-backed evolution state with JSON fallback
+Provider-selection surface for durable curator and review state records
 
 ## Model Experience
 

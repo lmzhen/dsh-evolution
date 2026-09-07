@@ -1012,12 +1012,6 @@ export class EvolutionCurator extends Service {
   }
 
   /**
-   * Keep only the newest N curator reports, ordered by the report's own
-   * `startedAt` (the runId is a UUID and cannot order history). Best-effort
-   * like `retainSnapshots`: a failed removal must not fail the run that just
-   * persisted its report. The paired `.md` digest is pruned with its JSON.
-   */
-  /**
    * Keep only the newest N curator run reports plus at most `errorKeep` error
    * reports, ordered by the report's own `startedAt` (the runId is a UUID and
    * cannot order history). Best-effort like `retainSnapshots`: a failed removal

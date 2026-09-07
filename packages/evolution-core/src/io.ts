@@ -19,9 +19,12 @@ export interface EvolutionIoLike {
   copy(path: string, destination: string): Promise<void>
   /**
    * Optional byte-size probe for the read guard. Return the file's size in
-   * bytes, or `null`/`undefined` when unknown (unsupported backend, missing
-   * file, stat failure). An implementation without this probe gets no guard:
-   * consumers treat an unknown size as "guard not applicable".
+   * bytes, or `null` when the file does not exist (ENOENT/ENOTDIR);
+   * V8-23⑨ (0.3.49): the doc claimed "stat failure → null" but the
+   * implementation propagates other stat errors — only missing-file is a
+   * "guard not applicable" signal, a real stat failure is an IO error.
+   * An implementation without this probe gets no guard: consumers treat an
+   * unknown size as "guard not applicable".
    */
   size?(path: string): Promise<number | null>
   /**

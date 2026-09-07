@@ -280,7 +280,7 @@ function serialize(items: EvolutionActivityRecord[]): string {
       { sessionId: 's-a', planId: 'p-1', memoryApplied: 1, skillApplied: 2, rejectedOps: 0, at: 123 },
     ]
     const raw = serializeActivity(items)
-    // The versioned envelope is the one format both saveActivity and apply() emit.
+    // The versioned envelope is the one format the apply() listener emits.
     expect(JSON.parse(raw)).toEqual({ version: ACTIVITY_FILE_VERSION, items })
     // The matching reader decodes it back to the same records (no drift).
     expect(parseActivityContent(raw)).toEqual(items)

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.49 (patch) — v8 审计批 6（收尾）：文档同步 + 死代码清扫 + 测试缺口（V8-22/23）
+
+**来源**：v8 审计报告批次 6（L6 文档 + T 横切）——v8 审计轮最后一个版次。
+
+- **V8-22 [P3]**：`packages/README.md` 补根 README 的两段补句（preset install 注记 + 双布局命令路径规则）——0.3.43 的修复只落了根副本；两文件头部互加 **「双副本需同步修改」** 注记（不做生成机制/守卫脚本——漂移面仅两处，手动同步 + 互注成本最合理）。
+- **V8-23 [P3·死代码/文档漂移批]**（十二子项）：
+  - **删除**：`saveActivity`（零生产调用、apply 直用 transactIo+serialize——含 F-304 注释更新与测试注释修正）、`summarizeAssessment`（零生产引用，jsdoc「for tests and replays」失实——含测试删除与类型导入清理）、constants 与 review 两处过期 doc-comment（合并残渣）、curator 孤儿 JSDoc、plan-validator 零 import 的 schemastery 运行时依赖、evolution-state 的 storage-domain/state-domain 幽灵 devDeps、evolution-state README 标题改写。
+  - **修正**：io.ts size/mtime doc 对齐实现（仅 ENOENT/ENOTDIR 归 null，其余 stat 错误是 IO error）、tsconfig.host.json 悬挂指针加 "(upstream tree only)" 限定。
+  - **补齐**：state-json 漏报 io-node devDeps（9 spec 实测用）、state-domain 漏报 storage/storage-json（3 spec 实测用）。
+  - **点修**：orchestrate maxDepth 加 Number.isFinite 守卫（导出 API 面——NaN/负值防折叠）；plan-validator memory ops 按 V6-26 口径写回显式 `action: 'add'`（新消费端不再猜默认）；memory 漂移备份改**固定名 `<file>.bak`**（写前删旧——原 `.bak.<stamp>` 无保留策略跨会话无限累积；既有测试断言同步适配）。
+- **T 横切**：V7-11 累计预算专项用例（多命中 replaceAll 超累计预算 → 整体拒绝——此前 fuzzy-patch.spec 无该专项，覆盖靠随机 fuzz；判别用例：300 段 × 单次 ~1M 扫描 ≈ 累计 300M ≫ 8M——`## Section  title` 双空格形态保证 fuzzy 非 exact 命中）。
+- **门禁**：受影响面全绿（skill-store 37/memory-store 19/activity 12/render-facts 4/validator 11/review 28）；oxlint 0/0（全树）；tsc 0（四包 --force）；全量以 CI Linux 为准。**v8 审计轮 24 项新发现 + 平台对照全部闭环：修 19 / 核验不修 2（V7-10 观察项延续、V8-04 已修）/ 文档 3**。
+
 ## 0.3.48 (patch) — v8 审计批 3+5：review 状态机收尾 + 发布链守卫（V8-03/04/17/18/19/20/21）
 
 **来源**：v8 审计报告批次 3（L4 状态机）+ 批次 5（L6 发布链守卫）合并。

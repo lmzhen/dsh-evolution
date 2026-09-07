@@ -1,5 +1,7 @@
 {
-  // Host aggregate (one of the two check units; see tsconfig.json). packages/client
+  // Host aggregate (one of the two check units; see tsconfig.json — the
+  // aggregate itself exists in the UPSTREAM tree only; the flat mirror ships
+  // the standalone host/client pair, G5.5). packages/client
   // type-checks in tsconfig.client.json: the two sides merge cordis Context under
   // the same keys, one program cannot see both.
   "extends": "./tsconfig.base.json",

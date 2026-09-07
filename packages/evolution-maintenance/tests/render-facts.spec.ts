@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeDriftSignals, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
-import { renderFacts, summarizeAssessment } from '../src/index.ts'
+import { renderFacts } from '../src/index.ts'
 
 const HEALTHY = '# A\n\n## When to Use\n\n- x\n'
 const shortDescription = 'Does one thing well.'
@@ -65,18 +65,3 @@ describe('renderFacts', () => {
   })
 })
 
-describe('summarizeAssessment', () => {
-  it('summarizes a clean skill', () => {
-    const report = computeDriftSignals([{ name: 'clean', body: HEALTHY, description: shortDescription }])
-    expect(summarizeAssessment(report.skills[0]!)).toBe('clean: clean')
-  })
-
-  it('summarizes over signals', () => {
-    const report = computeDriftSignals([
-      { name: 'fix-thing', body: '# x\n\n## A\n\n## A\n' + 'z'.repeat(2_500), description: 'x.y.'.repeat(20) },
-    ])
-    const summary = summarizeAssessment(report.skills[0]!)
-    expect(summary).toContain('over')
-    expect(summary.split(':')[1]?.trim().split(',')).toContain('dup_heading')
-  })
-})
