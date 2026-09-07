@@ -6,7 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -307,7 +307,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
             return ok(`Maintenance scan is already running (since ~${running}s ago) — re-submitting now would cancel it. Wait for it to settle; the result appears when it finishes.`)
           }
-          const cooldownMs = config.maintainCooldownMs ?? 30_000
+          // V8-07 (0.3.47): the cooldown joins the clampedNumber family — a
+          // NaN used to disable the cooldown silently (`NaN > 0` is false,
+          // exactly the repeated-model-call case this guards) and ±Infinity
+          // made every resubmission cooldown-blocked forever.
+          const cooldownMs = clampedNumber(config.maintainCooldownMs, 30_000, { min: 0 })
           const sinceLast = Date.now() - lastMaintainAt
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)
@@ -426,9 +430,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!toFile.startsWith('references/')) return err('to_file must live under references/ (log/detail destination).')
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
-          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
+          // V8-08 (0.3.47): the command's restructure write joins the single
+          // write-sink discipline — the skill-catalog cache invalidation
+          // event fires like every other mutating construction point.
+          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
           if (!result.ok) return err(result.message)
+          // Same mutating observation surface as skill_manage performs for the
+          // same action — the patch_count bump keeps the signals coherent.
+          await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
         }
         if (input === 'replay') {

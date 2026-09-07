@@ -44,10 +44,13 @@ const PATTERNS: ThreatPattern[] = [
   { label: 'context_exfil', category: 'exfiltration', scope: 'strict', regex: /(?:include|output|print|share)\s+(?:the\s+)?(?:conversation|chat\s+history|previous\s+messages|(?:full|entire)\s+context)/i },
   { label: 'send_to_url', category: 'exfiltration', scope: 'strict', regex: /(?:send|post|upload|transmit)\s+[^\n]{0,512}\s+(?:to|at)\s+https?:\/\//i },
 
-  // Shell-based secret exfiltration.
-  { label: 'exfil_curl', category: 'exfiltration', scope: 'all', regex: /curl\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
-  { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /wget\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
-  { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /cat\s+[^\n]{0,512}(?:\.env|credentials|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
+  // Shell-based secret exfiltration. V8-13 (0.3.47): `\b` word boundaries —
+  // the bare `cat`/`curl`/`wget` substrings matched inside `concat`/`scurl`
+  // prose (`[^\n]{0,512}` can be empty), locking EVERY write; the C2 table
+  // next to this one already uses `\b` — this row now matches that discipline.
+  { label: 'exfil_curl', category: 'exfiltration', scope: 'all', regex: /\bcurl\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
+  { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /\bwget\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
+  { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env|credentials|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
 
   // Persistence / backdoor / harness-config tampering.
   { label: 'ssh_backdoor', category: 'persistence', scope: 'strict', regex: /authorized_keys/i },

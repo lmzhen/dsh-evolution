@@ -46,4 +46,13 @@ describe('redactSecrets (E-1, 0.3.16)', () => {
   it('is idempotent', () => {
     expect(redactSecrets(redactSecrets('use sk-abcdefghij123456 tomorrow'))).toBe('use <redacted> tomorrow')
   })
+
+  it('V8-12: sk-only patterns carry a word boundary (task-/risk- words are not keys)', () => {
+    // `sk-` alone used to match inside `task-…`/`risk-…` identifiers — an
+    // identifier ending in `sk-` plus a ≥16-char suffix was masked wholesale.
+    expect(redactSecrets('task-2024010112345678')).toBe('task-2024010112345678')
+    expect(redactSecrets('risk-abcdef0123456789')).toBe('risk-abcdef0123456789')
+    // The real shape still redacts.
+    expect(redactSecrets('use sk-abcdefghij123456 tomorrow')).toBe('use <redacted> tomorrow')
+  })
 })

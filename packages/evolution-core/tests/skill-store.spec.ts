@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authoringFeedback, resolveSkillsRoot, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -127,6 +127,15 @@ it('V8-11: a concurrent patch between the consolidate pre-read and commit surviv
   expect(merged).toMatch(/consolidated from src-a/)
   expect(merged).toMatch(/PATTERNED-BODY-MARKER/)
   await rm(root, { recursive: true, force: true })
+})
+
+it('V8-10: restructure targets with double dots are refused by the shared predicate (0.3.47)', () => {
+  // The restructure validator AND the skill-store kernel share the same RE —
+  // a `references/my..notes.md` target used to be creatable while every later
+  // patch/write/remove on it was refused as traversal (an orphan file).
+  expect(RESTRUCTURE_TARGET_RE.test('references/my..notes.md')).toBe(false)
+  // Legitimate single-dot names still pass.
+  expect(RESTRUCTURE_TARGET_RE.test('references/v1.2.md')).toBe(true)
 })
 
 it('archive fallback rolls back the copied archive when the source cannot be removed (E-14, 0.3.16)', async () => {

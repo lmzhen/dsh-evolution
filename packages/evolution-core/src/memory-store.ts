@@ -278,7 +278,11 @@ export class MemoryStore {
     }
     const threat = scanMemoryThreats(content)
     if (threat) return { result: { ok: false, message: threat, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
-    if (hasEntryDelimiter(content)) {
+    // V8-02 (0.3.47): the delimiter guard must inspect the FINAL on-disk entry
+    // — with addDatePrefix the prefix+content seam can SYNTHESIZE `\n§\n`
+    // (`§\nfoo` passes the pre-prefix check but becomes `## date\n§\nfoo`).
+    const prefixed = this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${content}` : content
+    if (hasEntryDelimiter(prefixed)) {
       // F-201: a fact carrying the delimiter (or ending in `\n§`) would split
       // into multiple entries on read-back, and a delimiter-ending fact is
       // permanent drift. Refuse up front with the position so the model can
@@ -356,11 +360,14 @@ export class MemoryStore {
         if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = scanMemoryThreats(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
-        if (hasEntryDelimiter(body)) {
+        // V8-02 (0.3.47): same post-prefix inspection as addCore — the
+        // `## date\n${body}` seam must not synthesize the delimiter.
+        const entryBody = this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body
+        if (hasEntryDelimiter(entryBody)) {
           return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
         if (!working.some(entry => stripDatePrefix(entry) === body)) {
-          working.push(this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body)
+          working.push(entryBody)
         }
         continue
       }

@@ -8,7 +8,6 @@ it('memory add and batch (replace/remove semantics via applyBatch)', async () =>
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-'))
   const store = new MemoryStore({ root, memoryCharLimit: 400 })
   expect((await store.add('memory', 'User prefers concise answers.')).ok).toBe(true)
-  expect((await store.add('memory', 'User prefers concise answers.')).ok).toBe(true)
   expect((await store.read('memory')).length).toBe(1)
   expect((await store.applyBatch('memory', [{ action: 'replace', old_text: 'concise', facts: 'User prefers terse answers.' }])).ok).toBe(true)
   expect((await store.read('memory'))[0]).toBe('User prefers terse answers.')
@@ -347,4 +346,16 @@ it('a failed write to a MISSING file keeps it missing (M-4)', async () => {
   expect(await io.exists('root/MEMORY.md')).toBe(false)
   await store.add('memory', 'also-too-long-for-ten')
   expect(await io.exists('root/MEMORY.md')).toBe(false)
+})
+
+it('V8-02: with addDatePrefix a leading-§ fact is refused on the FINAL entry (0.3.47)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-v802-'))
+  const store = new MemoryStore({ root, addDatePrefix: true })
+  const result = await store.add('memory', '§\nfoo') // ``## <date>\n§\nfoo`` would synthesize the delimiter at the seam
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('delimiter')
+  // Without the prefix the same fact is a legal entry (unchanged behavior).
+  const plain = new MemoryStore({ root, addDatePrefix: false })
+  expect((await plain.add('memory', '§\nfoo')).ok).toBe(true)
+  await rm(root, { recursive: true, force: true })
 })

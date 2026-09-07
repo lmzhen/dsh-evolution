@@ -75,8 +75,13 @@ export interface SkillRestructureMove {
 /** Upper bound of moves per restructure proposal (validator and core agree). */
 export const MAX_RESTRUCTURE_MOVES = 5
 
-/** Restructure targets are plain markdown files under references/ — no subdirectories, no other support kind. */
-export const RESTRUCTURE_TARGET_RE = /^references\/[a-z0-9][a-z0-9._-]*\.md$/
+/** Restructure targets are plain markdown files under references/ — no
+ * subdirectories, no other support kind. V8-10 (0.3.47): the regex-level
+ * `(?!.*\.\.)` keeps the restructure-created set EXACTLY the set
+ * validateSupportPath can reopen — a `references/my..notes.md` target (double
+ * dots) used to pass here while every later patch/write/remove on it was
+ * refused as traversal (an orphan file the user could not touch). */
+export const RESTRUCTURE_TARGET_RE = /^references\/[a-z0-9](?!.*\.\.)[a-z0-9._-]*\.md$/
 
 /** Extra file name carried inside a snapshot's `extras/` directory. */
 export const SNAPSHOT_EXTRA_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/

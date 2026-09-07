@@ -9,7 +9,10 @@
  */
 
 const SECRET_PATTERNS: Array<[string, RegExp]> = [
-  ['openai-style key', /sk-[A-Za-z0-9_-]{16,}/g],
+  // V8-12 (0.3.47): `\b` left boundary — `sk-` alone matched inside
+  // `task-…`/`risk-…` words (the other patterns already carry their own
+  // anchors: AKIA/ghp_/glpat-/xox).
+  ['openai-style key', /\bsk-[A-Za-z0-9_-]{16,}/g],
   ['aws access key', /AKIA[0-9A-Z]{16}/g],
   ['github token', /gh[pousr]_[A-Za-z0-9]{20,}/g],
   ['gitlab token', /glpat-[A-Za-z0-9_-]{16,}/g],

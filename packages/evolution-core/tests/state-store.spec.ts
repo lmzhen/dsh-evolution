@@ -23,4 +23,10 @@ describe('evolutionRoot / evolutionHome (0.3.22 G3.2, F-207)', () => {
     expect(evolutionRoot(env)).toBe('dsh-home-x/evolution')
     expect(evolutionHome(env)).toBe(join('dsh-home-x', 'evolution', 'evolution'))
   })
+
+  it('V8-06: a WHITESPACE-ONLY DSH_HOME falls back too (upstream trim() adoption test)', () => {
+    const env = { DSH_HOME: '   ' }
+    expect(evolutionRoot(env)).toBe(join(homedir(), '.dsh'))
+    expect(evolutionHome(env)).toBe(join(homedir(), '.dsh', 'evolution'))
+  })
 })

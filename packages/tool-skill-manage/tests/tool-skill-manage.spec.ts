@@ -434,6 +434,28 @@ Use it.
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
   })
+
+  it('V8-09: a non-array restructure argument is a structured refusal, not a TypeError (0.3.47)', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`v809-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    const result = await execute({ action: 'restructure', name: 'anything', restructure: 5 })
+    // The tool schema rejects the malformed value first (isError with a schema
+    // message); the executeCore Array.isArray guard is the second line for a
+    // value that slips past — either way it is a STRUCTURED refusal, never a
+    // bare `.map` TypeError.
+    expect(result.isError).toBe(true)
+    const box = result.value as { message?: string } | undefined
+    expect(box?.message ?? '').not.toContain('TypeError')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true })
+  })
 })
 
 

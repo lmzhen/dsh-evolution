@@ -244,8 +244,15 @@ export function lifecycleCandidate(
   config: CuratorConfig,
   bundled: boolean,
   gates: EvolutionGateSet = createGateSet(config),
+  // V8-14 (0.3.47): marker-protected names are NOT candidates — the scope view
+  // bucketed them as protected but the transition engine still treated an
+  // agent-created marker skill as managed (it appeared in managed[] and
+  // protected[] at once, and the engine produced a failed archive step that
+  // deleteProtection then refused).
+  protectedNames?: ReadonlyMap<string, string>,
 ): boolean {
   if (record.pinned) return false
+  if (protectedNames?.has(name) === true) return false
   // One shared GateSet answers exclude / referenced / suppressed and the
   // protected-builtin list (decision B) - identical verdicts to the former
   // three inline set checks plus the builtin check.
@@ -303,7 +310,7 @@ export function computeScopeView(
     // protected so the view always predicts what a curator pass may touch.
     const isBuiltin = PROTECTED_BUILTIN_SKILLS.has(name)
     if (record.pinned || bundled || suppressed || protectedNames?.has(name) === true || isBuiltin) protectedSet.add(name)
-    if (lifecycleCandidate(name, record, config, bundled, gateSet)) {
+    if (lifecycleCandidate(name, record, config, bundled, gateSet, protectedNames)) {
       managed.push(name)
       if (record.state === 'stale' || record.quality_warn === true) watched.push(name)
       if (record.quality_warn === true) qualityWarned.push(name)
@@ -328,6 +335,11 @@ export function computeLifecycleTransitions(
   config: CuratorConfig,
   now = new Date(),
   gates?: EvolutionGateSet,
+  // V8-14 (0.3.47): marker-protected names (bundled / hub-installed / pinned
+  // markers from SkillLibrary.list()) never enter the transition engine — the
+  // scope view already buckets them as protected; passing the same set keeps
+  // the two derivations in agreement.
+  protectedNames?: ReadonlyMap<string, string>,
 ): CuratorResult {
   const result: CuratorResult = { transitions: [], archive: [], reactivate: [], markStale: [] }
   // One GateSet per run (decision B): callers holding a shared instance pass
@@ -335,7 +347,7 @@ export function computeLifecycleTransitions(
   const gateSet = gates ?? createGateSet(config)
   for (const [name, record] of usage) {
     const bundled = config.bundledNames?.has(name) === true
-    if (!lifecycleCandidate(name, record, config, bundled, gateSet)) continue
+    if (!lifecycleCandidate(name, record, config, bundled, gateSet, protectedNames)) continue
 
     const age = daysSince(null, record.created_at, now.getTime())
     if (record.use_count === 0 && age < config.staleAfterDays) continue

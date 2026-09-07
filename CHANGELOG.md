@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.47 (patch) — v8 审计批 2+4：守卫与口径批（V8-02/06/07/08/09/10/12/13/14）
+
+**来源**：v8 审计报告批次 2（L2 守卫）+ 批次 4（工具命令面）合并；V8-06（plan 批次遗漏项）补入。9 项全部先核验后修复。
+
+- **V8-02 [P2·数据完整性]**：memory 分隔符守卫改为检查**最终落盘 entry**（`addDatePrefix` 前缀与内容的接缝可合成 `\n§\n`——`§\nfoo` 过旧守卫但变 `## date\n§\nfoo` 后分裂为两条且 drift 假阴性）——addCore 与 applyBatch 两入口同修；判别用例（addDatePrefix:true + `§\nfoo` → 拒；无前缀同 fact 行为不变）。
+- **V8-06 [P3·口径]**：`evolutionRoot` 的 DSH_HOME 空串守卫扩展为 **trim**（上游 home-paths `trim().length > 0` 采纳测试）——`DSH_HOME=" "` 不再产生 CWD 相对侧车（/evolution preset install 与 evolutionHome 同源修复）；判别用例。
+- **V8-07 [P3·配置]**：maintainCooldownMs 接入家族 clampedNumber 管道（min:0 保留「0=禁用冷却」）——NaN 曾静默禁用冷却（恰是该配置要防的重复模型调用场景）、±Infinity 曾永久冷却；**注意**：cordis 加载剥键（0.3.45 实证）使该路径经 schema 即默认值——clamp 为直构/深度垃圾的防御层（判别=clampedNumber 既有测试族 + 注释说明）。
+- **V8-08 [P3·观测面]**：`/evolution restructure` 命令的 SkillLibrary 构造接入**单一写汇**（第 4 参 onMutation——`evolution/skill-mutated` 事件此刻发出）+ 成功后 `skillUsage.record(name,'patch')`（与 skill_manage 同动作的观测面一致）；判别用例（端到端 restructure → 事件 `{action:'restructure', name}` 收到）。
+- **V8-09 [P3·形状守卫]**：skill_manage 的 `args.restructure` 加 `Array.isArray` 守卫（非数组垃圾实参曾 `.map` TypeError）——第二道防线（tool schema 先拒）；测试证「结构化拒绝 non-TypeError」。
+- **V8-10 [P3·双口径单源]**：RESTRUCTURE_TARGET_RE 加 `(?!.*\.\.)`——restructure 可创建的集合与 validateSupportPath 可打开的集合重合（`references/my..notes.md` 曾可建不可开——孤儿文件；RE 侧收紧而非放宽 traversal 面）；判别用例（双点拒/单点存）。
+- **V8-12 [P3·误伤]**：redact `sk-` 模式加 `\b` 左边界（`task-…`/`risk-…` 词尾 sk- 曾整段误红）；判别用例（task-/risk- 不误伤 + 真密钥仍红）。
+- **V8-13 [P3·误伤（行为契约放宽，CHANGELOG 声明）】**：threats exfil 组 `cat/curl/wget` 加 `\b` 词边界（`concat .env files` 曾触发 scope='all' 全局写封锁——任意 prose 命中即全锁）；判别用例（concat/wget-demo/scurl 不触发 + 真 `cat .env`/`curl "$API_KEY"`/`wget "$TOKEN"` 仍封锁）。
+- **V8-14 [P3·视图口径]**：lifecycleCandidate 与 computeLifecycleTransitions 增加 **protectedNames 参数**（与 computeScopeView 共享同一 marker 集）——marker 保护的 `created_by:'agent'` 技能不再同时出现在 managed[] 与 protected[]（视图与转移 parity 恢复；转移引擎不再产生被 deleteProtection 拒绝的 failed 噪声）；判别用例（marker+agent → protected 有、managed 无、archive 无）。
+- **门禁**：受影响面全绿（memory-store 19/redact 7/threats 9/state-store 4/skill-store 36/curator 50/commands 30/tool-skill-manage 17=172）；oxlint 0/0（全树 194 文件）；tsc 0（三包 --force）；全量以 CI Linux 为准。
+
 ## 0.3.46 (patch) — v8 审计批 1：L1 存储与并发基座（V8-05/15/16/11）
 
 **来源**：v8 审计报告批次 1（L1 基座——先核验再修，四项均亲核属实后落地）。

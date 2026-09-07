@@ -140,7 +140,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin)
     else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin)
     else if (action === 'restructure') {
-      result = await library.restructure(name, (args.restructure ?? []).map(move => ({
+      // V8-09 (0.3.47): `args.restructure` is an ARRAY — a non-array payload
+      // (garbage that slipped past the schema) used to throw a bare `.map`
+      // TypeError; the family posture is a structured refusal instead.
+      const moves = Array.isArray(args.restructure) ? args.restructure : []
+      result = await library.restructure(name, moves.map(move => ({
         heading: move.heading ?? '',
         toFile: move.to_file ?? '',
       })), origin)

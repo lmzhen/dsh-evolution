@@ -322,6 +322,10 @@ describe('evolution-commands', () => {
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
     try {
       const ctx = new Context()
+      // V8-08 (0.3.47): the command's restructure now wires the single
+      // write-sink so the skill-catalog cache invalidation event fires.
+      let mutatedEvent: unknown
+      ctx.on('evolution/skill-mutated', (event) => { mutatedEvent = event })
       let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
@@ -338,6 +342,7 @@ describe('evolution-commands', () => {
       await ctx.plugin(Commands, { skillsRoot: root })
       const result = await captured!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
       expect(result.kind).toBe('success')
+      expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
       const body = await io.readText(join(skillDir, 'SKILL.md'))
       expect(body).not.toContain('old detail')
       expect(body).toContain('references/log.md')
