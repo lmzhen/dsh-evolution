@@ -27,6 +27,18 @@ describe('renderFacts', () => {
     expect(rendered).toContain('# skill=align-test-ops')
   })
 
+  it('V9-09: the dup_heading OVER shape renders its measured value — a pass-only assertion could not catch a dropped over path', () => {
+    // The healthy-body assertion above pins the pass shape; an over verdict
+    // must render the same face (value = the dup announcement) so the facts
+    // block is never silently missing the measurement.
+    const overReport = {
+      library: [],
+      skills: [{ name: 'dupe', signals: [{ id: 'dup_heading', verdict: 'over' as const, value: '重复标题(2)', threshold: 'count >= 2' }] }],
+    }
+    const rendered = renderFacts(overReport, { signalsVersion: '1', signature: 's' })
+    expect(rendered).toContain('[FACT] signal=dup_heading value=重复标题(2) verdict=over threshold=count >= 2')
+  })
+
   it('always carries protection + catalog meta on every skill header (0.3.11)', () => {
     const rendered = renderFacts(report, { signalsVersion: '1', signature: 's' })
     expect(rendered).toContain('# skill=align-test-ops (protected=none catalog=visible)')

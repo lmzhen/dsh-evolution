@@ -47,9 +47,13 @@ export interface EvolutionIoLike {
   /**
    * Optional mtime-generation probe (0.3.18, E-71): the path's mtime in
    * milliseconds since epoch, or `null` when unknown (unsupported backend,
-   * missing path, stat failure). Consumers use it as a cheap invalidation
-   * stamp for a cached directory listing; a backend without it keeps
-   * event-driven invalidation only.
+   * missing path, stat failure). Intended as a cheap invalidation stamp for a
+   * cached directory listing; a backend without it keeps event-driven
+   * invalidation only. V9-07 (0.3.51): as of this release NO in-tree consumer
+   * calls it — skill-catalog invalidation is event-driven
+   * (`evolution/skill-mutated` / `evolution/skills-refresh`). The probe stays
+   * as a backend contract extension point; document it here before wiring a
+   * consumer.
    */
   mtime?(this: void, path: string): Promise<number | null>
 }

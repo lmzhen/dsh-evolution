@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.51 (patch) — v9 审计批 2：口径与判别力批（V9-05~12）
+
+**来源**：v9 审计报告剩余八项——文档口径修正（`~` 展开挂账、CHANGELOG 失实句、mtime 消费方声明）+ 实现与注释对齐（threats 边界、redact 锚注、maxDepth 守卫、.bak 失败形态）+ 测试判别力补强。全部先核验后修复，无报告字面照办。
+
+- **V9-05 [P3·口径/分裂脑]**：三处 DSH_HOME resolver 行为分裂——`state-store.evolutionRoot()` 有 trim 守卫（V8-06，自称 single source），而 `memoryRoot`/`skillsRoot` 仍用裸 `||`：`DSH_HOME=" "` 曾解析到 CWD 相对 `" /memories"` 侧车。**修复**：两个 root 复用 `evolutionRoot()`（核心逻辑单点，注释指向）；判别用例（三 root 对空串/空白/真实值行为一致——用一个用例钉住 split-brain 不再复发）。
+- **V9-06 [P3·历史文档失实句]**：0.3.47 的 V8-14 条目隐含交付「parity 恢复 + 无 failed 噪声」——但当时仅函数级参数接线，生产 run() 仍 4 参（0.3.50 V9-02 才补）。**修复**：该条目附**更正注记**（历史句按交付事实保留，注记为当前权威陈述：0.3.47=函数级；0.3.50=生产接线；0.3.51=注记）。
+- **V9-07 [P3·文档失实]**：io.ts 的 `mtime` 探针注释称「Consumers use it as a cheap invalidation stamp」——**全树无消费方**（skill-catalog 失效是事件驱动的 `skill-mutated`/`skills-refresh`）。**修复**：注释如实化（无消费方声明，探针保留为后端契约扩展点，接线前先补文档）。
+- **V9-08 [P3·边角声明]**：0.3.49 固定名 `.bak` 的 two failure shapes 未声明——(1) 旧 `.bak` 删除失败：无害（copy 契约=覆盖 `cp force`）；(2) copy 失败：backup null → 拒绝消息无备份后缀、语义不变。**修复**：backupFile 注释声明两形态 + 判别用例（copy 抛错 → 拒绝消息无 backup 后缀 + drift 语义保留）。
+- **V9-09 [P3·测试断言]**：① 重复 add 容忍（`no duplicate added`）实现存在但**无断言**（曾消失）——恢复判别用例（add 重复 → ok:true + 消息含 no duplicate added + 条目数不变；batch add 同容忍）；② render-facts 的 dup_heading 只有 pass 形态断言——补 **over 形态渲染断言**（value=重复标题(2) verdict=over 完整面）。
+- **V9-10 [P3·边界/注释]**：① threats `ssh_backdoor` `/authorized_keys/i` 无 `\b`——`unauthorized_keys` 类复合词曾误红（C2 表纪律对齐）；真实 `.ssh/authorized_keys` 引用不受影响；判别用例（复合词不触发 + 真 .ssh 引用封锁）。② redact 注释「other patterns already carry their own anchors」**失实**——JWT（`eyJ…`）与 bearer 行并无左锚；注释如实化（无 `\b` 是有意选择，出现真误报再评估）。
+- **V9-11 [P3·挂账]**：evolution 配置路径面（`skillsRoot`/`eventsHome`/preset target）**不展开 `~`**——主库 `@deepseek-ai/dsh-home-paths` 的 `expandHomePath` 未复用；`skillsRoot:"~/skills"` 按字面解析。**挂账（低严重度暂不修）**——平台层无统一展开契约，家族自行展开会造成行为分裂；登记 `known-limitations 局限九`（触发条件：真实用户反馈 `~` 不生效时再评估，首选项=复用主库 expandHomePath 于 resolveSkillsRoot 单点）。
+- **V9-12 [P2·测试判别力专项]**（五项，全部红转绿可判别）：
+  1. **approval 重放路径**：approve 的两个未测分支补判别——runner **throw**（`{ok:false}` 之外的形态：记录保持 pending + claim 释放，`remains pending` 消息）与 **无 runner** approve（claim 释放 + `No replay runner registered` + 记录仍可 reject）；
+  2. **V8-08 record 半边**：restructure 端到端用例此前只断言事件——补 `skillUsage.record(name,'patch')` 断言（记录行被误删时用例必须红）；
+  3. **maxDepth 守卫**：实现与注释不一致——负数通过 `Number.isFinite` 却被注释声称兜底 1。**修复**：守卫补 `>= 1`（注释与实现对齐）+ 行为用例（NaN/Infinity/0/-2 → 1；合法 4 原样透传）；
+  4. **plan-validator action 写回**：V8-23⑪ 的 memory 侧无 action→`add` 写回有实现无断言——补判别用例（skill 侧 V6-26 对称既有）；
+  5. **.bak 判别精确化**：三处 `startsWith('MEMORY.md.bak')` 是前缀超集（时间戳累积形态也会绿）——改**精确名**判别 + 固定名覆盖用例（两次漂移 → 恒 1 个 .bak 且为最新字节）。
+- **门禁**：core 316/316（+状态 22/memory 22/threats 10）+ approval 20（+2）+ maintenance 92（+orchestrate 21/render-facts 5 含新）+ validator 12（+1）+ commands（含 record 半边断言）；oxlint 0/0（全树 194 文件）；tsc 0（五包 --force）；全量以 CI Linux 为准。
+
 ## 0.3.50 (patch) — v9 审计批 1：仓库状态与声明修复补完（V9-01/02/03/04）
 
 **来源**：v9 审计报告修正类批——三项「声明修复的补完」与一项修复引入回归。
@@ -49,6 +68,7 @@
 - **V8-12 [P3·误伤]**：redact `sk-` 模式加 `\b` 左边界（`task-…`/`risk-…` 词尾 sk- 曾整段误红）；判别用例（task-/risk- 不误伤 + 真密钥仍红）。
 - **V8-13 [P3·误伤（行为契约放宽，CHANGELOG 声明）】**：threats exfil 组 `cat/curl/wget` 加 `\b` 词边界（`concat .env files` 曾触发 scope='all' 全局写封锁——任意 prose 命中即全锁）；判别用例（concat/wget-demo/scurl 不触发 + 真 `cat .env`/`curl "$API_KEY"`/`wget "$TOKEN"` 仍封锁）。
 - **V8-14 [P3·视图口径]**：lifecycleCandidate 与 computeLifecycleTransitions 增加 **protectedNames 参数**（与 computeScopeView 共享同一 marker 集）——marker 保护的 `created_by:'agent'` 技能不再同时出现在 managed[] 与 protected[]（视图与转移 parity 恢复；转移引擎不再产生被 deleteProtection 拒绝的 failed 噪声）；判别用例（marker+agent → protected 有、managed 无、archive 无）。
+  - **更正注记（0.3.51 V9-06）**：本条目所述 parity 恢复在本版交付时只完成了**函数级**参数接线——生产 `run()` 当时仍以 4 参调用，运行态视图分裂与 failed 噪声依然存在；`run()` 第 5 参接线与全链路集成用例由 0.3.50（V9-02）补成。历史句按 0.3.47 交付事实表述，本注记为当前权威陈述。
 - **门禁**：受影响面全绿（memory-store 19/redact 7/threats 9/state-store 4/skill-store 36/curator 50/commands 30/tool-skill-manage 17=172）；oxlint 0/0（全树 194 文件）；tsc 0（三包 --force）；全量以 CI Linux 为准。
 
 ## 0.3.46 (patch) — v8 审计批 1：L1 存储与并发基座（V8-05/15/16/11）

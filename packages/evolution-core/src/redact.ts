@@ -10,8 +10,13 @@
 
 const SECRET_PATTERNS: Array<[string, RegExp]> = [
   // V8-12 (0.3.47): `\b` left boundary — `sk-` alone matched inside
-  // `task-…`/`risk-…` words (the other patterns already carry their own
-  // anchors: AKIA/ghp_/glpat-/xox).
+  // `task-…`/`risk-…` words. V9-10 (0.3.51): the "other patterns carry their
+  // own anchors" claim was overstated — AKIA/ghp_/glpat-/xox do carry a
+  // fixed prefix, but the JWT (`eyJ…`) and bearer rows have no left boundary
+  // at all (a `…xeyJ…` substring would redact mid-word). Deliberate: JWT
+  // body shapes never legitimately appear inside another word, and the
+  // bearer row's initial-cap `Bearer` form makes mid-word hits effectively
+  // nonexistent. Revisit only if a real false positive shows up.
   ['openai-style key', /\bsk-[A-Za-z0-9_-]{16,}/g],
   ['aws access key', /AKIA[0-9A-Z]{16}/g],
   ['github token', /gh[pousr]_[A-Za-z0-9]{20,}/g],

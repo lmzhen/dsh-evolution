@@ -253,9 +253,11 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       // maxDepth is the ABSOLUTE cap of the subagent's own depth (platform
       // resolveChildDepth: childDepth = parentDepth+1). 1 = subagent allowed,
       // nesting denied (2 > 1); 0 = spawn itself rejected (0.3.1 defect).
-      // V8-23⑩ (0.3.49): guard the exported option — a NaN/negative depth would
-      // fold into the platform's own rejection; fall back to the documented 1.
-      maxDepth: typeof options.maxDepth === 'number' && Number.isFinite(options.maxDepth) ? options.maxDepth : 1,
+      // V8-23⑩ (0.3.49): guard the exported option — a NaN/Infinity depth would
+      // fold into the platform's own rejection; V9-12 (0.3.51) extends the
+      // guard below 1 (negative depths pass `Number.isFinite` yet are equally
+      // outside the documented domain) — anything invalid falls back to 1.
+      maxDepth: typeof options.maxDepth === 'number' && Number.isFinite(options.maxDepth) && options.maxDepth >= 1 ? options.maxDepth : 1,
       agentOptions,
       persona: template,
       toolFilter: { allow: [...(options.toolAllow ?? ['skill', 'maintenance_probe'])] },

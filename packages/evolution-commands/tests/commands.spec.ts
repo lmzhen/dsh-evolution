@@ -326,6 +326,13 @@ describe('evolution-commands', () => {
       // write-sink so the skill-catalog cache invalidation event fires.
       let mutatedEvent: unknown
       ctx.on('evolution/skill-mutated', (event) => { mutatedEvent = event })
+      // V9-12 (0.3.51): the OTHER half of the V8-08 discipline — the
+      // skillUsage.record(...) observation — must be asserted too (an
+      // event-only assertion let a removed record() line pass silently).
+      const usageRecords: Array<[string, string]> = []
+      ctx.provide('skillUsage', {
+        record: async (name: string, kind: string) => { usageRecords.push([name, kind]) },
+      })
       let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
@@ -343,6 +350,7 @@ describe('evolution-commands', () => {
       const result = await captured!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
       expect(result.kind).toBe('success')
       expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
+      expect(usageRecords).toEqual([['demo-skill', 'patch']])
       const body = await io.readText(join(skillDir, 'SKILL.md'))
       expect(body).not.toContain('old detail')
       expect(body).toContain('references/log.md')

@@ -4,8 +4,8 @@
  */
 
 import { basename, join } from 'node:path'
-import { homedir } from 'node:os'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { scanMemoryThreats } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
@@ -67,7 +67,10 @@ export interface MemoryApplyResult {
 }
 
 export function memoryRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.DSH_HOME || join(homedir(), '.dsh'), 'memories')
+  // V9-05 (0.3.51): single resolver — evolutionRoot() holds the ONLY
+  // DSH_HOME empty/whitespace fallback; the old bare `||` here resolved
+  // `DSH_HOME=" "` to a CWD-relative " /memories" sidecar.
+  return join(evolutionRoot(env), 'memories')
 }
 
 function fileFor(root: string, target: MemoryTarget): string {
@@ -205,7 +208,12 @@ export class MemoryStore {
    * never loaded just to back it up. Failure to back up does not change the
    * refusal semantics. V8-23⑫ (0.3.49): ONE fixed backup name per target —
    * a fresh refusal overwrites it (the previous timestamped names accumulated
-   * per drift incident with no retention policy).
+   * per drift incident with no retention policy). V9-08 (0.3.51) declares the
+   * two failure shapes: (1) the pre-copy remove of the previous `.bak` fails —
+   * harmless, because the copy contract is overwrite (`cp force`);
+   * (2) the copy itself fails (disk/backend) — returns `null` and the refusal
+   * message simply carries no backup suffix; the refusal semantics and the
+   * on-disk file are untouched either way.
    */
   private async backupFile(target: MemoryTarget): Promise<string | null> {
     const path = fileFor(this.root, target)

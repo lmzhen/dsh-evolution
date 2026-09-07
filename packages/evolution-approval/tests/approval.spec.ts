@@ -376,6 +376,56 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('V9-12: a replay runner that THROWS keeps the record pending with its claim released (distinct from {ok:false})', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-throw-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    ctx.evolutionApproval.registerRunner('memory', async () => { throw new Error('runner backend exploded') })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'boom', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    const failed = await ctx.evolutionApproval.approve(id)
+    expect(failed.ok).toBe(false)
+    // The throw shape (not the runner {ok:false} shape): record stays pending
+    // AND the claim is released — a retry or reject can still act on it.
+    expect(failed.message).toContain('remains pending')
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
+    expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
+    const retry = await ctx.evolutionApproval.approve(id)
+    expect(retry.ok).toBe(false)
+    expect(retry.message).not.toContain('already resolved')
+    const rejected = await ctx.evolutionApproval.reject(id)
+    expect(rejected.ok).toBe(true)
+    await rm(home, { recursive: true, force: true })
+  })
+
+  it('V9-12: approve with NO replay runner releases the claim — record stays pending and rejectable', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-norunner-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    // No registerRunner at all (host-only composition case).
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'orphan', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    const approve = await ctx.evolutionApproval.approve(id)
+    expect(approve.ok).toBe(false)
+    expect(approve.message).toContain('No replay runner registered')
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
+    expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
+    const rejected = await ctx.evolutionApproval.reject(id)
+    expect(rejected.ok).toBe(true)
+    expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
+    await rm(home, { recursive: true, force: true })
+  })
+
   describe('effectiveSessionPolicy (G4.8, F-341)', () => {
     it('returns undefined when the platform approval service is not mounted', () => {
       const ctx = new Context()

@@ -52,8 +52,12 @@ const PATTERNS: ThreatPattern[] = [
   { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /\bwget\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
   { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env|credentials|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
 
-  // Persistence / backdoor / harness-config tampering.
-  { label: 'ssh_backdoor', category: 'persistence', scope: 'strict', regex: /authorized_keys/i },
+  // Persistence / backdoor / harness-config tampering. V9-10 (0.3.51):
+  // `\b` word boundaries — the bare `authorized_keys` substring matched inside
+  // OTHER underscore-joined words (`unauthorized_keys`-style compounds);
+  // real references are `.ssh/authorized_keys` / `~/.ssh/authorized_keys`,
+  // where the word sits on its own boundary.
+  { label: 'ssh_backdoor', category: 'persistence', scope: 'strict', regex: /\bauthorized_keys\b/i },
   { label: 'agent_config_mod', category: 'persistence', scope: 'strict', regex: /(?:update|modify|edit|write|change|append|add\s+to)\s+(?:AGENTS\.md|CLAUDE\.md|\.cursorrules|\.clinerules)/i },
   { label: 'hermes_env', category: 'persistence', scope: 'strict', regex: /\$?HOME\/\.hermes|~\/\.hermes|\.hermes\/\.env|%USERPROFILE%[\\/]\.hermes/i },
 

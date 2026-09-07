@@ -68,7 +68,7 @@ it('memory detects external file drift before mutation', async () => {
   // refusal, so an external edit stays recoverable.
   expect(result.message).toMatch(/backup was saved/)
   const { readdir, readFile } = await import('node:fs/promises')
-  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak'))
+  const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
   expect(await readFile(join(root, backups[0]!), 'utf8')).toContain('alpha')
   await rm(root, { recursive: true, force: true })
@@ -133,7 +133,7 @@ it('memory read guard skips oversized files and refuses writes with a byte-exact
   expect(refused.message).toContain('5000 bytes (limit 4000)')
   expect(refused.message).toContain('skipping read')
   expect(refused.message).toMatch(/backup was saved/)
-  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak'))
+  const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
   expect((await readFile(join(root, backups[0]!), 'utf8')).length).toBe(5000)
   // Injection side: the skipped block announces itself instead of vanishing.
@@ -180,7 +180,7 @@ it('memory drift flags a single entry above the store limit', async () => {
   expect(denied.ok).toBe(false)
   expect(denied.message).toContain('drift')
   expect(denied.message).toMatch(/backup was saved/)
-  const backups = (await readdir(root)).filter(name => name.startsWith('MEMORY.md.bak'))
+  const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
   await rm(root, { recursive: true, force: true })
 })
@@ -357,5 +357,70 @@ it('V8-02: with addDatePrefix a leading-§ fact is refused on the FINAL entry (0
   // Without the prefix the same fact is a legal entry (unchanged behavior).
   const plain = new MemoryStore({ root, addDatePrefix: false })
   expect((await plain.add('memory', '§\nfoo')).ok).toBe(true)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('V9-09: a duplicate add is tolerated with an explicit no-duplicate message (entry count unchanged)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-dup-'))
+  const store = new MemoryStore({ root })
+  const first = await store.add('memory', 'User prefers concise replies.')
+  expect(first.ok).toBe(true)
+  const dup = await store.add('memory', 'User prefers concise replies.')
+  expect(dup.ok).toBe(true)
+  // The tolerance must be VISIBLE to the model (silently claiming "Entry
+  // added." would double-count a fact it reuses).
+  expect(dup.message).toContain('no duplicate added')
+  expect(await store.read('memory')).toHaveLength(1)
+  // Batch add path keeps the same tolerance (silent skip, still ok).
+  const batch = await store.applyBatch('memory', [{ action: 'add', facts: 'User prefers concise replies.' }])
+  expect(batch.ok).toBe(true)
+  expect(await store.read('memory')).toHaveLength(1)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('V9-08: repeated drift refusals keep ONE fixed-name .bak holding the LATEST drifted content', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-bakcover-'))
+  const store = new MemoryStore({ root })
+  const { writeFile, readFile, readdir } = await import('node:fs/promises')
+  // First drift incident: exact-name discriminator (a timestamped-prefix
+  // filter cannot tell accumulation from the 0.3.49 fixed name — the old
+  // `startsWith('MEMORY.md.bak')` was a prefix-superset trap).
+  await store.add('memory', 'alpha')
+  await writeFile(join(root, 'MEMORY.md'), 'alpha\n§\n\n§\nbeta\n', 'utf8')
+  expect((await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])).ok).toBe(false)
+  let backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
+  expect(backups).toHaveLength(1)
+  expect((await readFile(join(root, backups[0]!))).toString()).toContain('alpha')
+  // Second incident: the same fixed file is overwritten (no accumulation) —
+  // a DIFFERENT structural drift (trailing extra blank line) and the backup
+  // holds the newest raw bytes, not the first incident's content.
+  await writeFile(join(root, 'MEMORY.md'), 'alpha\n§\nbeta\n\n', 'utf8')
+  expect((await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])).ok).toBe(false)
+  backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
+  expect(backups).toHaveLength(1)
+  expect((await readFile(join(root, backups[0]!))).toString()).toBe('alpha\n§\nbeta\n\n')
+  await rm(root, { recursive: true, force: true })
+})
+
+it('V9-08: a failing backup copy does not change the refusal — no backup suffix, semantics intact', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-bakfail-'))
+  const io: EvolutionIoLike = {
+    ...nodeEvolutionIo(),
+    copy: async (from, to) => {
+      void from
+      void to
+      throw new Error('disk full')
+    },
+  }
+  const store = new MemoryStore({ root, io })
+  const { writeFile } = await import('node:fs/promises')
+  await store.add('memory', 'alpha')
+  await writeFile(join(root, 'MEMORY.md'), 'alpha\n§\n\n§\nbeta\n', 'utf8')
+  const denied = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
+  expect(denied.ok).toBe(false)
+  expect(denied.message).toContain('drift')
+  // Failure shape (2): the backup silently no-ops — the refusal message
+  // carries no backup suffix and the drift semantics are untouched.
+  expect(denied.message).not.toMatch(/backup was saved/)
   await rm(root, { recursive: true, force: true })
 })

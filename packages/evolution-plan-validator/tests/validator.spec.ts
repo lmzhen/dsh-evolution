@@ -135,4 +135,14 @@ describe('evolution-plan-validator', () => {
     expect(result.accepted.skillOps).toHaveLength(1)
     expect(result.accepted.skillOps[0]?.action).toBe('patch')
   })
+
+  it('V8-23⑪: a missing MEMORY action is normalized to an explicit "add" on the accepted op (V9-12)', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [{ target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }],
+      skillOps: [],
+    }, { sessionSeq: 10 } satisfies Parameters<typeof validateEvolutionPlan>[1])
+    expect(result.ok).toBe(true)
+    expect(result.accepted.memoryOps).toHaveLength(1)
+    expect(result.accepted.memoryOps[0]?.action).toBe('add')
+  })
 })

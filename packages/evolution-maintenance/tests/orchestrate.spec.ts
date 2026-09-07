@@ -239,6 +239,29 @@ describe('runMaintain', () => {
     expect(outcome.text ?? '').toContain('quality_low gate')
   })
 
+  it('V8-23⑩: a non-finite or below-1 maxDepth falls back to 1 — never spawns with a platform-rejected depth (V9-12)', async () => {
+    const depths: Array<number | undefined> = []
+    const captureRuntime = (): MaintainRuntime => ({
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          depths.push((options as { maxDepth?: number }).maxDepth)
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    })
+    await runMaintain(captureRuntime(), { maxDepth: Number.NaN })
+    await runMaintain(captureRuntime(), { maxDepth: Number.POSITIVE_INFINITY })
+    await runMaintain(captureRuntime(), { maxDepth: 0 })
+    await runMaintain(captureRuntime(), { maxDepth: -2 })
+    // NaN/Infinity/0/negative all fold to the documented default 1 (a
+    // negative depth passes `Number.isFinite` — the guard must still reject it).
+    expect(depths).toEqual([1, 1, 1, 1])
+    // A valid depth passes through untouched.
+    await runMaintain(captureRuntime(), { maxDepth: 4 })
+    expect(depths[4]).toBe(4)
+  })
+
   it('routes the subagent model off evolutionPolicy.curatorModel (E-55)', async () => {
     let capturedOptions: { agentOptions?: Record<string, string> } | undefined
     const runtimeWithPolicy: MaintainRuntime = {

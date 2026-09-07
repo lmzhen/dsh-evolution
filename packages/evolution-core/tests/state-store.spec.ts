@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { evolutionHome, evolutionRoot } from '../src/index.ts'
+import { evolutionHome, evolutionRoot, memoryRoot, skillsRoot } from '../src/index.ts'
 
 describe('evolutionRoot / evolutionHome (0.3.22 G3.2, F-207)', () => {
   it('falls back to ~/.dsh when DSH_HOME is empty — never a CWD-relative path', () => {
@@ -28,5 +28,18 @@ describe('evolutionRoot / evolutionHome (0.3.22 G3.2, F-207)', () => {
     const env = { DSH_HOME: '   ' }
     expect(evolutionRoot(env)).toBe(join(homedir(), '.dsh'))
     expect(evolutionHome(env)).toBe(join(homedir(), '.dsh', 'evolution'))
+  })
+
+  it('V9-05: memoryRoot/skillsRoot share the SAME root resolver — empty/whitespace DSH_HOME never yields a relative path', () => {
+    // The old bare `||` in memoryRoot/skillsRoot resolved `DSH_HOME=" "`
+    // (truthy) to a CWD-relative " /memories" sidecar; the adoption test
+    // must now prove all three roots agree with evolutionRoot.
+    expect(memoryRoot({ DSH_HOME: '' })).toBe(join(homedir(), '.dsh', 'memories'))
+    expect(skillsRoot({ DSH_HOME: '' })).toBe(join(homedir(), '.dsh', 'skills'))
+    expect(memoryRoot({ DSH_HOME: '   ' })).toBe(join(homedir(), '.dsh', 'memories'))
+    expect(skillsRoot({ DSH_HOME: '   ' })).toBe(join(homedir(), '.dsh', 'skills'))
+    // A real DSH_HOME still flows to every root verbatim.
+    expect(memoryRoot({ DSH_HOME: 'custom-home' })).toBe(join('custom-home', 'memories'))
+    expect(skillsRoot({ DSH_HOME: 'custom-home' })).toBe(join('custom-home', 'skills'))
   })
 })

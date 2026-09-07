@@ -8,10 +8,10 @@
  */
 
 import { basename, join } from 'node:path'
-import { homedir } from 'node:os'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats } from './threats.ts'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { suppressedFile, usageFile } from './usage.ts'
@@ -120,7 +120,10 @@ export interface ArchiveOptions {
 }
 
 export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.DSH_HOME || join(homedir(), '.dsh'), 'skills')
+  // V9-05 (0.3.51): single resolver — evolutionRoot() holds the ONLY
+  // DSH_HOME empty/whitespace fallback; the old bare `||` here resolved
+  // `DSH_HOME=" "` to a CWD-relative " /skills" sidecar.
+  return join(evolutionRoot(env), 'skills')
 }
 
 /** 0.3.18 (S4.1, E-30): the ONE root resolution for every member that reads
