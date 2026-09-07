@@ -12,7 +12,7 @@
  * Usage (both paths are REQUIRED — no hardcoded machine layouts):
  *   node packages/scripts/verify-layout-sync.mjs <dev-scripts-dir> <mirror-scripts-dir>
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const argv = process.argv.slice(2)
@@ -51,9 +51,34 @@ for (const name of new Set([...dev, ...mirror])) {
   }
 }
 
+// V9-01 (0.3.50): committed-preview contract — the first "## x.y.z" heading in
+// the mirror-root CHANGELOG must equal every package manifest version AND the
+// root package.json version. dcebd8c rewrote 30 manifests to the dev baseline
+// 0.1.0-rc.1 and four releases later nothing had caught it (the publish chain
+// re-derives versions from the git tag, so the drift was invisible to CI).
+const repoRoot = resolve(mirrorDir, '..', '..')
+try {
+  const changelog = readFileSync(join(repoRoot, 'CHANGELOG.md'), 'utf8')
+  const head = /^## (\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)/m.exec(changelog)?.[1]
+  if (!head) {
+    failures.push('CHANGELOG.md has no "## x.y.z" heading')
+  } else {
+    const rootManifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
+    if (rootManifest.version !== head) failures.push(`root package.json version ${rootManifest.version} != CHANGELOG head ${head}`)
+    for (const entry of readdirSync(join(repoRoot, 'packages'))) {
+      const manifestPath = join(repoRoot, 'packages', entry, 'package.json')
+      if (!existsSync(manifestPath)) continue
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      if (manifest.version !== head) failures.push(`${entry}: version ${manifest.version} != CHANGELOG head ${head}`)
+    }
+  }
+} catch (error) {
+  failures.push(`version-guard scan failed: ${error instanceof Error ? error.message : String(error)}`)
+}
+
 if (failures.length > 0) {
   console.error(`verify-layout-sync: ${failures.length} layout drift(s):`)
   console.error(failures.join('\n'))
   process.exit(1)
 }
-console.log(`verify-layout-sync: OK — ${dev.length} script(s) identical across layouts (line endings normalized)`)
+console.log(`verify-layout-sync: OK — ${dev.length} script(s) identical across layouts (line endings normalized); versions align with CHANGELOG head`)

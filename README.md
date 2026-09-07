@@ -1,7 +1,10 @@
 # Evolution plugin family
 
-> **V8-22 (0.3.49):** `packages/README.md` is a copy of this file — change
-> both together (the packages copy carries the same note at its top).
+> **V9-03 (0.3.50):** `packages/README.md` is synced from the dev-tree
+> `README.md` by the release robocopy (its canonical copy) — this root file
+> and the packages copy are SIBLING documents with parallel install sections;
+> keep them in sync manually (the packages copy carries the same note at its
+> top).
 
 Hermes-style self-evolution for DeepSeek Harness, implemented as composable
 Cordis plugins. The model may only propose and write **memory** and **skills**;

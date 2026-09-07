@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.50 (patch) — v9 审计批 1：仓库状态与声明修复补完（V9-01/02/03/04）
+
+**来源**：v9 审计报告修正类批——三项「声明修复的补完」与一项修复引入回归。
+
+- **V9-01 [P2·仓库状态]**：**30 个 manifest 版本被 dcebd8c（0.3.45 pinned-contract update）反向改写为 dev 基线 `0.1.0-rc.1` 且四个版次未对齐**（root=0.3.45、CHANGELOG=0.3.49 三方不一致——一次「robocopy 二次同步带入 dev 清单后未跑 normalize」的反向同步事故；发布不受影响（tarball 版本由 git tag 在 pack 时覆写），但 committed 预览契约被破坏且 normalize 文档契约与仓库现状自相矛盾）。**修复**：① 本版发布链 normalize 把 31 个 manifest 钉回发布线（0.3.50）；② **新守卫挂入 verify-layout-sync**：「manifest 版本 == CHANGELOG 头节」检查（根 CHANGELOG 首个 `## x.y.z` 与全部包 manifest + 根 package.json 一致）——当前漂移形态被守卫当场抓出（30 manifest + 根全报），未来 CI 可见。
+- **V9-02 [P2·修复未接线]**：V8-14 的 `protectedNames` 只接了 core 签名与 scopeView——**生产调用 run() 仍 4 参**，marker 保护的 `created_by:'agent'` 技能照旧进归档候选 → deleteProtection 拒绝 → error 噪声（v8 报告 V8-14 原症状在生产入口原样存活）。**修复**：run() 补第 5 参（一行）+ **run() 全链路集成判别用例**（bundled marker + agent 记录 → errors 空、archived 不含——**红转绿实证**：临时去参 → errors [Array(1)] 红 → 还原绿）。**教训**：带新参数的修复必须核验全部生产调用方接线（V6-48 同型第二例，已入收口检查单）。
+- **V9-03 [P2·声明失实]**：V8-22 未交付——0.3.49 的修改目标是**镜像** packages/README，随后发布链 robocopy 用 dev 版覆写掉了；且根 README 互注断言「对侧注释存在」为假。**修复**：改 **dev 树 README.md（canonical——robocopy 同步镜像 packages 副本）**——补 preset install 注记 + 双布局命令规则两段 + 改互注（准确描述 canonical 关系）；根 README 互注同步修正。**教训**：双副本/布局文件的 canonical 端是 dev 树，镜像侧编辑会被 robocopy 冲掉。
+- **V9-04 [P2·修复引入回归]**：V8-11 把 target 存在性/合并校验后移到归档之后——干净拒绝（not found/超限）变成「先归档全部 source 再逐回滚」的破坏性路径（restore 失败即半完成）。**修复**：归档循环前恢复**廉价 target 存在性预检**（serial 内权威读保留——竞态修复目标不失）；判别用例（missing target → ok:false + source 未归档）——预备检对拒绝路径零破坏。
+- **门禁**：curator 51/51（+V9-02 集成）+ skill-store 38/38（+V9-04 拒绝路径）；oxlint 0/0（全树）；tsc 0（--force）；verify-layout-sync 守卫对当前漂移报 31 项（判别力实证——发布链 normalize 后应 0 项）；全量以 CI Linux 为准。
+
 ## 0.3.49 (patch) — v8 审计批 6（收尾）：文档同步 + 死代码清扫 + 测试缺口（V8-22/23）
 
 **来源**：v8 审计报告批次 6（L6 文档 + T 横切）——v8 审计轮最后一个版次。

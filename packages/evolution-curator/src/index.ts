@@ -593,6 +593,11 @@ export class EvolutionCurator extends Service {
     // order (transitions → scoring) applied last run's warn state and delayed
     // the quality-warn stale path by a full curator cycle.
     await this.scoreTree(usage, treeNames)
+    // V9-02 (0.3.50): pass protectedNames into the transition engine — V8-14
+    // wired the core signature and the scope view, but the PRODUCTION run
+    // call stayed 4-argument, so marker-protected agent skills still entered
+    // the archive candidates and produced the failed-step noise the 0.3.47
+    // CHANGELOG declared gone.
     const result = computeLifecycleTransitions(usage, {
       staleAfterDays: lifecycle.staleAfterDays,
       archiveAfterDays: lifecycle.archiveAfterDays,
@@ -603,7 +608,7 @@ export class EvolutionCurator extends Service {
       bundledNames,
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
-    }, new Date(), gates)
+    }, new Date(), gates, protectedNames)
     const recommendPool = [...new Set([...result.markStale, ...dedupMembers])]
     const nominations = this.llmReview
       ? await this.recommend(recommendPool, { dryRun })

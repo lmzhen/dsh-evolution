@@ -56,6 +56,12 @@ Then select the `Evolution` agent preset for sessions that should expose the
 automation (review, curator, approval, observability) without model-facing
 evolution tools.
 
+> **One-time step (V7-06):** before a session can select the `Evolution`
+> preset, run `/evolution preset install` once in a session on any preset —
+> it writes `.agent-presets/evolution/` so the preset actually exists in the
+> profile. See the Chinese README for the same flow; without this step a
+> `dsh plugin add`-installed host is mounted but the preset is absent.
+
 ### One-click compatibility install
 
 Use the legacy preset overlay on a standard DSH host:
@@ -179,3 +185,12 @@ standalone flat mirror, where the packages live as `packages/evolution-*`.
 When a config in the published repo is copied into the flat tree for a
 stand-alone build, its project references therefore remain
 CI-overlay-only and must not be expected to resolve independently (G5.5).
+The same layout rule applies to the setup commands: in the flat mirror run
+`node packages/scripts/install-layered.mjs` (there is no
+`packages/evolution/scripts` directory here), while the upstream checkout
+uses `packages/evolution/scripts/install-layered.mjs`.
+
+> **V9-03 (0.3.50):** this file is the canonical copy — the mirrored
+> `packages/README.md` is synced from here on every release (robocopy);
+> the mirror-root `README.md` is a sibling document with its own install
+> sections, keep its notes in sync manually (see its top note).

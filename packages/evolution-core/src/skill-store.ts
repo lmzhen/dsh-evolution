@@ -1401,6 +1401,14 @@ export class SkillLibrary {
     //     .archive does the kernel commit the writes (byte-level rollback).
     const archived: string[] = []
     try {
+      // V9-04 (0.3.50): restore the cheap target-existence pre-check BEFORE
+      // the destructive archive loop — V8-11 moved the authoritative read into
+      // the serial queue, which silently turned a clean "Skill not found"
+      // refusal into "archive ALL sources, then roll back" (a half-completed
+      // tree when a restore fails). The serial read stays authoritative for
+      // the merge; this probe keeps the failure path non-destructive.
+      const preTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
+      if (!preTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
       for (const source of normalizedSources) {
         const result = await this.archive(source, { absorbedInto: targetName })
         if (!result.ok) throw new Error(result.message)

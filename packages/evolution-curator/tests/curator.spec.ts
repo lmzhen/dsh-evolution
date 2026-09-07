@@ -1718,6 +1718,40 @@ Body of ${name}.
   })
 })
 
+it('V9-02: a bundled-marker agent skill produces no failed archive step through run() (0.3.50)', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v902-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  const ctx = new Context()
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  await ctx.plugin(EvolutionCurator, { enabled: true })
+  const skills = ctx.evolutionCurator.skills
+  const body = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n${text}\n`
+  await skills.create('marker-skill', body('marker-skill', 'Marker body.'), 'foreground')
+  // Bundled marker on the ACTIVE tree: SkillLibrary.list reports protectedBy,
+  // so the production protectedNameMap carries it (V8-14 wired this into the
+  // engine's signature and the scope view, but run() stayed 4-argument — the
+  // missing-argument case this test guards).
+  await writeFile(join(skills.root, 'marker-skill', '.bundled'), '', 'utf8')
+  const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
+  await saveUsage(skills.root, new Map([['marker-skill', {
+    created_by: 'agent', created_at: old, use_count: 1, view_count: 0, patch_count: 0,
+    last_used_at: old, last_viewed_at: null, last_patched_at: null,
+    state: 'active', pinned: false, archived_at: null,
+  }]]), nodeEvolutionIo())
+  const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+  // The marker-protected skill never entered the archive candidate pool —
+  // no error entries (a 4-arg call would put it through the candidate gate
+  // and surface the deleteProtection refusal as an error), and it is not
+  // archived.
+  expect(result.errors).toEqual([])
+  expect(result.archived).not.toContain('marker-skill')
+  if (previous === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previous
+  await rm(home, { recursive: true, force: true })
+})
+
 it('V8-14: a marker-protected agent skill is protected, never also managed (0.3.47)', () => {
   const record = {
     created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 1, view_count: 0, patch_count: 0,

@@ -476,6 +476,21 @@ description: A skill for the cumulative fuzzy budget test.
   }
 })
 
+it('V9-04: consolidate of a MISSING target refuses BEFORE archiving any source (0.3.50)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-v904-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('src-a', USABLE('src-a'), 'foreground')
+  // V8-11 moved the authoritative read into the serial queue, which silently
+  // turned this clean refusal into "archive ALL sources then roll back" (a
+  // half-completed tree when a restore fails). The pre-check makes the
+  // failure path non-destructive again.
+  const result = await lib.consolidate('no-such-target', ['src-a'])
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('not found')
+  expect((await lib.list()).some(s => s.name === 'src-a')).toBe(true) // not archived
+  await rm(root, { recursive: true, force: true })
+})
+
 it('relatedSkillNames is the single related_skills parser (G3)', () => {
   const md = (related: string) => `---
 name: hub
