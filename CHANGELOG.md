@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.42 (patch) — v7 批二：V7-03 通知唤醒通道 + V7-04 清零失败留痕（V7-14 核验不修）
+
+**来源**：v7 审计轮第二批（0.3.40 状态机收尾）。
+
+- **V7-03 [P2·行为不一致]**：`trySubagentReview` 成功路径的结果通知（applied / 零落地两处）原为 `agent.inject`（非唤醒）——默认 subagent 部署的成功路径里主会话对审查结果**零感知**（通知 pending 至用户下轮发言），与 0.3.40「任务结束模型立刻开始总结」的决策口径相悖。**修复**：抽出共享唤醒通道 `deliverMessage(agent, text, summary)`（followup 优先 + 唤醒轮 cadence fire 一次旗标 + 无 followup 降级 inject），review prompt 与两条结果通知统一走该通道——subagent 成功路径的通知现在**被唤醒的模型立即感知**（skip 旗标随行，interval=1 不自驱）。completion 通道（task-complete 提示词）保持 inject（其 session 级一次性旗标不同域）。
+- **V7-04 [P2·状态机]**：flush 交付后的计数清零持久化（`saveReviewState`）失败时——交付已发生、latch 已删、磁盘计数仍 ≥ 阈值——stateful 部署下轮会重复交付（无崩溃、审查幂等，纯成本）。**修复**：清零 save 包 try/catch + **一次性 warn per session**（「could not be persisted … a stateful reload may re-deliver」）——留痕供操作者识别重复来源；内存计数已清零（当前进程保持新段）。
+- **V7-14 [P2] 核验结论：不修（判据推翻）**：报告按 0.3.39 语义（fire 即归零）静态推演「已到期的 skill 被覆盖/复位」；0.3.40 的 `resetOnFire:false` 使**先到期域计数持续超标**——后到域到期时 `advanceReview` 必返回 `combined`（涵盖两域），latch 单槽覆盖终被 combined 兜住；「纯 kind 覆盖另一到期 kind」与「单 kind 交付 + 另一域已到期」在持续 due 语义下**不可达**。单槽的「越晚越贴近当前相关性」注释语义（0.3.38）保持。**防过度修复不做结构改动**；未实跑（逻辑推演 + 全部源码实证）。
+- **测试**：V7-03 判别（subagent 成功 → 通知走 followup、inject 零——onFollowup/onInject 分叉断言）；V7-04 判别（fixture `failSaveFrom:2`——交付前 save 成功、交付后清零 save 抛 → 交付 1 次 + warn 文本命中）；review.spec 25/25 + lifecycle/anchored-smoke/persistence-resume 6/6（通知相关既有用例 G4.4/V6-24/V4-21 因 fixture followup 桥接 onInject 保持断言兼容）。
+- **回归**：oxlint 0/0（194 文件）；tsc 0（review --force）；全量（结果以本版 CI Linux 为准）。
+
 ## 0.3.41 (patch) — v7 审计轮第一批：V7-01 发布链 P1 + V7-02 审查自激循环（P2）
 
 **来源**：v7 审计报告（`dsh-evolution-mirror-audit-report-v7.md`）核验轮——全部 20 项新发现经主审亲核 + 只读子代理交叉验证**全部属实，0 误判**；本版交付第一批（P1 + 发散性 P2）。

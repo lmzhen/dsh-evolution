@@ -436,18 +436,24 @@ async function mountReviewFixture(options: {
   noState?: boolean
   stateful?: boolean
   noFollowup?: boolean
+  failSaveFrom?: number
   events?: Array<Record<string, unknown>>
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   const stateBox: { current: unknown } = { current: null }
   if (!options.noState) {
+    let saveCalls = 0
     ctx.provide('evolutionState', {
       loadReviewState: async () => {
         if (options.failState) throw new Error('state store boom')
         return options.stateful ? stateBox.current : null
       },
       saveReviewState: async (_id: string, record: unknown) => {
+        saveCalls += 1
+        if (options.failSaveFrom !== undefined && saveCalls >= options.failSaveFrom) {
+          throw new Error('state store boom')
+        }
         stateBox.current = record
       },
     })
@@ -639,6 +645,55 @@ it('0.3.41: interval=1 waking delivery cannot self-drive — the injected wake t
   // suppression is one-shot, normal cadence activity is not starved.
   emitEnd(3); await settle()
   expect(deliveries).toHaveLength(2)
+})
+
+it('0.3.42: subagent-success result notice wakes via followup, not inject (V7-03)', async () => {
+  const followups: unknown[] = []
+  const injects: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    onFollowup: (message) => { followups.push(message) },
+    onInject: (message) => { injects.push(message) },
+  })
+  ctx.provide('subagents', {
+    start: async () => ({
+      result: Promise.resolve({
+        structured: { memoryOps: [{ target: 'memory', action: 'add', facts: 'f1', evidence: [{ event_seq: 0 }] }], skillOps: [], summary: 'ok' },
+      }),
+      dispose: async () => {},
+    }),
+  })
+  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+  emitEnd(1, 'blocked') // latch mid-task
+  emitEnd(2) // flush: subagent succeeds → the result notice must WALK the parent
+  await vi.waitFor(() => { expect(followups).toHaveLength(1) })
+  expect(injects).toHaveLength(0)
+})
+
+it('0.3.42: a failed counter-reset persist warns once instead of repeating silently (V7-04)', async () => {
+  const delivered: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    stateful: true,
+    failSaveFrom: 2, // save #1 (pre-flush) succeeds; save #2 (post-delivery reset) fails
+    onFollowup: (message) => { delivered.push(message) },
+  })
+  const warnSpy = vi.spyOn(ctx.logger, 'warn')
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 1,
+    skillInterval: 1,
+    reviewMode: 'inject',
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(delivered).toHaveLength(1) }) // delivery itself succeeded
+  await vi.waitFor(() => {
+    expect(warnSpy.mock.calls.some(([message]) => String(message).includes('could not be persisted after a delivered review'))).toBe(true)
+  })
 })
 
 it('0.3.40: without a followup the waking delivery degrades to inject', async () => {

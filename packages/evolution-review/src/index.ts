@@ -168,6 +168,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // re-arms normally. In-memory only: a restart clears the inbox queue, so
   // the loop cannot survive it.
   const skipNextCadenceFire = new Map<SessionId, boolean>()
+  // V7-04 (0.3.42): the post-delivery counter reset may fail to persist (state
+  // store IO failure) — delivery already happened, so warn once per session
+  // about the repeat-review source instead of silently re-delivering forever.
+  const cadenceResetWarned = new Set<SessionId>()
   // 0.3.18 (E-19): ONE in-flight review subagent process-wide. The shared
   // skill tree and memory have no cross-writer mutex, so two overlapping
   // reviews (a 120s window is long) could fuzzyPatch the same file
@@ -189,6 +193,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
       || skipNextCadenceFire.size >= COUNTER_SWEEP_THRESHOLD
+      || cadenceResetWarned.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
       sweepDeadSessionEntries(turnStarts, isAlive)
@@ -197,6 +202,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       sweepDeadSessionEntries(pendingCadenceReviews, isAlive)
       sweepDeadSessionEntries(pendingCadenceWarned, isAlive)
       sweepDeadSessionEntries(skipNextCadenceFire, isAlive)
+      sweepDeadSessionEntries(cadenceResetWarned, isAlive)
     }
     void onTurnEnd(session, event)
   })
@@ -273,19 +279,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // non-waking), so the model starts the summary immediately instead of
     // waiting for the next driver wake. Defensive degradation: a host without
     // followup (stub/older neighbor typed narrowly) falls back to inject.
-    const deliverReview = (text: string): void => {
-      const message = createUserMessage({
-        content: [{ type: 'text', text }],
-        source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-      })
-      const followup = (agent as { followup?: (message: unknown) => void }).followup
-      if (config.reviewWakeInject && typeof followup === 'function') {
-        followup(message)
-        // V7-02: the waking turn's cadence fire is suppressed once (its own
-        // review prompt must not re-trigger a review with interval=1).
-        skipNextCadenceFire.set(session.id, true)
-      } else agent.inject(message)
-    }
+    // V7-03 (0.3.42): the subagent-path result notices use the SAME waking
+    // channel — a successful review left the parent idle, and a non-waking
+    // notice would sit pending until the user's next message.
     if (event.data.reason.kind === 'completed') {
       // 0.3.40: at the completing turn the flush uses the LATCHED kind or the
       // just-fired one (a threshold crossing exactly at task completion).
@@ -297,7 +293,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // 'inject' contract is superseded, 0.3.39).
         if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
           try {
-            deliverReview(reviewPrompt(pendingKind))
+            deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review')
           } catch (injectError) {
             ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
@@ -315,7 +311,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
             // Subagent path failed at the END — fall back to the prompt delivery
             // (still at completion; there is no later boundary to defer to).
             try {
-              deliverReview(reviewPrompt(pendingKind))
+              deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review')
             } catch (injectError) {
               ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
             }
@@ -327,7 +323,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // segment; the post-flush save is authoritative over the earlier one).
         state.turnsSinceMemory = 0
         state.turnsSinceSkill = 0
-        await stateService?.saveReviewState(session.id, state)
+        // V7-04 (0.3.42): delivery already happened before this save; a persist
+        // failure means a stateful reload still sees the pre-reset counters and
+        // re-delivers next completed turn — warn once per session so the repeat
+        // source is identifiable (in-memory counters stay zeroed; the current
+        // process keeps the fresh segment).
+        try {
+          await stateService?.saveReviewState(session.id, state)
+        } catch (resetError) {
+          if (!cadenceResetWarned.has(session.id)) {
+            cadenceResetWarned.add(session.id)
+            ctx.logger.warn(`dsh-evolution-review: cadence counter reset could not be persisted after a delivered review (${resetError instanceof Error ? resetError.message : String(resetError)}) — a stateful reload may re-deliver this review`)
+          }
+        }
       }
     }
     // V6-53 / 0.3.39 + 0.3.40: a threshold-deserved cadence review is NEVER
@@ -376,6 +384,24 @@ export function apply(ctx: Context, rawConfig: Config): void {
       userChars: signal.userChars,
       assistantChars: signal.assistantChars,
     })
+  }
+
+  /** V7-03 (0.3.42): shared waking delivery — review prompts AND result
+   * notices go through the same followup-first channel (skip the woken turn's
+   * cadence fire once, degrade to inject when reviewWakeInject is off or the
+   * host lacks followup). */
+  const deliverMessage = (agent: import('@deepseek-ai/dsh-agent').Agent, text: string, summary: string): void => {
+    const message = createUserMessage({
+      content: [{ type: 'text', text }],
+      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary },
+    })
+    const followup = (agent as { followup?: (message: unknown) => void }).followup
+    if (config.reviewWakeInject && typeof followup === 'function') {
+      followup(message)
+      // V7-02: the waking turn's cadence fire is suppressed once (its own
+      // review prompt must not re-trigger a review with interval=1).
+      skipNextCadenceFire.set(agent.session.id, true)
+    } else agent.inject(message)
   }
 
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean> {
@@ -486,10 +512,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
           // and continue; the durable plan-applied emit below still records the
           // execution truth.
           try {
-            agent.inject(createUserMessage({
-              content: [{ type: 'text', text: `💾 Self-improvement review: ${applied}${note}` }],
-              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
-            }))
+            deliverMessage(agent, `💾 Self-improvement review: ${applied}${note}`, 'self-improvement review')
           } catch (injectError) {
             ctx.logger.warn(`dsh-evolution-review: result notice inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
@@ -508,10 +531,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
             if (reasons.length === 0) reasons.push('the review plan contained nothing executable')
             let text = `💾 Self-improvement review: 0 ops landed. ${reasons.join(' ')}`
             if (text.length > 500) text = `${text.slice(0, 497)}…`
-            agent.inject(createUserMessage({
-              content: [{ type: 'text', text }],
-              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'self-improvement review' },
-            }))
+            deliverMessage(agent, text, 'self-improvement review')
           } catch (injectError) {
             ctx.logger.warn(`dsh-evolution-review: zero-landing notice inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
