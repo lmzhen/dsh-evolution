@@ -40,6 +40,14 @@ export interface ApprovalRequest {
   /** 0.3.17 (E-25): the requesting session id, kept on the record for
    * audit attribution (staged AND resolved history). */
   sessionId?: string
+  /** 0.3.40 (V6-27 fix): the requesting SESSION OBJECT. The platform
+   * `approval.overrideOf(session: Session)` reads `session.events` — a bare id
+   * string throws a TypeError in the real implementation (`.events` on a
+   * string is undefined → `events.length`). Callers that hold the session
+   * (model tools, review pipeline) MUST pass it so the session-level override
+   * (`approval/policy` event) is honored; absent falls back to the id probe
+   * (undefined for platform lookups) + the config chain. */
+  session?: unknown
 }
 
 export interface ApprovalDecision {
@@ -176,8 +184,9 @@ export class EvolutionApproval extends Service {
     // platform approval service when it is mounted (overrideOf is the platform
     // authority). The caller's self-reported sessionPolicy is honored ONLY in
     // assemblies WITHOUT the platform service — a tool can no longer claim
-    // 'never' and bypass staging on its own.
-    const derived = this.deriveSessionPolicy(input.sessionId)
+    // 'never' and bypass staging on its own. 0.3.40 (V6-27): the real platform
+    // overrideOf reads session.events, so the SESSION object rides the request.
+    const derived = this.deriveSessionPolicy(input.sessionId, input.session)
     const policy = derived ?? (this.ctx.get('approval') ? undefined : input.sessionPolicy)
     if (policy === 'never') {
       return { action: 'allow', message: 'Session approval policy is "never"; write allowed without staging.' }
@@ -273,11 +282,15 @@ export class EvolutionApproval extends Service {
    * `effectiveSessionPolicy`, overrideOf ?? config.policy ?? 'ask'). The mount
    * check is lazy: the platform service can start before or after this plugin.
    */
-  private deriveSessionPolicy(sessionId?: string): 'ask' | 'never' | undefined {
-    if (!sessionId) return undefined
+  private deriveSessionPolicy(sessionId?: string, session?: unknown): 'ask' | 'never' | undefined {
+    if (!sessionId && !session) return undefined
     const platformApproval = this.ctx.get('approval') as ApprovalPolicyLike | undefined
     if (!platformApproval) return undefined
-    const override = platformApproval.overrideOf(sessionId)
+    // 0.3.40 (V6-27): the platform overrideOf reads `session.events` — the
+    // SESSION OBJECT is required; a bare id string throws a TypeError in the
+    // real implementation. Without a session object we do NOT probe (the id
+    // would crash the real platform service) — the config chain below stands.
+    const override = session !== undefined ? platformApproval.overrideOf(session) : undefined
     if (override === 'never' || override === 'ask') return override
     // The config field itself is optional at runtime (a bare platform stub) —
     // read it through the optional shape.

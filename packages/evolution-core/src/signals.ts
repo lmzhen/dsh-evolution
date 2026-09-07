@@ -16,6 +16,12 @@ export interface SignalConfig {
   substantiveMinToolCalls: number
   substantiveMinUserChars: number
   substantiveMinAgentChars: number
+  /** 0.3.40 (user decision): the counting window restarts at the INJECTION, not
+   * at the threshold fire. `false` keeps the counters MONOTONIC across fires
+   * (the `>=` check still returns the kind; the caller resets the counters at
+   * its own injection point). Default `true` preserves the historical
+   * fire-resets window for existing callers/tests. */
+  resetOnFire?: boolean
 }
 
 export interface TurnSignals {
@@ -105,17 +111,22 @@ export function advanceReview(
 
   const memoryDue = state.turnsSinceMemory >= config.memoryInterval
   const skillDue = state.turnsSinceSkill >= config.skillInterval
-  if (memoryDue && skillDue) {
+  // 0.3.40: with resetOnFire=false the counters stay monotonic — the caller
+  // resets them at its injection point (the counting window is inject→inject).
+  const zero = (): void => {
     state.turnsSinceMemory = 0
     state.turnsSinceSkill = 0
+  }
+  if (memoryDue && skillDue) {
+    if (config.resetOnFire !== false) zero()
     return 'combined'
   }
   if (memoryDue) {
-    state.turnsSinceMemory = 0
+    if (config.resetOnFire !== false) state.turnsSinceMemory = 0
     return 'memory'
   }
   if (skillDue) {
-    state.turnsSinceSkill = 0
+    if (config.resetOnFire !== false) state.turnsSinceSkill = 0
     return 'skill'
   }
   return null

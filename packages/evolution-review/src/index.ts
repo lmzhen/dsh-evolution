@@ -47,6 +47,11 @@ export interface Config {
   skillReviewTrigger?: string
   /** Cumulative session tool calls before a session counts as proven-long for the completion channel. */
   skillReviewCompletionMinToolCalls?: number
+  /** 0.3.40: deliver the deferred review with a WAKING inject for a summary the
+   * model starts immediately (agent.followup — same send() queue, wakeup bit
+   * differs). Default true; false degrades to the non-waking inject (the
+   * summary then waits for the next driver wake). */
+  reviewWakeInject?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -71,6 +76,7 @@ export const Config: z<Config> = z.object({
   // `reviewProvider?` and this schema agree; "Omit to inherit" holds.
   reviewProvider: z.string(),
   skillReviewTrigger: z.string().default(DEFAULT_SKILL_REVIEW_TRIGGER),
+  reviewWakeInject: z.boolean().default(true),
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
 })
 
@@ -229,6 +235,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
       substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? 3,
       substantiveMinUserChars: snapshot?.substantiveMinUserChars ?? 200,
       substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
+      // 0.3.40 (user decision): the counting window restarts at the INJECTION —
+      // the counters stay monotonic across threshold fires and are zeroed at
+      // the flush below (one injection per task segment regardless of how many
+      // thresholds fired before the task ended).
+      resetOnFire: false,
     })
     await stateService?.saveReviewState(session.id, state)
     // Cumulative tool-call counter updates on EVERY turn/end — including turns
@@ -241,8 +252,24 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // a threshold-firing turn (the flush must still run before that return).
     // With the default trigger='cadence' the completion channel below is off
     // and exactly ONE end-of-conversation review runs.
+    // 0.3.40 (user decision): the delivery is WAKING — `agent.followup` is the
+    // waking next-turn alias of the send() primitive (inject = same queue,
+    // non-waking), so the model starts the summary immediately instead of
+    // waiting for the next driver wake. Defensive degradation: a host without
+    // followup (stub/older neighbor typed narrowly) falls back to inject.
+    const deliverReview = (text: string): void => {
+      const message = createUserMessage({
+        content: [{ type: 'text', text }],
+        source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
+      })
+      const followup = (agent as { followup?: (message: unknown) => void }).followup
+      if (config.reviewWakeInject && typeof followup === 'function') followup(message)
+      else agent.inject(message)
+    }
     if (event.data.reason.kind === 'completed') {
-      const pendingKind = pendingCadenceReviews.get(session.id)
+      // 0.3.40: at the completing turn the flush uses the LATCHED kind or the
+      // just-fired one (a threshold crossing exactly at task completion).
+      const pendingKind = pendingCadenceReviews.get(session.id) ?? (kind ?? undefined)
       if (pendingKind !== undefined) {
         pendingCadenceReviews.delete(session.id)
         // Explicit 'inject' deployments also execute at the end (the user
@@ -250,10 +277,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // 'inject' contract is superseded, 0.3.39).
         if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
           try {
-            agent.inject(createUserMessage({
-              content: [{ type: 'text', text: reviewPrompt(pendingKind) }],
-              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-            }))
+            deliverReview(reviewPrompt(pendingKind))
           } catch (injectError) {
             ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
@@ -268,25 +292,31 @@ export function apply(ctx: Context, rawConfig: Config): void {
               assistantChars: signal.assistantChars,
             })
           } else {
-            // Subagent path failed at the END — fall back to the prompt inject
+            // Subagent path failed at the END — fall back to the prompt delivery
             // (still at completion; there is no later boundary to defer to).
             try {
-              agent.inject(createUserMessage({
-                content: [{ type: 'text', text: reviewPrompt(pendingKind) }],
-                source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-              }))
+              deliverReview(reviewPrompt(pendingKind))
             } catch (injectError) {
               ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
             }
           }
         }
+        // 0.3.40 (user decision): the counting window restarts AT THE INJECTION
+        // — zero the monotonic counters and re-persist so a continued
+        // conversation starts a fresh segment from here (one injection per
+        // segment; the post-flush save is authoritative over the earlier one).
+        state.turnsSinceMemory = 0
+        state.turnsSinceSkill = 0
+        await stateService?.saveReviewState(session.id, state)
       }
     }
-    // V6-53 / 0.3.39: a threshold-deserved cadence review is NEVER executed
-    // mid-task — NOT the subagent spawn either (per the user decision: BOTH
-    // channels run at conversation end only). The kind is stashed here (last
-    // trigger wins — the most recent relevance) and executed in the flush above.
-    if (kind) {
+    // V6-53 / 0.3.39 + 0.3.40: a threshold-deserved cadence review is NEVER
+    // executed mid-task — NOT the subagent spawn either (BOTH channels run at
+    // conversation end only). The kind is LATCHED here (one per task segment —
+    // repeated threshold fires before the task ends still inject once; the
+    // segment resets at the flush). A fire that arrives ON the completing turn
+    // was already consumed by the flush (`?? kind`), so no latch is left.
+    if (kind && event.data.reason.kind !== 'completed') {
       pendingCadenceReviews.set(session.id, kind)
       if (!pendingCadenceWarned.has(session.id)) {
         pendingCadenceWarned.add(session.id)
@@ -420,7 +450,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const acceptedSkillOps = validation.accepted.skillOps ?? []
         const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-        const executed = await executePlan(validation.accepted, session.id)
+        const executed = await executePlan(validation.accepted, session)
         const actions = executed.actions
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
@@ -517,8 +547,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
   async function executePlan(
     plan: EvolutionPlan,
-    sessionId?: string,
+    session?: Session,
   ): Promise<{ actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }> {
+    const sessionId = session?.id
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
@@ -541,7 +572,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
         const normalized = { target, action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text }
         const result = approval
-          ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized)
+          ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized, session)
           : await memory?.applyBatch(normalized.target, [normalized])
         if (result?.ok) actions.push('Memory updated')
         else {
@@ -557,7 +588,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // background_review origin in the approval-disabled (default) path too.
         const runnerArgs = { operation: args, origin: origins.library }
         const result = approval
-          ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs)
+          ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs, session)
           : await executeSkillDirect(args)
         if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
         else {
@@ -579,7 +610,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return { actions, ok: false, failedOps, aborted: reason }
     }
 
-    async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
+    async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown, approvalSession?: Session): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
       // P1-9 pre-check: with approval ENABLED but no registered runner for
       // this kind (host-only compositions mount no tool runners), staging
       // would create a pending record that no approver could ever replay.
@@ -591,7 +622,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
         ctx.logger.warn(`dsh-evolution-review: approval enabled but no replay runner registered for kind "${kind}" - skipping write (${summary})`)
         return { ok: false, message: `Approval is enabled but no replay runner is registered for kind "${kind}"; write skipped (mount the tool that provides it, or disable approval).` }
       }
-      const decision = await approval.request({ kind, summary, args: stored, origin: origins.approval, ...sessionId ? { sessionId } : {} })
+      const decision = await approval.request({
+        kind, summary, args: stored, origin: origins.approval,
+        ...sessionId ? { sessionId } : {},
+        ...approvalSession ? { session: approvalSession } : {},
+      })
       if (decision.action === 'staged') return { ok: false, message: decision.message }
       // The staged service is mounted but DISABLED (the default deployment),
       // and host-only compositions mount no tool runners — replaying would

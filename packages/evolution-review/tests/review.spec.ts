@@ -91,7 +91,7 @@ describe('evolution-review', () => {
       skillInterval: 1,
       reviewMode: 'subagent',
     })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(starts).toBe(0) // threshold reached but DEFERRED — no mid-task spawn
     emitEnd(2)
@@ -136,7 +136,7 @@ describe('evolution-review', () => {
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     await new Promise(resolve => setTimeout(resolve, 50))
     // Threshold reached but DEFERRED: no review ran, no error, no inject yet.
     expect(errors).toEqual([])
@@ -161,7 +161,7 @@ describe('evolution-review', () => {
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
     // The review reaches read-name collection and completes, proving
     // `arguments: 'null'` no longer throws inside collectReadSkillNames.
@@ -178,7 +178,7 @@ describe('evolution-review', () => {
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     await new Promise(resolve => setTimeout(resolve, 50))
     // V6-53 (0.3.39): the spawn is DEFERRED too — no immediate run, no inject,
     // no schedule signal (E-41 stands).
@@ -210,7 +210,7 @@ describe('evolution-review', () => {
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     await new Promise(resolve => setTimeout(resolve, 50))
     // Threshold reached but fully DEFERRED: no inject AND no subagent spawn.
     expect(injected).toHaveLength(0)
@@ -258,7 +258,7 @@ describe('evolution-review', () => {
     ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
     // The plan applied (executePlan landed the memory op), so plan-applied is
     // recorded even though the result-notice inject threw.
@@ -339,7 +339,7 @@ describe('evolution-review', () => {
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
     // The plan DID run (partially), so plan-applied fires once.
     await vi.waitFor(() => { expect(applied).toHaveLength(1) })
@@ -408,7 +408,7 @@ describe('evolution-review', () => {
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1)
+    emitEnd(1, 'blocked')
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(starts).toBe(0) // deferred — no mid-task spawn
     emitEnd(2)
@@ -424,19 +424,25 @@ describe('evolution-review', () => {
 async function mountReviewFixture(options: {
   failState?: boolean
   onInject?: (message: unknown) => void
+  onFollowup?: (message: unknown) => void
   skillArguments?: string
   noState?: boolean
+  stateful?: boolean
+  noFollowup?: boolean
   events?: Array<Record<string, unknown>>
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  const stateBox: { current: unknown } = { current: null }
   if (!options.noState) {
     ctx.provide('evolutionState', {
       loadReviewState: async () => {
         if (options.failState) throw new Error('state store boom')
-        return null
+        return options.stateful ? stateBox.current : null
       },
-      saveReviewState: async () => {},
+      saveReviewState: async (_id: string, record: unknown) => {
+        stateBox.current = record
+      },
     })
   }
   const session = {
@@ -451,12 +457,18 @@ async function mountReviewFixture(options: {
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
   } as unknown as Session
   const agent = { id: session.id, session, inject: (message: unknown) => { options.onInject?.(message) } } as unknown as Agent
+  if (!options.noFollowup) {
+    ;(agent as { followup: unknown }).followup = (message: unknown) => {
+      if (options.onFollowup) options.onFollowup(message)
+      else options.onInject?.(message)
+    }
+  }
   ctx.agents.register(agent)
   const releaseStart: { current: (() => void) | undefined } = { current: undefined }
-  const emitEnd = (turn: number): void => {
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
+  const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
+    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: reasonKind } } } as never)
   }
-  return { ctx, session, emitEnd, releaseStart }
+  return { ctx, session, emitEnd, releaseStart, stateBox }
 }
 
 /** A policy fake whose low thresholds make the single skill tool/call substantive. */
@@ -535,4 +547,93 @@ it('V6-24: a zero-landing plan still notifies the model with the reasons (0.3.36
   await vi.waitFor(() => {
     expect(injected.some(text => text.includes('0 ops landed') && text.includes('1 op(s) skipped'))).toBe(true)
   })
+})
+
+it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires inject once per segment', async () => {
+  const injected: string[] = []
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    onInject: (message) => {
+      const box = message as { content?: Array<{ type: string; text: string }> } | null
+      injected.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
+    },
+  })
+  ctx.provide('evolutionPolicy', {
+    get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 2, reviewSkillInterval: 2, reviewMode: 'inject' }),
+  })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 2,
+    skillInterval: 2,
+    reviewMode: 'inject',
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
+  // turn1 completed: count 1 < 2 → no fire, no inject.
+  emitEnd(1); await settle()
+  expect(injected).toHaveLength(0)
+  // turn2/turn3 NOT completed (mid-task threshold fires): the kind is latched
+  // once — repeated fires do not inject mid-task and do not stack.
+  emitEnd(2, 'blocked'); await settle()
+  emitEnd(3, 'blocked'); await settle()
+  expect(injected).toHaveLength(0)
+  // turn4 completed (the flush boundary): EXACTLY ONE injection, and the
+  // counters are zeroed at the injection.
+  emitEnd(4); await settle()
+  expect(injected).toHaveLength(1)
+  const saved = (stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number })
+  expect(saved.turnsSinceMemory).toBe(0)
+  expect(saved.turnsSinceSkill).toBe(0)
+  // turn5 completed: without the zero-at-injection the counter would still be
+  // ≥2 and would fire again — the fresh segment must stay silent.
+  emitEnd(5); await settle()
+  expect(injected).toHaveLength(1)
+  // turn6 completed: the fresh segment reaches the threshold again → a NEW
+  // injection (the completing-turn fire is caught by the flush `?? kind`).
+  emitEnd(6); await settle()
+  expect(injected).toHaveLength(2)
+  // turn7: after the second zero the new segment is silent again.
+  emitEnd(7); await settle()
+  expect(injected).toHaveLength(2)
+})
+
+it('0.3.40: without a followup the waking delivery degrades to inject', async () => {
+  const injected: string[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({ noFollowup: true, onInject: () => { injected.push('x') } })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 1,
+    skillInterval: 1,
+    reviewMode: 'inject',
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(injected).toHaveLength(1) })
+})
+
+it('0.3.40: the default delivery wakes via agent.followup, not inject', async () => {
+  const followups: unknown[] = []
+  const injects: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    onFollowup: (message) => { followups.push(message) },
+    onInject: (message) => { injects.push(message) },
+  })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 1,
+    skillInterval: 1,
+    reviewMode: 'inject',
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(followups).toHaveLength(1) })
+  expect(injects).toHaveLength(0)
 })

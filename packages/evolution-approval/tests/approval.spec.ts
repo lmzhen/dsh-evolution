@@ -48,6 +48,45 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true })
   })
 
+  it('V6-27: the platform-shaped overrideOf receives the SESSION OBJECT, never the id string (0.3.40)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-v627-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    // REAL platform shape (user-approval): overrideOf reads session.events with
+    // NO guard — a string would throw (`undefined.length`). Record what it saw.
+    let probed: unknown
+    const overrideOf = (session: unknown): 'ask' | 'never' | undefined => {
+      probed = session
+      const events = (session as { events?: Array<{ type: string; data: { policy: string } }> }).events
+      if (!events) return undefined
+      for (let index = events.length - 1; index >= 0; index -= 1) {
+        if (events[index]?.type === 'approval/policy') return events[index].data.policy as 'ask' | 'never'
+      }
+      return undefined
+    }
+    ctx.provide('approval', { overrideOf, config: { policy: 'ask' } })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    // Caller passes the SESSION object (the session-override is honored).
+    const sessionShape = { id: 's1', events: [{ type: 'approval/policy', data: { policy: 'never' } }] }
+    const allowed = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'z', args: {}, origin: 'background_review', sessionId: 's1', session: sessionShape,
+    })
+    expect(allowed.action).toBe('allow')
+    expect(probed).toBe(sessionShape)
+    // WITHOUT a session object the id is NEVER handed to the platform probe
+    // (a string would crash the real implementation) — config chain stands.
+    const fallback = await ctx.evolutionApproval.request({
+      kind: 'memory', summary: 'w', args: {}, origin: 'background_review', sessionId: 's2',
+    })
+    expect(fallback.action).toBe('staged')
+    expect(probed).toBe(sessionShape) // unchanged — no string probe happened
+    await rm(home, { recursive: true, force: true })
+  })
+
   it('allows when the platform service derives "never" even if the caller said "ask" (S3.1, E-22)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3b-'))
     const ctx = new Context()
@@ -59,7 +98,8 @@ describe('evolution-approval', () => {
     ctx.provide('approval', { overrideOf: () => 'never' })
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     const allowed = await ctx.evolutionApproval.request({
-      kind: 'memory', summary: 'y', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
+      kind: 'memory', summary: 'y', args: {}, origin: 'background_review', sessionId: 's1',
+      session: { id: 's1', events: [] }, sessionPolicy: 'ask',
     })
     expect(allowed.action).toBe('allow')
     await rm(home, { recursive: true, force: true })

@@ -273,6 +273,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // 0.3.20 (N-1): session id rides along so the approval service can
           // derive the platform override (see tool-memory for the rationale).
           ...exec.agent?.session.id ? { sessionId: exec.agent.session.id } : {},
+          // V6-27 (0.3.40): the platform overrideOf reads session.events — the
+          // session OBJECT, not the id, is what it can probe.
+          ...exec.agent?.session ? { session: exec.agent.session } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {

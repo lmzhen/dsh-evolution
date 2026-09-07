@@ -38,6 +38,7 @@ describe('evolution-review lifecycle guards', () => {
       session,
       ctx,
       inject: (message: unknown) => { injected.push(message as (typeof injected)[number]) },
+      followup: (message: unknown) => { injected.push(message as (typeof injected)[number]) },
     } as unknown as Agent)
 
     session.append('turn/start', { turn: 1 })

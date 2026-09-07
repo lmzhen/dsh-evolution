@@ -261,6 +261,9 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
           // mounted platform approval service discards in favour of its own
           // derivation — leaving CI/cron writes stuck in staging.
           ...exec.agent?.session.id ? { sessionId: exec.agent.session.id } : {},
+          // V6-27 (0.3.40): the platform overrideOf reads session.events — the
+          // session OBJECT, not the id, is what it can probe.
+          ...exec.agent?.session ? { session: exec.agent.session } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })
         if (decision.action === 'staged') {

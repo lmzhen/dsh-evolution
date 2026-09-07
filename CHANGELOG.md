@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.40 (patch) — V6-27 真 Session 对象修复 + 计数注入时清零 + 唤醒式审查注入（followup）
+
+**用户决策**：① 审查注入改**唤醒式**——`agent.followup`（= next-turn + 唤醒，空闲驱动立即开新轮）替代非唤醒 `inject`（pending 至下一驱动点）：任务结束瞬间大模型立刻开始总结任务；② 计数窗口改为「注入→注入」——阈值命中不再归零（`resetOnFire:false`），flush 注入时清零重计（续聊从新段起点计算）；③ 段内阈值多次命中只注入一次（session 级 latch 保持）。
+
+- **V6-27 【真缺陷修复】approval 平台形状 TypeError**：平台 `user-approval` 的 `overrideOf(session: Session)` 无守卫读 `session.events`（`user-approval` 真实实现 `effectiveApprovalPolicy(session.events)` 即 `undefined.length`——逐字重放实证）；历史传参 `sessionId` 字符串在**启用 approval 的部署上 request() 必崩**（默认 `enabled=false` 使其潜伏）。修复：`ApprovalRequest` 增 `session?: Session`，三调用面（review/approval-precheck？—— 实为 review runApproved/tool-memory/tool-skill-manage）随 `exec.agent.session` 透传**真对象**；`deriveSessionPolicy(sessionId?, session?)` **无 session 对象不再探测**（字符串永不进入 `overrideOf`）；无 session 时配置链 `config.policy ?? 'ask'` 兜底。
+- **【核心】计数窗口 = 注入时刻**：`advanceReview` 增 `resetOnFire?:boolean`（默认 true 保留既有语义；review 传 false 使计数跨阈值单调累计）——阈值命中不再清零；flush 执行注入后 `turnsSinceMemory/turnsSinceSkill=0` 并 `saveReviewState`（续聊从注入点重计，下段不误触发）。完成轮命中（latch 空 + 本轮 fire）经 `pendingKind = latch ?? kind` 兜入 flush（不再像 0.3.39 那样完成轮命中丢失）。
+- **【核心】唤醒式注入**：`deliverReview` 优先 `agent.followup(message)`（平台语义：next-turn + 唤醒；`source:{kind:'plugin',plugin:'dsh-evolution-review'}` 合法唤醒源），无 followup 的宿主降级 `inject`（`reviewWakeInject` 默认 true，显式 false 走 inject）。
+- **平台事实（核验，写入文档口径）**：`send()` 原语按 (target×wakeup) 路由；`agent.followup(msg)`= next-turn+唤醒（**无完成句柄**——message id 标识领取/丢弃事实）；`agent.inject(msg)`= next-step 不唤醒；`agent.steer(msg)`= next-step+唤醒。followup 在 turn/end 后唤醒=新 turn 开始（agent-loop idle 的 followup/steer 先例）。
+- **测试**：V6-27 平台形状桩回归（mock `overrideOf` 逐字节重放真实 shape：读 `session.events` 无守卫 + 调用记录断言 session **对象**传入、无 session 时不探测）；计数/latch stateful 用例（interval=2 全序列：段内 fire×2 零注入 → 完成轮注入恰一次 → 注入后清零（下一段 silent）→ 新段再触发——七轮断言）；`reviewWakeInject` 默认 followup 判别（onFollowup 收到、onInject 零）+ no-followup 降级 inject；既有九条两段流用例 turn1 改段内轮（blocked）+ turn2 完成轮 flush（0.3.40 完成轮命中即注入语义）。
+- **回归**：全量 vitest（735 全绿 731 + 4 已知 Windows 负载 flake 隔离复跑全绿，CI Linux 为准）；oxlint 0/0；包级 tsc 0。
+
 ## 0.3.39 (patch) — 审查全通道延迟化 + 默认 trigger 收敛（V6-53 follow-up）
 
 **用户决策**：不仅注入，**子代理执行也在任务完成后进行**（平台机制：`subagents.start` = 唤醒式子代理（立即驱动、立即生成），`agent.inject` = 非唤醒式（pending 至下一驱动点）——0.3.38 只延迟了注入回退，subagent 仍在阈值命中即跑）。且 `'cadence'` 与 `'completion'` 在结尾注入时机重叠 → 默认 `'both'` 无意义。
