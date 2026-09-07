@@ -34,6 +34,9 @@
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-maintenance": "workspace:^"
   },
+  "optionalDependencies": {
+    "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",

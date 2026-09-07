@@ -58,10 +58,13 @@ const otp = argv.includes('--otp') ? argv[argv.indexOf('--otp') + 1] : ''
  * Candidates: standalone npm (APPDATA shim layout) and node-bundled npm
  * (node_modules/npm next to node.exe / Program Files). */
 function npmCliJs() {
+  // V8-17 (0.3.48): skip the env-dependent candidates when the variable is
+  // unset (the install-layered V6-51 precedent) — `join('', 'npm', …)`
+  // probes a CWD-RELATIVE phantom path that may accidentally exist.
   const candidates = [
-    join(process.env.APPDATA ?? '', 'npm', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    ...(process.env.APPDATA ? [join(process.env.APPDATA, 'npm', 'node_modules', 'npm', 'bin', 'npm-cli.js')] : []),
     join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-    join(process.env.ProgramFiles ?? '', 'nodejs', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    ...(process.env.ProgramFiles ? [join(process.env.ProgramFiles, 'nodejs', 'node_modules', 'npm', 'bin', 'npm-cli.js')] : []),
   ]
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
@@ -121,6 +124,15 @@ const order = JSON.parse(readFileSync(join(distRoot, 'publish-order.json'), 'utf
 
 const expected = Object.keys(manifest).sort()
 const listed = order.flat().sort()
+// V8-18 (0.3.48): the F-103 vacuum-guard discipline — an empty manifest or an
+// empty publish order would compare equal and the run would print "publish
+// run complete" without publishing anything.
+if (expected.length === 0) {
+  throw new Error('manifest.json declares ZERO packages — refusing to publish (a vacuum run would falsely report complete)')
+}
+if (listed.length === 0) {
+  throw new Error('publish-order.json declares ZERO packages — refusing to publish (a vacuum run would falsely report complete)')
+}
 if (JSON.stringify(expected) !== JSON.stringify(listed)) {
   throw new Error('manifest and publish-order disagree on the package set')
 }
@@ -134,6 +146,17 @@ for (const name of onlyNames) {
 }
 
 const publishOrder = groupLimit === undefined ? order : order.slice(0, groupLimit)
+// V8-19 (0.3.48): --only × --groups — a named package beyond the sliced
+// publishOrder was silently skipped while the run still reported complete
+// (the operator believed it was published). Fail loud instead.
+if (onlyNames.length > 0) {
+  const slicedNames = new Set(publishOrder.flat())
+  for (const name of onlyNames) {
+    if (!slicedNames.has(name)) {
+      throw new Error(`--only package ${name} is outside the --groups slice (${groupLimit} group(s)) — it would be silently skipped; raise the limit or drop --groups`)
+    }
+  }
+}
 for (const group of publishOrder) {
   for (const name of group) {
     if (onlyNames.length > 0 && !onlyNames.includes(name)) continue

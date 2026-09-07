@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.48 (patch) — v8 审计批 3+5：review 状态机收尾 + 发布链守卫（V8-03/04/17/18/19/20/21）
+
+**来源**：v8 审计报告批次 3（L4 状态机）+ 批次 5（L6 发布链守卫）合并。
+
+- **V8-03 [P3·保护域]**：flush 的 `evolution/review-scheduled` emit（subagent 成功路径）与 completion 通道同款 emit 均包 try/catch + warn——抛错监听器曾穿透 flush 跳过计数清零（V7-04 重复交付的 emit 入口变体）；判别用例（抛错监听器 → 通知仍达 + 计数清零 + warn 命中）。
+- **V8-04 [P3·状态机]**：flush 取值改 **fresh 优先**（`kind ?? latch ?? undefined`）——完成轮当轮跨过第二阈值时 `advanceReview` 返回 combined 但旧 latch-first 丢弃它（V7-14 裁定的「完成轮当轮交叉」残余窗口——无中间轮覆写）；fresh 优先语义与「last-trigger-wins 越晚越贴近相关性」一致；skip 轮 kind=null 自然回落 latch。**行为变更（CHANGELOG 声明）**：完成轮 fire 与段内旧 latch 并存时以当轮 fresh 为准。判别用例（5/10 双阈值 10 轮序列：turn9 前 latch=memory → turn10 completed 交叉 → 交付 `[Auto-review]`（combined）而非 `[Auto-review — Memory]`）。
+- **V8-17 [P3]**：publish-scoped 的 npmCliJs 候选只在 env 存在时加入（APPDATA/ProgramFiles 未设曾产生 CWD 相对幻影候选——install-layered V6-51 同款处理）。
+- **V8-18 [P3]**：发布主链路真空守卫——manifest 或 publish-order 声明 0 包即 fail-loud（原来空集相等比较通过、循环零次后打印 "publish run complete"——F-103 教义与 verify-* 三脚本对齐）。
+- **V8-19 [P3]**：`--only` × `--groups` 组合——点名包落在截断切片之外时 fail-loud（原来静默跳过仍报 complete——操作者以为发了实际没发）。
+- **V8-20 [P3]**：prepare-release 的 exports 校验覆盖**对象形态**（{types, default} 递归一层同 inShipped 检查）——string 形 35 处原已查、object 形 61 处（含全部主导出与 ./invariant）从不校验的空转被闭合。
+- **V8-21 [P3]**：`@deepseek-ai/dsh-evolution-agent-preset` 列入 evolution-commands 的 **optionalDependencies**（运行时 createRequire().resolve 的声明语义——被补齐；verify-dependency-closure 静态 import 盲区的运行时面获得声明）。
+- **门禁**：review 28/28（+2 判别）+ anchored-smoke 2/2 + lifecycle 2/2；oxlint 0/0（含 scripts）；tsc 0（review --force）；publish-scoped/prepare-release `node --check` 语法校验通过；全量以 CI Linux 为准。
+
 ## 0.3.47 (patch) — v8 审计批 2+4：守卫与口径批（V8-02/06/07/08/09/10/12/13/14）
 
 **来源**：v8 审计报告批次 2（L2 守卫）+ 批次 4（工具命令面）合并；V8-06（plan 批次遗漏项）补入。9 项全部先核验后修复。

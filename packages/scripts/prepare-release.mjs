@@ -318,8 +318,18 @@ for (const item of tarballs) {
     }
   }
   for (const [name, target] of Object.entries(manifest.exports ?? {})) {
+    // V8-20 (0.3.48): the guard covered ONLY string-form exports (35 of 96) —
+    // the object form ({ types, default }: 61 entries incl. every main entry
+    // and ./invariant) was never checked. Recurse one level over the object
+    // values (types/default) with the same inShipped test.
     if (typeof target === 'string' && !inShipped(target)) {
       failures.push(`${item.name}: export ${name} -> ${target} is missing from the tarball`)
+    } else if (typeof target === 'object' && target !== null) {
+      for (const [sub, value] of Object.entries(target)) {
+        if (typeof value === 'string' && !inShipped(value)) {
+          failures.push(`${item.name}: export ${name}.${sub} -> ${value} is missing from the tarball`)
+        }
+      }
     }
   }
 }

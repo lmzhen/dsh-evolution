@@ -667,6 +667,71 @@ it('0.3.41: interval=1 waking delivery cannot self-drive — the injected wake t
   expect(deliveries).toHaveLength(2)
 })
 
+it('0.3.48: a completing-turn cross of the second threshold delivers the combined review, not the stale latch (V8-04)', async () => {
+  const delivered: string[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    stateful: true,
+    onInject: (message) => {
+      const box = message as { content?: Array<{ type: string; text: string }> } | null
+      delivered.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
+    },
+  })
+  ctx.provide('evolutionPolicy', {
+    get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 5, reviewSkillInterval: 10, reviewMode: 'inject' }),
+  })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 5,
+    skillInterval: 10,
+    reviewMode: 'inject',
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
+  // turns 1-9 non-completing: memory crosses alone at turn 5 (latch='memory');
+  // the monotonic counters keep it due through 6-9 (latch unchanged).
+  for (let turn = 1; turn <= 9; turn += 1) { emitEnd(turn, 'blocked'); await settle() }
+  // turn10 (completing): skill crosses at the SAME boundary → kind='combined';
+  // latch-first delivery used to discard the fresh combined and deliver the
+  // stale single-kind prompt (V7-14's completing-turn-cross residual window).
+  emitEnd(10); await settle()
+  expect(delivered).toHaveLength(1)
+  expect(delivered[0]).toContain('[Auto-review]')
+  expect(delivered[0]).not.toContain('— Memory')
+})
+
+it('0.3.48: a throwing review-scheduled listener cannot skip the counter reset (V8-03)', async () => {
+  const delivered: string[] = []
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    onFollowup: (message) => {
+      const box = message as { content?: Array<{ type: string; text: string }> } | null
+      delivered.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
+    },
+  })
+  ctx.on('evolution/review-scheduled', () => { throw new Error('listener boom') })
+  const warnSpy = vi.spyOn(ctx.logger, 'warn')
+  ctx.provide('subagents', {
+    start: async () => ({
+      result: Promise.resolve({
+        structured: { memoryOps: [{ target: 'memory', action: 'add', facts: 'f', evidence: [{ event_seq: 0 }] }], skillOps: [], summary: 'ok' },
+      }),
+      dispose: async () => {},
+    }),
+  })
+  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+  emitEnd(1, 'blocked')
+  emitEnd(2) // flush: subagent succeeds → schedule emit throws → protection domain
+  await vi.waitFor(() => { expect(delivered).toHaveLength(1) }) // the result notice still lands
+  const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
+  expect(saved.turnsSinceMemory).toBe(0) // reset NOT skipped by the throwing listener
+  expect(saved.turnsSinceSkill).toBe(0)
+  expect(warnSpy.mock.calls.some(([message]) => String(message).includes('review-scheduled emit failed'))).toBe(true)
+})
+
 it('0.3.42: subagent-success result notice wakes via followup, not inject (V7-03)', async () => {
   const followups: unknown[] = []
   const injects: unknown[] = []

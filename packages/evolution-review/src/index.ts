@@ -337,9 +337,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // channel — a successful review left the parent idle, and a non-waking
     // notice would sit pending until the user's next message.
     if (event.data.reason.kind === 'completed') {
-      // 0.3.40: at the completing turn the flush uses the LATCHED kind or the
-      // just-fired one (a threshold crossing exactly at task completion).
-      const pendingKind = pendingCadenceReviews.get(session.id) ?? (kind ?? undefined)
+      // V8-04 (0.3.48): the just-fired kind takes precedence — the completing
+      // turn is LATEST-relevance (last-trigger-wins) and covers both domains
+      // when it crosses the second threshold (the old latch-first form
+      // discarded a fresh 'combined' and delivered a stale single kind).
+      const pendingKind = kind ?? pendingCadenceReviews.get(session.id) ?? undefined
       if (pendingKind !== undefined) {
         pendingCadenceReviews.delete(session.id)
         // Explicit 'inject' deployments also execute at the end (the user
@@ -354,13 +356,22 @@ export function apply(ctx: Context, rawConfig: Config): void {
         } else {
           const started = await trySubagentReview(session, agent, pendingKind, signal)
           if (started) {
-            ctx.emit('evolution/review-scheduled', {
-              sessionId: session.id,
-              kind: pendingKind,
-              toolCalls: signal.toolCalls,
-              userChars: signal.userChars,
-              assistantChars: signal.assistantChars,
-            })
+            // V8-03 (0.3.48): the emit is a protection domain (V5-19③/F-334
+            // discipline) — a throwing listener used to escape the flush,
+            // skip the counter reset below and re-deliver the same kind next
+            // completed turn (the V7-04 double-delivery shape, entered via
+            // the emit instead of the save).
+            try {
+              ctx.emit('evolution/review-scheduled', {
+                sessionId: session.id,
+                kind: pendingKind,
+                toolCalls: signal.toolCalls,
+                userChars: signal.userChars,
+                assistantChars: signal.assistantChars,
+              })
+            } catch (emitError) {
+              ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+            }
           } else {
             // Subagent path failed at the END — fall back to the prompt delivery
             // (still at completion; there is no later boundary to defer to).
@@ -431,13 +442,20 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // G4.4 (F-334): emit the schedule confirmation only after the completion
     // review inject actually dispatches (E-41 ordering: record-schedule once the
     // review was truly sent, not before a dispatch that may fail).
-    ctx.emit('evolution/review-scheduled', {
-      sessionId: session.id,
-      kind: 'skill',
-      toolCalls: signal.toolCalls,
-      userChars: signal.userChars,
-      assistantChars: signal.assistantChars,
-    })
+    // V8-03 (0.3.48): protection domain (same as the flush emit above) — the
+    // weaker form: the inject already happened, so a throwing listener only
+    // surfaces a spurious review-error, but the family discipline applies.
+    try {
+      ctx.emit('evolution/review-scheduled', {
+        sessionId: session.id,
+        kind: 'skill',
+        toolCalls: signal.toolCalls,
+        userChars: signal.userChars,
+        assistantChars: signal.assistantChars,
+      })
+    } catch (emitError) {
+      ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+    }
   }
 
   /** V7-03 (0.3.42): shared waking delivery — review prompts AND result
