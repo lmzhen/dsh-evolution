@@ -69,9 +69,12 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     // V6-21 (0.3.37): the same content guard the user branch got in E-49 —
     // a malformed assistant content must skip, not break the signal pipeline
     // (the review E-6 catch used to swallow the whole turn's signals).
-    if (!Array.isArray(event.data.message.content)) return
-    const text = event.data.message.content
-      .map(block => block.type === 'text' ? block.text : '')
+    // V7-09 (0.3.44): the guard must also cover `data.message` ITSELF missing
+    // — `.content` on an absent message is the same TypeError one level up.
+    const message = (event.data as { message?: { content?: Array<{ type: string; text?: string }> } }).message
+    if (!message || !Array.isArray(message.content)) return
+    const text = message.content
+      .map(block => block.type === 'text' ? block.text ?? '' : '')
       .join(' ')
     signal.assistantChars += text.length
     return

@@ -56,6 +56,10 @@ describe('evolution-state-domain', () => {
     await provider.savePending({ id: 'p1', kind: 'memory', summary: 'x', args: {}, createdAt: 'now', status: 'pending' })
     const claimed = await provider.claimPending('p1', 'c1')
     expect(claimed?.status).toBe('executing')
+    // V6-33 (0.3.37): claimPending returns a COPY (the update callback's
+    // no-change paths can hand back the internal record) — an in-place
+    // mutation by the caller must not poison the domain map.
+    if (claimed) claimed.summary = 'poisoned'
     expect(await provider.claimPending('p1', 'c2')).toBeNull()
     const resolved = await provider.tryResolvePending('p1', 'rejected')
     expect(resolved.applied).toBe(true)

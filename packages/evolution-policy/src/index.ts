@@ -58,7 +58,7 @@ export interface Config {
   substantiveMinToolCalls?: number
   substantiveMinUserChars?: number
   substantiveMinAgentChars?: number
-  reviewMode?: string
+  reviewMode?: 'subagent' | 'inject'
   memoryReviewModel?: string
   skillReviewModel?: string
   curatorModel?: string
@@ -78,7 +78,10 @@ export const Config: Schema<Config> = z.object({
   substantiveMinToolCalls: z.number().min(1).default(DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS),
   substantiveMinUserChars: z.number().min(1).default(DEFAULT_SUBSTANTIVE_MIN_USER_CHARS),
   substantiveMinAgentChars: z.number().min(1).default(DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS),
-  reviewMode: z.string().default('subagent'),
+  // V7-15 (0.3.44): closed union — a typo cannot silently select a fourth
+  // behavior (schemastery strips an unmatching value, so runtime degradation
+  // is silent; the union closes the TYPE surface for config authors).
+  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
   memoryReviewModel: z.string().default('deepseek-v4-flash'),
   skillReviewModel: z.string().default('deepseek-v4-pro'),
   curatorModel: z.string().default('deepseek-v4-pro'),
@@ -128,10 +131,11 @@ export class EvolutionPolicy extends Service {
       reviewMode: (() => {
         // V5-33 (0.3.31): an invalid reviewMode string fell silently to
         // 'subagent' — the numeric fields beside it all warn once; the string
-        // surface gets the same posture (joined into the same fallback warn).
-        const mode = config.reviewMode
-        if (mode !== undefined && mode !== 'inject' && mode !== 'subagent') clamped.push('reviewMode')
-        return mode === 'inject' ? 'inject' : 'subagent'
+        // surface got the same posture. V7-15 (0.3.44): the type is a closed
+        // union and the cordis loader REJECTS an invalid value at load, so
+        // the clamp's mismatch branch is unreachable by construction — the
+        // fallback below is kept for direct construction / legacy reads.
+        return config.reviewMode === 'inject' ? 'inject' : 'subagent'
       })(),
       memoryReviewModel: config.memoryReviewModel ?? 'deepseek-v4-flash',
       skillReviewModel: config.skillReviewModel ?? 'deepseek-v4-pro',

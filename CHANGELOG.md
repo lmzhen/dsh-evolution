@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.44 (patch) — v7 收尾批：P3 清扫（V7-08/09/11/15/16/18）+ 测试专项补齐（V7-20）
+
+**来源**：v7 审计轮最后一批（P3 清扫 + 四项测试缺口）。
+
+- **V7-08 [P3]**：`archivedIdsCache`（json provider 每实例读一次）在 archive **任何写入后**失效——原实现只在实例启动读一次，cache 建立后的 append/轮转加入的新 id 永不被 mutation 路径（`mergedWithFilteredLegacy`）排除——幽灵 pending 双胞胎可经「append 后、list 前」的 mutation 并入。修复同时覆盖轮转与非轮转写入（两处 return 前失效）；判别用例（cache 空建立 → resolve append live-0 → legacy ghost 键=id → mutation → 排除；**教训：filterLegacy 按 legacy 键对比 archivedIds（id 值）——测试构造的键必须等于 id，键≠id 的"幽灵"不被排除是正确行为**）。
+- **V7-09 [P3]**：signals 的 assistant 分支补 `data.message` 本身缺场守卫（V6-21 只守 content——message 缺场 `.content` 仍 TypeError 且被 E-6 吞掉整轮信号；user 分支的 E-49 同款不对称残余）。
+- **V7-10 [P3] 核验裁决：不修（观察项）**：空体锁接管 1s 门（io.ts:304）静态双持窗口需「创建者在 open 与 write 间被阻塞 >1s 或时钟偏差 >1s」——未实证 + 锁协议第五版经 32-way 压测多轮稳定 + 接管后仍有 re-read+票二次验证——成本收益不划算，记录观察（若未来出现该形态事故再配合压力实跑修复）。
+- **V7-11 [P3]**：fuzzyReplace 的 replaceAll 循环加**累计预算**（每次扫描 work 累加，超 FUZZY_MAX_WORK 返回 null——不部分应用任意前缀）；单次预算（V6-17）与累计预算分离；null 的上层消息补「or the replaceAll fuzzy budget was exceeded」。
+- **V7-15 [P3]**：`skillReviewTrigger`（review）与 `reviewMode`（policy）schema 与 Config 接口均收窄为**字面量联合**（类型面闭合——拼错在 TS/配置作者层即失败；schemastery 仍剥键静默（0.3.43 实证），运行时 warn 不可达，已在注释中写明）。
+- **V7-16 [P3]**：cleanup 枚举补全 0.3.38-0.3.42 新增的四张 per-session 状态表（pendingCadenceReviews/pendingCadenceWarned/skipNextCadenceFire/cadenceResetWarned——原 cleanup 只清三张旧表；实际无泄漏（闭包整体回收），口径已对齐）。
+- **V7-18 [P3]**：install-layered 的 E-33 互斥检查从全名 includes 改为**包尾段匹配**（scope 无关——`@lmzhen/dsh-evolution-preset` 不再绕过默认 scope 装 host 的互斥）；判别用例（直接构造跨 scope manifest——scoped 安装需 .release-staging 测试不可行，检查先于 copy 故构造可行）。
+- **V7-20 [P3·测试专项补齐]**：① V6-31（.bak 键集）+ V7-08 行为用例；② V6-33（claimPending 返回拷贝——调用方 mutation 不污染域表）；③ V6-16（无 transact 后端下 serial 队列串行化并发 add——丢记录判别）；④ V6-08/V5-20（stamp 探针同秒后缀形态 `<name>-<stamp>-<rand>`——原只测 plain+正例）。
+- **回归**：受影响 spec 全绿（pending-cap 12/12、installer 12/12（+V7-18）、curator 49/49、domain 6/6、memory-store 18/18、skill-store 34/34、review 25/25）；oxlint 0/0（全树）；tsc 0（五包 --force）；全量以 CI Linux 为准。**v7 审计轮 20 项+1（V6-48 失效）全部闭环（修 11 / 核验不修 2（V7-10/14）/ 文档 7）**。
+
 ## 0.3.43 (patch) — v7 批三：发布文档契约（V7-05/06/17）+ 声明失实与死代码（V7-07/12/13/19）
 
 **来源**：v7 审计轮第三批（文档契约 + 低风险文字面/实现补正）。

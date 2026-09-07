@@ -181,4 +181,17 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'layered')).rejects.toThrow(/mutually exclusive/)
     await rm(home, { recursive: true, force: true })
   }, 30_000)
+
+  it('V7-18: cross-scope bundle names still hit the E-33 mutual exclusion (0.3.44)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-v718-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    // A profile carrying the host bundle under a NON-default scope — the
+    // scoped install path needs .release-staging (not available in tests),
+    // so the bundle entry is constructed directly; the mutual-exclusion
+    // check runs BEFORE the package copy either way.
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-host'] } } }), 'utf8')
+    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
+    await rm(home, { recursive: true, force: true })
+  }, 30_000)
 })

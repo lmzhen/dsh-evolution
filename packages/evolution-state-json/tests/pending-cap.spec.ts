@@ -322,6 +322,37 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('V7-08: rotation REFRESHES the once-read archive id cache (0.3.44)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v708-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    // 1) First mutation establishes the once-per-instance archivedIdsCache
+    //    (empty archive).
+    await provider.savePending({ id: 'first', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' })
+    // 2) Resolving the fresh pending evicts the oldest resolved record and
+    //    appends it to the archive — the id the cache never saw (only the
+    //    oldest entry leaves; ARCHIVE_RESOLVED_CAP keeps the sidecar small).
+    const live: Record<string, PendingRecord> = {}
+    for (let i = 0; i < 200; i += 1) {
+      live[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
+    }
+    live['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(live))
+    await provider.tryResolvePending('to-resolve', 'approved')
+    // 3) Without the refresh a stale cache excludes NOTHING for the id the
+    //    append just added — the ghost twin of `live-0` (now archived) slips
+    //    in through a later mutation before any list. The legacy KEY must
+    //    match the record id (filterLegacy compares keys against the id set).
+    await io.writeText(join(root, 'pending.json'), JSON.stringify({
+      'live-0': { id: 'live-0', kind: 'skill', summary: 'ghost twin', args: { facts: 'old' }, createdAt: 'now', status: 'pending' },
+    }))
+    await provider.savePending({ id: 'after-rotate', kind: 'memory', summary: 'n2', args: {}, createdAt: 'now', status: 'pending' })
+    const current = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    expect(Object.values(current).some(record => record.id === 'live-0')).toBe(false)
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('does not write an empty .bak when the archive was empty at rotation (V5-10)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-empty-bak-'))
     const ctx = await mount(root)

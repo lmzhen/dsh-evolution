@@ -390,7 +390,13 @@ export async function install(options = {}) {
           ? manifest.dsh.profile.bundles
           : []
         const other = bundleName === BUNDLES.host ? BUNDLES.oneclick : BUNDLES.host
-        if (existing.includes(other)) {
+        // V7-18 (0.3.44): the comparison was an exact full-name includes — a
+        // profile that carries `@lmzhen/dsh-evolution-preset` slipped past the
+        // check when installing the host with the default `@deepseek-ai` scope
+        // (E-33 double mount). Match the package TAIL (scope-agnostic).
+        const otherTail = other.slice(other.lastIndexOf('/') + 1)
+        const conflict = existing.some(entry => typeof entry === 'string' && (entry === other || entry.endsWith(`/${otherTail}`)))
+        if (conflict) {
           throw new Error(
             `install-layered: profile "${profile}" already carries the ${other} bundle — host and preset are mutually exclusive install targets (E-33). Uninstall it first or use dsh plugin add. DSH_EVOLUTION_ALLOW_ROW_COLLISIONS does not exempt this check.`,
           )

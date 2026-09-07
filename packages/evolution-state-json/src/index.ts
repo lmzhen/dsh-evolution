@@ -363,8 +363,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
           if (archive.length > 0) {
             await io().writeText(pathOf('pending-state-archive.json.bak'), JSON.stringify(archive, null, 2)).catch(() => {})
           }
+          // V7-08 (0.3.44): the rotation just moved ids into/out of the active
+          // archive — the once-per-instance archivedIdsCache would keep
+          // excluding with a stale view (a ghost pending twin could slip in
+          // through a mutation that runs before any list). Invalidate so the
+          // next read rebuilds from both sidecars.
+          archivedIdsCache = null
           return JSON.stringify((fresh.length > 0 ? fresh : next).slice(-ARCHIVE_RESOLVED_CAP), null, 2)
         }
+        // V7-08 (0.3.44): ANY archive append below the rotation cap still adds
+        // new ids the once-read cache never saw — invalidate on the plain
+        // write too (a stale cache would let a ghost twin in through a later
+        // mutation before any list).
+        archivedIdsCache = null
         return JSON.stringify(next, null, 2)
       })
     } catch {

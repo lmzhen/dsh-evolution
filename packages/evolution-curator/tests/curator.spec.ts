@@ -591,6 +591,12 @@ describe('evolution-curator', () => {
     await mkdir(join(skills.root, '.archive', `foo-bar-${stamp}`), { recursive: true })
     await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}`, '.bundled'), '', 'utf8')
     await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}`, 'SKILL.md'), body('foo-bar', 'Sibling body.'), 'utf8')
+    // V7-20 (0.3.44): the same-second random-suffix shape (`<name>-<stamp>-<rand>`)
+    // must be matched by the stamp probe too — the probe previously only saw
+    // the plain `<name>-<stamp>` form in tests.
+    await mkdir(join(skills.root, '.archive', `foo-bar-${stamp}-a1b2c3`), { recursive: true })
+    await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}-a1b2c3`, '.bundled'), '', 'utf8')
+    await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}-a1b2c3`, 'SKILL.md'), body('foo-bar', 'Sibling body.'), 'utf8')
     const result = await ctx.evolutionCurator.run({ ignoreGates: true })
     expect(result.errors).toEqual([])
     // `foo` is NOT bundled: the sibling's marker must not suppress it, else its

@@ -44,7 +44,9 @@ export interface Config {
   /** LLM provider for review subagents. Omit to inherit the deployment default route. */
   reviewProvider?: string
   /** Skill-review trigger: cadence (interval) | completion (once after a proven-long task) | both. */
-  skillReviewTrigger?: string
+  /** Which channel runs the end-of-conversation summary: the cadence latch
+   * ('cadence'), the long-session completion gate ('completion'), or both. */
+  skillReviewTrigger?: 'cadence' | 'completion' | 'both'
   /** Cumulative session tool calls before a session counts as proven-long for the completion channel. */
   skillReviewCompletionMinToolCalls?: number
   /** 0.3.40: deliver the deferred review with a WAKING inject for a summary the
@@ -75,7 +77,12 @@ export const Config: z<Config> = z.object({
   // (rc.66 note) schemastery fields are optional by default — the interface
   // `reviewProvider?` and this schema agree; "Omit to inherit" holds.
   reviewProvider: z.string(),
-  skillReviewTrigger: z.string().default(DEFAULT_SKILL_REVIEW_TRIGGER),
+  // V7-15 (0.3.44): the trigger is closed to the three known values — a typo
+  // cannot silently select a fourth behavior. Note: schemastery is tolerant
+  // (it STRIPS an unmatching value and keeps the default), so the runtime
+  // degradation is silent by design; the union keeps the TYPE surface closed
+  // for config authors.
+  skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER),
   reviewWakeInject: z.boolean().default(true),
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
 })
@@ -750,9 +757,18 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
 
   ctx.effect(() => () => {
+    // V7-16 (0.3.44): enumerate EVERY per-session state map — the 0.3.38-0.3.42
+    // additions (pendingCadenceReviews/pendingCadenceWarned/skipNextCadenceFire/
+    // cadenceResetWarned) were missing from the cleanup list; the closures were
+    // reclaimed with the fiber anyway (no real leak), but the cleanup contract
+    // now matches the full set.
     turnStarts.clear()
     cumulativeToolCalls.clear()
     completionInjected.clear()
+    pendingCadenceReviews.clear()
+    pendingCadenceWarned.clear()
+    skipNextCadenceFire.clear()
+    cadenceResetWarned.clear()
   }, 'dsh-evolution-review.cleanup')
 }
 

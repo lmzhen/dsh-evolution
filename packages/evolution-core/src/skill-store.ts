@@ -503,11 +503,19 @@ function trimPatternBoundaries(pattern: string): string {
   return trailing < 0 ? trimmed : trimmed.slice(0, trailing)
 }
 
-/** Replace only the fuzzy-matched span, preserving all surrounding bytes. */
-function fuzzyReplace(content: string, oldString: string, newString: string, replaceAll: boolean): string {
+/** Replace only the fuzzy-matched span, preserving all surrounding bytes.
+ * V7-11 (0.3.44): the replaceAll loop accumulates the per-scan cost — the
+ * single-scan budget at the caller only bounded ONE fuzzyIndexOf, while an
+ * unbounded number of matches × O(n·m) each could still stall the loop.
+ * When the accumulated cost exceeds the budget the whole replace fails
+ * (null) instead of partially applying an arbitrary prefix. */
+function fuzzyReplace(content: string, oldString: string, newString: string, replaceAll: boolean): string | null {
   let current = content
   let scanFrom = 0
+  let totalWork = 0
   for (;;) {
+    totalWork += current.length * oldString.length
+    if (totalWork > FUZZY_MAX_WORK) return null
     const match = fuzzyIndexOf(current, oldString, scanFrom)
     if (match === null) return current
     const [start, end] = match
@@ -1167,8 +1175,9 @@ export class SkillLibrary {
         return { result: { ok: false, message: `old_string too large for fuzzy match (${oldString.length} chars in ${patchLabel}); use update for a full rewrite or a narrower anchor.` }, write: null }
       }
       const patched = fuzzyPatch(md, oldString, newString, replaceAll)
-      // `null` means "no match"; an empty string is a legitimate replacement.
-      if (patched === null) return { result: { ok: false, message: `Could not find old_string in "${name}/${patchLabel}". Use update for a full rewrite.` }, write: null }
+      // `null` means "no match" or (V7-11) the replaceAll loop exceeded the
+      // cumulative fuzzy budget; an empty string is a legitimate replacement.
+      if (patched === null) return { result: { ok: false, message: `Could not find old_string in "${name}/${patchLabel}" (or the replaceAll fuzzy budget was exceeded). Use update for a full rewrite.` }, write: null }
       let writeContent = patched
       let normalizedFields: string[] | undefined
       if (target === skillMd) {

@@ -323,6 +323,22 @@ it('memory add also runs inside the transaction (P1-①)', async () => {
   expect(entries).toHaveLength(2)
 })
 
+it('V6-16: without a transact backend the in-process serial queue still folds concurrent adds (0.3.37)', async () => {
+  const io = memoryFakeIo(false)
+  const store = new MemoryStore({ root: 'root', io })
+  // Two concurrent adds on an unserialized read→write path would both read
+  // the empty file and the last rename wins — one record silently lost. The
+  // V6-16 process-level queue chains RMWs even without a backend transaction.
+  await Promise.all([
+    store.add('memory', 'serial-one'),
+    store.add('memory', 'serial-two'),
+  ])
+  const entries = await store.read('memory')
+  expect(entries).toHaveLength(2)
+  expect(entries).toContain('serial-one')
+  expect(entries).toContain('serial-two')
+})
+
 it('a failed write to a MISSING file keeps it missing (M-4)', async () => {
   const io = memoryFakeIo(true)
   const store = new MemoryStore({ root: 'root', io, memoryCharLimit: 10 })
