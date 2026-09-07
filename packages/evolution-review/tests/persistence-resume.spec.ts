@@ -81,6 +81,9 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
         source: { kind: 'user' },
       }), { surfaceOp: 'append' })
       session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+      // V6-53 (0.3.39): the threshold turn only STASHES the kind — the review
+      // subagent runs at the NEXT completed boundary (the flush).
+      session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
       // onTurnEnd is async-void: poll until the review pipeline reported back.
       const deadline = Date.now() + 5_000

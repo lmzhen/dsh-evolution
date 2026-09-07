@@ -46,15 +46,21 @@ describe('evolution-review lifecycle guards', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    // V6-53 (0.3.39): the threshold turn only STASHES the review — the subagent
+    // runs at the NEXT completed boundary (the flush). Append a second
+    // completed turn/end to drive the flush.
+    session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
-    // V6-53 (0.3.38): the pipeline failure now DEFERS the review (no mid-task
-    // inject), so settle with a fixed sleep instead of polling for the prompt.
+    // V6-53 (0.3.39): the review runs at the END-flush — settle, then assert the
+    // dispose guarantee (the rejected run is still disposed exactly once).
     await new Promise(resolve => setTimeout(resolve, 150))
     // The dispose guarantee is the point of this test: the rejected run must
     // still be disposed exactly once, even though the pipeline failed.
     expect(disposed).toBe(1)
-    // The failure no longer falls back to a synchronous mid-task inject.
-    expect(injected).toHaveLength(0)
+    // The failure falls back to the synchronous inject path AT the end-flush.
+    expect(injected).toHaveLength(1)
+    const text = injected[0]?.content.find(block => block.type === 'text')?.text ?? ''
+    expect(text).toContain('Auto-review')
   })
 
   it('sweepDeadSessionEntries drops only entries whose session is gone (P1-10)', () => {

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.39 (patch) — 审查全通道延迟化 + 默认 trigger 收敛（V6-53 follow-up）
+
+**用户决策**：不仅注入，**子代理执行也在任务完成后进行**（平台机制：`subagents.start` = 唤醒式子代理（立即驱动、立即生成），`agent.inject` = 非唤醒式（pending 至下一驱动点）——0.3.38 只延迟了注入回退，subagent 仍在阈值命中即跑）。且 `'cadence'` 与 `'completion'` 在结尾注入时机重叠 → 默认 `'both'` 无意义。
+
+- **两通道统一延迟（核心）**：cadence 阈值命中 → **只暂存 kind（0 执行：不 spawn、不注入）**；`turn/end` 且 `reason.kind==='completed'`（平台语义：turn 正常完成——`aborted/blocked/error/max-tokens/interrupted` 均不算）时统一执行：
+  - `reviewMode='subagent'`（默认）→ 此时才 `subagents.start` 跑审查（子代理失败 → fallback 在结尾注入——已无更晚边界）；
+  - 显式 `'inject'` → 此时才注入（**原「立即注入」契约被取代**：BOTH 模式都按用户定案在任务完成后执行）。
+  - flush 先于 cadence 暂存块（完成轮本身可能同时是阈值触发轮）。
+- **默认 `skillReviewTrigger='completion'` 无需，改为默认 `'cadence'`**：0.3.38 后 cadence 的延迟执行即「结尾总结」，`'both'` 会在同一边界再注入一次 task-complete 提示词（双注入）；completion 通道保留为显式可选（`'completion'`/`'both'` 部署行为不变）。
+- **平台事实（核验，写入文档口径）**：`TurnEndReasonMap` = `completed / aborted / blocked / error / max-tokens / interrupted`（可合并扩展）；无会话级结束事件——「任务结尾」只能从 turn/end reason 派生；`agent.inject` 为 non-waking（结束瞬间不会自动开新模型轮——总结在**下一驱动点**执行，用户不再回复则保持 pending 不消费）。
+- **计数口径**：cadence 内部计数 `turnsSince*` 阈值即归零（滚动等窗口——每次触发标准与首次相同）；completion 通道的 20 次门槛用会话累计（无重置）；延迟 flush 不叠加 20 门（阈值已证值得审）。
+- **测试**：E-19/E-59c/E-41/F-203/G4.4/V4-21/F-102/V6-24/lifecycle 九条按两段流重写（turn1 暂存零执行 + turn2 flush 执行）+ 默认断言 'both'→'cadence'；新 E-19 变体断言「多个阈值命中 = 一次 flush 执行、单飞行保持」。
+- **回归**：全量 vitest（本机并行已知 Windows 负载 flake 隔离复跑全绿，CI Linux 为准）；oxlint 0/0；包级 tsc 0。
+
 ## 0.3.38 (patch) — 审查注入延迟化 + v6 M5 收口挂账清点
 
 **背景（用户报告）**：auto-review 提示词在中途注入打断任务（且注入同时使主对话前缀缓存从该轮起全部失效）。核验发现的真相：**`skillReviewTrigger` 只门控 completion 通道**；中途注入的唯一来源 = cadence 通道在回退路径（子代理不可用/单飞行/失败/子代理无结构化计划）下的立即 `agent.inject`——阈值检测逻辑本身无问题，需要改的是「注入时机」。

@@ -66,8 +66,14 @@ describe('anchored-standard review smoke', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    // V6-53 (0.3.39): the threshold turn only STASHES the kind — the review
+    // subagent starts at the NEXT completed boundary (the flush).
+    session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    const deadline = Date.now() + 5000
+    while (capturedRequest === undefined && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
     expect(capturedRequest).toBeDefined()
     const request = capturedRequest as Record<string, unknown> | undefined
     // The DSH tool catalog exposes `skill` only — discovery tools don't exist,
@@ -180,6 +186,9 @@ describe('anchored-standard review smoke', () => {
         source: { kind: 'user' },
       }), { surfaceOp: 'append' })
       session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+      // V6-53 (0.3.39): the threshold turn only STASHES the kind — the review
+      // subagent starts at the NEXT completed boundary (the flush).
+      session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
       // The schedule fires on a 1ms interval and the plan applies asynchronously:
       // a fixed sleep can snapshot the window where the disk archive landed but

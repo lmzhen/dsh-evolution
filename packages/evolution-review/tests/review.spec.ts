@@ -23,7 +23,7 @@ describe('evolution-review', () => {
 
   it('defaults the completion channel to both with a long-conversation threshold', () => {
     const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { skillReviewTrigger: string; skillReviewCompletionMinToolCalls: number } } } })['~standard'].validate({}).value
-    expect(value.skillReviewTrigger).toBe('both')
+    expect(value.skillReviewTrigger).toBe('cadence')
     expect(value.skillReviewCompletionMinToolCalls).toBe(20)
   })
 
@@ -57,7 +57,7 @@ describe('evolution-review', () => {
     expect(ops.map(op => op.name).filter(Boolean)).toEqual(['read-skill', 'brand-new-skill'])
   })
 
-  it('E-19: concurrent turn/end changes spawn only one review subagent (0.3.18)', async () => {
+  it('E-19: a deferred review spawns once per completed boundary and never concurrently (0.3.18 + 0.3.39)', async () => {
     const { ctx, emitEnd, releaseStart } = await mountReviewFixture()
     let starts = 0
     ctx.provide('subagents', {
@@ -92,12 +92,16 @@ describe('evolution-review', () => {
       reviewMode: 'subagent',
     })
     emitEnd(1)
-    await vi.waitFor(() => { expect(starts).toBe(1) })
-    // Second turn/end while the first review is still running: the signal
-    // advances but no second subagent spawns (single-flight).
-    emitEnd(2)
     await new Promise(resolve => setTimeout(resolve, 50))
-    expect(starts).toBe(1)
+    expect(starts).toBe(0) // threshold reached but DEFERRED — no mid-task spawn
+    emitEnd(2)
+    await vi.waitFor(() => { expect(starts).toBe(1) }) // flush spawn (held)
+    emitEnd(3)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(starts).toBe(1) // pending consumed; the next stash waits for its own flush
+    emitEnd(4)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(starts).toBe(1) // single-flight: the held review blocks the next flush (fallback inject at end)
     releaseStart.current?.()
   })
 
@@ -117,7 +121,7 @@ describe('evolution-review', () => {
     await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
   })
 
-  it('E-59c: a started subagent with no structured plan emits review-error and defers instead of injecting mid-task (0.3.19 + 0.3.38)', async () => {
+  it('E-59c: a subagent with no structured plan emits review-error at the END-flush, never mid-task (0.3.19 + 0.3.39)', async () => {
     const injected: unknown[] = []
     const { ctx, session, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
     const errors: string[] = []
@@ -133,12 +137,16 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
-    await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
-    // The review-error surfaced (no crash) — and V6-53 (0.3.38): the fallback
-    // NO LONGER injects the prompt immediately (it deferred the review to the
-    // conversation end), so the task is not interrupted.
-    expect(scheduled).toEqual([])
+    await new Promise(resolve => setTimeout(resolve, 50))
+    // Threshold reached but DEFERRED: no review ran, no error, no inject yet.
+    expect(errors).toEqual([])
     expect(injected).toHaveLength(0)
+    emitEnd(2)
+    // At the completed flush the subagent runs and fails to produce a plan —
+    // review-error surfaces AND the fallback injects (at the end).
+    await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
+    expect(injected).toHaveLength(1)
+    expect(scheduled).toEqual([])
   })
 
   it('F-203: a skill tool/call with JSON-null arguments does not crash read-name collection', async () => {
@@ -154,12 +162,13 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
+    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
     // The review reaches read-name collection and completes, proving
     // `arguments: 'null'` no longer throws inside collectReadSkillNames.
     await vi.waitFor(() => { expect(applied).toHaveLength(1) })
   })
 
-  it('E-41: review-scheduled is not emitted and the prompt is deferred when the subagent does not start (0.3.19 + 0.3.38)', async () => {
+  it('E-41: review-scheduled is not emitted and the subagent spawn is deferred when it cannot start (0.3.19 + 0.3.39)', async () => {
     const injected: unknown[] = []
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
     const scheduled: string[] = []
@@ -170,15 +179,22 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
-    // V6-53 (0.3.38): the spawn-failure fallback DEFERS — no immediate inject,
-    // no schedule signal (E-41 stands). Wait the async path to settle first.
     await new Promise(resolve => setTimeout(resolve, 50))
+    // V6-53 (0.3.39): the spawn is DEFERRED too — no immediate run, no inject,
+    // no schedule signal (E-41 stands).
     expect(injected).toHaveLength(0)
     expect(scheduled).toEqual([])
+    emitEnd(2)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    // At the completed flush the spawn fails again → the fallback injects the
+    // prompt (at the end); still no schedule signal.
+    expect(scheduled).toEqual([])
+    expect(injected).toHaveLength(1)
   })
 
-  it('V6-53: a deferred cadence review is injected at conversation END, never mid-task (0.3.38)', async () => {
+  it('V6-53: a deferred cadence review executes at conversation END — neither inject nor subagent runs mid-task (0.3.39)', async () => {
     const injected: string[] = []
+    let starts = 0
     const { ctx, emitEnd } = await mountReviewFixture({
       onInject: (message) => {
         const box = message as { content?: Array<{ type: string; text: string }> } | null
@@ -188,21 +204,22 @@ describe('evolution-review', () => {
     })
     ctx.provide('subagents', {
       start: async () => {
+        starts += 1
         throw new Error('subagent spawn failed')
       },
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    // The fixture's state stub is stateless (fresh counters every turn), so the
-    // cadence fires on the FIRST turn (interval 1) — the deferral holds it, and
-    // the second (completed) turn flushes it.
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
     await new Promise(resolve => setTimeout(resolve, 50))
-    expect(injected).toHaveLength(0) // deferred — no mid-task injection
+    // Threshold reached but fully DEFERRED: no inject AND no subagent spawn.
+    expect(injected).toHaveLength(0)
+    expect(starts).toBe(0)
     emitEnd(2)
     await vi.waitFor(() => {
       expect(injected.some(text => text.includes('Auto-review'))).toBe(true)
     })
+    expect(starts).toBe(1) // the subagent ran at the flush (and fell back to inject)
     expect(injected).toHaveLength(1)
   })
 
@@ -242,6 +259,7 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
+    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
     // The plan applied (executePlan landed the memory op), so plan-applied is
     // recorded even though the result-notice inject threw.
     await vi.waitFor(() => { expect(applied).toHaveLength(1) })
@@ -322,6 +340,7 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
+    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
     // The plan DID run (partially), so plan-applied fires once.
     await vi.waitFor(() => { expect(applied).toHaveLength(1) })
     const texts = injected.map((message) => {
@@ -390,10 +409,13 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
-    await vi.waitFor(() => { expect(starts).toBe(1) })
-    await vi.waitFor(() => { expect(disposed).toBe(1) })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(starts).toBe(0) // deferred — no mid-task spawn
     emitEnd(2)
-    await vi.waitFor(() => { expect(starts).toBe(2) })
+    await vi.waitFor(() => { expect(starts).toBe(1) }) // flush: first run aborts
+    await vi.waitFor(() => { expect(disposed).toBe(1) })
+    emitEnd(3)
+    await vi.waitFor(() => { expect(starts).toBe(2) }) // next flush: second run succeeds
     expect(disposed).toBe(2)
   })
 })
@@ -507,6 +529,7 @@ it('V6-24: a zero-landing plan still notifies the model with the reasons (0.3.36
   ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
   emitEnd(1)
+  emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
   // The plan lands ZERO ops (the only skill op is not read this session) but
   // the model must still hear that nothing happened and why.
   await vi.waitFor(() => {

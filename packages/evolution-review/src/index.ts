@@ -236,61 +236,61 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // gate reflects the whole conversation, not only cadence-free turns.
     const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
     cumulativeToolCalls.set(session.id, cumulative)
-    // V6-53 / 0.3.38: flush a deferred cadence review at conversation END —
-    // BEFORE the cadence block, because the completing turn may itself be a
-    // cadence-firing turn (the flush must still run before that return). The
-    // deferral is the threshold analysis; the completion channel below is the
-    // separate task-complete prompt.
+    // V6-53 / 0.3.39: execute a deferred cadence review at conversation END —
+    // BEFORE the cadence stash block, because the completing turn may itself be
+    // a threshold-firing turn (the flush must still run before that return).
+    // With the default trigger='cadence' the completion channel below is off
+    // and exactly ONE end-of-conversation review runs.
     if (event.data.reason.kind === 'completed') {
       const pendingKind = pendingCadenceReviews.get(session.id)
       if (pendingKind !== undefined) {
         pendingCadenceReviews.delete(session.id)
-        try {
-          agent.inject(createUserMessage({
-            content: [{ type: 'text', text: reviewPrompt(pendingKind) }],
-            source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-          }))
-        } catch (injectError) {
-          ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+        // Explicit 'inject' deployments also execute at the end (the user
+        // decision: BOTH modes complete after the task — the old immediate
+        // 'inject' contract is superseded, 0.3.39).
+        if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
+          try {
+            agent.inject(createUserMessage({
+              content: [{ type: 'text', text: reviewPrompt(pendingKind) }],
+              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
+            }))
+          } catch (injectError) {
+            ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+          }
+        } else {
+          const started = await trySubagentReview(session, agent, pendingKind, signal)
+          if (started) {
+            ctx.emit('evolution/review-scheduled', {
+              sessionId: session.id,
+              kind: pendingKind,
+              toolCalls: signal.toolCalls,
+              userChars: signal.userChars,
+              assistantChars: signal.assistantChars,
+            })
+          } else {
+            // Subagent path failed at the END — fall back to the prompt inject
+            // (still at completion; there is no later boundary to defer to).
+            try {
+              agent.inject(createUserMessage({
+                content: [{ type: 'text', text: reviewPrompt(pendingKind) }],
+                source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
+              }))
+            } catch (injectError) {
+              ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+            }
+          }
         }
       }
     }
+    // V6-53 / 0.3.39: a threshold-deserved cadence review is NEVER executed
+    // mid-task — NOT the subagent spawn either (per the user decision: BOTH
+    // channels run at conversation end only). The kind is stashed here (last
+    // trigger wins — the most recent relevance) and executed in the flush above.
     if (kind) {
-      // E-41: run the subagent FIRST, then confirm the schedule. review-scheduled
-      // is only emitted after a review actually started (and returned a plan);
-      // the inject fallback path (no subagent, or a subagent that yielded no
-      // structured plan) does NOT emit it — that signal now means "a review ran".
-      const started = await trySubagentReview(session, agent, kind, signal)
-      if (started) {
-        // Process event, payload v2 (sessionId) — never session.append: a
-        // session log carrying evolution/* types is refused wholesale at resume
-        // (assertEventsSupported; see core/events.ts for the full rationale).
-        ctx.emit('evolution/review-scheduled', {
-          sessionId: session.id,
-          kind,
-          toolCalls: signal.toolCalls,
-          userChars: signal.userChars,
-          assistantChars: signal.assistantChars,
-        })
-      } else {
-        // V6-53 / 0.3.38: the cadence fallback used to inject the review prompt
-        // IMMEDIATELY — interrupting the task and invalidating the prefix cache
-        // from that point on. An explicit `inject` deployment keeps its
-        // contract; the DEFAULT (subagent) mode DEFERS to the conversation end
-        // (the threshold already proved the review is deserved, so no 20-call
-        // gate applies at flush time).
-        if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
-          agent.inject(createUserMessage({
-            content: [{ type: 'text', text: reviewPrompt(kind) }],
-            source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-          }))
-        } else {
-          pendingCadenceReviews.set(session.id, kind)
-          if (!pendingCadenceWarned.has(session.id)) {
-            pendingCadenceWarned.add(session.id)
-            ctx.logger.warn(`dsh-evolution-review: ${kind} review could not run on a subagent this turn; deferred to the end of the conversation (no mid-task injection)`)
-          }
-        }
+      pendingCadenceReviews.set(session.id, kind)
+      if (!pendingCadenceWarned.has(session.id)) {
+        pendingCadenceWarned.add(session.id)
+        ctx.logger.warn(`dsh-evolution-review: ${kind} review threshold reached; the review runs at the end of the conversation (no mid-task execution)`)
       }
       return
     }
