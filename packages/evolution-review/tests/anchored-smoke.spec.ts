@@ -87,16 +87,20 @@ describe('anchored-standard review smoke', () => {
     // request.maxDepth is the ABSOLUTE cap on the child's own depth
     // (resolveChildDepth throws when parentDepth+1 > maxDepth). 1 permits the
     // review subagent itself while denying nesting (2 > 1); 0 rejects the
-    // spawn outright. The structured-output schema is an object whose array
-    // items use the DSL's lossless 'json' node type.
+    // spawn outright. The structured-output contract is an object whose array
+    // nodes carry NO items type — V8-01 (0.3.45): `items: { type: 'json' }`
+    // is a defineTool DSL value that the raw assertObjectJsonSchema boundary
+    // rejects (every spawn failed and silently degraded to inject).
     expect(request?.maxDepth).toBe(1)
     const outputSchema = request?.outputSchema as {
       type?: string
       properties?: Record<string, { items?: { type?: string } }>
     } | undefined
     expect(outputSchema?.type).toBe('object')
-    expect(outputSchema?.properties?.memoryOps?.items?.type).toBe('json')
-    expect(outputSchema?.properties?.skillOps?.items?.type).toBe('json')
+    expect(outputSchema?.properties?.memoryOps?.type).toBe('array')
+    expect(outputSchema?.properties?.skillOps?.type).toBe('array')
+    expect(outputSchema?.properties?.memoryOps?.items).toBeUndefined()
+    expect(outputSchema?.properties?.skillOps?.items).toBeUndefined()
   })
 
   it('direct delete path marks the usage record archived (G1, rc.39 audit §4-A)', async () => {
