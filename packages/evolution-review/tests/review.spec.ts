@@ -117,7 +117,7 @@ describe('evolution-review', () => {
     await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
   })
 
-  it('E-59c: a started subagent with no structured plan emits review-error and falls back to inject (0.3.19)', async () => {
+  it('E-59c: a started subagent with no structured plan emits review-error and defers instead of injecting mid-task (0.3.19 + 0.3.38)', async () => {
     const injected: unknown[] = []
     const { ctx, session, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
     const errors: string[] = []
@@ -134,10 +134,11 @@ describe('evolution-review', () => {
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
     await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
-    // The review-error surfaced (no crash) and the caller fell through to the
-    // inject fallback path — which must NOT emit a schedule signal (E-41).
+    // The review-error surfaced (no crash) — and V6-53 (0.3.38): the fallback
+    // NO LONGER injects the prompt immediately (it deferred the review to the
+    // conversation end), so the task is not interrupted.
     expect(scheduled).toEqual([])
-    expect(injected).toHaveLength(1)
+    expect(injected).toHaveLength(0)
   })
 
   it('F-203: a skill tool/call with JSON-null arguments does not crash read-name collection', async () => {
@@ -158,7 +159,7 @@ describe('evolution-review', () => {
     await vi.waitFor(() => { expect(applied).toHaveLength(1) })
   })
 
-  it('E-41: review-scheduled is not emitted when the subagent review does not start (0.3.19)', async () => {
+  it('E-41: review-scheduled is not emitted and the prompt is deferred when the subagent does not start (0.3.19 + 0.3.38)', async () => {
     const injected: unknown[] = []
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
     const scheduled: string[] = []
@@ -169,10 +170,40 @@ describe('evolution-review', () => {
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
     emitEnd(1)
-    // Wait for the inject fallback (started=false) to prove the async path
-    // settled before asserting no schedule signal was emitted.
-    await vi.waitFor(() => { expect(injected).toHaveLength(1) })
+    // V6-53 (0.3.38): the spawn-failure fallback DEFERS — no immediate inject,
+    // no schedule signal (E-41 stands). Wait the async path to settle first.
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(injected).toHaveLength(0)
     expect(scheduled).toEqual([])
+  })
+
+  it('V6-53: a deferred cadence review is injected at conversation END, never mid-task (0.3.38)', async () => {
+    const injected: string[] = []
+    const { ctx, emitEnd } = await mountReviewFixture({
+      onInject: (message) => {
+        const box = message as { content?: Array<{ type: string; text: string }> } | null
+        const text = typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
+        injected.push(text)
+      },
+    })
+    ctx.provide('subagents', {
+      start: async () => {
+        throw new Error('subagent spawn failed')
+      },
+    })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    // The fixture's state stub is stateless (fresh counters every turn), so the
+    // cadence fires on the FIRST turn (interval 1) — the deferral holds it, and
+    // the second (completed) turn flushes it.
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(injected).toHaveLength(0) // deferred — no mid-task injection
+    emitEnd(2)
+    await vi.waitFor(() => {
+      expect(injected.some(text => text.includes('Auto-review'))).toBe(true)
+    })
+    expect(injected).toHaveLength(1)
   })
 
   it('G4.5: warns once when the evolution-state service is absent (stateless cadence)', async () => {

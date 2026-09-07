@@ -47,17 +47,14 @@ describe('evolution-review lifecycle guards', () => {
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
-    // onTurnEnd is async-void: poll for the fallback inject (post-catch).
-    const deadline = Date.now() + 5_000
-    while (injected.length === 0 && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 25))
-    }
+    // V6-53 (0.3.38): the pipeline failure now DEFERS the review (no mid-task
+    // inject), so settle with a fixed sleep instead of polling for the prompt.
+    await new Promise(resolve => setTimeout(resolve, 150))
     // The dispose guarantee is the point of this test: the rejected run must
     // still be disposed exactly once, even though the pipeline failed.
     expect(disposed).toBe(1)
-    // The failure falls back to the synchronous inject path.
-    const text = injected[0]?.content.find(block => block.type === 'text')?.text ?? ''
-    expect(text).toContain('Auto-review')
+    // The failure no longer falls back to a synchronous mid-task inject.
+    expect(injected).toHaveLength(0)
   })
 
   it('sweepDeadSessionEntries drops only entries whose session is gone (P1-10)', () => {

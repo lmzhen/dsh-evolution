@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.38 (patch) — 审查注入延迟化 + v6 M5 收口挂账清点
+
+**背景（用户报告）**：auto-review 提示词在中途注入打断任务（且注入同时使主对话前缀缓存从该轮起全部失效）。核验发现的真相：**`skillReviewTrigger` 只门控 completion 通道**；中途注入的唯一来源 = cadence 通道在回退路径（子代理不可用/单飞行/失败/子代理无结构化计划）下的立即 `agent.inject`——阈值检测逻辑本身无问题，需要改的是「注入时机」。
+
+- **【核心】cadence 回退延迟注入化**：默认（`reviewMode='subagent'`）下，回退不再立即注入——审查按 session 暂存（`pendingCadenceReviews`，同一 session 最后一次触发覆盖前次——越晚越贴近当前相关性；warn 每 session 一次），**在对话结束（turn/end reason=completed）时注入**；延迟审查经阈值触发已证明值得审，故 flush 不叠加 completion 通道的 20 次调用门（两者并存、各司其职：延迟审查=阈值分析，completion=任务完成专属提示词）。显式 `reviewMode:'inject'` 部署保留原立即注入契约（显式自选不受默认变更影响）。flush 置于 cadence 块**之前**（完成轮本身可能是 cadence 触发轮——置后则永不到达）；暂存表并入死会话 sweep（P1-10 同款）。**效果：默认部署全程零中途注入——打断与主前缀缓存污染同灭；阈值检测与末尾注入并存**（用户设计的「照常触发、延后注入」落地；`skillReviewTrigger` 默认保持 `'both'` 不再需要改）。
+- **验证**：E-59c/E-41/lifecycle 三条原「fallback 立即注入」断言改为「无即时注入+延迟」；新用例 V6-53（子代理失败→turn1 零注入 → turn2 结束时注入且仅一次——stateless 夹具下 interval=1 逐轮触发、flush 前置于 cadence 块的设计被该用例钉住；首次实现 flaky 根因=夹具 state 每轮重建 + flush 位置，均已修正）。
+- **v6 M5 收口**：T.1 余项已在 0.3.37 完成（threats 实计 26、prompts 标题 v14、V5-03 mtime 回归）；**审计挂账清点（按「不修申报项」口径维持，防口径漂移）**：F-328（完整 hash）、G4.8/N-2（上游平台议题）、F-309/310/311/354（脚本层申报）、capability 接线声明——全部维持挂账，不在修复范围。
+- **回归**：全量 vitest（本机并行已知 Windows 负载 flake 隔离复跑全绿，CI Linux 为准）；oxlint 0/0；包级 tsc 0。
+
 ## 0.3.37 (patch) — v6 审计 M4：契约对齐与发布卫生（V6-16~52 大项 + T.1 余项）
 
 v6 审计（0.3.33 全量复审轮）M4 里程碑（最后一批实质项；M5 收口随本版）；每项先核验属实再修。**行为/契约变更声明**：V6-26（缺省 action 归一为显式 patch）、V6-27（部署级 `config.policy='never'` 在 request() 内生效——此前静默 staged 堆积）、V6-25（enum 外 action fail-loud——此前静默按 replace 执行）、V6-45（发布包移除失效 `./src/*` 导出子路径——全仓零消费已证）。

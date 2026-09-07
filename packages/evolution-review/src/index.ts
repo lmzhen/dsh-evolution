@@ -146,6 +146,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // widening the on-disk record contract.
   const cumulativeToolCalls = new Map<SessionId, number>()
   const completionInjected = new Set<SessionId>()
+  // V6-53 / 0.3.38 (deferred cadence inject): a threshold-deserved review whose
+  // subagent path was unavailable is HELD here (last trigger wins — the most
+  // recent relevance) and injected at conversation completion instead of
+  // interrupting the task (and invalidating the prefix cache from that point
+  // on). Same in-memory discipline as the completion channel: a restart is a
+  // fresh conversation boundary, and the deferred review is a light loss.
+  const pendingCadenceReviews = new Map<SessionId, ReviewKind>()
+  const pendingCadenceWarned = new Set<SessionId>()
   // 0.3.18 (E-19): ONE in-flight review subagent process-wide. The shared
   // skill tree and memory have no cross-writer mutex, so two overlapping
   // reviews (a 120s window is long) could fuzzyPatch the same file
@@ -165,11 +173,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
     const sweepDue = turnStarts.size >= COUNTER_SWEEP_THRESHOLD
       || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
+      || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
       sweepDeadSessionEntries(turnStarts, isAlive)
       sweepDeadSessionEntries(cumulativeToolCalls, isAlive)
       sweepDeadSessionEntries(completionInjected, isAlive)
+      sweepDeadSessionEntries(pendingCadenceReviews, isAlive)
+      sweepDeadSessionEntries(pendingCadenceWarned, isAlive)
     }
     void onTurnEnd(session, event)
   })
@@ -225,6 +236,25 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // gate reflects the whole conversation, not only cadence-free turns.
     const cumulative = (cumulativeToolCalls.get(session.id) ?? 0) + signal.toolCalls
     cumulativeToolCalls.set(session.id, cumulative)
+    // V6-53 / 0.3.38: flush a deferred cadence review at conversation END —
+    // BEFORE the cadence block, because the completing turn may itself be a
+    // cadence-firing turn (the flush must still run before that return). The
+    // deferral is the threshold analysis; the completion channel below is the
+    // separate task-complete prompt.
+    if (event.data.reason.kind === 'completed') {
+      const pendingKind = pendingCadenceReviews.get(session.id)
+      if (pendingKind !== undefined) {
+        pendingCadenceReviews.delete(session.id)
+        try {
+          agent.inject(createUserMessage({
+            content: [{ type: 'text', text: reviewPrompt(pendingKind) }],
+            source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
+          }))
+        } catch (injectError) {
+          ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+        }
+      }
+    }
     if (kind) {
       // E-41: run the subagent FIRST, then confirm the schedule. review-scheduled
       // is only emitted after a review actually started (and returned a plan);
@@ -243,10 +273,24 @@ export function apply(ctx: Context, rawConfig: Config): void {
           assistantChars: signal.assistantChars,
         })
       } else {
-        agent.inject(createUserMessage({
-          content: [{ type: 'text', text: reviewPrompt(kind) }],
-          source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
-        }))
+        // V6-53 / 0.3.38: the cadence fallback used to inject the review prompt
+        // IMMEDIATELY — interrupting the task and invalidating the prefix cache
+        // from that point on. An explicit `inject` deployment keeps its
+        // contract; the DEFAULT (subagent) mode DEFERS to the conversation end
+        // (the threshold already proved the review is deserved, so no 20-call
+        // gate applies at flush time).
+        if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
+          agent.inject(createUserMessage({
+            content: [{ type: 'text', text: reviewPrompt(kind) }],
+            source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
+          }))
+        } else {
+          pendingCadenceReviews.set(session.id, kind)
+          if (!pendingCadenceWarned.has(session.id)) {
+            pendingCadenceWarned.add(session.id)
+            ctx.logger.warn(`dsh-evolution-review: ${kind} review could not run on a subagent this turn; deferred to the end of the conversation (no mid-task injection)`)
+          }
+        }
       }
       return
     }
