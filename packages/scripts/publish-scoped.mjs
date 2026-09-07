@@ -49,13 +49,35 @@ if (argv.includes('--only') && (onlyArg === undefined || onlyArg === '')) {
 const onlyNames = onlyArg ? onlyArg.split(',').map(name => name.trim()).filter(Boolean) : []
 const otp = argv.includes('--otp') ? argv[argv.indexOf('--otp') + 1] : ''
 
-/** V6-48 (0.3.37): `cmd.exe /c npm` re-splits the command line — an absolute
- * tarball path containing SPACES is broken apart (local manual publish only;
- * CI runs a Unix agent). Use the `npm.cmd` shim directly with shell:false. */
-const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+/** V7-01 (0.3.41): `npm.cmd` with shell:false is EINVAL on Windows (Node
+ * ≥18.20/20.12/22 CVE-2024-27980 hardening — install-layered.mjs already knew:
+ * "spawn of npm.cmd is blocked on Windows (EINVAL)"). Resolve the npm CLI
+ * entry and run it with NODE directly: execFileSync stays shell-free, so a
+ * tarball path containing SPACES is never re-split (the V6-48 reason for
+ * dropping `cmd.exe /c` in the first place) and no .cmd/bat is spawned.
+ * Candidates: standalone npm (APPDATA shim layout) and node-bundled npm
+ * (node_modules/npm next to node.exe / Program Files). */
+function npmCliJs() {
+  const candidates = [
+    join(process.env.APPDATA ?? '', 'npm', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    join(process.env.ProgramFiles ?? '', 'nodejs', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  throw new Error('cannot locate npm-cli.js (checked APPDATA/npm, node.exe dir, Program Files/nodejs) — install npm and retry')
+}
+
+const npmExecutable = process.platform === 'win32' ? process.execPath : 'npm'
+
+function npmArgs(args) {
+  if (process.platform === 'win32') return [npmCliJs(), ...args]
+  return args
+}
 
 function npm(args, options = {}) {
-  return execFileSync(npmExecutable, args, {
+  return execFileSync(npmExecutable, npmArgs(args), {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     ...options,
@@ -80,7 +102,7 @@ function publish(tarball) {
   if (otp) args.push('--otp', otp)
   if (provenance) args.push('--provenance')
   if (interactive) {
-    execFileSync(npmExecutable, args, { stdio: 'inherit' })
+    execFileSync(npmExecutable, npmArgs(args), { stdio: 'inherit' })
     return
   }
   const output = npm(args)

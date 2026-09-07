@@ -414,7 +414,14 @@ describe('evolution-review', () => {
     emitEnd(2)
     await vi.waitFor(() => { expect(starts).toBe(1) }) // flush: first run aborts
     await vi.waitFor(() => { expect(disposed).toBe(1) })
+    // 0.3.41 (V7-02): the failed spawn fell back to a WAKING delivery — the
+    // woken turn is cadence-suppressed once, so this (artificially sent)
+    // turn does not spawn either. The single-flight guard HAS reset; the
+    // next REAL turn below spawns again.
     emitEnd(3)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(starts).toBe(1)
+    emitEnd(4)
     await vi.waitFor(() => { expect(starts).toBe(2) }) // next flush: second run succeeds
     expect(disposed).toBe(2)
   })
@@ -597,6 +604,41 @@ it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires 
   // turn7: after the second zero the new segment is silent again.
   emitEnd(7); await settle()
   expect(injected).toHaveLength(2)
+})
+
+it('0.3.41: interval=1 waking delivery cannot self-drive — the injected wake turn fires once suppressed (V7-02)', async () => {
+  const deliveries: string[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    stateful: true,
+    onInject: (message) => {
+      const box = message as { content?: Array<{ type: string; text: string }> } | null
+      deliveries.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
+    },
+  })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 1,
+    skillInterval: 1,
+    reviewMode: 'inject',
+    substantiveMinToolCalls: 1,
+    substantiveMinUserChars: 0,
+    substantiveMinAgentChars: 0,
+  })
+  const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
+  // turn1 (real turn): threshold fires (first ever) → exactly one delivery,
+  // and the followup marks the woken turn for one-shot fire suppression.
+  emitEnd(1); await settle()
+  expect(deliveries).toHaveLength(1)
+  // turn2 (the woken turn): without V7-02 its own cadence would fire again
+  // (interval=1, its review prompt alone is substantive) and deliver a second
+  // copy — an unbounded review loop. The suppression must keep it at one.
+  emitEnd(2); await settle()
+  expect(deliveries).toHaveLength(1)
+  // turn3 (the next REAL turn): a new threshold crossing delivers again — the
+  // suppression is one-shot, normal cadence activity is not starved.
+  emitEnd(3); await settle()
+  expect(deliveries).toHaveLength(2)
 })
 
 it('0.3.40: without a followup the waking delivery degrades to inject', async () => {

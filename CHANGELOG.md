@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.41 (patch) — v7 审计轮第一批：V7-01 发布链 P1 + V7-02 审查自激循环（P2）
+
+**来源**：v7 审计报告（`dsh-evolution-mirror-audit-report-v7.md`）核验轮——全部 20 项新发现经主审亲核 + 只读子代理交叉验证**全部属实，0 误判**；本版交付第一批（P1 + 发散性 P2）。
+
+- **V7-01 [P1·发布链修复自身失效]**：V6-48 把 `cmd.exe /c npm` 换成 `npm.cmd` 直启（shell:false）——Node ≥18.20/20.12/22 的 CVE-2024-27980 加固使无 shell 的 `.cmd` spawn 必抛 EINVAL（本机 Node 26 实测复现；同仓 install-layered.mjs:243 注释早已自认「spawn of npm.cmd is blocked on Windows (EINVAL)」——V6-48 未做同仓知识检索）。**修复**：`publish-scoped.mjs` 解析 npm CLI 入口（候选：APPDATA 独立安装 / node.exe 旁 bundnode_modules / Program Files\nodejs——本机三候选均在），用 **node 直启 npm-cli.js**——execFileSync 保持无 shell：tarball 路径含空格不再被重分词（V6-48 的原始动机同时保全）且无 `.cmd` spawn 面；候选全缺则 fail-loud。**实跑取证**：`node npm-cli.js --version`（12.0.2）+ 含空格 cache 路径参数 `npm view` 成功（重分词 canary）+ 旧形态对照 EINVAL。
+- **V7-02 [P2·状态机]**：0.3.40 唤醒式注入在 `interval=1` 下可自激成「审查→新轮→再审查」无界循环——五环节全部源码实证：① 上游 agent.ts:283 把 followup 消息 append 为 `user/message` 无来源过滤；② observeEvent 无条件累计（MEMORY_REVIEW_PROMPT ≈474 字符 ≥ substantiveMinUserChars 默认 200）；③ flush 交付后清零（resetOnFire:false）→ 注入轮从 0 起；④ interval schema/clamp 均允许 1；⑤ 注入轮 completed → `pendingKind = latch ?? kind` 再 flush 再 followup。**修复**：`skipNextCadenceFire` 一次旗标——deliverReview 走 **followup 分支**时 set；下一个 turn/end 的 cadence **fire 抑制一次**（计数照常累计——同轮混入的真实用户内容不丢失；下真实轮正常再触发）；inject 降级/非唤醒路径不 set（无新轮无需抑制）。旗标并入死会话 sweep（P1-10 同款）与 pending 表同域；in-memory（重启清 inbox 队列，循环无法存活）。
+- **测试**：V7-02 判别用例（interval=1 + followup：turn1 真实轮注入恰一次 → turn2 唤醒轮被抑制（无 skip 则二次注入）→ turn3 真实轮再注入——三断言区分循环/抑制/再仲裁）；F-102 适配（subagent abort → fallback 唤醒交付 → 唤醒轮被抑制 → 下一**真实**轮 spawn 成功——单飞复位语义保持，断言补一轮）；review.spec 23/23 + lifecycle/anchored-smoke/persistence-resume 6/6。
+- **回归**：全量 736 中 730+ 绿、失败 6 例全为已知 Windows 负载 flake 族（guard/inject-paths 5s 子进程超时、ENOTEMPTY 临时目录竞态）隔离复跑全绿；oxlint 0/0；tsc 0（review/core --force）。
+
 ## 0.3.40 (patch) — V6-27 真 Session 对象修复 + 计数注入时清零 + 唤醒式审查注入（followup）
 
 **用户决策**：① 审查注入改**唤醒式**——`agent.followup`（= next-turn + 唤醒，空闲驱动立即开新轮）替代非唤醒 `inject`（pending 至下一驱动点）：任务结束瞬间大模型立刻开始总结任务；② 计数窗口改为「注入→注入」——阈值命中不再归零（`resetOnFire:false`），flush 注入时清零重计（续聊从新段起点计算）；③ 段内阈值多次命中只注入一次（session 级 latch 保持）。

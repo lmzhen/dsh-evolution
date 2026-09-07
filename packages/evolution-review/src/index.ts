@@ -160,6 +160,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // fresh conversation boundary, and the deferred review is a light loss.
   const pendingCadenceReviews = new Map<SessionId, ReviewKind>()
   const pendingCadenceWarned = new Set<SessionId>()
+  // V7-02 (0.3.41): the waking delivery (followup) starts a NEW turn whose
+  // only substantive input is our own review prompt — with interval=1 that
+  // turn fires cadence again and re-delivers, an unbounded review loop. The
+  // delivered turn still accumulates (real user content arriving with it is
+  // not lost) but its cadence FIRE is suppressed once; the next real turn
+  // re-arms normally. In-memory only: a restart clears the inbox queue, so
+  // the loop cannot survive it.
+  const skipNextCadenceFire = new Map<SessionId, boolean>()
   // 0.3.18 (E-19): ONE in-flight review subagent process-wide. The shared
   // skill tree and memory have no cross-writer mutex, so two overlapping
   // reviews (a 120s window is long) could fuzzyPatch the same file
@@ -180,6 +188,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
+      || skipNextCadenceFire.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
       sweepDeadSessionEntries(turnStarts, isAlive)
@@ -187,6 +196,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       sweepDeadSessionEntries(completionInjected, isAlive)
       sweepDeadSessionEntries(pendingCadenceReviews, isAlive)
       sweepDeadSessionEntries(pendingCadenceWarned, isAlive)
+      sweepDeadSessionEntries(skipNextCadenceFire, isAlive)
     }
     void onTurnEnd(session, event)
   })
@@ -229,7 +239,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
     }
     const state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     const snapshot = policy()
-    const kind = advanceReview(state, event.data.turn, signal, {
+    // V7-02: a turn woken by our own followup still accumulates (any real
+    // user content arriving with it stays in the window) but cannot fire —
+    // its review prompt alone must not re-trigger cadence with interval=1.
+    const skipFire = skipNextCadenceFire.get(session.id) ?? false
+    if (skipFire) skipNextCadenceFire.delete(session.id)
+    const rawKind = advanceReview(state, event.data.turn, signal, {
       memoryInterval: snapshot?.reviewMemoryInterval ?? config.memoryInterval,
       skillInterval: snapshot?.reviewSkillInterval ?? config.skillInterval,
       substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? 3,
@@ -241,6 +256,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // thresholds fired before the task ended).
       resetOnFire: false,
     })
+    const kind = skipFire ? null : rawKind
     await stateService?.saveReviewState(session.id, state)
     // Cumulative tool-call counter updates on EVERY turn/end — including turns
     // that fired a cadence review — so the completion channel's long-session
@@ -263,8 +279,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
         source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' },
       })
       const followup = (agent as { followup?: (message: unknown) => void }).followup
-      if (config.reviewWakeInject && typeof followup === 'function') followup(message)
-      else agent.inject(message)
+      if (config.reviewWakeInject && typeof followup === 'function') {
+        followup(message)
+        // V7-02: the waking turn's cadence fire is suppressed once (its own
+        // review prompt must not re-trigger a review with interval=1).
+        skipNextCadenceFire.set(session.id, true)
+      } else agent.inject(message)
     }
     if (event.data.reason.kind === 'completed') {
       // 0.3.40: at the completing turn the flush uses the LATCHED kind or the
