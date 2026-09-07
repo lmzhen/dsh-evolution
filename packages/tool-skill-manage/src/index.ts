@@ -96,15 +96,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (value !== undefined && result !== value) numericClamped.push(name)
     return result
   }
-  if (numericClamped.length > 0) {
-    ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
-  }
   const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io, {
     maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
     maxSkillContentChars: limit('maxSkillContentChars', rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
   }, (event) => { ctx.emit('evolution/skill-mutated', event) })
+  // V7-12 (0.3.43): the warn must run AFTER the limit() calls above — the
+  // former position evaluated the always-empty array before any limit ran,
+  // so an invalid config value was never surfaced.
+  if (numericClamped.length > 0) {
+    ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
+  }
 
   async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
     const action = args.action

@@ -80,10 +80,11 @@ export function resolveMaxScanChars(config: Config): number {
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (!(rawConfig.enabled ?? true)) return
-  // G3.1 (0.3.23): clamp maxScanChars to at least 1. A 0 would silently disable
-  // scanning; NaN/±Infinity (the number schema lets them through) would corrupt
-  // the scan window. The schema `.min(1)` rejects 0/negative; this clamp is the
-  // net that also covers NaN/±Infinity.
+  // V6-05 (0.3.35): the clamp floor is PATTERN_OVERLAP+1 (=4097) so the
+  // proportional step never leaves a match span uncovered — a 0 would silently
+  // disable scanning and NaN/±Infinity (the number schema lets them through)
+  // would corrupt the scan window; the schema `.min(1)` and this clamp were
+  // both raised to the overlap floor in V6-05.
   const maxScanChars = resolveMaxScanChars(rawConfig)
   if (maxScanChars !== (rawConfig.maxScanChars ?? 65_536)) {
     ctx.logger.warn(`evolution-threat: maxScanChars=${String(rawConfig.maxScanChars)} is invalid; falling back to the default 65_536`)

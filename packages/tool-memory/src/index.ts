@@ -233,6 +233,13 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       } else if (conflict(args)) {
         return { ok: false, message: 'Provide only one of facts or content (same field); different values were given.', entries: [], chars: 0, limit: 0 }
       }
+      // V7-07 (0.3.43): an EMPTY operations array is a no-op input — reject it
+      // BEFORE the approval gate (a "memory 0 ops" approval record would be
+      // staged and is meaningless to replay; the 0.3.37 V6-25 declaration
+      // assumed this check existed).
+      if (Array.isArray(args.operations) && args.operations.length === 0) {
+        return { ok: false, message: 'No operations provided (the operations array is empty).', entries: [], chars: 0, limit: 0 }
+      }
       const target = args.target === 'user' ? 'user' : 'memory'
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
         ? { target, operations: args.operations }

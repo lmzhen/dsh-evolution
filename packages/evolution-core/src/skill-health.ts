@@ -98,7 +98,8 @@ export function assessStructureHealth(
   if (needs) {
     reasons.push(`body ${snapshot.bodyChars} chars is >= 2x the soft limit (${thresholds.softBodyChars}) — consider splitting or offloading`)
   } else if (snapshot.bodyChars >= thresholds.softBodyChars) {
-    reasons.push(`body ${snapshot.bodyChars} chars above the soft limit (${thresholds.softBodyChars})`)
+    // V7-19 (0.3.43): "at or above" — the branch fires at == too, "above" alone was off by one at the exact threshold.
+    reasons.push(`body ${snapshot.bodyChars} chars at or above the soft limit (${thresholds.softBodyChars})`)
   }
   if (snapshot.bodyText && snapshot.bodyChars >= MIN_STAMP_BODY_CHARS) {
     const kb = Math.max(1, snapshot.bodyChars / 1024)

@@ -212,6 +212,27 @@ describe('tool-memory', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0]).toHaveLength(200)
   })
+
+  it('V7-07: an empty operations array is rejected BEFORE the approval gate (0.3.43)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    let approvals = 0
+    ctx.provide('evolutionApproval', {
+      request: async () => { approvals += 1; return { action: 'staged', message: 'staged' } },
+      registerRunner: () => () => {},
+    })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: { session: { header: { version: 0, id: 's8', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const result = await tool.execute({ target: 'memory', operations: [] as never }, execArg)
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('No operations provided')
+    expect(approvals).toBe(0)
+  })
 })
 
 async function makeTmp(): Promise<string> {

@@ -39,6 +39,20 @@ async function setup() {
 }
 
 describe('tool-skill-manage', () => {
+  it('V7-12: the schema strips non-finite/out-of-range limits so the clamp warn only covers direct construction (0.3.43)', () => {
+    // Empirical: schemastery REMOVES the invalid key (no error) — NaN, 0 and
+    // Infinity all come back undefined, so the plugin's numericClamped warn
+    // can only fire for values that bypass the schema (direct construction /
+    // another resolver). The warn was moved AFTER the limit() calls (0.3.43)
+    // — its position is now correct for those direct-construction paths.
+    const s = (ToolSkillManage.Config as unknown as { ['~standard']: { validate(input: unknown): { value?: { maxSkillNameLength?: number } } } })['~standard']
+    for (const candidate of [Number.NaN, 0, Number.POSITIVE_INFINITY]) {
+      const result = s.validate({ maxSkillNameLength: candidate })
+      const value = result.value?.maxSkillNameLength as number | undefined
+      expect(Number.isFinite(value)).toBe(false) // never a legal number reaches the plugin
+    }
+  })
+
   it('registers the skill_manage tool', async () => {    const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
