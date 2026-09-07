@@ -56,24 +56,30 @@ for (const name of new Set([...dev, ...mirror])) {
 // root package.json version. dcebd8c rewrote 30 manifests to the dev baseline
 // 0.1.0-rc.1 and four releases later nothing had caught it (the publish chain
 // re-derives versions from the git tag, so the drift was invisible to CI).
+// The check only runs against a COMPLETE mirror layout (root CHANGELOG
+// present) — a scripts-only temp fixture (the layout-sync spec) must not
+// fail on a missing root.
 const repoRoot = resolve(mirrorDir, '..', '..')
-try {
-  const changelog = readFileSync(join(repoRoot, 'CHANGELOG.md'), 'utf8')
-  const head = /^## (\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)/m.exec(changelog)?.[1]
-  if (!head) {
-    failures.push('CHANGELOG.md has no "## x.y.z" heading')
-  } else {
-    const rootManifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
-    if (rootManifest.version !== head) failures.push(`root package.json version ${rootManifest.version} != CHANGELOG head ${head}`)
-    for (const entry of readdirSync(join(repoRoot, 'packages'))) {
-      const manifestPath = join(repoRoot, 'packages', entry, 'package.json')
-      if (!existsSync(manifestPath)) continue
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-      if (manifest.version !== head) failures.push(`${entry}: version ${manifest.version} != CHANGELOG head ${head}`)
+const changelogPath = join(repoRoot, 'CHANGELOG.md')
+if (existsSync(changelogPath)) {
+  try {
+    const changelog = readFileSync(changelogPath, 'utf8')
+    const head = /^## (\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)/m.exec(changelog)?.[1]
+    if (!head) {
+      failures.push('CHANGELOG.md has no "## x.y.z" heading')
+    } else {
+      const rootManifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
+      if (rootManifest.version !== head) failures.push(`root package.json version ${rootManifest.version} != CHANGELOG head ${head}`)
+      for (const entry of readdirSync(join(repoRoot, 'packages'))) {
+        const manifestPath = join(repoRoot, 'packages', entry, 'package.json')
+        if (!existsSync(manifestPath)) continue
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+        if (manifest.version !== head) failures.push(`${entry}: version ${manifest.version} != CHANGELOG head ${head}`)
+      }
     }
+  } catch (error) {
+    failures.push(`version-guard scan failed: ${error instanceof Error ? error.message : String(error)}`)
   }
-} catch (error) {
-  failures.push(`version-guard scan failed: ${error instanceof Error ? error.message : String(error)}`)
 }
 
 if (failures.length > 0) {
