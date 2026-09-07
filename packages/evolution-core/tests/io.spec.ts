@@ -185,10 +185,11 @@ it('self-heals a leftover lock carrying this process pid (F-367)', async () => {
   const target = join(root, 'self.json')
   const lock = `${target}.lock`
   // A leftover lock naming OUR pid, whose failed release was recorded in
-  // pendingSelfCleanup, is stale by definition — the next write recycles it.
+  // pendingSelfCleanup (with the body TOKEN — V8-05), is stale by definition —
+  // the next write recycles it when the current body still matches.
   // (V4-05: without the pendingSelfCleanup registration an old same-pid lock
   // is treated as a live in-process task and deliberately NOT recycled.)
-  pendingSelfCleanup.add(lock)
+  pendingSelfCleanup.set(lock, String(process.pid))
   await writeFile(lock, String(process.pid), 'utf8')
   const old = new Date(Date.now() - 60_000)
   await utimes(lock, old, old)
@@ -201,6 +202,29 @@ it('self-heals a leftover lock carrying this process pid (F-367)', async () => {
   }
   await rm(root, { recursive: true, force: true })
 })
+
+it('V8-05: a stale pendingSelfCleanup entry never removes a NEW same-pid lock (0.3.46)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-v805-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'v805.json')
+  const lock = `${target}.lock`
+  // The stale-entry hazard: a registered leftover was externally removed, and
+  // another same-process writer created a FRESH lock at the path. The old
+  // implementation compared two live reads and recycled it; V8-05 compares
+  // the CURRENT body against the REGISTERED TOKEN from the failed release.
+  pendingSelfCleanup.set(lock, 'old-token-body')
+  await writeFile(lock, `${process.pid}:fresh-claim`, 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(lock, old, old)
+  try {
+    await expect(io.writeText(target, 'x')).rejects.toThrow()
+    // The fresh lock survived — fail-loud instead of double-hold.
+    expect(await io.readText(lock)).toBe(`${process.pid}:fresh-claim`)
+  } finally {
+    pendingSelfCleanup.delete(lock)
+  }
+  await rm(root, { recursive: true, force: true })
+}, 60_000)
 
 it('does not steal a same-pid lock held by a long-running task (V4-05)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-live-samepid-'))

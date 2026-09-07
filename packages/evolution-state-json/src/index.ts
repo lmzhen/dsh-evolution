@@ -103,6 +103,18 @@ export async function jsonTransact<T>(
         const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
         return await quarantine(io, root, file, current, `expected a plain JSON object (map of records), got ${kind}`)
       }
+      // V8-16 (0.3.46): the top-level shape gate let VALUE-level malformations
+      // (`{"a": null}`) through — listPending/enforceResolvedCap then hit a
+      // bare `.status` TypeError with no quarantine / no preserving failure
+      // context. Every record value of a record-map file must itself be a
+      // plain object; anything else quarantines (original bytes preserved).
+      if (RECORD_MAP_FILES.has(file) && isPlainRecord(parsed)) {
+        for (const [recordId, record] of Object.entries(parsed as Record<string, unknown>)) {
+          if (!isPlainRecord(record)) {
+            return await quarantine(io, root, file, current, `expected a plain object for record "${recordId}", got ${record === null ? 'null' : Array.isArray(record) ? 'an array' : typeof record}`)
+          }
+        }
+      }
     }
     const next = await task(parsed)
     // 0.3.28 (V4-08): a record-map task's return must be null (ensure-absent —
@@ -140,6 +152,16 @@ export function apply(ctx: Context, rawConfig: Config): void {
     if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
       const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
       return await quarantine(io, root, file, raw, `expected a plain JSON object (map of records), got ${kind}`)
+    }
+    // V8-16 (0.3.46): same value-level gate as jsonTransact — the read path
+    // (listPending / loadPendingMap) used to pass `{"a": null}` through and
+    // then hit a bare `.status` TypeError with no quarantine context.
+    if (RECORD_MAP_FILES.has(file) && isPlainRecord(parsed)) {
+      for (const [recordId, record] of Object.entries(parsed as Record<string, unknown>)) {
+        if (!isPlainRecord(record)) {
+          return await quarantine(io, root, file, raw, `expected a plain object for record "${recordId}", got ${record === null ? 'null' : Array.isArray(record) ? 'an array' : typeof record}`)
+        }
+      }
     }
     return parsed
   }
@@ -478,7 +500,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
           // pending (a runner FAILURE is retryable); a crash leaves it
           // executing + claimed for only the operator to resolve (reject or
           // release + re-stage) — it is never automatically re-claimed.
+          // V8-15 (0.3.46): the domain provider guards the status the same way
+          // — a RESOLVED record (approved/rejected) is never touched by a
+          // release (its audit attribution must not be stripped after the fact).
           if (!record || record.claimedBy !== claimId) return map
+          if (record.status !== 'pending' && record.status !== 'executing') return map
           record.status = releasedStatus(record.status)
           delete record.claimedBy
           delete record.claimedAt

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.46 (patch) — v8 审计批 1：L1 存储与并发基座（V8-05/15/16/11）
+
+**来源**：v8 审计报告批次 1（L1 基座——先核验再修，四项均亲核属实后落地）。
+
+- **V8-05 [P3·并发]**：`pendingSelfCleanup` 生命周期双不对称修复：
+  1. (a) 登记删除移入 rm **成功**路径——rm 瞬态失败（Windows EPERM/EBUSY）时保留登记，下一写仍可自愈（原来无条件删除使注释承诺的 "always recorded" 失实，进程重启前只 fail-loud）；
+  2. (b) 登记表 `Set` → `Map<lock, bodyToken>`：登记时记录失败释放的锁体 token——自愈分支比对「当前 body == 登记 token」才删——登记后残留锁被外部移除、同进程另一写者在同路径新建活锁的场景不再误删（V4-05 注释声称杜绝的形态实际可达）。
+  - **验收**：io.spec 新增 V8-05 判别用例（登记旧 token + 磁盘新同 pid 锁 → 写者 fail-loud 且活锁不被删）；F-367 用例适配 Map 形态；**32-way 压测前后整跑 0 丢失**。
+- **V8-15 [P3·provider 契约]**：json provider `releasePendingClaim` 补 domain 同款 status 守卫（`pending/executing` 之外直接返回）——已解析（approved/rejected）记录的 claimedBy/claimedAt 审计归因不再被剥；**G7.4 一致性 harness 补「resolve 之后再 release」段**（json/domain 两侧行为一致断言——补上此前只测 executing→release 的分叉面）。
+- **V8-16 [P3·形状门]**：record-map 文件的**value 级**形状门（readJson 与 jsonTransact 两入口同款）——`{"a": null}` 这类 value 畸形经过原顶层门后会在 listPending/enforceResolvedCap 触发裸 `.status` TypeError；现在 quarantine（原始字节保留）并指名具体 record id。判别用例（`{"a":null}` → 拒绝且 `.corrupt-*` 旁本在位）。
+- **V8-11 [P3·并发/申报]**：`consolidate` 的 target 预读与 merged/pointer 构建**移入 in-process serial 队列**（与 update/patch/restructure/writeSupportFile 同一第二层）——并发 patch 在「预读与提交」之间的交错覆盖窗口闭合（判别用例：consolidate×patch 并发双写皆存；时序性——旧实现大多时序下会覆盖 patch 而红）。**申报**（按 G2.5 先例）：`create`/`archive`/`removeSupportFile`/`setPinned` 四个低频单文件入口的无锁读→写标注为文档化残留（core README 并发模型段补条——不做加锁：收益不抵锁面扩大）。
+- **门禁**：受影响面 88/88（io 25 含 32-way/V8-05、skill-store 35 含 V8-11 并发、state 家族 28 全绿）；oxlint 0/0（含 tests）；tsc 0（--force）；全量以 CI Linux 为准。
+
 ## 0.3.45 (patch) — v8 审计批 0：V8-01 平台契约 P1 — review 子代理 outputSchema 去 `'json'` 方言
 
 **来源**：v8 审计报告批次 0（最高优先 P1——独立先行发布）。

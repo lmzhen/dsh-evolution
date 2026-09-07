@@ -62,6 +62,21 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it('V8-16: a value-level malformation quarantines (no bare .status TypeError) and preserves the bytes (0.3.46)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-value-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    const content = JSON.stringify({ broken: null })
+    await io.writeText(join(root, 'pending-state.json'), content)
+    await expect(provider.listPending()).rejects.toThrow(/record "broken"/)
+    const corrupt = (await io.list(root)).find(name => name.startsWith('pending-state.json.corrupt-'))
+    expect(corrupt).toBeDefined()
+    expect(await io.readText(join(root, corrupt!))).toBe(content)
+    expect(await io.readText(join(root, 'pending-state.json'))).toBe(content)
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('loads a well-shaped record map normally', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-ok-'))
     const ctx = await mount(root)

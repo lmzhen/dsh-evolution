@@ -102,4 +102,19 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   await provider.savePending(filt)
   expect((await provider.listPending('pending')).map(record => record.id)).toContain('c-filter')
   expect((await provider.listPending('approved')).map(record => record.id)).not.toContain('c-filter')
+
+  // --- V8-15 (0.3.46): release AFTER resolve is a no-op on BOTH providers —
+  // the resolved record keeps its audit attribution (the domain provider had
+  // the status guard; json now matches — G7.4 previously covered only the
+  // executing→release path) ---
+  const post = pendingOf('c-post-resolve', 'memory')
+  await provider.savePending(post)
+  await provider.claimPending('c-post-resolve', 'claim-c')
+  await provider.tryResolvePending('c-post-resolve', 'rejected')
+  await provider.releasePendingClaim('c-post-resolve', 'claim-c')
+  const postResolved = (await provider.listPending('rejected')).find(record => record.id === 'c-post-resolve')
+  expect(postResolved?.status).toBe('rejected')
+  expect(postResolved?.claimedBy).toBe('claim-c')
+  expect(typeof postResolved?.claimedAt).toBe('string')
+  expect(typeof postResolved?.resolvedAt).toBe('string')
 }

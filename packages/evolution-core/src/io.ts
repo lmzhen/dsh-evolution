@@ -116,7 +116,7 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
  * sole gate for the self-pid recycle branch. Exported (read-only in practice)
  * so `io.spec.ts` can drive the self-heal path deterministically.
  */
-export const pendingSelfCleanup = new Set<string>()
+export const pendingSelfCleanup = new Map<string, string>()
 
 /**
  * Retry a rename that a peer is temporarily holding on Windows (EPERM/EBUSY):
@@ -271,10 +271,20 @@ export function nodeEvolutionIo(): EvolutionIoLike {
           // instead of ever double-holding; this process's own failed
           // release is always recorded via pendingSelfCleanup).
           if (holder === process.pid && pendingSelfCleanup.has(lock)) {
+            // V8-05 (0.3.46): the registration carries the body TOKEN from the
+            // failed release — only a matching current body is our leftover; a
+            // mismatched body is a NEW lock another same-process writer owns.
+            const token = pendingSelfCleanup.get(lock)
             const current = await readFile(lock, 'utf8').catch(() => '')
-            if (current === holderContent) {
-              try { await rm(lock, { force: true }) } catch { /* raced with the holder */ }
-              pendingSelfCleanup.delete(lock)
+            if (current === token) {
+              try {
+                await rm(lock, { force: true })
+                // Only a successful removal retires the registration; a failed
+                // rm keeps it so the next write still self-heals (the old form
+                // deleted unconditionally and orphaned the record — the
+                // process then never re-tried and failed loud until restart).
+                pendingSelfCleanup.delete(lock)
+              } catch { /* raced with the holder — keep the registration */ }
             }
             continue
           }
@@ -365,7 +375,15 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         // untouched — the owner/rebuilder owns it.
         const mine = await readFile(lock, 'utf8').catch(() => null)
         if (mine === myClaim) {
-          await rm(lock, { force: true }).catch(() => { pendingSelfCleanup.add(lock) })
+          // V8-05 (0.3.46): record the failed release WITH the lock-body token
+          // — the later self-recycle compares the CURRENT body against this
+          // snapshot, so a fresh lock another same-process writer created at
+          // the same path (the stale-entry hazard) is never removed as if it
+          // were our own leftover.
+          await rm(lock, { force: true }).catch(async () => {
+            const body = await readFile(lock, 'utf8').catch(() => '')
+            pendingSelfCleanup.set(lock, body)
+          })
         }
       }
     }

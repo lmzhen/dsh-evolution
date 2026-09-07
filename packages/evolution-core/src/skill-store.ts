@@ -1345,13 +1345,14 @@ export class SkillLibrary {
       if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
     }
     const targetDir = this.dirOf(targetName)
-    const targetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
-    if (!targetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
     const targetProtection = await this.writeProtection(targetName, origin)
     if (targetProtection) return { ok: false, message: `Skill "${targetName}" is protected (${targetProtection}).` }
-    const writes: TreeChangeWrite[] = []
+    // V8-11 (0.3.46): the targetMd pre-read below MOVED into the serial queue
+    // (commit section) — a concurrent patch between the old pre-read and the
+    // commit used to be silently overwritten by the merged body.
+    const referenceWrites: TreeChangeWrite[] = []
+    const parts: string[] = []
     if (mode === 'append') {
-      const parts: string[] = []
       for (const source of normalizedSources) {
         const protection = await this.deleteProtection(source)
         if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
@@ -1370,10 +1371,6 @@ export class SkillLibrary {
         }
         parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
       }
-      const merged = targetMd.trimEnd() + parts.join('\n') + '\n'
-      const validation = validateFrontmatter(merged, targetName, this.limits)
-      if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
-      writes.push({ target: join(targetDir, 'SKILL.md'), content: merged })
     } else {
       for (const source of normalizedSources) {
         const protection = await this.deleteProtection(source)
@@ -1387,14 +1384,11 @@ export class SkillLibrary {
           return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.` }
         }
         const target = join(targetDir, 'references', `${source}.md`)
-        writes.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
+        referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
       }
-      // Discoverability: the umbrella's body gains one pointer per demoted source.
-      const pointerLines = normalizedSources.map(source => `\n${POINTER_LINE_PREFIX}${source}.md`).join('')
-      const extended = targetMd.trimEnd() + pointerLines + '\n'
-      const validation = validateFrontmatter(extended, targetName, this.limits)
-      if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
-      writes.push({ target: join(targetDir, 'SKILL.md'), content: extended })
+      // Discoverability: the umbrella's body gains one pointer per demoted
+      // source — built INSIDE the serial queue below against the fresh target
+      // (V8-11), so it never merges over a concurrent patch.
     }
     // Two-phase commit so a failure partway never leaves the tree inconsistent:
     // (1) archive every source first — a source that cannot be archived aborts
@@ -1407,16 +1401,39 @@ export class SkillLibrary {
         if (!result.ok) throw new Error(result.message)
         archived.push(source)
       }
-      const result = await this.applyTreeChange({
-        name: targetName,
-        origin,
-        protection: 'write',
-        writes,
-        auditAction: 'consolidate',
-        auditSummary: `consolidated ${normalizedSources.join(', ')} (${mode}) into ${targetName}`,
-        eventAction: 'consolidate',
+      // V8-11 (0.3.46): the target pre-read and the merged/pointer construction
+      // moved INSIDE the in-process serialize queue — a concurrent
+      // patch/update between the old pre-read and the commit used to be
+      // silently overwritten (the serial chain is the same second layer
+      // update/patch/restructure/writeSupportFile use).
+      const result = await this.serial(async (): Promise<SkillActionResult> => {
+        const freshTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
+        if (!freshTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
+        const writes: TreeChangeWrite[] = [...referenceWrites]
+        if (mode === 'append') {
+          const merged = freshTargetMd.trimEnd() + parts.join('\n') + '\n'
+          const validation = validateFrontmatter(merged, targetName, this.limits)
+          if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+          writes.push({ target: join(targetDir, 'SKILL.md'), content: merged })
+        } else {
+          const pointerLines = normalizedSources.map(source => `\n${POINTER_LINE_PREFIX}${source}.md`).join('')
+          const extended = freshTargetMd.trimEnd() + pointerLines + '\n'
+          const validation = validateFrontmatter(extended, targetName, this.limits)
+          if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+          writes.push({ target: join(targetDir, 'SKILL.md'), content: extended })
+        }
+        return await this.applyTreeChange({
+          name: targetName,
+          origin,
+          protection: 'write',
+          writes,
+          auditAction: 'consolidate',
+          auditSummary: `consolidated ${normalizedSources.join(', ')} (${mode}) into ${targetName}`,
+          eventAction: 'consolidate',
+        })
       })
       if (!result.ok) throw new Error(result.message)
+      return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
     } catch (error) {
       // Bring back every source we already archived so the merge is fully
       // undone. 0.3.16 (T-14): a failed restore used to be swallowed by
@@ -1439,7 +1456,6 @@ export class SkillLibrary {
       }
       return { ok: false, message: `Consolidation failed and was rolled back: ${reason}` }
     }
-    return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
   }
 
   /**

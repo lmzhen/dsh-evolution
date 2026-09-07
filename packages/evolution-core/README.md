@@ -22,14 +22,23 @@ Independent of request-prefix construction. This package does not alter the asse
 
 Skill-library mutations are read-modify-write on one file, so `SkillLibrary`
 serializes them in-process with a `makeSerialQueue` chain: `update`, `patch`,
-`restructure` and `writeSupportFile` run their whole read→validate→write under
-one serial task, so two concurrent mutators on one skill never interleave in
-this process. Single-file writes (`update`, `patch`, `writeSupportFile`)
+`restructure`, `writeSupportFile` and — since 0.3.46 — `consolidate`'s target
+read→merge→commit run their whole read→validate→write under one serial task,
+so two concurrent mutators on one skill never interleave in this process.
+Single-file writes (`update`, `patch`, `writeSupportFile`)
 additionally run the read and the write inside `transactIo` when a caller
 injects a `transact` into the constructor — that is the cross-process lock, so
 two processes sharing `DSH_HOME` cannot interleave their RMW on one file.
 `create` writes a new file and `archive`/`consolidate` already own a two-phase
 commit, so they deliberately stay outside the serial chain.
+
+**0.3.46 residual (documented, per G2.5 precedent):** the low-frequency
+single-file entry points `create`, `archive`, `removeSupportFile` and
+`setPinned` still perform an unlocked read→write (their per-file read is not
+inside the serial/transact task). The race needs a same-process concurrent
+mutator on the SAME skill file, which the serialized entry points above make
+unlikely; the exposure is acknowledged and not locked (收益不抵锁面扩大 —
+adding locks to four low-frequency entry points is not worth the surface).
 
 When the backend provides `transact` (nodeEvolutionIo and the io adapter do),
 the constructor binds it BY DEFAULT since 0.3.27 — the single-file entry points

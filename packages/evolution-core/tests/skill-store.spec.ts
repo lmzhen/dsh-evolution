@@ -111,6 +111,24 @@ it('skill consolidate merges sources into target and archives them', async () =>
   await rm(root, { recursive: true, force: true })
 })
 
+it('V8-11: a concurrent patch between the consolidate pre-read and commit survives (0.3.46)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('target-skill', USABLE('target-skill'), 'foreground')
+  await lib.create('src-a', USABLE('src-a'), 'foreground')
+  // A patch racing the consolidate: the old implementation pre-read the
+  // target OUTSIDE the serial queue and committed the merged body over any
+  // concurrent patch; V8-11 re-reads inside the serial chain, so BOTH land.
+  await Promise.all([
+    lib.consolidate('target-skill', ['src-a']),
+    lib.patch('target-skill', 'Body of target-skill.', 'PATTERNED-BODY-MARKER', undefined, true),
+  ])
+  const merged = await lib.read('target-skill') ?? ''
+  expect(merged).toMatch(/consolidated from src-a/)
+  expect(merged).toMatch(/PATTERNED-BODY-MARKER/)
+  await rm(root, { recursive: true, force: true })
+})
+
 it('archive fallback rolls back the copied archive when the source cannot be removed (E-14, 0.3.16)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-'))
   const real = nodeEvolutionIo()
