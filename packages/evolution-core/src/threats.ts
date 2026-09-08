@@ -172,15 +172,18 @@ export function scanMemoryThreats(text: string, maxScanChars = 65_536, options: 
   const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
   const pattern = findings.find(f => f.category !== 'unicode_obfuscation')
-  if (pattern) return `Blocked by security scan (${pattern.label}). Rephrase without instruction-like language.`
-  return 'Blocked by security scan: invisible or potentially malicious Unicode detected.'
+  // WD2 (0.3.56): every user-facing block carries the exemption surface — a
+  // legitimate DevOps/skill phrase must end in a next step, not a dead end.
+  const exemptionHint = ' A deployment that needs a specific label can exempt it via threatExemptLabels (see the README env/dial reference).'
+  if (pattern) return `Blocked by security scan (${pattern.label}). Rephrase without instruction-like language.${exemptionHint}`
+  return `Blocked by security scan: invisible or potentially malicious Unicode detected.${exemptionHint}`
 }
 
 /** User-facing block message for skill content writes. */
 export function scanContentThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
   const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
-  return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions.`
+  return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions. Installations with a known-innocent label can exempt it via threatExemptLabels (README dial reference).`
 }
 
 /**

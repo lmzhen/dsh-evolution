@@ -40,7 +40,18 @@ budget class; `catalog` — the model-visible skill index (60-char cap);
 `rank` — catalog provider priority; `review mode` — how a review decides
 (cadence / subagent plan).
 
-## Install modes (M1-M4)
+## Get started
+
+**First 10 minutes** (defaults as shipped): after the M1 install and restart,
+a review observes the first sessions — the FIRST automatic pass is deferred
+until the interval/usage window opens, so nothing writes on boot. The first
+memory entry arrives after a review decides a conversation fact is worth
+keeping; the first skill edit arrives after a review proposes a change the
+conversation supports. Everything is visible in `/evolution doctor` (form,
+services, pending) and every write shows in `/evolution mutations`. Stop any
+of it with M3 (infrastructure only) or M2 gates per-write.
+
+### Install modes (M1-M4)
 
 | Mode | One-liner | What you get |
 |---|---|---|
@@ -55,7 +66,7 @@ all vs layered), checks `DSH_EVOLUTION_*` variables and the mounted services,
 and ends with suggested next steps. Install docs point here instead of
 repeating the same prose.
 
-## Package map
+## Development: package map (mechanism)
 
 | Package | Role |
 |---|---|
@@ -82,28 +93,83 @@ repeating the same prose.
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | One-command aggregate entry (host + model tools) |
 
+## Reference
+
 ### Command surface (`/evolution`)
 
-The built-in `/evolution` help is the authoritative surface — re-run it after
-upgrades. Full enumeration from the registered handler
-(`packages/evolution-commands/src/index.ts`, 0.3.52):
+Generated from the subcommand registry (`evolution-commands/src/registry.ts` —
+single source with the input hint and the emitted help/README text):
 
-`pending [--detail]` · `approve <id>` · `reject <id>` · `curator run` ·
-`curator pause` · `curator resume` · `curator status` · `curator report` ·
-`curator scope` · `mutations` · `restore` (snapshot restore) ·
-`consolidate <target> <sources...> [--plan <runId>]` · `skill restore <name>` ·
-`skills health` · `skills refresh` · `learn [request]` ·
-`maintain [--timeout <ms> | --facts]` · `preset install` ·
-`restructure <name> "<heading>" <to_file> [--plan <runId>]` · `replay`
+| Command | Purpose |
+|---|---|
+| `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
+| `/evolution approve <id>` | replay an approved staged write through its runner |
+| `/evolution reject <id>` | drop a staged write without running it |
+| `/evolution doctor` | read-only self-check: install form, conflicts, env, services |
+| `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
+| `/evolution mutations` | list skill-mutation audit records |
+| `/evolution restore` | restore skills from the latest snapshot |
+| `/evolution consolidate <target> <sources...>` | merge source skills into a target umbrella skill |
+| `/evolution skill restore <name>` | restore one archived skill by name |
+| `/evolution skills health` | structure-health verdicts for the skill library |
+| `/evolution skills refresh` | drop the catalog caches and re-read the tree |
+| `/evolution learn [request]` | send a learning request to this session |
+| `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
+| `/evolution preset install` | generate the Evolution agent preset into the user root |
+| `/evolution restructure <name> "<heading>" <to_file>` | move a body section into a references/ file |
+| `/evolution replay` | compare prompt-bundle replay for this session |
 
-(bare `/evolution` prints the same list)
+### Configuration dials (5 knobs, underlying fields pinned by tests)
+
+| Dial | Values | Underlying fields (all in package Config / profile rows) |
+|---|---|---|
+| autonomy | auto / reviewed / observe | `approval.enabled` (profile row), `reviewEnabled` (evolution-review), `/evolution pending\|approve\|reject` |
+| scope | global / per-session | package choice — evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
+| curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` (evolution-curator) |
+| memoryInjection | on / off | `memoryEnabled` (tool-memory: guidance + snapshot injection) |
+| threatStrictness | strict / exempt-list | threat Config + `threatExemptLabels` (SkillLibrary/MemoryStore option, P2-18) |
+
+Fine-grained knobs run into the three-level appendix: **daily** (review
+intervals, curator cadence), **tuning** (health thresholds, quality weights),
+**high-risk** (maxOpsPerPlan, char budgets, review/curator model choice —
+cost and behavior).
+
+### Environment variables
+
+| Variable | Where read | Effect |
+|---|---|---|
+| `DSH_EVOLUTION_SESSION_QUERY` | profile config (`!!js` in bundle patch) | `startup` / `first-search` / `never` (SQLite index openAt); invalid values normalize to `startup` |
+| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile config (`!!js` in bundle patch) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
+| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code (core `env.ts`) | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
 
 ## Installation
 
 See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
 compatibility flow, and profile override examples.
 
-## Composition
+## Operate
+
+### Troubleshooting
+
+| Symptom / code | Meaning | Next step |
+|---|---|---|
+| startup: `invariants: package "…" is already registered` | two bundles or bundle+preset double-mount the same rows | keep ONE of evolution-all / evolution-host / evolution-preset / layered — run `/evolution doctor` |
+| `E-301` | approval service not mounted | evolution-approval row ships with host/all; run doctor |
+| `E-302` | curator service not mounted | mount evolution-curator row; run doctor |
+| `E-303` | replay service not mounted | mount evolution-replay row; run doctor |
+| threat deny (memory/skill write) | strict scan hit an instruction-like phrase | rephrase; or exempt a known-innocent label via `threatExemptLabels` (dial reference) |
+| `/evolution doctor` reports `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
+
+### Migration (0.3.x → 0.3.56)
+
+| Current install | What changes on upgrade | Action |
+|---|---|---|
+| host (infra only) | nothing | stays M3 |
+| evolution-all (passive aggregate era) | becomes the FULL bundle — every session gains the model tools | keep (M1) or switch to host (M3) |
+| one-click preset | nothing | stays; new installs should use all |
+| layered (host + preset) | nothing | stays; don't add all (exclusive) |
+
+## Development: composition & bundles
 
 ### Full bundle (DEFAULT, 0.3.54)
 

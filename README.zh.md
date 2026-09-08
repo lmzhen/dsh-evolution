@@ -262,6 +262,26 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 
 ## 配置
 
+### 拨盘层（5 个语义拨盘——背后字段与 README(en) `Configuration dials` 一致，测试钉住）
+
+| 拨盘 | 取值 | 背后字段 |
+|---|---|---|
+| autonomy | auto / reviewed / observe | `approval.enabled`（profile 行）、`reviewEnabled`（evolution-review）、`/evolution pending\|approve\|reject` |
+| scope | global / per-session | 包选择：evolution-all（全局，默认）vs host + Evolution 预设（按会话） |
+| curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours`（evolution-curator） |
+| memoryInjection | on / off | `memoryEnabled`（tool-memory：指引与快照注入） |
+| threatStrictness | strict / 豁免清单 | threat 配置 + `threatExemptLabels`（core SkillLibrary/MemoryStore 选项） |
+
+细粒度旋钮分三档（日常 / 调优 / 高危——如 maxOpsPerPlan、chars 上限、review/curator 模型选择：直接影响花费与行为），见英文 README `Configuration dials` 下说明。
+
+### 环境变量（DSH_EVOLUTION_*）
+
+| 变量 | 读取层 | 作用 |
+|---|---|---|
+| `DSH_EVOLUTION_SESSION_QUERY` | profile 配置（bundle patch `!!js`） | `startup` / `first-search` / `never`；非法值归一为 `startup` |
+| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile 配置（`!!js`） | 索引路径；空串回退 `$DSH_HOME/evolution/session-query.db` |
+| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | 插件代码（core `env.ts`） | `1` 将预设 delta 行冲突从 fail-loud 降为 warn+双行保留 |
+
 所有稳定 row id 都可通过 profile 覆盖：
 
 ```yaml
@@ -287,6 +307,17 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 - **以本地用户权限运行。** 和其他 DSH 插件一样，evolution 的代码跑在宿主进程里——安装前先看一遍仓库；第一次试，建议用隔离 profile。
 - **只写 memory 和 skills。** 循环写入只针对 `~/.dsh/`（可配置）下的 memory 与 skills；写入会过保护标记（pinned、预装技能后台改不了）、分阶段审批、快照和审计；它不会动平台的沙箱或权限模型。
 - **默认保守。** 后台评审只改本会话读过的技能；curator 按你定的周期跑；分阶段审批默认关（和上游 Hermes 一致），一行配置可开。
+
+## 常见问题
+
+| 症状 / 编号 | 含义 | 下一步 |
+|---|---|---|
+| 启动报 `invariants: package "…" is already registered` | 两个 bundle 或 bundle+预设双挂相同行 | 只保留一个（evolution-all / evolution-host / evolution-preset / layered）；跑 `/evolution doctor` |
+| `E-301` | approval 服务未挂载 | evolution-approval 行随 host/all 提供；跑 doctor |
+| `E-302` | curator 服务未挂载 | 挂 evolution-curator 行；跑 doctor |
+| `E-303` | replay 服务未挂载 | 挂 evolution-replay 行；跑 doctor |
+| 威胁扫描拒绝（memory/skill 写入） | strict 命中指令式短语 | 改写；或经 `threatExemptLabels` 豁免已知无害 label（见拨盘表） |
+| doctor 报 `install form: none` | 未装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
 ## 安全边界
 

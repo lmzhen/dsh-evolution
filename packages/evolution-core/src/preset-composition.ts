@@ -1,3 +1,6 @@
+/* WC (0.3.56): the N-5 escape reads through the single env module. */
+import { allowRowCollisions } from './env.ts'
+
 /**
  * Build the user-root Evolution preset composition from the RUNTIME platform's
  * `standard` preset rows plus the evolution delta rows (P1-1 follow-up,
@@ -29,7 +32,7 @@ export function composePresetComposition(standardComposition: string, deltaCompo
   const standardIds = compositionRowIds(standardComposition)
   const deltaIds = compositionRowIds(deltaComposition)
   const collisions = [...deltaIds].filter(id => standardIds.has(id)).sort()
-  if (collisions.length > 0 && process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS !== '1') {
+  if (collisions.length > 0 && !allowRowCollisions()) {
     throw new Error(`evolution preset composition: delta rows collide with runtime standard rows: ${collisions.join(', ')}`)
   }
   if (collisions.length > 0) {

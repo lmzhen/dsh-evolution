@@ -66,6 +66,26 @@ pins the equality).
 | `/evolution restructure <name> "<heading>" <to_file>` | move a body section into a references/ file |
 | `/evolution replay` | compare prompt-bundle replay for this session |
 
+## Composition details
+
+### Configuration dials (5 knobs — field names pinned by T-WC2)
+
+| Dial | Values | Underlying config fields |
+|---|---|---|
+| autonomy | auto / reviewed / observe | approval.enabled (profile row), reviewEnabled (evolution-review), pending/approve/reject commands |
+| scope | global / per-session | package choice: evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
+| curatorBackground | on / off | autoStart, intervalHours, minIdleHours (evolution-curator) |
+| memoryInjection | on / off | memoryEnabled (tool-memory) |
+| threatStrictness | strict / exempt-list | threat config + threatExemptLabels (core SkillLibrary/MemoryStore option) |
+
+### Environment variables (DSH_EVOLUTION_*)
+
+| Variable | Layer | Effect |
+|---|---|---|
+| DSH_EVOLUTION_SESSION_QUERY | profile config (`!!js` in bundle patch) | startup / first-search / never; invalid normalizes to startup |
+| DSH_EVOLUTION_SESSION_QUERY_PATH | profile config (`!!js`) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
+| DSH_EVOLUTION_ALLOW_ROW_COLLISIONS | plugin code (core env.ts) | `1` downgrades delta-row collision from fail-loud to warn+keep-both |
+
 ## Composition
 
 ### Layered install (recommended)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.56 (patch) — 0.4.0 系列批 2：配置两层化 / 错误附下一步 / 文档五区（WC/WD2-D4/WE/C4）
+
+- **WC 配置两层化**：①**拨盘层**——5 个语义拨盘（autonomy / scope / curatorBackground / memoryInjection / threatStrictness）文档化 + 背后字段映射表（全部实测存在，T-WC2 钉住 7 个字段）与三档风险标注（日常/调优/高危）；②**env 收口**——core 新增 `env.ts` 单源模块（`allowRowCollisions()` + 键表），`DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` 读取迁移（行为不变）；配置层 `!!js` env（SESSION_QUERY/SESSION_QUERY_PATH）按边界**保留在 profile 配置求值层**（不可迁移），文档表区分两读取层；③**生成式导航**：命令表/拨盘/env 表均以「单源渲染 + 测试守卫」形态落地（README 五区）。
+- **WD2-D4 失败与命令体验**：①常见错误编号化 E-301/302/303（approval/curator/replay 服务未挂载——附「下一步」指向 doctor）；②threat 拒绝消息统一附豁免通道指引（`threatExemptLabels`——内存/技能双写面）；③README Operate 区 Troubleshooting 表（already registered 双装解读、E-3xx、threat、form none——每行含下一步）。
+- **WE 文档五区**：根 README 重组为 Concepts / Get started（含 **C4 首 10 分钟叙事**：首次审阅 defer、第一条记忆/技能从哪来、去 `/evolution doctor`/`mutations` 看什么、怎么停）/ Reference（命令表×拨盘×env）/ Operate（Troubleshooting×Migration 四类用户）/ Development（包地图+compositions+invariants+双布局下沉）；zh 同步（配置拨盘表 + 常见问题表）；dev README 补 dials/env 节（canonical 测试面）。
+- **护栏**：T-WC2（dial-reference 守卫：README 拨盘节存在 + 7 字段逐一存在于所属包源码）；T-WD2 既有（命令表/hint 单源）延续。
+- **门禁**：core 303（+env 迁移下 preset-composition 9）、commands 47（+E-xxx 断言面）、dial-reference 2；oxlint 0/0（206 文件）；tsc 0；全量以 CI Linux 为准。
+
 ## 0.3.55 (patch) — 0.4.0 系列批 1：概念产品化 + 安装模式 + 生成式命令面（WA/WB/WD1）
 
 - **WA 概念产品化**：根 README 首屏新增「Concepts: the two evolution loops」——记忆进化/技能进化两回路 + 共享引擎（Review 心脏 + Curator 代谢 + Governance 闸门）+ 术语表（plan/pending/staged/snapshot/consolidate/nomination/drift/substantive/catalog/rank/review mode——中英单源，与命令输出同一套词汇）；zh 快速开始同步（含概念简报 + 模式表）。

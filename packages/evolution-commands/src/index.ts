@@ -107,23 +107,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('approve ')) {
           const id = input.slice(8).trim()
-          const result = approval ? await approval.approve(id) : { ok: false, message: 'approval service not mounted' }
+          const result = approval ? await approval.approve(id) : { ok: false, message: 'E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('reject ')) {
           const id = input.slice(7).trim()
-          const result = approval ? await approval.reject(id) : { ok: false, message: 'approval service not mounted' }
+          const result = approval ? await approval.reject(id) : { ok: false, message: 'E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: { runId: string; snapshotPath?: string } }> } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const result = await curator.run({ ignoreGates: true })
           return ok(`Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
         }
         if (input === 'curator pause' || input === 'curator resume') {
           const curator = ctx.get('evolutionCurator') as { setPaused(paused: boolean): Promise<void> } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const paused = input === 'curator pause'
           await curator.setPaused(paused)
           // H-07 completion: in a state-less composition the curator warns and
@@ -138,7 +138,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator status') {
           const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const state = await curator.status()
           if (!state) return ok('No curator state yet: the first automatic pass is deferred until the interval elapses.')
           // A corrupt state record must not crash the command surface with a
@@ -155,7 +155,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'mutations') {
           const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const records: unknown = await curator.skills.listMutations()
           // V6-41 (0.3.36): the mutations file is out-of-band editable — a
           // damaged record must not crash the command with a TypeError (the
@@ -174,7 +174,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator scope') {
           const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const view = await curator.scopeView()
           const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
           return ok([
@@ -188,7 +188,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator report') {
           const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const report: unknown = await curator.latestReport()
           if (!report) return ok('No curator report available.')
           // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
@@ -225,7 +225,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('restore ')) {
           const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'Curator service not mounted.' }
+          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('consolidate ')) {
@@ -236,7 +236,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const [target, ...sources] = names
           if (!target || sources.length === 0) return err('Usage: /evolution consolidate <target> <source...>')
           const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: 'Curator service not mounted.' }
+          const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           if (!result.ok) return err(result.message)
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
         }
@@ -244,12 +244,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const name = input.slice(14).trim()
           if (!name) return err('Usage: /evolution skill restore <name>')
           const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restore(name) : { ok: false, message: 'Curator service not mounted.' }
+          const result = curator ? await curator.restore(name) : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'skills health') {
           const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>>; usageObserved(): Promise<boolean> } | undefined
-          if (!curator) return err('Curator service not mounted.')
+          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const [rows, observed] = await Promise.all([curator.healthView(), curator.usageObserved()])
           // C observation window: before ANY observed read exists, view_count
           // zero is not evidence — say so instead of silently showing a clean
@@ -493,7 +493,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'replay') {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
-          if (!replay) return err('Replay service not mounted.')
+          if (!replay) return err('E-303: replay service not mounted. Next: mount the evolution-replay row (evolution-host/evolution-all) and run /evolution doctor.')
           return ok(replay.compare().report)
         }
         if (input === 'doctor' || input === 'doctor --json') {
