@@ -22,7 +22,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 15
+export const PROMPT_BUNDLE_VERSION = 16
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -290,7 +290,7 @@ D. 库·整合纪律（计划形态约束）
  * fail-closed signal); PROMPT_BUNDLE_VERSION itself is owned by the core test
  * pin and stays untouched in this batch.
  */
-export const MAINTAIN_OUTPUT_INSTRUCTION = '按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。'
+export const MAINTAIN_OUTPUT_INSTRUCTION = '按模板契约输出 JSON 维护计划（verdict/plan/notes）；你有 skill 工具与维护模板；并在维护探针（maintenance_probe）挂载时可用它深挖细节。'
 
 /**
  * System-prompt guidance section (Hermes `SKILLS_GUIDANCE`, DSH-adapted).

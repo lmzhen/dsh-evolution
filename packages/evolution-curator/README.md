@@ -22,7 +22,11 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - LLM nomination pass is advisory and disabled by default; deterministic lifecycle remains authoritative.
-- Consolidation is control-plane only (`/evolution consolidate <target> <source...>`): no LLM pass proposes merge groups yet, and merged source bodies are appended verbatim rather than rewritten into a synthesized skill.
+- Consolidation is a REAL merger path: the LLM nomination (when enabled / via `recommend()`) proposes
+  merge groups, the control plane gates them and applies the mutation — merged source bodies are appended
+  verbatim rather than rewritten into a synthesized skill. The one-click `/evolution consolidate
+  <target> <source...>` remains the direct manual path (P2-8, v11: the earlier "no LLM pass proposes
+  merge groups" wording contradicted the tested nomination chain).
 
 ## Recovery and consolidation
 

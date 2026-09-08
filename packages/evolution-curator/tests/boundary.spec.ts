@@ -17,6 +17,24 @@ async function mount(_home: string, config: ConstructorParameters<typeof Evoluti
 }
 
 describe('evolution-curator boundaries', () => {
+  it('D2: a custom config.root points the SkillLibrary at the custom tree (0.3.58)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-root-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const customRoot = join(home, 'custom-skills')
+      const ctx = await mount(home, { root: customRoot })
+      expect(ctx.evolutionCurator.skills.root).toBe(customRoot)
+      // Default (root omitted): resolveSkillsRoot falls back to $DSH_HOME/skills.
+      const defaultCtx = await mount(home)
+      expect(defaultCtx.evolutionCurator.skills.root).toBe(join(home, 'skills'))
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
   it('skips an automatic run while a session is recently active', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-idle-'))
     const previous = process.env.DSH_HOME

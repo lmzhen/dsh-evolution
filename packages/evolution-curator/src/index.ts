@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE } from '@deepseek-ai/dsh-evolution-core'
+import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -38,6 +38,11 @@ export interface Config {
   intervalHours?: number
   staleAfterDays?: number
   archiveAfterDays?: number
+  /** Skill-tree root for curator scope/snapshot/archive (D2, v11) — a custom
+   * root deployment (review/tool-skill-manage write another tree) must point
+   * the curator at the SAME tree or lifecycle decisions land on the default
+   * tree and never see the deployed skills. Empty uses skillsRoot(). */
+  root?: string
   /** Spend one LLM review pass on stale candidates before the deterministic archive step. */
   llmReview?: boolean
   curatorProvider?: string
@@ -166,7 +171,7 @@ export class EvolutionCurator extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    this.skills = new SkillLibrary(undefined, this.io, undefined, (event) => { this.ctx.emit('evolution/skill-mutated', event) })
+    this.skills = new SkillLibrary(resolveSkillsRoot({ root: config.root }), this.io, undefined, (event) => { this.ctx.emit('evolution/skill-mutated', event) })
     this.enabled = config.enabled ?? true
     // G3.1 (0.3.23): numeric config is clamped at assembly so a 0/negative/NaN/
     // ±Infinity value falls back to the package default instead of folding as a

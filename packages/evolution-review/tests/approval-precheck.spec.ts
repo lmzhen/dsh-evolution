@@ -9,11 +9,12 @@ import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state'
 import * as Review from '../src/index.ts'
 
 /**
- * P1-9 (rc.44 plan): with approval ENABLED but no replay runner registered
- * for a kind (host-only compositions mount no tool runners), staging used to
- * create a pending record that no approver could ever replay. The review now
- * pre-checks `hasRunner` and executes through its trusted direct path, so the
- * write lands and no unanswerable pending is created.
+ * P1-9 (rc.44 plan) — CORRECTED wording (P2-13, v11): with approval ENABLED
+ * but no replay runner registered for a kind (host-only compositions mount no
+ * tool runners), the review FAIL-CLOSED instead of staging — it skips the
+ * write (`applied === 0` in every assertion below) so no unanswerable pending
+ * is ever created. The old heading claimed the direct path lands the write;
+ * the implementation and the tests both assert the refusal.
  */
 
 const REVIEWER = 'I prefer concise answers and want you to remember that preference. '.repeat(6)

@@ -29,7 +29,7 @@
     - id: evolution-io-node
       name: '@deepseek-ai/dsh-evolution-io-node'
 
-    # ── durable state: storage-domain KV first, portable JSON fallback ──────
+    # ── durable state: provider registry (json active; domain opt-in) ───────
     - id: evolution-state-storage
       name: '@deepseek-ai/dsh-evolution-state-storage'
     - id: evolution-state-domain

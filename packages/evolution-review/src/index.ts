@@ -43,8 +43,12 @@ export interface Config {
   reviewMaxDepth?: number
   /** LLM provider for review subagents. Omit to inherit the deployment default route. */
   reviewProvider?: string
-  /** Which channel runs the end-of-conversation summary: the cadence latch
-   * ('cadence'), the long-session completion gate ('completion'), or both. */
+  /** E3/P1-8 (v11) — TRUE semantics: this flag gates ONLY the completion
+   * channel. The cadence latch stays active regardless of the value (a
+   * completion-gated deployment still fires at the policy cadence), so
+   * 'completion' does NOT mean "cadence off", and 'both' is effectively
+   * "completion on top of the always-on cadence". The mutually-exclusive
+   * channel reading in earlier docs was wrong. */
   skillReviewTrigger?: 'cadence' | 'completion' | 'both'
   /** Cumulative session tool calls before a session counts as proven-long for the completion channel. */
   skillReviewCompletionMinToolCalls?: number
@@ -176,7 +180,20 @@ let statelessReviewStateWarned = false
  * rejects the spawn outright). Warn once when a user-supplied value had to be
  * corrected.
  */
-export function clampReviewConfig(rawConfig: Config, ctx: Context): Required<Config> {
+/** F5 (P2-16, v11): the clamp sets exactly these seven numeric fields — the
+ * old `as Required<Config>` lied about `reviewToolAllow` etc. being populated
+ * (`[...undefined]` TypeErrors under a direct `apply(ctx, {})`). */
+type ClampedReviewConfig = Config & {
+  memoryInterval: number
+  skillInterval: number
+  reviewTimeoutMs: number
+  reviewContextMessages: number
+  reviewMessageChars: number
+  reviewMaxDepth: number
+  skillReviewCompletionMinToolCalls: number
+}
+
+export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedReviewConfig {
   const clamped: string[] = []
   const field = (name: keyof Config, value: number | undefined, fallback: number, min: number): number => {
     const result = clampedNumber(value, fallback, { min })
@@ -191,7 +208,7 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): Required<Con
     reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, 2000, 1),
     reviewMaxDepth: field('reviewMaxDepth', rawConfig.reviewMaxDepth, 1, 1),
     skillReviewCompletionMinToolCalls: field('skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
-  }) as Required<Config>
+  })
   if (clamped.length > 0) {
     ctx.logger.warn(`dsh-evolution-review: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
   }
@@ -532,7 +549,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // limit (deliverable = plan, never narrated actions) instead of the
         // operative wording that contradicts the tool filter.
         persona: reviewPrompt(kind, 'plan'),
-        toolFilter: { allow: [...config.reviewToolAllow] },
+        toolFilter: { allow: [...(config.reviewToolAllow ?? [])] },
         // V8-01 (0.3.45): the single-sourced constant — `'json'` DSL values
         // in items would be rejected by the upstream raw-schema boundary.
         outputSchema: REVIEW_OUTPUT_SCHEMA,

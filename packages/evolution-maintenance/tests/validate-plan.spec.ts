@@ -35,7 +35,9 @@ function validItem(overrides: Record<string, unknown> = {}): Record<string, unkn
     kind: 'skill-level',
     names: ['healthy-skill'],
     rule: 'B1',
-    evidence: [{ signal: 'stamp_density', value: '0.5/KB' }],
+    // E1 (P1-6, 0.3.58): the fixture report carries `dedup_group=over` at the
+    // library level — a §3-compliant plan must cover it (evidence or notes).
+    evidence: [{ signal: 'stamp_density', value: '0.5/KB' }, { signal: 'dedup_group', value: 'a, b' }],
     finding: 'stamp_density=pass',
     recommendation: '无动作（示例）',
     semantic_reasoning: '追溯锚判据',
@@ -99,6 +101,30 @@ describe('validateAndNormalizeMaintainPlan', () => {
     const bad = validateAndNormalizeMaintainPlan(badRoot, report, SIGNALS)
     expect(bad.ok).toBe(false)
     expect(bad.errors.some(e => e.includes('no_issues'))).toBe(true)
+  })
+
+  it('E1: an EMPTY issues plan over an over-signal report is refused (P1-6 completeness)', () => {
+    const empty = validateAndNormalizeMaintainPlan({ verdict: 'issues', plan: [], notes: [] }, report, SIGNALS)
+    expect(empty.ok).toBe(false)
+    expect(empty.errors.some(e => e.includes('completeness'))).toBe(true)
+    expect(empty.errors.some(e => e.includes('empty plan AND no notes'))).toBe(true)
+  })
+
+  it('E1: an uncovered over signal is refused even with a non-empty plan (P1-6)', () => {
+    // The fixture report carries dedup_group=over; drop it from evidence and
+    // name it nowhere — §3 fails loud.
+    const item = validItem({ evidence: [{ signal: 'stamp_density', value: '0.5/KB' }] })
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
+    expect(result.ok).toBe(false)
+    expect(result.errors.some(e => e.includes('dedup_group'))).toBe(true)
+    expect(result.errors.some(e => e.includes('completeness'))).toBe(true)
+    // Naming the id in a note satisfies §3's explain-away clause.
+    const withNote = validateAndNormalizeMaintainPlan(
+      { verdict: 'issues', plan: [validItem()], notes: ['dedup_group 已人工评估：保留双技能'] },
+      report,
+      SIGNALS,
+    )
+    expect(withNote.ok).toBe(true)
   })
 
   it('rejects evidence that references a signal outside the facts block', () => {

@@ -12,7 +12,9 @@ Human commands for the evolution family
 
 #### Token effect
 
-Zero direct token effect from this package; consumers add any model-visible tokens.
+P2-22 (v11) correction: this package's **only** direct model-visible token is the
+`/evolution learn` injection — the full learning guidance is injected as a user
+message in this session. Everything else adds no tokens; consumers add their own.
 
 #### KV Cache effect
 

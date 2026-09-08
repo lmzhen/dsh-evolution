@@ -21,7 +21,15 @@ const validResult = {
       kind: 'skill-level',
       names: ['fix-alignment-bad'],
       rule: 'B3',
-      evidence: [{ signal: 'dup_heading', value: 'A(2)' }],
+      // E1 (0.3.58): §3 completeness — this fixture's skill reports THREE over
+      // signals (dup_heading / overlong_line / narrow_name; computed from the
+      // fakeLibrary body) and a compliant plan must cover them all in evidence
+      // (or name them in notes).
+      evidence: [
+        { signal: 'dup_heading', value: 'A(2)' },
+        { signal: 'overlong_line', value: '7:2500' },
+        { signal: 'narrow_name', value: 'session-verb' },
+      ],
       finding: 'dup_heading=over: A(2)',
       recommendation: 'patch: 删除重复标题行（执行形态：skill_manage patch）',
       semantic_reasoning: '双份标题为笔误形态',

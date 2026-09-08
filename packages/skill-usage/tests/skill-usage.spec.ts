@@ -20,6 +20,21 @@ describe('skill-usage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('P1-4: the sidecar key is trimmed at the service boundary (ghost-key divergence, 0.3.58)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-trim-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.record('  spaced-name  ', 'use')
+    await ctx.skillUsage.ensureRecordCreated(' spaced-create ', false)
+    const map = await ctx.skillUsage.report()
+    expect(map.has('spaced-name')).toBe(true)
+    expect(map.has('  spaced-name  ')).toBe(false)
+    expect(map.has('spaced-create')).toBe(true)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-usage-dispose-'))
     const ctx = new Context()

@@ -61,10 +61,15 @@ export class EvolutionFeedback {
    * unpersisted note there, and reverting to it resurrects a value the log
    * never held). Seeded from the fold truth, updated on successful appends. */
   private readonly durableNote = new Map<string, string | undefined>
+  /** P2-32 (v11): process-level bound — every feedbacked session would
+   * otherwise keep one entry for the whole process lifetime (a name + note
+   * string per session); cap both maps and drop the oldest on overflow. */
+  private static readonly NOTE_CAP = 512
   /** V5-32 (0.3.31): fire-and-forget append failures are warn-once per unique
    * message — a persistent refusal (e.g. a future-version log) must not spam
    * the log on every user feedback entry (family posture: process-level once). */
   private readonly warnedMessages = new Set<string>()
+  private readonly WARNED_CAP = 512
   /** V5-29 (0.3.31): invoked after a FAILED append rolled back, so a caller
    * holding derived state (skillUsage quality score) can re-push it instead of
    * keeping an optimistic value that never landed. */
@@ -177,7 +182,13 @@ export class EvolutionFeedback {
         const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
         // A successfully persisted note becomes the durable truth for a later
         // failed append's rollback (V4-41).
-        if (note !== undefined) this.durableNote.set(this.noteKey(mode, target), note)
+        if (note !== undefined) {
+          if (this.durableNote.size >= EvolutionFeedback.NOTE_CAP) {
+            const oldest = this.durableNote.keys().next().value
+            if (oldest !== undefined) this.durableNote.delete(oldest)
+          }
+          this.durableNote.set(this.noteKey(mode, target), note)
+        }
         // rc.72 G-3: cadence snapshot keeps the boot cache inside the retention
         // window (see CACHE_SNAP_EVERY); best-effort inside the same task.
         // writeCacheNow swallows its own errors and never throws, so this catch
@@ -215,6 +226,10 @@ export class EvolutionFeedback {
         // user entry, regardless of which target triggered it.
         const cause = error instanceof Error ? error.message : String(error)
         if (!this.warnedMessages.has(cause)) {
+          if (this.warnedMessages.size >= this.WARNED_CAP) {
+            const oldest = this.warnedMessages.values().next().value
+            if (oldest !== undefined) this.warnedMessages.delete(oldest)
+          }
           this.warnedMessages.add(cause)
           this.warn(message)
         }

@@ -206,10 +206,16 @@ export class SkillUsageRegistry extends Service {
   }
 
   async record(name: string, kind: 'use' | 'view' | 'patch', at = new Date()): Promise<void> {
+    // P1-4 (v11): the sidecar key is trimmed at the SERVICE boundary — the
+    // SkillLibrary trims every entry too, so an untrimmed args.name wrote the
+    // usage record under a ghost key (" foo ") that review/curator could never
+    // see (P1-4: sidecar key divergence). All callers (tool / graph / commands)
+    // now land on the same key.
+    const normalized = name.trim()
     await this.mutate((map) => {
-      if (kind === 'use') bumpUse(map, name, at)
-      else if (kind === 'view') bumpView(map, name, at)
-      else bumpPatch(map, name, at)
+      if (kind === 'use') bumpUse(map, normalized, at)
+      else if (kind === 'view') bumpView(map, normalized, at)
+      else bumpPatch(map, normalized, at)
     })
   }
 
@@ -222,7 +228,7 @@ export class SkillUsageRegistry extends Service {
 
   async markAgentCreated(name: string): Promise<void> {
     await this.mutate((map) => {
-      markAgentCreated(map, name)
+      markAgentCreated(map, name.trim())
     })
   }
 
@@ -236,8 +242,8 @@ export class SkillUsageRegistry extends Service {
    */
   async ensureRecordCreated(name: string, agentCreated: boolean): Promise<void> {
     await this.mutate((map) => {
-      if (agentCreated) markAgentCreated(map, name)
-      else getRecord(map, name)
+      if (agentCreated) markAgentCreated(map, name.trim())
+      else getRecord(map, name.trim())
     })
   }
 
@@ -248,7 +254,7 @@ export class SkillUsageRegistry extends Service {
    */
   async markArchived(name: string, at = new Date()): Promise<void> {
     await this.mutate((map) => {
-      const record = map.get(name)
+      const record = map.get(name.trim())
       if (record) {
         record.state = 'archived'
         record.archived_at = at.toISOString()

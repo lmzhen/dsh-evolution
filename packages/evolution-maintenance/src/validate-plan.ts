@@ -261,6 +261,30 @@ export function validateAndNormalizeMaintainPlan(
     ? (raw.notes as unknown[]).filter((note): note is string => isNonEmptyString(note))
     : []
 
+  // E1 (P1-6, v11): the §3 completeness contract — every OVER verdict signal
+  // in the facts block must be COVERED: referenced as evidence in some plan
+  // item, or named in a note. An empty `{issues, [], []}` (a silently skipped
+  // over signal) used to pass as a legitimate scan; now it fails like the
+  // existing verdict=no_issues-with-plan symmetry check. Semantic correctness
+  // of a note stays out of scope (template §3 leaves that to the reviewer).
+  const overSignals = new Set<string>()
+  for (const signal of report.library) if (signal.verdict === 'over') overSignals.add(signal.id)
+  for (const skill of report.skills) {
+    for (const signal of skill.signals) if (signal.verdict === 'over') overSignals.add(signal.id)
+  }
+  const covered = new Set(plan.flatMap(item => item.evidence.map(ev => ev.signal)))
+  const notesText = notes.join('\n')
+  if (verdict === 'issues') {
+    if (plan.length === 0 && notes.length === 0 && overSignals.size > 0) {
+      errors.push('completeness: verdict=issues with an empty plan AND no notes — every over signal must be covered by evidence or named in a note (§3)')
+    } else {
+      const uncovered = [...overSignals].filter(id => !covered.has(id) && !notesText.includes(id))
+      if (uncovered.length > 0) {
+        errors.push(`completeness: over signal(s) not covered by any plan evidence nor named in a note (${uncovered.join(', ')}) — §3 requires each over signal to be addressed or explicitly explained away`)
+      }
+    }
+  }
+
   if (errors.length > 0) {
     return { ok: false, errors, plan: { verdict: verdict === 'no_issues' ? 'no_issues' : 'issues', plan, notes }, forcedHuman }
   }

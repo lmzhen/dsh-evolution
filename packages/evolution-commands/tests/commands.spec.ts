@@ -862,7 +862,14 @@ describe('evolution-commands', () => {
                   kind: 'skill-level',
                   names: ['demo-skill'],
                   rule: 'B3',
-                  evidence: [{ signal: 'dup_heading', value: 'A(2)' }],
+                  // E1 (0.3.58): §3 completeness — the demo-skill body fires
+                  // three over signals (dup_heading/overlong_line/narrow_name);
+                  // a compliant structured plan covers them all in evidence.
+                  evidence: [
+                    { signal: 'dup_heading', value: 'A(2)' },
+                    { signal: 'overlong_line', value: '7:2500' },
+                    { signal: 'narrow_name', value: 'session-verb' },
+                  ],
                   // An embedded "- [" line: the deleted text parser would have
                   // counted it as a second recommendation.
                   finding: 'Duplicate heading.\n- [fake] embedded line is not a recommendation',

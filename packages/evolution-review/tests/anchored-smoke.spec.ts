@@ -194,10 +194,13 @@ describe('anchored-standard review smoke', () => {
       // subagent starts at the NEXT completed boundary (the flush).
       session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
-      // The schedule fires on a 1ms interval and the plan applies asynchronously:
-      // a fixed sleep can snapshot the window where the disk archive landed but
-      // markArchived has not run yet (observed once in the full parallel suite).
-      // Poll each contract signal instead — the contract is final consistency.
+      // P2-14 (v11): the schedule is EVENT-DRIVEN (no 1ms timer exists in
+      // this package — the old "fires on a 1ms interval" note described a
+      // removed scheduler). The plan applies asynchronously: a fixed sleep
+      // could snapshot the window where the disk archive landed but
+      // markArchived has not run yet (observed once in the full parallel
+      // suite). Poll each contract signal instead — the contract is final
+      // consistency.
       await expect.poll(() => capturedRequest !== undefined, { timeout: 3000, interval: 50 }).toBe(true)
       // The actual archive landed (schedule-review ran executePlan → direct path).
       await expect.poll(async () => (await library.list()).some(s => s.name === 'doomed-skill'), { timeout: 3000, interval: 50 }).toBe(false)

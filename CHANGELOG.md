@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.58 (patch) — v11 审计修复批 2：写入面契约统一 + 模型面对齐 + 交互/文档（阶段 D+E+F+H）
+
+- **阶段 D（跨包写入面契约统一）**：① skill 名称 trim 下沉到 **skill-usage 服务层**（record/ensureRecordCreated/markAgentCreated/markArchived 四入口——侧车键与 SkillLibrary 全入口 trim 单源一致，幽灵键「 foo 」消除）；② **curator 补 `root` 配置**（自定义 root 部署下 curator 作用于真实技能树——此前是全家族唯一无 root 的树消费者，生命周期在自定义树部署下整体失效）；③ graph 审批归属：invocation 无会话通道（实测）——注释声明取舍（不造命令级会话机制）；④ feedback 两个进程级 Map 512 上界；⑤ 契约钉住：trim/root 判别用例（D1/D2 验收）。
+- **阶段 E（模型面对齐，PROMPT_BUNDLE_VERSION 15→16 一次 bump）**：① 维护校验器补 **§3 完整性契约**（空洞 `{issues,[],[]}` 拒绝 + 每个 over 信号须被 evidence 覆盖或 notes 点名——P1-6 从提示词承诺变机械执行；no_issues 豁免）；② `MAINTAIN_OUTPUT_INSTRUCTION` 如实（不再否认 maintenance_probe 存在——P1-7 系统性抑制 probe）；③ review `skillReviewTrigger` jsdoc 如实（该标志只门控 completion 通道——P1-8 文档失实）；④ replay 失败权重裁决=report-only（注释对齐——P1-10 选 a）。
+- **阶段 F（交互/文档一致性）**：① commands + maintenance 补家族 **Config schema**（唯一无 schema 层防线缺口闭合——P2-18）；② T-WD2 改为**真实调用 renderCommandTable** 与 README 逐行比对（P2-17 死导出消灭）；③ atomicWriteFiles 走 logger 参数 / maintainTimeoutMs 报错区分配置与 CLI（P2-20）/ 失败扫描保留上次成功 runId（P2-21）；④ 文档八处批量（curator 合并通道描述/commands token 口径/learning-graph 头注释/patch "KV first" 标题×2/review 两测试 docblock；host README 的 cap 段已不存在无需修）；⑤ clampReviewConfig 类型精确化 + reviewToolAllow 兜底（P2-16）。
+- **阶段 H（防回归）**：① 挂账 deferred-v11（domain 值语义/executionTimeoutMs/命名债/`~` 展开——触发条件登记）；② **arch-guards 新增幽灵服务键静态守卫**（P0-1 class：探测键必须存在提供方——dev 扫描时当场抓出 evolutionReplay 提供面正则盲区并修正——守卫验证有效）。
+- **门禁**：core 305 / commands 49 / maintenance 71（+E1 三判别）/ review 48 / replay / skill-usage 22（+trim）/ curator 51（+root）/ feedback 27 / learning-graph / arch-guards --strict exit 0（含 H2 守卫）；oxlint 0/0（206 文件）；tsc 0（九包）；全量以 CI Linux 为准。
+
 ## 0.3.57 (patch) — v11 审计修复批 1：P0 止血 + 持久化/核心/安装链（阶段 A+B+C+G）
 
 - **阶段 A（P0 交互面止血）**：① doctor 删除 `evolutionReview` 幽灵服务键——review 从不 provide 服务，自检永远显示 false——改为按安装形态推断（full/host/preset 任一即已装配）；② 裸 `restore` 命令分发修复（注册表/文档声明 `restore`，handler 只匹配 `restore ` 参数形态——裸输入落 help）。

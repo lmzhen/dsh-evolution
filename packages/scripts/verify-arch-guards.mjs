@@ -59,6 +59,15 @@ const violations = []
  * legitimate optional-id default. */
 const nDeadFallback = []
 
+/** H2 (v11): P0-1-class guard — a probed `evolution[A-Z]\w+` service key
+ * must have a provider SOMEWHERE in the tree. doctor probed `evolutionReview`
+ * for five releases with zero providers and the self-check silently lied;
+ * this catches the next ghost key statically. */
+const probedEvolutionKeys = new Set()
+const providedEvolutionKeys = new Set()
+const PROBE_RE = /(?:\bhas|\.get|ctx\.get)\('(evolution[A-Z]\w+)'\)/g
+const PROVIDE_RE = /(?:super\([^)]*,\s*'|\.provide\('|provide\(')(evolution[A-Z]\w+)'/g
+
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
@@ -69,6 +78,9 @@ function walk(dir) {
       checkedCount += 1
       const rel = relative(root, path).split('\\').join('/')
       const text = readFileSync(path, 'utf8')
+      // H2 (v11): collect probe/provider pairs for the ghost-key check.
+      for (const match of text.matchAll(PROBE_RE)) probedEvolutionKeys.add(match[1])
+      for (const match of text.matchAll(PROVIDE_RE)) providedEvolutionKeys.add(match[1])
       // N1: production routing — only files under a package's src/ are
       // checked, so test fixtures that set DSH_HOME for an isolated home are
       // not treated as single-source drift.
@@ -108,6 +120,13 @@ function walk(dir) {
 }
 
 walk(root)
+
+// H2 (v11): a probed evolution service key without ANY provider is the
+// P0-1 class (doctor's evolutionReview ghost) — fail the gate.
+const orphanKeys = [...probedEvolutionKeys].filter(key => !providedEvolutionKeys.has(key))
+if (orphanKeys.length > 0) {
+  violations.push(`ghost service key(s) probed but never provided: ${orphanKeys.join(', ')} (an evolution service key with zero providers makes a diagnosis silently lie)` )
+}
 
 if (checkedCount === 0) {
   // V4-30 (0.3.26): the guard must never pass on an unscanned tree (the F-103

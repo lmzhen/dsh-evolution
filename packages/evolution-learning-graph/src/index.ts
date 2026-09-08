@@ -1,6 +1,8 @@
 /**
  * Learning graph over skills and memory, plus node-level commands
- * (`/evolution graph [detail|edit|delete] <nodeId>`) aligned with the Hermes
+ * (`graph [detail|edit|delete] <nodeId>` — P2-33 (v11): the command is a
+ * TOP-LEVEL `graph` command, not `/evolution graph`; README is accurate)
+ * aligned with the Hermes
  * journey surface: a skill node is its name, a memory node is
  * `memory:<source>:<index>` (source = memory|user, index = position in that
  * file's entries). Memory node ids carry a trailing snapshot token so
@@ -386,6 +388,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 // session origin channel, so it derives to 'foreground'. The
                 // graph surface is marked in the summary so the audit record
                 // names where the write came from.
+                // P2-34 (v11): the graph command invocation carries only
+                // rawInput — no session/sessionId. Tool surfaces pass
+                // sessionId + session + sessionPolicy (E-25/V6-27) so a
+                // `never`-policy session stages nothing; graph cannot, and
+                // building a command-level session channel is a platform
+                // change beyond this batch. Documented trade-off (the staged
+                // row names graph origin; the operator can reject), not a
+                // silent divergence. The delete branch below shares this.
                 summary: `graph edit ${parsed.name}`,
                 args: { operation: { action: 'update', name: parsed.name, content }, origin: origins.approval, libraryOrigin: origins.library },
                 origin: origins.approval,

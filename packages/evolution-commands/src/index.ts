@@ -4,6 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -45,6 +46,16 @@ export interface Config {
    * widens them. */
   threatExemptLabels?: string[] | undefined
 }
+
+// F1 (P2-18, v11): the family Config-schema convention — numeric config gets
+// its `.min()` at the loader (the runtime clamp stays as the second layer for
+// direct construction/NaN). The interface above stays as the static face.
+export const Config = z.object({
+  skillsRoot: z.string().default(''),
+  maintainCooldownMs: z.number().min(0).default(30_000),
+  maintainTimeoutMs: z.number().min(1).default(600_000),
+  threatExemptLabels: z.array(z.string()).default([]),
+})
 
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
 import { buildEnrichment } from '@deepseek-ai/dsh-evolution-maintenance'
@@ -329,7 +340,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // — reject the domain explicitly instead of surfacing the platform
           // error from a `--timeout` typo.
           if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0 || runTimeoutMs > 0xFFFFFFFF) {
-            return err('Invalid --timeout value: expected a positive integer number of milliseconds up to 4294967295 (e.g. /evolution maintain --timeout 600000).')
+            // P2-20 (F3, v11): name the ACTUAL source — a bad config value used
+            // to be reported as a `--timeout` CLI typo and permanently
+            // deadlock maintain (the user had no CLI flag to fix).
+            return err(maintainArgs[1]
+              ? 'Invalid --timeout value: expected a positive integer number of milliseconds up to 4294967295 (e.g. /evolution maintain --timeout 600000).'
+              : 'The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to 4294967295. Fix the evolution-commands row config (maintainTimeoutMs), then retry.')
           }
           if (maintainInFlightSince > 0) {
             const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
@@ -393,7 +409,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 usageObserved: () => enrichment.usageObservedValue,
               },
             )
-            lastMaintainRunId = outcome.runId ?? ''
+            // P2-21 (F3, v11): a FAILED scan must keep the previous successful
+            // runId (the `?? ''` used to blank it, so the cooldown refusal
+            // rendered "latest scan ;").
+            if (outcome.ok) lastMaintainRunId = outcome.runId ?? ''
             if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
             const eventIo = ioRegistry.provider()
             const home = evolutionRoot()
@@ -455,7 +474,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             atomicWriteFiles(target, [
               { name: 'agent.cordis.yml', content: composition },
               { name: 'preset.yml', content: readFileSync(presetPath) },
-            ])
+            ], undefined, (message) => { ctx.logger.warn(message) })
             return ok(`Evolution agent preset installed to ${target} (runtime standard + delta). Restart the session switcher to select it.`)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -591,6 +610,10 @@ export function atomicWriteFiles(
   targetDir: string,
   writes: Array<{ name: string; content: string | Uint8Array }>,
   fs: FsOps = defaultFs,
+  // F3 (P2-19, v11): warnings go through the caller's logger (the runtime
+  // pipeline), not a raw console.warn — the .bak-refresh failure is a
+  // real production event and must be observable in the operator logs.
+  logger: (message: string) => void = console.warn,
 ): void {
   const stage = (name: string): string => join(targetDir, `${name}.tmp`)
   // V6-42 (0.3.36): a duplicate name makes the commit re-visit the same
@@ -673,7 +696,7 @@ export function atomicWriteFiles(
       try {
         if (fs.existsSync(finalPath)) fs.copyFileSync(finalPath, join(targetDir, `${name}.bak`))
       } catch (refreshError) {
-        console.warn(`atomicWriteFiles: committed "${name}" but failed to refresh its .bak (${refreshError instanceof Error ? refreshError.message : String(refreshError)}); a later failed commit will recover to an OLDER generation`)
+        logger(`atomicWriteFiles: committed "${name}" but failed to refresh its .bak (${refreshError instanceof Error ? refreshError.message : String(refreshError)}); a later failed commit will recover to an OLDER generation`)
       }
     }
   } catch (error) {

@@ -10,6 +10,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { SkillLibrary, redactSecrets, resolveSkillsRoot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
@@ -23,6 +24,11 @@ export interface Config {
    * tool-skill-manage/skill-usage/evolution-skill-catalog/commands rows (A7). */
   skillsRoot?: string | undefined
 }
+
+// F1 (P2-18, v11): family Config-schema convention (same as commands).
+export const Config = z.object({
+  skillsRoot: z.string().default(''),
+})
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig

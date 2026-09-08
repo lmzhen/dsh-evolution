@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { COMMAND_ENTRIES, renderHelpText, renderHint } from '../src/registry.ts'
+import { COMMAND_ENTRIES, renderCommandTable, renderHelpText, renderHint } from '../src/registry.ts'
 
 describe('command registry (WD1, 0.3.55)', () => {
   it('renders the input-declaration hint and the help from ONE table', () => {
@@ -13,10 +13,13 @@ describe('command registry (WD1, 0.3.55)', () => {
 
   it('T-WD2: the README command table matches the registry (single-source pin)', () => {
     const readme = readFileSync(fileURLToPath(new URL('../../README.md', import.meta.url)), 'utf8')
-    for (const entry of COMMAND_ENTRIES) {
-      const cell = entry.usage.replace(/\|/g, '\\|')
-      // Same escape as renderCommandTable — a drifted row fails here.
-      expect(readme, `README must document /evolution ${entry.usage}`).toContain(`/evolution ${cell}`)
+    // F2 (P2-17, v11): compare against the ACTUAL renderer — the table in the
+    // README must be byte-identical to renderCommandTable() (the old test
+    // inlined its own escape logic and never called the function, so a
+    // renderer drift silently passed).
+    const rendered = renderCommandTable()
+    for (const line of rendered.split('\n')) {
+      expect(readme, `README must contain the rendered line: ${line}`).toContain(line)
     }
   })
 

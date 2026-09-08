@@ -158,6 +158,13 @@ export class EvolutionReplayDriver {
       estimatedInputChars: typeof plan.estimatedInputChars === 'number' ? plan.estimatedInputChars : 0,
       // V6-10 (0.3.36): keep the failure dimension for the leaderboard —
       // a plan whose ops all failed must not score as a clean empty plan.
+      // E4 (P1-10, v11): the failure dimension is a REPORT-ONLY field (shown
+      // in the leaderboard text); scorePlan intentionally weighs only
+      // accepted/rejected/evidence/cost — execution failures and validation
+      // rejections score differently BY DESIGN (the operational layers differ:
+      // rejected ops were prevented, failed ops were attempted). The V6-10
+      // comment above was the only place claiming a score equality it does
+      // not implement; the score function below is the authority.
       executionFailures: typeof plan.executionFailures === 'number' ? plan.executionFailures : 0,
       ...typeof plan.executionError === 'string' ? { executionError: plan.executionError } : {},
     })
