@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.53 (patch) — P1-2 延伸修复：catalog cap 注入下沉至预设组合器（V10-14 收尾）
+
+- **P1-2 延伸 [组合层可达]**：v10 修复只在 install-layered（源码树自举工具）注入 `catalogDescriptionMaxLength: 60`——而 `/evolution preset install`（commands 路径，**npm 用户唯一预设生成途径**）走 core `composePresetComposition`，无注入：生成预设的会话可见 tool-skill 行仍跑平台默认 500，P1-2 症状在该路径原样存活。**修复**：cap 注入下沉为**组合器契约**——core `composePresetComposition` 内建 `injectCatalogDescriptionCap`（幂等：已有 `config:` 行不动；marker 注释标识组合器文本；无 tool-skill 行时 warn 一次并原样返回），install-layered `generateAgentPreset` 同步内化同一规则；两路径输出字节一致（installer.spec parity 钉，fixture 升级为含 tool-skill 行——任一侧漏注入即红）；commands preset install 端到端用例补 cap 断言（判别力：旧 fixture 无 tool-skill 行测不出注入）。
+- **门禁**：core preset-composition 9（+2 判别：注入/幂等）、installer 13（parity 升级）、commands（preset install 含 cap 断言）共 50/50；oxlint 0/0（200 文件）；tsc 0（core/host/commands/agent 四包）；全量以 CI Linux 为准。
+
 ## 0.3.52 (patch) — v10 审计轮（批次 0–8）：行为契约变更声明（V10-01~18）
 
 **来源**：v10 审计报告（P1×2、P2×19、P3≈80）按架构层级分批（批次 0–8）实施；按计划约定，本节集中声明本轮**行为契约变更**，逐条一行。批次 8（T 横切：README/INSTALL 同步、invariant 样板注释、延后台账落档）同版交付。

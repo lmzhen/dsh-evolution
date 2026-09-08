@@ -314,7 +314,11 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
   if (collisions.length > 0) {
     console.warn(`install-layered: warning — delta rows collide with standard rows (${collisions.join(', ')}); keeping both (DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1)`)
   }
-  return `${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`
+  // V10-14 / 0.3.53 (P1-2): the cap injection is PART of the generation
+  // contract — core composePresetComposition applies the byte-identical rule
+  // (installer.spec pins the parity), so `/evolution preset install` and this
+  // source installer can never diverge on the preset-scope tool-skill cap.
+  return injectToolSkillCap(`${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`)
 }
 
 /**
@@ -326,7 +330,9 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
  * cannot reach it, so before this injection the layered install ran the
  * platform default (500) on the catalog's read side. Text-level rewrite in
  * the same line-scan style as rowIds() above (no YAML library — v2 §10 scope
- * control):
+ * control). 0.3.53: generateAgentPreset now calls this internally; core
+ * composePresetComposition ships the byte-identical rule (installer.spec
+ * pins the parity), so the npm `/evolution preset install` path applies it too:
  *   - idempotent: a tool-skill item that already carries a `config:` key is
  *     left byte-identical, so re-running the installer never doubles the key;
  *   - the injected block carries a marker comment so a diff of the generated
@@ -354,7 +360,7 @@ export function injectToolSkillCap(composition) {
     }
     if (hasConfig) continue
     lines.splice(end + 1, 0,
-      '  # V10-14: Hermes 60-char catalog cap — injected by install-layered (P1-2);',
+      '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
       '  # this preset-scope row is the session-visible instance and no profile',
       '  # patch can reach it. Remove only to run the platform default (500).',
       '  config:',
@@ -377,10 +383,10 @@ async function installAgentPreset(home, dryRun, force) {
   // fragment; the packaged evolution-agent/agent.cordis.yml stays the default.
   const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
   const deltaComposition = await readFile(deltaPath, 'utf8')
-  // V10-14 (P1-2): the cap injection runs on the COMPOSED output (after the
-  // collision guard), not inside generateAgentPreset — that function must stay
-  // byte-identical to core's composePresetComposition (single-source pin).
-  const composition = injectToolSkillCap(generateAgentPreset(standardComposition, deltaComposition))
+  // V10-14 (P1-2): the cap injection runs INSIDE generateAgentPreset (on the
+  // COMPOSED output, after the collision guard) — core composePresetComposition
+  // applies the byte-identical rule, and installer.spec pins the parity.
+  const composition = generateAgentPreset(standardComposition, deltaComposition)
   // The `exists && !force` result must be reported identically in dry-run and
   // real mode — a dry-run always claiming installed:true hides an already
   // present preset (F-354). Only the write is skipped in dry-run.

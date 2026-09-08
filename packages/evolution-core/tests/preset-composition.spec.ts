@@ -44,4 +44,21 @@ describe('composePresetComposition (0.3.15)', () => {
     const delta = '- id: c\n  name: "@deepseek-ai/dsh-c"\n'
     expect(composePresetComposition(standard, delta)).toContain('- id: c')
   })
+
+  it('V10-14/0.3.53: a standard-sourced tool-skill row receives the 60-char catalog cap', () => {
+    const standard = '- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const composed = composePresetComposition(standard, delta)
+    expect(composed).toContain('- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  # V10-14')
+    expect(composed).toContain('catalogDescriptionMaxLength: 60')
+    expect(composed).toContain('- id: tool-memory')
+  })
+
+  it('V10-14/0.3.53: an already-configured tool-skill row is left byte-identical (idempotent)', () => {
+    const standard = '- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  config:\n    custom: 1\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const composed = composePresetComposition(standard, delta)
+    expect(composed).toContain('  config:\n    custom: 1')
+    expect(composed).not.toContain('catalogDescriptionMaxLength: 60')
+  })
 })

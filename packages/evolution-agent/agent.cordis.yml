@@ -21,10 +21,11 @@
 # `tool-skill` 60-char catalog cap is likewise NOT carried as a delta row: the
 # session-visible `tool-skill` instance is the standard composition's own row,
 # so a delta copy would collide with it (N-5) and a profile-root patch cannot
-# reach this preset scope at all — instead install-layered INJECTS the cap onto
-# that standard-sourced row at generation time (V10-14). The delta rows are
-# also the only evolution-owned text in the composed preset, so it tracks
-# every platform version.
+# reach this preset scope at all — instead the preset COMPOSER (both
+# `/evolution preset install` and install-layered; 0.3.53 unified the rule)
+# INJECTS the cap onto that standard-sourced row at generation time (V10-14).
+# The delta rows are also the only evolution-owned text in the composed
+# preset, so it tracks every platform version.
 - id: tool-memory
   name: '@deepseek-ai/dsh-tool-memory'
 

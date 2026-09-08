@@ -597,7 +597,11 @@ describe('evolution-commands', () => {
         },
       })
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
+      // 0.3.53: the standard fixture carries a tool-skill row so the
+      // /evolution preset install path is proven to inject the V10-14 cap —
+      // the npm user's ONLY preset generation path (install-layered is the
+      // source-tree tool), and P1-2's symptom lived here before this batch.
+      const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
       ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
       await ctx.plugin(Commands, { skillsRoot: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
       const result = await handler!.handler({ rawInput: 'preset install' })
@@ -607,7 +611,12 @@ describe('evolution-commands', () => {
       // The registry mounts the composition verbatim: the written file is the
       // standard rows + the delta, NEVER the delta alone (0.3.14 defect shape).
       const delta = readFileSync(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url), 'utf8')
-      expect(composed).toBe(`${standardFixture.replace(/\s+$/, '')}\n\n${delta.trim()}\n`)
+      expect(composed).toContain(standardFixture.replace(/\s+$/, ''))
+      expect(composed).toContain(delta.trim())
+      // V10-14 cap injection rides the composer (0.3.53) — the generated
+      // preset-scope tool-skill row carries the 60-char cap.
+      expect(composed).toContain('- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  # V10-14')
+      expect(composed).toContain('catalogDescriptionMaxLength: 60')
       expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.yml', import.meta.url), 'utf8'))
       expect(existsSync(join(target, 'preset.yml'))).toBe(true)
     } finally {

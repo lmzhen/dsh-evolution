@@ -177,7 +177,11 @@ describe('layered installer', () => {
 
   it('core composePresetComposition and installer generateAgentPreset agree byte-for-byte (0.3.15 single-source pin)', async () => {
     const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
-    const standard = '# runtime standard\n- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n'
+    // 0.3.53: the fixture carries a standard-sourced tool-skill row so the
+    // parity pin also covers the V10-14 cap injection — a one-sided composer
+    // forgetting the injection would fail HERE, not in the power/idempotent
+    // cases that feed it a hand-crafted row.
+    const standard = '# runtime standard\n- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
     const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n'
     // The installer script ships no type declarations, so the parity check
     // runs it in a fresh node subprocess (base64 stdout, no lint-visible any).
@@ -187,7 +191,11 @@ describe('layered installer', () => {
       'process.stdout.write(Buffer.from(out, "utf8").toString("base64"))',
     ].join('\n')
     const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
-    expect(Buffer.from(stdout, 'base64').toString('utf8')).toBe(composePresetComposition(standard, delta))
+    const installed = Buffer.from(stdout, 'base64').toString('utf8')
+    const composed = composePresetComposition(standard, delta)
+    expect(installed).toBe(composed)
+    // The shared fixture row must actually exercise the injection on both sides.
+    expect(composed).toContain('catalogDescriptionMaxLength: 60')
   })
 
   it('core composePresetComposition honors the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (0.3.25 collision-path pin)', async () => {

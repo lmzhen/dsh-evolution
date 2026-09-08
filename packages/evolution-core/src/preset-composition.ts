@@ -11,6 +11,14 @@
  * standard row id fails loud by default, and `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1`
  * downgrades it to a warning that keeps both (the row mounts twice).
  *
+ * V10-14 / 0.3.53 (P1-2): BOTH composers now inject the Hermes 60-char catalog
+ * cap onto the standard-sourced `- id: tool-skill` row of the composed preset
+ * (see injectCatalogDescriptionCap) — the session-visible tool-skill instance
+ * mounts in the preset's own standing scope, where no profile-root patch can
+ * reach it. 0.3.53 moved the injection INTO the composer so
+ * `/evolution preset install` (the npm user's only preset path) gets it too;
+ * install-layered applies the byte-identical rule, pinned by installer.spec.
+ *
  * Row ids are read from `- id:` lines; an id present in both fragments would
  * mount twice and could shadow the platform row, so it fails loud.
  * @param standardComposition - the runtime `standard` preset composition.
@@ -27,7 +35,58 @@ export function composePresetComposition(standardComposition: string, deltaCompo
   if (collisions.length > 0) {
     console.warn(`evolution preset composition: warning — delta rows collide with standard rows (${collisions.join(', ')}); keeping both (DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1)`)
   }
-  return `${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`
+  return injectCatalogDescriptionCap(`${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`)
+}
+
+/**
+ * V10-14 (P1-2), 0.3.53: inject the Hermes 60-char catalog cap onto the
+ * standard-sourced `- id: tool-skill` row of a composed preset.
+ *
+ * The session-visible `tool-skill` instance mounts in the agent preset's own
+ * standing scope; a profile-root patch (evolution-host/cordis.patch.yml)
+ * cannot reach it, so without this injection the catalog's read side runs the
+ * platform default (500). Text-level rewrite in the same line-scan style as
+ * compositionRowIds (no YAML library):
+ *   - idempotent: a tool-skill item that already carries a `config:` key is
+ *     left byte-identical, so re-running the installer never doubles the key;
+ *   - the injected block carries a marker comment so a diff of the generated
+ *     preset can tell composer-owned text from platform text;
+ *   - a composition WITHOUT a tool-skill row is returned unchanged with a
+ *     one-time warning (a renamed platform row must not brick the install,
+ *     but the missed cap must be observable).
+ * install-layered.mjs ships the byte-identical `injectToolSkillCap`.
+ */
+function injectCatalogDescriptionCap(composition: string): string {
+  const lines = composition.split('\n')
+  let found = false
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!/^- id:\s*tool-skill\s*$/.test(lines[i] ?? '')) continue
+    found = true
+    // Walk the item's continuation lines (indented) up to the next item or
+    // top-level line; a blank line terminates the item block.
+    let end = i
+    let hasConfig = false
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const next = lines[j] ?? ''
+      if (next.trim() === '') break
+      if (!/^\s/.test(next)) break
+      if (/^\s+config:(\s|$)/.test(next)) hasConfig = true
+      end = j
+    }
+    if (hasConfig) continue
+    lines.splice(end + 1, 0,
+      '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
+      '  # this preset-scope row is the session-visible instance and no profile',
+      '  # patch can reach it. Remove only to run the platform default (500).',
+      '  config:',
+      '    catalogDescriptionMaxLength: 60',
+    )
+    i = end + 5
+  }
+  if (!found) {
+    console.warn('evolution preset composition: warning — no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)')
+  }
+  return lines.join('\n')
 }
 
 function compositionRowIds(composition: string): Set<string> {
