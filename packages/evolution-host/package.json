@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-host",
   "description": "Self-evolution automation bundle — infrastructure only (no model tools); the shrink-path install",
-  "version": "0.3.59",
+  "version": "0.3.60",
   "publishConfig": {
     "access": "public"
   },

@@ -102,6 +102,10 @@ async function quarantine(io: () => EvolutionIoLike, root: string, file: string,
   let preservedNote = `; original preserved at ${dest} — inspect and fix it, then retry.`
   try {
     await io().writeText(dest, raw)
+    // P2-1 (v13): the quarantine write replaces the caveat copy's CONTENT —
+    // its key must go stale or the gate path's "key match + copy on disk"
+    // skip would trust the old key and never rewrite the record-scoped copy.
+    corruptWritten.delete(file)
   } catch (writeError) {
     preservedNote = `; the quarantine copy at ${dest} FAILED to write (${writeError instanceof Error ? writeError.message : String(writeError)}) — the original file is left in place.`
   }

@@ -146,8 +146,19 @@ export class EvolutionFeedback {
       }
       // V4-41: seed the durable-note map from the persisted fold (the TRUTH),
       // so a later failed append rolls back to what the log actually holds.
-      for (const [target, record] of Object.entries(truth.skills)) this.durableNote.set(this.noteKey('skills', target), record.lastNote)
-      for (const [target, record] of Object.entries(truth.sessions)) this.durableNote.set(this.noteKey('sessions', target), record.lastNote)
+      // P3-3 (v13): interleave skills/sessions by kind — the old order seeded
+      // all skills first, so the N7 oldest-dropped eviction beyond the cap
+      // (insertion order) systematically evicted skill notes (the V5-29
+      // quality-rollback channel) over session notes.
+      const skillEntries = Object.entries(truth.skills)
+      const sessionEntries = Object.entries(truth.sessions)
+      const seedCount = Math.max(skillEntries.length, sessionEntries.length)
+      for (let i = 0; i < seedCount; i += 1) {
+        const skillEntry = skillEntries[i]
+        if (skillEntry) this.durableNote.set(this.noteKey('skills', skillEntry[0]), skillEntry[1].lastNote)
+        const sessionEntry = sessionEntries[i]
+        if (sessionEntry) this.durableNote.set(this.noteKey('sessions', sessionEntry[0]), sessionEntry[1].lastNote)
+      }
       // N7 (v12): the seed path had no cap — a >512 feedbacked-target
       // deployment stayed over the bound after every restore (the record
       // path's insert-time eviction cannot lower it). Same oldest-dropped

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.60 (patch) — v13 审计修复批：3×P2 + 6×P3 全部收口（问题规模连续第三轮收敛）
+
+- **P2-1（state-json 裂割）**：`quarantine()` 整文件损坏覆盖 `.corrupt` 后补 `corruptWritten.delete(file)`——整文件快照覆盖后旧键失效，记录门禁下次命中按新键重写**记录集副本**（修复前"键匹配 + 在盘"会基于陈旧键跳过，副本从此是整文件快照、违反"仅含失败记录"契约）；判别用例走完整时序（gate 写记录集 → 整文件损坏 quarantine 覆盖 → 修复 JSON → 断言副本重回记录集——红转绿有效）。
+- **P2-2（installer）**：E-33 host⇄oneclick 互斥检查**提出 dry-run 门**（与 N10 的 all 半边一致——dry-run 解析真实 profileDir，报告必须与真实模式一致；干跑谎报类别全灭）；自相矛盾注释改写；补两条判别用例（dry-run host 遇 preset / dry-run oneclick 遇 host 均拒绝）。
+- **P2-3（声明失实纠正）**：补 **N2 判别用例**（.corrupt 写失败不置键——stub io 注入写失败，第二次读仍重试 writes=2，修复前=1 红转绿）；0.3.59 声称的"各带红转绿用例"里唯一缺项就此补齐；发布链自检模式（挂账存在性）同源教训记录。
+- **P3 批**：① `deferred-v11.md` 补 v11 计划 H1 点名的两项（state-store 命名债、`~` 不展开——0.3.58 CHANGELOG 声称含它们而未入表）+ P2-1 附带的 quarantine 零去重登记（既有边界）；② signals tool/call 分支失实注释（"local contract"——守卫已并入共享前置）改写；③ feedback restore 种子**按 kind 轮转交错**（原 skills 全量先入使超 cap 的"丢最旧"系统性偏向 skill notes——V5-29 质量回滚通道；交错后两通道均摊）；④ publish-chain：挂账自检**只扫当前版本节**（历史节提及不再误杀）+ 正则兼容 `deferred-items-v10` 旧命名；CI 轮询 30 分钟耗尽**显式归因退出**（"run 未完成，非 npm 失败——勿立即 --resume"——不再跌入 npm 段误报 "missing on npm"）；头注释 11→12。
+- **门禁**：state-json（+N2/P2-1 判别 2）/ host installer（+P2-2 判别 2）/ feedback（种子交错回跑）/ core signals（注释）；oxlint / tsc / 守卫以本机与 CI 实跑为准。
+
 ## 0.3.59 (patch) — v12 审计修复批：修复的"最后一公里"收口（N1–N18 + v11 遗留 P2-12 一并闭合）
 
 - **P1（N1 真实缺口修复）**：`/graph edit|delete` 的审批请求改为**携带命令 invocation 的会话**（`invocation.agent.session`——evolution-commands `/evolution learn` 早已用 `invocation.agent.inject`，命令级会话通道并非"平台不支持"）——`never`-policy 会话不再被当作 foreground 直接落盘；P2-34 的失实取舍注释改写为如实声明（照 tool-skill-manage 同型模式：sessionId/session/sessionPolicy 三字段随行）。

@@ -534,8 +534,10 @@ export async function install(options = {}) {
     // itself could turn the documented accident into reality. Fail loud when
     // the other bundle is already present. DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
     // does not exempt this check (mutual exclusion is install-surface
-    // semantics, not a row collision). Same dry-run behavior as above.
-    if (!dryRun) {
+    // semantics, not a row collision). P2-2 (v13): runs in dry-run too —
+    // same rationale as the evolution-all check above (dry-run resolves the
+    // real profileDir and the E-33 report must match the real mode).
+    {
       const manifestPath = join(profileDir, 'package.json')
       if (existsSync(manifestPath)) {
         const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))

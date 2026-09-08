@@ -126,4 +126,58 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('N2 (v13): a failed .corrupt write is RETRIED on the next read — the rewrite key is not set', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-n2-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' }
+    let writes = 0
+    ctx.provide('evolutionIo', {
+      provider: () => ({
+        readText: async () => JSON.stringify({ z1: zombie }),
+        writeText: async () => { writes += 1; throw new Error('disk full') },
+        exists: async () => false,
+        list: async () => [],
+        remove: async () => {},
+        rename: async () => {},
+        copy: async () => {},
+      }),
+    })
+    await ctx.plugin(JsonState, { root })
+    const provider = ctx.evolutionStateStorage.provider('json')
+    expect(await provider.listPending()).toEqual([])
+    const writesAfterFirst = writes
+    await provider.listPending()
+    // Before N2: a failed write still set the rewrite key, so the second read
+    // skipped the copy and the write count stayed flat. The key must remain
+    // unset so every read retries (red-to-green discriminator; the absolute
+    // count is layout-dependent — listPending touches several record maps).
+    expect(writes).toBeGreaterThan(writesAfterFirst)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('P2-1 (v13): a whole-file quarantine overwrite must let the record gate rewrite its scoped copy', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-p21-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' }
+    const corruptPath = join(root, 'pending-state.json.corrupt')
+    // ① record gate writes the SCOPED copy (key K = {z1}).
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ z1: zombie }))
+    await provider.listPending()
+    expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
+    // ② the file turns fully corrupt — quarantine overwrites the SAME copy
+    // with the whole-file snapshot (key K stays unless invalidated, P2-1).
+    await io.writeText(join(root, 'pending-state.json'), '{corrupt')
+    await expect(provider.listPending()).rejects.toThrow()
+    expect(await io.readText(corruptPath)).toBe('{corrupt')
+    // ③ the operator fixes the JSON; the failing set is the same — the gate
+    // must REWRITE the scoped copy, not trust the stale key+on-disk pair.
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ z1: zombie }))
+    await provider.listPending()
+    expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })

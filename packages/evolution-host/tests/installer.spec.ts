@@ -279,6 +279,27 @@ describe('layered installer', () => {
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
+  it('P2-2 (v13): --dry-run host refuses a profile carrying the oneclick/preset bundle (E-33)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p22a-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-preset'] } } }), 'utf8')
+    // N10 killed the dry-run loophole for evolution-all only; the E-33
+    // host⇄preset check stayed behind the dry-run gate and reported
+    // "installable" (wet-run refused). Dry-run must match the real mode.
+    await expect(runInstaller(home, 'host', 'evo-test', ['--dry-run'])).rejects.toThrow(/mutually exclusive/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('P2-2 (v13): --dry-run oneclick refuses a profile carrying the host bundle (E-33 reverse)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p22b-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-host'] } } }), 'utf8')
+    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/mutually exclusive/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
   it('P1-2: --uninstall removes the evolution-all bundle row too (symmetric with host/preset)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p12-'))
     const profileDir = join(home, 'profiles', 'evo-test')

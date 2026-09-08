@@ -89,12 +89,10 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     return
   }
   if (event.type === 'tool/call') {
-    // P1-1 (v11): the one branch without a data-shape guard — a persisted
-    // event with missing/non-object `data` TypeErrors here and the review
-    // E-6 catch swallowed the whole turn's remaining signals; every replay
-    // fold breaks at the same point, so review could stop firing entirely.
-    // (The branch-level guard is now redundant with the shared one above but
-    // kept as the local contract.)
+    // P1-1 (v11): this branch used to be the one without a data-shape guard —
+    // a persisted event with missing/non-object `data` TypeErrors here and the
+    // review E-6 catch swallowed the whole turn's remaining signals. Since N4
+    // (v12) the shared guard above covers all three branches.
     signal.toolCalls += 1
     const name = (data as { name?: unknown }).name
     if (name === 'skill' || name === 'skill_manage') signal.skillSignal = true
