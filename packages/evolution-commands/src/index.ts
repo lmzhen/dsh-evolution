@@ -8,6 +8,8 @@ import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
+import { diagnose, renderDoctorText } from './doctor.ts'
+import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, dirname } from 'node:path'
@@ -72,10 +74,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        // F-03: maintain accepts both timeout spellings —
-        // `--timeout <ms>` and `--timeout=<ms>` (the hint names the
-        // self-delimiting `=` form; the grammar takes both).
-        hint: 'pending [--detail] | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | mutations | restore | consolidate <target> <sources...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout=<ms> | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay',
+        // F-03 + WD1 (0.3.55): the hint renders FROM the subcommand registry
+        // (single source with the help output and the README command table —
+        // T-WD2 pins the equality).
+        hint: renderHint(),
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
@@ -494,7 +496,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | mutations | restore | consolidate <target> <source...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout=<ms> | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay.')
+        if (input === 'doctor' || input === 'doctor --json') {
+          // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
+          // mounted services, pending count. `--json` feeds scripts.
+          const report = await diagnose(ctx, { home: evolutionRoot() })
+          if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
+          return ok(renderDoctorText(report))
+        }
+        return ok(`Evolution: memory, skills, review, curator — self-evolution status, approval and maintenance.\n${renderHelpText()}`)
       },
     }))
   })

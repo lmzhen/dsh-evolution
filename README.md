@@ -13,6 +13,47 @@ policy, prompts, routing, state, and audit history are control-plane data.
 > Community-published packages under `@lmzhen` are maintained by the
 > dsh-evolution community and are not official DeepSeek releases.
 
+## Concepts: the two evolution loops
+
+Evolution runs two loops. Both share the same engine — **Review** (watch the
+conversation and produce a change plan) + **Curator** (merge, demote, archive
+the skills over time) + **Governance** (threat scan, immutable policy,
+staged approval as the gate):
+
+**Memory Evolution** — observe conversations → review → memory plan →
+write (memory entries) → injected into new sessions. Carrier: `memory` /
+`memory-files` / `tool-memory` / review.
+
+**Skill Evolution** — observe conversations → review → skill plan →
+(when gated: approve) → write/patch the skill tree → catalog shows it to the
+model → the model extends/uses it → usage stats → curator merges/archives
+(metabolism). Carrier: `skill-store` / `tool-skill-manage` / `skill-catalog`
+/ `curator` / `skill-usage` / review.
+
+**Vocabulary (single source in code + docs):** `plan` — a review-proposed
+change set; `pending` — a staged write awaiting approval (approve replays it
+through its runner); `staged` — approval-stage writes; `snapshot` — point-in-time
+skill-tree backup (restore target); `consolidate` — merge sources into an
+umbrella skill; `nomination` — the curator's LLM proposal; `drift` —
+out-of-band file edits detected before write; `substantive` — review-trigger
+budget class; `catalog` — the model-visible skill index (60-char cap);
+`rank` — catalog provider priority; `review mode` — how a review decides
+(cadence / subagent plan).
+
+## Install modes (M1-M4)
+
+| Mode | One-liner | What you get |
+|---|---|---|
+| **M1 Full-auto (DEFAULT)** | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` | Both loops run and write automatically; model tools in every session |
+| **M2 Human gated** | M1 + `approval.enabled: true` | Evolution may propose; every write shows as `/evolution pending` for you to approve/reject |
+| **M3 Infrastructure only** | `dsh plugin --profile web add @lmzhen/dsh-evolution-host` | Automation runs but the model has no memory/skill tools — nothing gets written by the model |
+| **M4 Per-session (advanced)** | host + `/evolution preset install` | Tools only in sessions selecting the Evolution preset (exclusive with M1) |
+
+**Fastest check — `/evolution doctor`:** after any install, run it once: it
+tells you the install form, flags conflicts (all/host/preset double mounts,
+all vs layered), checks `DSH_EVOLUTION_*` variables and the mounted services,
+and ends with suggested next steps. Install docs point here instead of
+repeating the same prose.
 
 ## Package map
 

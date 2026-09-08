@@ -40,6 +40,32 @@ policy, prompts, routing, state, and audit history are control-plane data.
 See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
 compatibility flow, and profile override examples.
 
+## Command reference
+
+The `/evolution` surface below is generated from the subcommand registry
+(`evolution-commands/src/registry.ts` — single source shared with the
+input-declaration hint and the emitted help/README text; `commands.spec`
+pins the equality).
+
+| Command | Purpose |
+|---|---|
+| `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
+| `/evolution approve <id>` | replay an approved staged write through its runner |
+| `/evolution reject <id>` | drop a staged write without running it |
+| `/evolution doctor` | read-only self-check: install form, conflicts, env, services |
+| `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
+| `/evolution mutations` | list skill-mutation audit records |
+| `/evolution restore` | restore skills from the latest snapshot |
+| `/evolution consolidate <target> <sources...>` | merge source skills into a target umbrella skill |
+| `/evolution skill restore <name>` | restore one archived skill by name |
+| `/evolution skills health` | structure-health verdicts for the skill library |
+| `/evolution skills refresh` | drop the catalog caches and re-read the tree |
+| `/evolution learn [request]` | send a learning request to this session |
+| `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
+| `/evolution preset install` | generate the Evolution agent preset into the user root |
+| `/evolution restructure <name> "<heading>" <to_file>` | move a body section into a references/ file |
+| `/evolution replay` | compare prompt-bundle replay for this session |
+
 ## Composition
 
 ### Layered install (recommended)

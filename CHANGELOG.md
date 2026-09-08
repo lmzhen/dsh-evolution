@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.55 (patch) — 0.4.0 系列批 1：概念产品化 + 安装模式 + 生成式命令面（WA/WB/WD1）
+
+- **WA 概念产品化**：根 README 首屏新增「Concepts: the two evolution loops」——记忆进化/技能进化两回路 + 共享引擎（Review 心脏 + Curator 代谢 + Governance 闸门）+ 术语表（plan/pending/staged/snapshot/consolidate/nomination/drift/substantive/catalog/rank/review mode——中英单源，与命令输出同一套词汇）；zh 快速开始同步（含概念简报 + 模式表）。
+- **WB 安装模式产品化**：M1–M4 模式表（M1 全自动默认 / M2 人审把关 / M3 只装底座 / M4 按会话进阶——与 all 互斥）；**新增 `/evolution doctor`**（只读自检：安装形态识别 full/host/preset/layered/none、三方冲突检测（all/host/preset 双装 + all vs layered）、`DSH_EVOLUTION_*` 体检（SESSION_QUERY 白名单等）、服务挂载清单、pending 数；`--json` 供脚本；输出末尾附建议动作）；INSTALL 验证节改为「跑 doctor 应看到 ✓」；npm 元数据场景化（host/preset/commands/all description 改写为语言）。
+- **WD1 生成式命令面**：`evolution-commands/src/registry.ts` 子命令注册表成为**单源**——input hint、bare `/evolution` help、README 命令表全部由它渲染（原三处手写副本删除——v10 R-13 类漂移根治）；README/zh 命令表同步为注册表渲染。
+- **护栏**：T-WB2（doctor 六用例：四形态分类/冲突/env 体检/渲染尾建议/多 profile 聚合）；T-WD2（hint==注册表合成、README 命令表与注册表逐条一致、summary 非空）。
+- **门禁**：evolution-commands 47/47（+doctor 7 + registry 3）；oxlint 0/0（204 文件）；tsc 0；全量以 CI Linux 为准。
+
 ## 0.3.54 (patch) — route B：默认安装即全量（`dsh-evolution-all` 升级为完整 bundle）
 
 - **行为契约（安装体验反转）**：

@@ -51,18 +51,32 @@
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
-安装后重启 profile，运行 `/evolution preset install`（一次性：用运行时 standard 预设 + evolution delta 组合出预设文件），并为需要自进化工具的会话选择 **Evolution** 预设。
-Agent 即拥有：
+**0.3.54 起 `evolution-all` 是默认全量包**（无需第二步骤）：安装并重启后，
+所有会话自动拥有两条进化回路 + 模型工具（memory / skill_manage /
+session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 
-```text
-持久记忆
-skill_manage
-后台 review
-curator
-写入门控
-威胁扫描
-使用遥测
+安装完成后运行一次内置自检确认形态：
+
+```bash
+/evolution doctor          # 人类可读自检（安装形态/冲突/env/服务清单 + 建议动作）
+/evolution doctor --json   # 脚本友好
 ```
+
+两条进化回路（共享引擎：**Review** 审阅出计划 + **Curator** 整并/降级/归档 +
+**Governance** 威胁/策略/审批闸门）：
+
+- **记忆进化**：观察对话 → 后台审阅 → 记忆计划 → 写入沉淀 → 新会话注入；
+- **技能进化**：观察对话 → 后台审阅 → 技能计划 →（受闸门时）批准 → 写入/修补技能树
+  → 目录对模型可见 → 模型自主增改 → 使用统计 → 整并/归档（代谢）。
+
+安装模式（M1-M4）：
+
+| 模式 | 一句话 | 构成 |
+|---|---|---|
+| M1 全自动（默认） | 后台自己积累记忆与技能 | `add @lmzhen/dsh-evolution-all` |
+| M2 人审把关 | 进化可以，每步先给我看 | M1 + `approval.enabled: true`（`/evolution pending\|approve\|reject`） |
+| M3 只装底座 | 先别让它写任何东西 | `add @lmzhen/dsh-evolution-host` |
+| M4 按会话启用（进阶） | 只在指定会话生效 | host + `/evolution preset install`（与 M1 互斥） |
 
 > [!WARNING]
 > 插件会在你的本地权限下运行第三方代码。安装前请阅读源码，建议先在

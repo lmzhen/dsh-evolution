@@ -180,6 +180,17 @@ filter:
 
 ## Verification
 
+**Fastest check — run the built-in doctor:**
+
+```bash
+/evolution doctor          # human-readable self-check
+/evolution doctor --json   # script-friendly
+```
+
+It reports the install form (full / host / preset / layered / none), flags
+all/host/preset or all-vs-layered conflicts, checks the `DSH_EVOLUTION_*`
+environment variables, and ends with suggested next steps.
+
 Composed profile tree:
 
 ```bash
