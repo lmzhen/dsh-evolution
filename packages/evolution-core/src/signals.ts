@@ -80,9 +80,17 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     return
   }
   if (event.type === 'tool/call') {
+    // P1-1 (v11): the one branch without a data-shape guard — a persisted
+    // event with missing/non-object `data` TypeErrors here and the review
+    // E-6 catch swallowed the whole turn's remaining signals; every replay
+    // fold breaks at the same point, so review could stop firing entirely.
+    // The `as unknown` is the lying-type shape: `data` is typed by the event
+    // union but arrives from disk, so the guard must be meaningful.
+    const data: unknown = event.data
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) return
     signal.toolCalls += 1
-    if (event.data.name === 'skill') signal.skillSignal = true
-    if (event.data.name === 'skill_manage') signal.skillSignal = true
+    const name = (data as { name?: unknown }).name
+    if (name === 'skill' || name === 'skill_manage') signal.skillSignal = true
   }
 }
 

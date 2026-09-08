@@ -78,8 +78,12 @@ export async function diagnose(
   if (host && preset) conflicts.push('evolution-host and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
   if (full && layered) conflicts.push('evolution-all and the layered Evolution preset are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).')
 
+  // P0-1 fix (v11): `evolutionReview` is NOT a provided service — review only
+  // registers session-event hooks. Infer its presence from the install form
+  // (any of the three bundles carries the review row) instead of a ghost key.
+  const reviewMounted = full || host || preset
   const services = {
-    review: has('evolutionReview'),
+    review: reviewMounted,
     curator: has('evolutionCurator'),
     approval: has('evolutionApproval'),
     skillUsage: has('skillUsage'),

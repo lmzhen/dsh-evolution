@@ -39,7 +39,7 @@ if (!existsSync(root)) {
 const strict = process.argv.includes('--strict') || process.env.DSH_EVOLUTION_ARCH_STRICT === '1'
 const CORE_SRC = 'evolution-core/src'
 const APPROVAL_SRC = 'evolution-approval/src'
-const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', 'tsdown'])
+const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
 const DSH_HOME_RE = /process\.env\.DSH_HOME/
 const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolicy/
 let checkedCount = 0
@@ -80,6 +80,11 @@ function walk(dir) {
         violations.push(`${rel}: local copy of ApprovalPolicyLike/effectiveSessionPolicy (single-source in ${APPROVAL_SRC})`)
       }
       // N3 (gate): bare Config numeric fields (see comment above).
+      // P2-40 (v11) heuristic boundary: single-LINE scanning only — a
+      // chained `z.number()\n  .min(1)` is a FALSE POSITIVE on its first
+      // line, and block comments/string literals are NOT stripped (a
+      // `z.number()` in prose still flags). The repo's current single-line
+      // style keeps both at zero; change the scanning if the style changes.
       if (rel.includes('/src/')) {
         // Split on CRLF so `\r` is not left on the line end — otherwise the
         // comment strip below (`/\/\/.*$/`) cannot match a `//` comment on a

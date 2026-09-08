@@ -197,6 +197,10 @@ describe('evolution-commands', () => {
     expect(result.kind).toBe('success')
     expect(result.text).toContain('Restored skill tree from /path')
     expect(calls).toEqual(['restoreSnapshot'])
+    // P0-2 (v11): the BARE `restore` (registry/README documented usage) must
+    // also reach the snapshot restorer — it used to fall into the help branch.
+    await captured!.handler({ rawInput: 'restore' })
+    expect(calls).toEqual(['restoreSnapshot', 'restoreSnapshot'])
   })
   it('dispatches curator pause/resume/status to the curator service (G2)', async () => {
     const ctx = new Context()

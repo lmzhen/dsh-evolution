@@ -14,6 +14,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { changelogHead } from './lib-changelog.mjs'
 
 const argv = process.argv.slice(2)
 
@@ -64,7 +65,7 @@ const changelogPath = join(repoRoot, 'CHANGELOG.md')
 if (existsSync(changelogPath)) {
   try {
     const changelog = readFileSync(changelogPath, 'utf8')
-    const head = /^## (\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)/m.exec(changelog)?.[1]
+    const head = changelogHead(changelog)
     if (!head) {
       failures.push('CHANGELOG.md has no "## x.y.z" heading')
     } else {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.57 (patch) — v11 审计修复批 1：P0 止血 + 持久化/核心/安装链（阶段 A+B+C+G）
+
+- **阶段 A（P0 交互面止血）**：① doctor 删除 `evolutionReview` 幽灵服务键——review 从不 provide 服务，自检永远显示 false——改为按安装形态推断（full/host/preset 任一即已装配）；② 裸 `restore` 命令分发修复（注册表/文档声明 `restore`，handler 只匹配 `restore ` 参数形态——裸输入落 help）。
+- **阶段 B（持久化数据完整性）**：事务基线复用记录字段门（字符串 runCount 等不再经 `(x ?? 0)+1` 污染写回）；`archivedIdsCache` 进程级缓存删除（每次直读——跨进程陈旧缓存可复活 ghost pending 双胞胎，V7-08 只修了进程内失效）；`retireLegacyOnce` 失败不再放行未过滤 legacy（僵尸「可见不可 claim」视图消除）；`appendArchive` 非对象条目防御 + 吞错补 warn（E-52）；`.corrupt` 重写去重（坏集不变则跳过——写放大 + mtime 触清扫失效）；quarantine 抢救失败如实报告（不再声称 preserved）；IO seam rename 接入 renameWithRetry（C-28 一致）。
+- **阶段 C（core 域逻辑）**：signals `tool/call` 分支补形状守卫（P1-1——唯一无守卫分支，坏事件使 review 信号整轮丢失）；`appendEvolutionEvent` 删重复 rotateIfDue；`restoreFromArchive` 换 badName() 单源（补 64 长度限制）；`create`/`removeSupportFile` 纳入串行队列（F-208 纪律双缺口闭合）；`snapshotAll` 失败清理半成品目录（孤儿快照无界增长）；curator 三小修（invalidate 吞错补 warn / 侧车键进 RegExp 前过 SKILL_NAME_RE / autoCheck docstring 如实）；`pendingSelfCleanup` 64 条上界。
+- **阶段 G（安装链/CI）**：installer host/oneclick 遇已装 all 拒绝（三方互斥补全）；uninstall 对称移除 all bundle 行（+scope-agnostic 匹配——精确名挡 @lmzhen 差）；`removedAgentPreset` 如实（dry-run/不存在=false）；CHANGELOG head 版本解析单源（lib-changelog.mjs——prerelease 版式两脚本一致）；publishGroups 与 staged 目录双向核验 fail-loud（不再写 null）；prepare-release 导入校验边界注释；CI overlay 清理 staging 残留 + 校验步注释如实（脚本半边 CI 恒等、真校验在发布前本机）；N3/N4 启发式边界注释；anchored 基座 P1-11 调查结论（pinned 上游全树 0 命中三工具名——注释声明适用平台线，行为保留）。
+- **门禁**：core 363 / commands 48 / state-json 49 / host 59（installer 17 含 4 新）/ state-storage；oxlint 0/0（206 文件）；tsc 0；全量以 CI Linux 为准。方案两处修正：审计 P2 计数 29→42、E 阶段 PROMPT_BUNDLE_VERSION 15→16（0.3.58 执行）。
+
 ## 0.3.56 (patch) — 0.4.0 系列批 2：配置两层化 / 错误附下一步 / 文档五区（WC/WD2-D4/WE/C4）
 
 - **WC 配置两层化**：①**拨盘层**——5 个语义拨盘（autonomy / scope / curatorBackground / memoryInjection / threatStrictness）文档化 + 背后字段映射表（全部实测存在，T-WC2 钉住 7 个字段）与三档风险标注（日常/调优/高危）；②**env 收口**——core 新增 `env.ts` 单源模块（`allowRowCollisions()` + 键表），`DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` 读取迁移（行为不变）；配置层 `!!js` env（SESSION_QUERY/SESSION_QUERY_PATH）按边界**保留在 profile 配置求值层**（不可迁移），文档表区分两读取层；③**生成式导航**：命令表/拨盘/env 表均以「单源渲染 + 测试守卫」形态落地（README 五区）。

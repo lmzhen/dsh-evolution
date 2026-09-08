@@ -21,6 +21,20 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(report.installForm).toBe('full')
       expect(report.conflicts).toEqual([])
       expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
+      // P0-1 (v11): review is inferred from the bundle (it provides no service
+      // key) — a healthy full install must never render review=false.
+      expect(report.services.review).toBe(true)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('P0-1 (v11): a host-only install still infers review=true via the bundle', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-review-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      const report = await diagnose(stub, { home })
+      expect(report.services.review).toBe(true)
     } finally {
       await rm(home, { recursive: true, force: true })
     }

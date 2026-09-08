@@ -82,17 +82,24 @@ runs:
         rm -rf upstream/packages/evolution/node_modules \
                upstream/packages/evolution/lib \
                upstream/packages/evolution/dist
+        # P2-41 (v11): local overlay residue (mirror staging swap variants)
+        # would be copied into the upstream tree and double-counted by the
+        # guards below — remove them with the same hygiene as node_modules/lib.
+        rm -rf upstream/packages/evolution/.release-staging.next \
+               upstream/packages/evolution/.release-staging.previous
 
     - name: Verify layout sync and version alignment (P2-15, V9-01 guard)
       shell: bash
       working-directory: upstream
       run: |
-        # The scripts-comparison half is tautological directly after the
-        # overlay copy (the overlay COPIED those files), but the version half
-        # is not: the mirror CHANGELOG head must equal the root manifest and
-        # every package manifest version — the V9-01 incident rewrote 30
-        # manifests and nothing caught it. The second argument anchors the
-        # version guard at the MIRROR checkout root (mirrorDir/../..).
+        # P2-37 (v11): the SCRIPTS half of this check is tautological directly
+        # after the overlay copy (the overlay COPIED those files) — the real
+        # dev↔mirror scripts sync invariant can only be verified where the dev
+        # tree exists (the release-time publish-chain runs it before commit).
+        # The VERSION half is genuine and stays: the mirror CHANGELOG head must
+        # equal the root manifest and every package manifest version — the
+        # V9-01 incident rewrote 30 manifests and nothing caught it. The second
+        # argument anchors the version guard at the MIRROR checkout root.
         node packages/evolution/scripts/verify-layout-sync.mjs \
           packages/evolution/scripts ../packages/scripts
 

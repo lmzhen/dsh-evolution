@@ -35,7 +35,7 @@ if (!existsSync(root)) {
   process.exit(2)
 }
 const strict = process.argv.includes('--strict')
-const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', 'tsdown'])
+const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
 // Externally owned (README): emitted for platform/user wiring, no in-repo
 // production consumer — expected orphans.
 const EXEMPT_ORPHANS = new Set(['evolution/review-scheduled', 'evolution/review-error'])

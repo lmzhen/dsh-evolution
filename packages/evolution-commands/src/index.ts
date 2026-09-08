@@ -223,7 +223,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ]
           return ok(lines.join('\n'))
         }
-        if (input.startsWith('restore ')) {
+        if (input === 'restore' || input.startsWith('restore ')) {
+          // P0-2 (v11): the bare `restore` (registry/README documented usage)
+          // fell into the help branch — the handler only matched the
+          // argument-carrying shape. Both forms now reach restoreSnapshot.
           const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           return result.ok ? ok(result.message) : err(result.message)

@@ -195,8 +195,9 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
       }
     }
     const events = await rotateIfDue(io, path, v1EventRecords(parsedBody), rotateAt)
-    const nextEvents = await rotateIfDue(io, path, events, rotateAt)
-    let maxSeq = nextEvents.reduce((max, entry) => Math.max(max, entry.seq), 0)
+    // P2-1 (v11): a single rotate pass — the second call was either a no-op
+    // (production threshold) or a double rotation (small test thresholds).
+    let maxSeq = events.reduce((max, entry) => Math.max(max, entry.seq), 0)
     if (maxSeq === 0) {
       // The active is empty/missing: seq continues from the highest ARCHIVE
       // name (archives always carry lower seqs than a present active, so this
@@ -207,7 +208,7 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
     }
     const record: EvolutionEvent = { ...event, seq: maxSeq + 1, at: new Date().toISOString() }
     assigned = record.seq
-    return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...nextEvents, record] }, null, 2)
+    return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...events, record] }, null, 2)
   })
   if (assigned === 0) {
     throw new Error(`${refuseMessage || 'evolution event log is malformed and was not touched'}: ${path}`)

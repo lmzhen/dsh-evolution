@@ -96,9 +96,17 @@ const QUARANTINE_ERROR_NAME = 'EvolutionStateCorruptFile'
  * copy is swept after 7 days by the node backend's sweepStaleTmps (S-10). */
 async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string): Promise<never> {
   const dest = `${join(root, file)}.corrupt`
-  await io().writeText(dest, raw).catch(() => {})
+  // P2-27 (v11): a failed rescue copy must not claim "original preserved" —
+  // the operator follows the message to a file that does not exist. The main
+  // failure stays fail-loud either way; only the diagnosis gets honest.
+  let preservedNote = `; original preserved at ${dest} — inspect and fix it, then retry.`
+  try {
+    await io().writeText(dest, raw)
+  } catch (writeError) {
+    preservedNote = `; the quarantine copy at ${dest} FAILED to write (${writeError instanceof Error ? writeError.message : String(writeError)}) — the original file is left in place.`
+  }
   throw Object.assign(
-    new Error(`evolution state file "${file}" is not valid JSON (${reason}); original preserved at ${dest} — inspect and fix it, then retry.`),
+    new Error(`evolution state file "${file}" is not valid JSON (${reason})${preservedNote}`),
     { name: QUARANTINE_ERROR_NAME },
   )
 }
@@ -159,6 +167,17 @@ const RECORD_FIELD_GATES: Record<string, (record: Record<string, unknown>) => bo
   [PENDING_LEGACY_FILE]: gatePendingRecord,
 }
 
+/** V11-B1 (P2-23): shared per-record field-gate scan for BOTH paths (readJson
+ * + jsonTransact — the transaction baseline used to skip the field gates, so
+ * a string `runCount` became `"x1"` through `(current?.runCount ?? 0) + 1` at
+ * the next save). Returns the failing [id, record] entries; empty when the
+ * file has no gate, the value is not a plain map, or everything passes. */
+function gateScan(file: string, parsed: unknown): Array<[string, unknown]> {
+  const gate = RECORD_FIELD_GATES[file]
+  if (gate === undefined || !isPlainRecord(parsed)) return []
+  return Object.entries(parsed).filter(([, record]) => !isPlainRecord(record) || !gate(record))
+}
+
 /**
  * Cross-process JSON-file RMW (v3-audit M-8): every read-modify-write state
  * mutation runs inside the IO backend's transact lock (via transactIo) so a
@@ -201,6 +220,21 @@ export async function jsonTransact<T>(
       // path (it was ~15 lines duplicated verbatim in this file).
       const malformed = firstNonRecordValue(parsed)
       if (malformed !== null) return await quarantine(io, root, file, current, malformed)
+      // V11-B1 (P2-23): the transaction baseline must pass the SAME per-record
+      // field gate as the read path — a bad primary (string runCount etc.)
+      // used to reach the task and pollute the write-back ("x1"). Bad records
+      // go to the fixed `<file>.corrupt` copy; the task sees the sanitized map.
+      const failing = gateScan(file, parsed)
+      if (failing.length > 0) {
+        const bad: Record<string, unknown> = {}
+        const good: Record<string, unknown> = {}
+        for (const [id, record] of Object.entries(parsed as Record<string, unknown>)) {
+          if (failing.some(([failedId]) => failedId === id)) bad[id] = record
+          else good[id] = record
+        }
+        await io().writeText(`${join(root, file)}.corrupt`, JSON.stringify(bad, null, 2)).catch(() => {})
+        parsed = good as T
+      }
     }
     const next = await task(parsed)
     // 0.3.28 (V4-08): a record-map task's return must be null (ensure-absent —
@@ -230,6 +264,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // V10-04 (P2-19): the record-gate warn fires once per file per process —
   // a permanently bad record would otherwise warn on every turn's read.
   const recordGateWarned = new Set<string>()
+  // P2-24 (v11): the last `.corrupt` rewrite key per file (sorted failing id
+  // set) — skip rewriting when nothing changed, so a permanently bad record
+  // never re-atomic-writes the copy on every read.
+  const corruptWritten = new Map<string, string>()
 
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
@@ -256,29 +294,29 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // S-05: single-sourced via firstNonRecordValue.
     const malformed = firstNonRecordValue(parsed)
     if (malformed !== null) return await quarantine(io, root, file, raw, malformed)
-    // V10-04 (P2-19): per-record field gate — a record failing its schema is
-    // quarantined to the FIXED `<file>.corrupt` copy (atomic overwrite, at
-    // most one per file) and EXCLUDED from the result instead of propagating
-    // as a NaN/zombie. The file itself is NOT rewritten here: unknown bytes
-    // stay on disk for operator rescue; only the read result is sanitized.
-    const gate = RECORD_FIELD_GATES[file]
-    if (gate !== undefined && isPlainRecord(parsed)) {
-      const entries = Object.entries(parsed)
-      const failing = entries.filter(([, record]) => !isPlainRecord(record) || !gate(record)).map(([id]) => id)
-      if (failing.length > 0) {
-        const bad: Record<string, unknown> = {}
-        const good: Record<string, unknown> = {}
-        for (const [id, record] of entries) {
-          if (failing.includes(id)) bad[id] = record
-          else good[id] = record
-        }
-        await io().writeText(`${pathOf(file)}.corrupt`, JSON.stringify(bad, null, 2)).catch(() => {})
-        if (!recordGateWarned.has(file)) {
-          recordGateWarned.add(file)
-          ctx.logger.warn(`evolution-state-json: ${failing.length} record(s) in "${file}" failed the record schema gate and were quarantined to "${file}.corrupt": ${failing.join(', ')}`)
-        }
-        return good as T
+    // V11-B1: single-sourced via gateScan (readJson + jsonTransact share it).
+    const failing = gateScan(file, parsed)
+    if (failing.length > 0) {
+      const bad: Record<string, unknown> = {}
+      const good: Record<string, unknown> = {}
+      for (const [id, record] of Object.entries(parsed as Record<string, unknown>)) {
+        if (failing.some(([failedId]) => failedId === id)) bad[id] = record
+        else good[id] = record
       }
+      // P2-24 (v11): rewrite the .corrupt copy only when the failing set CHANGED
+      // — a permanently bad record otherwise re-atomic-writes it on every read
+      // (write amplification + an mtime touch that defeats the 7-day sweep in a
+      // long-running process).
+      const corruptKey = JSON.stringify(failing.map(([id]) => id).sort())
+      if (corruptWritten.get(file) !== corruptKey) {
+        await io().writeText(`${pathOf(file)}.corrupt`, JSON.stringify(bad, null, 2)).catch(() => {})
+        corruptWritten.set(file, corruptKey)
+      }
+      if (!recordGateWarned.has(file)) {
+        recordGateWarned.add(file)
+        ctx.logger.warn(`evolution-state-json: ${failing.length} record(s) in "${file}" failed the record schema gate and were quarantined to "${file}.corrupt": ${failing.map(([id]) => id).join(', ')}`)
+      }
+      return good as T
     }
     return parsed
   }
@@ -312,9 +350,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
   // exclusion (the id was in current at the time it was archived before it
   // could be rotated out).
   let legacyMigrated = false
-  let archivedIdsCache: Set<string> | null = null
   async function readArchivedIds(): Promise<Set<string>> {
-    if (archivedIdsCache !== null) return archivedIdsCache
+    // V11-B2 (P1-9): NO process-level cache — the archive set is only read on
+    // the legacy-merge paths (low frequency), and a stale set across processes
+    // re-opened the V5-02 ghost-twin window (a cap-rotated id excluded from a
+    // cached set could be merged back in and RE-CLAIMED). Every call re-reads
+    // both sidecars; two reads per merge is an acceptable cost.
     const ids = new Set<string>()
     try {
       const rawArchive = await readJson<Array<{ id?: string } | null>>(PENDING_ARCHIVE_FILE)
@@ -337,7 +378,6 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // Corrupt/unreadable archive — best-effort: keep legacy copies (the
       // previous merge behavior) rather than dropping possibly-real work.
     }
-    archivedIdsCache = ids
     return ids
   }
   function filterLegacy(
@@ -385,7 +425,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // point) but now warns instead of vanishing without a trace.
       if (error instanceof Error && error.name === QUARANTINE_ERROR_NAME) throw error
       ctx.logger.warn(`evolution-state-json: legacy pending retirement deferred: ${error instanceof Error ? error.message : String(error)}`)
-      return legacy
+      // P2-26 (v11): the old catch returned the WHOLE legacy map — archived
+      // ghost twins escaped into the read view ("visible but never claimable"
+      // zombies). A deferred retirement must NOT free the unfiltered legacy:
+      // the view falls back to current-only (the legacy file stays on disk and
+      // the next safe point retries).
+      return {}
     }
   }
   async function loadPendingMap(): Promise<Record<string, PendingRecord>> {
@@ -462,11 +507,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
   async function appendArchive(records: PendingRecord[]): Promise<void> {
     try {
       await transactIo(io(), pathOf(PENDING_ARCHIVE_FILE), async (current) => {
-        let archive: PendingRecord[] = []
+        // P2-25 (v11): the archive arrives from disk — keep the type honest as
+        // (PendingRecord | null)[] so the non-object guard below is meaningful
+        // (a null entry used to TypeError inside pendingArchiveKey).
+        let archive: Array<PendingRecord | null> = []
         if (current !== null) {
           try {
             const parsed = JSON.parse(current) as unknown
-            if (Array.isArray(parsed)) archive = parsed as PendingRecord[]
+            if (Array.isArray(parsed)) archive = parsed as Array<PendingRecord | null>
           } catch {
             // unrecoverable archive — best-effort: start fresh
           }
@@ -475,9 +523,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // carry duplicate entries (same id+status+resolvedAt) that counted
         // toward the cap forever — collapse them on load (first occurrence
         // wins, best-effort; the .bak may still hold them, audit is allowed
-        // to fall behind).
+        // to fall behind). P2-25 (v11): non-object entries are dropped FIRST —
+        // pendingArchiveKey would TypeError on a null entry and the outer
+        // catch silently killed the whole audit sidecar.
+        const shaped = archive.filter((entry): entry is PendingRecord => entry !== null && typeof entry === 'object')
         const archiveKeys = new Set<string>()
-        const collapsed = archive.filter((entry) => {
+        const collapsed = shaped.filter((entry) => {
           const key = pendingArchiveKey(entry)
           if (archiveKeys.has(key)) return false
           archiveKeys.add(key)
@@ -489,7 +540,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
         // them in memory, the cap accounting was correct, the residue wasn't).
         const hadDuplicates = collapsed.length !== archive.length
         archive = collapsed
-        const seen = new Set(archive.map(pendingArchiveKey))
+        const seen = new Set(collapsed.map(pendingArchiveKey))
         const fresh = records.filter(record => !seen.has(pendingArchiveKey(record)))
         if (fresh.length === 0 && !hadDuplicates) return current
         const next = [...archive, ...fresh]
@@ -509,23 +560,19 @@ export function apply(ctx: Context, rawConfig: Config): void {
           if (archive.length > 0) {
             await io().writeText(pathOf(PENDING_ARCHIVE_BAK_FILE), JSON.stringify(archive, null, 2)).catch(() => {})
           }
-          // V7-08 (0.3.44): the rotation just moved ids into/out of the active
-          // archive — the once-per-instance archivedIdsCache would keep
-          // excluding with a stale view (a ghost pending twin could slip in
-          // through a mutation that runs before any list). Invalidate so the
-          // next read rebuilds from both sidecars.
-          archivedIdsCache = null
+          // V7-08 (0.3.44) + V11-B2 (P1-9): the rotation moved ids into/out of
+          // the active archive — readArchivedIds now reads fresh on every call
+          // (no cache to invalidate), so the exclusion can never be stale.
           return JSON.stringify((fresh.length > 0 ? fresh : next).slice(-ARCHIVE_RESOLVED_CAP), null, 2)
         }
-        // V7-08 (0.3.44): ANY archive append below the rotation cap still adds
-        // new ids the once-read cache never saw — invalidate on the plain
-        // write too (a stale cache would let a ghost twin in through a later
-        // mutation before any list).
-        archivedIdsCache = null
+        // V7-08 (0.3.44) + V11-B2: plain appends add ids—re-read covers them.
         return JSON.stringify(next, null, 2)
       })
-    } catch {
-      // Audit aid only: never let an archive write failure surface as a resolve failure.
+    } catch (error) {
+      // Audit aid only: never let an archive write failure surface as a
+      // resolve failure. P2-25 (v11): E-52 discipline — the swallow must be
+      // observable, or a poisoned archive sidecar dies silently.
+      ctx.logger.warn(`evolution-state-json: archive append deferred: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

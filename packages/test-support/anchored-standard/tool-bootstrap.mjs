@@ -136,7 +136,15 @@ const DEFAULT_SUPPRESSED_SOURCES = ['skill-catalog', 'agent-instructions']
  */
 const DEFAULT_BOOTSTRAP_TOOLS = ['bash', 'str_replace_editor']
 
-/** Discovery tools always resident after promotion (the tool-search pattern). */
+/** Discovery tools always resident after promotion (the tool-search pattern).
+ * P1-11 (v11, verified): NONE of the three names exist on the pinned upstream
+ * anchor (dsh-upstream-0.1.1-rc.2 — full-tree grep = 0 hits); this vendored
+ * base targets a platform line that CARRIES these tools. On the pinned line
+ * the keep-set lands in a filtered catalog and the unlock requires a
+ * `dev_tool_search` tool/call that never fires — the two compat tests drive
+ * fabricated events and mask, rather than cover, the platform difference.
+ * Kept verbatim (vendored external contract); if this base is ever re-anchored
+ * to a line without the discovery tools, extend the keep/unlock logic. */
 const RESIDENT_DISCOVERY_TOOLS = ['dev_tool_search', 'skill_search', 'skill_load']
 
 function stringList(value, field) {

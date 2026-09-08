@@ -35,6 +35,7 @@ const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
 const BUNDLES = {
   host: `${EVOLUTION_SCOPE}/dsh-evolution-host`,
   oneclick: `${EVOLUTION_SCOPE}/dsh-evolution-preset`,
+  all: `${EVOLUTION_SCOPE}/dsh-evolution-all`,
 }
 const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
 
@@ -192,8 +193,15 @@ async function removeBundleFromProfile(profileDir, bundleName) {
   if (!existsSync(manifestPath)) return false
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   const bundles = manifest.dsh?.profile?.bundles
-  if (!Array.isArray(bundles) || !bundles.includes(bundleName)) return false
-  manifest.dsh.profile.bundles = bundles.filter(name => name !== bundleName)
+  if (!Array.isArray(bundles)) return false
+  // V7-18 scope-agnostic match (same tail rule the mutual-exclusion check
+  // uses): the profile may carry the bundle under @lmzhen while this script
+  // defaults to the @deepseek-ai scope — an exact full-name filter misses it
+  // and leaves the row behind (P1-2 removed everything but the all row).
+  const tail = bundleName.slice(bundleName.lastIndexOf('/') + 1)
+  const matched = bundles.filter(name => typeof name === 'string' && (name === bundleName || name.endsWith(`/${tail}`)))
+  if (matched.length === 0) return false
+  manifest.dsh.profile.bundles = bundles.filter(name => !matched.includes(name))
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   return true
 }
@@ -423,11 +431,20 @@ export async function uninstall(options = {}) {
     const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
     result.removedBundle = bundleName
     if (!dryRun) await removeBundleFromProfile(profileDir, bundleName)
+    // P1-2 (v11): evolution-all is a DEFAULT install target — uninstall must
+    // remove its bundle row symmetrically, or the leftover row resolves a
+    // package that was just deleted and bricks the profile.
+    if (!dryRun) await removeBundleFromProfile(profileDir, BUNDLES.all)
     result.removedPackages = await removeCopiedEvolutionPackages(profileDir, dryRun)
   }
   if (mode === 'agent' || mode === 'layered') {
-    result.removedAgentPreset = true
-    if (!dryRun) await rm(agentPresetDirectory(home), { recursive: true, force: true })
+    // P2-42 (v11): report the real outcome — dry-run or an absent preset
+    // directory does not mean "deleted".
+    const presetDir = agentPresetDirectory(home)
+    if (!dryRun && existsSync(presetDir)) {
+      await rm(presetDir, { recursive: true, force: true })
+      result.removedAgentPreset = true
+    }
   }
   return result
 }
@@ -481,6 +498,17 @@ export async function install(options = {}) {
 
   if (needsHost || needsCompat) {
     const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick
+    // P1-3 (v11): evolution-all is the DEFAULT full bundle — installing host
+    // or oneclick on top must refuse like host⇄preset does (the all patch
+    // double-mounts the infra rows, startup fail-loud).
+    const installedAll = detectInstalledAllBundle(profileDir)
+    if (!dryRun && installedAll.length > 0) {
+      throw new Error(
+        `install-layered: profile "${profile}" already carries an evolution-all bundle (${installedAll.join(', ')}). `
+        + 'evolution-all is the DEFAULT full-functionality install — host/preset would double-mount its infra rows. '
+        + 'Uninstall all first (or keep it and skip this installer).',
+      )
+    }
     // V6-49 (0.3.37): E-33 — the host bundle and the preset bundle are
     // mutually exclusive install targets (their shared rows would double-mount
     // in one profile). A documented warning was not enforcement: the tool

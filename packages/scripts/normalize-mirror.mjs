@@ -21,6 +21,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { changelogHead } from './lib-changelog.mjs'
 
 const packagesRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -30,7 +31,7 @@ if (!existsSync(changelogPath)) {
   process.exit(0)
 }
 
-const match = /^## (\d+\.\d+\.\d+)/m.exec(readFileSync(changelogPath, 'utf8'))
+const match = changelogHead(readFileSync(changelogPath, 'utf8'))
 if (!match) {
   // V6-47 (0.3.37): a missing "## x.y.z" heading used to fall back to the
   // hardcoded '0.1.0-rc.1' and REWRITE every manifest DOWN (a dangerous
@@ -38,7 +39,7 @@ if (!match) {
   console.error('normalize-mirror: no "## x.y.z" heading at the top of CHANGELOG.md (format drift?) — refusing to touch manifests.')
   process.exit(1)
 }
-const VERSION = match[1]
+const VERSION = match
 
 let changed = 0
 for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {

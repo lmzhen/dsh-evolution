@@ -535,6 +535,13 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
           // budget expires — observed as a lost RMW under full-suite load.
           await rm(lock, { force: true, maxRetries: 20, retryDelay: 100 }).catch(async () => {
             const body = await readFile(lock, 'utf8').catch(() => '')
+            // P2-7 (v11): a never-again-touched lock path would stay registered
+            // forever (the entry only leaves on a successful self-heal) —
+            // cap the map at 64 entries, dropping the oldest on overflow.
+            if (pendingSelfCleanup.size >= 64) {
+              const oldest = pendingSelfCleanup.keys().next().value
+              if (oldest !== undefined) pendingSelfCleanup.delete(oldest)
+            }
             pendingSelfCleanup.set(lock, body)
           })
         }
@@ -687,7 +694,11 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
     },
     async rename(path, destination) {
       await mkdir(dirname(destination), { recursive: true })
-      await rename(path, destination)
+      // P2-6 (v11): the seam's rename routes through the SAME transient
+      // EPERM/EBUSY retry as the writeText/transact commit path (C-28) —
+      // legacy retirement and archive/restore moves were bare-rename and
+      // could fail on antivirus/indexer hold while the commit path retried.
+      await renameWithRetry(path, destination)
     },
     async copy(path, destination) {
       await mkdir(dirname(destination), { recursive: true })

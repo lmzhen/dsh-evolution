@@ -1141,6 +1141,14 @@ export class SkillLibrary {
 
   async create(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const normalized = name.trim()
+    // P2-3 (v11): the exists-probe → write window runs under the in-process
+    // serialize queue (F-208 discipline, like update/patch) — two concurrent
+    // create calls for one name used to both pass exists() and double-write
+    // (double audit, double mutation event).
+    return await this.serial(() => this.createCore(normalized, content, origin))
+  }
+
+  private async createCore(normalized: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
     // C-12 (v10 audit): the inline badName() copy is gone (see setPinned).
     const bad = this.badName(normalized)
     if (bad) return { ok: false, message: bad }
@@ -1748,7 +1756,11 @@ export class SkillLibrary {
    */
   async restoreFromArchive(rawName: string): Promise<SkillActionResult> {
     const name = rawName.trim()
-    if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
+    // P2-2 (v11): the inline regex + hand-written message bypassed badName()
+    // (C-12 single source — the regex carries no length bound, so a >64-char
+    // name used to pass here).
+    const bad = this.badName(name)
+    if (bad) return { ok: false, message: bad }
     if (await this.io.exists(join(this.dirOf(name), 'SKILL.md'))) {
       return { ok: false, message: `Skill "${name}" already exists in the active root; refusing to overwrite.` }
     }
@@ -1835,10 +1847,15 @@ export class SkillLibrary {
   }
 
   async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
-
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    // P2-4 (v11): the exists/read/remove window runs under the serialize queue
+    // — writeSupportFile wraps itself (F-208), so an unwrapped remove could
+    // interleave with a concurrent write and silently drop its write.
+    return await this.serial(() => this.removeSupportFileCore(name, filePath, origin))
+  }
 
+  private async removeSupportFileCore(name: string, filePath: string, origin: WriteOrigin): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
@@ -1875,47 +1892,56 @@ export class SkillLibrary {
     while (await this.io.exists(dest)) {
       dest = join(backupRoot, `skills-${stamp}-${Math.random().toString(36).slice(2, 8)}`)
     }
-    const names = await listNames(this.root, this.io)
-    // Parallel copies: snapshot backups touch disjoint directories, and the
-    // per-path write locks never contend (P2-6).
-    await Promise.all(names.map(async (name) => {
-      await this.io.copy(this.dirOf(name), join(dest, name))
-    }))
-    // Sidecar co-snapshot: a rollback that restores the tree but leaves the
-    // post-archival usage/suppression state behind would immediately let the
-    // curator re-decide on stale records (rollback integrity).
-    const sidecars: string[] = []
-    for (const sidecar of [usageFile(this.root), suppressedFile(this.root)]) {
-      if (await this.io.exists(sidecar)) {
-        const name = basename(sidecar)
-        await this.io.copy(sidecar, join(dest, name))
-        sidecars.push(name)
+    try {
+      const names = await listNames(this.root, this.io)
+      // Parallel copies: snapshot backups touch disjoint directories, and the
+      // per-path write locks never contend (P2-6).
+      await Promise.all(names.map(async (name) => {
+        await this.io.copy(this.dirOf(name), join(dest, name))
+      }))
+      // Sidecar co-snapshot: a rollback that restores the tree but leaves the
+      // post-archival usage/suppression state behind would immediately let the
+      // curator re-decide on stale records (rollback integrity).
+      const sidecars: string[] = []
+      for (const sidecar of [usageFile(this.root), suppressedFile(this.root)]) {
+        if (await this.io.exists(sidecar)) {
+          const name = basename(sidecar)
+          await this.io.copy(sidecar, join(dest, name))
+          sidecars.push(name)
+        }
       }
+      // Archive co-snapshot: rollback must restore what was archived at snapshot
+      // time too — archived skills are the recoverable history, and a restore
+      // that leaves a post-run `.archive/` behind breaks the archive invariant
+      // (Hermes curator_backup backs up `.archive/` as well).
+      const archiveRoot = join(this.root, '.archive')
+      let hasArchive = false
+      if (await this.io.exists(archiveRoot)) {
+        await this.io.copy(archiveRoot, join(dest, '.archive'))
+        hasArchive = true
+      }
+      const validExtras = extras.filter(extra => SNAPSHOT_EXTRA_NAME_RE.test(extra.name))
+      const extraNames = validExtras.map(extra => extra.name)
+      await Promise.all(validExtras.map(async (extra) => {
+        await this.io.writeText(join(dest, 'extras', extra.name), extra.content)
+      }))
+      await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({
+        reason,
+        createdAt: new Date().toISOString(),
+        skills: names,
+        sidecars,
+        hasArchive,
+        extras: extraNames,
+      }, null, 2))
+      await this.retainSnapshots(5)
+    } catch (error) {
+      // P2-5 (v11): a mid-snapshot failure used to leave a manifest-less
+      // orphan directory behind — retainSnapshots only counts listed
+      // snapshots, so it was never reaped (unbounded growth on repeated
+      // failures). Best-effort removal of the half-written snapshot.
+      await this.io.remove(dest).catch(() => {})
+      throw error
     }
-    // Archive co-snapshot: rollback must restore what was archived at snapshot
-    // time too — archived skills are the recoverable history, and a restore
-    // that leaves a post-run `.archive/` behind breaks the archive invariant
-    // (Hermes curator_backup backs up `.archive/` as well).
-    const archiveRoot = join(this.root, '.archive')
-    let hasArchive = false
-    if (await this.io.exists(archiveRoot)) {
-      await this.io.copy(archiveRoot, join(dest, '.archive'))
-      hasArchive = true
-    }
-    const validExtras = extras.filter(extra => SNAPSHOT_EXTRA_NAME_RE.test(extra.name))
-    const extraNames = validExtras.map(extra => extra.name)
-    await Promise.all(validExtras.map(async (extra) => {
-      await this.io.writeText(join(dest, 'extras', extra.name), extra.content)
-    }))
-    await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({
-      reason,
-      createdAt: new Date().toISOString(),
-      skills: names,
-      sidecars,
-      hasArchive,
-      extras: extraNames,
-    }, null, 2))
-    await this.retainSnapshots(5)
     return dest
   }
 

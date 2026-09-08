@@ -256,4 +256,34 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'agent')).rejects.toThrow(/Choose ONE/)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
+
+  it('P1-3: --mode host/oneclick refuses when the profile already carries evolution-all', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p13-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
+    await expect(runInstaller(home, 'host')).rejects.toThrow(/evolution-all/)
+    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/evolution-all/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('P1-2: --uninstall removes the evolution-all bundle row too (symmetric with host/preset)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p12-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    const manifestPath = join(profileDir, 'package.json')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(manifestPath, JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
+    const { stdout } = await runInstaller(home, 'layered', 'evo-test', ['--uninstall'])
+    const after = JSON.parse(await readFile(manifestPath, 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
+    expect(stdout).toContain('bundle:')
+    expect(after.dsh?.profile?.bundles ?? []).not.toContain('@lmzhen/dsh-evolution-all')
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('P2-42: a dry-run uninstall does not claim the agent preset was deleted', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p242-'))
+    const { stdout } = await runInstaller(home, 'layered', 'evo-test', ['--uninstall', '--dry-run'])
+    expect(stdout).not.toContain('removedAgentPreset')
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
 })

@@ -369,6 +369,11 @@ for (const item of tarballs) {
         failures.push(`${item.name}: lib/${rel} still imports ${originalName} (unrewritten scope)`)
       }
     }
+    // P2-38 (v11): the local-import guard only recognizes DOUBLE-QUOTED
+    // static `from "./x.js"` (what tsdown emits today). Single-quote imports,
+    // dynamic `import("./x.js")` and re-exports are outside its scope — if the
+    // bundler style changes, extend this pattern or the guard silently turns
+    // vacuum-pass.
     for (const match of text.matchAll(/from\s+"(\.\/[^"]+\.js)"/g)) {
       const local = join(libRoot, match[1].slice(2))
       if (!inShipped(relative(staged, local).replace(/\\/g, '/'))) {
@@ -424,6 +429,19 @@ const publishGroups = [
   ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog', 'evolution-capability'],
   ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
+// P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale
+// entry previously wrote `null` into publish-order.json (and the downstream
+// consistency check blamed the wrong root cause). Fail loud naming both sides.
+const stagedDirs = tarballs.map(item => item.dir)
+const publishGroupDirs = publishGroups.flat()
+const stagedButUnlisted = stagedDirs.filter(dir => !publishGroupDirs.includes(dir))
+const listedButUnstaged = publishGroupDirs.filter(dir => !stagedDirs.includes(dir))
+if (stagedButUnlisted.length > 0 || listedButUnstaged.length > 0) {
+  throw new Error(
+    `prepare-release: publish-order tables out of sync — staged-but-unlisted: ${stagedButUnlisted.join(', ') || '(none)'}; `
+    + `listed-but-unstaged: ${listedButUnstaged.join(', ') || '(none)'}. Update the publishGroups table in prepare-release.mjs.`,
+  )
+}
 writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups.map(group => group.map(dir => nameByDir[dir])), null, 2) + '\n')
 
 const smokeDeps = {}

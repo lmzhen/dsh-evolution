@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -290,11 +290,10 @@ export class EvolutionCurator extends Service {
   }
 
   /**
-   * One automatic schedule check: run a pass when the persisted curator state
-   * (falling back to the in-memory clock for state-less compositions) is at
-   * least one interval old. All gates — interval, idle, first-run defer,
-   * reentrancy — stay inside `run()`, so this method only decides whether to
-   * wake it, and never duplicates gate logic.
+   * One automatic schedule check. P2-11 (v11): the interval gate is exercised
+   * HERE as a cheap pre-check (persisted or in-memory clock) AND again inside
+   * run() as the authoritative gate — the docstring no longer claims the two
+   * never duplicate; a future interval change must update both.
    */
   private async autoCheck(): Promise<void> {
     // 0.3.18 (E-7): the unattended tick (boot catch-up / hourly interval) must
@@ -875,6 +874,11 @@ export class EvolutionCurator extends Service {
               // make a crashed non-bundled `foo` a false positive (which would
               // suppress the lifecycle gate on the next rebuild of `foo`).
               // The name charset validates the anchor; no escaping needed.
+              // P2-10 (v11): a hand-edited sidecar key must not reach RegExp
+              // construction — unbalanced parens throw, a `|` changes the
+              // match semantics and could eat a sibling's marker. Skip any
+              // name outside the skill charset.
+              if (!SKILL_NAME_RE.test(name)) continue
               if (!new RegExp(`^${name}-\\d{14}(-[0-9a-z]{1,6})?$`).test(entry)) continue
               wasBundled = await this.io.exists(join(this.skills.root, '.archive', entry, markerEntryName('bundled')))
               // E-3 precedent: confirm the archive is OURS by its frontmatter
@@ -999,8 +1003,12 @@ export class EvolutionCurator extends Service {
     const usageRegistry = this.ctx.get('skillUsage') as { invalidate?(): Promise<void> } | undefined
     try {
       await usageRegistry?.invalidate?.()
-    } catch {
-      // Best-effort like the flush above.
+    } catch (error) {
+      // P2-9 (v11): E-52 discipline — the one silent swallow left in this
+      // file; a failed invalidate would let the next telemetry flush re-cover
+      // the curator's written fields with its stale cache and nothing would
+      // point at it.
+      this.ctx.logger.warn(`evolution-curator: skillUsage cache invalidate failed after curation: ${error instanceof Error ? error.message : String(error)}`)
     }
     return { archivedSkills, errors, suppressedChanged, consolidated: executedConsolidations }
   }
