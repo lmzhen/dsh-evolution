@@ -246,4 +246,14 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
+
+  it('0.3.54-T5: --mode agent refuses when the profile already carries evolution-all (choose-one guidance)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-routeb-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
+    await expect(runInstaller(home, 'agent')).rejects.toThrow(/evolution-all/)
+    await expect(runInstaller(home, 'agent')).rejects.toThrow(/Choose ONE/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
 })

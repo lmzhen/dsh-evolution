@@ -1,0 +1,141 @@
+# Full-functionality evolution bundle (DEFAULT install target).
+#
+# This layer = evolution-host's entire infrastructure plane ∪ the four
+# model-facing tool rows (tool-memory / tool-skill-manage / tool-session-query
+# / evolution-skill-catalog), all mounted at PROFILE-ROOT level: installing
+# @lmzhen/dsh-evolution-all is the default "most complete first" path — every
+# session gets the automation AND the memory/skill tools AND the
+# SKILLS/MEMORY guidance injection, with no agent-preset step.
+#
+# THREE-WAY DRIFT GUARD (bundle-mutual-exclusion.spec):
+#   - every infra row block below must stay byte-identical to
+#     evolution-host/cordis.patch.yml (same id/name/config/disabled);
+#   - the four model rows must stay byte-identical to
+#     evolution-preset/cordis.patch.yml's model rows;
+#   - the row names must all resolve inside this package's dependency closure.
+# MUTUAL EXCLUSION: all / host / one-click preset are ALTERNATIVE install
+# targets — mounting two of them triple-mounts the infra rows and fails loud
+# at startup (invariants: already registered). `all` is likewise exclusive
+# with the layered Evolution agent preset (the preset scope's model rows would
+# double-mount the tools). Single install only.
+- insert:
+    # ── control plane ───────────────────────────────────────────────────────
+    - id: evolution-policy
+      name: '@deepseek-ai/dsh-evolution-policy'
+
+    # ── IO seam: one registry, one node:fs provider ─────────────────────────
+    - id: evolution-io
+      name: '@deepseek-ai/dsh-evolution-io'
+    - id: evolution-io-node
+      name: '@deepseek-ai/dsh-evolution-io-node'
+
+    # ── durable state: storage-domain KV first, portable JSON fallback ──────
+    - id: evolution-state-storage
+      name: '@deepseek-ai/dsh-evolution-state-storage'
+    - id: evolution-state-domain
+      name: '@deepseek-ai/dsh-evolution-state-domain'
+      # The storage-domain provider is opt-in. It is disabled by default so a
+      # profile without the host storage-domain facility boots deterministically
+      # and evolution-state-json remains the active portable backend. Enable it
+      # explicitly in a profile overlay only when storage-domain is mounted.
+      disabled: true
+    - id: evolution-state-json
+      name: '@deepseek-ai/dsh-evolution-state-json'
+    - id: evolution-state
+      name: '@deepseek-ai/dsh-evolution-state'
+
+    # ── memory seam: registry, provider, model-facing tool ───────────────────
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+    - id: memory-files
+      name: '@deepseek-ai/dsh-memory-files'
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+
+    # ── skills: usage telemetry, model-facing management tools ───────────────
+    - id: skill-usage
+      name: '@deepseek-ai/dsh-skill-usage'
+    - id: tool-skill-manage
+      name: '@deepseek-ai/dsh-tool-skill-manage'
+    - id: tool-session-query
+      name: '@deepseek-ai/dsh-tool-session-query'
+    - id: evolution-skill-catalog
+      name: '@deepseek-ai/dsh-evolution-skill-catalog'
+
+    # ── write admission: staged approval (off by default) + threat guard ────
+    - id: evolution-approval
+      name: '@deepseek-ai/dsh-evolution-approval'
+      config:
+        enabled: false
+        stageForeground: true
+    # D-9 (rc.51): `evolution-capability` is no longer part of the host bundle
+    # — staged, non-executing Creator-mode adapter with no live consumer; keep
+    # the host mount minimal and let deployments opt in by adding the row.
+    - id: evolution-threat
+      name: '@deepseek-ai/dsh-evolution-threat'
+
+    # ── review / curator / observability / human controls ───────────────────
+    - id: evolution-review
+      name: '@deepseek-ai/dsh-evolution-review'
+      config:
+        # The DSH tool catalog exposes the plain `skill` tool only — the
+        # `skill_search`/`skill_load` discovery pair does not exist here, so
+        # listing it would be dead configuration. Allow `skill` so review
+        # subagents can load skills under the Anchored Standard preset family.
+        reviewToolAllow: [skill]
+    - id: evolution-curator
+      name: '@deepseek-ai/dsh-evolution-curator'
+    - id: evolution-commands
+      name: '@deepseek-ai/dsh-evolution-commands'
+    - id: evolution-maintenance-tools
+      name: '@deepseek-ai/dsh-evolution-maintenance/tools'
+    - id: evolution-activity
+      name: '@deepseek-ai/dsh-evolution-activity'
+    - id: evolution-feedback
+      name: '@deepseek-ai/dsh-evolution-feedback'
+    - id: evolution-learning-graph
+      name: '@deepseek-ai/dsh-evolution-learning-graph'
+    - id: evolution-replay
+      name: '@deepseek-ai/dsh-evolution-replay'
+
+# ── cross-session recall: enable the native session-query index ─────────────
+# `tool-session-query` (above) exposes `session_search`; this overlay
+# enables the backing SQLite full-text index so that search actually works.
+# It is a configuration OVERRIDE of the base `session-query-sqlite` row (never
+# an insert — base already provides it), so it must sit OUTSIDE the `- insert:`
+# block above. Both fields are parameterized via environment variables (dsh
+# `!!js` runtime evaluation), and any profile cordis.patch.yml overlay may still
+# override them later. `openAt` defaults to `startup` so the index is ready for
+# cross-session recall; set `DSH_EVOLUTION_SESSION_QUERY=never` to disable, or
+# `first-search` to build it lazily. A durable `path` (not `:memory:`) lets the
+# index survive restarts. Note: `config` values replace the base entry's config
+# wholesale, so both path and openAt are set here.
+- id: session-query-sqlite
+  config:
+    # P2-12 (V10-15): `??` only catches null/undefined, so a set-but-EMPTY
+    # variable kept the empty string and `resolve('')` dropped the SQLite
+    # index into the process CWD. The three-part form trims the value first;
+    # only a non-empty path overrides the durable default.
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
+    # P2-13 (V10-15): whitelist normalization — an arbitrary invalid value used
+    # to reach the platform z.union schema and blow up the whole profile at
+    # startup with an error far from the root cause. Unknown/empty values fall
+    # back to 'startup'. (Quoted scalar: the ternary's `: ` would otherwise
+    # break YAML plain-scalar parsing — see the upstream `!!js "..."` forms.)
+    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
+
+# ── Hermes 60-char catalog rule: platform interface, deployment default ──────
+# Upstream tool-skill exposes `catalogDescriptionMaxLength` (the 500 constant is
+# only the schema default); the Hermes authoring standard is 60 and the index
+# truncates at the configured value.
+# REACH (P1-2 / V10-14, corrected): this override is a PROFILE-ROOT row, so it
+# covers sessions mounted WITHOUT an agent preset only. Sessions running under
+# an agent preset read the preset scope's own `tool-skill` row, which no
+# profile patch can touch — for those, the preset composer injects the same cap
+# at generation time (V10-14 → 0.3.53), and the one-click preset patch carries
+# the identical root-level override.
+# Base `tool-skill` row carries no other config today, so the whole-config
+# replacement is safe; if upstream adds fields there, copy them.
+- id: tool-skill
+  config:
+    catalogDescriptionMaxLength: 60

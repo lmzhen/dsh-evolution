@@ -1,22 +1,25 @@
 # Installing dsh-evolution
 
-Two supported layouts:
+Three supported layouts (0.3.54 route B — default is most-complete first):
 
 | Layout | What is installed | Model tools |
 |---|---|---|
+| **Full (DEFAULT)** | `dsh-evolution-all` bundle (infra + model tools, profile-root) | Exposed to **every** session — the recommended new-install path |
 | Layered | `dsh-evolution-host` bundle + `Evolution` agent preset | Exposed only to sessions selecting the preset |
 | One-click | `dsh-evolution-preset` compatibility bundle | Exposed to every session in the profile |
 
-The layered layout is recommended for production.
+The full `all` bundle is the new-install default; `host` is the shrink path
+(same automation, no model tools). Shrinking = uninstall `all`, install `host`.
 
-> ⚠️ **`dsh-evolution-host` and `dsh-evolution-preset` are mutually exclusive
-> install targets — never add both bundles to the same profile.** The host
-> bundle is infrastructure only (no profile-wide model tools); the preset bundle
-> is the one-click compatibility bundle that also exposes the model tools
-> profile-wide. They share the self-evolution infrastructure rows, so mounting
-> both double-registers that infrastructure and, if their shared configs ever
-> diverged, would produce an ambiguous composition. Choose one per profile: the
-> layered host/agent layout (recommended) or the one-click preset layout.
+> ⚠️ **`dsh-evolution-all`, `dsh-evolution-host` and `dsh-evolution-preset` are
+> mutually exclusive install targets — never add more than one of these bundles
+> to the same profile.** `all` and the preset expose the model tools
+> profile-wide; `host` is infrastructure only. They share the self-evolution
+> infrastructure rows, so mounting two double-registers that infrastructure
+> and fails loud at startup (invariants: already registered). The layered
+> layout (host + Evolution agent preset) is ALSO exclusive with `all` — the
+> preset scope's model rows would double-mount the tools. Choose one:
+> full (`all`), layered (`host` + preset), or one-click (`preset`).
 
 ## Prerequisites
 

@@ -432,6 +432,23 @@ export async function uninstall(options = {}) {
   return result
 }
 
+/**
+ * 0.3.54 (route B): is the target profile already carrying an evolution-all
+ * bundle row? The full bundle and the layered Evolution preset are exclusive
+ * on the model rows — returning the matched bundle names lets the installer
+ * refuse up front with the choose-one guidance instead of the user reaching
+ * the startup double-mount error.
+ */
+export function detectInstalledAllBundle(profileDir) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
+    const bundles = manifest?.dsh?.profile?.bundles
+    return Array.isArray(bundles) ? bundles.filter(name => /evolution-all/.test(String(name))) : []
+  } catch {
+    return []
+  }
+}
+
 export async function install(options = {}) {
   const mode = options.mode ?? 'layered'
   if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')}`)
@@ -445,6 +462,22 @@ export async function install(options = {}) {
   const needsHost = mode === 'host' || mode === 'layered'
   const needsAgent = mode === 'agent' || mode === 'layered'
   const needsCompat = mode === 'oneclick'
+
+  // 0.3.54 (route B): the full bundle mounts the SAME model rows at profile
+  // root — generating the layered preset on top would double-mount them
+  // (startup fail-loud). Refuse with the choose-one guidance instead of
+  // letting the user reach that error.
+  if (needsAgent) {
+    const allBundles = detectInstalledAllBundle(profileDir)
+    if (allBundles.length > 0) {
+      throw new Error(
+        `install-layered: the profile already carries an evolution-all bundle (${allBundles.join(', ')}). `
+        + 'evolution-all is the DEFAULT full-functionality install and already mounts the model tools at profile root — '
+        + 'the layered Evolution preset would double-mount them. Choose ONE: keep evolution-all (no preset), '
+        + 'or switch the profile to evolution-host and generate the preset.',
+      )
+    }
+  }
 
   if (needsHost || needsCompat) {
     const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick

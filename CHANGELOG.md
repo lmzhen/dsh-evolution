@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.54 (patch) — route B：默认安装即全量（`dsh-evolution-all` 升级为完整 bundle）
+
+- **行为契约（安装体验反转）**：
+  1. `@lmzhen/dsh-evolution-all` 从被动聚合包升为**完整 bundle**——新增 `dsh.bundle.patch`（`cordis.patch.yml`）：行集 = evolution-host 基础设施行 ∪ 4 个模型工具行（`tool-memory`/`tool-skill-manage`/`tool-session-query`/`evolution-skill-catalog`），全部 profile **root** 级。`dsh plugin add all` = 装完即全量：每会话自动获得后台自动化 + 记忆/技能工具 + SKILLS/MEMORY 指引注入，**无需预设与会话选择**（旧 all 用户升级重启后即全量——行为变更）；
+  2. **删减 = 包选择**：`host` 保持 infra-only（same automation minus model tools）——移除全量 = 卸 all 装 host；
+  3. **三方互斥 fail-loud**：all / host / one-click preset 两两互斥（同 scope 双装 = 重复行 → 上游 invariants `already registered` 启动即抛）；**all 与 layered Evolution 预设亦互斥**（预设 scope 模型行双挂载同类触发）。install-layered `--mode agent/layered` 检测到 profile 已装 all 时提前拒绝并给出二选一文案。
+- **防漂移守卫**：bundle-mutual-exclusion.spec 新增 G-A（all 的 infra 行体 ≡ host.patch）/G-B（all 的 4 模型行体 ≡ preset.patch）/ G-C（模型行包 ⊆ all 依赖闭包——infra 行由 host 自身契约担保）；T2 组合层证明 all+host / all+preset 双装真实构成重复行（fail-loud 前提）；installer T5（agent 模式遇 all 拒绝）。all.spec 依赖断言升级 6 项（补 `dsh-tool-session-query`——v10 F6 缺口在此版闭合）。
+- **文档**：根 README/README.zh/INSTALL/包 README 三向安装表重写（全量默认 → 精简换包 → 进阶 layered → 兼容 preset）；evolution-all/README 与 src docstring 重写（不再是"one command 装但只挂 infra"的 H-08 语义）。
+- **门禁**：host/all/preset 69/69（+G-A/G-B/T2×2/T5、all 依赖 6 项）；oxlint 0/0；tsc 0（三包）；全量以 CI Linux 为准。设计蓝本：`dsh-evolution-mirror-plan-route-b-full-bundle.md`（机制事实含 applyEntryPatches insert 无去重——互斥 fail-loud 的承重证据）。
+
 ## 0.3.53 (patch) — P1-2 延伸修复：catalog cap 注入下沉至预设组合器（V10-14 收尾）
 
 - **P1-2 延伸 [组合层可达]**：v10 修复只在 install-layered（源码树自举工具）注入 `catalogDescriptionMaxLength: 60`——而 `/evolution preset install`（commands 路径，**npm 用户唯一预设生成途径**）走 core `composePresetComposition`，无注入：生成预设的会话可见 tool-skill 行仍跑平台默认 500，P1-2 症状在该路径原样存活。**修复**：cap 注入下沉为**组合器契约**——core `composePresetComposition` 内建 `injectCatalogDescriptionCap`（幂等：已有 `config:` 行不动；marker 注释标识组合器文本；无 tool-skill 行时 warn 一次并原样返回），install-layered `generateAgentPreset` 同步内化同一规则；两路径输出字节一致（installer.spec parity 钉，fixture 升级为含 tool-skill 行——任一侧漏注入即红）；commands preset install 端到端用例补 cap 断言（判别力：旧 fixture 无 tool-skill 行测不出注入）。

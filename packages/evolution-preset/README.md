@@ -7,6 +7,11 @@ Compatibility one-click bundle for the dsh-evolution plugin family
 > infrastructure rows with `@deepseek-ai/dsh-evolution-host`; do **not** add both
 > bundles to the same profile — pick the layered host/agent layout (recommended)
 > or this preset bundle.
+>
+> **0.3.54 (route B)**: `@lmzhen/dsh-evolution-all` is now the DEFAULT
+> full-functionality bundle with the same row set — new installs should use
+> `all` and reserve this preset for legacy compatibility. Its rows are kept in
+> sync with `all` by the bundle-mutual-exclusion guard (identical row bodies).
 
 
 ## Model Experience

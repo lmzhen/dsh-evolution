@@ -10,6 +10,12 @@ Host-plane self-evolution infrastructure bundle for DeepSeek Harness
 > (layered), or the one-click preset bundle. (V10-14 / H-02: the previous
 > wording "pick host+preset" described the forbidden combination itself —
 > "host + preset" IS the layered install, not an alternative to it.)
+>
+> **0.3.54 (route B)**: the DEFAULT full bundle is now
+> `@lmzhen/dsh-evolution-all` (infra + model tools, profile-root). This package
+> is the **shrink path**: the same automation minus model tools. `all`, `host`
+> and the one-click preset are three ALTERNATIVE install targets — mounting two
+> of them fails loud at startup (invariants: already registered).
 
 
 ## Model Experience

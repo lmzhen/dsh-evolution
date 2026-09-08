@@ -108,35 +108,41 @@ curator
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
 ```
 
-`dsh-evolution-all` 是**纯依赖聚合包**：pull `dsh-evolution-host`（基础设施 + 控制面；其
-bundle patch 承载 profile 组合 rows）、三个模型工具包（`tool-memory`、
-`tool-skill-manage`、`evolution-skill-catalog`）与 `dsh-evolution-agent-preset`
-（预设容器：`/evolution preset install` 用它把 delta 合并进完整预设）。`plugin add`
+`dsh-evolution-all` 是**全量 bundle（默认安装，0.3.54）**：自带 `dsh.bundle.patch`
+（行集 = `dsh-evolution-host` 的基础设施行 ∪ 四个模型工具行
+`tool-memory` / `tool-skill-manage` / `tool-session-query` / `evolution-skill-catalog`），
+全部挂在 profile **root** 级。依赖闭包同时 pull 上述包与
+`dsh-evolution-agent-preset`（预设容器：layered 场景的 `/evolution preset install` 用它）。`plugin add`
 自动识别声明的 `dsh.bundle.patch` 清单并把整个依赖树带进来——无需任何额外 flags。
 
-安装效果：
+安装效果（默认形态 = 最完善优先）：
 
 ```text
 host 基础设施   review、curator、审批、审计、可观测性、威胁检查……
-                 profile 内所有会话共享
-模型工具        memory / skill_manage / 技能目录 —— 只有选择 Evolution
-                 预设的会话才看得到
+                  profile 内所有会话共享
+模型工具        memory / skill_manage / session_search / 技能目录 +
+                  SKILLS/MEMORY 指引注入 —— 默认对 profile 内**每一**个会话可见（root 级）
 ```
 
 - 版本：省略 `@<version>` 安装最新稳定版；预发布线需显式 `@<version>-rc.x`（发布在 `next` tag）。
 - 细粒度安装（仅 host、或按需挑选工具包）受支持——见下表。卸载：对同样包执行
   `dsh plugin --profile web remove`（移除 rows 与包；记忆、技能、状态、报告和审批历史保留）。
 
-之后先让预设可用：运行 `/evolution preset install`（一次性；从 agent-preset 注册表读运行时 `standard` 组合，合并 `dsh-evolution-agent-preset` 携带的 delta，把组合后的 `agent.cordis.yml`/`preset.yml` 写入 `$DSH_HOME/.agent-presets/evolution/`——无需手动拷贝文件），再为需要自进化工具的会话选择 **Evolution** 预设。
-其他预设仍获得 review、curator、审批和观测能力，但不会暴露模型侧的自进化工具。
+- 默认无第二步骤。若想按会话分级暴露模型工具，采用下面的 **layered** 形态：
+  先装 `host`，再运行 `/evolution preset install`（一次性；从 agent-preset 注册表读运行时
+  `standard` 组合，合并 `dsh-evolution-agent-preset` 携带的 delta，把组合后的
+  `agent.cordis.yml`/`preset.yml` 写入 `$DSH_HOME/.agent-presets/evolution/`），
+  再为需要自进化工具的会话选择 **Evolution** 预设。
+  其他预设仍获得 review、curator、审批和观测能力，但不会暴露模型侧的自进化工具。
+  **注意：`all` 与 layered 形态互斥**（两者都挂模型行，双装启动即 fail-loud）。
 
 #### 选择安装方式（场景 → 操作 → 你得到什么）
 
 | 想要 | 发布操作 | 你得到 | 注意 |
 |---|---|---|---|
-| **全量**（host+工具） | `add @lmzhen/dsh-evolution-all`（推荐） | review/curator/审批/审计/威胁检查（全会话）+ memory/`skill_manage`/技能目录（Evolution 预设会话） | 其他预设会话看不到模型工具——这是设计 |
-| **仅 host**（无模型工具） | `add @lmzhen/dsh-evolution-host`（需要时加 `activity`/`skill-catalog`） | 后台自动化 + 审批 + 审计 + 威胁检查 | **模型无法自主写记忆/技能**——自动化但"手脚受限" |
-| **精细暴露** | 装全量 + 会话侧选/不选 Evolution 预设 | 同一 profile 内按会话分级暴露模型工具 | 需在会话切换处手动选预设 |
+| **全量（默认）** | `add @lmzhen/dsh-evolution-all`（推荐） | review/curator/审批/审计/威胁检查 + memory/`skill_manage`/`session_search`/技能目录 + 指引注入（**全会话 root 级**） | 无需预设、无需会话选择；升级后旧 all 用户即全量 |
+| **仅 host（精简）** | `add @lmzhen/dsh-evolution-host` | 后台自动化 + 审批 + 审计 + 威胁检查 | **模型无法自主写记忆/技能**——删减=从 all 换装 host |
+| **按会话分级（layered）** | `add @lmzhen/dsh-evolution-host` + 生成/选择 Evolution 预设 | 后台全会话 + 模型工具仅 Evolution 预设会话 | 与 `all` 互斥，二选一 |
 | **兼容旧包** | `add @lmzhen/dsh-evolution-preset` | 与旧单体 facade 等价的兼容包（会全会话暴露模型工具） | **仅 legacy 兼容**；新部署用第一行 |
 
 业务视角的另一面见 [使用场景](#使用场景)。

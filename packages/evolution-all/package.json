@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-all",
-  "description": "One-command aggregate entry for the dsh-evolution plugin family (host + model tools)",
-  "version": "0.3.53",
+  "description": "Full-functionality evolution bundle — DEFAULT install: host automation + model tools, all profile-root",
+  "version": "0.3.54",
   "publishConfig": {
     "access": "public"
   },
@@ -13,6 +13,11 @@
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "exports": {
     ".": {
       "types": "./lib/types/index.d.ts",
@@ -26,13 +31,15 @@
   },
   "files": [
     "lib/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml"
   ],
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-host": "workspace:^",
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
+    "@deepseek-ai/dsh-tool-session-query": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^"
   },

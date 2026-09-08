@@ -33,7 +33,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-host` | Host-plane infrastructure bundle (no model tools) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
-| `evolution-all` | One-command aggregate entry (host + model tools) |
+| `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
 
 ## Installation
 

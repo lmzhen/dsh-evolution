@@ -64,19 +64,33 @@ compatibility flow, and profile override examples.
 
 ## Composition
 
-### Layered install (recommended)
+### Full bundle (DEFAULT, 0.3.54)
+
+Install everything at profile root in one step — no agent preset, no session
+choice:
+
+```yaml
+- id: dsh-evolution-all
+  name: '@lmzhen/dsh-evolution-all'
+```
+
+`all` mounts the host automation AND the four model tools
+(`memory` / `skill_manage` / `session_search` / skill catalog) with the
+SKILLS/MEMORY guidance injection in every session.
+
+### Layered install (host + preset, per-session tools)
 
 Install the host bundle into the profile:
 
 ```yaml
 - id: dsh-evolution-host
-  name: '@deepseek-ai/dsh-evolution-host'
+  name: '@lmzhen/dsh-evolution-host'
 ```
 
 Then select the `Evolution` agent preset for sessions that should expose the
 `memory` / `skill_manage` tools. Sessions on other presets keep the shared
 automation (review, curator, approval, observability) without model-facing
-evolution tools.
+evolution tools. **`all` and this layout are exclusive** — do not combine them.
 
 > **One-time step (V7-06, 0.3.43):** before a session can select the `Evolution`
 > preset, run `/evolution preset install` once in a session on any preset —
@@ -91,17 +105,17 @@ Use the legacy preset overlay on a standard DSH host:
 
 ```yaml
 - id: dsh-evolution
-  name: '@deepseek-ai/dsh-evolution-preset'
+  name: '@lmzhen/dsh-evolution-preset'
 ```
 
-This one-click preset and the layered `evolution-host` bundle are ALTERNATIVE
-install targets (mutual exclusion, E-33) — install one, not both, or the shared
-infra rows mount twice. The one-click preset carries its own
-`evolution-maintenance-tools` row and its own `session-query-sqlite` index
-override; the `tool-skill` 60-char catalog cap override is evolution-host-owned
-and a preset-alone install runs the platform catalog default (add the override
-yourself if you want the cap — the 60-char authoring bar enforced by
-tool-skill-manage still applies regardless).
+This one-click preset, the `all` bundle and the layered `evolution-host`
+layout are ALTERNATIVE installs (mutual exclusion, E-33) — install one, not
+two, or the shared infra rows mount twice and startup fails loud. The one-click
+preset carries its own `evolution-maintenance-tools` row and its own
+`session-query-sqlite` index override; the `tool-skill` 60-char catalog cap
+override is evolution-host-owned and a preset-alone install runs the platform
+catalog default (add the override yourself if you want the cap — the 60-char
+authoring bar enforced by tool-skill-manage still applies regardless).
 
 Or compose manually — order matters because provider rows declare `inject`.
 This mirrors the row set shipped by the two bundles (evolution-host infra +
