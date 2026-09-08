@@ -17,7 +17,7 @@
     - id: evolution-io-node
       name: '@deepseek-ai/dsh-evolution-io-node'
 
-    # ── durable state: storage-domain KV first, portable JSON fallback ──────
+    # ── durable state: provider registry (json active; domain opt-in) ───────
     - id: evolution-state-storage
       name: '@deepseek-ai/dsh-evolution-state-storage'
     - id: evolution-state-domain
@@ -31,6 +31,13 @@
       name: '@deepseek-ai/dsh-evolution-state-json'
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-state'
+      # No `provider` pin on purpose (V10-16 pinned it only in the standalone
+      # cordis.yml): the registry has NO fallback, so the effective provider is
+      # whichever row registered first. With `evolution-state-domain` disabled
+      # above that is always `json`; an overlay that ENABLES domain makes
+      # `domain` (row order: earlier than json) the implicit default. Pin
+      # `config: { provider: json|domain }` in a profile overlay to make the
+      # choice explicit.
 
     # ── memory seam: registry and provider, no model tool ───────────────────
     - id: memory

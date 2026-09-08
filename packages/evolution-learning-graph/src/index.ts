@@ -397,6 +397,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // soft dependency (ctx.get); when absent the write executes
             // directly, unchanged.
             const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+            // P3-38 (v14): the write origin is derived ONCE — the direct path
+            // used to hardcode 'foreground' while the staged path sent
+            // `origins.library` (which is 'subagent' for a subagent invocation).
+            const origins = resolveOrigins(session?.header?.origin)
             if (approval) {
               // P2-34 (v11): the graph surface is marked in the summary so the
               // audit record names where the write came from. N1 (v12): the
@@ -405,7 +409,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // rides the request and the approval service derives the platform
               // session policy — a `never`-policy session now stages nothing
               // instead of being treated as foreground.
-              const origins = resolveOrigins(session?.header?.origin)
               const sessionPolicy = effectiveSessionPolicy(ctx, session)
               const decision = await approval.request({
                 kind: 'skill',
@@ -418,7 +421,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               })
               if (decision.action === 'staged') return ok(decision.message)
             }
-            const result = await withSkills().update(parsed.name, content, 'foreground')
+            const result = await withSkills().update(parsed.name, content, origins.library)
             // E-26: a graph edit is a content patch — bump the patch counter
             // exactly as skill_manage does (previously graph edits never
             // entered the mutation-maturity signal). V4-13: a no-op update

@@ -94,7 +94,7 @@ export function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 
 interface EvolutionStateLike {
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
-  tryResolvePending(id: string, status: 'approved' | 'rejected'): Promise<{ record: PendingRecord | null; applied: boolean }>
+  tryResolvePending(id: string, status: 'approved' | 'rejected', expectedClaimId?: string): Promise<{ record: PendingRecord | null; applied: boolean }>
   claimPending(id: string, claimId: string): Promise<PendingRecord | null>
   releasePendingClaim(id: string, claimId: string): Promise<void>
 }
@@ -350,8 +350,20 @@ export class EvolutionApproval extends Service {
       this.ctx.logger.warn(error)
       return { ok: false, message: 'Replay runner failed; the pending write remains pending.' }
     }
-    const resolution = await this.state().tryResolvePending(id, 'approved')
+    const resolution = await this.state().tryResolvePending(id, 'approved', claimId)
     if (!resolution.applied) {
+      // P2-2 (v14): the claim-scoped resolve refused, which means the record
+      // left 'executing' under us — typically a concurrent operator reject
+      // while the runner was still in flight. The write DID land (the runner
+      // succeeded), so report the divergence instead of a bare "already
+      // resolved": the operator must verify the effect, not re-approve.
+      const rejected = (await this.state().listPending('rejected')).find(item => item.id === id)
+      if (rejected) {
+        return {
+          ok: false,
+          message: `Approved write "${id}" was replayed, but the record was resolved to "rejected" concurrently — the effect has landed while the audit reads rejected. Verify the write and do NOT replay it.`,
+        }
+      }
       return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
     }
     // 0.3.17 (E-61): the success message names what was approved, not just
@@ -376,6 +388,9 @@ function normalizeSummary(input: { kind: PendingKind; summary: string; args: unk
       return `memory ${qualifier}batch of ${candidate.operations.length} operations`
     }
   }
-  if (input.kind === 'skill' && /^skill delete /.test(trimmed)) return `${trimmed} (warning: archive)`
+  // P3-39 (v14): match the DELETE semantics, not one caller's prefix spelling —
+  // learning-graph stages the same operation as "graph delete X" and used to
+  // miss the archive warning that review's "skill delete X" got.
+  if (input.kind === 'skill' && /(?:^|\s)delete\s/.test(trimmed)) return `${trimmed} (warning: archive)`
   return trimmed
 }

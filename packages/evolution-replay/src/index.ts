@@ -145,16 +145,23 @@ export class EvolutionReplayDriver {
   }
 
   record(plan: EvolutionPlanAppliedEvent): void {
+    // P3-23 (v14): the op counters arrive from a persisted session event, so a
+    // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
+    // with NaN and every score derived from it. Same finite-number discipline
+    // as the other guarded fields below.
+    const count = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0)
+    const memoryApplied = count(plan.memoryApplied)
+    const skillApplied = count(plan.skillApplied)
     this.plans.push({
       // 0.3.17 (E-76): an EMPTY policyFingerprint counts as missing — the
       // leaderboard used to show a nameless "" entry (empty-string checks pass
       // through typeof).
       policyId: typeof plan.policyFingerprint === 'string' && plan.policyFingerprint.length > 0 ? plan.policyFingerprint : plan.planId,
-      acceptedOps: plan.memoryApplied + plan.skillApplied,
-      rejectedOps: plan.rejectedOps,
-      memoryOps: plan.memoryApplied,
-      skillOps: plan.skillApplied,
-      evidenceQuotes: typeof plan.evidenceQuotes === 'number' ? plan.evidenceQuotes : plan.memoryApplied + plan.skillApplied,
+      acceptedOps: memoryApplied + skillApplied,
+      rejectedOps: count(plan.rejectedOps),
+      memoryOps: memoryApplied,
+      skillOps: skillApplied,
+      evidenceQuotes: typeof plan.evidenceQuotes === 'number' ? plan.evidenceQuotes : memoryApplied + skillApplied,
       estimatedInputChars: typeof plan.estimatedInputChars === 'number' ? plan.estimatedInputChars : 0,
       // V6-10 (0.3.36): keep the failure dimension for the leaderboard —
       // a plan whose ops all failed must not score as a clean empty plan.

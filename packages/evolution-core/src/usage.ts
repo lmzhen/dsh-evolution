@@ -195,7 +195,9 @@ export function foldCuratorFields(disk: UsageMap, curated: UsageMap, stateOwned?
 /** Whole-file usage write (V6-37, 0.3.37): this is the ONE path that bypasses
  * the malformed-defense and the transact lock — prefer `mutateUsage` for any
  * read-modify-write so a concurrent writer cannot lose its update and a
- * malformed sidecar stays recoverable. Kept for fixture/test seeding. */
+ * malformed sidecar stays recoverable. Kept for fixture/test seeding.
+ * @internal P3-16 (v14): no production caller (verified by grep); exported for
+ * the family's tests only. Do not use it to write the sidecar in new code. */
 export async function saveUsage(root: string, map: UsageMap, io: EvolutionIoLike = nodeEvolutionIo()): Promise<void> {
   const obj = Object.fromEntries(map.entries())
   await io.writeText(usageFile(root), JSON.stringify(obj, null, 2))

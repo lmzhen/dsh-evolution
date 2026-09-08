@@ -67,6 +67,27 @@ describe('evolution-state-json boundaries', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('P2-2 (v14): a claim-scoped resolve refuses once the record is no longer ours', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-claim-scope-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    await provider.savePending({ id: 'p1', kind: 'memory', summary: 'x', args: {}, createdAt: 'now', status: 'pending' })
+    await provider.claimPending('p1', 'claim-a')
+    // Another writer's claim id cannot resolve the record…
+    const foreign = await provider.tryResolvePending('p1', 'approved', 'claim-b')
+    expect(foreign.applied).toBe(false)
+    expect(foreign.record?.status).toBe('executing')
+    // …while the owner's own claim still can.
+    const mine = await provider.tryResolvePending('p1', 'approved', 'claim-a')
+    expect(mine.applied).toBe(true)
+    expect(mine.record?.status).toBe('approved')
+    // Unscoped callers (the operator rescue path) keep their behavior.
+    await provider.savePending({ id: 'p2', kind: 'memory', summary: 'y', args: {}, createdAt: 'now', status: 'pending' })
+    await provider.claimPending('p2', 'claim-a')
+    expect((await provider.tryResolvePending('p2', 'rejected')).applied).toBe(true)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('reads the legacy pending.json audit file for upgrade continuity', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-legacy-'))
     const ctx = await mount(root)

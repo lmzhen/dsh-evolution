@@ -936,7 +936,14 @@ export class SkillLibrary {
 
 
 
-  /** Name-format guard shared by every path-building mutator/reader. */
+  /**
+   * Name-format guard for every path-building entry point (P1-1/v14 closed the
+   * one gap: `patch`). Write paths, protection probes and support-file
+   * enumeration all call it before `dirOf`, so no directory path is ever built
+   * from a name that could escape the skills root. `list()` and `snapshotAll()`
+   * are the deliberate exceptions — their names come from `listNames()`, i.e.
+   * from the tree itself, never from caller input.
+   */
   private badName(name: string): string | null {
     const normalized = name.trim()
     if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
@@ -945,10 +952,18 @@ export class SkillLibrary {
     return null
   }
 
+  /**
+   * Refusal reason for a write to `rawName`, or null when the write may
+   * proceed: a protection marker on the directory, or an invalid name
+   * (P1-1/v14 — the name guard lives HERE as well as at every entry point, so
+   * no caller can build a path from an unvalidated name).
+   */
   async writeProtection(rawName: string, origin: WriteOrigin = 'foreground'): Promise<string | null> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    const badName = this.badName(name)
+    if (badName) return badName
 
     const dir = this.dirOf(name)
     for (const marker of ['bundled', 'hub-installed'] as const) {
@@ -969,6 +984,10 @@ export class SkillLibrary {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    // P1-1 (v14): invalid names are refused here too (same rationale as
+    // writeProtection) — the returned string is the refusal reason.
+    const badName = this.badName(name)
+    if (badName) return badName
 
     const dir = this.dirOf(name)
     const markers: ReadonlyArray<'bundled' | 'hub-installed' | 'pinned'> = options.allowBundled
@@ -985,6 +1004,7 @@ export class SkillLibrary {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
 
+    if (this.badName(name) !== null) return false
     const dir = this.dirOf(name)
     return await this.io.exists(markerPath(dir, 'hermes-managed'))
   }
@@ -1040,7 +1060,10 @@ export class SkillLibrary {
    * Used by the maintenance enrichment (011 §7) and probe reads.
    */
   async listSupportFiles(rawName: string): Promise<string[]> {
-    const dir = this.dirOf(rawName)
+    // P1-1 (v14): no path is built from an unvalidated name here either.
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return []
+    const dir = this.dirOf(name)
     let entries: string[]
     try { entries = await this.io.list(dir) } catch { return [] }
     const out: string[] = []
@@ -1251,6 +1274,13 @@ export class SkillLibrary {
     replaceAll: boolean,
     origin: WriteOrigin,
   ): Promise<SkillActionResult> {
+    // P1-1 (v14): patch was the ONE path-building mutator without the name
+    // guard — `name = '../outside'` plus a `file_path` escaped the skills root
+    // and rewrote an existing support file there (the SKILL.md branch was
+    // saved only by the frontmatter name equality check, the support-file
+    // branch had no such second line of defence).
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
     const skillMd = join(dir, 'SKILL.md')
     if (!await this.io.exists(skillMd)) return { ok: false, message: `Skill "${name}" not found.` }
@@ -1275,6 +1305,13 @@ export class SkillLibrary {
       // a NON-exact anchor past the budget is refused with an honest message.
       if (!md.includes(oldString) && (oldString.length > FUZZY_MAX_PATTERN_CHARS || md.length * oldString.length > FUZZY_MAX_WORK)) {
         return { result: { ok: false, message: `old_string too large for fuzzy match (${oldString.length} chars in ${patchLabel}); use update for a full rewrite or a narrower anchor.` }, write: null }
+      }
+      // P3-30 (v14): an empty or whitespace-only anchor is refused by the
+      // fuzzy boundary, but the caller used to report it as "Could not find
+      // old_string" — indistinguishable from a genuine miss. Name the real
+      // reason so the model retries with an anchor instead of rewriting.
+      if (oldString === '' || trimPatternBoundaries(oldString) === '') {
+        return { result: { ok: false, message: `old_string is empty (or whitespace-only) — a patch of "${name}/${patchLabel}" needs an anchor; use update for a full rewrite.` }, write: null }
       }
       const patched = fuzzyPatch(md, oldString, newString, replaceAll)
       // `null` means "no match" or (V7-11) the replaceAll loop exceeded the
@@ -1413,7 +1450,16 @@ export class SkillLibrary {
       }
     }
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
-    await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
+    // P2-9 (v14): the move already landed, so a failed metadata write must NOT
+    // abort the archive — the caller (consolidate) would then report a rollback
+    // it cannot perform while the tree stays archived, and audit/notify below
+    // would be skipped entirely. The reason file is metadata; best-effort like
+    // `audit()`.
+    try {
+      await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
+    } catch {
+      // The archive itself succeeded; only the human-readable reason is missing.
+    }
     await this.audit(name, 'archive', md, null, reason)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
     return { ok: true, message: `Skill "${name}" archived to .archive.`, path: dest }

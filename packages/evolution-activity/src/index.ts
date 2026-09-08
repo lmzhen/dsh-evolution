@@ -98,6 +98,7 @@ export function serializeActivity(items: EvolutionActivityRecord[]): string {
 
 export function parseActivityContent(raw: string | null): EvolutionActivityRecord[] {
   if (raw === null) return []
+  const isCount = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value)
   try {
     const parsed = JSON.parse(raw) as unknown
     const items = typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { items?: unknown }).items)
@@ -106,7 +107,13 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
     return items.filter((item): item is EvolutionActivityRecord =>
       typeof item === 'object' && item !== null
       && typeof (item as EvolutionActivityRecord).planId === 'string'
-      && typeof (item as EvolutionActivityRecord).sessionId === 'string')
+      && typeof (item as EvolutionActivityRecord).sessionId === 'string'
+      // P3-23 (v14): the op counters are consumed by numeric math downstream;
+      // a malformed sidecar entry must be dropped rather than propagating NaN
+      // (same finite-number discipline feedback applies to its own records).
+      && isCount((item as EvolutionActivityRecord).memoryApplied)
+      && isCount((item as EvolutionActivityRecord).skillApplied)
+      && isCount((item as EvolutionActivityRecord).rejectedOps))
   } catch {
     // Malformed sidecar is treated as empty; observability is best-effort.
     return []

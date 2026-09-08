@@ -50,7 +50,7 @@ const PATTERNS: ThreatPattern[] = [
   // next to this one already uses `\b` — this row now matches that discipline.
   { label: 'exfil_curl', category: 'exfiltration', scope: 'all', regex: /\bcurl\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
   { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /\bwget\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
-  { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env|credentials|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
+  { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env(?!\w)|(?:\bcredentials\b)|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
 
   // Persistence / backdoor / harness-config tampering. V9-10 (0.3.51):
   // `\b` word boundaries — the bare `authorized_keys` substring matched inside
@@ -69,6 +69,11 @@ const PATTERNS: ThreatPattern[] = [
 
   // Hardcoded secrets.
   { label: 'hardcoded_secret', category: 'hardcoded_secrets', scope: 'strict', regex: /(?:api[_-]?key|token|secret|password)\s*[=:]\s*["'][a-z0-9+/=_-]{20,}["']/i },
+  // P3-22 (v14): a JWT is `base64url.base64url.base64url` — the dot-separated
+  // alphabet is outside `hardcoded_secret`'s character class, so an embedded
+  // token of that form went unreported. Dedicated pattern instead of widening
+  // the generic class (which would raise false positives on dotted identifiers).
+  { label: 'jwt_like_secret', category: 'hardcoded_secrets', scope: 'strict', regex: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/ },
   { label: 'private_key_block', category: 'hardcoded_secrets', scope: 'all', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
 ]
 
@@ -119,10 +124,15 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   // below it cannot guarantee full coverage (see PATTERN_OVERLAP).
   const windowSize = clampedNumber(maxScanChars, 65_536, { min: PATTERN_OVERLAP + 1 })
   const findings: ThreatFinding[] = []
-  if (ZERO_WIDTH_CHARS.test(text)) {
+  const excluded = new Set(options.excludeLabels ?? [])
+  // P3-22 (v14): unicode obfuscation is scope-INDEPENDENT by design — invisible
+  // and bidi characters are never legitimate in stored knowledge, so they block
+  // even under `scope: 'all'`. The exemption surface still applies: a
+  // deployment that knows a label is benign can allowlist it like any other.
+  if (ZERO_WIDTH_CHARS.test(text) && !excluded.has('unicode_zero_width')) {
     findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope })
   }
-  if (BIDI_CHARS.test(text)) {
+  if (BIDI_CHARS.test(text) && !excluded.has('unicode_bidi_override')) {
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope })
   }
   const normalized = text.normalize('NFKC')
@@ -141,7 +151,6 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
       windows.push(normalized.slice(start, start + windowSize))
     }
   }
-  const excluded = new Set(options.excludeLabels ?? [])
   const seen = new Set<string>()
   for (const window of windows) {
     for (const pattern of PATTERNS) {
@@ -190,8 +199,10 @@ export function scanContentThreats(text: string, maxScanChars = 65_536, options:
  * V10-03 (P2-18): suffix the SkillLibrary/MemoryStore write gates append to a
  * block message — the hit label is already embedded by scanContentThreats /
  * scanMemoryThreats, this names the deployable self-heal path so the model
- * (or operator) can allowlist a known-benign label. The evolution-threat tool
- * channel deliberately does NOT append it: that channel has no
- * threatExemptLabels option to advertise.
+ * (or operator) can allowlist a known-benign label. P2-4 (v14): the
+ * evolution-threat guard channel now carries `threatExemptLabels` too, so its
+ * block message (which embeds the same exemption sentence) is accurate there
+ * as well; this suffix stays store-side because the guard returns the scan
+ * message verbatim.
  */
 export const THREAT_EXEMPT_HINT = ' If this is a legitimate false positive, the deployment can allow its label via the threatExemptLabels store option.'

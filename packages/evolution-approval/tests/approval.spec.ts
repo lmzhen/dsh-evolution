@@ -263,8 +263,11 @@ describe('evolution-approval', () => {
     // Release the runner: the write completes AFTER reject already resolved it.
     releaseRunner!()
     const approved = await approve
-    expect(approved.ok).toBe(false) // the resolve is refused — already rejected
-    expect(approved.message).toContain('already resolved')
+    expect(approved.ok).toBe(false) // the claim-scoped resolve refuses — the record is no longer ours
+    // P2-2 (v14): the message now names the DIVERGENCE (write landed, audit
+    // reads rejected) instead of the generic "already resolved".
+    expect(approved.message).toContain('resolved to "rejected" concurrently')
+    expect(approved.message).toContain('do NOT replay it')
     // The write ran exactly once (it did land even though the audit reads rejected).
     expect(executions).toBe(1)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)

@@ -21,7 +21,8 @@ The layered layout is recommended for production.
 ## Prerequisites
 
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
-  or a published `@deepseek-ai/dsh-evolution-host` bundle available to pnpm.
+  or the published community bundle `@lmzhen/dsh-evolution-host` available to
+  pnpm (see §5).
 - For the local installer below: Node 22+ and the source checkout.
 
 ## 1. Layered install (local development)
@@ -220,7 +221,7 @@ minimal, and deployments that use Creator mode add the row themselves:
 
 ```yaml
 - id: evolution-capability
-  name: '@deepseek-ai/dsh-evolution-capability'
+  name: '@lmzhen/dsh-evolution-capability'
 ```
 
 It fails closed while `evolution-approval` is disabled, and it never executes

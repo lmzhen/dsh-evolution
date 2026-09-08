@@ -178,3 +178,64 @@ describe('V10 boundary hardening', () => {
     expect((await lib.writeSupportFile('named', 'scripts/run_v2.mjs', 'export {}')).ok).toBe(true)
   })
 })
+
+// ── v14 audit P1-1 / P2-9 boundary hardening ────────────────────────────────
+
+describe('V14 name-guard unification and archive metadata', () => {
+  it('P1-1: patch refuses a traversal name even when the escaped support file EXISTS', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    // A real skill tree OUTSIDE the configured root, with a support file. The
+    // pre-fix code built `join(root, '../outside')` and rewrote it (the
+    // SKILL.md branch was saved only by the frontmatter name equality check;
+    // the support-file branch skipped that check entirely).
+    io.files.set('/outside/SKILL.md', SKILL.replace('boundary-skill', 'outside'))
+    io.files.set('/outside/references/detail.md', 'ORIGINAL')
+    const patched = await lib.patch('../outside', 'ORIGINAL', 'PWNED', 'references/detail.md')
+    expect(patched.ok).toBe(false)
+    expect(patched.message).toContain('Invalid skill name')
+    expect(io.files.get('/outside/references/detail.md')).toBe('ORIGINAL')
+    // The same guard now covers the SKILL.md branch and the protection probes.
+    expect((await lib.patch('../outside', 'ORIGINAL', 'PWNED')).ok).toBe(false)
+    expect(await lib.writeProtection('../outside')).toContain('Invalid skill name')
+    expect(await lib.deleteProtection('../outside')).toContain('Invalid skill name')
+    expect(await lib.isManaged('../outside')).toBe(false)
+    expect(await lib.listSupportFiles('../outside')).toEqual([])
+  })
+
+  it('P3-30: an empty or whitespace-only anchor names its own reason, not "not found"', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    const empty = await lib.patch('boundary-skill', '', 'x')
+    expect(empty.ok).toBe(false)
+    expect(empty.message).toContain('needs an anchor')
+    const blank = await lib.patch('boundary-skill', '   \n  ', 'x')
+    expect(blank.ok).toBe(false)
+    expect(blank.message).toContain('needs an anchor')
+    // A genuine miss keeps the original wording.
+    const miss = await lib.patch('boundary-skill', 'NOT-IN-THE-FILE', 'x')
+    expect(miss.ok).toBe(false)
+    expect(miss.message).toContain('Could not find old_string')
+  })
+
+  it('P2-9: a failed .archive-reason write does not abort the archive or skip its audit', async () => {
+    const base = fakeIo()
+    const io: EvolutionIoLike & { files: Map<string, string> } = {
+      ...base,
+      files: base.files,
+      async writeText(path, content) {
+        if (path.replaceAll('\\', '/').endsWith('/.archive-reason')) throw new Error('disk full')
+        await base.writeText(path, content)
+      },
+    }
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    const archived = await lib.archive('boundary-skill', { reason: 'Lifecycle: threshold' })
+    expect(archived.ok).toBe(true)
+    // The move landed and the mutation trail recorded it, so a caller can never
+    // report "rolled back" while the tree stays archived.
+    expect(await io.exists('/skills/.archive/boundary-skill/SKILL.md')).toBe(true)
+    expect((await lib.listMutations()).some(record => record.skillName === 'boundary-skill' && record.action === 'archive')).toBe(true)
+  })
+})

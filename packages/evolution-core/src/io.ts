@@ -202,7 +202,14 @@ export async function writeDurableTmp(
 ): Promise<string> {
   const tmp = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
   try {
-    const handle = await openImpl(tmp, 'wx')
+    // P3-9 (v14): commitTmp renames the tmp ONTO the target, so the target
+    // inherits the tmp's inode and mode. Without carrying the target's own
+    // mode, a file an operator tightened to 0o600 silently widened to
+    // 0o666 & ~umask on the next write. POSIX only — Windows ignores mode bits.
+    const mode = process.platform === 'win32'
+      ? undefined
+      : await stat(target).then(value => value.mode & 0o777).catch(() => undefined)
+    const handle = await openImpl(tmp, 'wx', mode)
     try {
       await handle.writeFile(content, 'utf8')
       await handle.sync()
@@ -538,9 +545,18 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
             // P2-7 (v11): a never-again-touched lock path would stay registered
             // forever (the entry only leaves on a successful self-heal) —
             // cap the map at 64 entries, dropping the oldest on overflow.
+            // P3-10 (v14): dropping a path whose lock STILL EXISTS permanently
+            // disables the self-heal for it (every later write burns the full
+            // retry budget and fails). Prefer an entry whose lock is already
+            // gone; only when none is droppable fall back to the oldest.
             if (pendingSelfCleanup.size >= 64) {
-              const oldest = pendingSelfCleanup.keys().next().value
-              if (oldest !== undefined) pendingSelfCleanup.delete(oldest)
+              let droppable: string | undefined
+              for (const candidate of pendingSelfCleanup.keys()) {
+                if (candidate === lock) continue
+                if (await readFile(candidate, 'utf8').then(() => false, () => true)) { droppable = candidate; break }
+              }
+              const victim = droppable ?? pendingSelfCleanup.keys().next().value
+              if (victim !== undefined) pendingSelfCleanup.delete(victim)
             }
             pendingSelfCleanup.set(lock, body)
           })
@@ -711,9 +727,14 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
       }
     },
     async isSymlink(path) {
-      try { return (await lstat(path)).isSymbolicLink() } catch {
-        // Guard not applicable: missing path or an lstat failure never blocks.
-        return null
+      try { return (await lstat(path)).isSymbolicLink() } catch (error) {
+        // G7 guard (P3-8, v14): `null` means "probe not applicable", which for
+        // this guard is exactly a MISSING path. A real lstat failure
+        // (EACCES/EIO/…) must not read as "not a symlink" — the caller would
+        // then move a link it was supposed to refuse. Same discipline as the
+        // sibling probes (`size`/`mtime`/`exists`).
+        if (isMissing(error)) return null
+        throw error
       }
     },
     async mtime(path) {

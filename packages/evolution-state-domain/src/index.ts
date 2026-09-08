@@ -181,8 +181,11 @@ export function apply(ctx: Context): void {
       // the seam's "whole RMW inside one transact" contract. The optimistic
       // retry re-enters the domain write chain: if the concurrent writer has
       // created the key meanwhile, `task` runs on the FRESH basis and nothing
-      // is lost. Only a SECOND missing-key proves the key still absent, so
-      // the seed below (task(null) + put/delete) races no third party.
+      // is lost. Only a SECOND missing-key proves the key still absent, so the
+      // seed below is safe against the common race — the residual window
+      // between that second missing-key and the put is a narrow lost-update
+      // possibility (no conditional-put primitive on the domain seam), not a
+      // "races no third party" guarantee.
       try {
         await table.update(CURATOR_STATE_KEY, current => task(current) ?? current)
         return
@@ -252,12 +255,15 @@ export function apply(ctx: Context): void {
       }
     },
 
-    async tryResolvePending(id, status): Promise<PendingResolution> {
+    async tryResolvePending(id, status, expectedClaimId): Promise<PendingResolution> {
       const table = (await ensure()).table(PENDING_TABLE)
       try {
         const resolved = { record: null as PendingRecord | null }
         const record = await table.update(id, (current) => {
           if (!canResolvePending(current.status)) return current
+          // P2-2 (v14): claim-scoped resolve — refuse once the record is no
+          // longer ours (same rule as the json provider).
+          if (expectedClaimId !== undefined && current.claimedBy !== expectedClaimId) return current
           resolved.record = { ...current, status, resolvedAt: new Date().toISOString() }
           return resolved.record
         })

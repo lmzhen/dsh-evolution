@@ -95,16 +95,20 @@ export class SkillUsageRegistry extends Service {
     // 0.3.23 (G7.1 N1): DSH_HOME resolution routes through core's single
     // source (evolutionRoot, `||` empty-string fallback) — a raw probe here
     // would let an empty DSH_HOME mint a CWD-relative events home.
-    this.eventsHome = config.eventsHome || evolutionRoot()
+    // P3-17 (v14): trim like resolveSkillsRoot/evolutionRoot — a whitespace-only
+    // value is truthy and used to become a CWD-relative path.
+    this.eventsHome = config.eventsHome?.trim() || evolutionRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // A2 observation: `session/event` tool/call records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
     // makes the sidecar's view counters live; names without a usage record are
     // skipped so unrelated reads never mint entries (records are authored by
     // creation / patch / seed, never by observation).
-    // V6-43 (0.3.37): the listener is registered through ctx.effect so a plugin
-    // unload/re-mount disposes it (the family's tool-memory/skill-catalog
-    // pattern) — a bare ctx.on here leaks a stale observer.
+    // V6-43 (0.3.37): registered through ctx.effect for symmetry with
+    // tool-memory/skill-catalog. Note `ctx.on` already ties the listener to the
+    // current fiber (vendor/cordis events.ts: "Register an event listener owned
+    // by the current fiber"), so the wrapper is symmetry/explicitness, not a
+    // leak fix.
     ctx.effect(() => {
       const dispose = ctx.on('session/event', (_session, event) => {
         if (event.type !== 'tool/call') return
@@ -223,7 +227,11 @@ export class SkillUsageRegistry extends Service {
     })
   }
 
-  /** Read-only snapshot of the sidecar (no disk write — reading never mutates). */
+  /** Read-only snapshot of the sidecar (no disk write — reading never mutates).
+   * P3-18 (v14): unlike `mutate()` this takes no cross-process transact lock.
+   * That is safe by construction: every writer commits through tmp+rename, so a
+   * reader observes a complete generation (old or new), never a torn file, and
+   * the lock exists for the read-modify-write cycle this method does not do. */
   async report(): Promise<UsageMap> {
     const run = this.chain.then(async () => new Map(await loadUsage(this.root, this.io)))
     this.chain = run.then(() => undefined, () => undefined)

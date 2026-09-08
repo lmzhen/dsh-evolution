@@ -325,4 +325,11 @@ function serialize(items: EvolutionActivityRecord[]): string {
     expect('executionError' in full).toBe(true)
   })
 
+
+  it('P3-23 (v14): a malformed counter in a persisted entry drops that entry instead of propagating NaN', () => {
+    const good = { planId: 'p1', sessionId: 's1', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 }
+    const bad = { planId: 'p2', sessionId: 's1', memoryApplied: 'two', skillApplied: 0, rejectedOps: 0 }
+    const parsed = parseActivityContent(JSON.stringify({ version: ACTIVITY_FILE_VERSION, items: [good, bad] }))
+    expect(parsed.map(item => item.planId)).toEqual(['p1'])
+  })
 })

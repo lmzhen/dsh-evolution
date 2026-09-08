@@ -73,6 +73,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // (descriptions/supportFiles/quality) — previously the probe fed
           // body-only snapshots and answered "description=missing" while the
           // facts block measured real lengths (review finding, 13:38 run).
+          // P3-20 (v14): `buildEnrichment` and `snapshotFromLibrary` each walk
+          // the whole tree (list + read per skill), so one probe call is O(2N)
+          // reads and a maintain scan repeats it. Deliberately uncached: the
+          // probe must observe the CURRENT tree, and the family ships no
+          // runId-scoped snapshot store. Revisit only with a measured need
+          // (a large library where probe latency becomes visible).
           const enrichment = await buildEnrichment(ctx, library)
           const snapshots = await snapshotFromLibrary(library, {
             descriptions: enrichment.descriptions,

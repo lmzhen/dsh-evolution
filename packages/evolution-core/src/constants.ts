@@ -71,6 +71,13 @@ export const DEFAULT_USER_CHAR_LIMIT = 1375
 /** Consolidation-failure backoff cap, shared by MemoryStore and memory-files' Config default. */
 export const DEFAULT_CONSOLIDATION_FAILURES = 3
 export const DEFAULT_SKILL_CONTENT_CHARS = 100_000
+/** P3-19 (v14): defaults that were written twice (schema `.default()` AND the
+ * clamp fallback literal) now have one home per value. */
+export const DEFAULT_REVIEW_TIMEOUT_MS = 120_000
+export const DEFAULT_REVIEW_CONTEXT_MESSAGES = 60
+export const DEFAULT_REVIEW_MESSAGE_CHARS = 2_000
+export const DEFAULT_CURATOR_BOOT_GRACE_SECONDS = 10
+export const DEFAULT_CURATOR_REVIEW_MAX_TOKENS = 2_048
 
 /** 0.3.17 (S3.10, T-1): control-plane fields a model-facing write call may
  * never carry — single source for plan-validator, evolution-policy and the

@@ -209,6 +209,12 @@ const corruptWritten = new Map<string, string>()
 // successful write (a failed write is retried, not marked done); and the
 // key alone is not trusted — a copy swept by the 7-day stale cleanup (S-10)
 // is rebuilt on the next access instead of being skipped until restart.
+// P3-12 (v14): these three are MODULE scope on purpose (`jsonTransact` is a
+// module function that cannot reach the apply-scoped closure), which means they
+// outlive a plugin unload/re-mount and are shared by every provider instance in
+// the process. The observable consequence is warn/rewrite DEDUPLICATION across
+// instances and roots keyed by file NAME only — never a wrong write (the
+// `.corrupt` existence probe in ensureCorruptCopy re-checks the actual root).
 const corruptWriteWarned = new Set<string>()
 
 function reportGateViolation(ctx: Context, file: string, failing: Array<[string, unknown]>): void {
@@ -295,6 +301,17 @@ export async function jsonTransact<T>(
     if (next !== null && RECORD_MAP_FILES.has(file) && !isPlainRecord(next)) {
       const kind = Array.isArray(next) ? 'an array' : typeof next
       throw new Error(`evolution state file "${file}" task returned ${kind} (expected null or a plain JSON object map of records); not written.`)
+    }
+    // P2-1 (v14): the WRITE-BACK must clear the SAME per-record field gate the
+    // read path (:342-362) and the domain provider (zod at put time) enforce.
+    // Without it a record with a wrong field shape was persisted and then
+    // quarantined on the next read — a silent loss window ("written, then
+    // gone"). Fail loud before any write, exactly like the shape gate above.
+    if (next !== null && RECORD_MAP_FILES.has(file)) {
+      const failing = gateScan(file, next)
+      if (failing.length > 0) {
+        throw new Error(`evolution state file "${file}" write-back carries ${failing.length} record(s) that fail the field gate (${failing.map(([id]) => id).join(', ')}); not written.`)
+      }
     }
     return next === null ? null : JSON.stringify(next, null, 2)
   })
@@ -732,7 +749,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       })
     },
 
-    async tryResolvePending(id, status): Promise<PendingResolution> {
+    async tryResolvePending(id, status, expectedClaimId): Promise<PendingResolution> {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
         let evicted: PendingRecord[] = []
@@ -745,6 +762,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
           // legal resolve source — a crash mid-approve leaves it there for the
           // operator; a DUPLICATE execution is what this blocks.
           if (record === null || !canResolvePending(record.status)) {
+            result = { record, applied: false }
+            return map
+          }
+          // P2-2 (v14): a claim-scoped resolve refuses once the record is no
+          // longer ours — the approve that owns it can then report the real
+          // final state instead of silently overwriting a concurrent reject.
+          if (expectedClaimId !== undefined && record.claimedBy !== expectedClaimId) {
             result = { record, applied: false }
             return map
           }

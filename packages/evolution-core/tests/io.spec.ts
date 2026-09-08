@@ -2,7 +2,7 @@ import { afterAll, expect, it, vi } from 'vitest'
 // Contention tests spawn real fs races; full-suite parallel load can stretch
 // them far beyond the vitest default (audit v10 integration fix).
 vi.setConfig({ testTimeout: 30_000 })
-import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -560,5 +560,31 @@ it('C-07: the transact-less fallback skips the write on a byte-identical result'
   // A changed result still writes through the fallback.
   await transactIo(fallback, target, async () => 'changed')
   expect(await readFile(target, 'utf8')).toBe('changed')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('P3-8 (v14): isSymlink returns null only for a missing path and propagates a real lstat failure', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-symlink-'))
+  const io = nodeEvolutionIo()
+  // Missing path = "guard not applicable".
+  expect(await io.isSymlink(join(root, 'nope'))).toBeNull()
+  await writeFile(join(root, 'plain.txt'), 'x')
+  expect(await io.isSymlink(join(root, 'plain.txt'))).toBe(false)
+  // A genuine lstat failure must NOT read as "not a symlink": an invalid path
+  // throws ERR_INVALID_ARG_VALUE, which the old blanket catch swallowed.
+  await expect(io.isSymlink('bad\0path')).rejects.toThrow()
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('P3-9 (v14): an atomic rewrite preserves a tightened file mode (POSIX)', async () => {
+  if (process.platform === 'win32') return
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-mode-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'secret.txt')
+  await io.writeText(target, 'first')
+  await chmod(target, 0o600)
+  await io.writeText(target, 'second')
+  expect((await stat(target)).mode & 0o777).toBe(0o600)
+  expect(await readFile(target, 'utf8')).toBe('second')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

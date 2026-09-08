@@ -79,12 +79,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let control: SkillProviderControl | undefined
   // 0.3.18 (S4.5, X-7): process-internal summaries cache — every `get()` used
   // to run a full tree scan (read + parse every SKILL.md). Dropped on
-  // `evolution/skill-mutated` (in-band writes) and re-stamped via the root
-  // mtime probe, so a structural out-of-band change (directory add/remove/
-  // rename) does not serve stale metadata once the provider re-queries.
-  // In-place out-of-band CONTENT edits need `/evolution skills refresh`
-  // (explicit invalidation — decision C keeps no filesystem watcher); see
-  // README Known Limitations.
+  // `evolution/skill-mutated` (in-band writes). The root-mtime probe below is
+  // a best-effort SECOND signal: it only notices a change to the skills root
+  // DIRECTORY itself, so a nested skill's content edit, or a change that does
+  // not touch the root's mtime, is NOT detected — the E-71 test pins that
+  // (`catalog.spec.ts`: a new skill directory stays invisible until
+  // `evolution/skills-refresh`). Out-of-band changes therefore require the
+  // explicit refresh (decision C keeps no filesystem watcher); see README
+  // Known Limitations.
   let summariesCache: SkillSummary[] | null = null
   let summariesStamp: number | null = null
   async function summaries(): Promise<SkillSummary[]> {

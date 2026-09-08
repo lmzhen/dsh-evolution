@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-a
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE, resolveSkillsRoot, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -136,8 +136,8 @@ export class EvolutionCurator extends Service {
     autoStart: z.boolean().default(true),
     // bootGraceSeconds 0 is a legitimate "no grace" (setTimeout(0)); negative
     // values are rejected.
-    bootGraceSeconds: z.number().min(0).default(10),
-    curatorReviewMaxTokens: z.number().min(1).default(2048),
+    bootGraceSeconds: z.number().min(0).default(DEFAULT_CURATOR_BOOT_GRACE_SECONDS),
+    curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS),
     healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
     healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
     healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
@@ -171,6 +171,8 @@ export class EvolutionCurator extends Service {
    * in-memory clock is seeded and later due runs must proceed, or the
    * persisted===null defer repeats forever (no state service to persist). */
   private statelessFirstRunDeferred = false
+  /** P2-5 (v14): one-shot warning that the interval baseline is process-only. */
+  private statelessStateWarned = false
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
@@ -203,8 +205,8 @@ export class EvolutionCurator extends Service {
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
-    this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, 10, 0)
-    this.curatorReviewMaxTokens = field('curatorReviewMaxTokens', config.curatorReviewMaxTokens, 2048, 1)
+    this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0)
+    this.curatorReviewMaxTokens = field('curatorReviewMaxTokens', config.curatorReviewMaxTokens, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1)
     this.healthSoftBodyChars = field('healthSoftBodyChars', config.healthSoftBodyChars, DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1)
     this.healthStampDensityPerKb = field('healthStampDensityPerKb', config.healthStampDensityPerKb, DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1)
     this.healthChurnMinPatches = field('healthChurnMinPatches', config.healthChurnMinPatches, DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1)
@@ -303,6 +305,12 @@ export class EvolutionCurator extends Service {
    * HERE as a cheap pre-check (persisted or in-memory clock) AND again inside
    * run() as the authoritative gate — the docstring no longer claims the two
    * never duplicate; a future interval change must update both.
+   *
+   * P2-5 (v14): without the `evolution-state` service there is no durable
+   * `lastRunAt`, so the baseline degrades to this process's lifetime. That is
+   * a supported-but-degraded composition (every shipped bundle mounts the
+   * state rows), so the schedule is left as-is and the degradation is
+   * surfaced once instead of silently meaning "never runs".
    */
   private async autoCheck(): Promise<void> {
     // 0.3.18 (E-7): the unattended tick (boot catch-up / hourly interval) must
@@ -311,7 +319,12 @@ export class EvolutionCurator extends Service {
     // unhandled rejection and crash the host. Catch, log, persist a failed
     // report (leave a trace), never propagate.
     try {
-      const persisted = await this.curatorStateService()?.loadCuratorState()
+      const stateService = this.curatorStateService()
+      if (stateService === undefined && !this.statelessStateWarned) {
+        this.statelessStateWarned = true
+        this.ctx.logger.warn('evolution-curator: evolution-state is not mounted — the curation interval baseline is this process\'s lifetime only (default interval 168h), so automatic curation will not fire again until the process has been alive that long. Mount evolution-state (evolution-host/all bundle) for a durable schedule.')
+      }
+      const persisted = await stateService?.loadCuratorState()
       const last = persisted?.lastRunAt ?? this.lastRun
       if (Date.now() - last >= this.lifecycle().intervalHours * 3_600_000) {
         await this.run()

@@ -26,5 +26,13 @@ export function apply(ctx: Context): void {
     name: 'node',
     ...nodeEvolutionIo(),
   }
-  ctx.effect(() => ctx.evolutionIo.registerProvider(provider), 'evolution-io-node.provider')
+  // P3-11 (v14): a second apply (HMR or a re-mounted row) must not throw
+  // "already registered" — our own provider being present is the idempotent
+  // case; a DIFFERENT provider under the same name still fails loud in
+  // registerProvider.
+  if (ctx.evolutionIo.hasProvider(provider.name)) return
+  // P2-7 (v14): declare the node backend as the nameless `provider()` default
+  // so an additionally registered backend cannot silently become the one every
+  // production consumer resolves.
+  ctx.effect(() => ctx.evolutionIo.registerProvider(provider, { default: true }), 'evolution-io-node.provider')
 }

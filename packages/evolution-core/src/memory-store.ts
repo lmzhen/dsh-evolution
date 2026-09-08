@@ -239,11 +239,17 @@ export class MemoryStore {
   private async backupFile(target: MemoryTarget): Promise<string | null> {
     const path = fileFor(this.root, target)
     const backup = `${path}.bak`
+    // P3-13 (v14): stage the copy under a transient name and only then replace
+    // the fixed `.bak`, so a FAILED copy leaves the previous backup intact —
+    // the old shape removed `.bak` first and lost the last good generation.
+    const staging = `${backup}.${process.pid}.${Date.now().toString(36)}.tmp`
     try {
-      await this.io.remove(backup).catch(() => {})
-      await this.io.copy(path, backup)
+      await this.io.remove(staging).catch(() => {})
+      await this.io.copy(path, staging)
+      await this.io.rename(staging, backup)
       return backup
     } catch {
+      await this.io.remove(staging).catch(() => {})
       return null
     }
   }
@@ -495,6 +501,12 @@ export class MemoryStore {
           ? ` [${Math.min(100, Math.floor((body.length * 100) / limit))}% — ${body.length}/${limit} chars]`
           : ''
         parts.push(`## ${label} (${safe.length} entries)${usage}${note}\n${body}`)
+      } else if (entries.length > 0) {
+        // P3-14 (v14): every entry was threat-matched. The block used to
+        // vanish with no trace, so the model (and an operator reading the
+        // transcript) could not tell "no memories" from "all filtered" — the
+        // oversized branch above already states its skip explicitly.
+        parts.push(`## ${label} — ${entries.length} entries withheld by the security scan; none injected`)
       }
     }
     return parts.join('\n\n')

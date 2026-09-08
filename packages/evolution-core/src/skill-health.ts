@@ -60,7 +60,13 @@ export const MIN_STAMP_BODY_CHARS = 2_000
 
 export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure'
 
-/** Facts a caller already has; assessors never do IO. */
+/** Facts a caller already has; assessors never do IO.
+ *
+ * `bodyChars`/`bodyText` are the WHOLE `SKILL.md` text as read from disk
+ * (frontmatter included), matching both callers: `SkillLibrary.assessHealth`
+ * and `snapshotFromLibrary` feed `read()` verbatim. The field names predate
+ * that convention; the thresholds are calibrated against the whole file, so a
+ * caller must not strip frontmatter before measuring. */
 export interface SkillHealthSnapshot {
   skillName: string
   bodyChars: number

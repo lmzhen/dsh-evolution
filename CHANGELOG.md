@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.62 (patch) — v14 全量审计优化批：安全边界 + 契约对称 + 鲁棒性 + 单源文档（B1–B5 全量，49 文件 / +772 −145 / 20 条新判别用例）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v14.md`（1×P1 + 9×P2 + 39×P3，首次全量审计）→ `optimization-plan-v14.md`（B1–B5 五批 + §7 扩展点 + §8 非目标）→ 实施完成情况见 `optimization-completion-v14.md`（含发布前独立复核章节：镜像↔开发树 46/46 sha256 一致、110 files/898 tests、21 包 tsc 0、oxlint 0/0、四道守卫 exit 0、P1-1 与 P2-1 两条真实红→绿实证）。
+- **行为契约变化（用户/部署可见，逐条）**：
+  1. **`skill_manage action=patch` 拒绝非法名称**（含 `..`）——此前该分支是唯一未经 `badName` 的写路径，可改写 skills root 之外的**已存在**支持文件（P1-1，安全边界）。
+  2. **json 状态 provider 的写回补记录字段门（fail-loud）**——此前"先落盘、下轮读才隔离"的静默丢失窗口消除，与 domain provider 的"写入即校验"对齐（P2-1）。
+  3. **审批 claim 语义收紧**：`approve` 只在仍持有 claim 时 resolve；被并发 `reject` 后返回"写已落地、审计读 rejected，请勿重放"的明确指引（原为含糊的 "already resolved"）；`reject` 的 executing 救援分支显式声明允许无 claim（P2-2）。
+  4. **删除 `executionTimeoutMs`**（声明即死配置，无读取点）；**删除死导出 `EVOLUTION_ENV_KEYS`**（P3-4/P3-1）。
+  5. **`evolution-threat` 新增 `threatExemptLabels`**（本轮唯一新增配置字段，计划批准）：guard 与 store 的豁免语义一致，拦截文案不再指向无效开关（P2-4）。
+  6. **威胁规则边界调整**：`read_secrets` 不再误报 `.envrc` 与词中 `credentials`；新增 JWT 形态密钥检测；unicode 发现可被豁免（P3-22）。
+- **其余批次**：B1（`patch`/四探测方法统一 `badName`、`.archive-reason` 写失败降级 best-effort、`renderContext` 进 `serializedWrite` 单代一致）；B2（审批 claim 归属、io 默认 provider 显式化 `registerProvider(..., {default})` + `hasProvider`、curator stateless 一次性 warn、review 远程 subagent 限制文档化）；B3（命令表单源补 `[--plan <runId>]`、env 表补 `EVOLUTION_SCOPE`、发布 scope 口径统一为"monorepo 内 `@deepseek-ai/*`、发布重写 `@lmzhen/*`"、patch 注释与 pin 口径对齐、失实注释清理、镜像工程面边界声明）；B4（io 错误分类/原子写保 mode/锁淘汰/注册幂等、威胁规则边界、activity+replay 有限数守卫、记忆备份与过滤提示）；B5（默认值单点、死配置清理、**门禁降噪（N4 死兜底清单下线，78 行误报消失）**、接缝包契约用例、模块级状态注释与其余小项）。
+- **门禁**：全量 110 files / 898 tests；受影响 21 包 `tsc --noEmit` exit 0；oxlint 0/0（206 文件）；arch-guards / event-pairing / dependency-closure / profile-bundles 全 exit 0。本批含实施方 18/20 条红→绿自证 + 发布前独立复核抽证 2 条（P1-1、P2-1）。
+- **未执行（计划内非目标/待决策）**：拆 `skill-store.ts`、引框架/缓存、统一 `~` 展开、curator stateless 调度语义变更、远程 subagent 读集回传（上游契约扩展）、P3-10 专门回归用例——理由与触发条件见计划 §8 与完成说明 §6。
+
 ## 0.3.61 (patch) — profile 双 bundle 事故闭环：仓库级守卫 + 发布链集成 + 安装文档核查
 
 - **背景**：0.3.59/0.3.60 的 profile 升级命令同时安装了 `dsh-evolution-all` 与 `dsh-evolution-host` 两个互斥捆绑——`dsh plugin add` 的 bundle reconcile 只增不减，`dsh.profile.bundles` 出现双行，两捆绑的 patch 插入相同 infra 行（`evolution-policy` 首个冲突）→ cordis loader fail-loud，`dsh web` 启动 abort（GUI 旧进程掩盖至重启才暴露）。

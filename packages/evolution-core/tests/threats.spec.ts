@@ -156,3 +156,26 @@ it('V10-03 (P2-18): MemoryStore default refuses and threatExemptLabels opens the
   expect(context).toContain('authorized_keys')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
+
+it('P3-22 (v14): read_secrets stops matching .envrc and word-internal credentials', () => {
+  // `.env` used to prefix-match `.envrc`; `credentials` had no word boundary.
+  expect(evaluateThreat('cat .envrc').blocked).toBe(false)
+  expect(evaluateThreat('cat xcredentials').blocked).toBe(false)
+  // The real targets still block, including dotted variants of `.env`.
+  expect(evaluateThreat('cat .env').blocked).toBe(true)
+  expect(evaluateThreat('cat .env.local').blocked).toBe(true)
+  expect(evaluateThreat('cat ~/.aws/credentials').blocked).toBe(true)
+})
+
+it('P3-22 (v14): a JWT-shaped secret is reported even though it is dot-separated', () => {
+  const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'
+  const findings = scanThreats(`token = "${jwt}"`)
+  expect(findings.some(finding => finding.label === 'jwt_like_secret')).toBe(true)
+})
+
+it('P3-22 (v14): unicode findings are scope-independent but still exemptable', () => {
+  const text = 'invisible\u200bmarker'
+  expect(scanThreats(text, 'all').some(finding => finding.label === 'unicode_zero_width')).toBe(true)
+  expect(scanThreats(text, 'strict', 65_536, { excludeLabels: ['unicode_zero_width'] })).toEqual([])
+  expect(scanMemoryThreats(text, 65_536, { excludeLabels: ['unicode_zero_width'] })).toBeNull()
+})

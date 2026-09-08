@@ -61,12 +61,6 @@ const violations = []
  * violation. 0.3.23 held the remaining fields as a warn-only TODO; 0.3.25
  * clamped them all (N3 = 0), so the check flipped into the violations gate.
  * */
-/** N4 (warn-only listing, not a gate): dead-fallback returns — a `?? ''` or
- * `?? <identifier>Id` after a value that is already supplied makes the branch
- * dead. Reported as a smell rather than an error because many `?? xId` are a
- * legitimate optional-id default. */
-const nDeadFallback = []
-
 /** H2 (v11): P0-1-class guard — a probed `evolution[A-Z]\w+` service key
  * must have a provider SOMEWHERE in the tree. doctor probed `evolutionReview`
  * for five releases with zero providers and the self-check silently lied;
@@ -116,12 +110,6 @@ function walk(dir) {
           if (/\.(?:min|max|finite|nonnegative)\(/.test(code)) continue
           violations.push(`${rel}:${i + 1}: numeric field without a value clamp (route through clampedNumber + a .min/.max schema bound)`)
         }
-        // N4 (warn-only): dead-fallback returns (see comment above).
-        for (let i = 0; i < lines.length; i += 1) {
-          const code = (lines[i] ?? '').replace(/\/\/.*$/, '').trim()
-          if (!(/\?\? ''|\?\? [A-Za-z]\w*Id/.test(code))) continue
-          nDeadFallback.push(`${rel}:${i + 1}: dead-fallback return ('?? ...' — the value is already supplied)`)
-        }
       }
     }
   }
@@ -160,7 +148,9 @@ if (violations.length > 0) {
 } else {
   console.log(`verify-arch-guards: OK — no DSH_HOME reads outside ${CORE_SRC}, no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC}`)
 }
-if (nDeadFallback.length > 0) {
-  console.warn(`verify-arch-guards [warn]: ${nDeadFallback.length} dead-fallback return(s) ('?? ...' — value already supplied):`)
-  console.warn(nDeadFallback.join('\n'))
-}
+// P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
+// matched `?? ''` / `?? <id>Id` textually with no type information, so all 78
+// reported lines were idiomatic `noUncheckedIndexedAccess`/optional-field
+// guards (`regex[1] ?? ''`, `lines[i] ?? ''`, `config.root ?? ''`) — a signal
+// with zero true positives that printed on every run and trained reviewers to
+// ignore the section. A type-aware equivalent belongs to oxlint, not here.

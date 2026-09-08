@@ -38,17 +38,38 @@ declare module '@deepseek-ai/cordis' {
 
 export class EvolutionIoRegistry extends Service {
   private readonly providers = new Map<string, EvolutionIo>()
+  /** Name of the provider that declared itself the default (P2-7, v14). */
+  private defaultName: string | undefined
 
   constructor(ctx: Context) {
     super(ctx, 'evolutionIo')
   }
 
-  registerProvider(provider: EvolutionIo): () => void {
+  /**
+   * @param options.default - mark this provider as the one a nameless
+   * `provider()` resolves. The first explicit default wins; without any
+   * default the registry keeps its historical registration-order fallback.
+   */
+  registerProvider(provider: EvolutionIo, options: { default?: boolean } = {}): () => void {
     if (this.providers.has(provider.name)) throw new Error(`evolution IO provider "${provider.name}" already registered`)
     this.providers.set(provider.name, provider)
+    if (options.default === true) this.defaultName ??= provider.name
     return () => {
-      if (this.providers.get(provider.name) === provider) this.providers.delete(provider.name)
+      if (this.providers.get(provider.name) === provider) {
+        this.providers.delete(provider.name)
+        if (this.defaultName === provider.name) this.defaultName = undefined
+      }
     }
+  }
+
+  /** Whether a provider with this exact name is mounted. */
+  hasProvider(name: string): boolean {
+    return this.providers.has(name)
+  }
+
+  /** Whether ANY provider is mounted (used by lazy/boot-time probes). */
+  hasProviders(): boolean {
+    return this.providers.size > 0
   }
 
   provider(name?: string): EvolutionIo {
@@ -57,7 +78,11 @@ export class EvolutionIoRegistry extends Service {
       if (provider) return provider
       throw new Error(`evolution IO provider "${name}" is not registered`)
     }
-    const first = this.providers.values().next().value
+    // P2-7 (v14): prefer the provider that explicitly declared itself the
+    // default; registration order remains the fallback for backends/tests that
+    // do not declare one.
+    const declared = this.defaultName === undefined ? undefined : this.providers.get(this.defaultName)
+    const first = declared ?? this.providers.values().next().value
     if (!first) throw new Error('no evolution IO provider registered')
     return first
   }

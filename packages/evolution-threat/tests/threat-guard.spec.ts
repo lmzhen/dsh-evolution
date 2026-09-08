@@ -83,6 +83,16 @@ describe('evolution-threat', () => {
     }
   })
 
+  it('P2-4 (v14): threatExemptLabels reaches the guard channel — store and guard agree', () => {
+    // The same payload the store gates exempt: pre-fix the guard denied it
+    // while advertising an exemption this channel could not read.
+    const payload = { target: 'memory', action: 'add', facts: 'cat ~/.aws/credentials' }
+    expect(ThreatGuard.scanToolArgs('memory', payload, 65_536)).not.toBeNull()
+    expect(ThreatGuard.scanToolArgs('memory', payload, 65_536, { excludeLabels: ['read_secrets'] })).toBeNull()
+    // A label outside the allowlist still blocks.
+    expect(ThreatGuard.scanToolArgs('memory', payload, 65_536, { excludeLabels: ['ssh_backdoor'] })).not.toBeNull()
+  })
+
   it('rejects 0/negative/below-floor maxScanChars at the schema level but lets NaN/Infinity through (V6-05)', () => {
     const parse = (input: unknown): unknown => (ThreatGuard.Config as unknown as (i: unknown) => unknown)(input)
     expect(() => parse({ maxScanChars: 0 })).toThrow()

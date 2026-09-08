@@ -88,4 +88,15 @@ describe('evolution-replay', () => {
     const result = driver.compare()
     expect(result.report).toContain('3 failed: staged (approval)')
   })
+
+  it('P3-23 (v14): a malformed op counter cannot poison the score with NaN', () => {
+    const driver = new EvolutionReplayDriver()
+    // A persisted event with missing/non-numeric counters (the boundary the
+    // record() fields arrive from) must degrade to 0, not NaN.
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'p', memoryApplied: 'two', skillApplied: undefined, rejectedOps: NaN } as unknown as Parameters<typeof driver.record>[0])
+    const plan = driver.plansSnapshot()[0]!
+    expect(plan.acceptedOps).toBe(0)
+    expect(plan.rejectedOps).toBe(0)
+    expect(Number.isNaN(plan.acceptedOps)).toBe(false)
+  })
 })

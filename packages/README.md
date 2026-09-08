@@ -56,14 +56,14 @@ pins the equality).
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
 | `/evolution mutations` | list skill-mutation audit records |
 | `/evolution restore` | restore skills from the latest snapshot |
-| `/evolution consolidate <target> <sources...>` | merge source skills into a target umbrella skill |
+| `/evolution consolidate <target> <sources...> [--plan <runId>]` | merge source skills into a target umbrella skill |
 | `/evolution skill restore <name>` | restore one archived skill by name |
 | `/evolution skills health` | structure-health verdicts for the skill library |
 | `/evolution skills refresh` | drop the catalog caches and re-read the tree |
 | `/evolution learn [request]` | send a learning request to this session |
 | `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
 | `/evolution preset install` | generate the Evolution agent preset into the user root |
-| `/evolution restructure <name> "<heading>" <to_file>` | move a body section into a references/ file |
+| `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
 | `/evolution replay` | compare prompt-bundle replay for this session |
 
 ## Composition details
@@ -218,6 +218,22 @@ owns — `evolution-state-domain` joins it only when mounted (D-30):
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media
    decisions out of policy code; native packages perform no node:fs IO of
    their own.
+
+## Extension points
+
+One change point per extension; a second edit anywhere else means the seam is
+being bypassed. (v14 audit §7.)
+
+| Extension | The one place to change | Must ship with it |
+|---|---|---|
+| New IO medium (remote/in-memory backend) | `evolution-io` `registerProvider` + one bundle row | seam-method passthrough test; declare the default provider (`{ default: true }`) or leave the node backend as the declared default |
+| New durable-state backend | `evolution-state-storage` `registerProvider` + record schema | schema in **zod** (`domainTable`) for the domain provider; the json provider's `gateScan` must accept the same records — **both read AND write paths** (v14 P2-1) |
+| New memory backend | `ctx.memory.registerProvider` | `snapshot()` **and** `renderContext()` must both be single-generation (v14 P2-3) |
+| New threat rule | `evolution-core/threats.ts` `PATTERNS` row + `scope` | one false-positive and one true-positive case; add the label to the exemption surface if it can be benign |
+| New `/evolution` subcommand | `evolution-commands/src/registry.ts` row + handler | the README command table is rendered from this table (T-WD2 pins it) |
+| New model-facing tool | the tool package + the `evolution-agent` delta row (+ a bundle row only if every session needs it) | tool description must name the real fields/tools; unit test on the tool surface |
+| New agent-preset row | `evolution-agent/agent.cordis.yml` (delta only) | never repeat a host-owned row; `composePresetComposition` / installer byte-parity test |
+| Upstream platform bump | `UPSTREAM_SHA` + `PLATFORM_VERSION` + the name-collision check | CI baseline **and** released-compat chains; re-verify the seams listed in the audit report §3 |
 
 ## Development: the two layouts and their tsconfigs
 

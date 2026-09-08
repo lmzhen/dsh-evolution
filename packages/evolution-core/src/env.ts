@@ -7,11 +7,14 @@
  * reads inside patch YAML `!!js` expressions (session-query path/openAt) stay
  * in the profile config evaluation — they are NOT migrated (they are resolved
  * at cordis config time, not plugin time) but are documented in the README
- * env table.
+ * env table. `EVOLUTION_SCOPE` is read by the source installers only
+ * (`packages/scripts/install-layered.mjs`, `packages/test-support/row-contract.ts`),
+ * never by plugin runtime code.
+ *
+ * v14 P3-1: the former `EVOLUTION_ENV_KEYS` export was deleted — nothing read
+ * it, so the "generated env reference" it claimed to source was never
+ * generated (the README table is maintained by hand and now lists every key).
  */
-
-/** Plugin-side DSH_EVOLUTION_* keys (config-layer keys are documented separately). */
-export const EVOLUTION_ENV_KEYS = ['DSH_EVOLUTION_ALLOW_ROW_COLLISIONS'] as const
 
 const ALLOW_ROW_COLLISIONS = '1'
 

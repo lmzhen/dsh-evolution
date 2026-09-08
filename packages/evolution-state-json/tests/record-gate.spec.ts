@@ -180,4 +180,23 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('P2-1 (v14): the write-back clears the same field gate — a malformed record never lands', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-write-gate-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    // The same zombie record the READ gate quarantines: before v14 the write
+    // path only checked the top-level map shape, so this landed on disk and
+    // disappeared (quarantined + excluded) on the next read — the silent loss
+    // window. The domain provider rejects it at put time; json now matches.
+    const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' } as unknown as Parameters<typeof provider.savePending>[0]
+    await expect(provider.savePending(zombie)).rejects.toThrow(/field gate/)
+    expect(await io.readText(join(root, 'pending-state.json'))).toBeNull()
+    expect(await io.readText(join(root, 'pending-state.json.corrupt'))).toBeNull()
+    // A well-formed record still lands, and a legacy write-back keeps working.
+    await provider.savePending({ id: 'p2', kind: 'memory', summary: 'ok', args: {}, createdAt: 'now', status: 'pending' })
+    expect((await provider.listPending()).map(record => record.id)).toEqual(['p2'])
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })

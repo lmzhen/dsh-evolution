@@ -98,8 +98,8 @@ export class EvolutionState extends Service {
     return this.storage().savePending(record)
   }
 
-  tryResolvePending(id: string, status: 'approved' | 'rejected') {
-    return this.storage().tryResolvePending(id, status)
+  tryResolvePending(id: string, status: 'approved' | 'rejected', expectedClaimId?: string) {
+    return this.storage().tryResolvePending(id, status, expectedClaimId)
   }
 
   claimPending(id: string, claimId: string) {

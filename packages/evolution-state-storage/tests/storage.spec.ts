@@ -27,4 +27,27 @@ describe('evolution-state-storage', () => {
     dispose()
     expect(() => ctx.evolutionStateStorage.provider()).toThrow(/no evolution state storage provider/)
   })
+
+  it('P2-2/P3-4 (v14): the registry forwards pending and curator calls to the selected provider', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    const calls: string[] = []
+    const spy = {
+      ...provider('a'),
+      tryResolvePending: async (id: string, status: string, claimId?: string) => {
+        calls.push(`resolve:${id}:${status}:${String(claimId)}`)
+        return { record: null, applied: false }
+      },
+      claimPending: async (id: string) => { calls.push(`claim:${id}`); return null },
+      releasePendingClaim: async (id: string, claimId: string) => { calls.push(`release:${id}:${claimId}`) },
+      transactCuratorState: async () => { calls.push('transact') },
+    }
+    ctx.evolutionStateStorage.registerProvider(spy)
+    const selected = ctx.evolutionStateStorage.provider()
+    await selected.tryResolvePending('x', 'approved', 'claim-1')
+    await selected.claimPending('x')
+    await selected.releasePendingClaim('x', 'claim-1')
+    await selected.transactCuratorState(() => null)
+    expect(calls).toEqual(['resolve:x:approved:claim-1', 'claim:x', 'release:x:claim-1', 'transact'])
+  })
 })

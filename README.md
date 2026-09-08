@@ -109,14 +109,14 @@ single source with the input hint and the emitted help/README text):
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
 | `/evolution mutations` | list skill-mutation audit records |
 | `/evolution restore` | restore skills from the latest snapshot |
-| `/evolution consolidate <target> <sources...>` | merge source skills into a target umbrella skill |
+| `/evolution consolidate <target> <sources...> [--plan <runId>]` | merge source skills into a target umbrella skill |
 | `/evolution skill restore <name>` | restore one archived skill by name |
 | `/evolution skills health` | structure-health verdicts for the skill library |
 | `/evolution skills refresh` | drop the catalog caches and re-read the tree |
 | `/evolution learn [request]` | send a learning request to this session |
 | `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
 | `/evolution preset install` | generate the Evolution agent preset into the user root |
-| `/evolution restructure <name> "<heading>" <to_file>` | move a body section into a references/ file |
+| `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
 | `/evolution replay` | compare prompt-bundle replay for this session |
 
 ### Configuration dials (5 knobs, underlying fields pinned by tests)
@@ -141,6 +141,7 @@ cost and behavior).
 | `DSH_EVOLUTION_SESSION_QUERY` | profile config (`!!js` in bundle patch) | `startup` / `first-search` / `never` (SQLite index openAt); invalid values normalize to `startup` |
 | `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile config (`!!js` in bundle patch) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
 | `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code (core `env.ts`) | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
+| `EVOLUTION_SCOPE` | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. Plugin runtime never reads it |
 
 ## Installation
 
@@ -232,62 +233,62 @@ owns — `evolution-state-domain` joins it only when mounted (D-30):
 
 ```yaml
 - id: evolution-policy
-  name: '@deepseek-ai/dsh-evolution-policy'
+  name: '@lmzhen/dsh-evolution-policy'
 - id: evolution-io
-  name: '@deepseek-ai/dsh-evolution-io'
+  name: '@lmzhen/dsh-evolution-io'
 - id: evolution-io-node
-  name: '@deepseek-ai/dsh-evolution-io-node'
+  name: '@lmzhen/dsh-evolution-io-node'
 - id: evolution-state-storage
-  name: '@deepseek-ai/dsh-evolution-state-storage'
+  name: '@lmzhen/dsh-evolution-state-storage'
 - id: evolution-state-domain
-  name: '@deepseek-ai/dsh-evolution-state-domain'
+  name: '@lmzhen/dsh-evolution-state-domain'
   # Opt-in: joins the HOST storage-domain facility when mounted; disabled by
   # default so evolution-state-json stays the portable backend.
   disabled: true
 - id: evolution-state-json
-  name: '@deepseek-ai/dsh-evolution-state-json'
+  name: '@lmzhen/dsh-evolution-state-json'
 - id: evolution-state
-  name: '@deepseek-ai/dsh-evolution-state'
+  name: '@lmzhen/dsh-evolution-state'
 - id: memory
-  name: '@deepseek-ai/dsh-memory'
+  name: '@lmzhen/dsh-memory'
 - id: memory-files
-  name: '@deepseek-ai/dsh-memory-files'
+  name: '@lmzhen/dsh-memory-files'
 - id: skill-usage
-  name: '@deepseek-ai/dsh-skill-usage'
+  name: '@lmzhen/dsh-skill-usage'
 # model-facing tools (evolution-agent preset layer)
 - id: tool-memory
-  name: '@deepseek-ai/dsh-tool-memory'
+  name: '@lmzhen/dsh-tool-memory'
 - id: tool-skill-manage
-  name: '@deepseek-ai/dsh-tool-skill-manage'
+  name: '@lmzhen/dsh-tool-skill-manage'
 - id: tool-session-query
-  name: '@deepseek-ai/dsh-tool-session-query'
+  name: '@lmzhen/dsh-tool-session-query'
 - id: evolution-skill-catalog
-  name: '@deepseek-ai/dsh-evolution-skill-catalog'
+  name: '@lmzhen/dsh-evolution-skill-catalog'
 - id: evolution-approval
-  name: '@deepseek-ai/dsh-evolution-approval'
+  name: '@lmzhen/dsh-evolution-approval'
   config:
     enabled: false
     stageForeground: true
 - id: evolution-threat
-  name: '@deepseek-ai/dsh-evolution-threat'
+  name: '@lmzhen/dsh-evolution-threat'
 - id: evolution-review
-  name: '@deepseek-ai/dsh-evolution-review'
+  name: '@lmzhen/dsh-evolution-review'
   config:
     reviewToolAllow: [skill]
 - id: evolution-curator
-  name: '@deepseek-ai/dsh-evolution-curator'
+  name: '@lmzhen/dsh-evolution-curator'
 - id: evolution-commands
-  name: '@deepseek-ai/dsh-evolution-commands'
+  name: '@lmzhen/dsh-evolution-commands'
 - id: evolution-maintenance-tools
-  name: '@deepseek-ai/dsh-evolution-maintenance/tools'
+  name: '@lmzhen/dsh-evolution-maintenance/tools'
 - id: evolution-activity
-  name: '@deepseek-ai/dsh-evolution-activity'
+  name: '@lmzhen/dsh-evolution-activity'
 - id: evolution-feedback
-  name: '@deepseek-ai/dsh-evolution-feedback'
+  name: '@lmzhen/dsh-evolution-feedback'
 - id: evolution-learning-graph
-  name: '@deepseek-ai/dsh-evolution-learning-graph'
+  name: '@lmzhen/dsh-evolution-learning-graph'
 - id: evolution-replay
-  name: '@deepseek-ai/dsh-evolution-replay'
+  name: '@lmzhen/dsh-evolution-replay'
 
 # Cross-session recall (base `session-query-sqlite` override) and the Hermes
 # 60-char catalog cap (base `tool-skill` override) — both also carried by the
@@ -329,6 +330,14 @@ standalone flat mirror, where the packages live as `packages/evolution-*`.
 When a config in the published repo is copied into the flat tree for a
 stand-alone build, its project references therefore remain
 CI-overlay-only and must not be expected to resolve independently (G5.5).
+The same is true of the per-package `tsconfig.json` files: they keep the dev
+tree's `"extends": "../../../tsconfig.base.json"` depth and reference
+`../../core/session`, `../../../vendor/cordis` and
+`../../runtime-diagnostics/invariants`, none of which exist in the flat
+mirror; `tsconfig.base.json`'s `paths` likewise point at `./packages/evolution/*`
+and `vendor/*`, and `tsconfig.host.json` includes `apps/web/tests/**` and
+`packages/evolution/test-support/**`. Type-checking therefore runs in the CI
+overlay tree, never in the mirror checkout itself.
 The same layout rule applies to the setup commands: in the flat mirror run
 `node packages/scripts/install-layered.mjs` (there is no
 `packages/evolution/scripts` directory here), while the upstream checkout
@@ -352,9 +361,11 @@ Walk through this list on every upstream bump (see `UPSTREAM_SHA`):
    `user-dsh` source shadow. Both constants are private to their owners: if
    upstream changes either value or the comparison semantics, our provider
    silently loses the shadow. Re-verify both sides on upgrade.
-2. **`@deepseek-ai` package-name collision**: the family publishes self-owned
-   packages under the official `@deepseek-ai` scope (`dsh-memory`,
+2. **`@deepseek-ai` package-name collision**: inside the upstream monorepo the
+   family occupies the official `@deepseek-ai` names (`dsh-memory`,
    `dsh-tool-memory`, `dsh-skill-usage`, `dsh-memory-files`,
-   `dsh-tool-skill-manage`, …). Before adopting an upstream release, check its
-   package list for new names that collide with ours — a collision makes
-   resolution ambiguous.
+   `dsh-tool-skill-manage`, …) and `prepare-release --scope` rewrites them to
+   the publish scope (`@lmzhen`) in every manifest, `cordis*.yml`,
+   `agent.cordis.yml` and built `.js`/`.d.ts`. Before adopting an upstream
+   release, check its package list for new names that collide with ours — a
+   collision makes resolution ambiguous.

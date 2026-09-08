@@ -21,14 +21,14 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { usage: 'curator run|pause|resume|status|report|scope', summary: 'run one curation pass, control or inspect automatic curation' },
   { usage: 'mutations', summary: 'list skill-mutation audit records' },
   { usage: 'restore', summary: 'restore skills from the latest snapshot' },
-  { usage: 'consolidate <target> <sources...>', summary: 'merge source skills into a target umbrella skill' },
+  { usage: 'consolidate <target> <sources...> [--plan <runId>]', summary: 'merge source skills into a target umbrella skill' },
   { usage: 'skill restore <name>', summary: 'restore one archived skill by name' },
   { usage: 'skills health', summary: 'structure-health verdicts for the skill library' },
   { usage: 'skills refresh', summary: 'drop the catalog caches and re-read the tree' },
   { usage: 'learn [request]', summary: 'send a learning request to this session' },
   { usage: 'maintain [--timeout=<ms> | --facts]', summary: 'run a maintenance scan (--facts: 0-token preview)' },
   { usage: 'preset install', summary: 'generate the Evolution agent preset into the user root' },
-  { usage: 'restructure <name> "<heading>" <to_file>', summary: 'move a body section into a references/ file' },
+  { usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', summary: 'move a body section into a references/ file' },
   { usage: 'replay', summary: 'compare prompt-bundle replay for this session' },
 ]
 

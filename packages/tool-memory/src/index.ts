@@ -50,7 +50,7 @@ export const MEMORY_TOOL_DESCRIPTION =
   'Save durable facts to persistent memory that survive across sessions. '
   + 'Memory is injected into future turns, so keep entries compact and high-signal.\n\n'
   + 'HOW: make all changes in ONE call via an `operations` array (each item '
-  + '{action, content?, old_text?}). The batch applies atomically and the char '
+  + '{action, facts?|content?, old_text?}). The batch applies atomically and the char '
   + 'limit is checked on the final result — so one call can remove/replace stale '
   + 'entries to free room AND add new ones. Use bare action/content/old_text '
   + 'only for a single lone change.\n\n'

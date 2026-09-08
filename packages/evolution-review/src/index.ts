@@ -12,7 +12,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
@@ -33,7 +33,6 @@ export interface Config {
    */
   reviewToolAllow?: string[]
   reviewTimeoutMs?: number
-  executionTimeoutMs?: number
   reviewContextMessages?: number
   reviewMessageChars?: number
   /** ABSOLUTE cap of the review subagent's own delegation depth (platform
@@ -71,13 +70,12 @@ export const Config: z<Config> = z.object({
   memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),
-  reviewTimeoutMs: z.number().min(1).default(120_000),
-  // executionTimeoutMs is declared but has no read point in this package (no
-  // consumer uses it); `.min(1)` is applied for G3.1 schema consistency, and the
-  // field is flagged for the removal review (it is dead as a clamp target today).
-  executionTimeoutMs: z.number().min(1).default(30_000),
-  reviewContextMessages: z.number().min(1).default(60),
-  reviewMessageChars: z.number().min(1).default(2000),
+  reviewTimeoutMs: z.number().min(1).default(DEFAULT_REVIEW_TIMEOUT_MS),
+  // P3-4 (v14): the former `executionTimeoutMs` declaration was deleted — no
+  // code path ever read it, and keeping a configurable-looking dead field in
+  // the schema invited deployments to set something with no effect.
+  reviewContextMessages: z.number().min(1).default(DEFAULT_REVIEW_CONTEXT_MESSAGES),
+  reviewMessageChars: z.number().min(1).default(DEFAULT_REVIEW_MESSAGE_CHARS),
   // reviewMaxDepth 0 is the historical 0.3.1 maximum-depth defect (a 0 rejects
   // the spawn outright), so its min is 1. `reviewTimeoutMs` 0 is not a "no
   // timeout" meaning — AbortSignal.timeout(0) aborts immediately (and there is
@@ -203,9 +201,9 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
   const config = Object.assign({}, rawConfig, {
     memoryInterval: field('memoryInterval', rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
     skillInterval: field('skillInterval', rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
-    reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, 120_000, 1),
-    reviewContextMessages: field('reviewContextMessages', rawConfig.reviewContextMessages, 60, 1),
-    reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, 2000, 1),
+    reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 1),
+    reviewContextMessages: field('reviewContextMessages', rawConfig.reviewContextMessages, DEFAULT_REVIEW_CONTEXT_MESSAGES, 1),
+    reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, DEFAULT_REVIEW_MESSAGE_CHARS, 1),
     reviewMaxDepth: field('reviewMaxDepth', rawConfig.reviewMaxDepth, 1, 1),
     skillReviewCompletionMinToolCalls: field('skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
   })
@@ -322,6 +320,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
       statelessReviewStateWarned = true
       ctx.logger.warn('dsh-evolution-review: evolution-state service not mounted — memory/skill review cadence is not persisted and resets every turn (see README Known Limitations).')
     }
+    // P3-5 (v14): `lastTurn: -1` is an IN-MEMORY sentinel only — it makes the
+    // first `advanceReview` always count (a PERSISTED record requires
+    // lastTurn >= 0 in both providers). The save below always runs after
+    // `advanceReview`, which overwrites it, so the sentinel never reaches disk.
     const state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     const snapshot = policy()
     // V7-02: a turn woken by our own followup still accumulates (any real

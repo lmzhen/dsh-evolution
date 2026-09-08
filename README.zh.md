@@ -85,7 +85,8 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 ## 命令面
 
 以 `/evolution` 内建 help 为准（最权威——升级后先跑一次裸 `/evolution` 对照）。以下为
-`packages/evolution-commands/src/index.ts` 当前注册面的全量枚举（0.3.52）：
+`packages/evolution-commands/src/registry.ts` 注册表（hint / help / README 表格的单源）的
+全量枚举，版本以 CHANGELOG head 为准（不在此处钉死版本号）：
 
 `pending [--detail]` · `approve <id>` · `reject <id>` · `curator run` ·
 `curator pause` · `curator resume` · `curator status` · `curator report` ·
@@ -328,6 +329,9 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 5. 依赖缺失时优雅降级，例如没有 storage-domain 时使用 JSON provider。
 
 ## 开发与测试
+
+以下命令在**合并/上游树**（`packages/evolution/<pkg>`）中运行；扁平镜像内没有该布局，
+且每包 `tsconfig.json` 的 `extends`/`references` 只在合并树可解析（见「两种布局与 tsconfig」一节）：
 
 ```bash
 tsc -b tsconfig.host.json --force

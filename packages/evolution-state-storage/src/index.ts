@@ -93,8 +93,14 @@ export interface EvolutionStateStorage {
   transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void>
   listPending(status?: PendingStatus): Promise<PendingRecord[]>
   savePending(record: PendingRecord): Promise<void>
-  /** Atomically transition a pending record exactly once. */
-  tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>): Promise<PendingResolution>
+  /**
+   * Atomically transition a pending record exactly once.
+   * @param expectedClaimId - when given, the transition applies only while the
+   * record is STILL claimed by this approver (P2-2, v14). A record resolved or
+   * re-claimed by another writer is left untouched and reported as
+   * `applied: false`, so an approve can never overwrite a concurrent reject.
+   */
+  tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>, expectedClaimId?: string): Promise<PendingResolution>
   /** Atomically mark a pending record as claimed by one approver, or return null. */
   claimPending(id: string, claimId: string): Promise<PendingRecord | null>
   /** Release this claim when the replay runner cannot complete. */

@@ -6,6 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-threat'
 export const inject = ['tools']
@@ -14,6 +15,11 @@ export interface Config {
   enabled?: boolean
   /** Maximum normalized characters scanned per write field. */
   maxScanChars?: number
+  /** Pattern labels the deployment knows to be benign. P2-4 (v14): without
+   * this the guard blocked payloads the SkillLibrary/MemoryStore gates already
+   * exempted, while its message advertised an exemption that did not exist on
+   * this channel. Same `excludeLabels` contract as the store gates. */
+  threatExemptLabels?: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -23,6 +29,7 @@ export const Config: z<Config> = z.object({
   // evolution-core PATTERN_OVERLAP), so the schema rejects it at load and the
   // assembly clamp falls back to the default.
   maxScanChars: z.number().min(PATTERN_OVERLAP + 1).default(65_536),
+  threatExemptLabels: z.array(z.string()).default([]),
 })
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -30,8 +37,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 /** Scan one tool invocation for threat-shaped payload text. Exported so the
- * guard contract is testable directly (0.3.17). */
-export function scanToolArgs(toolName: string, args: unknown, maxScanChars: number): string | null {
+ * guard contract is testable directly (0.3.17). `options.excludeLabels` carries
+ * the deployment's benign-label allowlist so this channel agrees with the
+ * SkillLibrary/MemoryStore write gates (P2-4, v14). */
+export function scanToolArgs(toolName: string, args: unknown, maxScanChars: number, options: ScanOptions = {}): string | null {
   // 0.3.20 (N-5): the write-tool set is the core single source — the local
   // hardcoded pair drifted into the S3.10 dead-constant trap.
   if (!EVOLUTION_WRITE_TOOLS.includes(toolName as (typeof EVOLUTION_WRITE_TOOLS)[number])) return null
@@ -39,7 +48,7 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
   if (toolName === 'memory') {
     for (const text of [record.facts, record.content]) {
       if (typeof text === 'string') {
-        const hit = scanMemoryThreats(text, maxScanChars)
+        const hit = scanMemoryThreats(text, maxScanChars, options)
         if (hit) return hit
       }
     }
@@ -51,7 +60,7 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
         const inner = asRecord(op)
         for (const text of [inner.facts, inner.content]) {
           if (typeof text === 'string') {
-            const hit = scanMemoryThreats(text, maxScanChars)
+            const hit = scanMemoryThreats(text, maxScanChars, options)
             if (hit) return hit
           }
         }
@@ -61,7 +70,7 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
   }
   for (const text of [record.content, record.file_content, record.new_string]) {
     if (typeof text === 'string') {
-      const hit = scanContentThreats(text, maxScanChars)
+      const hit = scanContentThreats(text, maxScanChars, options)
       if (hit) return hit
     }
   }
@@ -88,6 +97,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (maxScanChars !== (rawConfig.maxScanChars ?? 65_536)) {
     ctx.logger.warn(`evolution-threat: maxScanChars=${String(rawConfig.maxScanChars)} is invalid; falling back to the default 65_536`)
   }
+  // P2-4 (v14): the store gates already honored `threatExemptLabels`; the guard
+  // channel did not, so an exempted payload was still denied here and the deny
+  // message pointed at an option this row could not read.
+  const scanOptions: ScanOptions = { excludeLabels: rawConfig.threatExemptLabels ?? [] }
   // V10-12 (P2-8): the deny decision moved from a `tools/pre-execute`
   // waterfall listener to the monotonic `tools.guard()` channel (the same
   // channel evolution-policy uses). The pre-execute waterfall is extensible
@@ -105,7 +118,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       guard(guard: (exec: { name: string; arguments: unknown }) => string | undefined): () => void
     }
     toolCtx.effect(() => tools.guard((exec) => {
-      const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars)
+      const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars, scanOptions)
       return hit ?? undefined
     }), 'evolution-threat.tools-guard')
   })

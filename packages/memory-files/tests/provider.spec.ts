@@ -67,6 +67,48 @@ describe('memory-files', () => {
     expect(await ctx.memory.read('user')).toContain('new fact')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('renderContext reads memory and user in one serialized step — no mixed generation (P2-3, v14)', async () => {
+    const root = await makeTmp()
+    await writeFile(join(root, 'USER.md'), 'original fact\n', 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    let userReads = 0
+    let signalStarted!: () => void
+    const started = new Promise<void>((res) => { signalStarted = res })
+    let releaseGate!: () => void
+    const gate = new Promise<void>((res) => { releaseGate = res })
+    const provider: EvolutionIo = {
+      ...base,
+      name: 'p2-3-gated',
+      readText: async (path: string) => {
+        if (path.replaceAll('\\', '/').endsWith('USER.md')) {
+          const first = userReads === 0
+          userReads += 1
+          if (first) { signalStarted(); await gate }
+        }
+        return base.readText(path)
+      },
+    }
+    ctx.evolutionIo.registerProvider(provider)
+    await ctx.plugin(MemoryFiles, { root })
+    // renderContext is the path tool-memory injects; it used to await MEMORY.md
+    // and USER.md as two independent reads, so the write below landed between
+    // them and the model saw a mixed generation.
+    const rendering = ctx.memory.renderContext()
+    await started
+    const applying = ctx.memory.applyBatch('user', [{ action: 'add', facts: 'new fact' }])
+    await new Promise(res => setTimeout(res, 20))
+    releaseGate()
+    const rendered = await rendering
+    await applying
+    expect(rendered).toContain('original fact')
+    expect(rendered).not.toContain('new fact')
+    expect(await ctx.memory.read('user')).toContain('new fact')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })
 
 async function makeTmp(): Promise<string> {

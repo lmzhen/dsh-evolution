@@ -365,7 +365,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)
             // V10-08 (F-04): same contract as the in-flight refusal above —
             // cooldown-blocked returns kind:'error' (behavior contract change).
-            return err(`Maintenance cooldown active (${remaining}s) — latest scan ${lastMaintainRunId}; re-running now would spend another model call.`)
+            // P3-21 (v14): a FAILED first scan also arms the cooldown but never
+            // records a runId, so the old wording printed "latest scan ;".
+            const latest = lastMaintainRunId === '' ? '' : ` — latest scan ${lastMaintainRunId}`
+            return err(`Maintenance cooldown active (${remaining}s)${latest}; re-running now would spend another model call.`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           const subagents = ctx.get('subagents') as { start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }> } | undefined

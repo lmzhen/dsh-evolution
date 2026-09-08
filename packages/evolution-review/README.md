@@ -28,12 +28,13 @@ Independent of request-prefix construction. This package does not alter the asse
 - The completion-channel counters (`cumulativeToolCalls` / `completionInjected`) are in-memory only. A process restart resets them, which is accepted behavior: the completion review is a one-per-session post-task adaptation and a restart is treated as a fresh conversation boundary. The cadence state (`turnsSinceMemory` / `turnsSinceSkill`) is persisted via `ReviewState` and survives restart.
 - `evolution/review-scheduled` and `evolution/review-error` are emitted for platform/user wiring only — this family has no in-repo production `ctx.on` consumer for them. They are declared externally owned (the platform side wires consumption), which matches the `EXEMPT_ORPHANS` set in `scripts/verify-event-pairing.mjs`.
 - When the `evolution-state` service is not mounted, the memory/skill cadence state is not persisted and every turn restarts from a clean `{ turnsSinceMemory: 0, turnsSinceSkill: 0 }` baseline — the review schedule is stateless and re-decided each turn rather than accumulating across the conversation. The loss is surfaced once per process as a logger warning at the first turn/end.
+- Read-before-write can see the review subagent's own `skill` reads only when the subagent backend exposes `localAgent` (the in-process driver does; out-of-process backends such as ACP and the CLI providers set `localAgent: undefined`). With a remote backend the subagent's reads are invisible, so a plan item patching a skill the subagent itself loaded is dropped as "unread" — the review then falls back to the parent session's reads only. Documented rather than worked around: recovering the child read set needs a `SubagentLike` contract change (v14 P2-6).
 
 ## Configuration
 
 `reviewProvider` selects the LLM provider for review subagents. When omitted, the subagent inherits the deployment default route instead of a hardcoded provider name. Model selection stays on the policy (`memoryReviewModel` / `skillReviewModel`).
 
-`reviewTimeoutMs` bounds each review subagent run (an `AbortSignal.timeout`; `0` aborts immediately). `executionTimeoutMs` is a leftover declaration and is **not consumed** — it is kept only as a code comment and has no effect; configure `reviewTimeoutMs` instead.
+`reviewTimeoutMs` bounds each review subagent run (an `AbortSignal.timeout`; `0` aborts immediately). The former `executionTimeoutMs` declaration was removed in v14 (nothing read it, so it was configuration that did nothing); use `reviewTimeoutMs`.
 
 ### Review delivery contract (0.3.38-0.3.42)
 

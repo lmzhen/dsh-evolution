@@ -96,7 +96,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
       const text = JSON.stringify([memory, user])
       return { version: 1, sha256: createHash('sha256').update(text).digest('hex'), memory, user }
     },
-    renderContext: () => store.renderContext(),
+    // P2-3 (v14): the SAME single-generation rule as `snapshot` — this is the
+    // path the model actually reads (tool-memory injects `renderContext`), and
+    // it read memory and user as two independent awaits, so a concurrent
+    // applyBatch could land between them and produce a mixed-generation
+    // context. Queue both reads as one serialized step.
+    renderContext: () => serializedWrite(() => store.renderContext()),
   }
   ctx.effect(() => ctx.memory.registerProvider(provider), 'memory-files.provider')
 }
