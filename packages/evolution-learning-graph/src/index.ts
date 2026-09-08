@@ -11,7 +11,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
+import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
@@ -43,6 +43,23 @@ export interface GraphDensity {
   relatedEdges: number
   edgesPerNode: number
   isolatedPct: number
+}
+
+/**
+ * The command invocation contract (N1, v12): the platform command handler
+ * freezes the invoking agent onto the invocation object — evolution-commands
+ * `/evolution learn` already reads `invocation.agent` — so the graph can pass
+ * `agent.session` to the approval service (tool-skill-manage pattern) instead
+ * of deriving every approval as foreground.
+ */
+export interface GraphInvocation {
+  rawInput?: string
+  agent?: {
+    session?: {
+      id?: string
+      header?: { origin?: string }
+    }
+  }
 }
 
 export function graphDensity(graph: LearningGraph): GraphDensity {
@@ -301,7 +318,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       input: {
         hint: '[detail|edit|delete] <nodeId> [text]',
       },
-      handler: async (invocation: { rawInput?: string }) => {
+      handler: async (invocation: GraphInvocation) => {
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
         const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
@@ -311,6 +328,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const usage = usageService
         const memory = memoryService
         const io = ioService
+        const session = invocation.agent?.session
         const input = (invocation.rawInput ?? '').trim()
         const detail = /^detail\s+(\S+)$/.exec(input)
         if (detail && detail[1]) return await nodeDetail(detail[1])
@@ -380,25 +398,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // directly, unchanged.
             const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
             if (approval) {
-              const origins = resolveOrigins(undefined)
+              // P2-34 (v11): the graph surface is marked in the summary so the
+              // audit record names where the write came from. N1 (v12): the
+              // command invocation DOES carry the agent (evolution-commands
+              // `/evolution learn` reads `invocation.agent`), so the session
+              // rides the request and the approval service derives the platform
+              // session policy — a `never`-policy session now stages nothing
+              // instead of being treated as foreground.
+              const origins = resolveOrigins(session?.header?.origin)
+              const sessionPolicy = effectiveSessionPolicy(ctx, session)
               const decision = await approval.request({
                 kind: 'skill',
-                // The origin field is the approval surface vocabulary
-                // ('foreground' | 'background_review'); a command has no
-                // session origin channel, so it derives to 'foreground'. The
-                // graph surface is marked in the summary so the audit record
-                // names where the write came from.
-                // P2-34 (v11): the graph command invocation carries only
-                // rawInput — no session/sessionId. Tool surfaces pass
-                // sessionId + session + sessionPolicy (E-25/V6-27) so a
-                // `never`-policy session stages nothing; graph cannot, and
-                // building a command-level session channel is a platform
-                // change beyond this batch. Documented trade-off (the staged
-                // row names graph origin; the operator can reject), not a
-                // silent divergence. The delete branch below shares this.
                 summary: `graph edit ${parsed.name}`,
                 args: { operation: { action: 'update', name: parsed.name, content }, origin: origins.approval, libraryOrigin: origins.library },
                 origin: origins.approval,
+                ...session?.id ? { sessionId: session.id } : {},
+                ...session ? { session } : {},
+                ...sessionPolicy !== undefined ? { sessionPolicy } : {},
               })
               if (decision.action === 'staged') return ok(decision.message)
             }
@@ -434,12 +450,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // (the audit's noted gap was approval + the edit patch counter).
             const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
             if (approval) {
-              const origins = resolveOrigins(undefined)
+              // N1 (v12): session-riding request — same pattern as the edit
+              // branch above (see the comment there).
+              const origins = resolveOrigins(session?.header?.origin)
+              const sessionPolicy = effectiveSessionPolicy(ctx, session)
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph delete ${parsed.name}`,
                 args: { operation: { action: 'delete', name: parsed.name }, origin: origins.approval, libraryOrigin: origins.library },
                 origin: origins.approval,
+                ...session?.id ? { sessionId: session.id } : {},
+                ...session ? { session } : {},
+                ...sessionPolicy !== undefined ? { sessionPolicy } : {},
               })
               if (decision.action === 'staged') return ok(decision.message)
             }

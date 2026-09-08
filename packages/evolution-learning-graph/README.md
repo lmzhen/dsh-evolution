@@ -10,7 +10,7 @@ Memory node ids carry a trailing snapshot token (`memory:<source>:<index>:<snaps
 
 Memory→skill edges are word-level, not substring: the entry is tokenized on non-letter/digit/hyphen runs and a skill name links only when it is a whole token. This prevents a skill named `run` from linking the words `running`/`grunt`.
 
-`graph edit`/`graph delete` of a skill node route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent). Each approved/executed edit bumps the skill's patch counter and a delete archives it, matching `skill_manage` — including the no-op gate: an edit whose content is byte-equivalent to the current file (`noop`) writes nothing and does not bump the patch counter, exactly as `skill_manage` treats an unchanged update/patch.
+`graph edit`/`graph delete` of a skill node route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent). Each approved/executed edit bumps the skill's patch counter and a delete archives it, matching `skill_manage` — including the no-op gate: an edit whose content is byte-equivalent to the current file (`noop`) writes nothing and does not bump the patch counter, exactly as `skill_manage` treats an unchanged update/patch. The command invocation's session rides the approval request (v12 N1), so a `never`-policy session stages nothing instead of deriving every graph write as foreground.
 
 ## Model Experience
 

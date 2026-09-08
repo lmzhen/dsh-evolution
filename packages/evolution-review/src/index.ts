@@ -454,16 +454,17 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // Cadence waited; the completion channel fires once per session after a
     // task the conversation has proven long (cumulative tool-call threshold),
     // so short conversations are never adapted to at the cost of long ones.
+    // P2-12 (v12): the completion channel previously injected directly,
+    // bypassing deliverMessage — reviewWakeInject did not apply and the woken
+    // turn's cadence fire was not suppressed. It now shares the waking
+    // followup-first channel with every other review delivery.
     const trigger = config.skillReviewTrigger
     if (trigger !== 'completion' && trigger !== 'both') return
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
     try {
-      agent.inject(createUserMessage({
-        content: [{ type: 'text', text: COMPLETION_SKILL_REVIEW_PROMPT }],
-        source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'completion review' },
-      }))
+      deliverMessage(agent, COMPLETION_SKILL_REVIEW_PROMPT, 'completion review')
     } catch (injectError) {
       // V4-21 (F-334 residual ②): the flag was added BEFORE the inject; a
       // failing inject left it set, so this session's completion review was

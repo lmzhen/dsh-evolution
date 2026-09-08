@@ -13,6 +13,11 @@ import { evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
 
 export interface DoctorReport {
   installForm: 'full' | 'host' | 'preset' | 'layered' | 'none'
+  /** Aggregated across ALL profiles under `home` (N13, v12): doctor answers
+   * "is any profile carrying an evolution bundle / which install forms exist"
+   * — not "what this runtime mounted". `services.review` is the runtime-side
+   * counterpart (inferred from the install form, P0-1) and may disagree on a
+   * multi-profile machine; the render marks the aggregation explicitly. */
   bundles: string[]
   conflicts: string[]
   envIssues: string[]
@@ -118,7 +123,7 @@ export async function diagnose(
 export function renderDoctorText(report: DoctorReport): string {
   const lines = [
     `Evolution doctor — install form: ${report.installForm}`,
-    `bundles: ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
+    `bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
     `services: review=${report.services.review} curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
   ]

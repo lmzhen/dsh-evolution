@@ -724,4 +724,33 @@ describe('evolution-feedback', () => {
       await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
+
+  it('N7 (v12): restore caps the durable-note seed at the 512 bound like the record path', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-n7-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      await ctx.plugin(Feedback)
+      // 513 distinct feedbacked targets — just past NOTE_CAP (512). The record
+      // path evicts on insert, but the restore() seed path previously
+      // re-seeded the whole map unbounded, leaving a >512 deployment over the
+      // bound forever (kept at 513 so the suite stays fast under load).
+      for (let i = 0; i < 513; i += 1) ctx.evolutionFeedback.record(`t-${i}`, 'positive', `note-${i}`, 'skill')
+      await ctx.evolutionFeedback.waitIdle()
+      const ctx2 = new Context()
+      await ctx2.plugin(EvolutionIoRegistry)
+      await ctx2.plugin(NodeIo)
+      await ctx2.plugin(Feedback)
+      await ctx2.evolutionFeedback.waitIdle()
+      const notes = (ctx2.evolutionFeedback as unknown as { durableNote: Map<string, unknown> }).durableNote
+      expect(notes.size).toBeLessThanOrEqual(512)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  }, 60_000)
 })

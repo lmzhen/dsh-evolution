@@ -86,4 +86,25 @@ describe('advanceReview (activity-weighted memory counter, G4.6)', () => {
     observeEvent(signal, { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: 'hello' }] } } } as never)
     expect(signal.assistantChars).toBe(5)
   })
+
+  it('N4 (v12): user/assistant branches with data:null skip instead of throwing', () => {
+    // P1-1 guarded tool/call only; a persisted event with `data: null` used to
+    // TypeError in the user/assistant branches and the review E-6 catch then
+    // swallowed the whole turn's remaining signals.
+    const signal = sig(0)
+    expect(() => {
+      observeEvent(signal, { type: 'user/message', data: null } as never)
+      observeEvent(signal, { type: 'assistant/message', data: null } as never)
+    }).not.toThrow()
+    expect(signal.userChars).toBe(0)
+    expect(signal.assistantChars).toBe(0)
+  })
+
+  it('N4 (v12): the shared guard keeps the tool/call branch counting after a null-data event', () => {
+    const signal = sig(0)
+    observeEvent(signal, { type: 'user/message', data: null } as never)
+    observeEvent(signal, { type: 'tool/call', data: { name: 'skill' } } as never)
+    expect(signal.toolCalls).toBe(1)
+    expect(signal.skillSignal).toBe(true)
+  })
 })

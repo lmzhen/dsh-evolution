@@ -819,3 +819,31 @@ it('0.3.40: the default delivery wakes via agent.followup, not inject', async ()
   await vi.waitFor(() => { expect(followups).toHaveLength(1) })
   expect(injects).toHaveLength(0)
 })
+
+it('P2-12 (v12): the completion channel delivers through the waking followup channel (reviewWakeInject)', async () => {
+  const toolCalls = Array.from({ length: 25 }, (_, i) => ({
+    type: 'tool/call' as const,
+    data: { turn: 1, step: i + 2, callId: `c${i}`, name: 'skill', arguments: '{}' },
+  }))
+  const followups: unknown[] = []
+  const injects: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    onFollowup: (message) => { followups.push(message) },
+    onInject: (message) => { injects.push(message) },
+    events: toolCalls,
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 1_000_000, reviewSkillInterval: 1_000_000 }) })
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    reviewMode: 'subagent',
+    memoryInterval: 1_000_000,
+    skillInterval: 1_000_000,
+    skillReviewTrigger: 'completion',
+    skillReviewCompletionMinToolCalls: 20,
+  })
+  // The completion channel used to inject directly (never waking, reviewWakeInject
+  // ignored, no woken-turn cadence suppression); it must share deliverMessage.
+  emitEnd(1)
+  await vi.waitFor(() => { expect(followups).toHaveLength(1) })
+  expect(injects).toHaveLength(0)
+})

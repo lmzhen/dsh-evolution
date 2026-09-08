@@ -429,8 +429,11 @@ export async function uninstall(options = {}) {
 
   if (mode === 'host' || mode === 'layered' || mode === 'oneclick') {
     const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
-    result.removedBundle = bundleName
-    if (!dryRun) await removeBundleFromProfile(profileDir, bundleName)
+    // P2-42 carried over (N11, v12): report the REAL outcome — a dry-run or a
+    // manifest without the bundle row does not mean "removed". Only a
+    // non-dry-run removal of an existing row sets `removedBundle`.
+    result.removedBundle = !dryRun && manifestCarriesBundle(profileDir, bundleName) ? bundleName : null
+    if (result.removedBundle !== null) await removeBundleFromProfile(profileDir, bundleName)
     // P1-2 (v11): evolution-all is a DEFAULT install target — uninstall must
     // remove its bundle row symmetrically, or the leftover row resolves a
     // package that was just deleted and bricks the profile.
@@ -463,6 +466,19 @@ export function detectInstalledAllBundle(profileDir) {
     return Array.isArray(bundles) ? bundles.filter(name => /evolution-all/.test(String(name))) : []
   } catch {
     return []
+  }
+}
+
+/** N11 (v12): does this profile's manifest carry the given bundle row?
+ * Scope-agnostic tail match — same rule the install-time conflict check uses. */
+function manifestCarriesBundle(profileDir, bundle) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
+    const bundles = Array.isArray(manifest?.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
+    const tail = bundle.slice(bundle.lastIndexOf('/') + 1)
+    return bundles.some(entry => typeof entry === 'string' && (entry === bundle || entry.endsWith(`/${tail}`)))
+  } catch {
+    return false
   }
 }
 
@@ -500,9 +516,12 @@ export async function install(options = {}) {
     const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick
     // P1-3 (v11): evolution-all is the DEFAULT full bundle — installing host
     // or oneclick on top must refuse like host⇄preset does (the all patch
-    // double-mounts the infra rows, startup fail-loud).
+    // double-mounts the infra rows, startup fail-loud). The check runs in
+    // dry-run too (N10, v12): dry-run resolves the REAL profileDir (only the
+    // ensure/write is skipped), so a --dry-run --mode host against an all
+    // profile reports the would-be refusal instead of claiming it installs.
     const installedAll = detectInstalledAllBundle(profileDir)
-    if (!dryRun && installedAll.length > 0) {
+    if (installedAll.length > 0) {
       throw new Error(
         `install-layered: profile "${profile}" already carries an evolution-all bundle (${installedAll.join(', ')}). `
         + 'evolution-all is the DEFAULT full-functionality install — host/preset would double-mount its infra rows. '
@@ -515,8 +534,7 @@ export async function install(options = {}) {
     // itself could turn the documented accident into reality. Fail loud when
     // the other bundle is already present. DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
     // does not exempt this check (mutual exclusion is install-surface
-    // semantics, not a row collision). Dry-run reads a phantom profile path —
-    // there is no real state to check.
+    // semantics, not a row collision). Same dry-run behavior as above.
     if (!dryRun) {
       const manifestPath = join(profileDir, 'package.json')
       if (existsSync(manifestPath)) {

@@ -267,6 +267,18 @@ describe('layered installer', () => {
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
+  it('N10 (v12): --dry-run host refuses too — dry-run reads the real profile state', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-n10-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
+    // The dry-run gate used to skip the mutual-exclusion check (and documented
+    // a phantom-path rationale that contradicted the code): a dry-run reported
+    // the host bundle as installable on an all profile.
+    await expect(runInstaller(home, 'host', 'evo-test', ['--dry-run'])).rejects.toThrow(/evolution-all/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
   it('P1-2: --uninstall removes the evolution-all bundle row too (symmetric with host/preset)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p12-'))
     const profileDir = join(home, 'profiles', 'evo-test')
@@ -275,15 +287,21 @@ describe('layered installer', () => {
     await writeFile(manifestPath, JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
     const { stdout } = await runInstaller(home, 'layered', 'evo-test', ['--uninstall'])
     const after = JSON.parse(await readFile(manifestPath, 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
-    expect(stdout).toContain('bundle:')
+    // N11 (v12): the manifest carries NO host/oneclick row, so the report must
+    // not print a phantom `bundle:` line claiming it removed one.
+    expect(stdout).not.toContain('bundle:')
     expect(after.dsh?.profile?.bundles ?? []).not.toContain('@lmzhen/dsh-evolution-all')
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
-  it('P2-42: a dry-run uninstall does not claim the agent preset was deleted', async () => {
+  it('P2-42 + N11: a dry-run uninstall reports preset: false and no phantom bundle line', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-p242-'))
     const { stdout } = await runInstaller(home, 'layered', 'evo-test', ['--uninstall', '--dry-run'])
-    expect(stdout).not.toContain('removedAgentPreset')
+    // The old assertion `not.toContain('removedAgentPreset')` was vacuous — the
+    // CLI prints `preset:   <bool>`; assert the TRUE value (and that no
+    // removed-bundle claim sneaks in either).
+    expect(stdout).toMatch(/preset:\s+false/)
+    expect(stdout).not.toContain('bundle:')
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 })

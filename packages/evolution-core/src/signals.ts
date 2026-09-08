@@ -53,12 +53,21 @@ const FIX_PATTERNS = [
 
 /** Fold one session event into the current turn observation. */
 export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
+  // P1-1 (v11) carried to the remaining branches (N4, v12): the event union
+  // types `data`, but events arrive from disk — a persisted event with
+  // `data: null` / non-object used to TypeError in the user/assistant
+  // branches (the review E-6 catch then swallowed the whole turn's remaining
+  // signals, so every replay fold broke at the same point). One guard before
+  // the branch switch covers user/assistant/tool alike.
+  const data: unknown = event.data
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return
   if (event.type === 'user/message') {
     // 0.3.16 (E-49): a malformed content (not an array) used to throw here and
     // break the whole signal pipeline — guard and skip instead.
-    if (!Array.isArray(event.data.content)) return
-    const text = event.data.content
-      .map(block => block.type === 'text' ? block.text : '')
+    const content = (data as { content?: unknown }).content
+    if (!Array.isArray(content)) return
+    const text = content
+      .map(block => (block as { type?: string; text?: string }).type === 'text' ? (block as { text?: string }).text ?? '' : '')
       .join(' ')
     signal.userChars += text.length
     if (CORRECTION_PATTERNS.some(pattern => pattern.test(text))) signal.memorySignal = true
@@ -71,7 +80,7 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     // (the review E-6 catch used to swallow the whole turn's signals).
     // V7-09 (0.3.44): the guard must also cover `data.message` ITSELF missing
     // — `.content` on an absent message is the same TypeError one level up.
-    const message = (event.data as { message?: { content?: Array<{ type: string; text?: string }> } }).message
+    const message = (data as { message?: { content?: Array<{ type: string; text?: string }> } }).message
     if (!message || !Array.isArray(message.content)) return
     const text = message.content
       .map(block => block.type === 'text' ? block.text ?? '' : '')
@@ -84,10 +93,8 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     // event with missing/non-object `data` TypeErrors here and the review
     // E-6 catch swallowed the whole turn's remaining signals; every replay
     // fold breaks at the same point, so review could stop firing entirely.
-    // The `as unknown` is the lying-type shape: `data` is typed by the event
-    // union but arrives from disk, so the guard must be meaningful.
-    const data: unknown = event.data
-    if (data === null || typeof data !== 'object' || Array.isArray(data)) return
+    // (The branch-level guard is now redundant with the shared one above but
+    // kept as the local contract.)
     signal.toolCalls += 1
     const name = (data as { name?: unknown }).name
     if (name === 'skill' || name === 'skill_manage') signal.skillSignal = true

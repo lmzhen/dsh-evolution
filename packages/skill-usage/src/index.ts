@@ -139,10 +139,14 @@ export class SkillUsageRegistry extends Service {
    * that anchor exists (curator gates churn on `usageObserved()`).
    */
   private observeRead(name: string): Promise<void> {
+    // N5 (v12): trim at THIS entry too — the four authoring entries trim
+    // (P1-4 single source), so a whitespace-y read would otherwise miss the
+    // trimmed key on disk (view silently not counted, no ghost key).
+    const normalized = name.trim()
     return this.mutate(async (map) => {
-      if (!map.has(name)) return
+      if (!map.has(normalized)) return
       const viewsBefore = usageTotals(map).views
-      bumpView(map, name, new Date())
+      bumpView(map, normalized, new Date())
       if (viewsBefore === 0) {
         await this.appendUsageWindowEvent(map)
       }
@@ -275,8 +279,12 @@ export class SkillUsageRegistry extends Service {
 
   /** Write feedback-derived quality onto the usage sidecar; curator reads it. */
   async setQuality(name: string, score: number, warn: boolean): Promise<void> {
+    // N5 (v12): trim — feedback calls this with the raw target; an untrimmed
+    // key used to silently miss the trimmed record (quality_score never
+    // persisted, no ghost key, no error).
+    const normalized = name.trim()
     await this.mutate((map) => {
-      const record = map.get(name)
+      const record = map.get(normalized)
       if (!record) return
       record.quality_score = score
       record.quality_warn = warn

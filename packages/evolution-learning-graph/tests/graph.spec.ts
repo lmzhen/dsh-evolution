@@ -334,4 +334,90 @@ describe('learning graph', () => {
     }
   })
 
+  it('N1 (v12): /graph edit passes the command invocation session to the approval request', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map<string, unknown>(),
+      })
+      ctx.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      let captured: { sessionId?: unknown; session?: unknown; args?: { origin?: unknown } } | undefined
+      ctx.provide('evolutionApproval', {
+        request: async (input: unknown) => {
+          captured = input as typeof captured
+          return { action: 'staged', message: 'staged for approval' }
+        },
+      })
+      await ctx.plugin(Graph)
+      const result = await handler!.handler({
+        rawInput: 'edit demo-skill new body',
+        agent: { session: { id: 'sess-n1', header: { origin: 'subagent' } } },
+      })
+      expect(result.kind).toBe('success')
+      // The approval service derives the platform session policy from these —
+      // before N1 the graph sent neither and documented the absence as a
+      // platform limitation (a `never`-policy session staged anyway). A
+      // subagent-origin session derives to the review channel (resolveOrigins).
+      expect(captured?.sessionId).toBe('sess-n1')
+      expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1')
+      expect(captured?.args?.origin).toBe('background_review')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('N1 (v12): /graph delete passes the session too and a never-policy session is not staged', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1d-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map<string, unknown>(),
+      })
+      ctx.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      let captured: { sessionId?: unknown; session?: unknown } | undefined
+      ctx.provide('evolutionApproval', {
+        request: async (input: unknown) => {
+          captured = input as typeof captured
+          return { action: 'allow', message: 'allowed' }
+        },
+      })
+      await ctx.plugin(Graph)
+      await handler!.handler({ rawInput: 'delete demo-skill', agent: { session: { id: 'sess-n1d', header: { origin: 'foreground' } } } })
+      expect(captured?.sessionId).toBe('sess-n1d')
+      expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1d')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
 })

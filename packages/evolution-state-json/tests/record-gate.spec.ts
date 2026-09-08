@@ -69,8 +69,8 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     }))
     expect(await provider.loadCuratorState()).toBeNull()
     expect(await io.readText(join(root, 'curator-state.json.corrupt'))).not.toBeNull()
-    // The next save still works (the gate never rewrote the state file, the
-    // transact path is untouched) and the record becomes readable again.
+    // The next save still works (the gate rewrote the state file with the bad
+    // record dropped and the record becomes readable again).
     await provider.saveCuratorState({ lastRunAt: 1, runCount: 1, lastSummary: 'ok', paused: false })
     expect((await provider.loadCuratorState())?.lastSummary).toBe('ok')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -104,6 +104,26 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     // No quarantine copies anywhere — a clean store stays clean.
     const io = ctx.evolutionIo.provider('node')
     expect((await io.list(root)).filter(name => name.includes('.corrupt'))).toEqual([])
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('N12 (v12): rebuilds a .corrupt copy swept by the 7-day cleanup in the same process', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-n12-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ z1: zombie }))
+    expect(await provider.listPending()).toEqual([])
+    const corruptPath = join(root, 'pending-state.json.corrupt')
+    expect(await io.readText(corruptPath)).not.toBeNull()
+    // The sweep (io.ts S-10) removed the copy after its 7-day window; the
+    // rewrite key alone used to suppress the rebuild until a restart — the
+    // copy must come back on the next access.
+    await rm(corruptPath, { force: true })
+    expect(await provider.listPending()).toEqual([])
+    expect(await io.readText(corruptPath)).not.toBeNull()
+    expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

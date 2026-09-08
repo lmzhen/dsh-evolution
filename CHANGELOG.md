@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.59 (patch) — v12 审计修复批：修复的"最后一公里"收口（N1–N18 + v11 遗留 P2-12 一并闭合）
+
+- **P1（N1 真实缺口修复）**：`/graph edit|delete` 的审批请求改为**携带命令 invocation 的会话**（`invocation.agent.session`——evolution-commands `/evolution learn` 早已用 `invocation.agent.inject`，命令级会话通道并非"平台不支持"）——`never`-policy 会话不再被当作 foreground 直接落盘；P2-34 的失实取舍注释改写为如实声明（照 tool-skill-manage 同型模式：sessionId/session/sessionPolicy 三字段随行）。
+- **P2 批（v12 §3 全部 12 项）**：① state-json `.corrupt` 写**成功才置键**（写失败重试 + 可观测 warn——N2）；事务基线坏记录剔除路径补同款 warn/去重（N3——transact 路径此前零日志，E-52 新吞错点）；`.corrupt` 重写前校验副本在盘（已被 7 天清扫删除则重建——N12）；② signals `user/message` `assistant/message` 分支补 `data` 形状前置守卫（N4——P1-1 病灶类在另两分支存活）；③ skill-usage `setQuality`/`observeRead` 收进 **trim 单源**（N5——feedback 带原始 target 写质量分此前静默不落盘）；④ curator Config schema 补 `root` 字段（N6——interface/构造声明的 20 字段唯独漏它）；⑤ feedback `restore()` 种子路径补 512 cap（N7——长跑部署一次 restore 永久超界水位）；⑥ installer host/oneclick 互斥检查在 `--dry-run` 下同样拒绝（N10——dry-run 解析真实 profileDir，注释失实已纠正）；`removedBundle` 如实（dry-run/无该行=null——N11）；⑦ review README trigger 段与新 jsdoc 对齐（N9——cadence 恒开、标志只门控 completion 通道）；⑧ doctor 报告注明 bundle 聚合口径（N13——跨全部 profile 采集，非本运行时挂载）。
+- **v11 遗留闭合（P2-12）**：review **completion 通道接入 `deliverMessage`**——不再绕行直接 `agent.inject`（reviewWakeInject 生效 + woken-turn cadence 一次抑制，与 flush/结果通知同一通道）。
+- **观察批（N14–N18）**：`deferred-v11.md` **真实落档**（0.3.58 声称挂账而文件缺失——N8；含 P2-15/28/29/30 触发条件与 N14 三处机械宽行登记）；判别用例补齐（N15——N1/N2/N4/N5/N7/N10/N11/N12/P2-12 各带红转绿用例；P2-42 验收断言由永真改真值断言）；prompts 残留 "stays untouched in this batch" 注释清理（N16）；verify 脚本 SKIP 补 `dist.next/dist.previous`（N17）；arch-guards 头注释声明 H2 启发式边界（N18）。
+- **流程**：publish-chain 同步步骤将 `docs` 纳入 robocopy（挂账/审计文件不再靠手动双写——N8 教训），并新增**挂账存在性自检**（CHANGELOG 声称的 deferred 文件缺失即 fail——v12 §6.4 流程建议）；本脚本新增逐行时间戳 + 分阶段耗时 + 持久化 timing 日志。
+- **门禁**：core（+N4 判别 2）/ state-json（+N12）/ skill-usage（+N5 判别 2）/ curator（schema root）/ feedback（+N7）/ learning-graph（+N1 判别 2）/ review（+P2-12 判别）/ host installer（+N10、P2-42 断言修真）/ commands doctor（聚合口径）；oxlint / tsc 以本机与 CI 实跑为准。
+
 ## 0.3.58 (patch) — v11 审计修复批 2：写入面契约统一 + 模型面对齐 + 交互/文档（阶段 D+E+F+H）
 
 - **阶段 D（跨包写入面契约统一）**：① skill 名称 trim 下沉到 **skill-usage 服务层**（record/ensureRecordCreated/markAgentCreated/markArchived 四入口——侧车键与 SkillLibrary 全入口 trim 单源一致，幽灵键「 foo 」消除）；② **curator 补 `root` 配置**（自定义 root 部署下 curator 作用于真实技能树——此前是全家族唯一无 root 的树消费者，生命周期在自定义树部署下整体失效）；③ graph 审批归属：invocation 无会话通道（实测）——注释声明取舍（不造命令级会话机制）；④ feedback 两个进程级 Map 512 上界；⑤ 契约钉住：trim/root 判别用例（D1/D2 验收）。

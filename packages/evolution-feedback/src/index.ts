@@ -148,6 +148,15 @@ export class EvolutionFeedback {
       // so a later failed append rolls back to what the log actually holds.
       for (const [target, record] of Object.entries(truth.skills)) this.durableNote.set(this.noteKey('skills', target), record.lastNote)
       for (const [target, record] of Object.entries(truth.sessions)) this.durableNote.set(this.noteKey('sessions', target), record.lastNote)
+      // N7 (v12): the seed path had no cap — a >512 feedbacked-target
+      // deployment stayed over the bound after every restore (the record
+      // path's insert-time eviction cannot lower it). Same oldest-dropped
+      // order as record().
+      while (this.durableNote.size > EvolutionFeedback.NOTE_CAP) {
+        const oldest = this.durableNote.keys().next().value
+        if (oldest === undefined) break
+        this.durableNote.delete(oldest)
+      }
       // Refresh the boot cache from the TRUTH, never from the memory-merged
       // state — an optimistic record whose event is not yet on disk must not
       // double-count at the next boot.

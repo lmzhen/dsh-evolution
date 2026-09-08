@@ -191,7 +191,50 @@ function gateScan(file: string, parsed: unknown): Array<[string, unknown]> {
  * @internal Exported only for this package's own tests — not public API
  * surface (audit v10 S-03); other packages must go through the provider seam.
  */
+// V10-04 (P2-19): the record-gate warn fires once per file per process — a
+// permanently bad record would otherwise warn on every turn's read. Module
+// scope: readJson (apply closure) and jsonTransact (module function) share it.
+const recordGateWarned = new Set<string>()
+// P2-24 (v11): the last `.corrupt` rewrite key per file (sorted failing id
+// set) — skip rewriting when nothing changed, so a permanently bad record
+// never re-atomic-writes the copy on every read.
+const corruptWritten = new Map<string, string>()
+// N2/N3/N12 (v12): shared quarantine machinery for the READ path and the
+// TRANSACT baseline — the bad-record warn fires once per file per process
+// whichever path hit it first; the rewrite key is set ONLY after a
+// successful write (a failed write is retried, not marked done); and the
+// key alone is not trusted — a copy swept by the 7-day stale cleanup (S-10)
+// is rebuilt on the next access instead of being skipped until restart.
+const corruptWriteWarned = new Set<string>()
+
+function reportGateViolation(ctx: Context, file: string, failing: Array<[string, unknown]>): void {
+  if (recordGateWarned.has(file)) return
+  recordGateWarned.add(file)
+  ctx.logger.warn(`evolution-state-json: ${failing.length} record(s) in "${file}" failed the record schema gate and were quarantined to "${file}.corrupt": ${failing.map(([id]) => id).join(', ')}`)
+}
+
+async function ensureCorruptCopy(
+  ctx: Context,
+  io: () => EvolutionIoLike,
+  root: string,
+  file: string,
+  bad: Record<string, unknown>,
+): Promise<void> {
+  const corruptPath = `${join(root, file)}.corrupt`
+  const corruptKey = JSON.stringify(Object.keys(bad).sort())
+  if (corruptWritten.get(file) === corruptKey && await io().exists(corruptPath)) return
+  const wrote = await io().writeText(corruptPath, JSON.stringify(bad, null, 2)).then(() => true).catch(() => false)
+  if (wrote) {
+    corruptWritten.set(file, corruptKey)
+    corruptWriteWarned.delete(file)
+  } else if (!corruptWriteWarned.has(file)) {
+    corruptWriteWarned.add(file)
+    ctx.logger.warn(`evolution-state-json: could not write quarantine copy "${corruptPath}" for ${Object.keys(bad).length} failed record(s) — the main file keeps them; the copy is retried on the next access`)
+  }
+}
+
 export async function jsonTransact<T>(
+  ctx: Context,
   io: () => EvolutionIoLike,
   root: string,
   file: string,
@@ -232,7 +275,11 @@ export async function jsonTransact<T>(
           if (failing.some(([failedId]) => failedId === id)) bad[id] = record
           else good[id] = record
         }
-        await io().writeText(`${join(root, file)}.corrupt`, JSON.stringify(bad, null, 2)).catch(() => {})
+        // N3 (v12): the transact baseline previously dropped bad records and
+        // wrote .corrupt with zero observable trace — same warn/rewrite
+        // discipline as the read path now applies (deduped per file).
+        reportGateViolation(ctx, file, failing)
+        await ensureCorruptCopy(ctx, io, root, file, bad)
         parsed = good as T
       }
     }
@@ -261,13 +308,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
-  // V10-04 (P2-19): the record-gate warn fires once per file per process —
-  // a permanently bad record would otherwise warn on every turn's read.
-  const recordGateWarned = new Set<string>()
-  // P2-24 (v11): the last `.corrupt` rewrite key per file (sorted failing id
-  // set) — skip rewriting when nothing changed, so a permanently bad record
-  // never re-atomic-writes the copy on every read.
-  const corruptWritten = new Map<string, string>()
+  // The shared quarantine machinery lives at module scope (see above): the
+  // transact baseline runs inside jsonTransact, a module-level wrapper that
+  // cannot reach apply-scoped closures.
 
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
@@ -306,16 +349,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // P2-24 (v11): rewrite the .corrupt copy only when the failing set CHANGED
       // — a permanently bad record otherwise re-atomic-writes it on every read
       // (write amplification + an mtime touch that defeats the 7-day sweep in a
-      // long-running process).
-      const corruptKey = JSON.stringify(failing.map(([id]) => id).sort())
-      if (corruptWritten.get(file) !== corruptKey) {
-        await io().writeText(`${pathOf(file)}.corrupt`, JSON.stringify(bad, null, 2)).catch(() => {})
-        corruptWritten.set(file, corruptKey)
-      }
-      if (!recordGateWarned.has(file)) {
-        recordGateWarned.add(file)
-        ctx.logger.warn(`evolution-state-json: ${failing.length} record(s) in "${file}" failed the record schema gate and were quarantined to "${file}.corrupt": ${failing.map(([id]) => id).join(', ')}`)
-      }
+      // long-running process). N2/N12 (v12): the shared helper additionally
+      // rebuilds a copy the sweep already removed and does not mark a failed
+      // write as done.
+      reportGateViolation(ctx, file, failing)
+      await ensureCorruptCopy(ctx, io, root, file, bad)
       return good as T
     }
     return parsed
@@ -411,7 +449,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // argument — a closure over the pre-lock snapshot could overwrite a
       // concurrent writer's newer state between the probe and the lock (Y
       // staged → vanished, or X approved → reverted to pending → replayable).
-      await jsonTransact(io, root, PENDING_STATE_FILE, fresh => ({ ...retired, ...(fresh ?? {}) }))
+      await jsonTransact(ctx, io, root, PENDING_STATE_FILE, fresh => ({ ...retired, ...(fresh ?? {}) }))
       await io().rename(pathOf(PENDING_LEGACY_FILE), `${pathOf(PENDING_LEGACY_FILE)}.migrated`)
       legacyMigrated = true
       return retired
@@ -589,7 +627,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async saveReviewState(sessionId, record) {
       await mutate(async () => {
         await jsonTransact<Record<string, ReviewStateRecord>>(
-          io, root, REVIEW_STATE_FILE,
+          ctx, io, root, REVIEW_STATE_FILE,
           current => ({ ...(current ?? {}), [sessionId]: record }),
         )
       })
@@ -605,7 +643,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async saveCuratorState(record) {
       await mutate(async () => {
         await jsonTransact<Record<string, CuratorStateRecord>>(
-          io, root, CURATOR_STATE_FILE,
+          ctx, io, root, CURATOR_STATE_FILE,
           current => ({ ...(current ?? {}), [CURATOR_STATE_KEY]: record }),
         )
       })
@@ -613,7 +651,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async transactCuratorState(task) {
       await mutate(async () => {
-        await jsonTransact<Record<string, CuratorStateRecord>>(io, root, CURATOR_STATE_FILE, (current) => {
+        await jsonTransact<Record<string, CuratorStateRecord>>(ctx, io, root, CURATOR_STATE_FILE, (current) => {
           // 0.3.22 (F-202): null = keep the current record unchanged (the
           // domain update primitive cannot delete; json aligns). The record
           // is ADD-only via the seam — a truly deletable empty is expressed
@@ -634,7 +672,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async savePending(record) {
       await mutate(async () => {
-        await jsonTransact<Record<string, PendingRecord>>(io, root, PENDING_STATE_FILE, async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})), [record.id]: record }
@@ -646,7 +684,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async claimPending(id, claimId) {
       return await mutate(async () => {
         const slot = { claimed: null as PendingRecord | null }
-        await jsonTransact<Record<string, PendingRecord>>(io, root, PENDING_STATE_FILE, async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
@@ -668,7 +706,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
 
     async releasePendingClaim(id, claimId) {
       await mutate(async () => {
-        await jsonTransact<Record<string, PendingRecord>>(io, root, PENDING_STATE_FILE, async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
@@ -694,7 +732,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
         let evicted: PendingRecord[] = []
-        await jsonTransact<Record<string, PendingRecord>>(io, root, PENDING_STATE_FILE, async (current) => {
+        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }

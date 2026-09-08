@@ -287,8 +287,8 @@ D. 库·整合纪律（计划形态约束）
  * orchestrate — a second model-facing prompt living OUTSIDE the bundle digest.
  * It now rides PROMPT_BUNDLE so the digest integrity check covers every
  * maintenance prompt. Adding the entry changes the bundle digest (the intended
- * fail-closed signal); PROMPT_BUNDLE_VERSION itself is owned by the core test
- * pin and stays untouched in this batch.
+ * fail-closed signal); PROMPT_BUNDLE_VERSION is owned by the core test pin and
+ * bumps with the batch that changes the bundle (15→16 in 0.3.58).
  */
 export const MAINTAIN_OUTPUT_INSTRUCTION = '按模板契约输出 JSON 维护计划（verdict/plan/notes）；你有 skill 工具与维护模板；并在维护探针（maintenance_probe）挂载时可用它深挖细节。'
 

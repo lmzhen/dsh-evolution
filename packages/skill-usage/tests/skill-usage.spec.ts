@@ -230,4 +230,39 @@ describe('skill-usage', () => {
     expect(report.get('user-skill')?.created_by).toBeNull()
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('N5 (v12): setQuality trims like the authoring entries (no silent quality drop)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-n5q-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.record('demo', 'use')
+    await ctx.skillUsage.setQuality('  demo  ', 0.42, true)
+    const record = (await ctx.skillUsage.report()).get('demo')
+    expect(record?.quality_score).toBe(0.42)
+    expect(record?.quality_warn).toBe(true)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('N5 (v12): observeRead counts a whitespace-y tool name against the trimmed key', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-n5v-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.record('demo', 'use')
+    // skillNameFromToolCall mirrors the raw arguments `name` (no trim) — the
+    // read must land on the trimmed sidecar key.
+    ctx.emit('session/event', { id: 's1' } as never, { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{"name":" demo "}' } } as never)
+    const deadline = Date.now() + 3000
+    let views = 0
+    while (Date.now() < deadline) {
+      views = (await ctx.skillUsage.report()).get('demo')?.view_count ?? 0
+      if (views > 0) break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    expect(views).toBe(1)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })

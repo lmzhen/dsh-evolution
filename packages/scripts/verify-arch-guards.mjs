@@ -21,6 +21,14 @@
  * 0.3.22 (G4.8): N2 single-source moved to evolution-approval/src — the
  * exemption list follows the authority.
  *
+ * H2 (0.3.58) heuristic boundary (N18, v12): the ghost-service-key probe is
+ * textual — it detects `has('evolutionX…')` probes and `super(ctx,'…')` /
+ * `.provide('…')` declarations. Forms it does NOT see: double-quoted calls,
+ * array-form `inject(['evolutionX'])` declarations, and constant indirection
+ * where the key never appears as a string literal. Documented, not a
+ * guarantee: a new ghost key hidden behind indirection needs the pairing
+ * inventory (verify-event-pairing / service-key listing), not this script.
+ *
  * Usage (works from BOTH layouts — dev `packages/evolution/scripts/…`, flat
  * mirror `packages/scripts/…`; the packages root argument is the evolution
  * tree regardless of layout):
@@ -39,7 +47,7 @@ if (!existsSync(root)) {
 const strict = process.argv.includes('--strict') || process.env.DSH_EVOLUTION_ARCH_STRICT === '1'
 const CORE_SRC = 'evolution-core/src'
 const APPROVAL_SRC = 'evolution-approval/src'
-const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
+const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
 const DSH_HOME_RE = /process\.env\.DSH_HOME/
 const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolicy/
 let checkedCount = 0

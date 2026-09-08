@@ -114,6 +114,10 @@ export function gateConsolidations(
 export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
   static Config: Schema<Config> = z.object({
+    // N6 (v12): `root` was declared on the interface and consumed by the
+    // constructor (D2) but missing from the schema — schema-driven surfaces
+    // (doc generation, config guard rails) could not see it.
+    root: z.string().default(''),
     enabled: z.boolean().default(true),
     intervalHours: z.number().min(1).default(DEFAULT_CURATOR_INTERVAL_HOURS),
     staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
