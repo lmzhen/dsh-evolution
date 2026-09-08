@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.61 (patch) — profile 双 bundle 事故闭环：仓库级守卫 + 发布链集成 + 安装文档核查
+
+- **背景**：0.3.59/0.3.60 的 profile 升级命令同时安装了 `dsh-evolution-all` 与 `dsh-evolution-host` 两个互斥捆绑——`dsh plugin add` 的 bundle reconcile 只增不减，`dsh.profile.bundles` 出现双行，两捆绑的 patch 插入相同 infra 行（`evolution-policy` 首个冲突）→ cordis loader fail-loud，`dsh web` 启动 abort（GUI 旧进程掩盖至重启才暴露）。
+- **新守卫 `scripts/verify-profile-bundles.mjs`**（双布局，dev `packages/evolution/scripts/` + mirror `packages/scripts/`，与 normalize-mirror 同性质；随发布链自动同步）：
+  ① evolution 捆绑（all/host/preset，scope-agnostic tail 匹配）在 `dsh.profile.bundles` 中**至多一行**（互斥 E-33，附"保留 all（超集）"指引）；② mounted 捆绑必须同时是 `dependencies` 显式 pin（幽灵行 → loader 无法解析）；③ vacant guard（无 manifest exit 2，空检≠通过）；④ Windows BOM 剥离（本机 `Out-File` 默认 BOM 会炸 JSON.parse）。
+- **发布链集成**：publish-chain 步骤 2 新增 **`profile-check` 阶段**（发布=升级前置，每次发布先验本机 profile；`--skip-profile-check` 逃生）；头注释与同步日志的脚本计数改为**动态**（"12 个"静态计数不再随新脚本漂移）。
+- **核查结论（无需修改，已覆盖）**：doctor 的 all+host 冲突检测（T-WB2 用例在位）、INSTALL.md 与根 README 的三方互斥明示（"never add more than one"）**均已存在**——缺口仅在"无自动关卡"与"发布流程未执行验证"，本批闭环。
+- **用户侧修复（非本仓库）**：profile bundles 已由现场修复为单 `dsh-evolution-all`（all 为超集：host 基础设施行 ∪ 4 模型行——G-A 守卫断言）；dependencies 保留 host pin（all 依赖它，同版无碍）。
+- **门禁**：verify-profile-bundles 四场景冒烟（真实 profile OK / 双行 exit1 / 幽灵行 exit1 / 缺文件 exit2）＋ publish-chain 语法检查；其余以本机与 CI 实跑为准。
+
 ## 0.3.60 (patch) — v13 审计修复批：3×P2 + 6×P3 全部收口（问题规模连续第三轮收敛）
 
 - **P2-1（state-json 裂割）**：`quarantine()` 整文件损坏覆盖 `.corrupt` 后补 `corruptWritten.delete(file)`——整文件快照覆盖后旧键失效，记录门禁下次命中按新键重写**记录集副本**（修复前"键匹配 + 在盘"会基于陈旧键跳过，副本从此是整文件快照、违反"仅含失败记录"契约）；判别用例走完整时序（gate 写记录集 → 整文件损坏 quarantine 覆盖 → 修复 JSON → 断言副本重回记录集——红转绿有效）。
