@@ -46,7 +46,7 @@ describe('inject-evolution-paths (N-7 purity)', () => {
     // machine-specific, and a target that already declares it must not fail
     // the "already declares an evolution alias" check.
     expect(next).not.toContain('"zod"')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('fails loudly when the target already declares an evolution alias line', async () => {
@@ -60,6 +60,6 @@ describe('inject-evolution-paths (N-7 purity)', () => {
     expect(error).not.toBeNull()
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('absorbed this row')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

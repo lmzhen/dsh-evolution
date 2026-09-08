@@ -27,7 +27,7 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     await provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'a', paused: false }))
     expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'a', paused: false })
     expect(await io.exists(join(root, 'curator-state.json'))).toBe(true)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('returns null (ensure-absent) on a missing seed and writes no file', async () => {
@@ -38,7 +38,7 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     await provider.transactCuratorState(() => null)
     expect(await provider.loadCuratorState()).toBeNull()
     expect(await io.exists(join(root, 'curator-state.json'))).toBe(false)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a null return keeps an existing record unchanged', async () => {
@@ -51,7 +51,7 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     expect((await provider.loadCuratorState())?.lastSummary).toBe('orig')
     const raw = JSON.parse(await io.readText(join(root, 'curator-state.json'))) as { primary: { lastSummary: string } }
     expect(raw.primary.lastSummary).toBe('orig')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a returning task overwrites the existing primary record', async () => {
@@ -62,6 +62,6 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     await provider.transactCuratorState(current => ({ ...current!, lastSummary: 'new', runCount: 6 }))
     expect((await provider.loadCuratorState())?.lastSummary).toBe('new')
     expect((await provider.loadCuratorState())?.runCount).toBe(6)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

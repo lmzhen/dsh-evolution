@@ -2,6 +2,14 @@ name: release
 
 on:
   pull_request:
+    # R-12: docs-only PRs skip the full build (a one-line README edit used to
+    # cost two full overlay+test+pack runs). The PUSH trigger intentionally
+    # carries NO paths filter — a tag push whose diff happens to touch only
+    # docs must never silently skip its own release.
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'NOTICE'
   push:
     branches: [main]
     tags: ['v*']
@@ -10,7 +18,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}
+  # R-12: the workflow name prefix was redundant — this repo runs exactly one
+  # workflow, so the ref alone identifies the group. cancel-in-progress stays
+  # false: a running release must never be killed mid-publish.
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -33,6 +44,9 @@ jobs:
   validate:
     name: validate (baseline)
     runs-on: ubuntu-latest
+    # R-12: a hung full-suite run used to occupy the runner for hours — cap
+    # the job (generous headroom over a healthy ~20-30 min run).
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,6 +67,9 @@ jobs:
           platform_version: ${{ env.PLATFORM_VERSION }}
           artifact_suffix: baseline
           copy_host_tsconfig: 'true'
+          # R-10: pass the scope explicitly so the action's pack rewrite and
+          # the range guard (--our-scope) share ONE definition with this env.
+          npm_scope: ${{ env.NPM_SCOPE }}
 
   # M4 §4.6: the published platform version (dsh-v0.1.1-rc.2) is a different
   # commit than the pinned development baseline (UPSTREAM_SHA), so this job
@@ -67,6 +84,8 @@ jobs:
   compat-check:
     name: validate (released upstream)
     runs-on: ubuntu-latest
+    # R-12: same cap as the baseline validate job.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,6 +98,7 @@ jobs:
           platform_version: ${{ env.PLATFORM_VERSION }}
           artifact_suffix: released
           copy_host_tsconfig: 'false'
+          npm_scope: ${{ env.NPM_SCOPE }}
 
   publish:
     name: publish

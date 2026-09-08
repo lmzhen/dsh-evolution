@@ -9,7 +9,7 @@
 
 import { basename, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
-import { scanContentThreats } from './threats.ts'
+import { scanContentThreats, THREAT_EXEMPT_HINT, type ScanOptions } from './threats.ts'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
@@ -288,17 +288,25 @@ export interface FrontmatterNormalizeResult {
  * rewritten block no longer parses, or a rewritten value's parsed content
  * differs from the original, the rewrite is rolled back and reported in
  * `issues` (fail-loud, never a silent value corruption — P3-4).
+ *
+ * V10-02 (P2-3): the rewrite decision is PER LINE — each entry parses its own
+ * value, so a duplicated key can never route one entry's unsafe value into a
+ * different line's rewrite (the old key→Map lookup rewrote the FIRST (safe)
+ * line with the SECOND line's quoted value, and the last-wins YAML reader
+ * masked the damage). A duplicated key is itself invalid input and is
+ * reported in `issues` (the write path refuses) instead of being rewritten.
  */
 export function normalizeFrontmatter(content: string): FrontmatterNormalizeResult {
   const block = frontmatterBlock(content)
   if (!block) return { content, changed: false, fields: [], issues: [] }
   const { lines, end, nl } = block
-  // Detection is shared with the audit side (frontmatterYamlUnsafeValues):
-  // normalize and catalog-invalid detection can never disagree.
-  const unsafe = new Map(frontmatterYamlUnsafeValues(content).map(entry => [entry.key, entry.value]))
-  const originalValues = new Map(unsafe)
   const fields: string[] = []
   const issues: string[] = []
+  // Detection shares the predicate with the audit side
+  // (frontmatterYamlUnsafeValues): normalize and catalog-invalid detection
+  // can never disagree.
+  const seen = new Set<string>()
+  const originalValues = new Map<string, string>()
   let changed = false
   for (let i = 1; i < end; i++) {
     const line = lines[i]
@@ -306,8 +314,16 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
     const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
     if (!match) continue
     const key = match[1]
-    const value = unsafe.get(key ?? '')
-    if (key === undefined || value === undefined) continue
+    if (key === undefined) continue
+    // V10-02 (P2-3): parse THIS line's own value (quotes included) — never a
+    // same-key value from another line.
+    const value = (match[2] ?? '').trim()
+    if (seen.has(key)) {
+      issues.push(`${key}: duplicate frontmatter key — remove the repeated entry and retry`)
+      continue
+    }
+    seen.add(key)
+    if (!yamlPlainScalarNeedsQuotes(value)) continue
     if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value)) {
       issues.push(`${key}: value contains control characters — clean them manually`)
       continue
@@ -318,9 +334,13 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
       ? `'${value.replace(/'/g, "''")}'`
       : `"${value}"`
     lines[i] = `${key}: ${quoted}`
+    originalValues.set(key, value)
     fields.push(key)
     changed = true
   }
+  // V10-02 (P2-3): any issue (duplicate key, control characters) refuses the
+  // whole rewrite — the write path rejects instead of shipping a partial fix.
+  if (issues.length > 0) return { content, changed: false, fields: [], issues }
   if (!changed) return { content, changed: false, fields: [], issues }
   // 0.3.14: verify the rewritten block with the real parser — the fast-path
   // rule can mis-detect a multiline flow collection (`[a,` + continuation)
@@ -378,7 +398,9 @@ export function validateFrontmatter(content: string, expectedName?: string, limi
   const parsed = parseFrontmatter(content)
   if (!parsed) return 'SKILL.md must start and end with YAML frontmatter and include a body.'
   if (!parsed.frontmatter.name) return 'Frontmatter must include a name field.'
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(parsed.frontmatter.name)) return `Invalid skill name "${parsed.frontmatter.name}" — use lowercase letters, digits, and hyphens.`
+  // C-12 (v10 audit): single-source the name shape — the inline copy of
+  // SKILL_NAME_RE could silently drift from constants.ts.
+  if (!SKILL_NAME_RE.test(parsed.frontmatter.name)) return `Invalid skill name "${parsed.frontmatter.name}" — use lowercase letters, digits, and hyphens.`
   if (parsed.frontmatter.name.length > limits.maxNameLength) return `Skill name exceeds ${limits.maxNameLength} characters.`
   if (expectedName && parsed.frontmatter.name !== expectedName) return `Frontmatter name "${parsed.frontmatter.name}" does not match target skill "${expectedName}".`
   if (!parsed.frontmatter.description) return 'Frontmatter must include a description field.'
@@ -435,6 +457,23 @@ async function listNames(root: string, io: EvolutionIoLike): Promise<string[]> {
   return names.sort()
 }
 
+/** C-18: support file names are restricted to the
+ * RESTRUCTURE_TARGET_RE character class (leading `[a-z0-9]`, then
+ * `[a-z0-9._-]`) — drive-colon / odd-character / uppercase names can no
+ * longer reach the filesystem through writeSupportFile / patch /
+ * removeSupportFile. */
+const SUPPORT_FILE_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
+
+/** C-18: win32 reserves these stems with ANY extension (`nul.md` hits the
+ * NUL device), and they are fully inside the charset above — so the reserved
+ * set is checked on the first-dot prefix as well; the charset close alone
+ * cannot refuse them. */
+const WIN32_RESERVED_DEVICE_NAMES: ReadonlySet<string> = new Set([
+  'con', 'prn', 'aux', 'nul',
+  'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+  'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+])
+
 function validateSupportPath(filePath: string): string | null {
   const normalized = filePath.replace(/\\/g, '/')
   if (normalized.includes('..')) return 'Path traversal is not allowed.'
@@ -443,6 +482,15 @@ function validateSupportPath(filePath: string): string | null {
     return `file_path must be under one of: ${SUPPORT_DIRS.join(', ')}.`
   }
   if (parts.length < 2) return 'Provide a file name, not just a directory.'
+  for (const part of parts.slice(1)) {
+    if (!SUPPORT_FILE_NAME_RE.test(part)) {
+      return `Unsupported file name "${part}" — use lowercase letters, digits, dots, hyphens, and underscores (leading letter or digit).`
+    }
+    const stem = part.split('.')[0]?.toLowerCase() ?? ''
+    if (WIN32_RESERVED_DEVICE_NAMES.has(stem)) {
+      return `Unsupported file name "${part}" — a Windows reserved device name.`
+    }
+  }
   return null
 }
 
@@ -710,6 +758,9 @@ export class SkillLibrary {
    * one skill never interleave their read-modify-write (the cross-process layer
    * is the IO backend's transact lock; this chain is the second layer). */
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
+  /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
+   * default — the strict ANY-hit-blocks policy is unchanged. */
+  private readonly threatExemptLabels: readonly string[]
 
   constructor(
     root = skillsRoot(),
@@ -717,11 +768,13 @@ export class SkillLibrary {
     limits: SkillLimits = DEFAULT_SKILL_LIMITS,
     onMutation?: (event: EvolutionSkillMutatedEvent) => void,
     transact?: typeof transactIo,
+    threatExemptLabels?: readonly string[],
   ) {
     this.root = root
     this.io = io
     this.limits = limits
     this.onMutation = onMutation
+    this.threatExemptLabels = threatExemptLabels ?? []
     // V4-20: bind the IO backend's own transact by default. Explicit injection
     // stays first; a backend WITHOUT transact keeps the old plain read→write
     // (the in-process serial chain is the second layer). The wrapper adapts the
@@ -790,12 +843,31 @@ export class SkillLibrary {
     }
   }
 
+  /** V10-03 (P2-18): ScanOptions shared by every write-path threat check —
+   * the constructor's exempt labels, empty by default (behavior unchanged). */
+  private threatScanOptions(): ScanOptions {
+    return this.threatExemptLabels.length > 0 ? { excludeLabels: this.threatExemptLabels } : {}
+  }
+
+  /** V10-03 (P2-18): the strict-scan write gate. A block message names the hit
+   * label (scanContentThreats already embeds it) plus the self-heal hint, so a
+   * false-positive rewrite direction is actionable instead of a dead end. */
+  private contentThreatBlock(content: string): string | null {
+    const threat = scanContentThreats(content, undefined, this.threatScanOptions())
+    return threat === null ? null : threat + THREAT_EXEMPT_HINT
+  }
+
   async list(): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
     for (const name of await listNames(this.root, this.io)) {
       const dir = this.dirOf(name)
       const md = await this.io.readText(join(dir, 'SKILL.md'))
-      if (!md) continue
+      // C-14: a 0-byte SKILL.md is "present but corrupt" — listNames
+      // already proved the file exists, so the entry stays visible (parseFrontmatter
+      // of '' yields no description) instead of being ghost-skipped: scope and
+      // curator must still see a directory that may carry protection markers.
+      // Only a missing read (null — a lost race against an archive) skips.
+      if (md === null) continue
       const parsed = parseFrontmatter(md)
       // One directory listing replaces the per-marker exists() probes (P2-6
       // N+1 convergence); the marker set matches deleteProtection(). Names are
@@ -809,9 +881,13 @@ export class SkillLibrary {
       }
       const has = (marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed') => entries.includes(markerEntryName(marker))
       const protectedBy = has('bundled') ? 'bundled' : has('hub-installed') ? 'hub-installed' : has('pinned') ? 'pinned' : null
+      // C-17: type-gate the description — a corrupt frontmatter value
+      // (e.g. `description: 123` surviving as a number) must not leak into the
+      // string-typed summary field.
+      const parsedDescription = parsed?.frontmatter.description
       summaries.push({
         name,
-        description: parsed?.frontmatter.description ?? '',
+        description: typeof parsedDescription === 'string' ? parsedDescription : '',
         path: dir,
         protectedBy,
         managed: has('hermes-managed'),
@@ -886,7 +962,10 @@ export class SkillLibrary {
     return null
   }
 
-  async deleteProtection(rawName: string, options: { allowBundled?: boolean } = {}): Promise<string | null> {
+  // C-13 (v10 audit): `allowBundled` accepts an explicit `undefined` (needed
+  // under exactOptionalPropertyTypes) so archive() can pass its whole
+  // ArchiveOptions through instead of rebuilding the object.
+  async deleteProtection(rawName: string, options: { allowBundled?: boolean | undefined } = {}): Promise<string | null> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
@@ -1033,9 +1112,10 @@ export class SkillLibrary {
    */
   async setPinned(name: string, pinned: boolean, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const normalized = name.trim()
-    if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
-      return { ok: false, message: `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).` }
-    }
+    // C-12 (v10 audit): the inline badName() copy is gone — every entry guard
+    // reads the single source, so a limits change cannot fork the message.
+    const bad = this.badName(normalized)
+    if (bad) return { ok: false, message: bad }
     if (origin === 'background_review') {
       return { ok: false, message: 'Only the foreground (user or the main agent) may pin or unpin skills.' }
     }
@@ -1061,9 +1141,9 @@ export class SkillLibrary {
 
   async create(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
     const normalized = name.trim()
-    if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
-      return { ok: false, message: `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).` }
-    }
+    // C-12 (v10 audit): the inline badName() copy is gone (see setPinned).
+    const bad = this.badName(normalized)
+    if (bad) return { ok: false, message: bad }
     const validation = validateFrontmatter(content, normalized, this.limits)
     if (validation) return { ok: false, message: validation }
     // 0.3.11: frontmatter normalization happens at the write point — the
@@ -1076,10 +1156,16 @@ export class SkillLibrary {
       const revalidated = validateFrontmatter(finalContent, normalized, this.limits)
       if (revalidated) return { ok: false, message: revalidated }
     }
-    const threat = scanContentThreats(finalContent)
+    const threat = this.contentThreatBlock(finalContent)
     if (threat) return { ok: false, message: threat }
     const dir = this.dirOf(normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
+    // C-15: a pre-existing directory carrying a protection marker is
+    // refused — the same writeProtection() verdict update/patch apply — so
+    // create() can no longer drop a SKILL.md into a bundled/hub-installed
+    // (or, for the review channel, pinned) tree it does not own.
+    const protection = await this.writeProtection(normalized, origin)
+    if (protection) return { ok: false, message: `Skill "${normalized}" is protected (${protection}).` }
     // F-337: hash the bytes that actually land on disk (write uses
     // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
     const onDisk = finalContent.trimEnd() + '\n'
@@ -1119,7 +1205,7 @@ export class SkillLibrary {
       const revalidated = validateFrontmatter(finalContent, name, this.limits)
       if (revalidated) return { ok: false, message: revalidated }
     }
-    const threat = scanContentThreats(finalContent)
+    const threat = this.contentThreatBlock(finalContent)
     if (threat) return { ok: false, message: threat }
     return await this.runSingleWrite(path, (current) => {
       if (current === null) return { result: { ok: false, message: `Skill "${name}" not found.` }, write: null }
@@ -1208,7 +1294,7 @@ export class SkillLibrary {
       if (writeContent.length > this.limits.maxSkillContentChars && target === skillMd) {
         return { result: { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }, write: null }
       }
-      const threat = scanContentThreats(writeContent)
+      const threat = this.contentThreatBlock(writeContent)
       if (threat) return { result: { ok: false, message: threat }, write: null }
       // 0.3.18 (E-68): old_string === replacement reaches fuzzyPatch's exact
       // path and yields patched === md. Previously the file was rewritten, the
@@ -1242,8 +1328,15 @@ export class SkillLibrary {
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
-    if (!md) return { ok: false, message: `Skill "${name}" not found.` }
-    const protection = await this.deleteProtection(name, options.allowBundled === undefined ? {} : { allowBundled: options.allowBundled })
+    // C-14: a 0-byte SKILL.md is "present but corrupt" — the tree is
+    // still archivable (protection checks and the audit do not need body
+    // bytes; the audit hashes the empty before-string). Only a genuinely
+    // MISSING file reads as "not found".
+    if (md === null) return { ok: false, message: `Skill "${name}" not found.` }
+    // C-13 (v10 audit): the redundant ternary is gone — deleteProtection now
+    // accepts an explicit `undefined` allowBundled, so the options object
+    // passes through verbatim.
+    const protection = await this.deleteProtection(name, options)
     if (protection) {
       return {
         ok: false,
@@ -1350,7 +1443,10 @@ export class SkillLibrary {
     const mode = options.mode ?? 'append'
     if (normalizedSources.length === 0) return { ok: false, message: 'Consolidation requires at least one distinct source skill.' }
     for (const name of [targetName, ...normalizedSources]) {
-      if (!SKILL_NAME_RE.test(name)) return { ok: false, message: `Invalid skill name "${name}". Use lowercase letters, digits, and hyphens.` }
+      // C-16: the name guard is badName() now — consolidate gains the
+      // same 64-char length ceiling and message form as every other mutator.
+      const bad = this.badName(name)
+      if (bad) return { ok: false, message: bad }
     }
     const targetDir = this.dirOf(targetName)
     const targetProtection = await this.writeProtection(targetName, origin)
@@ -1425,7 +1521,19 @@ export class SkillLibrary {
       const result = await this.serial(async (): Promise<SkillActionResult> => {
         const freshTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
         if (!freshTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
-        const writes: TreeChangeWrite[] = [...referenceWrites]
+        // V10-01 (P2-2): reference-mode targets APPEND, mirroring restructure
+        // (base + '\n\n' + new text) — a second consolidate of a re-created
+        // source used to overwrite the first demotion's bytes (silent loss of
+        // the older degraded knowledge). The previous bytes are read INSIDE
+        // the serial queue (V8-11 discipline), so a concurrent patch between
+        // planning and commit is never silently overwritten; applyTreeChange
+        // re-reads at commit for the rollback bytes.
+        const writes: TreeChangeWrite[] = []
+        for (const reference of referenceWrites) {
+          const previous = await this.io.readText(reference.target).catch(() => null)
+          const base = previous?.trimEnd() ?? ''
+          writes.push({ target: reference.target, content: base === '' ? reference.content : `${base}\n\n${reference.content}` })
+        }
         if (mode === 'append') {
           const merged = freshTargetMd.trimEnd() + parts.join('\n') + '\n'
           const validation = validateFrontmatter(merged, targetName, this.limits)
@@ -1604,7 +1712,7 @@ export class SkillLibrary {
       if (Buffer.byteLength(write.content, 'utf8') > this.limits.maxSkillFileBytes) {
         return { ok: false, message: `Write exceeds ${this.limits.maxSkillFileBytes} bytes: ${write.target}` }
       }
-      const threat = scanContentThreats(write.content)
+      const threat = this.contentThreatBlock(write.content)
       if (threat) return { ok: false, message: threat }
       landing.push({ target: write.target, content: write.content, previous })
     }
@@ -1706,7 +1814,7 @@ export class SkillLibrary {
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
     if (Buffer.byteLength(content, 'utf8') > this.limits.maxSkillFileBytes) return { ok: false, message: `Support file exceeds ${this.limits.maxSkillFileBytes} bytes.` }
-    const threat = scanContentThreats(content)
+    const threat = this.contentThreatBlock(content)
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     return await this.runSingleWrite(target, (current) => {

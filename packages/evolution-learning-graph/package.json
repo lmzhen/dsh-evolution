@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-learning-graph",
   "description": "Learning graph over skills and memory",
-  "version": "0.3.51",
+  "version": "0.3.52",
   "publishConfig": {
     "access": "public"
   },
@@ -31,7 +31,8 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
-    "@deepseek-ai/dsh-evolution-core": "workspace:^"
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",

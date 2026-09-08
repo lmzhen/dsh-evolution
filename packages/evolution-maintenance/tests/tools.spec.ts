@@ -69,7 +69,7 @@ describe('evolution-maintenance tools registration', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 })

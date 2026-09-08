@@ -2,9 +2,11 @@
  * Shared library for the dsh-evolution plugin family.
  *
  * Pure stores, prompts, signals, lifecycle logic, threat scanning, IO seam
- * types, and session-event augmentations. This package owns no Cordis plugin
- * entry of its own; consumers import named exports from the package root so
- * published npm bundles never depend on source subpaths.
+ * types, and session-event augmentations. This package ships no runtime
+ * plugin beyond the invariant companion entry (`./invariant` — the subpath
+ * the host auto-assembles to register this package's no-op invariant);
+ * consumers import named exports from the package root so published npm
+ * bundles never depend on source subpaths.
  * @module @deepseek-ai/dsh-evolution-core
  */
 

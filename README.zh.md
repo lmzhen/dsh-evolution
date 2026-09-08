@@ -12,6 +12,7 @@
 
 - [这是什么](#这是什么)
 - [快速开始](#快速开始)
+- [命令面](#命令面)
 - [功能](#功能)
 - [安装方式](#安装方式)
 - [使用场景](#使用场景)
@@ -66,6 +67,21 @@ curator
 > [!WARNING]
 > 插件会在你的本地权限下运行第三方代码。安装前请阅读源码，建议先在
 > 不含生产凭据的 profile 中试用。
+
+## 命令面
+
+以 `/evolution` 内建 help 为准（最权威——升级后先跑一次裸 `/evolution` 对照）。以下为
+`packages/evolution-commands/src/index.ts` 当前注册面的全量枚举（0.3.52）：
+
+`pending [--detail]` · `approve <id>` · `reject <id>` · `curator run` ·
+`curator pause` · `curator resume` · `curator status` · `curator report` ·
+`curator scope` · `mutations` · `restore`（快照恢复） ·
+`consolidate <target> <sources...> [--plan <runId>]` · `skill restore <name>` ·
+`skills health` · `skills refresh` · `learn [request]` ·
+`maintain [--timeout <ms> | --facts]` · `preset install` ·
+`restructure <name> "<heading>" <to_file> [--plan <runId>]` · `replay`
+
+（裸 `/evolution` 输出同一清单。）
 
 ## 功能
 
@@ -268,6 +284,21 @@ vitest run packages/evolution
 ```
 
 当前状态：持续由 CI 校验（baseline 锚点 + 已发布上游兼容检查）；测试/检查数字以 CI 日志为准，不在此固定。
+
+**测试导入取舍（I-03）**：tests 中约 30 组 `@deepseek-ai/*` 导入**有意未**在 package.json
+声明——这些导入只在上游合并布局下可解析（与 tsconfig paths 的 G5.5 双布局规则同理，
+详见英文 README"Development"一节），属已知取舍；**不为测试补 devDependencies**（合并树
+是测试唯一可运行路径，补声明只会增加一块需持续同步的漂移面）。
+
+**上游升级对照清单（I-02，每次升级过一遍）**：
+
+1. **技能 provider 影子 rank**：本插件 `evolution-skill-catalog` 以
+   `EVOLUTION_SKILL_RANK=390` shadow 上游 `USER_DSH_RANK`（0.1.1-rc.2 为 400，低 rank
+   胜出、抢占 `user-dsh` source）。两侧常量互为私有：上游改动任一数值或比较语义，本侧
+   会**静默**失去 shadow——升级时两侧复核。
+2. **`@deepseek-ai` 包名撞名检查**：本家族在官方 `@deepseek-ai` scope 下发布自有包名
+   （`dsh-memory`、`dsh-tool-memory`、`dsh-skill-usage`、`dsh-memory-files`、
+   `dsh-tool-skill-manage` 等）。采纳上游版本前对照其包清单，新包名与本侧撞名即解析歧义。
 
 ## Attribution
 

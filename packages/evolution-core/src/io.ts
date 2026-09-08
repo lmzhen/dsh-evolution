@@ -61,7 +61,9 @@ export interface EvolutionIoLike {
 /**
  * Run `task` inside `io.transact` when the backend provides it; otherwise fall
  * back to a plain read → task → write/remove sequence (no cross-process lock —
- * callers keep their single-process serialize chain as the second layer).
+ * callers keep their single-process serialize chain as the second layer). A
+ * byte-identical task result skips the write (C-07 — parity with the
+ * node backend's V5-03 short-circuit).
  */
 export async function transactIo(
   io: EvolutionIoLike,
@@ -75,7 +77,11 @@ export async function transactIo(
   const current = await io.readText(path)
   const next = await task(current)
   if (next === null) await io.remove(path)
-  else await io.writeText(path, next)
+  // C-07: a byte-identical result is a no-op — the same V5-03
+  // short-circuit the node backend's transact already has. Without it every
+  // fallback RMW churned a tmp+rename and touched the mtime even when nothing
+  // changed, so transact-less backends behaved asymmetrically.
+  else if (next !== current) await io.writeText(path, next)
 }
 
 /** Lazy adapter over an IO provider registry, shared by every evolution consumer. */
@@ -125,11 +131,23 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
  */
 export const pendingSelfCleanup = new Map<string, string>()
 
+// C-28: the transient-EPERM/EBUSY retry budget grows from 3x50ms
+// (~150ms — shorter than a real antivirus/indexer scan window) to ~2s, the
+// same magnitude as the write-lock retry budget (rc.69), with exponential
+// backoff so a short hold recovers fast and a long hold still recovers.
+const RENAME_RETRY_BASE_MS = 50
+const RENAME_RETRY_MAX_DELAY_MS = 800
+// 50 + 100 + 200 + 400 + 800 + 800 = 2350ms of backoff (~2s budget).
+const RENAME_RETRY_MAX_ATTEMPTS = 6
+
 /**
  * Retry a rename that a peer is temporarily holding on Windows (EPERM/EBUSY):
- * a short 50ms backoff, at most 3 retries (~150ms budget), matching the
- * write-lock cadence. A non-transient code surfaces immediately. `fn` is the
- * rename primitive, injectable for deterministic tests.
+ * exponential backoff (50ms doubling, capped at 800ms) with a ~2s total
+ * budget, matching the write-lock cadence (C-28 — the old 3x50ms
+ * budget turned a transient antivirus hold into a permanent write failure).
+ * A non-transient code surfaces immediately; a persistent EPERM/EBUSY
+ * rethrows with a pointer at the usual causes instead of a bare errno.
+ * `fn` is the rename primitive, injectable for deterministic tests.
  *
  * @param tmp - the source path to rename.
  * @param target - the destination path.
@@ -148,27 +166,99 @@ export async function renameWithRetry(
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | undefined)?.code
       if (code !== 'EPERM' && code !== 'EBUSY') throw error
-      if (retry >= 3) throw error
-      await new Promise(resolve => setTimeout(resolve, 50))
+      if (retry >= RENAME_RETRY_MAX_ATTEMPTS) {
+        // C-28: keep the original message (callers match on it) and
+        // append the direction a bare EPERM never gave: the target — not the
+        // tmp — is the thing being held or refused.
+        const final = error as NodeJS.ErrnoException
+        final.message = `${final.message} (persisted after ${retry + 1} rename attempts over ~2s — the target may be held by another process or marked read-only; check antivirus, search indexers and file attributes)`
+        throw final
+      }
+      await new Promise(resolve =>
+        setTimeout(resolve, Math.min(RENAME_RETRY_BASE_MS * 2 ** retry, RENAME_RETRY_MAX_DELAY_MS)))
     }
   }
 }
 
 /**
+ * V10-06 (P1-1): the crash-durable tmp half of the upstream storage-json
+ * `writeAtomic` protocol (storage-json/src/atomic.ts:24-40): exclusive-create
+ * a same-directory tmp (`wx` — never clobbers), write, `handle.sync()`,
+ * close, then hand the tmp to `commitTmp` for the rename. Without the fsync a
+ * power loss could land the rename (metadata) before the data blocks and
+ * leave an empty/truncated target — which the state-json E-9 quarantine then
+ * amplifies into a permanent fail-loud. The tmp name keeps the
+ * `<target>.<pid>.<rand>.tmp` shape so sweepStaleTmps keeps matching.
+ * Mode parity note: no explicit mode is passed (upstream uses 0o600) — this
+ * seam also writes operator-editable skill/memory files, so the previous
+ * `writeFile` default (0o666 & ~umask) is deliberately preserved.
+ * `openImpl` is injectable so the sync-failure regression test can drive a
+ * failing `handle.sync()` deterministically.
+ */
+export async function writeDurableTmp(
+  target: string,
+  content: string,
+  openImpl: typeof open = open,
+): Promise<string> {
+  const tmp = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
+  try {
+    const handle = await openImpl(tmp, 'wx')
+    try {
+      await handle.writeFile(content, 'utf8')
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    return tmp
+  } catch (error) {
+    // Never leak the tmp of a failed durable write (same tail as upstream).
+    await rm(tmp, { force: true }).catch(() => {})
+    throw error
+  }
+}
+
+/** V10-06 (P1-1): fsync a POSIX directory so a just-renamed entry is
+ * crash-durable (upstream atomic.ts `fsyncDirectory`). */
+/* v8 ignore start -- Windows rejects O_RDONLY directory opens; POSIX coverage exercises this. */
+async function fsyncDirectory(path: string): Promise<void> {
+  if (process.platform === 'win32') return
+  const handle = await open(path, 'r')
+  try {
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
+}
+/* v8 ignore stop */
+
+/**
  * F-366: commit a freshly-written tmp to its target inside the write lock. On a
  * still-failing rename the tmp is deleted immediately rather than left for the
  * (1h + dead-pid) sweep, so a live writer never leaks a tmp it abandoned.
+ * V10-06 (P1-1): after a successful rename the parent directory is fsynced on
+ * POSIX so the new directory entry itself is crash-durable (upstream atomic.ts
+ * tail; Windows skips — it rejects O_RDONLY directory opens). A dir-fsync
+ * failure propagates like upstream: the data is on disk, but the durability
+ * contract failed loud.
  */
 async function commitTmp(tmp: string, target: string): Promise<void> {
   try {
     await renameWithRetry(tmp, target)
+    await fsyncDirectory(dirname(target))
   } catch (error) {
     await rm(tmp, { force: true }).catch(() => {})
     throw error
   }
 }
 
-export function nodeEvolutionIo(): EvolutionIoLike {
+/**
+ * Build the Node IO backend. `lockAttempts` scales the write-lock retry budget
+ * (attempts × 50ms); the default 40 (~2s, rc.69) covers production contention,
+ * while contention TESTS on a loaded runner may raise it (e.g. 240 ≈ 12s) —
+ * V10-06 integration: full-suite parallel load made 32-way takeover bursts
+ * exceed the default budget and fail loud.
+ */
+export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
   const isMissing = (error: unknown): boolean => {
     const code = (error as NodeJS.ErrnoException | undefined)?.code
     // EISDIR deliberately stays OUT: a directory squatting on a file path is
@@ -186,6 +276,25 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       return (error as NodeJS.ErrnoException | undefined)?.code === 'EPERM'
     }
   }
+  /**
+   * V10-07 (P2-1): age threshold for taking over a lock whose body is TORN
+   * (non-empty, but the pid prefix does not parse to a positive integer). 1h:
+   * a legal hold (the ~2s lock/rename retry budgets, a slow task) never
+   * approaches minutes, so 1h fires only in the "torn write + creator long
+   * dead" scenario — far above any legitimate hold, far below "forever".
+   */
+  const LOCK_TEAR_TAKEOVER_MS = 3_600_000
+
+  /**
+   * V10-06 (P1-1 integration fix): a takeover TICKET must never be reclaimed
+   * while its (live) holder can still be committing — the C-28 rename retry
+   * budget is ~2.35s under AV/indexer pressure, so the former 1s ticket age
+   * threshold let a contender steal an in-flight ticket, double-enter the
+   * critical section and drop one RMW (observed as 5/6 increments under
+   * full-suite load). 5s = retry budget + comfortable margin; a DEAD holder's
+   * ticket is still reclaimed immediately via the pid probe.
+   */
+  const TICKET_STALE_MS = 5_000
 
   /**
    * Cross-process write lock (claw `withFileLock` parity): an O_EXCL lock file
@@ -218,11 +327,15 @@ export function nodeEvolutionIo(): EvolutionIoLike {
    * mtime over 1s is indistinguishable from a long task still executing in this
    * process, and recycling that live lock would double-hold it. A failure to
    * release in finally is recorded so the next write self-heals.
+   * V10-07 (P2-1): a third takeover shape — a TORN body (non-empty, no
+   * parseable pid) — is taken over after a wide 1h threshold with a
+   * console.warn; before this branch such a lock blocked every future writer
+   * forever.
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
     const lock = `${path}.lock`
     let myClaim = ''
-    for (let attempt = 0; attempt < 40; attempt += 1) {
+    for (let attempt = 0; attempt < lockAttempts; attempt += 1) {
       // Phase 1 — acquire. ONLY acquisition errors are retryable contention.
       // 0.3.28 (V4-04 32-way repro): the lock body carries `pid:token` so a
       // takeover probe can tell a stale claim from a freshly created one, and
@@ -317,9 +430,22 @@ export function nodeEvolutionIo(): EvolutionIoLike {
           // after open, so a lingering empty lock is a crashed creator; the 1s
           // gate keeps an in-flight create safe). The re-read + ticket flow
           // below stays the single execution gate for BOTH shapes.
+          // V10-07 (P2-1): a TORN body (non-empty, unparseable pid — a crash
+          // mid-write) matched neither the dead-pid nor the empty-body branch,
+          // so the lock blocked every future writer FOREVER (sweepStaleTmps
+          // deliberately skips `.lock`); past LOCK_TEAR_TAKEOVER_MS it is
+          // taken over too, with a console.warn marking the anomaly.
           const staleDead = Number.isInteger(holder) && holder > 0 && Date.now() - st.mtimeMs > 1000 && !holderAlive
           const staleEmpty = holderContent === '' && Date.now() - st.mtimeMs > 1000
-          if (staleDead || staleEmpty) {
+          const staleCorrupt = holderContent !== ''
+            && !(Number.isInteger(holder) && holder > 0)
+            && Date.now() - st.mtimeMs > LOCK_TEAR_TAKEOVER_MS
+          if (staleDead || staleEmpty || staleCorrupt) {
+            if (staleCorrupt) {
+              // Exactly one warn per actual takeover — an anomaly that should
+              // not exist in a healthy deployment.
+              console.warn(`evolution-io: took over a corrupt write lock "${lock}" (body ${JSON.stringify(holderContent)} has no parseable pid, lock older than 1h) — a previous writer likely crashed mid-write`)
+            }
             const current = await readFile(lock, 'utf8').catch(() => '')
             if (current === holderContent) {
               const ticket = `${lock}.next`
@@ -331,13 +457,15 @@ export function nodeEvolutionIo(): EvolutionIoLike {
                 const ticketMtime = await stat(ticket).then(s => s.mtimeMs, () => 0)
                 const ticketHolder = Number(ticketBody.split(':')[0] ?? '')
                 const ticketStale = !Number.isInteger(ticketHolder) || ticketHolder <= 0
-                  || !isAlive(ticketHolder) || Date.now() - ticketMtime > 1000
+                  || !isAlive(ticketHolder) || Date.now() - ticketMtime > TICKET_STALE_MS
                 // V6-04: an empty body carries no pid to probe — reclaim only an
                 // OLD ticket (a live creator writes its body right after open;
-                // >1s with no body = crashed between create and write). The
-                // ticket grants no lock, so a wrong reclaim costs the former
-                // owner one retry round — never a second holder.
-                if (ticketStale && (ticketBody !== '' || Date.now() - ticketMtime > 1000)) {
+                // beyond TICKET_STALE_MS with no body = crashed between create
+                // and write). The ticket grants no lock, so a wrong reclaim
+                // costs the former owner one retry round — never a second
+                // holder. The age threshold must exceed the rename retry
+                // budget (see TICKET_STALE_MS above).
+                if (ticketStale && (ticketBody !== '' || Date.now() - ticketMtime > TICKET_STALE_MS)) {
                   await rm(ticket, { force: true }).catch(() => {})
                 }
               } catch { /* ticket vanished — nothing to do */ }
@@ -356,7 +484,20 @@ export function nodeEvolutionIo(): EvolutionIoLike {
               // so the removed file IS the dead lock, not a live claim.
               const verify = await readFile(lock, 'utf8').catch(() => '')
               if (verify === holderContent) {
-                await rm(lock, { force: true }).catch(() => {})
+                // C-27: the staleEmpty shape cannot name its creator
+                // from an empty body, so re-parse the FRESH body right before
+                // the removal — if a pid has appeared AND is alive, a creator
+                // stalled >1s between open and write has materialized its
+                // claim, and removing its lock would double-hold a live
+                // writer. The byte-equality re-check above stays the primary
+                // TOCTOU gate (a fully written body already fails it); this
+                // explicit liveness probe is the belt that narrows the
+                // event-loop-starvation window the v10 audit called out.
+                const verifyHolder = Number(verify.split(':')[0] ?? '')
+                const verifyAlive = Number.isInteger(verifyHolder) && verifyHolder > 0 && isAlive(verifyHolder)
+                if (!verifyAlive) {
+                  await rm(lock, { force: true }).catch(() => {})
+                }
               }
               await rm(ticket, { force: true }).catch(() => {})
               continue
@@ -387,14 +528,19 @@ export function nodeEvolutionIo(): EvolutionIoLike {
           // snapshot, so a fresh lock another same-process writer created at
           // the same path (the stale-entry hazard) is never removed as if it
           // were our own leftover.
-          await rm(lock, { force: true }).catch(async () => {
+          // V10-06 (integration fix): the release rm RETRIES before falling
+          // back to the pending-self-cleanup snapshot. A single-shot rm fails
+          // under AV/indexer pressure (EPERM/EBUSY on a freshly-written file),
+          // and every contender then waits on our (alive) pid until its whole
+          // budget expires — observed as a lost RMW under full-suite load.
+          await rm(lock, { force: true, maxRetries: 20, retryDelay: 100 }).catch(async () => {
             const body = await readFile(lock, 'utf8').catch(() => '')
             pendingSelfCleanup.set(lock, body)
           })
         }
       }
     }
-    throw new Error(`could not acquire write lock for ${path} after 40 attempts`)
+    throw new Error(`could not acquire write lock for ${path} after ${lockAttempts} attempts`)
   }
 
   /** 0.3.17 (E-8b): sweep tmp files a crashed writer left behind — same
@@ -414,6 +560,12 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     // as the per-attempt reclaim.
     const lockName = `${base}.lock`
     const ticketName = `${lockName}.next`
+    // S-10: quarantine copies (the state-json provider's fixed
+    // `<file>.corrupt`, and any legacy timestamped `.corrupt-*` series) older
+    // than 7 days are sweepable — the operator rescue window is days, the
+    // fixed-name copy is bounded at one per target, and without this rule an
+    // abandoned corrupt copy lived forever.
+    const CORRUPT_SWEEP_AGE_MS = 7 * 24 * 3_600_000
     for (const name of entries) {
       if (!name.startsWith(prefix) || name === lockName) continue
       if (!name.endsWith('.tmp')) {
@@ -431,6 +583,18 @@ export function nodeEvolutionIo(): EvolutionIoLike {
             if (dead || old) await rm(ticketPath, { force: true })
           } catch {
             // The ticket vanished (or a race with its reaper); nothing to clean.
+          }
+          continue
+        }
+        // S-10: a quarantine copy past the rescue window is removed
+        // (best-effort: a vanished file needs no cleanup).
+        if (name.includes('.corrupt')) {
+          const corruptPath = join(dir, name)
+          try {
+            const st = await stat(corruptPath)
+            if (Date.now() - st.mtimeMs > CORRUPT_SWEEP_AGE_MS) await rm(corruptPath, { force: true })
+          } catch {
+            // The copy vanished (or raced its reaper); nothing to clean.
           }
         }
         continue
@@ -466,8 +630,11 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       await mkdir(dirname(path), { recursive: true })
       await withWriteLock(path, async () => {
         await sweepStaleTmps(path)
-        const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
-        await writeFile(tmp, content, 'utf8')
+        // V10-06 (P1-1): durable tmp (exclusive create + handle fsync) before
+        // the rename — the upstream storage-json crash-durable protocol, not
+        // a bare writeFile whose data blocks could trail the rename metadata
+        // across a power loss.
+        const tmp = await writeDurableTmp(path, content)
         await commitTmp(tmp, path)
       })
     },
@@ -496,8 +663,8 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         if (next === current) {
           return
         }
-        const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
-        await writeFile(tmp, next, 'utf8')
+        // V10-06 (P1-1): same durable tmp protocol as writeText.
+        const tmp = await writeDurableTmp(path, next)
         await commitTmp(tmp, path)
       })
     },

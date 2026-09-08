@@ -79,8 +79,12 @@ export const Config: Schema<Config> = z.object({
   substantiveMinUserChars: z.number().min(1).default(DEFAULT_SUBSTANTIVE_MIN_USER_CHARS),
   substantiveMinAgentChars: z.number().min(1).default(DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS),
   // V7-15 (0.3.44): closed union — a typo cannot silently select a fourth
-  // behavior (schemastery strips an unmatching value, so runtime degradation
-  // is silent; the union closes the TYPE surface for config authors).
+  // behavior. H-03 correction: schemastery REJECTS an unmatching
+  // value at LOADER time (the union keeps the config surface closed for
+  // config authors); the clamp branch below only covers DIRECT construction
+  // / legacy reads that bypass the loader schema. The former "strips an
+  // unmatching value" wording was wrong and contradicted the V5-33 comment
+  // inside the clamp.
   reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
   memoryReviewModel: z.string().default('deepseek-v4-flash'),
   skillReviewModel: z.string().default('deepseek-v4-pro'),

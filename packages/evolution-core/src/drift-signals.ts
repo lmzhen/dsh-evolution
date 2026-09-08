@@ -244,7 +244,10 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
     const description = snapshot.description
     signals.push(
       description === undefined
-        ? sig('description_chars', 'unknown', 'missing', '60')
+        // C-21 (v10 audit): the threshold renders from the constant like the
+        // assessed branch below — the hardcoded '60' could drift from
+        // AUTHORING_DESCRIPTION_BAR.
+        ? sig('description_chars', 'unknown', 'missing', `${AUTHORING_DESCRIPTION_BAR}`)
         : sig(
           'description_chars',
           description.length > AUTHORING_DESCRIPTION_BAR ? 'over' : 'pass',

@@ -5,7 +5,6 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import { EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'evolution-threat'
@@ -83,15 +82,31 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // V6-05 (0.3.35): the clamp floor is PATTERN_OVERLAP+1 (=4097) so the
   // proportional step never leaves a match span uncovered — a 0 would silently
   // disable scanning and NaN/±Infinity (the number schema lets them through)
-  // would corrupt the scan window; the schema `.min(1)` and this clamp were
-  // both raised to the overlap floor in V6-05.
+  // would corrupt the scan window; the schema `.min(PATTERN_OVERLAP + 1)` and
+  // this clamp were both raised to the overlap floor in V6-05.
   const maxScanChars = resolveMaxScanChars(rawConfig)
   if (maxScanChars !== (rawConfig.maxScanChars ?? 65_536)) {
     ctx.logger.warn(`evolution-threat: maxScanChars=${String(rawConfig.maxScanChars)} is invalid; falling back to the default 65_536`)
   }
-  ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
-    const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars)
-    if (hit) return { kind: 'deny', reason: hit }
-    return next()
+  // V10-12 (P2-8): the deny decision moved from a `tools/pre-execute`
+  // waterfall listener to the monotonic `tools.guard()` channel (the same
+  // channel evolution-policy uses). The pre-execute waterfall is extensible
+  // and any earlier listener may short-circuit it by returning a decision
+  // without calling `next()` — which silently skipped the threat scan. A
+  // guard runs for every ALLOWED execution (upstream evaluates guards on the
+  // allow path of the pre-execute gate) and cannot be force-allowed or
+  // bypassed by listener ordering; a short-circuiting DENIAL still denies the
+  // call, so both outcomes keep the payload scanned-or-denied.
+  // The former listener is REMOVED rather than kept as a logging observer:
+  // guards and listeners receive the same arguments, so keeping both would
+  // double-scan every write-tool call on the hot path.
+  ctx.inject(['tools'], (toolCtx) => {
+    const tools = toolCtx.get('tools') as {
+      guard(guard: (exec: { name: string; arguments: unknown }) => string | undefined): () => void
+    }
+    toolCtx.effect(() => tools.guard((exec) => {
+      const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars)
+      return hit ?? undefined
+    }), 'evolution-threat.tools-guard')
   })
 }

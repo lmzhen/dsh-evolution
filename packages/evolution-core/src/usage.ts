@@ -67,8 +67,12 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
   const base = emptyRecord()
   if (!record || typeof record !== 'object' || Array.isArray(record)) return base
   const raw = record as Record<string, unknown>
+  // C-09: counters are cardinalities — a negative value from a
+  // corrupted sidecar falls back to the baseline instead of poisoning the
+  // quality math and the write-ghost judgment (1e300-class magnitudes still
+  // pass; only the sign domain is closed here).
   const num = (value: unknown, fallback: number): number =>
-    typeof value === 'number' && Number.isFinite(value) ? value : fallback
+    typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback
   const bool = (value: unknown, fallback: boolean): boolean =>
     typeof value === 'boolean' ? value : fallback
   return {

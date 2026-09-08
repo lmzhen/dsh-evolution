@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+// Child-process spawns slow down under full-suite parallel load; the vitest
+// default 5s per test is too tight for multiple node spawns (audit v10 fix).
+vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
@@ -24,7 +27,7 @@ describe('guard scripts (V4-30 sentry)', () => {
     try {
       await expect(run(process.execPath, [closure, empty], { encoding: 'utf8' })).rejects.toMatchObject({ code: 1 })
     } finally {
-      await rm(empty, { recursive: true, force: true })
+      await rm(empty, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -39,7 +42,7 @@ describe('guard scripts (V4-30 sentry)', () => {
       expect(error).not.toBeNull()
       expect((error as { stderr?: string }).stderr).toContain('not declared')
     } finally {
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -50,7 +53,7 @@ describe('guard scripts (V4-30 sentry)', () => {
     try {
       await expect(run(process.execPath, [archGuards, empty, '--strict'], { encoding: 'utf8' })).rejects.toMatchObject({ code: 1 })
     } finally {
-      await rm(empty, { recursive: true, force: true })
+      await rm(empty, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -64,7 +67,7 @@ describe('guard scripts (V4-30 sentry)', () => {
       expect(error).not.toBeNull()
       expect((error as { stderr?: string }).stderr).toContain('DSH_HOME')
     } finally {
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -94,7 +97,21 @@ describe('guard scripts (V4-30 sentry)', () => {
       const unpaired = await run(process.execPath, [eventPairing, root], { encoding: 'utf8' })
       expect(unpaired.stderr).toContain('evolution/never-listened-twice')
     } finally {
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('R-03: arch-guards and event-pairing report usage (exit 2) on a missing root', async () => {
+    // A wrong root used to surface as a raw ENOENT from readdirSync; both
+    // guards now print the usage line like verify-dependency-closure.
+    const missing = join(tmpdir(), 'guard-missing-root-does-not-exist')
+    for (const guard of [archGuards, eventPairing]) {
+      const error = await run(process.execPath, [guard, missing], { encoding: 'utf8' })
+        .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+      expect(error).not.toBeNull()
+      expect(error?.code).toBe(2)
+      expect(error?.stderr).toContain('usage:')
+      expect(error?.stderr).toContain(missing)
     }
   })
 })

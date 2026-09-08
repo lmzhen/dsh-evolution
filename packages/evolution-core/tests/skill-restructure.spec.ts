@@ -43,7 +43,7 @@ it('moves a body section to references/ and replaces it with a pointer line (B)'
   const moved = await readFile(join(root, 'demo-skill', 'references', 'release-log.md'), 'utf8').catch(() => '')
   expect(moved.includes('## Details log')).toBe(true)
   expect(moved.includes('rc.67')).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('appends to an existing references file and keeps the skill readable', async () => {
@@ -54,7 +54,7 @@ it('appends to an existing references file and keeps the skill readable', async 
   const notes = await readFile(join(root, 'demo-skill', 'references', 'notes.md'), 'utf8').catch(() => '')
   expect(notes).toContain('# existing notes')
   expect(notes.indexOf('# existing notes')).toBeLessThan(notes.indexOf('## Details log'))
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('orders two moves into one file by move order', async () => {
@@ -66,7 +66,7 @@ it('orders two moves into one file by move order', async () => {
   expect(result.ok).toBe(true)
   const moved = await readFile(join(root, 'demo-skill', 'references', 'log.md'), 'utf8').catch(() => '')
   expect(moved.indexOf('## Details log')).toBeLessThan(moved.indexOf('## Usage'))
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('rejects an unknown heading with zero writes', async () => {
@@ -80,7 +80,7 @@ it('rejects an unknown heading with zero writes', async () => {
     () => 'absent',
   )
   expect(entries).toBe('absent')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('rejects duplicate, empty and out-of-domain moves', async () => {
@@ -111,7 +111,7 @@ Use it.
   const subdir = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/sub/x.md' }], 'background_review')
   expect(subdir.ok).toBe(false)
   expect(await lib.read('demo-skill')).toBe(BODY)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('moves deeper headings with their parent section', async () => {
@@ -146,7 +146,7 @@ Elsewhere.
   const moved = await readFile(join(root, 'deeper-skill', 'references', 'logs.md'), 'utf8').catch(() => '')
   expect(moved).toContain('### Sub nuance')
   expect(moved).toContain('Nuance detail.')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('refuses pinned skills from the background review (origin gate)', async () => {
@@ -156,7 +156,7 @@ it('refuses pinned skills from the background review (origin gate)', async () =>
   expect(result.ok).toBe(false)
   expect(result.message).toContain('protected')
   expect(await lib.read('demo-skill')).toBe(BODY)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('a `----` line inside frontmatter does not truncate the header (E-38, 0.3.16)', async () => {
@@ -185,7 +185,7 @@ Intro.
   // the real `---` closer (the old indexOf cut the header on the 4-dash line).
   expect(md.slice(0, md.indexOf('# Demo'))).toContain('----')
   expect(md).toContain('> 详见 references')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('keeps CRLF line endings on every untouched line (E-38a, 0.3.16)', async () => {
@@ -200,7 +200,7 @@ it('keeps CRLF line endings on every untouched line (E-38a, 0.3.16)', async () =
   expect(raw.includes('\r\n')).toBe(true)
   // No lone LF remains: untouched lines kept their original ending.
   expect(raw.replace(/\r\n/g, '').includes('\n')).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('never duplicates frontmatter on success or on repeated restructures (v7 audit P1-1)', async () => {
@@ -220,5 +220,5 @@ it('never duplicates frontmatter on success or on repeated restructures (v7 audi
   expect(parsed2?.frontmatter.name).toBe('demo-skill')
   expect(md2 ?? '').toContain('> 详见 references/log.md')
   expect(md2 ?? '').toContain('> 详见 references/use.md')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

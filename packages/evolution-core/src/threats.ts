@@ -182,3 +182,13 @@ export function scanContentThreats(text: string, maxScanChars = 65_536, options:
   if (!blocked) return null
   return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions.`
 }
+
+/**
+ * V10-03 (P2-18): suffix the SkillLibrary/MemoryStore write gates append to a
+ * block message — the hit label is already embedded by scanContentThreats /
+ * scanMemoryThreats, this names the deployable self-heal path so the model
+ * (or operator) can allowlist a known-benign label. The evolution-threat tool
+ * channel deliberately does NOT append it: that channel has no
+ * threatExemptLabels option to advertise.
+ */
+export const THREAT_EXEMPT_HINT = ' If this is a legitimate false positive, the deployment can allow its label via the threatExemptLabels store option.'

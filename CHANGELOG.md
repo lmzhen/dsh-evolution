@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.52 (patch) — v10 审计轮（批次 0–8）：行为契约变更声明（V10-01~18）
+
+**来源**：v10 审计报告（P1×2、P2×19、P3≈80）按架构层级分批（批次 0–8）实施；按计划约定，本节集中声明本轮**行为契约变更**，逐条一行。批次 8（T 横切：README/INSTALL 同步、invariant 样板注释、延后台账落档）同版交付。
+
+- **V10-01 [P2·数据完整性]**：consolidate reference 模式目标已存在时改为**追加**（原无条件覆盖——"consolidate → 重建 → 再 consolidate"静默清除旧降级知识；与 restructure 追加语义对齐）。
+- **V10-02 [P2·数据完整性]**：normalizeFrontmatter 发现**重复 key 拒写**（进 issues 拦截；原按 key 查 Map 改写错行、带病字节经 last-wins 校验静默落盘）。
+- **V10-03 [P2·误报通道]**：SkillLibrary/MemoryStore 新增 `threatExemptLabels` 选项（默认空=行为不变）——部署可经 config 打开豁免白名单；拒绝消息附加命中 label 与豁免提示。
+- **V10-04 [P2·数据完整性]**：state-json **记录级门禁**——必填字段/枚举不过关的记录走 quarantine 隔离并在返回集合剔除（原 `{"foo":1}` 被当作合法记录、NaN 静默传播，非法 status 成为查询不可见僵尸）。
+- **V10-05 [P2·有界化]**：损坏文件隔离副本收敛为**固定名 `<file>.corrupt`** 原子覆盖（原时间戳+随机后缀，每次读取新写一份无限堆积）；历史 `.corrupt-*` 由 sweep 超 7 天兜底清理。
+- **V10-06 [P1·耐久性]**：io 写路径对齐上游 crash-durable 协议——tmp `open('wx')` + `handle.sync()` + POSIX 目录 fsync 后 rename（原裸 writeFile+rename 无 fsync，掉电产生空/截断状态文件，触发 E-9 永不自愈 fail-loud）。
+- **V10-07 [P2·锁完备]**：写锁接管新增**第三分支**——锁体非空、pid 不可解析（NaN）、mtime 超 1h 宽阈值可接管并 warn 一次（原撕裂写锁使该目标全部写入永久 fail-loud 需人工删锁）。
+- **V10-08 [P3·语义]**：`/evolution maintain` 冷却/在飞拒绝改返回 **err**（原 success 文本——消费方无法从结果类型区分"已执行/被拒"；monorepo 内已核无按文案判断的消费方）。
+- **V10-09 [P3·结构化契约]**：`MaintainOutcome` 新增 `recommendationCount`；commands 侧**删除** formatPlan 渲染文本解析（`/^- \[/gm`+Notes 切割，不留双轨；渲染本身不变）。
+- **V10-10 [P2·接口失配]**：review 证据通道改读 `tool/result` 的 `message.content`（tool-result 块文本；原 `output` 字段上游 rc.2 不存在、`[result]` 行恒空、审阅证据静默降级）；错误标记同时看 `data.error` 与块级 `isError`；截断预算不变。
+- **V10-11 [P2·root 统一]**：review / learning-graph 新增 `skillsRoot` 配置（默认空=原行为），接入 `resolveSkillsRoot` 统一解析——自定义 root 部署下 review/`/graph` 不再向默认树写错。
+- **V10-12 [P2·防御纵深]**：威胁 deny 迁入 `tools.guard` **单调通道**（与 policy 同通道，不可被 pre-execute 监听器短路）；原监听器移除避免双扫描。
+- **V10-13 [P2·状态机]**：review `skillReviewTrigger:'both'` 同回合**互斥**——completed 回合命中 cadence flush 后跳过 completion 通道（原同一完成点可双发、双倍 token 互相干扰）。
+- **V10-14 [P1·组合可达]**：install-layered 生成 Evolution 预设时向 standard 来源的 `tool-skill` 行注入 `catalogDescriptionMaxLength: 60`（幂等：已有 config 跳过）——layered 形态读取侧 60 字符 cap 恢复生效（原 host patch 覆盖到不了预设 scope、模型可见上限实为平台默认 500）。
+- **V10-15 [P2·env 边界]**：`DSH_EVOLUTION_SESSION_QUERY_PATH` 空串回退默认路径（原 `resolve('')` 落进程 CWD 产生杂散 session-query.db）；`DSH_EVOLUTION_SESSION_QUERY` 非法值白名单归一 `startup`（原直接炸 zod ValidationError、profile 无法启动）。
+- **V10-16 [P2·装配]**：standalone `cordis.yml` 的 `evolution-state` 行**显式 pin `provider: 'domain'`**（原实际生效 provider 由 yml 行序隐式决定、双 provider 注册介质静默分叉；头注释 "fallback" 改写为真实语义）。
+- **V10-17 [P2·发布元数据]**：tarball `repository.directory` 改由打包目录名生成、指向实际扁平目录 `packages/evolution-*`（原按改写后包名拼接指向不存在路径，已发布包源码跳转全部失效）。
+- **V10-18 [P2·CI]**：版本守卫（verify-layout-sync）接入 validate action；安装步骤改 frozen-lockfile（或步骤名如实化，以 CI 实跑二选一）；release.yml 补 `timeout-minutes` 与 PR paths-ignore。
+- **落地状态注记**：批次 8（本节落笔）时点对照工作树核验，批次 0–7 修复**均尚未见于工作树**（并行批次实施中）——上列条目按计划声明；收尾消项复核（计划 §6-6）确认某条未落地时由主控在该条补注 deferred。
+- **T 横切（批次 8，本版已交付）**：README/README.zh 新增 `/evolution` 命令面全量枚举（对齐 `evolution-commands` 注册面，内建 help 为权威；原清单缺 curator pause/resume/status/scope、mutations、consolidate、learn、maintain、preset install、restructure、replay 等十余条，且裸 `|` 破坏表格渲染）；INSTALL 验证一节 vitest 路径修正为扁平布局 + 双布局注记（G5.5 口径）；30 份 `src/invariant.ts` 头注释补样板声明（audit v10 S-09；不抽共享工厂，计划 §4-3）；README（en+zh）补测试导入取舍声明（I-03：约 30 组未声明 `@deepseek-ai/*` 测试导入依赖合并布局，不为测试补 devDependencies）与上游升级对照清单（I-02：USER_DSH_RANK 影子 rank 对照 + `@deepseek-ai` 包名撞名检查）；`packages/docs/deferred-items-v10.md` 落档计划 §5 全部 12 项延后台账（含重访触发条件，本地存档不上传）。
+
 ## 0.3.51 (patch) — v9 审计批 2：口径与判别力批（V9-05~12）
 
 **来源**：v9 审计报告剩余八项——文档口径修正（`~` 展开挂账、CHANGELOG 失实句、mtime 消费方声明）+ 实现与注释对齐（threats 边界、redact 锚注、maxDepth 守卫、.bak 失败形态）+ 测试判别力补强。全部先核验后修复，无报告字面照办。

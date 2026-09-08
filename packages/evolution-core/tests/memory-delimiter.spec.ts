@@ -24,7 +24,7 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.message).toContain('entry delimiter (§)')
     expect(result.message).toContain('rewrite it as separate facts')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('add refuses a fact containing the delimiter mid-body', async () => {
@@ -34,7 +34,7 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.ok).toBe(false)
     expect(result.message).not.toContain('Operation')
     expect(result.message).toContain('entry delimiter (§)')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('applyBatch add refuses a delimiter fact, names its position, and keeps the file unchanged', async () => {
@@ -54,7 +54,7 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.message).toContain('Current entries (preview):')
     expect(result.message).toContain('- alpha')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('applyBatch replace refuses a delimiter fact and names its position', async () => {
@@ -71,7 +71,7 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.message).toContain('Current entries (preview):')
     expect(result.message).toContain('- alpha fact')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a delimiting fact never reaches the store, so no entry is created', async () => {
@@ -79,6 +79,6 @@ describe('memory entry-delimiter defense (F-201)', () => {
     const store = new MemoryStore({ root })
     await store.add('memory', `a${ENTRY_DELIMITER}b`)
     expect(await store.read('memory')).toEqual([])
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

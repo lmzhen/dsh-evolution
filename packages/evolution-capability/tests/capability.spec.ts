@@ -44,7 +44,7 @@ describe('evolution-capability', () => {
     expect(result.ok).toBe(false)
     expect(result.message).toContain('approval')
     expect(await ctx.evolutionCapability.listPending()).toEqual([])
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('stages a valid capability package in the pending audit trail', async () => {
@@ -59,7 +59,7 @@ describe('evolution-capability', () => {
     expect(approved.message).toContain('manual activation')
     const pkg = await ctx.evolutionCapability.approvedPackage(result.pendingId!)
     expect(pkg).toEqual(PACKAGE)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-45: a capability submission that would be allowed-direct is refused (staged-only gate)', async () => {

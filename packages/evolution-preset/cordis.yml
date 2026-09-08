@@ -2,8 +2,16 @@
 #
 # Every medium dependency is behind a provider seam:
 #   ctx.evolutionIo            -> node:fs provider (evolution-io-node)
-#   ctx.evolutionStateStorage  -> storage-domain KV provider, with a JSON
-#                                provider mounted as fallback/portable audit
+#   ctx.evolutionStateStorage  -> domain KV provider as the PRIMARY medium
+#                                (explicitly pinned on the `evolution-state`
+#                                row below); the JSON provider is mounted too
+#                                but is an explicitly selectable alternative
+#                                only — a profile overlay re-pins
+#                                `provider: json`. There is NO automatic
+#                                fallback: registry `provider()` returns the
+#                                first-registered provider when unpinned, so
+#                                both rows are listed for resolution, not for
+#                                failover.
 #
 # Row-set differences from the layered / one-click flows (G5.1 decision).
 # This STANDALONE file is a hand-composed evolution row set, and it
@@ -20,15 +28,21 @@
 #     flow gets it from the Evolution agent preset), so it is not repeated
 #     here; a fully self-sufficient manual compose should add it (plus the
 #     host's `session-query-sqlite` index override) for cross-session recall.
-#   - `evolution-maintenance-tools` is listed by both the overlay form and the
-#     host bundle; `session-query-sqlite` override is carried by the overlay
-#     itself (it overrides the platform row the DSH profile already has). The
-#     `tool-skill` 60-char catalog cap override is evolution-host-owned — the
-#     host's base-row override and this one-click preset are ALTERNATIVE
-#     install targets (mutual exclusion, E-33) and the preset intentionally
-#     runs the platform catalog default instead; a manual compose wanting the
-#     cap adds the override itself. `host`/preset must never be installed
-#     together (either form), or shared rows would mount twice.
+#   - `evolution-maintenance-tools` is listed by the overlay form and the host
+#     bundle but deliberately NOT by this STANDALONE file (H-01) — a standalone
+#     compose that wants maintenance_probe / `/evolution maintain` must add the
+#     row (`name: '@deepseek-ai/dsh-evolution-maintenance/tools'`) itself. The
+#     package.json dependency on `dsh-evolution-maintenance` exists so that
+#     added row resolves without also editing dependencies. The standalone file
+#     likewise carries no `session-query-sqlite` override; the overlay form
+#     carries it (overriding the platform row the DSH profile already has).
+#   - the `tool-skill` 60-char catalog cap override is carried by the one-click
+#     patch (V10-14) and by the host bundle as the identical root-level row;
+#     this STANDALONE file does not list it — a manual compose wanting the cap
+#     adds the override itself, and preset-scope sessions need the
+#     install-layered injection (V10-14) regardless. `host` and the preset are
+#     ALTERNATIVE install targets: never install both (either form), or shared
+#     rows would mount twice (E-33).
 #   - `evolution-capability` is held out of the composition too (D-9, rc.51) —
 #     a staged Creator-mode governance seam with no live consumer; adopters
 #     add the row on top.
@@ -66,6 +80,14 @@
   name: '@deepseek-ai/dsh-evolution-state-json'
 - id: evolution-state
   name: '@deepseek-ai/dsh-evolution-state'
+  # P2-6 (V10-16): explicit provider pin. The storage registry's `provider()`
+  # has NO fallback logic — unpinned, the effective provider is whichever row
+  # registered first (fragile yml row order). `domain` is the primary medium;
+  # the json provider above stays mountable as an explicitly selectable
+  # alternative (an overlay re-pins `provider: json`), never an automatic
+  # failover. Both provider rows remain listed so the pinned name resolves.
+  config:
+    provider: domain
 
 # ── memory: registry, provider, model-facing tool ───────────────────────────
 - id: memory

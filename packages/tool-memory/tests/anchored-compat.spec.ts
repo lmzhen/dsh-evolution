@@ -63,7 +63,7 @@ describe('anchored-standard compatibility', () => {
     expect(names).toContain('str_replace_editor')
     expect(names).not.toContain('memory')
     expect(names).not.toContain('skill_manage')
-    rmSync(root, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('keeps evolution tools hidden after promotion until explicitly unlocked', async () => {
@@ -75,7 +75,7 @@ describe('anchored-standard compatibility', () => {
     const names = assembly.tools.map(tool => tool.name)
     expect(names).not.toContain('memory')
     expect(names).not.toContain('skill_manage')
-    rmSync(root, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('exposes memory after dev_tool_search unlocks it, matching the anchored contract', async () => {
@@ -92,6 +92,6 @@ describe('anchored-standard compatibility', () => {
     const names = assembly.tools.map(tool => tool.name)
     expect(names).toContain('memory')
     expect(names).not.toContain('skill_manage')
-    rmSync(root, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

@@ -186,10 +186,17 @@ dsh --profile <profile> --dump-config
 Runtime tests:
 
 ```bash
-vitest run packages/evolution/evolution-host/tests/installation-matrix.spec.ts
-vitest run packages/evolution/tool-memory/tests/anchored-compat.spec.ts
-vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
+vitest run packages/evolution-host/tests/installation-matrix.spec.ts
+vitest run packages/tool-memory/tests/anchored-compat.spec.ts
+vitest run packages/evolution-review/tests/anchored-smoke.spec.ts
 ```
+
+> Dual-layout note (G5.5): these vitest paths are written in the flat-mirror
+> layout (`packages/<pkg>/tests/...`). Like the tsconfig paths described in
+> README.md ("Development: the two layouts"), they resolve ONLY in the full
+> upstream checkout — the dev tree or the CI overlay built against it. A
+> standalone flat mirror has no standalone toolchain of its own, so the suites
+> run via that merged tree, not off the mirror alone.
 
 Uninstalling only removes the profile row or preset directory; memory, skills,
 state, reports, and approval history remain under `$DSH_HOME`.

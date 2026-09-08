@@ -20,7 +20,7 @@ import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evol
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -40,6 +40,11 @@ export interface Config {
   maxSkillFileBytes?: number
   /** When true, create/update refuse a description over the 60-char authoring bar (default: advisory feedback only). */
   descriptionStrict?: boolean
+  /** V10-03 (P2-18): threat-scan exemption labels forwarded to the skill
+   * write path (core `ScanOptions.excludeLabels`). Default empty — the
+   * strict ANY-hit-blocks behavior is unchanged; deployments opt in per
+   * label for known false-positive content. */
+  threatExemptLabels?: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -51,6 +56,9 @@ export const Config: z<Config> = z.object({
   maxSkillContentChars: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
   maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
   descriptionStrict: z.boolean().default(false),
+  // V10-03 (P2-18): default empty — the strict ANY-hit-blocks threat scan is
+  // unchanged unless a deployment explicitly opts labels in.
+  threatExemptLabels: z.array(z.string()).default([]),
 })
 
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
@@ -96,12 +104,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (value !== undefined && result !== value) numericClamped.push(name)
     return result
   }
-  const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io, {
+  // V10-03 (P2-18): forward the threat-exemption allowlist as the library's
+  // 6th constructor argument (`threatExemptLabels` → core
+  // `ScanOptions.excludeLabels`). The core-side constructor option landed in
+  // the same change window (plan batch 3a.3). No behavioral fork: absent
+  // config stays `[]` (strict scan).
+  const libraryOptions: SkillLimits = {
     maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
     maxSkillContentChars: limit('maxSkillContentChars', rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
-  }, (event) => { ctx.emit('evolution/skill-mutated', event) })
+  }
+  const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io, libraryOptions, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, [...(rawConfig.threatExemptLabels ?? [])])
   // V7-12 (0.3.43): the warn must run AFTER the limit() calls above — the
   // former position evaluated the always-empty array before any limit ran,
   // so an invalid config value was never surfaced.
@@ -254,15 +268,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],
     },
     isConcurrencySafe: () => false,
+    // F-06: `session` is optional in the exec contract too — the
+    // defensive chaining below is only honest if the type says so.
     async execute(args: SkillWriteArgs, exec: {
-      agent?: { session: { id: string; header: { origin?: string }; events?: readonly unknown[] } }
+      agent?: { session?: { id: string; header: { origin?: string }; events?: readonly unknown[] } }
     }) {
       // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
       // every delegated subagent as the review channel, while the LIBRARY
       // surface keeps the Hermes distinction - a delegated subagent write is
       // agent-authored ('subagent', pinned guard does not block it) and only
       // the review fork is 'background_review'.
-      const origins = resolveOrigins(exec.agent?.session.header.origin)
+      // F-06: the optional chain previously protected only one level
+      // (`exec.agent?.session.header.origin`) — an execution without a session
+      // object would TypeError here. Full-depth chaining matches the exec
+      // contract (agent and session are both optional); same fix as tool-memory.
+      const origins = resolveOrigins(exec.agent?.session?.header.origin)
       const reviewOrigin = origins.approval
       const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
@@ -279,9 +299,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           origin: reviewOrigin,
           // 0.3.20 (N-1): session id rides along so the approval service can
           // derive the platform override (see tool-memory for the rationale).
-          ...exec.agent?.session.id ? { sessionId: exec.agent.session.id } : {},
+          // F-06: full-depth optional chaining (see above).
+          ...exec.agent?.session?.id ? { sessionId: exec.agent.session.id } : {},
           // V6-27 (0.3.40): the platform overrideOf reads session.events — the
           // session OBJECT, not the id, is what it can probe.
+          // F-06: full-depth optional chaining (see above).
           ...exec.agent?.session ? { session: exec.agent.session } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })

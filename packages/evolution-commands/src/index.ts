@@ -33,6 +33,15 @@ export interface Config {
    * 4-8 min — the 13:38 successful run used --timeout 600000; the old 120s
    * default deadlined bare runs mid-analysis (14:37 run aborted at 119.94s). */
   maintainTimeoutMs?: number | undefined
+  /** Threat-scan exemption labels for WRITE-path skill mutations (P2-18).
+   * Threaded into the SkillLibrary this package constructs for `restructure`
+   * (its only write path); the core-side constructor option carries the same
+   * field name `threatExemptLabels` (P2-18 core batch — the field name is the
+   * linkage contract, keep in sync). Default empty: strict-scan behavior is
+   * unchanged; a deployment opts specific labels out explicitly. Read-only
+   * paths (maintain / maintain --facts) never threat-scan, so this never
+   * widens them. */
+  threatExemptLabels?: string[] | undefined
 }
 
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
@@ -63,7 +72,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // submit as the bare `/evolution` and the handler only ever sees the
       // help branch (field report 2026-08-31; /goal is the working precedent).
       input: {
-        hint: 'pending [--detail] | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | mutations | restore | consolidate <target> <sources...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout ms | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay',
+        // F-03: maintain accepts both timeout spellings —
+        // `--timeout <ms>` and `--timeout=<ms>` (the hint names the
+        // self-delimiting `=` form; the grammar takes both).
+        hint: 'pending [--detail] | approve <id> | reject <id> | curator run|pause|resume|status|report|scope | mutations | restore | consolidate <target> <sources...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout=<ms> | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay',
       },
       async handler(invocation: CommandInvocation) {
         const input = invocation.rawInput?.trim() ?? ''
@@ -112,9 +124,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!curator) return err('Curator service not mounted.')
           const paused = input === 'curator pause'
           await curator.setPaused(paused)
-          return ok(paused
+          // H-07 completion: in a state-less composition the curator warns and
+          // DROPS the write (setPaused is `Promise<void>`, so the loss cannot
+          // travel through the return). Surface it on the command result so
+          // the operator can tell a persisted pause from an ephemeral one.
+          const stateMounted = ctx.get('evolutionState') !== undefined
+          const notPersisted = stateMounted ? '' : '\nNOTE: no evolution state service is mounted — this setting is NOT persisted and will not survive this process.'
+          return ok((paused
             ? 'Curator automatic curation paused. Manual /evolution curator run is unaffected; resume with /evolution curator resume.'
-            : 'Curator automatic curation resumed. The next scheduled pass waits one interval (first-run defer semantics).')
+            : 'Curator automatic curation resumed. The next scheduled pass waits one interval (first-run defer semantics).') + notPersisted)
         }
         if (input === 'curator status') {
           const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
@@ -288,7 +306,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
           return ok(`Maintenance facts (0-token preview):\n${facts}`)
         }
-        const maintainArgs = /^maintain(?: --timeout (\d+))?\s*$/.exec(input)
+        // F-03: the grammar was a fragile single-space match —
+        // `maintain  --timeout 600000` (multi-space) and `--timeout=600000`
+        // fell into the unknown-args rejection below. `\s+` before the flag
+        // and `[ =]` after it accept both spellings; trailing whitespace was
+        // already tolerated and stays tolerated.
+        const maintainArgs = /^maintain(?:\s+--timeout[ =](\d+))?\s*$/.exec(input)
         if (maintainArgs) {
           // User-command maintenance scan (design 011): deterministic facts +
           // one-shot subagent → validated plan display. No writes, no auto
@@ -305,7 +328,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           if (maintainInFlightSince > 0) {
             const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
-            return ok(`Maintenance scan is already running (since ~${running}s ago) — re-submitting now would cancel it. Wait for it to settle; the result appears when it finishes.`)
+            // V10-08 (F-04): a refused scan is NOT a successful scan — the
+            // rejection returns kind:'error' so a consumer can distinguish
+            // "ran" from "refused" by the result type instead of matching
+            // prose. Behavior contract change (CHANGELOG-declared V10-08).
+            return err(`Maintenance scan is already running (since ~${running}s ago) — re-submitting now would cancel it. Wait for it to settle; the result appears when it finishes.`)
           }
           // V8-07 (0.3.47): the cooldown joins the clampedNumber family — a
           // NaN used to disable the cooldown silently (`NaN > 0` is false,
@@ -315,7 +342,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const sinceLast = Date.now() - lastMaintainAt
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)
-            return ok(`Maintenance cooldown active (${remaining}s) — latest scan ${lastMaintainRunId}; re-running now would spend another model call.`)
+            // V10-08 (F-04): same contract as the in-flight refusal above —
+            // cooldown-blocked returns kind:'error' (behavior contract change).
+            return err(`Maintenance cooldown active (${remaining}s) — latest scan ${lastMaintainRunId}; re-running now would spend another model call.`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           const subagents = ctx.get('subagents') as { start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }> } | undefined
@@ -337,7 +366,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const outcome = await runMaintain(
               // E-55 (0.3.18): same-source model routing — the maintain subagent
               // reads evolutionPolicy.get().curatorModel exactly like the curator.
-              { library, subagents, parent: invocation.agent, evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() }, logger: { warn: (message: string) => { ctx.logger.warn(message) } } },
+              // F-02: the tools registry rides along as a soft probe so
+              // the orchestrator can degrade the subagent toolFilter when the
+              // host bundle's maintenance_probe row is not mounted (same
+              // `get(name)` accessor shape the platform registry exposes).
+              {
+                library,
+                subagents,
+                parent: invocation.agent,
+                evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() },
+                tools: { get: (name: string) => (ctx.get('tools') as { get(name: string): unknown } | undefined)?.get(name) },
+                logger: { warn: (message: string) => { ctx.logger.warn(message) } },
+              },
               {
                 timeoutMs: runTimeoutMs,
                 descriptions: () => enrichment.descriptions,
@@ -357,7 +397,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               source: 'manual',
               runId: outcome.runId,
               verdict: outcome.verdict,
-              recommendations: countMaintainRecommendations(outcome.text),
+              // V10-09 (F-05): the count comes from the structured outcome
+              // field (validated plan length) — the rendered text is
+              // display-only and is no longer parsed.
+              recommendations: outcome.recommendationCount,
             }).catch((error: unknown) => {
               ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
             })
@@ -371,10 +414,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (/^maintain\b/.test(input)) {
           // 0.3.14 (P3-2): an input that STARTS with maintain but did not
-          // match the grammar (unknown flags, `--timeout=600000`, stray args)
-          // was silently falling into the help branch despite the branch
-          // comment claiming explicit rejection. Reject it here.
-          return err('Unknown maintain arguments: expected bare `maintain` or `maintain --timeout <ms>` (a positive integer). Got: ' + input)
+          // match the grammar (unknown flags, stray args) was silently falling
+          // into the help branch despite the branch comment claiming explicit
+          // rejection. Reject it here.
+          return err('Unknown maintain arguments: expected bare `maintain`, `maintain --timeout <ms>` or `maintain --timeout=<ms>` (a positive integer). Got: ' + input)
         }
         if (input === 'preset install') {
           // 0.3.14 (P1-1): the published install delivers the Evolution agent
@@ -433,7 +476,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // V8-08 (0.3.47): the command's restructure write joins the single
           // write-sink discipline — the skill-catalog cache invalidation
           // event fires like every other mutating construction point.
-          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+          // P2-18 (V10-03): the write-side library receives the configured
+          // threat-scan exemption labels — the core-side constructor option
+          // field is named `threatExemptLabels` (P2-18 core batch; the field
+          // name is the linkage contract, keep in sync). Empty/omitted keeps
+          // the strict scan unchanged.
+          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, config.threatExemptLabels ?? [])
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
           if (!result.ok) return err(result.message)
           // Same mutating observation surface as skill_manage performs for the
@@ -446,7 +494,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!replay) return err('Replay service not mounted.')
           return ok(replay.compare().report)
         }
-        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | mutations | restore | consolidate <target> <source...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout ms | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay.')
+        return ok('Evolution: memory, skills, review, curator. Use /evolution pending | approve <id> | reject <id> | curator run | curator status | curator pause | curator resume | curator report | curator scope | mutations | restore | consolidate <target> <source...> | skill restore <name> | skills health | skills refresh | learn [request] | maintain [--timeout=<ms> | --facts] | preset install | restructure <name> "<heading>" <to_file> | replay.')
       },
     }))
   })
@@ -622,43 +670,13 @@ export function atomicWriteFiles(
   }
 }
 
-/**
- * Count the recommendation bullets in a rendered maintain plan.
- * `formatPlan` renders each recommendation as a line starting with `- [<kind>]`;
- * this matches that bullet (anchored at line start) instead of any string
- * prefix, so a `- note` line can never inflate the count.
- *
- * @param text - the rendered maintain result text, or `undefined`.
- * @returns the number of recommendation bullets in `text`.
- * @remarks the count is still text-derived — MaintainOutcome does not expose the
- * structured plan array, so a structured count would require a
- * evolution-maintenance outcome change (out of this package's scope).
- */
-export function countMaintainRecommendations(text: string | undefined): number {
-  if (!text) return 0
-  // F-365: the `Notes:` section renders as `- <note>` bullets; one that
-  // happens to OPEN with a bracket would match `^- [` and inflate the count.
-  // Drop the notes section before counting so a note can never be a
-  // recommendation (formatPlan emits `Notes:` on its own line).
-  // V4-26: the section header is matched as a STANDALONE line (`Notes:` alone,
-  // preceded by a newline/start and followed by a newline). The old
-  // `split('\nNotes:')[0]` cut at the FIRST `\nNotes:` anywhere, so a
-  // recommendation field whose value carried its own line break + `Notes:`
-  // truncated the plan section early and undercounted the recommendations.
-  const planSection = beforeNotesHeader(text)
-  return planSection.match(/^- \[/gm)?.length ?? 0
-}
-
-/** Locate the maintain-plan `Notes:` section header as a standalone line.
- * Returns everything before it (the plan section), or the whole text when the
- * header is absent. formatPlan emits the header via `lines.push('Notes:')`, so
- * it is always a line that is exactly `Notes:` (never an indented/embedded
- * continuation), letting us ignore a `Notes:` that appears inside a field. */
-function beforeNotesHeader(text: string): string {
-  const header = /(^|\n)Notes:(?=\n)/.exec(text)
-  if (!header) return text
-  return text.slice(0, header.index)
-}
+// V10-09 (F-05): countMaintainRecommendations / beforeNotesHeader were
+// deleted — the recommendation count now travels as the structured
+// `MaintainOutcome.recommendationCount` (validated plan length, filled by
+// evolution-maintenance orchestrate). Parsing the rendered text (`/^- \[/gm`,
+// `Notes:` splitting — with F-365/V4-26/V6-38 as two rounds of repair patches
+// to that very parse) was a fragile cross-package text contract and is gone
+// without a dual track; formatPlan's rendering itself is unchanged.
 
 interface CommandInvocation {
   rawInput?: string
@@ -674,15 +692,17 @@ interface CommandInvocation {
  * sequence — the marker makes the cut explicit rather than looking complete. */
 function safeStagedArgs(args: unknown): string {
   try {
-    // JSON.stringify's static type is `string` (.length/.slice are fine); a
-    // top-level undefined/function/symbol returns undefined at runtime and
-    // throws here on `.length`/`.slice`, falling into the catch below.
     const json = JSON.stringify(args)
+    // F-13: a top-level undefined/function/symbol makes
+    // JSON.stringify return `undefined` (it does not throw) — handled by this
+    // explicit type branch instead of relying on a `.length` TypeError to
+    // land in the catch below.
+    if (typeof json !== 'string') return '(unserializable)'
     if (json.length > 500) return `${json.slice(0, 500)}…(truncated ${json.length - 500} chars)`
     return json
   } catch {
-    // args is not JSON-serializable (circular refs, BigInt, undefined at the
-    // top level, …) — render a stub so the pending surface never crashes on a
+    // args is not JSON-serializable and stringifying THREW (circular refs,
+    // BigInt, …) — render a stub so the pending surface never crashes on a
     // malformed staged payload.
     return '(unserializable)'
   }

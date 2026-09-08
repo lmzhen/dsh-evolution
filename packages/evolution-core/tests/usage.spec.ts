@@ -12,7 +12,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await writeFile(join(root, 'usage.json'), JSON.stringify([{ created_by: 'agent' }, { created_by: 'agent' }]), 'utf8')
     const map = await loadUsage(root, nodeEvolutionIo())
     expect(map.size).toBe(0)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('falls back to the emptyRecord baseline for mistyped fields', () => {
     const record = normalizeUsageRecord({
@@ -41,6 +41,17 @@ describe('usage sidecar field normalization (P2-3)', () => {
     })
     // An unknowable age anchors at now (first-sight defer semantics).
     expect(typeof record.created_at).toBe('string')
+  })
+
+  it('C-09: negative counters fall back to the zero baseline instead of poisoning quality math', () => {
+    const record = normalizeUsageRecord({ use_count: -3, view_count: -1, patch_count: -0.5 })
+    expect(record.use_count).toBe(0)
+    expect(record.view_count).toBe(0)
+    expect(record.patch_count).toBe(0)
+    // Legit non-negative finite counters still pass through untouched.
+    const ok = normalizeUsageRecord({ use_count: 2, view_count: 0 })
+    expect(ok.use_count).toBe(2)
+    expect(ok.view_count).toBe(0)
   })
 
   it('garbage timestamps fall back instead of propagating Invalid Date (N-3)', () => {
@@ -88,7 +99,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
     const usage = await loadUsage(root, nodeEvolutionIo())
     expect(usage.get('broken-skill')?.use_count).toBe(0)
     expect(usage.get('good-skill')?.use_count).toBe(4)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('suppression merge must never resurrect a concurrently deleted name (rc.52 regression)', async () => {
@@ -112,7 +123,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
     expect(names.has('deleted-skill')).toBe(false)
     expect(names.has('keep-skill')).toBe(true)
     expect(names.has('new-skill')).toBe(true)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('mutateUsage runs an atomic read-modify-write where concurrent bumps are preserved', async () => {
@@ -124,7 +135,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
     })))
     const usage = await loadUsage(root, io)
     expect(usage.get('atomic-skill')?.use_count).toBe(8)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('applyCuratorFields copies exactly the curator-owned field set (rc.67 K-2)', () => {
@@ -165,7 +176,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await mutateUsage(root, io, (map) => { foldCuratorFields(map, curated) })
     const usage = await loadUsage(root, io)
     expect(usage.get('lifecycle-skill')).toMatchObject({ use_count: 5, state: 'stale', quality_score: 0.3, quality_warn: true })
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a state-ownership set never reverts a concurrent lifecycle write (rc.72 H-1)', () => {
@@ -195,6 +206,6 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await io.writeText(join(root, '.curator-suppressed.json'), 'not-json either')
     await updateSuppressedNames(root, io, (names) => { names.add('x') })
     expect(await io.readText(join(root, '.curator-suppressed.json'))).toBe('not-json either')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

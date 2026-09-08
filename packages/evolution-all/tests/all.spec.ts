@@ -25,3 +25,20 @@ it('evolution-all aggregates the host entry, the three model-tool entries and th
   // the complete entry set (the preset container closes the P1-1 delivery gap).
   expect(Object.keys(manifest.dependencies).sort()).toEqual([...expected].sort())
 })
+
+// H-08: "one command installs everything" overpromised — the
+// aggregate mounts only the host bundle; the model-facing tool rows ride the
+// Evolution agent preset and NOTHING auto-registers that preset. Both doc
+// surfaces must state the post-install requirement (install-layered --mode
+// agent, or a manually produced/selected Evolution preset), or the promise
+// creeps back.
+it('documents that the aggregate install does not auto-register the model tools (H-08)', () => {
+  const readme = readFileSync(join(here, '..', 'README.md'), 'utf8')
+  expect(readme).toContain('only the host bundle')
+  expect(readme).toContain('install-layered --mode agent')
+  expect(readme).toContain('/evolution preset install')
+  const entry = readFileSync(join(here, '..', 'src', 'index.ts'), 'utf8')
+  expect(entry).toContain('install-layered --mode agent')
+  expect(entry).toContain('/evolution preset')
+  expect(entry).toContain('H-08')
+})

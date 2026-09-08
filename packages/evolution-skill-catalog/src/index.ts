@@ -46,7 +46,24 @@ export const Config: z<Config> = z.object({
   excludeSkillNames: z.array(z.string()).default([]),
 })
 
-/** Below filesystem's user rank so the evolution-owned tree wins duplicates. */
+/**
+ * Below filesystem's user rank so the evolution-owned tree wins duplicates.
+ *
+ * P2-10 rank contract — this is a deliberate SHADOW of the upstream
+ * `skill-filesystem` provider, not an arbitrary number:
+ * - upstream `USER_DSH_RANK = 400` (skill-filesystem/src/index.ts) registers
+ *   the SAME `user-dsh` source over the same `$DSH_HOME/skills` tree; the
+ *   registry resolves duplicate names by "lower rank wins within a layer", so
+ *   this provider must stay BELOW 400 to win.
+ * - The shadow exists to remove the filesystem-watcher latency/window from the
+ *   write → visible loop (this provider invalidates synchronously on
+ *   `evolution/skill-mutated`).
+ * - UPSTREAM UPGRADE CHECK: re-verify `USER_DSH_RANK` (and the duplicate-name
+ *   comparison semantics) on every upstream bump — both constants are private
+ *   to their packages, so a silent upstream change would flip the shadow
+ *   without an error. The rank-contract test in tests/rank-contract.spec.ts
+ *   pins the "lower rank wins" resolution on the registry side.
+ */
 const EVOLUTION_SKILL_RANK = 390
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {

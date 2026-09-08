@@ -41,8 +41,13 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
   const catalogInvalid = new Map<string, boolean>()
   for (const entry of await library.list()) {
     if (entry.protectedBy) protectedMap.set(entry.name, entry.protectedBy)
-    const body = await library.read(entry.name)
-    if (body === null) continue
+    const body = (await library.read(entry.name)) as string | null | undefined
+    // F-01: the empty-read guard matches drift-scan.ts (null AND
+    // undefined) — an injected reader that resolves undefined (instead of the
+    // concrete SkillLibrary's null) must skip the entry, not TypeError inside
+    // parseFrontmatter below. The `as` widens the typed read exactly because
+    // the reader contract is JSON-shaped in practice.
+    if (body === undefined || body === null) continue
     const parsed = parseFrontmatter(body)
     // 0.3.11: surface catalog-unloadable frontmatter — the platform parses
     // strict YAML, so an unquoted `: ` (etc.) makes the skill invisible to

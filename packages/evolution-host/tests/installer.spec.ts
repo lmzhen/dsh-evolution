@@ -47,10 +47,21 @@ describe('layered installer', () => {
     expect(composition).toContain('- id: tool-memory')
     expect(composition).toContain('- id: evolution-skill-catalog')
 
+    // V10-14 (P1-2): the 60-char catalog cap must be INJECTED onto the
+    // standard-sourced `tool-skill` row — the session-visible instance mounts
+    // in the preset scope, which no profile patch can reach. Exact-row match
+    // (`tool-skill`, not the delta's `tool-skill-manage`).
+    const capStart = composition.search(/^- id: tool-skill$/m)
+    expect(capStart).toBeGreaterThanOrEqual(0)
+    const rowEnd = composition.indexOf('\n- id:', capStart)
+    const toolSkillBlock = composition.slice(capStart, rowEnd === -1 ? undefined : rowEnd)
+    expect(toolSkillBlock).toContain('catalogDescriptionMaxLength: 60')
+    expect(toolSkillBlock).toContain('V10-14')
+
     const patchRows = insertedRows(loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')))
     expect(rowIds(patchRows)).toContain('evolution-review')
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
   it('installs the compatibility one-click bundle', async () => {
@@ -58,7 +69,7 @@ describe('layered installer', () => {
     await runInstaller(home, 'oneclick', 'web')
     const manifest = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
     expect(manifest.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-preset')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
   it('uninstalls the layered installation without touching user data', async () => {
@@ -69,18 +80,18 @@ describe('layered installer', () => {
     expect(manifest.dsh?.profile?.bundles).toEqual([])
     const { readdir } = await import('node:fs/promises')
     expect(await readdir(join(home, 'profiles', 'evo-test', 'node_modules/@deepseek-ai'))).toHaveLength(0)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
   it('does not write profile files in dry-run mode', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-dry-'))
     await runInstaller(home, 'layered')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     const dryHome = await mkdtemp(join(tmpdir(), 'dsh-installer-dry2-'))
     const { stdout } = await runInstaller(dryHome, 'layered', 'evo-test', ['--dry-run'])
     expect(stdout).toContain('dry-run:  no files were written')
     await expect(readFile(join(dryHome, 'profiles', 'evo-test', 'package.json'), 'utf8')).rejects.toThrow()
-    await rm(dryHome, { recursive: true, force: true })
+    await rm(dryHome, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
   it('rejects a delta that collides with runtime standard rows (N-5)', async () => {
@@ -96,7 +107,7 @@ describe('layered installer', () => {
     }).then(() => null, (caught: unknown) => caught as { stderr?: string })
     expect(error).not.toBeNull()
     expect(error?.stderr).toContain('tool-session-query')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 20_000)
 
   it('keeps both rows under the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (N-5)', async () => {
@@ -112,7 +123,7 @@ describe('layered installer', () => {
       DSH_EVOLUTION_ALLOW_ROW_COLLISIONS: '1',
     })
     expect(stderr).toContain('collide with standard rows')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 20_000)
 
   it('mounts the 60-char catalog cap as a top-level tool-skill override (mount-and-restore semantics)', async () => {
@@ -128,7 +139,40 @@ describe('layered installer', () => {
     // would mount the tool twice. A profile overlay (later patch) may replace
     // the value; removing the host bundle removes the injection entirely.
     expect(insertedRows(overlay).some(row => rowId(row) === 'tool-skill')).toBe(false)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 20_000)
+
+  it('V10-14: cap injection is idempotent and warns when the standard row is absent', async () => {
+    // The installer script ships no type declarations, so the function runs in
+    // a fresh node subprocess (base64 stdout, no lint-visible any) — the same
+    // pattern as the byte-parity pin below.
+    const cases = {
+      plain: "- id: persona\n- id: tool-skill\n  name: '@deepseek-ai/dsh-tool-skill'\n",
+      configured: "- id: tool-skill\n  name: '@deepseek-ai/dsh-tool-skill'\n  config:\n    custom: 1\n",
+      absent: '- id: persona\n  name: x\n',
+    }
+    const script = [
+      `import { injectToolSkillCap } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,
+      `const cases = ${JSON.stringify(cases)}`,
+      'const warns = []',
+      'const originalWarn = console.warn',
+      'console.warn = (message) => warns.push(String(message))',
+      'const out = Object.fromEntries(Object.entries(cases).map(([key, value]) => [key, injectToolSkillCap(value)]))',
+      'console.warn = originalWarn',
+      'process.stdout.write(Buffer.from(JSON.stringify({ out, warns }), "utf8").toString("base64"))',
+    ].join('\n')
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
+    const { out, warns } = JSON.parse(Buffer.from(stdout, 'base64').toString('utf8')) as { out: Record<string, string>; warns: string[] }
+    // A plain standard row gains the config block plus the marker comment.
+    expect(out.plain).toContain('config:')
+    expect(out.plain).toContain('catalogDescriptionMaxLength: 60')
+    expect(out.plain).toContain('V10-14')
+    // Idempotent: an already-configured row is left byte-identical (no doubled
+    // config key on a re-install).
+    expect(out.configured).toBe(cases.configured)
+    // No tool-skill row: composition unchanged, but the missed cap is loud.
+    expect(out.absent).toBe(cases.absent)
+    expect(warns.join('\n')).toContain('tool-skill')
   }, 20_000)
 
   it('core composePresetComposition and installer generateAgentPreset agree byte-for-byte (0.3.15 single-source pin)', async () => {
@@ -172,14 +216,14 @@ describe('layered installer', () => {
     // in one profile (shared rows would double-mount); the installer used to
     // turn the documented accident into reality.
     await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
   it('V6-49: oneclick then layered fails loud (reverse order)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-v649b-'))
     await runInstaller(home, 'oneclick')
     await expect(runInstaller(home, 'layered')).rejects.toThrow(/mutually exclusive/)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
   it('V7-18: cross-scope bundle names still hit the E-33 mutual exclusion (0.3.44)', async () => {
@@ -192,6 +236,6 @@ describe('layered installer', () => {
     // check runs BEFORE the package copy either way.
     await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-host'] } } }), 'utf8')
     await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 })

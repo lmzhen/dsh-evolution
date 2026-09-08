@@ -71,7 +71,13 @@ export async function recordMutation(
   await transactIo(io, mutationsFile(root), (current) => {
     // P3 (v3 audit): never overwrite a malformed audit file with a re-serialized empty.
     if (current !== null) {
-      try { JSON.parse(current) } catch { return current }
+      try { JSON.parse(current) } catch {
+        // C-08: the drop used to be fully silent; warn once so a
+        // corrupted audit file is observable. Still best-effort — no retry,
+        // and the mutation itself never fails on auditing.
+        console.warn(`mutation audit record dropped: ${mutationsFile(root)} is malformed and was not overwritten`)
+        return current
+      }
     }
     const existing = parseMutationRecords(current)
     existing.push(record)

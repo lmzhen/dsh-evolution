@@ -129,4 +129,25 @@ describe('normalizeFrontmatter (0.3.11)', () => {
     expect(normalizeFrontmatter('# no frontmatter\n').changed).toBe(false)
     expect(normalizeFrontmatter('---\nno-close\n').changed).toBe(false)
   })
+
+  it('V10-02 (P2-3): a duplicated key is refused in issues and never rewrites the safe first line', () => {
+    // The second `description` carries the unsafe value; the first is safe.
+    // The old key→Map rewrite quoted the FIRST line with the SECOND line's
+    // value (corrupting safe bytes that the last-wins YAML reader then masked).
+    const dup = '---\nname: demo-skill\ndescription: Safe text.\ndescription: Search: arXiv papers\n---\n\n# Demo\n'
+    const result = normalizeFrontmatter(dup)
+    expect(result.changed).toBe(false)
+    expect(result.content).toBe(dup) // no line was rewritten
+    expect(result.issues.some(issue => issue.includes('duplicate') && issue.includes('description'))).toBe(true)
+  })
+
+  it('V10-02 (P2-3): per-line rewrite quotes each unsafe line from its OWN value', () => {
+    const two = '---\nname: demo-skill\ndescription: a: b\nrelated_skills: keyword # tag\n---\n\n# Demo\n'
+    const result = normalizeFrontmatter(two)
+    expect(result.changed).toBe(true)
+    expect(result.fields).toEqual(['description', 'related_skills'])
+    expect(result.issues).toEqual([])
+    expect(result.content).toContain('description: "a: b"')
+    expect(result.content).toContain('related_skills: "keyword # tag"')
+  })
 })

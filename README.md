@@ -33,13 +33,29 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
-| `evolution-commands` | `/evolution pending|approve|reject|curator run|curator report|restore` |
+| `evolution-commands` | The `/evolution` command surface (approval queue, curator, maintenance, presets) — full enumeration under "Command surface" below |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
 | `evolution-capability` | Staged non-executing governance adapter for Creator-mode capability packages |
 | `evolution-host` | Host-plane infrastructure bundle (no model tools) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | One-command aggregate entry (host + model tools) |
+
+### Command surface (`/evolution`)
+
+The built-in `/evolution` help is the authoritative surface — re-run it after
+upgrades. Full enumeration from the registered handler
+(`packages/evolution-commands/src/index.ts`, 0.3.52):
+
+`pending [--detail]` · `approve <id>` · `reject <id>` · `curator run` ·
+`curator pause` · `curator resume` · `curator status` · `curator report` ·
+`curator scope` · `mutations` · `restore` (snapshot restore) ·
+`consolidate <target> <sources...> [--plan <runId>]` · `skill restore <name>` ·
+`skills health` · `skills refresh` · `learn [request]` ·
+`maintain [--timeout <ms> | --facts]` · `preset install` ·
+`restructure <name> "<heading>" <to_file> [--plan <runId>]` · `replay`
+
+(bare `/evolution` prints the same list)
 
 ## Installation
 
@@ -196,3 +212,28 @@ The same layout rule applies to the setup commands: in the flat mirror run
 `node packages/scripts/install-layered.mjs` (there is no
 `packages/evolution/scripts` directory here), while the upstream checkout
 uses `packages/evolution/scripts/install-layered.mjs`.
+
+Tests rely on the same merged layout: the suites import ~30 `@deepseek-ai/*`
+modules that are intentionally NOT declared in the packages'
+`package.json`. Those imports resolve only in the merged upstream tree (the
+same G5.5 rule as the tsconfig paths above) — a known, accepted tradeoff, and
+devDependencies are deliberately NOT added for the tests (the merged tree is
+the only layout where they run; declaring them would just add a second
+surface to keep in sync).
+
+## Upstream upgrade checklist
+
+Walk through this list on every upstream bump (see `UPSTREAM_SHA`):
+
+1. **Skill-provider shadow rank** (`evolution-skill-catalog`): our provider
+   registers `EVOLUTION_SKILL_RANK = 390` and relies on the upstream
+   `USER_DSH_RANK` (400 in 0.1.1-rc.2) sorting ABOVE it — lower rank wins the
+   `user-dsh` source shadow. Both constants are private to their owners: if
+   upstream changes either value or the comparison semantics, our provider
+   silently loses the shadow. Re-verify both sides on upgrade.
+2. **`@deepseek-ai` package-name collision**: the family publishes self-owned
+   packages under the official `@deepseek-ai` scope (`dsh-memory`,
+   `dsh-tool-memory`, `dsh-skill-usage`, `dsh-memory-files`,
+   `dsh-tool-skill-manage`, …). Before adopting an upstream release, check its
+   package list for new names that collide with ours — a collision makes
+   resolution ambiguous.

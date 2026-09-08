@@ -18,6 +18,6 @@ describe('evolution-state-json cross-provider consistency (G7.4)', () => {
     await ctx.plugin(NodeIo)
     await ctx.plugin(JsonState, { root })
     await runStateProviderConsistency(ctx.evolutionStateStorage.provider('json'))
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

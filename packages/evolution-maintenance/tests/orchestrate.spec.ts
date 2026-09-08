@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderMaintainTemplate, runMaintain, type MaintainRuntime } from '../src/index.ts'
-import { MAINTAIN_PROMPT, DRIFT_SIGNAL_NOUNS } from '@deepseek-ai/dsh-evolution-core'
+import { MAINTAIN_OUTPUT_INSTRUCTION, MAINTAIN_PROMPT, DRIFT_SIGNAL_NOUNS, PROMPT_BUNDLE } from '@deepseek-ai/dsh-evolution-core'
 
 function fakeLibrary() {
   return {
@@ -360,6 +360,126 @@ describe('runMaintain', () => {
     expect(warns).toHaveLength(1)
     expect(warns[0] ?? '').toContain('dispose failed')
     expect(warns[0] ?? '').toContain('dispose boom')
+  })
+
+  // F-02: the default toolFilter names `maintenance_probe`, a tool
+  // registered by the host bundle's tools row — a cross-package coupling. The
+  // orchestrator soft-probes the registry before the spawn and degrades to
+  // `skill`-only when the tool is absent, instead of failing the spawn.
+  it('F-02: an unregistered maintenance_probe degrades the toolFilter to skill and declares it', async () => {
+    let captured: { toolFilter?: { allow?: string[] }; prompt?: Array<{ text: string }> } | undefined
+    const runtimeNoTools: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          captured = options as typeof captured
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    // No tools accessor at all (tools service not mounted) — same degradation.
+    const outcome = await runMaintain(runtimeNoTools)
+    expect(outcome.ok).toBe(true)
+    expect(captured?.toolFilter?.allow).toEqual(['skill'])
+    const promptText = captured?.prompt?.[0]?.text ?? ''
+    expect(promptText).toContain('maintenance_probe is not registered')
+    expect(promptText).toContain('degrades to the `skill` tool only')
+    // A registry accessor that answers "absent" degrades identically.
+    const runtimeEmptyRegistry: MaintainRuntime = {
+      ...runtimeNoTools,
+      tools: { get: () => undefined },
+    }
+    await runMaintain(runtimeEmptyRegistry)
+    expect(captured?.toolFilter?.allow).toEqual(['skill'])
+  })
+
+  it('F-02: a registered maintenance_probe keeps the two-tool default and adds no degradation note', async () => {
+    let captured: { toolFilter?: { allow?: string[] }; prompt?: Array<{ text: string }> } | undefined
+    const runtimeWithProbe: MaintainRuntime = {
+      library: fakeLibrary(),
+      tools: { get: (name: string) => name === 'maintenance_probe' ? { name } : undefined },
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          captured = options as typeof captured
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeWithProbe)
+    expect(outcome.ok).toBe(true)
+    expect(captured?.toolFilter?.allow).toEqual(['skill', 'maintenance_probe'])
+    expect(captured?.prompt?.[0]?.text ?? '').not.toContain('not registered')
+  })
+
+  it('F-02: an explicit toolAllow option is an informed override — passed through untouched', async () => {
+    let captured: { toolFilter?: { allow?: string[] } } | undefined
+    const runtimeOverride: MaintainRuntime = {
+      library: fakeLibrary(),
+      // Even a registry WITHOUT the probe must not rewrite a caller-provided
+      // filter.
+      tools: { get: () => undefined },
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          captured = options as typeof captured
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeOverride, { toolAllow: ['skill', 'bash'] })
+    expect(outcome.ok).toBe(true)
+    expect(captured?.toolFilter?.allow).toEqual(['skill', 'bash'])
+  })
+
+  // V10-09 (F-05): the recommendation count travels as a structured outcome
+  // field — consumers must never parse the rendered text again.
+  it('V10-09 (F-05): outcome.recommendationCount is the validated plan length, 0 otherwise', async () => {
+    const success = await runMaintain(runtime(validResult))
+    expect(success.ok).toBe(true)
+    expect(success.recommendationCount).toBe(1)
+    const none = await runMaintain(runtime({ verdict: 'no_issues', plan: [], notes: [] }))
+    expect(none.ok).toBe(true)
+    expect(none.recommendationCount).toBe(0)
+    // Every failure path carries the field too (0) — no `undefined` leaks.
+    const rejected = await runMaintain(runtime({ verdict: 'issues', plan: [{ kind: 'skill-level', names: [], rule: 'X', evidence: [{ signal: 'ghost', value: 'v' }] }], notes: [] }))
+    expect(rejected.ok).toBe(false)
+    expect(rejected.recommendationCount).toBe(0)
+    const noPlan = await runMaintain({
+      library: fakeLibrary(),
+      subagents: { async start() { return { result: Promise.resolve({ text: 'nothing here' }) } } },
+    })
+    expect(noPlan.ok).toBe(false)
+    expect(noPlan.recommendationCount).toBe(0)
+    const emptyLibrary = await runMaintain({
+      library: { async list() { return [] }, async read() { return undefined } },
+      subagents: { async start() { throw new Error('should not be called') } },
+    })
+    expect(emptyLibrary.ok).toBe(true)
+    expect(emptyLibrary.recommendationCount).toBe(0)
+  })
+
+  // F-16: the subagent output instruction is the `maintainOutput`
+  // PROMPT_BUNDLE entry — no second, undigested prompt text hardcoded in the
+  // orchestrator.
+  it('F-16: the output instruction rides PROMPT_BUNDLE and closes the prompt verbatim', () => {
+    expect(PROMPT_BUNDLE.prompts['maintainOutput']).toBe(MAINTAIN_OUTPUT_INSTRUCTION)
+    expect(MAINTAIN_OUTPUT_INSTRUCTION).toContain('JSON 维护计划')
+  })
+
+  it('F-16: the spawned prompt ends with the bundle instruction after the facts block', async () => {
+    let capturedPrompt: string | undefined
+    const runtimeWithCapture: MaintainRuntime = {
+      library: fakeLibrary(),
+      subagents: {
+        async start(_kind: string, options: unknown) {
+          capturedPrompt = (options as { prompt?: Array<{ text: string }> }).prompt?.[0]?.text
+          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeWithCapture)
+    expect(outcome.ok).toBe(true)
+    expect(capturedPrompt ?? '').toContain('MECHANICAL_FACTS')
+    expect(capturedPrompt?.endsWith(MAINTAIN_OUTPUT_INSTRUCTION)).toBe(true)
   })
 })
 

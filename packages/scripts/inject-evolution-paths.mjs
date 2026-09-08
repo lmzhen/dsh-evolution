@@ -73,10 +73,56 @@ if (index < 0) {
 
 const injected = evolutionLines.map(line => `      ${line.trim()}`).join(eol)
 const next = noBom.slice(0, index + marker.length) + eol + injected + eol + noBom.slice(index + marker.length)
+
+// R-04: smoke-parse the composed JSONC BEFORE writing. The insertion
+// silently assumed every injected line carries a trailing comma — an alias
+// that is the LAST entry of the mirror's paths block would land mid-block
+// without one and produce invalid JSONC. Strip comments (string-aware) and
+// trailing commas, then JSON.parse; any failure is loud and leaves the target
+// untouched.
+function jsoncParse(text) {
+  let out = ''
+  let inString = false
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (inString) {
+      out += ch
+      if (ch === '\\') {
+        out += text[i + 1] ?? ''
+        i += 1
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (ch === '"') {
+      inString = true
+      out += ch
+    } else if (ch === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1
+      out += '\n'
+    } else if (ch === '/' && text[i + 1] === '*') {
+      i += 2
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1
+      i += 1
+    } else {
+      out += ch
+    }
+  }
+  return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'))
+}
+try {
+  jsoncParse(next)
+} catch (error) {
+  console.error(`inject-evolution-paths: composed ${target} is not valid JSONC after injection (${error instanceof Error ? error.message : String(error)})`)
+  console.error('inject-evolution-paths: an injected alias line is likely missing a trailing comma — fix the mirror base instead of shipping a broken tsconfig')
+  process.exit(1)
+}
+
 // Atomic write (F-352): write a sibling temp and rename so a crash never
 // leaves a half-written tsconfig, and re-attach the original BOM.
 const tmp = `${target}.tmp`
 writeFileSync(tmp, (hasBom ? '\uFEFF' : '') + next)
 renameSync(tmp, target)
 
-console.log(`inject-evolution-paths: injected ${evolutionLines.length} evolution alias line(s) into ${target} (N-7)`)
+console.log(`inject-evolution-paths: injected ${evolutionLines.length} evolution alias line(s) into ${target} (N-7); composed JSONC smoke-parsed OK`)

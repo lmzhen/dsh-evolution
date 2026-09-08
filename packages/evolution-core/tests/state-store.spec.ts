@@ -30,6 +30,23 @@ describe('evolutionRoot / evolutionHome (0.3.22 G3.2, F-207)', () => {
     expect(evolutionHome(env)).toBe(join(homedir(), '.dsh', 'evolution'))
   })
 
+  it('C-11: the accepted value and the RETURNED value are the SAME trimmed source', () => {
+    // The old form tested `DSH_HOME?.trim()` but returned the RAW value, so a
+    // padded-but-real home was accepted AND persisted with literal spaces
+    // (" /x " became a path with spaces on every sidecar).
+    expect(evolutionRoot({ DSH_HOME: '  /d/x  ' })).toBe('/d/x')
+    expect(evolutionHome({ DSH_HOME: '  /d/x  ' })).toBe(join('/d/x', 'evolution'))
+    // An untrimmed real value is returned unchanged (trim only fixes padding).
+    expect(evolutionRoot({ DSH_HOME: '/d/plain' })).toBe('/d/plain')
+  })
+
+  it('C-11: no `~` expansion — the documented upstream resolveDshHome divergence', () => {
+    // Known deliberate tradeoff (audit v10 C-11): a literal `~` is passed
+    // through verbatim rather than expanded; this test pins the behavior so
+    // any future change is a conscious decision, not a drift.
+    expect(evolutionRoot({ DSH_HOME: '~/dsh-alt' })).toBe('~/dsh-alt')
+  })
+
   it('V9-05: memoryRoot/skillsRoot share the SAME root resolver — empty/whitespace DSH_HOME never yields a relative path', () => {
     // The old bare `||` in memoryRoot/skillsRoot resolved `DSH_HOME=" "`
     // (truthy) to a CWD-relative " /memories" sidecar; the adoption test

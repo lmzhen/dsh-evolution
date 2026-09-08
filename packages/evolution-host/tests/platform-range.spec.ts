@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+// Spawn-based guard tests slow down under full-suite parallel load.
+vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
@@ -37,7 +39,7 @@ describe('verify-platform-ranges (N-2 guard)', () => {
     ])
     const { stdout } = await run(process.execPath, [guard, '--platform-version', '0.1.1-rc.2', '--manifest-dir', root], { encoding: 'utf8' })
     expect(stdout).toContain('OK')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('fails on a drifted dsh-* platform range and names the offender', async () => {
@@ -50,7 +52,7 @@ describe('verify-platform-ranges (N-2 guard)', () => {
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('dsh-llm')
     expect(error?.stderr).toContain('^0.1.1-rc.2')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rejects --our-scope @deepseek-ai so the guard cannot go silent (M-7)', async () => {
@@ -62,7 +64,7 @@ describe('verify-platform-ranges (N-2 guard)', () => {
     expect(error).not.toBeNull()
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('--family-prefixes')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('fails loud when no manifest is actually scanned (empty/unreadable dirs)', async () => {
@@ -73,6 +75,6 @@ describe('verify-platform-ranges (N-2 guard)', () => {
     expect(error).not.toBeNull()
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('no package manifest found')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

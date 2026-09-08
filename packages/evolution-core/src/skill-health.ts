@@ -38,6 +38,12 @@ export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
  * (`defaced`, `feedback`) are not counted as commit shas; the ISO branch
  * accepts a UTC `Z`, a numeric UTC offset (`+08:00`), or no timezone at all —
  * non-UTC timestamps used to escape detection (log-like content missed).
+ *
+ * Known boundary, recorded not fixed (C-22, v10 audit): the hex branch also
+ * matches 7-40 char PURE-DIGIT strings (order numbers etc.), so stamp density
+ * can be over-reported for such content. The misjudgment direction is "extra
+ * stamp hits" only — never a miss — and no real incident exists; revisit only
+ * if curator decisions are actually distorted (v10 deferral ledger).
  */
 export const HEALTH_STAMP_RE = new RegExp(
   String.raw`\brc\.\d+\b|\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*[0-9][0-9a-f]*\b|\b\d{4}-\d{2}-\d{2}(?:T[0-9:.]+(?:Z|[+-]\d{2}:?\d{2})?)?\b`,

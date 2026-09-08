@@ -26,11 +26,11 @@ describe('evolution-state-json boundaries', () => {
     await expect(ctx.evolutionStateStorage.provider('json').loadReviewState('s1')).rejects.toThrow(/not valid JSON/)
     // The original bytes are preserved for operator rescue — never overwritten
     // as an empty map (the old contract silently cleared every other record).
+    // V10-05 (P2-5): the copy is the FIXED name `<file>.corrupt`.
     const entries = await io.list(root)
-    const corrupt = entries.find(name => name.startsWith('review-state.json.corrupt-'))
-    expect(corrupt).toBeDefined()
-    expect(await io.readText(join(root, corrupt!))).toBe('{not-json')
-    await rm(root, { recursive: true, force: true })
+    expect(entries).toContain('review-state.json.corrupt')
+    expect(await io.readText(join(root, 'review-state.json.corrupt'))).toBe('{not-json')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a save into a corrupt state file rejects and leaves the file untouched (E-9, 0.3.17)', async () => {
@@ -43,7 +43,7 @@ describe('evolution-state-json boundaries', () => {
       id: 'p2', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending',
     })).rejects.toThrow(/not valid JSON/)
     expect(await io.readText(join(root, 'pending-state.json'))).toBe('{"p1": ')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('claim moves the record to executing; resolve-from-executing and release-to-pending work (S3.3, E-24)', async () => {
@@ -64,7 +64,7 @@ describe('evolution-state-json boundaries', () => {
     await provider.releasePendingClaim('p2', 'c1')
     expect((await provider.listPending('pending')).find(r => r.id === 'p2')?.claimedBy).toBeUndefined()
     expect((await provider.listPending('pending')).find(r => r.id === 'p2')?.status).toBe('pending')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reads the legacy pending.json audit file for upgrade continuity', async () => {
@@ -76,7 +76,25 @@ describe('evolution-state-json boundaries', () => {
     }))
     const pending = await ctx.evolutionStateStorage.provider('json').listPending('pending')
     expect(pending.map(record => record.id)).toEqual(['p1'])
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('V10-05 (P2-5): a corrupt pending-state.json fails loud through the legacy read path — never a silent legacy-only view', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-legacy-corrupt-'))
+    const ctx = await mount(root)
+    const io = ctx.evolutionIo.provider('node')
+    // A valid legacy file AND a corrupt current file: the read must surface
+    // the corruption (fixed `.corrupt` copy + throw), not quietly degrade to
+    // the legacy-only view behind a best-effort catch.
+    await io.writeText(join(root, 'pending.json'), JSON.stringify({
+      p1: { id: 'p1', kind: 'memory', summary: 'legacy', args: {}, createdAt: 'old', status: 'pending' },
+    }))
+    await io.writeText(join(root, 'pending-state.json'), '{corrupt')
+    await expect(ctx.evolutionStateStorage.provider('json').listPending()).rejects.toThrow(/not valid JSON/)
+    expect(await io.list(root)).toContain('pending-state.json.corrupt')
+    // The corrupt file itself is never rewritten by the failed read.
+    expect(await io.readText(join(root, 'pending-state.json'))).toBe('{corrupt')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('keeps legacy pending records visible when a new record is saved and can resolve them', async () => {
@@ -96,7 +114,7 @@ describe('evolution-state-json boundaries', () => {
     expect(second.applied).toBe(false)
     expect(await provider.listPending('approved')).toHaveLength(1)
     expect(await provider.listPending('pending')).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('serializes concurrent state writes without lost updates', async () => {
@@ -112,7 +130,7 @@ describe('evolution-state-json boundaries', () => {
     expect((await provider.loadReviewState('s1'))?.turnsSinceMemory).toBe(1)
     expect((await provider.loadReviewState('s2'))?.turnsSinceMemory).toBe(2)
     expect((await provider.loadCuratorState())?.lastSummary).toBe('b')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('returns the existing record with applied:false on a status mismatch (E-10, 0.3.17 — json provider)', async () => {
@@ -124,7 +142,7 @@ describe('evolution-state-json boundaries', () => {
     const second = await provider.tryResolvePending('p1', 'rejected')
     expect(second.applied).toBe(false)
     expect(second.record).not.toBeNull()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('resolves a pending record exactly once under concurrent resolution', async () => {
@@ -138,6 +156,6 @@ describe('evolution-state-json boundaries', () => {
     ])
     expect([a, b].filter(result => result.applied)).toHaveLength(1)
     expect(await provider.listPending('approved')).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

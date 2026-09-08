@@ -118,7 +118,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
         await fiber2.dispose()
       }
     } finally {
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -153,7 +153,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
         await fiber2.dispose()
       }
     } finally {
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 })

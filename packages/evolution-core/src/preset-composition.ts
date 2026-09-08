@@ -34,7 +34,12 @@ function compositionRowIds(composition: string): Set<string> {
   const ids = new Set<string>()
   for (const line of composition.split('\n')) {
     const match = /^- id:\s*(\S+)/.exec(line)
-    if (match) ids.add(match[1] ?? '')
+    // C-25 (v10 audit): the old `match[1] ?? ''` was a dead expression (the
+    // regex guarantees group 1 exists), and an empty id would have poisoned
+    // the collision set anyway. Delta-INTERNAL duplicate ids remain
+    // undetected by design (deferred — see the v10 ledger).
+    const id = match?.[1]
+    if (id) ids.add(id)
   }
   return ids
 }

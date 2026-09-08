@@ -12,17 +12,43 @@ import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
-import { canClaimPending, canResolvePending, releasedStatus, type CuratorStateRecord, type EvolutionStateStorage, type PendingRecord, type PendingResolution, type PendingStatus, type ReviewStateRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import {
+  canClaimPending,
+  canResolvePending,
+  releasedStatus,
+  CURATOR_STATE_KEY,
+  CURATOR_STATE_TABLE,
+  PENDING_TABLE,
+  PROVIDER_DOMAIN,
+  REVIEW_STATE_TABLE,
+  type CuratorStateRecord,
+  type EvolutionStateStorage,
+  type PendingRecord,
+  type PendingResolution,
+  type PendingStatus,
+  type ReviewStateRecord,
+} from '@deepseek-ai/dsh-evolution-state-storage'
 
 export const name = 'evolution-state-domain'
 export const inject = ['evolutionStateStorage', 'storageDomain']
 
+/**
+ * Review-state record schema of the storage-domain table.
+ * @internal Referenced only by this package's own tests and EVOLUTION_DOMAIN
+ * below — not public API surface (audit v10 S-03); the record contract lives
+ * in `@deepseek-ai/dsh-evolution-state-storage` types.
+ */
 export const reviewStateSchema = z.object({
   turnsSinceMemory: z.number().int().nonnegative(),
   turnsSinceSkill: z.number().int().nonnegative(),
   lastTurn: z.number().int().nonnegative(),
 })
 
+/**
+ * Curator-state record schema of the storage-domain table.
+ * @internal Referenced only by this package's own tests and EVOLUTION_DOMAIN
+ * below — not public API surface (audit v10 S-03).
+ */
 export const curatorStateSchema = z.object({
   /** Optional record-shape version; legacy records without it stay compatible. */
   schemaVersion: z.number().int().nonnegative().optional(),
@@ -32,6 +58,11 @@ export const curatorStateSchema = z.object({
   paused: z.boolean(),
 })
 
+/**
+ * Pending record schema of the storage-domain table.
+ * @internal Referenced only by this package's own tests and EVOLUTION_DOMAIN
+ * below — not public API surface (audit v10 S-03).
+ */
 export const pendingSchema = z.object({
   id: z.string(),
   // 0.3.17 (S3.5, D-4): 'skill_batch' is gone — nothing ever created one, and
@@ -51,13 +82,18 @@ export const pendingSchema = z.object({
   sessionId: z.string().optional(),
 })
 
+/**
+ * The evolution storage-domain spec: three schema-validated KV tables.
+ * @internal Referenced only by this package's own tests and `open()` — not
+ * public API surface (audit v10 S-03).
+ */
 export const EVOLUTION_DOMAIN = defineDomain({
   name: 'evolution',
   version: 1,
   tables: {
-    review_state: domainTable<string, ReviewStateRecord>(reviewStateSchema),
-    curator_state: domainTable<string, CuratorStateRecord>(curatorStateSchema),
-    pending: domainTable<string, PendingRecord>(pendingSchema),
+    [REVIEW_STATE_TABLE]: domainTable<string, ReviewStateRecord>(reviewStateSchema),
+    [CURATOR_STATE_TABLE]: domainTable<string, CuratorStateRecord>(curatorStateSchema),
+    [PENDING_TABLE]: domainTable<string, PendingRecord>(pendingSchema),
   },
 })
 
@@ -107,56 +143,70 @@ export function apply(ctx: Context): void {
   }
 
   const provider: EvolutionStateStorage = {
-    name: 'domain',
+    name: PROVIDER_DOMAIN,
 
     async loadReviewState(sessionId) {
-      return (await ensure()).table('review_state').get(sessionId) ?? null
+      return (await ensure()).table(REVIEW_STATE_TABLE).get(sessionId) ?? null
     },
 
     async saveReviewState(sessionId, record) {
-      await (await ensure()).table('review_state').put(sessionId, record)
+      await (await ensure()).table(REVIEW_STATE_TABLE).put(sessionId, record)
     },
 
     async loadCuratorState() {
-      return (await ensure()).table('curator_state').get('primary') ?? null
+      return (await ensure()).table(CURATOR_STATE_TABLE).get(CURATOR_STATE_KEY) ?? null
     },
 
     async saveCuratorState(record) {
-      await (await ensure()).table('curator_state').put('primary', record)
+      await (await ensure()).table(CURATOR_STATE_TABLE).put(CURATOR_STATE_KEY, record)
     },
 
     async transactCuratorState(task) {
-      const table = (await ensure()).table('curator_state')
+      const table = (await ensure()).table(CURATOR_STATE_TABLE)
+      // Atomic read-modify-write on the domain write chain: `task` sees the
+      // record current at its queue slot, so a setPaused racing the run-core
+      // bookkeeping write never interleaves. task returns null to keep the
+      // record unchanged (the domain update primitive cannot delete).
       try {
-        // Atomic read-modify-write on the domain write chain: `task` sees the
-        // record current at its queue slot, so a setPaused racing the run-core
-        // bookkeeping write never interleaves. task returns null to keep the
-        // record unchanged (the domain update primitive cannot delete).
-        await table.update('primary', current => task(current) ?? current)
+        await table.update(CURATOR_STATE_KEY, current => task(current) ?? current)
+        return
       } catch (error) {
-        // Fresh install: no record yet — update() rejects missing-key. Seed by
-        // applying the task to null and putting the result (delete when null).
-        if (error instanceof DomainError && error.code === 'missing-key') {
-          const next = task(null)
-          if (next !== null) await table.put('primary', next)
-          else await table.delete('primary')
-          return
-        }
-        throw error
+        if (!(error instanceof DomainError && error.code === 'missing-key')) throw error
       }
+      // P2-4: fresh-install missing-key recovery now retries the
+      // SAME atomic update ONCE before seeding. The old shape (update reject →
+      // task(null) → bare put) computed the seed from a stale null basis: a
+      // concurrent first-writer that created the key between our failed
+      // update and our put was silently OVERWRITTEN (lost update), violating
+      // the seam's "whole RMW inside one transact" contract. The optimistic
+      // retry re-enters the domain write chain: if the concurrent writer has
+      // created the key meanwhile, `task` runs on the FRESH basis and nothing
+      // is lost. Only a SECOND missing-key proves the key still absent, so
+      // the seed below (task(null) + put/delete) races no third party.
+      try {
+        await table.update(CURATOR_STATE_KEY, current => task(current) ?? current)
+        return
+      } catch (error) {
+        if (!(error instanceof DomainError && error.code === 'missing-key')) throw error
+      }
+      // Fresh install, still no record: seed by applying the task to null and
+      // putting the result (delete when null).
+      const next = task(null)
+      if (next !== null) await table.put(CURATOR_STATE_KEY, next)
+      else await table.delete(CURATOR_STATE_KEY)
     },
 
     async listPending(status: PendingStatus = 'pending') {
-      const table = (await ensure()).table('pending')
+      const table = (await ensure()).table(PENDING_TABLE)
       return [...table.entries()].map(([, value]) => value).filter(record => record.status === status)
     },
 
     async savePending(record) {
-      await (await ensure()).table('pending').put(record.id, record)
+      await (await ensure()).table(PENDING_TABLE).put(record.id, record)
     },
 
     async claimPending(id, claimId) {
-      const table = (await ensure()).table('pending')
+      const table = (await ensure()).table(PENDING_TABLE)
       try {
         const slot = { record: null as PendingRecord | null }
         const now = Date.now()
@@ -183,7 +233,7 @@ export function apply(ctx: Context): void {
     },
 
     async releasePendingClaim(id, claimId) {
-      const table = (await ensure()).table('pending')
+      const table = (await ensure()).table(PENDING_TABLE)
       try {
         await table.update(id, (current) => {
           if (current.status !== 'pending' && current.status !== 'executing') return current
@@ -203,7 +253,7 @@ export function apply(ctx: Context): void {
     },
 
     async tryResolvePending(id, status): Promise<PendingResolution> {
-      const table = (await ensure()).table('pending')
+      const table = (await ensure()).table(PENDING_TABLE)
       try {
         const resolved = { record: null as PendingRecord | null }
         const record = await table.update(id, (current) => {

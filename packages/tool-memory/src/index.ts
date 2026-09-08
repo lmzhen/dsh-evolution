@@ -219,7 +219,9 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
     },
     isConcurrencySafe: () => false,
-    async execute(args, exec: { agent?: { session: { id: string; header: { origin?: string }; events?: readonly unknown[] } } }) {
+    // F-06: `session` is optional in the exec contract too — the
+    // defensive chaining below is only honest if the type says so.
+    async execute(args, exec: { agent?: { session?: { id: string; header: { origin?: string }; events?: readonly unknown[] } } }) {
       // facts and content are the same field under two names; a differing pair
       // is ambiguous input, so fail loud instead of silently dropping one.
       const conflict = (a: { facts?: string; content?: string }): boolean => {
@@ -240,6 +242,15 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       if (Array.isArray(args.operations) && args.operations.length === 0) {
         return { ok: false, message: 'No operations provided (the operations array is empty).', entries: [], chars: 0, limit: 0 }
       }
+      // F-07: a NON-ARRAY `operations` payload (garbage that slipped
+      // past the schema) used to fall into the single-operation branch, so the
+      // model received an error about the WRONG shape (e.g. "facts required")
+      // instead of the real one. Return a structured shape error before any
+      // normalization/approval; an ABSENT operations field keeps the single-op
+      // path (the documented bare action/content/old_text form).
+      if (args.operations !== undefined && !Array.isArray(args.operations)) {
+        return { ok: false, message: 'Invalid shape: operations must be an array of {action, content?, old_text?} objects (or omit operations for a single operation).', entries: [], chars: 0, limit: 0 }
+      }
       const target = args.target === 'user' ? 'user' : 'memory'
       const normalized: MemoryWriteArgs = Array.isArray(args.operations)
         ? { target, operations: args.operations }
@@ -253,7 +264,11 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
       const targetLabel = target === 'memory' ? '' : `${target} `
       // Single-source origin table (rc.44 M2-2.3): the approval surface reads
       // the delegated-subagent-as-review-channel mapping from core.
-      const origin = resolveOrigins(exec.agent?.session.header.origin).approval
+      // F-06: the optional chain previously protected only one level
+      // (`exec.agent?.session.header.origin`) — an execution without a session
+      // object would TypeError here. Full-depth chaining matches the exec
+      // contract (agent and session are both optional).
+      const origin = resolveOrigins(exec.agent?.session?.header.origin).approval
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval) {
@@ -267,9 +282,11 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
           // tool previously sent only the self-reported policy, which the
           // mounted platform approval service discards in favour of its own
           // derivation — leaving CI/cron writes stuck in staging.
-          ...exec.agent?.session.id ? { sessionId: exec.agent.session.id } : {},
+          // F-06: full-depth optional chaining (see above).
+          ...exec.agent?.session?.id ? { sessionId: exec.agent.session.id } : {},
           // V6-27 (0.3.40): the platform overrideOf reads session.events — the
           // session OBJECT, not the id, is what it can probe.
+          // F-06: full-depth optional chaining (see above).
           ...exec.agent?.session ? { session: exec.agent.session } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},
         })

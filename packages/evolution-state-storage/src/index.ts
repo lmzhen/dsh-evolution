@@ -9,6 +9,10 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 
+// S-06: the state-stack magic strings (singleton key, file names,
+// provider names, table names) are single-sourced here.
+export * from './constants.ts'
+
 /** 0.3.17 (S3.5, D-4): 'skill_batch' removed — nothing ever created one
  * (dead enum member); the historic value, if it ever reached disk, is read as
  * an unknown kind by consumers rather than minted here. */
@@ -116,6 +120,14 @@ export class EvolutionStateStorageRegistry extends Service {
     return () => {
       if (this.providers.get(provider.name) === provider) this.providers.delete(provider.name)
     }
+  }
+
+  /** S-07: whether ANY provider is registered. Lets the state
+   * consumer precheck a pinned `provider` config at mount time (a typo fails
+   * at start with the registry's precise message) while staying lazy when no
+   * provider has registered yet (mount order not settled). */
+  hasProviders(): boolean {
+    return this.providers.size > 0
   }
 
   provider(name?: string): EvolutionStateStorage {

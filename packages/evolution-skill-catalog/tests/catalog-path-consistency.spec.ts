@@ -55,7 +55,7 @@ describe('catalog invalidation covers every write path (decision C)', () => {
     await library.removeSupportFile('alpha', 'references/note.md', 'foreground')
     expect(await catalogOf('alpha')).toBeDefined()
 
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('lifecycle write paths (archive / restore / consolidate / snapshot restore) refresh the catalog', async () => {
@@ -80,6 +80,6 @@ describe('catalog invalidation covers every write path (decision C)', () => {
     await library.restoreLatestSnapshot()
     expect(await catalogOf('bravo')).toBeDefined()
 
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

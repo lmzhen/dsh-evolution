@@ -92,16 +92,30 @@
 # wholesale, so both path and openAt are set here.
 - id: session-query-sqlite
   config:
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
-    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY || 'startup'
+    # P2-12 (V10-15): `??` only catches null/undefined, so a set-but-EMPTY
+    # variable kept the empty string and `resolve('')` dropped the SQLite
+    # index into the process CWD. The three-part form trims the value first;
+    # only a non-empty path overrides the durable default.
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
+    # P2-13 (V10-15): whitelist normalization — an arbitrary invalid value used
+    # to reach the platform z.union schema and blow up the whole profile at
+    # startup with an error far from the root cause. Unknown/empty values fall
+    # back to 'startup'. (Quoted scalar: the ternary's `: ` would otherwise
+    # break YAML plain-scalar parsing — see the upstream `!!js "..."` forms.)
+    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
 
 # ── Hermes 60-char catalog rule: platform interface, deployment default ──────
 # Upstream tool-skill exposes `catalogDescriptionMaxLength` (the 500 constant is
 # only the schema default); the Hermes authoring standard is 60 and the index
-# truncates at the configured value. Override here so INSTALLING the evolution
-# host bundle carries the 60-char behavior automatically — no manual profile
-# edit needed. Base `tool-skill` row carries no other config today, so the
-# whole-config replacement is safe; if upstream adds fields there, copy them.
+# truncates at the configured value.
+# REACH (P1-2 / V10-14, corrected): this override is a PROFILE-ROOT row, so it
+# covers sessions mounted WITHOUT an agent preset only. Sessions running under
+# an agent preset read the preset scope's own `tool-skill` row, which no
+# profile patch can touch — for those, install-layered injects the same cap
+# onto the standard-sourced preset row at generation time (V10-14), and the
+# one-click preset patch carries the identical root-level override.
+# Base `tool-skill` row carries no other config today, so the whole-config
+# replacement is safe; if upstream adds fields there, copy them.
 - id: tool-skill
   config:
     catalogDescriptionMaxLength: 60

@@ -72,7 +72,7 @@ describe('evolution-feedback', () => {
 
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a record made before restore settles survives the restore (merge, not replace)', async () => {
@@ -100,7 +100,7 @@ describe('evolution-feedback', () => {
     await feedback.waitIdle()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('ignores a malformed aggregate and still records into the event log', async () => {
@@ -121,7 +121,7 @@ describe('evolution-feedback', () => {
     await ctx.evolutionFeedback.waitIdle()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('two instances recording the same target never lose an increment in the event log (rc.68)', async () => {
@@ -148,7 +148,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -183,7 +183,7 @@ describe('evolution-feedback', () => {
     expect(cache.lastSeq).toBe(3)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('an append after a booted cache does not double-count at the next boot (rc.68)', async () => {
@@ -211,7 +211,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -246,7 +246,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -265,7 +265,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -297,7 +297,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -325,7 +325,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -350,7 +350,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -373,7 +373,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -402,7 +402,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -443,7 +443,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -477,7 +477,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -503,7 +503,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -533,7 +533,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -565,7 +565,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -597,7 +597,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -625,7 +625,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -721,7 +721,7 @@ describe('evolution-feedback', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 })

@@ -10,6 +10,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
+import z from '@deepseek-ai/schemastery'
 import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
@@ -253,7 +254,37 @@ interface MemoryLike {
 
 export const name = 'evolution-learning-graph'
 
-export function apply(ctx: Context): void {
+export interface Config {
+  /** V10-11 (P2-7): skill tree root for graph reads/edits; empty (default)
+   * resolves through `resolveSkillsRoot` to the shared default root. Keeps
+   * the graph on the SAME skills tree the tools/catalog read under a
+   * custom-root deployment (previously the default root was hardcoded). */
+  root?: string
+}
+
+export const Config: z<Config> = z.object({
+  root: z.string().default(''),
+})
+
+/**
+ * F-10: rendered-line cap for the `/graph` directory — nodes span the
+ * whole usage set plus every memory entry and the edge list is a full join, so
+ * a large library used to produce an unbounded command result. Nodes and edges
+ * are each capped at this many lines (the density footer always renders the
+ * true totals); overflow shows a `…N more` marker instead.
+ */
+export const GRAPH_RENDER_LINE_CAP = 200
+
+/** Join lines under the render cap; overflow is summarized, not dropped silently. */
+export function capRenderedLines(lines: string[]): string {
+  if (lines.length <= GRAPH_RENDER_LINE_CAP) return lines.join('\n')
+  return [...lines.slice(0, GRAPH_RENDER_LINE_CAP), `…${lines.length - GRAPH_RENDER_LINE_CAP} more`].join('\n')
+}
+
+export function apply(ctx: Context, rawConfig: Config = {}): void {
+  // V10-11 (P2-7): single root resolution for every graph skill read/edit —
+  // empty config falls through to the shared default root inside the resolver.
+  const graphSkillsRoot = resolveSkillsRoot(rawConfig)
   ctx.inject(['commands'], (commandCtx) => {
     const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
     // M-11 (v3 audit): the register disposer must be bound to the fiber — an
@@ -304,20 +335,27 @@ export function apply(ctx: Context): void {
             related.set(name, relatedSkillNames(content, name))
           }
           const graph = buildLearningGraph(usageMap, memoryEntries, userEntries, related)
-          const lines = graph.nodes.map(node => renderNodeLine(node))
-          const edges = graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to)
+          // F-10: bound the rendered output — node lines cover the
+          // whole usage set plus every memory entry, and edge lines are the
+          // full join; on a large library the command result used to grow
+          // unbounded. Each block caps at GRAPH_RENDER_LINE_CAP lines with an
+          // explicit …N more marker; the density footer keeps the true totals.
+          const nodeBlock = capRenderedLines(graph.nodes.map(node => renderNodeLine(node)))
+          const edgeBlock = capRenderedLines(graph.edges.map(edge => edge.from + ' --' + edge.type + '--> ' + edge.to))
           const density = graphDensity(graph)
           const densityLine = `\n\nSkills: ${density.skillNodes} · related edges: ${density.relatedEdges} (${density.edgesPerNode}/node) · isolated: ${density.isolatedPct}%`
-          return lines.join('\n') + '\n\n' + edges.join('\n') + densityLine
+          return nodeBlock + '\n\n' + edgeBlock + densityLine
         }
 
         function withSkills(): SkillLibrary {
           // 0.3.18 (S4.1, E-30): the graph read the COMMON root via undefined —
           // a configured root in other members was silently ignored here,
           // producing graph data from a DIFFERENT skills tree than the one the
-          // tools wrote to. Single resolution via resolveSkillsRoot (the graph
-          // mount exposes no own config channel; it follows the default root).
-          return new SkillLibrary(resolveSkillsRoot(), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+          // tools wrote to. Single resolution via resolveSkillsRoot.
+          // V10-11 (P2-7): the resolver now reads THIS package's Config.root
+          // (empty = the shared default root), so a custom-root deployment no
+          // longer has the graph edit/delete write the wrong tree.
+          return new SkillLibrary(graphSkillsRoot, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
         }
 
         async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {

@@ -92,7 +92,10 @@ function normalize(content: string): string {
   return content.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-function contentHash(content: string): string {
+/** C-26 (v10 audit): renamed from `contentHash` — mutations.ts exports a
+ * contentHash of RAW bytes, this one hashes the NORMALIZED text for dedup
+ * grouping. Same private helper, unambiguous name. */
+function normalizedHash(content: string): string {
   return createHash('sha256').update(normalize(content)).digest('hex')
 }
 
@@ -120,7 +123,7 @@ export function computeDedupGroups(input: {
   const names = [...input.contents.keys()]
   const hashes = new Map<string, string[]>()
   for (const name of names) {
-    const hash = contentHash(input.contents.get(name) ?? '')
+    const hash = normalizedHash(input.contents.get(name) ?? '')
     const bucket = hashes.get(hash)
     if (bucket) bucket.push(name)
     else hashes.set(hash, [name])

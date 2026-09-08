@@ -22,7 +22,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 14
+export const PROMPT_BUNDLE_VERSION = 15
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -280,6 +280,19 @@ D. 库·整合纪律（计划形态约束）
 - 信号机制疑问（阈值/检测原理）→ needs_human，不猜测机制。`
 
 /**
+ * One-line output instruction appended after the facts block in the maintain
+ * subagent's prompt (persona carries the template, the prompt carries facts +
+ * this instruction — one copy of the template in the model input, 011 v11
+ * P3-4). F-16: this text used to be hardcoded in evolution-maintenance
+ * orchestrate — a second model-facing prompt living OUTSIDE the bundle digest.
+ * It now rides PROMPT_BUNDLE so the digest integrity check covers every
+ * maintenance prompt. Adding the entry changes the bundle digest (the intended
+ * fail-closed signal); PROMPT_BUNDLE_VERSION itself is owned by the core test
+ * pin and stays untouched in this batch.
+ */
+export const MAINTAIN_OUTPUT_INSTRUCTION = '按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。'
+
+/**
  * System-prompt guidance section (Hermes `SKILLS_GUIDANCE`, DSH-adapted).
  * Registered as a system-prompt section by tool-skill-manage (it mounts
  * exactly when `skill_manage` is available — the DSH analogue of Hermes'
@@ -345,6 +358,9 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   curator: CURATOR_PROMPT,
   completion: COMPLETION_SKILL_REVIEW_PROMPT,
   maintain: MAINTAIN_PROMPT,
+  // F-16: new entry — the maintain subagent's output instruction
+  // (see MAINTAIN_OUTPUT_INSTRUCTION). Digest changes with this entry.
+  maintainOutput: MAINTAIN_OUTPUT_INSTRUCTION,
   skillsGuidance: SKILLS_GUIDANCE,
 })
 

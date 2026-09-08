@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle for the dsh-evolution plugin family",
-  "version": "0.3.51",
+  "version": "0.3.52",
   "publishConfig": {
     "access": "public"
   },
@@ -20,6 +20,7 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
+  "//": "dependencies carries @deepseek-ai/dsh-evolution-maintenance because the one-click cordis.patch.yml mounts '@deepseek-ai/dsh-evolution-maintenance/tools'. The STANDALONE cordis.yml deliberately omits that row (see its header, H-01): a standalone compose must add the row itself, and the dependency exists so an added row resolves without editing dependencies again.",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

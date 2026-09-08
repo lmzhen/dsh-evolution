@@ -60,12 +60,12 @@ describe('0.3.16 S1.9 batch (E-42..E-50)', () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-evo-e43-'))
     const lib = new SkillLibrary(root)
     await lib.create('normal-skill', '---\nname: normal-skill\ndescription: fine.\n---\n\n# N\n', 'foreground')
-    await rm(join(root, 'normal-skill', 'SKILL.md'), { recursive: true, force: true })
+    await rm(join(root, 'normal-skill', 'SKILL.md'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     await mkdir(join(root, 'normal-skill', 'SKILL.md'), { recursive: true })
     // Library surface: absent (no reject, no bricked read).
     expect(await lib.read('normal-skill')).toBeNull()
     // Raw IO keeps throwing so rotation can still flag the malformed slot (G-2).
     await expect(nodeEvolutionIo().readText(join(root, 'normal-skill', 'SKILL.md'))).rejects.toThrow()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

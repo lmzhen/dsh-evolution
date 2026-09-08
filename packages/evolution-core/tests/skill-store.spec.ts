@@ -32,7 +32,7 @@ it('setPinned writes the marker, audits it, and refuses the background review', 
   const unpinned = await lib.setPinned('pin-target', false, 'foreground')
   expect(unpinned.ok).toBe(true)
   expect(await lib.isPinned('pin-target')).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('invalid skill names cannot escape the skills root (path traversal guard)', async () => {  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-traversal-'))
@@ -48,8 +48,8 @@ it('invalid skill names cannot escape the skills root (path traversal guard)', a
   expect(await lib.isPinned(evil)).toBe(false)
   expect(await lib.isBundled(evil)).toBe(false)
   expect(await lib.countSupportDirs(evil)).toBe(0)
-  await rm(root, { recursive: true, force: true })
-  await rm(join(root, '..', 'outside'), { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  await rm(join(root, '..', 'outside'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('skill create/update/patch/archive are recoverable', async () => {
@@ -67,7 +67,7 @@ it('skill create/update/patch/archive are recoverable', async () => {
   const archived = await lib.archive('python-testing')
   expect(archived.ok).toBe(true)
   expect((await lib.list()).some(s => s.name === 'python-testing')).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('skill protection and path traversal guards', async () => {
@@ -78,7 +78,7 @@ it('skill protection and path traversal guards', async () => {
   expect((await lib.update('safe-skill', SKILL.replace('python-testing', 'safe-skill'))).ok).toBe(true)
   expect((await lib.archive('safe-skill')).ok).toBe(false)
   expect((await lib.writeSupportFile('safe-skill', '../evil.md', 'bad')).ok).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 const USABLE = (name: string) => `---
@@ -108,7 +108,7 @@ it('skill consolidate merges sources into target and archives them', async () =>
   // And can be restored without clobbering the now-merged target.
   const restored = await lib.restoreFromArchive('src-a')
   expect(restored.ok).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V8-11: a concurrent patch between the consolidate pre-read and commit survives (0.3.46)', async () => {
@@ -126,7 +126,7 @@ it('V8-11: a concurrent patch between the consolidate pre-read and commit surviv
   const merged = await lib.read('target-skill') ?? ''
   expect(merged).toMatch(/consolidated from src-a/)
   expect(merged).toMatch(/PATTERNED-BODY-MARKER/)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V8-10: restructure targets with double dots are refused by the shared predicate (0.3.47)', () => {
@@ -158,7 +158,7 @@ it('archive fallback rolls back the copied archive when the source cannot be rem
   expect(result.message).toContain('rolled back')
   expect(await lib.list().then(rows => rows.map(s => s.name))).toContain('swap-skill') // active kept
   expect(await io.exists(join(root, '.archive', 'swap-skill'))).toBe(false) // archive copy cleaned
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('snapshot restore rolls back to the pre-rollback snapshot when the restore fails (E-13, 0.3.16)', async () => {
@@ -168,7 +168,7 @@ it('snapshot restore rolls back to the pre-rollback snapshot when the restore fa
   const baseline = await lib.snapshotAll('baseline')
   // Damage the restore target: its keep-skill entry is gone, so the
   // manifest-driven copy throws mid-restore (after the root was cleared).
-  await rm(join(baseline, 'keep-skill'), { recursive: true, force: true })
+  await rm(join(baseline, 'keep-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   await lib.create('other-skill', USABLE('other-skill'), 'foreground')
   const result = await lib.restoreLatestSnapshot()
   expect(result.ok).toBe(false)
@@ -178,7 +178,7 @@ it('snapshot restore rolls back to the pre-rollback snapshot when the restore fa
   // the restore ran and failed) — never a cleared tree.
   expect(names).toContain('other-skill')
   expect(names).toContain('keep-skill')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('consolidate rollback reports sources it could not restore instead of silently swallowing (T-14, 0.3.16)', async () => {
@@ -212,7 +212,7 @@ it('consolidate rollback reports sources it could not restore instead of silentl
   expect(result.message).toContain('src-a')
   // The failed-to-restore source is still archived — and the message says so.
   expect(await io.exists(join(root, '.archive', 'src-a'))).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('resolveSkillsRoot: config wins, empty falls through to the default (S4.1, E-30 — 0.3.18)', () => {
@@ -240,7 +240,7 @@ it('restoring a skill never picks a sibling-prefixed archive (E-3, 0.3.16)', asy
   expect(restoredBar.ok).toBe(true)
   const barRead = await lib.read('foo-bar') ?? ''
   expect(barRead).toContain('name: foo-bar')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('skill consolidate is atomic: a protected source aborts before any mutation', async () => {
@@ -258,7 +258,7 @@ it('skill consolidate is atomic: a protected source aborts before any mutation',
   // No source may have been consumed (src-a untouched, src-pinned protected).
   expect((await lib.list()).some(s => s.name === 'src-a')).toBe(true)
   expect((await lib.list()).some(s => s.name === 'src-pinned')).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('skill consolidate rolls back earlier sources when a mid-loop archive fails (P1-1)', async () => {
@@ -291,7 +291,7 @@ it('skill consolidate rolls back earlier sources when a mid-loop archive fails (
   expect((await lib.list()).map(s => s.name)).toEqual(['src-a', 'src-b', 'target-skill'])
   // The target never received the merged body.
   expect(await lib.read('target-skill') ?? '').not.toMatch(/consolidated from/)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('archive options: a reason string is never validated as absorbedInto (F1 regression)', async () => {
@@ -308,7 +308,7 @@ it('archive options: a reason string is never validated as absorbedInto (F1 regr
   const absorbed = await lib.archive('stale-skill', { absorbedInto: 'no-such-umbrella' })
   expect(absorbed.ok).toBe(false)
   expect(absorbed.message).toMatch(/absorbed_into/)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('pinned skills are read-only to the background review but writable in the foreground', async () => {
@@ -327,7 +327,7 @@ it('pinned skills are read-only to the background review but writable in the for
   // not user improvements.
   expect((await lib.patch('pinned-skill', 'Body of pinned-skill.', 'Foreground body.')).ok).toBe(true)
   expect((await lib.writeSupportFile('pinned-skill', 'references/detail.md', '# Detail')).ok).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('bundled detection and allowBundled archival (F8 prune-builtins precondition)', async () => {
@@ -343,7 +343,7 @@ it('bundled detection and allowBundled archival (F8 prune-builtins precondition)
   expect((await lib.archive('builtin-skill', { allowBundled: true })).ok).toBe(true)
   // Hub-installed stays protected even with allowBundled (only bundled yields).
   expect((await lib.archive('hub-skill', { allowBundled: true })).ok).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('fuzzy patch tolerates whitespace drift without rewriting surrounding bytes (D8 re-check)', async () => {
@@ -370,7 +370,7 @@ it('fuzzy patch tolerates whitespace drift without rewriting surrounding bytes (
   const escaped = await lib.patch('ws-skill', 'Run tests with double spaces. (final)\nIndented    columns stay.', 'Run tests with double spaces. (final)\nIndented    columns changed.')
   expect(escaped.ok).toBe(true)
   expect(await lib.read('ws-skill') ?? '').toContain('Indented    columns changed.')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('snapshot co-copies usage/suppression sidecars and restore returns them', async () => {
@@ -391,7 +391,7 @@ it('snapshot co-copies usage/suppression sidecars and restore returns them', asy
   expect(restored.ok).toBe(true)
   expect((await loadUsage(root, nodeEvolutionIo())).get('keeper-skill')?.state).toBe('active')
   expect((await loadSuppressedNames(root, nodeEvolutionIo())).has('sup-skill')).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('snapshot co-copies .archive and restore replaces it with the snapshot state', async () => {
@@ -407,7 +407,7 @@ it('snapshot co-copies .archive and restore replaces it with the snapshot state'
   expect(restored.ok).toBe(true)
   expect((await lib.list()).map(s => s.name)).toEqual(['keeper-skill'])
   expect(await nodeEvolutionIo().list(join(root, '.archive'))).toEqual(['pre-archived'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('snapshot extras are manifest-declared and only declared names are read back', async () => {
@@ -427,7 +427,7 @@ it('snapshot extras are manifest-declared and only declared names are read back'
   expect(restored.ok).toBe(true)
   expect(restored.extras).toEqual([{ name: 'curator-state.json', content: '{"lastRunAt":1}' }])
   expect((await lib.list()).map(s => s.name)).toEqual(['keeper-skill'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('names normalize at the path choke point so padded aliases cannot fork a skill (P2-5)', async () => {
@@ -446,7 +446,7 @@ it('names normalize at the path choke point so padded aliases cannot fork a skil
   const restored = await lib.restoreFromArchive(' spaced ')
   expect(restored.ok).toBe(true)
   expect((await lib.list()).map(s => s.name)).toEqual(['spaced'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V7-11: a replaceAll beyond the CUMULATIVE fuzzy budget is refused whole (0.3.44)', async () => {
@@ -472,7 +472,7 @@ description: A skill for the cumulative fuzzy budget test.
     expect(result.ok).toBe(false)
     expect(result.message).toMatch(/fuzzy budget was exceeded/)
   } finally {
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
 
@@ -488,7 +488,7 @@ it('V9-04: consolidate of a MISSING target refuses BEFORE archiving any source (
   expect(result.ok).toBe(false)
   expect(result.message).toContain('not found')
   expect((await lib.list()).some(s => s.name === 'src-a')).toBe(true) // not archived
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('relatedSkillNames is the single related_skills parser (G3)', () => {
@@ -535,7 +535,7 @@ it('list() reports dot-prefixed protection markers with bundled-hub-pinned prece
   expect(by.get('rep-managed')?.protectedBy).toBeNull()
   expect(by.get('rep-managed')?.managed).toBe(true)
   expect(by.get('rep-pinned')?.managed).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('same-second re-archives get unique stamped destinations (N-6)', async () => {
@@ -554,7 +554,7 @@ it('same-second re-archives get unique stamped destinations (N-6)', async () => 
     expect(md).toContain('Body of collide-skill.')
   }
   expect(new Set(paths).size).toBe(3)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('authoringFeedback reports the 60-char bar and colon rule without changing validation (P0)', () => {
@@ -586,7 +586,7 @@ it('create normalizes unquoted YAML-unsafe frontmatter at the write point (0.3.1
   expect(created.normalizedFrontmatterFields).toEqual(['description'])
   const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('description: "Search: arXiv papers by keyword."')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('create quotes quote/backslash values via single-quote fallback — no catch-22 (0.3.11 fix)', async () => {
@@ -602,7 +602,7 @@ it('create quotes quote/backslash values via single-quote fallback — no catch-
   expect(updated.ok).toBe(true)
   const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('description: \'He said "hi" then: left\'')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('update and patch normalize frontmatter the same way (0.3.11)', async () => {
@@ -617,7 +617,7 @@ it('update and patch normalize frontmatter the same way (0.3.11)', async () => {
   expect(patched.normalizedFrontmatterFields).toEqual(['description'])
   const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('description: "Deep search: arXiv and journals."')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('E-68: an old===new patch is a noop — no write, no audit, no mutation event (0.3.18)', async () => {
@@ -635,7 +635,7 @@ it('E-68: an old===new patch is a noop — no write, no audit, no mutation event
   expect(await lib.read('python-testing')).toBe(before)
   expect((await lib.listMutations()).length).toBe(mutationsBefore)
   expect(events).toEqual([])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('F-318 (②): update with a byte-equivalent content is a noop — no write, no audit (E-68)', async () => {
@@ -652,7 +652,7 @@ it('F-318 (②): update with a byte-equivalent content is a noop — no write, n
   expect(await lib.read('python-testing')).toBe(before)
   // No audit record was appended (mutation-maturity is not inflated).
   expect((await lib.listMutations()).length).toBe(mutationsBefore)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('E-69: an archived skill cannot absorb into itself (0.3.18)', async () => {
@@ -664,7 +664,7 @@ it('E-69: an archived skill cannot absorb into itself (0.3.18)', async () => {
   expect(result.ok).toBe(false)
   expect(result.message).toContain('cannot absorb into itself')
   expect((await lib.list()).some(s => s.name === 'python-testing')).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('F-316: a drop-in root dot-file created AFTER the snapshot is cleaned on restore, while the audit sidecar survives', async () => {
@@ -683,7 +683,7 @@ it('F-316: a drop-in root dot-file created AFTER the snapshot is cleaned on rest
   expect(await readFile(join(root, '.usage.json'), 'utf8').then(() => false, () => true)).toBe(true)
   expect(await readFile(join(root, '.mutations.json'), 'utf8')).toBe('["old-audit"]')
   expect(await readFile(join(root, '.backups', 'skills-keep.me'), 'utf8')).toBe('x')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('F-321: relatedSkillNames skips CamelCase fragments and only takes delimited lowercase names', async () => {
@@ -707,7 +707,7 @@ it('V6-17: a non-exact anchor past the fuzzy budget is refused with an honest me
   // An exact large old_string is served by the fast includes path — still allowed.
   const exact = await lib.patch('python-testing', 'Run tests with pytest.', 'Run tests with pytest v2.')
   expect(exact.ok).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V6-19: a transact contract violation returns a structured error, not a TypeError (0.3.37)', async () => {
@@ -727,5 +727,5 @@ it('V6-19: a transact contract violation returns a structured error, not a TypeE
   const result = await lib.update('python-testing', SKILL.replace('Run tests with pytest.', 'Updated.'))
   expect(result.ok).toBe(false)
   expect(result.message).toContain('did not invoke the task')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

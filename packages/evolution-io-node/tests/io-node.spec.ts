@@ -30,6 +30,6 @@ describe('evolution-io-node', () => {
     expect(await io.list(root)).toContain('renamed.txt')
     await io.remove(join(root, 'nested'))
     expect(await io.exists(join(root, 'nested', 'a.txt'))).toBe(false)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

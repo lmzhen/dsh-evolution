@@ -10,8 +10,12 @@ import { cordisRows, rowId, type CordisRow } from '../../test-support/cordis-row
 // tools). Installing both would double-mount the infra rows and, if the shared
 // configs ever diverge, produce an ambiguous composition. This spec pins the
 // mutual exclusion: every row id present in BOTH bundles must carry a
-// byte-identical (id/name/config/disabled) definition, and each bundle keeps at
-// least one row the other lacks (their distinguishing identities).
+// byte-identical (id/name/config/disabled) definition, and the preset bundle
+// keeps the model-facing rows the host must never grow (their distinguishing
+// identities). V10-14 (P1-2): the `tool-skill` 60-char catalog cap override
+// became a SHARED row (identical in both patches), so the host row set is a
+// subset of the preset's — distinctness is pinned via the model tools, not via
+// a host-only row.
 function rowMap(value: unknown): Map<string, CordisRow> {
   const map = new Map<string, CordisRow>()
   for (const entry of cordisRows(value)) {
@@ -49,14 +53,16 @@ describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
     }
   })
 
-  it('keeps each bundle a distinct, non-superset install target', () => {
-    const hostOnly = [...hostPatch.keys()].filter(id => !presetPatch.has(id))
+  it('keeps the preset the only bundle exposing model-facing tools (V10-14: host rows are a subset)', () => {
     const presetOnly = [...presetPatch.keys()].filter(id => !hostPatch.has(id))
-    expect(hostOnly.length).toBeGreaterThan(0)
-    expect(presetOnly.length).toBeGreaterThan(0)
     // The preset bundle is the one that exposes the model-facing tools.
     for (const tool of ['tool-memory', 'tool-skill-manage', 'tool-session-query']) {
       expect(presetOnly).toContain(tool)
     }
+    // V10-14 (P1-2): the tool-skill cap override is now carried by BOTH
+    // bundles, so the host plane is a strict subset of the preset's — pin that
+    // subset relationship instead of a host-only row.
+    expect(hostPatch.size).toBeGreaterThan(0)
+    for (const id of hostPatch.keys()) expect(presetPatch.has(id)).toBe(true)
   })
 })

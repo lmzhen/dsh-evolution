@@ -174,6 +174,119 @@ describe('learning graph', () => {
     }
   })
 
+  it('F-10: capRenderedLines joins below the cap and summarizes overflow with an …N more marker', () => {
+    expect(Graph.capRenderedLines(['a', 'b'])).toBe('a\nb')
+    const lines = Array.from({ length: 250 }, (_, i) => `line-${i}`)
+    const rendered = Graph.capRenderedLines(lines)
+    const out = rendered.split('\n')
+    expect(out).toHaveLength(Graph.GRAPH_RENDER_LINE_CAP + 1)
+    expect(out[0]).toBe('line-0')
+    expect(out[Graph.GRAPH_RENDER_LINE_CAP - 1]).toBe(`line-${Graph.GRAPH_RENDER_LINE_CAP - 1}`)
+    expect(out[Graph.GRAPH_RENDER_LINE_CAP]).toBe('…50 more')
+    // The tail is summarized, not silently truncated: the marker names the count.
+    expect(rendered).not.toContain('line-249')
+  })
+
+  it('F-10: the /graph directory caps its node block on a large usage set', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-cap-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      const names = Array.from({ length: 250 }, (_, i) => `cap-skill-${String(i).padStart(3, '0')}`)
+      let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map(names.map(name => [name, {}])),
+      })
+      ctx.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      await ctx.plugin(Graph)
+      const result = await handler!.handler({ rawInput: '' })
+      expect(result.kind).toBe('success')
+      expect(result.text).toContain('● cap-skill-000')
+      expect(result.text).toContain('…50 more')
+      expect(result.text).not.toContain('● cap-skill-249')
+      // The density footer still reports the TRUE totals beyond the cap.
+      expect(result.text).toContain('Skills: 250')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('V10-11 (P2-7): Config.root routes graph reads to the configured skills tree, not the default root', async () => {
+    const configuredRoot = await mkdtemp(join(tmpdir(), 'evo-graph-root-a-'))
+    const emptyDefaultHome = await mkdtemp(join(tmpdir(), 'evo-graph-root-b-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = emptyDefaultHome
+    try {
+      // The skill exists ONLY in the configured root; the default root
+      // (DSH_HOME/skills) stays empty. Previously the graph read the default
+      // root unconditionally, so `graph detail` returned "not found".
+      await mkdir(join(configuredRoot, 'demo-skill'), { recursive: true })
+      await writeFile(join(configuredRoot, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Configured root demo.\n---\n\nConfigured-root body.\n', 'utf8')
+
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map<string, unknown>(),
+      })
+      ctx.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      await ctx.plugin(Graph, { root: configuredRoot })
+      const found = await handler!.handler({ rawInput: 'detail demo-skill' })
+      expect(found.kind).toBe('success')
+      expect(found.text).toContain('Configured-root body.')
+      // The default tree is genuinely empty, proving the read used the config.
+      expect(found.text).not.toContain('not found')
+
+      const ctxDefault = new Context()
+      let defaultHandler: typeof handler
+      ctxDefault.provide('commands', {
+        register: (definition: unknown) => {
+          defaultHandler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctxDefault.provide('skillUsage', {
+        report: async () => new Map<string, unknown>(),
+      })
+      ctxDefault.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctxDefault.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      await ctxDefault.plugin(Graph)
+      const missing = await defaultHandler!.handler({ rawInput: 'detail demo-skill' })
+      expect(missing.kind).toBe('error')
+      expect(missing.text).toContain('not found')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(configuredRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+      await rm(emptyDefaultHome, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
   it('V4-13: a no-op graph edit (byte-equivalent content) does not bump the patch counter, a real edit does', async () => {
     const root = await mkdtemp(join(tmpdir(), 'evo-graph-noop-'))
     const previousHome = process.env.DSH_HOME
@@ -217,7 +330,7 @@ describe('learning graph', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 

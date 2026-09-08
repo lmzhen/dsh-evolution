@@ -17,7 +17,7 @@ describe('evolution event log (rc.68)', () => {
     expect(events).toHaveLength(8)
     expect(new Set(events.map(event => event.seq))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8]))
     expect(events.filter(event => event.type === 'feedback')).toHaveLength(8)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a malformed log is never overwritten by an append (rc.65 posture)', async () => {
@@ -29,7 +29,7 @@ describe('evolution event log (rc.68)', () => {
       type: 'feedback', target: 'x', kind: 'skill', rating: 'positive',
     })).rejects.toThrow(/malformed/)
     expect(await io.readText(path)).toBe('{corrupt log')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reads a missing log as empty and flags a malformed one', async () => {
@@ -41,7 +41,7 @@ describe('evolution event log (rc.68)', () => {
     const read = await readEvolutionEvents(io, path)
     expect(read.malformed).toBe(true)
     expect(read.events).toEqual([])
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a whitespace-only log reads as empty and is rebuilt on append (rc.69)', async () => {
@@ -55,7 +55,7 @@ describe('evolution event log (rc.68)', () => {
     expect(malformed).toBe(false)
     expect(events).toHaveLength(1)
     expect(events[0]?.seq).toBe(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('shape-damaged content reads as empty (replaceable) and is rebuilt on append (rc.70 F-1)', async () => {
@@ -69,7 +69,7 @@ describe('evolution event log (rc.68)', () => {
     const { events, malformed } = await readEvolutionEvents(io, path)
     expect(malformed).toBe(false)
     expect(events).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a single damaged entry is dropped at append while valid entries survive (rc.70 F-1 self-heal)', async () => {
@@ -89,7 +89,7 @@ describe('evolution event log (rc.68)', () => {
     expect(events).toHaveLength(2)
     expect(events[0]?.target).toBe('good')
     expect(events[1]?.target).toBe('x')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rotates the older half into an archive at the threshold and continues seqs (rc.71)', async () => {
@@ -109,7 +109,7 @@ describe('evolution event log (rc.68)', () => {
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.events.map(event => event.seq)).toEqual([1, 2, 3, 4, 5])
     expect(timeline.malformed).toBe(false)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('the timeline merge dedupes by seq (rotation crash window, rc.71)', async () => {
@@ -130,7 +130,7 @@ describe('evolution event log (rc.68)', () => {
     ] }, null, 2))
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.events.map(event => event.seq)).toEqual([1, 2, 3, 4])
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('retention keeps the newest archives by NUMERIC seq (rc.71)', async () => {
@@ -147,7 +147,7 @@ describe('evolution event log (rc.68)', () => {
     expect(stays).toContain(`events-${EVENT_LOG_RETAIN_ARCHIVES + 2}.json`)
     expect(stays).not.toContain('events-1.json')
     expect(stays).not.toContain('events-2.json')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a deleted active continues seqs FROM THE ARCHIVE ANCHOR, never shadowing history (rc.72 G-1)', async () => {
@@ -166,7 +166,7 @@ describe('evolution event log (rc.68)', () => {
     expect(timeline.events.map(event => event.seq)).toEqual([1, 2])
     expect(timeline.events[0]?.target).toBe('old')
     expect(timeline.events[1]?.target).toBe('fresh')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rotateAt below 2 is a guarded no-op (rc.72 G-1)', async () => {
@@ -180,7 +180,7 @@ describe('evolution event log (rc.68)', () => {
     expect((await io.list(join(root, 'evolution'))).filter(name => name.startsWith('events-'))).toEqual([])
     const active = await readEvolutionEvents(io, path)
     expect(active.events.map(event => event.seq)).toEqual([1, 2])
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('non-numeric user files are neither read into the timeline nor pruned (rc.72 G-2)', async () => {
@@ -202,7 +202,7 @@ describe('evolution event log (rc.68)', () => {
     expect(stays).toContain('events-backup.json')
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.events.map(event => event.seq)).not.toContain(999)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('an unreadable archive (directory at a numeric name) flags but never bricks the boot (rc.72 G-2)', async () => {
@@ -216,6 +216,27 @@ describe('evolution event log (rc.68)', () => {
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.malformed).toBe(true)
     expect(timeline.events).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('C-05: a non-finite seq (1e400 parses to Infinity) is dropped as a damaged record', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-inf-'))
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    // 1e400 is valid JSON but parses to Infinity — the old bare typeof check
+    // let it through (a Map key that never dedupes, a comparator that never
+    // orders); Number.isFinite closes it. Standard JSON cannot carry NaN, so
+    // the overflow literal is the real-world carrier.
+    await io.writeText(path, '{"version":1,"events":[{"seq":1,"type":"feedback"},{"seq":1e400,"type":"feedback"}]}')
+    const read = await readEvolutionEvents(io, path)
+    expect(read.malformed).toBe(false)
+    expect(read.events.map(event => event.seq)).toEqual([1])
+    // The append continues AFTER the highest finite seq and drops the damaged
+    // record on the rewrite (rc.70 F-1 self-heal semantics).
+    const assigned = await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })
+    expect(assigned).toBe(2)
+    const after = await readEvolutionEvents(io, path)
+    expect(after.events.map(event => event.seq)).toEqual([1, 2])
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

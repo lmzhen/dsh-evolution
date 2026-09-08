@@ -2,7 +2,7 @@
  * Deterministic review signal gate.
  *
  * Scans a DSH session event log for durable learning signals before any LLM
- * is spent. `turn/end` calls `observeTurn`; the returned review kind is
+ * is spent. `turn/end` calls `observeEvent`; the returned review kind is
  * accumulated until a configured interval fires.
  */
 

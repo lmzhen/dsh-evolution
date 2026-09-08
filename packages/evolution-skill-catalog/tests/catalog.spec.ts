@@ -36,7 +36,7 @@ describe('evolution-skill-catalog', () => {
     expect(candidate).toBeDefined()
     expect(candidate?.provider).toBe('dsh-evolution')
 
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('X-7: repeated get() reuses the summaries cache; refresh drops it (0.3.18)', async () => {
@@ -72,7 +72,7 @@ describe('evolution-skill-catalog', () => {
     const afterRefresh = await ctx.skills.get('demo-skill')
     expect(afterRefresh?.name).toBe('demo-skill')
     expect(listCalls).toBeGreaterThan(scansAfterFirst)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-71: an out-of-band tree edit becomes visible via /evolution skills refresh (0.3.18)', async () => {
@@ -96,6 +96,6 @@ describe('evolution-skill-catalog', () => {
     // After the refresh the mtime stamp rebuilds the cache AND the registry
     // re-collects: the out-of-band skill is visible without a restart.
     expect((await ctx.skills.get('other-skill'))?.name).toBe('other-skill')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

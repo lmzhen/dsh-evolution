@@ -17,7 +17,7 @@ describe('skill-usage', () => {
     await ctx.plugin(SkillUsageRegistry, { root })
     await ctx.skillUsage.record('demo', 'use')
     expect((await ctx.skillUsage.report()).get('demo')?.use_count).toBe(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {
@@ -43,7 +43,7 @@ describe('skill-usage', () => {
     }
     expect(settled).toBeGreaterThan(0)
     await fiber.dispose()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('markArchived sets state without bumping the patch counter', async () => {
@@ -58,7 +58,7 @@ describe('skill-usage', () => {
     expect(record?.state).toBe('archived')
     expect(record?.archived_at).toBeTruthy()
     expect(record?.patch_count).toBe(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('invalidate() re-reads external writes instead of re-covering them', async () => {
@@ -80,7 +80,7 @@ describe('skill-usage', () => {
     const seen = (await ctx.skillUsage.report()).get('demo')
     expect(seen?.quality_score).toBe(0.9)
     expect(seen?.view_count).toBe(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('falls back to skillsRoot() when root is unset or empty (P0-3)', async () => {
@@ -111,7 +111,7 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('demo-read')
     expect(seen?.view_count).toBe(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('appends the observation-window anchor once, on the first observed read (C)', async () => {
@@ -138,7 +138,7 @@ describe('skill-usage', () => {
     expect(anchors[0]?.window?.opened).toBeTruthy()
     // Counts are the snapshot at the moment the window opened (first read).
     expect(anchors[0]?.counts?.views).toBe(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('does not mint a usage record for a read of an unknown skill (A2 guard)', async () => {
@@ -153,7 +153,7 @@ describe('skill-usage', () => {
     } as never)
     await ctx.skillUsage.invalidate()
     expect((await ctx.skillUsage.report()).has('never-created')).toBe(false)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('skips malformed tool/call events without throwing and without counting (E-65)', async () => {
@@ -178,7 +178,7 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('malformed-demo')
     expect(seen?.view_count).toBe(0)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('F-203: JSON-null arguments do not throw and do not count as a read', async () => {
@@ -197,7 +197,7 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('null-args-demo')
     expect(seen?.view_count).toBe(0)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-70: ensureRecordCreated creates and marks authorship in one atomic write (0.3.18)', async () => {
@@ -213,6 +213,6 @@ describe('skill-usage', () => {
     expect(report.get('agent-skill')?.patch_count).toBe(0)
     expect(report.get('user-skill')).toBeDefined()
     expect(report.get('user-skill')?.created_by).toBeNull()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

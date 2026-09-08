@@ -26,6 +26,6 @@ describe('evolution-state-json', () => {
     expect(await provider.listPending()).toHaveLength(1)
     expect((await provider.claimPending('p1', 'claim'))?.status).toBe('executing')
     expect(await provider.listPending('executing')).toHaveLength(1)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

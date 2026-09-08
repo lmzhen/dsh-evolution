@@ -24,6 +24,29 @@ describe('evolution-state', () => {
     expect((await ctx.evolutionState.loadCuratorState())?.runCount).toBe(2)
     await ctx.evolutionState.savePending({ id: 'p1', kind: 'memory', summary: 'add', args: {}, createdAt: 'now', status: 'pending' })
     expect(await ctx.evolutionState.listPending()).toHaveLength(1)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('S-07: a pinned provider typo fails at MOUNT when a provider is already registered', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-state-typo-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    // A provider IS registered (json), so the pinned-but-wrong name must fail
+    // at start with the registry's precise message — not at the first state
+    // access, far away from the config mistake.
+    await expect(ctx.plugin(EvolutionState, { provider: 'jso' })).rejects.toThrow(/provider "jso" is not registered/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('S-07: stays lazy when no provider has registered yet (mount order not settled)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    // Empty registry: the constructor must NOT throw; the pinned name is
+    // verified at the first state access instead.
+    await ctx.plugin(EvolutionState, { provider: 'typo' })
+    expect(() => ctx.evolutionState.loadReviewState('s1')).toThrow(/provider "typo" is not registered/)
   })
 })

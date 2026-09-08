@@ -77,7 +77,11 @@ export function eventsFile(home: string): string {
 }
 
 function isEventRecord(event: unknown): event is EvolutionEvent {
-  return typeof event === 'object' && event !== null && typeof (event as { seq?: unknown }).seq === 'number'
+  // C-05: NaN passed the bare typeof check — a NaN seq became a Map
+  // key that never matches and a sort comparator that never orders. Only a
+  // finite number is a seq.
+  const seq = (event as { seq?: unknown } | null | undefined)?.seq
+  return typeof event === 'object' && event !== null && typeof seq === 'number' && Number.isFinite(seq)
 }
 
 /**
@@ -97,16 +101,26 @@ function isEventRecord(event: unknown): event is EvolutionEvent {
  * damaged record is the only loss (self-heal semantics, matching the usage
  * sidecar's per-field normalization on read).
  */
+/**
+ * Post-parse v1 gate shared by parseEvolutionEvents and appendEvolutionEvent
+ * (C-06, v10 audit: the append used to JSON.parse the same body a second time
+ * through parseEvolutionEvents — double parse cost per append). A null parse
+ * (missing/whitespace/unparsable body) reads as an empty timeline.
+ */
+function v1EventRecords(parsed: { version?: unknown; events?: unknown } | null): EvolutionEvent[] {
+  if (parsed === null) return []
+  // v1-only reader: an explicit non-current version is a future format (or a
+  // corrupt version field) and must not be shaped as v1. A missing `version`
+  // is tolerated as legacy v1.
+  if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return []
+  if (!Array.isArray(parsed.events)) return []
+  return parsed.events.filter(isEventRecord)
+}
+
 export function parseEvolutionEvents(raw: string | null): EvolutionEvent[] {
   if (raw === null || raw.trim() === '') return []
   try {
-    const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
-    // v1-only reader: an explicit non-current version is a future format (or a
-    // corrupt version field) and must not be shaped as v1. A missing `version`
-    // is tolerated as legacy v1.
-    if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return []
-    if (!Array.isArray(parsed.events)) return []
-    return parsed.events.filter(isEventRecord)
+    return v1EventRecords(JSON.parse(raw) as { version?: unknown; events?: unknown })
   } catch {
     return []
   }
@@ -155,12 +169,16 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
   // message so a closure-side assignment is never narrowed to `never` by the
   // outer control flow.
   let refuseMessage = ''
+  // C-06 (v10 audit): the shape parse below is REUSED for the event list via
+  // v1EventRecords — the body used to be JSON.parsed twice per append.
+  let parsedBody: { version?: unknown; events?: unknown } | null = null
   await transactIo(io, path, async (current) => {
     // rc.69: a whitespace-only log (crash residue) is rebuildable — treat it
     // as missing; a genuinely corrupt body is still refused.
     if (current !== null && current.trim() !== '') {
-      let shape: { version?: unknown }
-      try { shape = JSON.parse(current) as { version?: unknown } } catch { return current }
+      let shape: { version?: unknown; events?: unknown }
+      try { shape = JSON.parse(current) as { version?: unknown; events?: unknown } } catch { return current }
+      parsedBody = shape
       // F-338: a non-v1 body is a FUTURE format. This v1 writer must never
       // rewrite it back down to v1 — refuse and keep the original bytes. (The
       // reader treats it as an empty timeline; only the append refuses.)
@@ -176,7 +194,7 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
         return current
       }
     }
-    const events = parseEvolutionEvents(current)
+    const events = await rotateIfDue(io, path, v1EventRecords(parsedBody), rotateAt)
     const nextEvents = await rotateIfDue(io, path, events, rotateAt)
     let maxSeq = nextEvents.reduce((max, entry) => Math.max(max, entry.seq), 0)
     if (maxSeq === 0) {

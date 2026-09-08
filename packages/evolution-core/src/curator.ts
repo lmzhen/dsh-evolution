@@ -9,7 +9,7 @@
 import type { UsageMap, UsageRecord } from './usage.ts'
 import { latestActivityAt } from './usage.ts'
 import { EvolutionGateSet, createGateSet } from './gates.ts'
-import { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
+import { PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE } from './constants.ts'
 
 export { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
@@ -161,7 +161,10 @@ export interface CuratorNominations {
   warnings: string[]
 }
 
-const NOMINATION_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+// C-12 (v10 audit): NOMINATION_NAME_RE was byte-identical to SKILL_NAME_RE —
+// the constant is the single source now, so a future shape change (length
+// ceiling, underscore policy) cannot fork curator parsing from the stores.
+const NOMINATION_NAME_RE = SKILL_NAME_RE
 
 /**
  * Parse the curator LLM's YAML nomination block (consolidations + prunings).

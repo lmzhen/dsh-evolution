@@ -7,7 +7,7 @@ import { basename, join } from 'node:path'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
-import { scanMemoryThreats } from './threats.ts'
+import { scanMemoryThreats, THREAT_EXEMPT_HINT, type ScanOptions } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
 export { ENTRY_DELIMITER } from './constants.ts'
@@ -105,6 +105,11 @@ export interface MemoryStoreOptions {
   root?: string
   maxConsolidationFailures?: number
   io?: EvolutionIoLike
+  /** V10-03 (P2-18): deployment-declared benign pattern labels (ScanOptions.
+   * excludeLabels) applied to every threat check of this store (writes and
+   * the renderContext filter). Default empty — the strict ANY-hit-blocks
+   * policy is unchanged; deploy configs opt in. */
+  threatExemptLabels?: readonly string[]
 }
 
 export type { EvolutionIoLike }
@@ -116,6 +121,8 @@ export class MemoryStore {
   readonly root: string
   private readonly maxFailures: number
   private readonly io: EvolutionIoLike
+  /** V10-03 (P2-18): see MemoryStoreOptions.threatExemptLabels. */
+  private readonly threatExemptLabels: readonly string[]
   /** V6-16 (0.3.37): same-process RMW serialization (the SkillLibrary queue) —
    * on a backend WITHOUT a transact lock two concurrent callers compute on the
    * same old content and the last rename wins, silently dropping one op's
@@ -132,6 +139,20 @@ export class MemoryStore {
     this.addDatePrefix = options.addDatePrefix ?? false
     this.root = options.root ?? memoryRoot()
     this.maxFailures = options.maxConsolidationFailures ?? DEFAULT_CONSOLIDATION_FAILURES
+    this.threatExemptLabels = options.threatExemptLabels ?? []
+  }
+
+  /** V10-03 (P2-18): ScanOptions shared by every threat check of this store —
+   * the constructor's exempt labels, empty by default (behavior unchanged). */
+  private threatScanOptions(): ScanOptions {
+    return this.threatExemptLabels.length > 0 ? { excludeLabels: this.threatExemptLabels } : {}
+  }
+
+  /** V10-03 (P2-18): the strict-scan write gate. A block message names the hit
+   * label (scanMemoryThreats already embeds it) plus the self-heal hint. */
+  private memoryThreatBlock(text: string): string | null {
+    const threat = scanMemoryThreats(text, undefined, this.threatScanOptions())
+    return threat === null ? null : threat + THREAT_EXEMPT_HINT
   }
 
   limitFor(target: MemoryTarget): number {
@@ -267,7 +288,16 @@ export class MemoryStore {
       // here: the file does not exist, so the remove is a no-op.
       return core.write ?? (current ?? null)
     })
-    return outcome as MemoryApplyResult
+    // C-01: a transact backend that violates the contract (never
+    // invokes the task) leaves `outcome` undefined — the old
+    // `undefined as MemoryApplyResult` cast handed callers an object whose
+    // `.ok` dereference raised a raw TypeError. Structured refusal instead,
+    // mirroring skill-store's V6-19 guard.
+    return outcome ?? {
+      ok: false,
+      message: 'internal error: the memory transaction did not invoke the task; no write was performed',
+      entries: [], chars: 0, limit: this.limitFor(target),
+    }
   }
 
   /**
@@ -286,11 +316,14 @@ export class MemoryStore {
       const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
       return { result: { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     }
-    const threat = scanMemoryThreats(content)
+    const threat = this.memoryThreatBlock(content)
     if (threat) return { result: { ok: false, message: threat, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     // V8-02 (0.3.47): the delimiter guard must inspect the FINAL on-disk entry
     // — with addDatePrefix the prefix+content seam can SYNTHESIZE `\n§\n`
     // (`§\nfoo` passes the pre-prefix check but becomes `## date\n§\nfoo`).
+    // C-03: the prefix is computed ONCE — the delimiter check and the
+    // appended entry below must see the same string (a midnight rollover
+    // between two computations made the checked string ≠ the written string).
     const prefixed = this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${content}` : content
     if (hasEntryDelimiter(prefixed)) {
       // F-201: a fact carrying the delimiter (or ending in `\n§`) would split
@@ -307,7 +340,7 @@ export class MemoryStore {
       this.resetFailures()
       return { result: { ok: true, message: `Entry already exists (no duplicate added).${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
     }
-    const next = [...entries, this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${content}` : content]
+    const next = [...entries, prefixed]
     const total = next.join(ENTRY_DELIMITER).length
     const addLimit = this.limitFor(target)
     if (addLimit > 0 && total > addLimit) {
@@ -344,7 +377,13 @@ export class MemoryStore {
       // and the remove is a no-op when nothing exists).
       return core.write ?? (current ?? null)
     })
-    return outcome as MemoryApplyResult
+    // C-01: same contract-violation guard as addChained above —
+    // no `undefined as MemoryApplyResult` can reach the caller.
+    return outcome ?? {
+      ok: false,
+      message: 'internal error: the memory transaction did not invoke the task; no write was performed',
+      entries: [], chars: 0, limit: this.limitFor(target),
+    }
   }
 
   /** Batch RMW inside the transaction. `write: null` = failure/no-op, disk untouched. */
@@ -363,16 +402,20 @@ export class MemoryStore {
     }
     const entries = [...new Set(normalizeEntries(raw))]
     const working = [...entries]
+    // C-02: one date prefix per batch — the replace branch gains the
+    // same addDatePrefix treatment as add, and every op in the batch shares a
+    // single computation (no midnight seam between ops).
+    const datePrefix = this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n` : ''
     for (const [index, op] of operations.entries()) {
       const position = index + 1
       if (op.action === 'add') {
         const body = (op.facts ?? '').trim()
         if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
-        const threat = scanMemoryThreats(body)
+        const threat = this.memoryThreatBlock(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         // V8-02 (0.3.47): same post-prefix inspection as addCore — the
         // `## date\n${body}` seam must not synthesize the delimiter.
-        const entryBody = this.addDatePrefix ? `## ${new Date().toISOString().slice(0, 10)}\n${body}` : body
+        const entryBody = `${datePrefix}${body}`
         if (hasEntryDelimiter(entryBody)) {
           return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
@@ -404,12 +447,16 @@ export class MemoryStore {
       } else {
         const body = (op.facts ?? '').trim()
         if (!body) return { result: { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
-        const threat = scanMemoryThreats(body)
+        const threat = this.memoryThreatBlock(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
-        if (hasEntryDelimiter(body)) {
+        // C-02: the replaced entry carries the date prefix like an
+        // added one, and the delimiter guard inspects the FINAL on-disk entry
+        // (the V8-02 seam rule — a leading-§ body would synthesize `\n§\n`).
+        const entryBody = `${datePrefix}${body}`
+        if (hasEntryDelimiter(entryBody)) {
           return { result: { ok: false, message: `Operation ${position} (replace): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
-        working[matchIndex] = body
+        working[matchIndex] = entryBody
       }
     }
     const total = working.join(ENTRY_DELIMITER).length
@@ -433,14 +480,21 @@ export class MemoryStore {
         parts.push(`## ${label} — file skipped: ${oversized.size} bytes (limit ${oversized.limit * READ_GUARD_FACTOR}); not read`)
         continue
       }
-      const safe = entries.filter(entry => !scanMemoryThreats(entry))
+      // V10-03 (P2-18): the same exempt labels apply on render — an entry the
+      // deployment allowed into the store must not silently vanish from the
+      // injected context.
+      const safe = entries.filter(entry => !scanMemoryThreats(entry, undefined, this.threatScanOptions()))
       if (safe.length > 0) {
         const body = safe.join(ENTRY_DELIMITER)
         const limit = this.limitFor(target)
-        // Usage indicator aligned with Hermes `_render_block`: floor percentage clamped at 100.
-        const pct = limit > 0 ? Math.min(100, Math.floor((body.length * 100) / limit)) : 0
         const note = safe.length === entries.length ? '' : ` (${entries.length - safe.length} threat-matched entries filtered)`
-        parts.push(`## ${label} (${safe.length} entries) [${pct}% — ${body.length}/${limit} chars]${note}\n${body}`)
+        // Usage indicator aligned with Hermes `_render_block`: floor percentage clamped at 100.
+        // C-04: with no limit (limit <= 0) the whole usage segment is
+        // omitted — the old form rendered a bogus "[0% — N/0 chars]".
+        const usage = limit > 0
+          ? ` [${Math.min(100, Math.floor((body.length * 100) / limit))}% — ${body.length}/${limit} chars]`
+          : ''
+        parts.push(`## ${label} (${safe.length} entries)${usage}${note}\n${body}`)
       }
     }
     return parts.join('\n\n')

@@ -93,7 +93,7 @@ describe('tool-skill-manage', () => {
     expect(message).toContain('exceeds the 60-char authoring bar')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reports the write-point frontmatter auto-quote on create (0.3.11)', async () => {
@@ -111,7 +111,7 @@ describe('tool-skill-manage', () => {
     expect(message).toContain('frontmatter auto-quoted (YAML compatibility): description')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('refuses an over-bar description when descriptionStrict is enabled (P0)', async () => {
@@ -140,7 +140,7 @@ describe('tool-skill-manage', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -163,7 +163,7 @@ describe('tool-skill-manage', () => {
     expect(usage.get('foreground-created')?.created_by).toBeNull()
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('review and skip are read-only: no counters, no mutation events', async () => {
@@ -197,7 +197,7 @@ describe('tool-skill-manage', () => {
     expect(usage.get('audit-skill')?.use_count).toBe(0)
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('review text aggregates quality-warned skills into one guidance line', async () => {
@@ -218,7 +218,7 @@ describe('tool-skill-manage', () => {
     expect(message).toContain('consider consolidating')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('review text marks protection with [pinned] (N-1)', async () => {
@@ -239,7 +239,7 @@ describe('tool-skill-manage', () => {
     expect(message).toContain('[pinned]')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('action=edit gets the same authoring strict gate as create/update (M-1)', async () => {
@@ -268,7 +268,7 @@ describe('tool-skill-manage', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -323,7 +323,7 @@ Use it.
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -371,7 +371,7 @@ Use it.
     expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(1)
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-06: NaN numeric limits fall back to the defaults and stay enforced (0.3.35)', async () => {
@@ -406,7 +406,7 @@ Use it.
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -432,7 +432,7 @@ Use it.
     expect((await ctx.skillUsage.report()).get('wf-skill')?.patch_count).toBe(1)
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V8-09: a non-array restructure argument is a structured refusal, not a TypeError (0.3.47)', async () => {
@@ -454,7 +454,29 @@ Use it.
     expect(box?.message ?? '').not.toContain('TypeError')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('V10-03 (P2-18): threatExemptLabels defaults to empty (strict scan unchanged) and accepts a label list', () => {
+    const s = (ToolSkillManage.Config as unknown as { ['~standard']: { validate(input: unknown): { value?: { threatExemptLabels?: string[] } } } })['~standard']
+    // Default: empty list — the ANY-hit-blocks threat behavior is unchanged
+    // unless a deployment explicitly opts labels in.
+    expect(s.validate({}).value?.threatExemptLabels).toEqual([])
+    const configured = s.validate({ threatExemptLabels: ['release-doc-examples', 'authorized-keys-docs'] })
+    expect(configured.value?.threatExemptLabels).toEqual(['release-doc-examples', 'authorized-keys-docs'])
+  })
+
+  it('V10-03 (P2-18): mounting with threatExemptLabels constructs the library and registers the tool', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-exempt-')) })
+    // The pass-through forwards the labels to the SkillLibrary options
+    // (`threatExemptLabels` → core ScanOptions.excludeLabels, linked core
+    // change in plan batch 3a.3); the construction itself must stay clean.
+    await ctx.plugin(ToolSkillManage, { threatExemptLabels: ['release-doc-examples'] })
+    expect(ctx.tools.get('skill_manage')).toBeDefined()
   })
 })
 

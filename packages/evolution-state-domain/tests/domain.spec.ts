@@ -22,7 +22,7 @@ describe('evolution-state-domain', () => {
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('returns the existing record with applied:false when already resolved to another status (E-10, 0.3.17)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-state-domain-e10-'))
@@ -41,7 +41,7 @@ describe('evolution-state-domain', () => {
     const second = await provider.tryResolvePending('p1', 'rejected')
     expect(second.applied).toBe(false)
     expect(second.record).not.toBeNull()
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('claim moves the record to executing and never double-claims (S3.3, E-24 — domain parity)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-state-domain-s3-'))
@@ -63,7 +63,7 @@ describe('evolution-state-domain', () => {
     expect(await provider.claimPending('p1', 'c2')).toBeNull()
     const resolved = await provider.tryResolvePending('p1', 'rejected')
     expect(resolved.applied).toBe(true)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('dispose waits for an in-flight open and closes the domain (E-17, 0.3.17)', async () => {
     const ctx = new Context()

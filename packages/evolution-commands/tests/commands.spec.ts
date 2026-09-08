@@ -149,7 +149,7 @@ describe('evolution-commands', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -357,7 +357,7 @@ describe('evolution-commands', () => {
       const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
       expect(support).toContain('old detail')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -399,7 +399,7 @@ describe('evolution-commands', () => {
       expect(capturedPrompt).toContain('signal=description_chars')
       expect(capturedPrompt).toContain('signal=usage_observed')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -441,7 +441,7 @@ describe('evolution-commands', () => {
       expect(good.kind).toBe('success')
       expect(capturedSignal).toBeTruthy()
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -486,14 +486,16 @@ describe('evolution-commands', () => {
       // 0.3.14 (P2-1): the flag is set BEFORE the first await, so a second
       // trigger racing inside the enrich window must already see "running" —
       // the old code exposed two spawns in this window.
+      // V10-08 (F-04): the refusal is now kind:'error' (a refused scan is not
+      // a successful scan).
       const concurrent = await handler!.handler({ rawInput: 'maintain' })
-      expect(concurrent.kind).toBe('success')
+      expect(concurrent.kind).toBe('error')
       expect(concurrent.text).toContain('already running')
       expect(starts).toBe(0) // first has NOT spawned yet — the window stayed closed
       await spawned // deterministic: wait for the spawn instead of a fixed sleep
       expect(starts).toBe(1)
       const second = await handler!.handler({ rawInput: 'maintain' })
-      expect(second.kind).toBe('success')
+      expect(second.kind).toBe('error')
       expect(second.text).toContain('already running')
       expect(starts).toBe(1) // no second spawn
       resolveRun!()
@@ -505,7 +507,7 @@ describe('evolution-commands', () => {
       expect(starts).toBe(2)
     } finally {
       if (resolveRun) resolveRun()
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -536,16 +538,17 @@ describe('evolution-commands', () => {
       expect(first.kind).toBe('error')
       expect(first.text).toContain('Maintenance scan failed')
       // The flag was reset (no "already running") AND the failure updated the
-      // cooldown (E-39) — the second trigger is cooldown-blocked, not in-flight-blocked.
+      // cooldown (E-39) — the second trigger is cooldown-blocked, not
+      // in-flight-blocked. V10-08 (F-04): cooldown-blocked is kind:'error'.
       const second = await handler!.handler({ rawInput: 'maintain' })
-      expect(second.kind).toBe('success')
+      expect(second.kind).toBe('error')
       expect(second.text).toContain('cooldown active')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
-  it('maintain rejects unknown arguments explicitly instead of falling into help (P3-2)', async () => {
+  it('maintain grammar: unknown args rejected explicitly; = and multi-space timeout forms accepted (P3-2, F-03)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'evo-commands-reject-'))
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
@@ -560,15 +563,23 @@ describe('evolution-commands', () => {
         },
       })
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      ctx.provide('subagents', {
+        async start(_kind: string, _options: unknown) {
+          return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) }
+        },
+      })
       await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
       const unknown = await handler!.handler({ rawInput: 'maintain --foo' })
       expect(unknown.kind).toBe('error')
       expect(unknown.text).toContain('Unknown maintain arguments')
+      // F-03: the `=` spelling and multi-space separators pass the
+      // grammar now (previously "Unknown maintain arguments" rejections).
       const equals = await handler!.handler({ rawInput: 'maintain --timeout=600000' })
-      expect(equals.kind).toBe('error')
-      expect(equals.text).toContain('Unknown maintain arguments')
+      expect(equals.kind).toBe('success')
+      const spaced = await handler!.handler({ rawInput: 'maintain   --timeout 600000' })
+      expect(spaced.kind).toBe('success')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -602,7 +613,7 @@ describe('evolution-commands', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -630,7 +641,7 @@ describe('evolution-commands', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -670,7 +681,7 @@ describe('evolution-commands', () => {
       expect(second.kind).toBe('success')
       expect(second.text).toContain('MECHANICAL_FACTS')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -706,12 +717,13 @@ describe('evolution-commands', () => {
       const first = await captured!.handler({ rawInput: 'maintain' })
       expect(first.kind).toBe('success')
       expect(starts).toBe(1)
+      // V10-08 (F-04): the cooldown refusal is kind:'error' now.
       const second = await captured!.handler({ rawInput: 'maintain' })
-      expect(second.kind).toBe('success')
+      expect(second.kind).toBe('error')
       expect(second.text).toContain('cooldown')
       expect(starts).toBe(1)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -775,8 +787,8 @@ describe('evolution-commands', () => {
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true })
-      await rm(skillsRoot, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+      await rm(skillsRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -797,41 +809,145 @@ describe('evolution-commands', () => {
     const help = await captured!.handler({ rawInput: '' })
     expect(help.kind).toBe('success')
     expect(help.text).toContain('mutations')
-    expect(help.text).toContain('maintain [--timeout ms | --facts]')
+    expect(help.text).toContain('maintain [--timeout=<ms> | --facts]')
   })
 
-  it('counts maintain recommendations by the plan bullet, not any string prefix (S6.6-1 E-64)', () => {
-    const text = [
-      'Maintenance scan abc: verdict=issues (2 recommendations, 1 notes)',
-      '- [skill-level] demo-skill · rule=pointer_missing · better rev=patch conf=0.90',
-      '  - indented line must not count',
-      '- [library-level] all · rule=body_size',
-      'Notes:',
-      '- this note is a bullet but not a recommendation',
-    ].join('\n')
-    expect(Commands.countMaintainRecommendations(text)).toBe(2)
-    expect(Commands.countMaintainRecommendations(undefined)).toBe(0)
-    expect(Commands.countMaintainRecommendations('')).toBe(0)
-    expect(Commands.countMaintainRecommendations('no bullets here')).toBe(0)
-    // F-365: a note that opens with a bracket must not count as a
-    // recommendation — the Notes: section is dropped before counting.
-    expect(Commands.countMaintainRecommendations((text.split('Notes:')[0] ?? '') + 'Notes:\n- [note-like] priority reminder')).toBe(2)
+  // V10-09 (F-05): the recommendation count is STRUCTURED — it travels as
+  // MaintainOutcome.recommendationCount (validated plan length) into the
+  // maintain event. The old text-parsing contract (`/^- \[/gm` + Notes:
+  // splitting, repaired twice by F-365/V4-26/V6-38) is deleted without a dual
+  // track; this case discriminates: an embedded "- [fake]" line inside a
+  // finding would have inflated the old text count to 2.
+  it('maintain event carries the structured recommendation count, not a text parse (V10-09/F-05)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'evo-cmd-rec-count-home-'))
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-reccount-'))
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    // Same dup-heading shape the maintenance suite proves fires dup_heading=over.
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# x\n\n## A\n\n## A\n\n' + 'y'.repeat(2_500) + '\n', 'utf8')
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      ctx.provide('subagents', {
+        async start(_kind: string, _options: unknown) {
+          return {
+            result: Promise.resolve({
+              text: 'x',
+              structured: {
+                verdict: 'issues',
+                plan: [{
+                  kind: 'skill-level',
+                  names: ['demo-skill'],
+                  rule: 'B3',
+                  evidence: [{ signal: 'dup_heading', value: 'A(2)' }],
+                  // An embedded "- [" line: the deleted text parser would have
+                  // counted it as a second recommendation.
+                  finding: 'Duplicate heading.\n- [fake] embedded line is not a recommendation',
+                  recommendation: 'patch: remove the duplicate heading',
+                  semantic_reasoning: 'duplicate heading shape',
+                  impact: 'better',
+                  impact_reason: 'remove duplicate',
+                  reversibility: 'patch',
+                  undo_path: 'backup restore',
+                  confidence: 0.8,
+                  needs_human: false,
+                  is_override: false,
+                }],
+                notes: ['a plain note'],
+              },
+            }),
+          }
+        },
+      })
+      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      const result = await handler!.handler({ rawInput: 'maintain' })
+      expect(result.kind).toBe('success')
+      // The append is fire-and-forget; poll for the locked RMW to land.
+      const eventPath = join(home, 'evolution', 'events.json')
+      const deadline = Date.now() + 5000
+      let raw: string | null = null
+      while (raw === null && Date.now() < deadline) {
+        raw = await nodeEvolutionIo().readText(eventPath)
+        if (raw === null) await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      expect(raw).not.toBeNull()
+      const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; recommendations?: number; verdict?: string }> }
+      const maintainEvents = parsed.events.filter(event => event.type === 'maintain')
+      expect(maintainEvents).toHaveLength(1)
+      expect(maintainEvents[0]?.recommendations).toBe(1)
+      expect(maintainEvents[0]?.verdict).toBe('issues')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
   })
 
-  it('V4-26: an embedded "\\nNotes:" inside a recommendation field does not undercount', () => {
-    const text = [
-      'Maintenance scan abc: verdict=issues (2 recommendations, 1 notes)',
-      '- [skill-level] demo-skill · rule=body_size · better rev=patch conf=0.90',
-      '  finding: The body has grown large.\nNotes: this is embedded inside the finding value, not the section header',
-      '- [library-level] all · rule=pointer_missing',
-      'Notes:',
-      '- a real note',
-    ].join('\n')
-    // The old `split('\nNotes:')[0]` cut at the embedded "\nNotes:" (inside the
-    // finding) and counted only 1 recommendation. The standalone-header match
-    // skips it and still counts both plan bullets.
-    expect(Commands.countMaintainRecommendations(text)).toBe(2)
+  // F-13: a top-level function/symbol staged payload makes
+  // JSON.stringify RESOLVE to undefined — the explicit type branch (not a
+  // `.length` TypeError) must render the unserializable stub.
+  it('pending --detail renders a resolving-undefined staged payload via the explicit branch (F-13/F-13)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    ctx.provide('evolutionApproval', {
+      list: async (status?: string) => status === 'pending'
+        ? [{ id: 'c3', kind: 'skill', status: 'pending', summary: 'fn args', args: () => 'unserializable', createdAt: '', origin: 'background_review' }]
+        : [],
+    })
+    await ctx.plugin(Commands)
+    const detail = await captured!.handler({ rawInput: 'pending --detail' })
+    expect(detail.text).toContain('c3  skill  pending  fn args')
+    expect(detail.text).toContain('staged args: (unserializable)')
   })
+
+  // V10-03 (P2-18): threatExemptLabels rides the Config into the write-side
+  // SkillLibrary (core-side constructor option `threatExemptLabels` — P2-18
+  // core batch). Default-empty semantics: a non-empty list is accepted and the
+  // restructure write path behaves exactly as before on threat-free content.
+  it('restructure accepts the threatExemptLabels config and keeps write behavior (P2-18)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-exempt-'))
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', { provider: () => io })
+      await ctx.plugin(Commands, { skillsRoot: root, threatExemptLabels: ['ssh_backdoor'] })
+      const result = await handler!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
+      expect(result.kind).toBe('success')
+      const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
+      expect(support).toContain('old detail')
+    } finally {
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
 
   it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
     const ctx = new Context()
@@ -876,23 +992,6 @@ describe('evolution-commands', () => {
     expect(bare.text).toContain('a1  skill  create demo')
     expect(bare.text).toContain('b2  memory  EXECUTING remember')
     expect(bare.text).not.toContain('staged args:')
-  })
-
-  it('V6-38: a sanitized embedded standalone Notes: line does not undercount recommendations (0.3.36)', () => {
-    // formatPlan (V6-38) marks a field-embedded standalone `Notes:` line as
-    // `> Notes: (inside the field above)` — the count helper must then see the
-    // REAL section header only and count both bullets.
-    const text = [
-      'Maintenance scan abc: verdict=issues (2 recommendations, 1 notes)',
-      '- [skill-level] demo-skill · rule=body_size · better rev=patch conf=0.90',
-      '  finding: The body has grown large.',
-      '> Notes: (inside the field above)',
-      '  More detail inside the finding value.',
-      '- [library-level] all · rule=pointer_missing',
-      'Notes:',
-      '- a real note',
-    ].join('\n')
-    expect(Commands.countMaintainRecommendations(text)).toBe(2)
   })
 
   it('V6-41: a damaged mutations/report shape renders unreadable instead of a TypeError (0.3.36)', async () => {

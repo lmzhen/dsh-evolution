@@ -21,7 +21,7 @@ it('memory add and batch (replace/remove semantics via applyBatch)', async () =>
   ])
   expect(batch.ok).toBe(true)
   expect(await store.read('memory')).toEqual(['Run tests with pnpm test.'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V6-25: an enum-outside action fails loud instead of silently executing a replace (0.3.37)', async () => {
@@ -34,7 +34,7 @@ it('V6-25: an enum-outside action fails loud instead of silently executing a rep
   expect(bad.ok).toBe(false)
   expect(bad.message).toContain('unknown action "Add"')
   expect(await store.read('memory')).toEqual(['Original fact.'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory enforces char limits with consolidation failure backoff', async () => {
@@ -52,7 +52,7 @@ it('memory enforces char limits with consolidation failure backoff', async () =>
   const capped = await store.add('memory', 'x')
   expect(capped.ok).toBe(false)
   expect(capped.message).toContain('Stop retrying memory calls')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory detects external file drift before mutation', async () => {
@@ -71,7 +71,7 @@ it('memory detects external file drift before mutation', async () => {
   const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
   expect(await readFile(join(root, backups[0]!), 'utf8')).toContain('alpha')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory warns at 80% storage so the model consolidates before overflow', async () => {
@@ -85,8 +85,8 @@ it('memory warns at 80% storage so the model consolidates before overflow', asyn
   const quiet = new MemoryStore({ root: quietRoot, memoryCharLimit: 100 })
   const quietResult = await quiet.add('memory', 'y'.repeat(50))
   expect(quietResult.message).not.toContain('Storage at')
-  await rm(root, { recursive: true, force: true })
-  await rm(quietRoot, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  await rm(quietRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory detectDrift flags structural drift but not canonical content', async () => {
@@ -105,7 +105,7 @@ it('memory detectDrift flags structural drift but not canonical content', async 
   // Trailing extra blank line is likewise flagged.
   await writeFile(join(root, 'MEMORY.md'), 'fact A\n§\nfact B\n\n', 'utf8')
   expect(await store.detectDrift('memory')).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory blocks threats and refuses ambiguous matches', async () => {
@@ -115,7 +115,7 @@ it('memory blocks threats and refuses ambiguous matches', async () => {
   await store.add('memory', 'Alpha uses git.')
   await store.add('memory', 'Beta uses git.')
   expect((await store.applyBatch('memory', [{ action: 'remove', old_text: 'git' }])).ok).toBe(false)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory read guard skips oversized files and refuses writes with a byte-exact backup', async () => {
@@ -144,7 +144,7 @@ it('memory read guard skips oversized files and refuses writes with a byte-exact
   const refusedAgain = await store.add('memory', 'gamma')
   expect(refusedAgain.ok).toBe(false)
   expect(refusedAgain.message).toContain('Fix the file manually')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory read guard is off when the IO backend has no size probe', async () => {
@@ -165,7 +165,7 @@ it('memory read guard is off when the IO backend has no size probe', async () =>
   expect(result.ok).toBe(false)
   expect(result.message).toContain('drift')
   expect(result.message).toMatch(/backup was saved/)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory drift flags a single entry above the store limit', async () => {
@@ -182,7 +182,7 @@ it('memory drift flags a single entry above the store limit', async () => {
   expect(denied.message).toMatch(/backup was saved/)
   const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory renderContext carries a usage-indicator header clamped at 100%', async () => {
@@ -196,7 +196,7 @@ it('memory renderContext carries a usage-indicator header clamped at 100%', asyn
   const context = await store.renderContext()
   expect(context).toContain('## Memory (1 entries) [100% — 250/200 chars]')
   expect(context).toContain('## User Profile (1 entries) [30% — 30/100 chars]')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('memory adopts an empty or whitespace-only file instead of flagging drift (P1-6)', async () => {
@@ -216,7 +216,7 @@ it('memory adopts an empty or whitespace-only file instead of flagging drift (P1
   const second = await store.add('user', 'Second entry.')
   expect(second.ok).toBe(true)
   expect(await store.read('user')).toEqual(['Second entry.'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('failure backoff decays after the window so a later turn retries normally (P2-1)', async () => {
@@ -236,7 +236,7 @@ it('failure backoff decays after the window so a later turn retries normally (P2
     const later = await store.add('memory', 'x')
     expect(later.message).not.toContain('Stop retrying memory calls')
     expect(later.message).toContain('exceed')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   } finally {
     vi.useRealTimers()
   }
@@ -264,7 +264,7 @@ it('memory recoverable errors carry a bounded current-entries preview (G5)', asy
   expect(batch.ok).toBe(false)
   expect(batch.message).toContain('old_text is required')
   expect(batch.message).toContain('Current entries (preview):')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 /** In-memory backend; with `withTransact` it serializes RMW like the node lock. */
@@ -357,7 +357,7 @@ it('V8-02: with addDatePrefix a leading-§ fact is refused on the FINAL entry (0
   // Without the prefix the same fact is a legal entry (unchanged behavior).
   const plain = new MemoryStore({ root, addDatePrefix: false })
   expect((await plain.add('memory', '§\nfoo')).ok).toBe(true)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V9-09: a duplicate add is tolerated with an explicit no-duplicate message (entry count unchanged)', async () => {
@@ -375,7 +375,7 @@ it('V9-09: a duplicate add is tolerated with an explicit no-duplicate message (e
   const batch = await store.applyBatch('memory', [{ action: 'add', facts: 'User prefers concise replies.' }])
   expect(batch.ok).toBe(true)
   expect(await store.read('memory')).toHaveLength(1)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V9-08: repeated drift refusals keep ONE fixed-name .bak holding the LATEST drifted content', async () => {
@@ -399,7 +399,7 @@ it('V9-08: repeated drift refusals keep ONE fixed-name .bak holding the LATEST d
   backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups).toHaveLength(1)
   expect((await readFile(join(root, backups[0]!))).toString()).toBe('alpha\n§\nbeta\n\n')
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V9-08: a failing backup copy does not change the refusal — no backup suffix, semantics intact', async () => {
@@ -422,5 +422,53 @@ it('V9-08: a failing backup copy does not change the refusal — no backup suffi
   // Failure shape (2): the backup silently no-ops — the refusal message
   // carries no backup suffix and the drift semantics are untouched.
   expect(denied.message).not.toMatch(/backup was saved/)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+// ── v10 audit batch 3 regressions (C-01 / C-02 / C-04) ──────────────────────
+
+it('C-01: a transact backend that never invokes the task yields a structured refusal, not undefined', async () => {
+  const io = memoryFakeIo(false)
+  // Contract-violating backend: transact exists but silently skips the task.
+  io.transact = () => Promise.resolve()
+  const store = new MemoryStore({ root: 'root', io })
+  const add = await store.add('memory', 'alpha record')
+  expect(add.ok).toBe(false)
+  expect(add.message).toContain('did not invoke the task')
+  const batch = await store.applyBatch('memory', [{ action: 'add', facts: 'beta record' }])
+  expect(batch.ok).toBe(false)
+  expect(batch.message).toContain('did not invoke the task')
+})
+
+it('C-02: replace keeps the date prefix and passes the post-prefix delimiter seam guard', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-c02-'))
+  const store = new MemoryStore({ root, addDatePrefix: true })
+  await store.add('memory', 'original fact')
+  const result = await store.applyBatch('memory', [{ action: 'replace', old_text: 'original fact', facts: 'updated fact' }])
+  expect(result.ok).toBe(true)
+  const entries = await store.read('memory')
+  // The replaced entry carries the same `## date` prefix an added one does.
+  expect(entries.join('\n§\n')).toMatch(/## \d{4}-\d{2}-\d{2}\nupdated fact/)
+  // Prefix parity keeps the dedup working: re-adding the body is a no-op.
+  const dup = await store.add('memory', 'updated fact')
+  expect(dup.ok).toBe(true)
+  expect(dup.message).toContain('already exists')
+  // V8-02 seam rule now covers replace too: a leading-§-then-newline body is
+  // refused on the FINAL on-disk entry (the prefix+§ seam synthesizes `§\n`).
+  await store.add('user', 'anchor')
+  const seam = await store.applyBatch('user', [{ action: 'replace', old_text: 'anchor', facts: '§\nevil' }])
+  expect(seam.ok).toBe(false)
+  expect(seam.message).toContain('delimiter')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('C-04: renderContext omits the usage segment when the limit is disabled (no "N/0 chars")', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-c04-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 0, userCharLimit: 0 })
+  await store.add('memory', 'unbounded fact')
+  const context = await store.renderContext()
+  expect(context).toContain('unbounded fact')
+  expect(context).not.toContain('/0 chars')
+  expect(context).not.toMatch(/\[\d+% —/)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

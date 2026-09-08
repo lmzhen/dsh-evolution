@@ -112,11 +112,11 @@ function publish(tarball) {
   console.log(output.trim())
 }
 
+// R-09: a publish retry must re-run within seconds, so block the event loop
+// with Atomics.wait instead of the previous 2-second busy-wait spin (which
+// burned a full core and starved any concurrent handle on the same loop).
 function sleep(ms) {
-  const end = Date.now() + ms
-  while (Date.now() < end) {
-    // busy-wait is fine for a publish control loop
-  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
 const manifest = JSON.parse(readFileSync(join(distRoot, 'manifest.json'), 'utf8'))
@@ -189,7 +189,19 @@ for (const group of publishOrder) {
         break
       } catch (error) {
         const text = `${error?.stderr ?? ''}${error?.message ?? ''}`
-        if (/E409|E429|EAI_AGAIN|ECONNRESET|HTTP 5|503|502|500/i.test(text) && attempt < 3) {
+        // R-09: E409 (version already exists with different content) is NOT a
+        // transient error — retrying deterministically fails 3 more times. The
+        // pre-publish viewIntegrity check above normally catches this; an E409
+        // here means the version appeared between the check and the publish
+        // (or the registry view failed). Fail immediately and point at the
+        // integrity comparison instead of retrying.
+        if (/E409/i.test(text)) {
+          throw new Error(
+            `${name}@${releaseVersion}: npm rejected the publish with E409 — the version already exists with different content. `
+            + `Compare the published tarball's dist.integrity against the local ${file} instead of retrying.`,
+          )
+        }
+        if (/E429|EAI_AGAIN|ECONNRESET|HTTP 5|503|502|500/i.test(text) && attempt < 3) {
           console.warn(`publish retry ${attempt}/3: ${name}`)
           sleep(2000)
           continue

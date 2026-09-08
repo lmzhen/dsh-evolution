@@ -28,7 +28,7 @@ describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-20
     expect(await provider.loadCuratorState()).toBeNull()
     await provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'a', paused: false }))
     expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'a', paused: false })
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a null return on a missing key keeps the record absent', async () => {
@@ -37,7 +37,7 @@ describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-20
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.transactCuratorState(() => null)
     expect(await provider.loadCuratorState()).toBeNull()
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a null return keeps an existing record unchanged', async () => {
@@ -47,7 +47,7 @@ describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-20
     await provider.saveCuratorState({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
     await provider.transactCuratorState(() => null)
     expect((await provider.loadCuratorState())?.lastSummary).toBe('orig')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a returning task overwrites the existing record', async () => {
@@ -58,7 +58,7 @@ describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-20
     await provider.transactCuratorState(current => ({ ...current!, lastSummary: 'new', runCount: 6 }))
     expect((await provider.loadCuratorState())?.lastSummary).toBe('new')
     expect((await provider.loadCuratorState())?.runCount).toBe(6)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
@@ -79,7 +79,7 @@ describe('evolution-state-domain pendingSchema origin/sessionId (G2.3, F-214)', 
     const record = (await provider.listPending('pending')).find(r => r.id === 'p-o')
     expect(record?.origin).toBe('background_review')
     expect(record?.sessionId).toBe('sess-1')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reads undefined origin/sessionId for a record that never set them', async () => {
@@ -90,7 +90,7 @@ describe('evolution-state-domain pendingSchema origin/sessionId (G2.3, F-214)', 
     const record = (await provider.listPending('pending')).find(r => r.id === 'p-x')
     expect(record?.origin).toBeUndefined()
     expect(record?.sessionId).toBeUndefined()
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
@@ -101,6 +101,76 @@ describe('evolution-state-domain releasePendingClaim missing-key (G2.7, F-332)',
     const provider = ctx.evolutionStateStorage.provider('domain')
     await expect(provider.releasePendingClaim('nope', 'claim-x')).resolves.toBeUndefined()
     expect(await provider.listPending('pending')).toHaveLength(0)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+})
+
+describe('P2-4: transactCuratorState missing-key optimistic retry', () => {
+  /** A minimal fake storageDomain facility whose curator_state table replays
+   * a scripted missing-key race: the FIRST update rejects missing-key, the
+   * concurrent first-writer's record lands in the window, and the retry must
+   * run the task on THAT fresh basis. */
+  async function mountRacy(update1SeedsThirdParty: boolean) {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    const records = new Map<string, Record<string, unknown>>()
+    const counters = { updates: 0, puts: 0 }
+    const thirdParty = { lastRunAt: 100, runCount: 7, lastSummary: 'third-party', paused: false }
+    ctx.provide('storageDomain', {
+      open: async () => ({
+        table: () => ({
+          get: async (key: string) => records.get(key) ?? null,
+          put: async (key: string, value: unknown) => {
+            counters.puts += 1
+            records.set(key, value as Record<string, unknown>)
+          },
+          delete: async (key: string) => records.delete(key),
+          entries: () => records.entries(),
+          update: async (key: string, fn: (current: never) => never) => {
+            counters.updates += 1
+            if (counters.updates === 1) {
+              if (update1SeedsThirdParty) {
+                // The race window: a concurrent first-writer seeds the key
+                // between our failed update and our retry.
+                records.set(key, thirdParty)
+              }
+              throw new DomainFacility.DomainError('missing-key', `no record '${key}' to update`)
+            }
+            if (!records.has(key)) throw new DomainFacility.DomainError('missing-key', `no record '${key}' to update`)
+            const next = fn(records.get(key) as never) as Record<string, unknown>
+            records.set(key, next)
+            return next
+          },
+        }),
+        close: async () => {},
+      }) as never,
+    })
+    await ctx.plugin(DomainState)
+    return { ctx, provider: ctx.evolutionStateStorage.provider('domain'), records, counters }
+  }
+
+  it('retries the atomic update so a concurrent first-writer is NOT overwritten by the seed', async () => {
+    const { provider, records, counters } = await mountRacy(true)
+    await provider.transactCuratorState(current => ({
+      ...(current ?? { lastRunAt: 0, runCount: 0, lastSummary: '', paused: false }),
+      lastSummary: 'mine',
+    }))
+    // The retry ran the task on the THIRD PARTY's basis: their runCount and
+    // lastRunAt survive the merge. The old bare-put shape rebuilt the record
+    // from a stale null basis and silently dropped their fields.
+    const final = records.get('primary')
+    expect(final?.lastSummary).toBe('mine')
+    expect(final?.runCount).toBe(7)
+    expect(final?.lastRunAt).toBe(100)
+    expect(counters.updates).toBe(2)
+    expect(counters.puts).toBe(0)
+  })
+
+  it('seeds via put only when the key is STILL missing after the retry', async () => {
+    const { provider, records, counters } = await mountRacy(false)
+    await provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'seeded', paused: false }))
+    expect(records.get('primary')).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seeded', paused: false })
+    expect(counters.updates).toBe(2)
+    expect(counters.puts).toBe(1)
   })
 })

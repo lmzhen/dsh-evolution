@@ -164,6 +164,13 @@ export class EvolutionReplayDriver {
     if (this.plans.length > this.maxPlans) this.plans.shift()
   }
 
+  /**
+   * F-11: test-support API — no production consumer reads the raw
+   * plan list (the leaderboard path goes through `compare()`); tests use this
+   * as a read/inspection window. Kept by declaration (same posture as the
+   * skill-usage `invalidate()` V6-44 declaration), so it is documented intent
+   * rather than undeclared dead code.
+   */
   plansSnapshot(): ReplayPlan[] {
     return [...this.plans]
   }

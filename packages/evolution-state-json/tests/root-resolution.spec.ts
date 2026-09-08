@@ -33,7 +33,7 @@ describe('evolution-state-json root resolution (V4-09)', () => {
     } finally {
       if (prev === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = prev
-      await rm(dshHome, { recursive: true, force: true })
+      await rm(dshHome, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -50,7 +50,7 @@ describe('evolution-state-json root resolution (V4-09)', () => {
     } finally {
       if (prev === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = prev
-      await rm(dshHome, { recursive: true, force: true })
+      await rm(dshHome, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -60,6 +60,6 @@ describe('evolution-state-json root resolution (V4-09)', () => {
     const provider = ctx.evolutionStateStorage.provider('json')
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

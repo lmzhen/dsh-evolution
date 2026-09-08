@@ -53,6 +53,14 @@ export class EvolutionState extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionState')
     this.providerName = config.provider ?? ''
+    // S-07: a PINNED provider name is verified at mount when any
+    // provider is already registered — a config typo used to explode only at
+    // the first state access, far away from the mistake (the registry's
+    // precise "not registered" error now surfaces at start). With an empty
+    // registry (mount order not settled yet) the check stays lazy by design.
+    if (this.providerName && ctx.evolutionStateStorage.hasProviders()) {
+      ctx.evolutionStateStorage.provider(this.providerName)
+    }
   }
 
   private storage(): EvolutionStateStorage {

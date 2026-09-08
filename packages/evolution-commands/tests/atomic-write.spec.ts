@@ -31,7 +31,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       // The staged temp is cleaned up.
       expect(existsSync(join(dir, 'f.tmp'))).toBe(false)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -62,7 +62,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       expect(message).toContain('already committed: a')
       expect(readFileSync(join(dir, 'a'), 'utf8')).toBe('NEW-A')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -85,7 +85,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       expect(existsSync(join(dir, 'f.bak'))).toBe(true)
       expect(existsSync(join(dir, 'f.tmp'))).toBe(false)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -103,7 +103,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       Commands.atomicWriteFiles(dir, [{ name: 'f', content: 'GEN2' }])
       expect(readFileSync(join(dir, 'f.bak'), 'utf8')).toBe('GEN2')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -128,7 +128,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       expect(existsSync(join(dir, 'f.bak'))).toBe(true)
       expect(existsSync(join(dir, 'f.tmp'))).toBe(false)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -162,7 +162,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       expect(message).toContain('could not remove "b" to replace it')
       expect(message).toContain('already committed: a')
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -180,7 +180,7 @@ describe('evolution-commands atomicWriteFiles (F-211)', () => {
       expect(readFileSync(join(dir, 'f'), 'utf8')).toBe('OLD')
       expect(existsSync(join(dir, 'f.tmp'))).toBe(false)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 })

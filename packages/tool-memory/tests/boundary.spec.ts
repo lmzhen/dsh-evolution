@@ -47,7 +47,7 @@ describe('tool-memory execution boundaries', () => {
     })
     expect(result.isError).toBe(false)
     expect(await ctx.memory.read('memory')).toContain('boundary normal')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('policy guard denies model-shaped control-plane fields before execution', async () => {
@@ -62,6 +62,42 @@ describe('tool-memory execution boundaries', () => {
     expect(result.isError).toBe(true)
     expect(result.content.some(block => block.type === 'text' && block.text.includes('evolution-policy'))).toBe(true)
     expect(await ctx.memory.read('memory')).not.toContain('boundary policy')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('F-06: an exec whose agent lacks a session no longer TypeErrors on origin resolution', async () => {
+    const { ctx, root } = await setup()
+    // `agent` present but WITHOUT `session`: the old one-level optional chain
+    // (`exec.agent?.session.header.origin`) threw TypeError here; the full
+    // chain degrades to the default origin and the write proceeds.
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: {} } as unknown as Parameters<typeof tool.execute>[1]
+    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'sessionless write' }, execArg)
+    expect(result.ok).toBe(true)
+    expect(await ctx.memory.read('memory')).toContain('sessionless write')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('F-07: a non-array operations payload returns a shape error instead of degrading to a single operation', async () => {
+    const { ctx, root } = await setup()
+    // A non-array `operations` used to fall into the single-op branch and
+    // WRITE the payload's stray fields as a normal add. The enforcing layer is
+    // the tool's parameters schema (rc.2 defineTool wraps execute with arg
+    // validation), which refuses the payload BEFORE the body runs — the
+    // execute-level shape check in src stays as defense-in-depth for
+    // schema-less callers. Pin the observable pipeline behavior: a proper
+    // array-shape error, no silent single-op write.
+    const result = await ctx.tools.execute({
+      callId: CallId('shape'),
+      name: 'memory',
+      arguments: { target: 'memory', action: 'add', facts: 'ghost write', operations: { action: 'add' } },
+      agent: fakeAgent(),
+      signal: new AbortController().signal,
+    })
+    expect(result.isError).toBe(true)
+    const text = result.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')
+    expect(text).toContain('\"operations\" must be an array')
+    expect(await ctx.memory.read('memory')).not.toContain('ghost write')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

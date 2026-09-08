@@ -39,7 +39,7 @@ describe('state-provider-consistency catches forged field drift (V4-07)', () => 
       },
     }
     await expect(runStateProviderConsistency(broken)).rejects.toThrow()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rejects a provider that drops resolvedAt on resolve', async () => {
@@ -55,6 +55,6 @@ describe('state-provider-consistency catches forged field drift (V4-07)', () => 
       },
     }
     await expect(runStateProviderConsistency(broken)).rejects.toThrow()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

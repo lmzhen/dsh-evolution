@@ -7,8 +7,10 @@
 # The storage stack (`storage`, `storage-json`, `storage-domain`) is
 # HOST-plane in DSH, exactly like session persistence and the native approval
 # stack. A preset must not own it. `evolution-state-domain` below joins the
-# host's storage-domain facility when present; `evolution-state-json` remains
-# the portable fallback and audit provider.
+# host's storage-domain facility when present; `evolution-state-json` is the
+# portable alternative — there is NO automatic fallback between providers
+# (P2-6): the effective one is whichever registered first unless a profile
+# overlay pins `config: { provider: ... }` on the `evolution-state` row.
 - insert:
     # ── control plane ───────────────────────────────────────────────────────
     - id: evolution-policy
@@ -92,14 +94,28 @@
 # via dsh `!!js` runtime env evaluation; profile overlays may still override.
 - id: session-query-sqlite
   config:
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
-    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY || 'startup'
+    # P2-12 (V10-15): trim-then-fallback — an empty DSH_EVOLUTION_SESSION_
+    # QUERY_PATH used to resolve the SQLite index into the process CWD (see
+    # the host patch for the full note; keep the two expressions identical).
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
+    # P2-13 (V10-15): whitelist normalization instead of feeding any raw value
+    # to the platform z.union schema (see the host patch for the full note).
+    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
 
-# ── Hermes 60-char catalog cap: evolution-host-owned, not repeated here ──────
-# The `tool-skill` `catalogDescriptionMaxLength: 60` override (the Hermes
-# authoring bar) is carried by the evolution-host bundle as a base row
-# override. `evolution-host` and this one-click preset are ALTERNATIVE install
-# targets (mutual exclusion, E-33), so this patch intentionally does NOT repeat
-# that row — it would mount `tool-skill` twice. A preset-alone install uses the
-# upstream DSH catalog default; the 60-char authoring bar enforced by
-# tool-skill-manage still applies regardless.
+# ── Hermes 60-char catalog cap: same root-level override the host carries ────
+# Upstream tool-skill exposes `catalogDescriptionMaxLength` (the 500 constant is
+# only the schema default); the Hermes authoring standard is 60.
+# REACH (P1-2 / V10-14): this override is a PROFILE-ROOT row, so it covers
+# sessions mounted WITHOUT an agent preset. Sessions running under an agent
+# preset (the default one-click setup boots the platform's standard preset)
+# read the preset scope's own `tool-skill` row, which NO profile patch — this
+# bundle's included — can touch; the layered flow covers those by injecting
+# the cap onto the standard-sourced preset row at install time
+# (install-layered.mjs, V10-14). Carrying the row here keeps the one-click
+# form at parity with the host bundle instead of shipping no cap anywhere.
+# The row is byte-identical to the host's, so the E-33 shared-row pin
+# (bundle-mutual-exclusion spec) holds; base `tool-skill` carries no other
+# config today, so the whole-config replacement is safe.
+- id: tool-skill
+  config:
+    catalogDescriptionMaxLength: 60

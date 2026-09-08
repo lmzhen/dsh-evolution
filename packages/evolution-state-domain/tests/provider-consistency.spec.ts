@@ -26,6 +26,6 @@ describe('evolution-state-domain cross-provider consistency (G7.4)', () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-domain-consistent-'))
     const ctx = await mount(home)
     await runStateProviderConsistency(ctx.evolutionStateStorage.provider('domain'))
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

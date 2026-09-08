@@ -14,6 +14,7 @@ import {
   DRIFT_SIGNALS_VERSION,
   DEFAULT_HEALTH_THRESHOLDS,
   LOW_QUALITY_THRESHOLD,
+  MAINTAIN_OUTPUT_INSTRUCTION,
   MAINTAIN_PROMPT,
   MIN_STAMP_BODY_CHARS,
   PROMPT_BUNDLE,
@@ -45,6 +46,11 @@ export interface MaintainRuntime {
    * the default model (E-55). `get()` may RESOLVE to undefined (a soft probe
    * can return nothing), hence the type carries it. */
   evolutionPolicy?: { get(): { curatorModel?: string | undefined } | undefined } | undefined
+  /** F-02: tools-registry soft probe, wired from the host context
+   * (`ctx.get('tools')`) with the platform's `get(name)` accessor shape.
+   * Optional — an absent accessor means the tools service is not mounted at
+   * all, so no tool beyond `skill` can be assumed registered. */
+  tools?: { get(name: string): unknown } | undefined
 }
 
 export interface MaintainOptions {
@@ -69,6 +75,11 @@ export interface MaintainOutcome {
   verdict?: 'issues' | 'no_issues' | undefined
   text?: string | undefined
   forcedHuman?: string[] | undefined
+  /** V10-09 (F-05): structured count of recommendations in the VALIDATED plan
+   * (plan entries, never notes). Consumers must read this field instead of
+   * parsing the rendered `text` — the text is display-only. 0 on every
+   * non-success outcome. */
+  recommendationCount: number
 }
 
 function existingSignalIds(report: DriftReport): Set<string> {
@@ -147,9 +158,12 @@ export function buildMaintainFacts(
 }
 
 /** V6-38 (0.3.36): a field value carrying its own standalone `Notes:` line is
- * indistinguishable from the plan's section header in the RENDERED text —
- * `beforeNotesHeader` cuts at the first standalone `Notes:` and undercounts
- * recommendations. Mark such lines so they can never read as the header. */
+ * indistinguishable from the plan's section header in the RENDERED text, which
+ * made the rendered plan read as if it ended early. Mark such lines so they
+ * can never read as the header. (The former text-based recommendation counter
+ * that motivated this marker is gone — V10-09/F-05 moved the count into
+ * `MaintainOutcome.recommendationCount` — but the rendered text stays
+ * unambiguous for the human reader.) */
 function sanitizeField(value: string): string {
   return value.split('\n').map(line => line === 'Notes:' ? '> Notes: (inside the field above)' : line).join('\n')
 }
@@ -194,7 +208,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // the bundle digest covers the FULL template; the joint signature adds
     // the signal vocabulary + thresholds agreement.
     if (!verifyPromptBundle(PROMPT_BUNDLE)) {
-      return { ok: false, error: 'dsh-evolution prompt bundle integrity check failed; refusing to run maintain' }
+      return { ok: false, recommendationCount: 0, error: 'dsh-evolution prompt bundle integrity check failed; refusing to run maintain' }
     }
     // 0.3.11: usageObserved is threaded straight into the snapshot assembly so
     // the probe (which reads it off the snapshot) and the facts block (which
@@ -210,7 +224,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     })
     if (snapshots.length === 0) {
       // Empty library: no facts to review — do not spend a model call.
-      return { ok: true, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
+      return { ok: true, recommendationCount: 0, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
     const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, usageObserved, options.redact)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
@@ -218,16 +232,32 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // Persona carries the full template; the prompt carries ONLY the facts
     // block and the output instruction — one copy of the template in the
     // model input (011 v11 P3-4).
-    const prompt = `${facts}
+    // F-02: soft-probe the tools registry BEFORE the spawn. The
+    // `maintenance_probe` entry in the default filter is a cross-package
+    // coupling with the host bundle's tools row — a deployment that mounts the
+    // command without that row used to fail the spawn outright (the platform
+    // rejects a filter naming an unregistered tool). A missing registry entry
+    // degrades the filter to `skill` alone and declares the degradation to the
+    // model; the facts block remains the complete evidence base (the probe is
+    // an optional deep-dive). An explicit `toolAllow` option is an informed
+    // override and is passed through untouched.
+    const probeRegistered = runtime.tools?.get('maintenance_probe') != null
+    const probeDegraded = options.toolAllow === undefined && !probeRegistered
+    const toolAllow = options.toolAllow ?? (probeRegistered ? ['skill', 'maintenance_probe'] : ['skill'])
+    // F-16: the output instruction is the `maintainOutput` bundle
+    // entry (MAINTAIN_OUTPUT_INSTRUCTION) — the digest now covers every
+    // model-facing maintenance prompt; it used to be a second, undigested
+    // prompt text hardcoded here.
+    const prompt = `${facts}${probeDegraded ? '\n\n[tools] maintenance_probe is not registered in this session — the scan degrades to the `skill` tool only; the facts block above remains the complete evidence base. Do not call maintenance_probe.' : ''}
 
-按模板契约输出 JSON 维护计划（verdict/plan/notes）；除 skill 工具与维护模板外你无其他工具。`
+${MAINTAIN_OUTPUT_INSTRUCTION}`
 
     const timeoutMs = options.timeoutMs ?? 600_000
     // V6-29 (0.3.36): AbortSignal.timeout accepts up to 2^32-1 ms — a larger
     // value throws a synchronous RangeError that only the outer catch would
     // translate (obscuring the cause). Validate the domain up front.
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 0xFFFFFFFF) {
-      return { ok: false, error: `maintain: --timeout must be a positive integer in ms, at most 4294967295; got ${String(timeoutMs)}` }
+      return { ok: false, recommendationCount: 0, error: `maintain: --timeout must be a positive integer in ms, at most 4294967295; got ${String(timeoutMs)}` }
     }
     // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
     // hoisted so the catch can consult `signal.aborted` (our own timeout)
@@ -260,7 +290,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       maxDepth: typeof options.maxDepth === 'number' && Number.isFinite(options.maxDepth) && options.maxDepth >= 1 ? options.maxDepth : 1,
       agentOptions,
       persona: template,
-      toolFilter: { allow: [...(options.toolAllow ?? ['skill', 'maintenance_probe'])] },
+      toolFilter: { allow: [...toolAllow] },
       outputSchema: {
         type: 'object',
         additionalProperties: false,
@@ -323,16 +353,17 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
         // error (evidence: command retry cancels the previous invocation, which
         // surfaced as both "This operation was aborted" and the no-plan text).
         if (runResult?.stopReason === 'aborted') {
-          return { ok: false, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
+          return { ok: false, recommendationCount: 0, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
         }
         // Platform contract: the subagent channel wraps its output as
         // `{ structured }` — a missing structured payload means no usable plan.
-        return { ok: false, error: 'Maintain subagent returned no structured plan (the model did not emit the structured plan, or the run ended without one) — retry; if it repeats, raise --timeout or check the model output shape.' }
+        return { ok: false, recommendationCount: 0, error: 'Maintain subagent returned no structured plan (the model did not emit the structured plan, or the run ended without one) — retry; if it repeats, raise --timeout or check the model output shape.' }
       }
       const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
       if (!validated.ok) {
         return {
           ok: false,
+          recommendationCount: 0,
           error: `Maintain plan rejected by validator: ${validated.errors.slice(0, 5).join('; ')}`,
         }
       }
@@ -342,6 +373,9 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
         runId,
         verdict: validated.plan.verdict,
         forcedHuman: validated.forcedHuman,
+        // V10-09 (F-05): the structured plan length IS the recommendation
+        // count — consumers read this instead of parsing the rendered text.
+        recommendationCount: validated.plan.plan.length,
         text: formatPlan(validated, runId),
       }
     } finally {
@@ -363,6 +397,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     const aborted = abortSignal?.aborted === true || name === 'AbortError' || message === 'This operation was aborted'
     return {
       ok: false,
+      recommendationCount: 0,
       error: aborted
         ? 'Maintenance scan was aborted (cancellation or timeout) before a plan was produced — retry, or raise the timeout (evolution-commands maintainTimeoutMs) on a slow/large library.'
         : `Maintenance scan failed: ${message}`,

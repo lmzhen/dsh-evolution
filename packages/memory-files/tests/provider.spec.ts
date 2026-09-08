@@ -65,7 +65,7 @@ describe('memory-files', () => {
     expect(snap.user).not.toContain('new fact')
     // And the write itself did land, after the snapshot completed.
     expect(await ctx.memory.read('user')).toContain('new fact')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 

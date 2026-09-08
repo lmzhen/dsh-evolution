@@ -225,7 +225,7 @@ describe('anchored-standard review smoke', () => {
       else process.env.DSH_HOME = previous
       for (let attempt = 0; ; attempt++) {
         try {
-          await rm(root, { recursive: true, force: true })
+          await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
           break
         } catch (error) {
           const code = (error as NodeJS.ErrnoException).code

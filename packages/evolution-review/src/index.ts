@@ -10,7 +10,7 @@ import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -53,6 +53,12 @@ export interface Config {
    * differs). Default true; false degrades to the non-waking inject (the
    * summary then waits for the next driver wake). */
   reviewWakeInject?: boolean
+  /** V10-11 (P2-7): skill tree root for the review's direct skill writes.
+   * Empty (the default) resolves through `resolveSkillsRoot` to the shared
+   * default root — the historical behavior. A custom root keeps review-created
+   * skills in the SAME tree the catalog/tools read instead of writing a
+   * parallel tree the rest of the family cannot see. */
+  skillsRoot?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -84,6 +90,9 @@ export const Config: z<Config> = z.object({
   skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER),
   reviewWakeInject: z.boolean().default(true),
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
+  // V10-11 (P2-7): empty string keeps the default root (resolveSkillsRoot
+  // trims and falls back) — the schema default mirrors the Config contract.
+  skillsRoot: z.string().default(''),
 })
 
 /** V8-01 (0.3.45): the review subagent's structured-output contract. The
@@ -400,6 +409,15 @@ export function apply(ctx: Context, rawConfig: Config): void {
             ctx.logger.warn(`dsh-evolution-review: cadence counter reset could not be persisted after a delivered review (${resetError instanceof Error ? resetError.message : String(resetError)}) — a stateful reload may re-deliver this review`)
           }
         }
+        // V10-13 (P2-9): same-turn mutual exclusion. With
+        // skillReviewTrigger:'both' this completed turn ALREADY delivered its
+        // review through the cadence flush above; falling through to the
+        // completion channel used to send a SECOND review for the same
+        // boundary (double tokens, two potentially conflicting change plans).
+        // The completion gate still covers every completed turn that ends
+        // WITHOUT a due cadence flush, so the long-session adaptation is not
+        // starved — a turn is served by exactly one review channel.
+        return
       }
     }
     // V6-53 / 0.3.39 + 0.3.40: a threshold-deserved cadence review is NEVER
@@ -768,7 +786,11 @@ export function apply(ctx: Context, rawConfig: Config): void {
     async function executeSkillDirect(skillArgs: SkillOp): Promise<{ ok: boolean; message: string }> {
       const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
       if (!io) return { ok: false, message: 'evolution-io service not mounted' }
-      const library = new SkillLibrary(undefined, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+      // V10-11 (P2-7): the review's background writes previously constructed
+      // the library on the hardcoded default root, so a custom-root deployment
+      // wrote skills into a tree the catalog/tools never read. Route through
+      // the single core resolver (empty config.skillsRoot = default root).
+      const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
       const op = skillArgs
       const name = op.name ?? ''
       const origin: WriteOrigin = origins.library
@@ -918,6 +940,56 @@ function fingerprintPolicy(snapshot: unknown): string | undefined {
   }
 }
 
+// V10-10 (P2-11): minimal LOCAL structural types for the upstream rc.2
+// 'tool/result' payload (`SessionEventMap['tool/result']` = `{ turn, step,
+// message: ToolResultMessage, error?, meta? }`) and its `ToolResultBlock`
+// (`{ type: 'tool-result', toolCallId, content: ContentBlock[], isError? }`).
+// Deliberately NOT an upstream type dependency (the mirror tree has no
+// upstream node_modules); only the fields read below are declared.
+interface ToolResultEventDataLike {
+  error?: unknown
+  message?: {
+    content?: Array<{
+      type?: string
+      isError?: boolean
+      /** Tolerated legacy/alternative shape: text directly on the block. */
+      text?: string
+      /** Upstream ToolResultBlock: the payload text lives in inner text blocks. */
+      content?: Array<{ type?: string; text?: string }>
+    }>
+  }
+}
+
+/**
+ * V10-10 (P2-11): render one `[result]` evidence line from a 'tool/result'
+ * event payload. The former read (`data.output`) targeted a field that does
+ * not exist on the upstream rc.2 payload, so EVERY result line rendered an
+ * empty payload and the review subagent never saw tool output — the evidence
+ * chain silently starved while still spending its line budget. The payload
+ * text now comes from `data.message.content` tool-result blocks (inner text
+ * blocks joined, mirroring the user/assistant rendering above). A failure is
+ * marked by the payload-level `error` OR a block-level `isError`. The legacy
+ * pre-rc.2 shape (no `message`) is tolerated as an empty payload — it never
+ * throws. Budget: 500 chars per line (the 12-line cap lives in
+ * buildReviewRequest and is unchanged).
+ */
+export function renderToolResultLine(data: unknown): string {
+  const shape = data as ToolResultEventDataLike | undefined
+  const content = shape?.message?.content
+  const blocks = Array.isArray(content) ? content : []
+  const resultBlocks = blocks.filter(block => block.type === 'tool-result')
+  const output = resultBlocks
+    .map(block => Array.isArray(block.content)
+      ? block.content
+        .map(inner => inner.type === 'text' && typeof inner.text === 'string' ? inner.text : '')
+        .join(' ')
+      : (typeof block.text === 'string' ? block.text : ''))
+    .join(' ')
+    .trim()
+  const failure = shape?.error || resultBlocks.some(block => block.isError === true) ? ' [ERROR]' : ''
+  return `[result]${failure} ${output.slice(0, 500)}`
+}
+
 function buildReviewRequest(
   session: Session,
   kind: ReviewKind,
@@ -945,10 +1017,7 @@ function buildReviewRequest(
       const argsRaw = typeof data?.arguments === 'string' ? data.arguments : JSON.stringify(data?.arguments ?? {})
       toolLines.push(`[call] ${data?.name ?? '?'} ${argsRaw.slice(0, 500)}`)
     } else if (event?.type === 'tool/result') {
-      const data = event.data as { error?: unknown; output?: string } | undefined
-      const output = typeof data?.output === 'string' ? data.output : ''
-      const failure = data?.error ? ' [ERROR]' : ''
-      toolLines.push(`[result]${failure} ${output.slice(0, 500)}`)
+      toolLines.push(renderToolResultLine(event.data))
     }
   }
   toolLines.reverse()

@@ -108,3 +108,73 @@ describe('SkillLibrary IO boundaries', () => {
     expect(await io.readText('/skills/keep-skill/SKILL.md')).toBeTruthy()
   })
 })
+
+// ── v10 audit batch 3a boundary hardening (C-14 / C-15 / C-16 / C-18) ───────
+
+describe('V10 boundary hardening', () => {
+  it('C-14: a 0-byte SKILL.md is listed (description empty, markers visible) and stays archivable', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    // A "present but corrupt" tree: the file exists (listNames proves it) but
+    // is empty, and the directory carries a protection marker — the old ghost
+    // skip hid all of it from list().
+    io.files.set('/skills/ghost-skill/SKILL.md', '')
+    io.files.set('/skills/ghost-skill/.pinned', '')
+    const summaries = await lib.list()
+    const ghost = summaries.find(s => s.name === 'ghost-skill')
+    expect(ghost).toBeDefined()
+    expect(ghost?.description).toBe('')
+    expect(ghost?.protectedBy).toBe('pinned')
+    // An unmarked 0-byte tree can be archived (no body bytes needed).
+    io.files.set('/skills/corrupt-skill/SKILL.md', '')
+    const archived = await lib.archive('corrupt-skill')
+    expect(archived.ok).toBe(true)
+    expect(await io.exists('/skills/.archive/corrupt-skill/SKILL.md')).toBe(true)
+  })
+
+  it('C-15: create refuses a pre-existing directory carrying a protection marker', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    io.files.set('/skills/guarded/.bundled', '')
+    const bundled = await lib.create('guarded', SKILL.replace('boundary-skill', 'guarded'), 'foreground')
+    expect(bundled.ok).toBe(false)
+    expect(bundled.message).toContain('protected (bundled)')
+    expect(io.files.has('/skills/guarded/SKILL.md')).toBe(false)
+    // Review channel: a pinned marker refuses the same way update/patch do.
+    io.files.set('/skills/review-target/.pinned', '')
+    const review = await lib.create('review-target', SKILL.replace('boundary-skill', 'review-target'), 'background_review')
+    expect(review.ok).toBe(false)
+    expect(review.message).toContain('protected (pinned)')
+    // Foreground keeps update/patch parity: pin blocks the review fork only.
+    const fg = await lib.create('review-target', SKILL.replace('boundary-skill', 'review-target'), 'foreground')
+    expect(fg.ok).toBe(true)
+  })
+
+  it('C-16: consolidate name validation carries the 64-char ceiling via badName', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    const long = 'a'.repeat(65)
+    const result = await lib.consolidate('target', [long], 'foreground')
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('Invalid skill name')
+    expect(result.message).toContain('<= 64')
+  })
+
+  it('C-18: support file names are closed to [a-z0-9._-] plus the win32 reserved stems', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('named', SKILL.replace('boundary-skill', 'named'), 'foreground')
+    // Charset violations (colon, uppercase, leading dot/space).
+    expect((await lib.writeSupportFile('named', 'references/with:colon.md', 'x')).ok).toBe(false)
+    expect((await lib.writeSupportFile('named', 'references/Notes.md', 'x')).ok).toBe(false)
+    expect((await lib.writeSupportFile('named', 'references/.hidden.md', 'x')).ok).toBe(false)
+    // Reserved device stems are charset-conformant — refused by the stem set.
+    const nul = await lib.writeSupportFile('named', 'references/nul.md', 'x')
+    expect(nul.ok).toBe(false)
+    expect(nul.message).toContain('reserved device name')
+    expect((await lib.writeSupportFile('named', 'references/com1.md', 'x')).ok).toBe(false)
+    // Nested dirs and ordinary names stay allowed.
+    expect((await lib.writeSupportFile('named', 'references/sub/ok-name.md', 'x')).ok).toBe(true)
+    expect((await lib.writeSupportFile('named', 'scripts/run_v2.mjs', 'export {}')).ok).toBe(true)
+  })
+})

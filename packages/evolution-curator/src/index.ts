@@ -262,10 +262,19 @@ export class EvolutionCurator extends Service {
    */
   async setPaused(paused: boolean): Promise<void> {
     const stateService = this.curatorStateService()
+    // H-07: a state-less composition previously fell through the
+    // optional chain silently — the pause LOOKED successful (the command
+    // surface reports success) but nothing was persisted, and the very next
+    // auto-check ran as if never paused. Declare the loss on the logger: the
+    // pause is NOT persisted and will not survive the process.
+    if (!stateService) {
+      this.ctx.logger.warn('evolution-curator: curator state service absent; pause not persisted')
+      return
+    }
     // E-16 (S5.5): one atomic read-modify-write instead of the previous
     // load→save pair, so a concurrent run-core bookkeeping write can never
     // interleave a stale load with a newer save (or vice versa).
-    await stateService?.transactCuratorState(current => ({
+    await stateService.transactCuratorState(current => ({
       schemaVersion: 1,
       lastRunAt: current?.lastRunAt ?? Date.now(),
       runCount: current?.runCount ?? 0,

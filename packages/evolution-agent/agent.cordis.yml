@@ -15,11 +15,16 @@
 # the model-facing entry points and the native skill-catalog bridge.
 #
 # This delta deliberately keeps the MINIMAL model-facing set and does NOT
-# duplicate host-bundle rows: `evolution-maintenance/tools` (maintenance_probe),
-# the `session-query-sqlite` index override and the `tool-skill` 60-char
-# catalog cap are evolution-host-owned, so repeating them here would mount the
-# row twice in a layered install. The delta rows are also the only evolution-
-# owned text in the composed preset, so it tracks every platform version.
+# duplicate host-bundle rows: `evolution-maintenance/tools` (maintenance_probe)
+# and the `session-query-sqlite` index override are evolution-host-owned, so
+# repeating them here would mount the row twice in a layered install. The
+# `tool-skill` 60-char catalog cap is likewise NOT carried as a delta row: the
+# session-visible `tool-skill` instance is the standard composition's own row,
+# so a delta copy would collide with it (N-5) and a profile-root patch cannot
+# reach this preset scope at all — instead install-layered INJECTS the cap onto
+# that standard-sourced row at generation time (V10-14). The delta rows are
+# also the only evolution-owned text in the composed preset, so it tracks
+# every platform version.
 - id: tool-memory
   name: '@deepseek-ai/dsh-tool-memory'
 

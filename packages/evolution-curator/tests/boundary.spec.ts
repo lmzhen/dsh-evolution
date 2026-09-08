@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -30,7 +30,7 @@ describe('evolution-curator boundaries', () => {
     expect(result.stale).toEqual([])
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('ignores a malformed report file instead of crashing the report reader', async () => {
@@ -43,6 +43,23 @@ describe('evolution-curator boundaries', () => {
     expect(await ctx.evolutionCurator.latestReport()).toBeNull()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('H-07: setPaused warns when the curator state service is absent (pause not persisted)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-pause-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    // No evolutionState service mounted: the optional-chain form used to make
+    // setPaused a silent no-op — the command surface reported success while
+    // nothing was persisted. The warn must declare the loss.
+    const ctx = await mount(home)
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    await expect(ctx.evolutionCurator.setPaused(true)).resolves.toBeUndefined()
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('curator state service absent; pause not persisted'))
+    warnSpy.mockRestore()
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

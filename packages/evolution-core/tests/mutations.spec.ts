@@ -23,7 +23,7 @@ it('recordMutation appends and trims to the cap', async () => {
   const records = await loadMutations(root, io)
   expect(records.length).toBe(3)
   expect(records.map(record => record.skillName)).toEqual(['s2', 's3', 's4'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('legacy plain-array sidecars stay readable (B2 read compat)', async () => {
@@ -38,7 +38,7 @@ it('legacy plain-array sidecars stay readable (B2 read compat)', async () => {
   expect(records[0]?.skillName).toBe('old-skill')
   const suppressed = await loadSuppressedNames(root, io)
   expect([...suppressed]).toEqual(['builtin-a', 'builtin-b'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('SkillLibrary mutations write audit records with before/after hashes', async () => {
@@ -51,7 +51,7 @@ it('SkillLibrary mutations write audit records with before/after hashes', async 
   expect(records[1]?.beforeHash).toBeTruthy()
   expect(records[1]?.afterHash).toBeTruthy()
   expect(records[1]?.beforeHash).not.toBe(records[1]?.afterHash)
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('F-337: audit afterHash matches the bytes actually on disk (update and patch)', async () => {
@@ -67,7 +67,7 @@ it('F-337: audit afterHash matches the bytes actually on disk (update and patch)
   const patchRecord = (await lib.listMutations()).at(-1)!
   expect(patchRecord?.action).toBe('patch')
   expect(patchRecord?.afterHash).toBe(contentHash((await io.readText(join(root, 'audited-skill', 'SKILL.md'))) ?? ''))
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('drops mutation records without a string timestamp (P2-3)', async () => {
@@ -83,5 +83,26 @@ it('drops mutation records without a string timestamp (P2-3)', async () => {
   // `at` feeds .slice() in the command surfaces: a non-string timestamp drops
   // the record instead of throwing later.
   expect(records.map(record => record.skillName)).toEqual(['kept'])
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('C-08: a dropped audit record warns once instead of failing silently', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mut-warn-'))
+  const io = nodeEvolutionIo()
+  await writeFile(join(root, '.mutations.json'), '{corrupt', 'utf8')
+  // vi.spyOn misses warns fired inside the io.transact closure under vitest 4
+  // (verified by a direct-repro: plain console replacement does intercept).
+  const previousWarn = console.warn
+  const warnCalls: unknown[][] = []
+  console.warn = (...args: unknown[]) => { warnCalls.push(args) }
+  try {
+    await recordMutation(root, io, { skillName: 's', action: 'update', summary: 'x', at: new Date().toISOString() })
+  } finally {
+    console.warn = previousWarn
+  }
+  expect(warnCalls).toHaveLength(1)
+  expect(String(warnCalls[0]?.[0])).toContain('malformed')
+  // The P3 posture is intact: the malformed file is never overwritten.
+  expect(await io.readText(join(root, '.mutations.json'))).toBe('{corrupt')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

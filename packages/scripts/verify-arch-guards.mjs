@@ -26,10 +26,16 @@
  * tree regardless of layout):
  *   node <scripts-dir>/verify-arch-guards.mjs <packages/evolution-root> [--strict]
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const root = process.argv[2] ?? 'packages/evolution'
+// R-03: a missing root used to surface as a raw ENOENT from readdirSync —
+// report the usage line instead (same posture as verify-dependency-closure).
+if (!existsSync(root)) {
+  console.error(`usage: verify-arch-guards.mjs <packages/evolution-root> [--strict] (root not found: ${root})`)
+  process.exit(2)
+}
 const strict = process.argv.includes('--strict') || process.env.DSH_EVOLUTION_ARCH_STRICT === '1'
 const CORE_SRC = 'evolution-core/src'
 const APPROVAL_SRC = 'evolution-approval/src'

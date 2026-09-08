@@ -121,7 +121,6 @@
       "@deepseek-ai/dsh-user-approval/types": ["./packages/interaction/user-approval/src/types.ts"],
       "@deepseek-ai/dsh-user-questions/types": ["./packages/interaction/user-questions/src/types.ts"],
       "@deepseek-ai/dsh-agent/types": ["./packages/core/agent/src/types.ts"],
-      "@deepseek-ai/dsh-agent/brand": ["./packages/core/agent/src/brand.ts"],
       "@deepseek-ai/dsh-agent/invariant": ["./packages/core/agent/src/invariant.ts"],
       "@deepseek-ai/dsh-scope/invariant": ["./packages/core/scope/src/invariant.ts"],
       "@deepseek-ai/dsh-agent-loop/invariant": ["./packages/core/agent-loop/src/invariant.ts"],
@@ -182,7 +181,7 @@
       // dir names are unique across groups, so first-on-disk-wins resolution is
       // unambiguous; adding a package under an existing group needs no edit
       // here. The aggregates' project references (tsconfig.host.json /
-      // tsconfig.client.json) stay explicit 鈥?TS project references have no
+      // tsconfig.client.json) stay explicit — TS project references have no
       // wildcard form.
       "@deepseek-ai/dsh-host-apiproxy": ["./packages/host/apiproxy/src"],
       "@deepseek-ai/dsh-host-directory-picker": ["./packages/host/directory-picker/src"],
@@ -202,9 +201,6 @@
       "@deepseek-ai/dsh-client-ui-slots": ["./packages/client/ui-slots/src"],
       "@deepseek-ai/dsh-client-ui-attachment": ["./packages/client/ui-attachment/src"],
       "@deepseek-ai/dsh-client-ui-primitives": ["./packages/client/ui-primitives/src"],
-      "@deepseek-ai/dsh-client-schema-form": ["./packages/client/schema-form/src"],
-      "@deepseek-ai/dsh-client-schema-form/invariant": ["./packages/client/schema-form/src/invariant.ts"],
-      "@deepseek-ai/dsh-client-web-react": ["./packages/client/web-react/src"],
       "@deepseek-ai/dsh-client-connection": ["./packages/client/connection/src"],
       "@deepseek-ai/dsh-api-remotes": ["./packages/api/remotes/src"],
       "@deepseek-ai/dsh-api-remotes/client": ["./packages/api/remotes/src/client/index.ts"],

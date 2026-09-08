@@ -127,7 +127,7 @@ function serialize(items: EvolutionActivityRecord[]): string {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -159,7 +159,7 @@ function serialize(items: EvolutionActivityRecord[]): string {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -244,7 +244,7 @@ function serialize(items: EvolutionActivityRecord[]): string {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -271,7 +271,7 @@ function serialize(items: EvolutionActivityRecord[]): string {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -294,6 +294,35 @@ function serialize(items: EvolutionActivityRecord[]): string {
     const plain = applyActivityEvent([], payload(), DEFAULT_MAX_ITEMS, 1000)
     expect(plain[0]?.executionFailures).toBeUndefined()
     expect(plain[0]?.executionError).toBeUndefined()
+  })
+
+  it('H-05: every absent optional field leaves its key ABSENT (uniform conditional spread)', () => {
+    // All optional fields undefined: the folded record must carry NONE of the
+    // optional keys — `'x' in record` is now symmetric across the whole
+    // optional surface (previously policyFingerprint/evidenceQuotes/
+    // estimatedInputChars were assigned unconditionally as undefined).
+    const record = applyActivityEvent([], {
+      sessionId: 's',
+      planId: 'p',
+      memoryApplied: 0,
+      skillApplied: 0,
+      rejectedOps: 0,
+    }, DEFAULT_MAX_ITEMS, 7)
+    expect(record).toHaveLength(1)
+    const item = record[0]!
+    for (const key of ['policyFingerprint', 'executionFailures', 'executionError', 'evidenceQuotes', 'estimatedInputChars']) {
+      expect(key in item, `${key} should be absent`).toBe(false)
+    }
+    // Present values keep their keys (and their key names exactly).
+    const full = applyActivityEvent([], payload({
+      executionFailures: 1,
+      executionError: 'boom',
+    }), DEFAULT_MAX_ITEMS, 8)[0]!
+    expect('policyFingerprint' in full).toBe(true)
+    expect('evidenceQuotes' in full).toBe(true)
+    expect('estimatedInputChars' in full).toBe(true)
+    expect('executionFailures' in full).toBe(true)
+    expect('executionError' in full).toBe(true)
   })
 
 })

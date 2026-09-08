@@ -26,7 +26,7 @@ describe('evolution-approval', () => {
       kind: 'memory', summary: 'x', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'never',
     })
     expect(staged.action).toBe('staged') // the self-report lost; default stands
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-27: a deployment-level config.policy=never allows without a session override (0.3.37)', async () => {
@@ -45,7 +45,7 @@ describe('evolution-approval', () => {
       kind: 'memory', summary: 'z', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
     })
     expect(allowed.action).toBe('allow')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-27: the platform-shaped overrideOf receives the SESSION OBJECT, never the id string (0.3.40)', async () => {
@@ -84,7 +84,7 @@ describe('evolution-approval', () => {
     })
     expect(fallback.action).toBe('staged')
     expect(probed).toBe(sessionShape) // unchanged — no string probe happened
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('allows when the platform service derives "never" even if the caller said "ask" (S3.1, E-22)', async () => {
@@ -102,7 +102,7 @@ describe('evolution-approval', () => {
       session: { id: 's1', events: [] }, sessionPolicy: 'ask',
     })
     expect(allowed.action).toBe('allow')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a crashed approve is never replayed: executing records block approve and reject cleans up (S3.3, E-24)', async () => {
@@ -134,7 +134,7 @@ describe('evolution-approval', () => {
     const cleanup = await ctx.evolutionApproval.reject(staged.id)
     expect(cleanup.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('pending').then(rows => rows.length)).toBe(0)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('stages background writes, keeps audit records and replays through a registered runner', async () => {
@@ -169,7 +169,7 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
     expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('keeps a pending record when the runner fails and retains rejection audit', async () => {
@@ -189,7 +189,7 @@ describe('evolution-approval', () => {
     const rejected = await ctx.evolutionApproval.reject(decision.pendingId!)
     expect(rejected.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('runs the replay exactly once when approve is called concurrently', async () => {
@@ -219,7 +219,7 @@ describe('evolution-approval', () => {
     expect(applied).toBe(1)
     expect([a.ok, b.ok].filter(Boolean).length).toBeGreaterThanOrEqual(1)
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reject on an executing record races an in-flight approve: audit stays honest, write still runs once (S3.3, F-204)', async () => {
@@ -270,7 +270,7 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('allows writes without staging when the session policy is never', async () => {
@@ -296,7 +296,7 @@ describe('evolution-approval', () => {
     })
     expect(askDecision.action).toBe('staged')
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('normalizes approval summaries: truncation, batch label and archive warning', async () => {
@@ -328,7 +328,7 @@ describe('evolution-approval', () => {
     expect(pending.some(item => item.summary === 'memory batch of 3 operations')).toBe(true)
     expect(pending.some(item => item.summary === 'skill delete old-skill (warning: archive)')).toBe(true)
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('hasRunner mirrors the runner registry for the P1-9 pre-check', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-approval-hasrunner-'))
@@ -344,7 +344,7 @@ describe('evolution-approval', () => {
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(true)
     dispose()
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(false)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-18: a rotated/unknown id is reported out of the pending window, not as a live concurrent writer', async () => {
@@ -373,7 +373,7 @@ describe('evolution-approval', () => {
     const executing = await ctx.evolutionApproval.approve(id)
     expect(executing.ok).toBe(false)
     expect(executing.message).toContain('executing')
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V9-12: a replay runner that THROWS keeps the record pending with its claim released (distinct from {ok:false})', async () => {
@@ -400,7 +400,7 @@ describe('evolution-approval', () => {
     expect(retry.message).not.toContain('already resolved')
     const rejected = await ctx.evolutionApproval.reject(id)
     expect(rejected.ok).toBe(true)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V9-12: approve with NO replay runner releases the claim — record stays pending and rejectable', async () => {
@@ -423,7 +423,7 @@ describe('evolution-approval', () => {
     const rejected = await ctx.evolutionApproval.reject(id)
     expect(rejected.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   describe('effectiveSessionPolicy (G4.8, F-341)', () => {

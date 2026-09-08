@@ -110,6 +110,11 @@ async function copyPackage(source, destination) {
     force: true,
     filter(sourcePath) {
       const base = sourcePath.slice(source.length + 1)
+      // Known boundary (R-08, recorded not changed): the `tests` prefix filter
+      // is intentionally wider than `tests/` — a path whose first segment
+      // merely STARTS WITH `tests` (e.g. `tests-support/`) would be excluded
+      // too. No package in the family carries such a segment today; tighten
+      // to an exact `tests` segment match only if one ever appears.
       return base !== 'node_modules'
         && !base.startsWith('tests')
         && !base.endsWith('.tsbuildinfo')
@@ -254,7 +259,11 @@ async function resolveStandardComposition() {
         if (existsSync(path)) return await readFile(path, 'utf8')
       }
     } else {
-      const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).trim()
+      // R-08 (V10): `npm` is a PATH executable on POSIX and the Windows branch
+      // above never reaches this line, so spawn it shell-free like every other
+      // child process in this script (shell: true re-introduced the injection
+      // surface and quoting hazards the rest of the file deliberately avoids).
+      const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim()
       const path = direct(join(globalRoot, '@deepseek-ai', 'dsh', 'config', 'agent-presets'))
       if (existsSync(path)) return await readFile(path, 'utf8')
     }
@@ -308,6 +317,57 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
   return `${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`
 }
 
+/**
+ * V10-14 (P1-2): inject the Hermes 60-char catalog cap onto the STANDARD
+ * sourced `- id: tool-skill` row of the composed preset.
+ *
+ * The session-visible `tool-skill` instance mounts in the agent preset's own
+ * standing scope; a profile-root patch (evolution-host/cordis.patch.yml)
+ * cannot reach it, so before this injection the layered install ran the
+ * platform default (500) on the catalog's read side. Text-level rewrite in
+ * the same line-scan style as rowIds() above (no YAML library — v2 §10 scope
+ * control):
+ *   - idempotent: a tool-skill item that already carries a `config:` key is
+ *     left byte-identical, so re-running the installer never doubles the key;
+ *   - the injected block carries a marker comment so a diff of the generated
+ *     preset can tell installer-owned text from platform text;
+ *   - a composition WITHOUT a tool-skill row is returned unchanged with a
+ *     one-time warning (a renamed platform row must not brick the install,
+ *     but the missed cap must be observable).
+ */
+export function injectToolSkillCap(composition) {
+  const lines = composition.split('\n')
+  let found = false
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!/^- id:\s*tool-skill\s*$/.test(lines[i] ?? '')) continue
+    found = true
+    // Walk the item's continuation lines (indented) up to the next item or
+    // top-level line; a blank line terminates the item block.
+    let end = i
+    let hasConfig = false
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const next = lines[j] ?? ''
+      if (next.trim() === '') break
+      if (!/^\s/.test(next)) break
+      if (/^\s+config:(\s|$)/.test(next)) hasConfig = true
+      end = j
+    }
+    if (hasConfig) continue
+    lines.splice(end + 1, 0,
+      '  # V10-14: Hermes 60-char catalog cap — injected by install-layered (P1-2);',
+      '  # this preset-scope row is the session-visible instance and no profile',
+      '  # patch can reach it. Remove only to run the platform default (500).',
+      '  config:',
+      '    catalogDescriptionMaxLength: 60',
+    )
+    i = end + 5
+  }
+  if (!found) {
+    console.warn('install-layered: warning — no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)')
+  }
+  return lines.join('\n')
+}
+
 async function installAgentPreset(home, dryRun, force) {
   const destination = agentPresetDirectory(home)
   // The generated composition always resolves, also in dry-run: a preset that
@@ -317,7 +377,10 @@ async function installAgentPreset(home, dryRun, force) {
   // fragment; the packaged evolution-agent/agent.cordis.yml stays the default.
   const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
   const deltaComposition = await readFile(deltaPath, 'utf8')
-  const composition = generateAgentPreset(standardComposition, deltaComposition)
+  // V10-14 (P1-2): the cap injection runs on the COMPOSED output (after the
+  // collision guard), not inside generateAgentPreset — that function must stay
+  // byte-identical to core's composePresetComposition (single-source pin).
+  const composition = injectToolSkillCap(generateAgentPreset(standardComposition, deltaComposition))
   // The `exists && !force` result must be reported identically in dry-run and
   // real mode — a dry-run always claiming installed:true hides an already
   // present preset (F-354). Only the write is skipped in dry-run.
@@ -331,7 +394,12 @@ async function installAgentPreset(home, dryRun, force) {
     const tmp = join(destination, 'agent.cordis.yml.tmp')
     await writeFile(tmp, composition)
     await rename(tmp, join(destination, 'agent.cordis.yml'))
-    await cp(join(packageSourceRoot(), 'evolution-agent', 'preset.yml'), join(destination, 'preset.yml'), { force })
+    // R-08 (V10): preset.yml gets the SAME tmp+rename atomic write as
+    // agent.cordis.yml above — F-354 previously protected only half of the
+    // transaction, so a crash could leave a truncated preset.yml behind.
+    const presetTmp = join(destination, 'preset.yml.tmp')
+    await writeFile(presetTmp, await readFile(join(packageSourceRoot(), 'evolution-agent', 'preset.yml')))
+    await rename(presetTmp, join(destination, 'preset.yml'))
   }
   return { destination, installed: true }
 }
@@ -445,17 +513,19 @@ if (isMain) {
       if (options.dryRun) console.log('dry-run:  no files were written')
     } else {
       const result = await install(options)
-    console.log(`scope:    ${EVOLUTION_SCOPE}`)
-    console.log(`mode:     ${result.mode}`)
-    console.log(`profile:  ${result.profile} (${result.profileDir})`)
-    if (result.bundle) console.log(`bundle:   ${result.bundle}`)
-    console.log(`copied:   ${result.copied.length} evolution packages`)
-    if (result.missingEntrypoints.length > 0) {
-      console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
-    }
-    if (result.agentPreset) {
-      console.log(`preset:   ${result.agentPreset.destination}${result.agentPreset.installed ? '' : ` (${result.agentPreset.reason})`}`)
-    }
+      // R-08 (V10): this block was left at column 4 by a merge (the uninstall
+      // branch above indents correctly) — realign with the surrounding try.
+      console.log(`scope:    ${EVOLUTION_SCOPE}`)
+      console.log(`mode:     ${result.mode}`)
+      console.log(`profile:  ${result.profile} (${result.profileDir})`)
+      if (result.bundle) console.log(`bundle:   ${result.bundle}`)
+      console.log(`copied:   ${result.copied.length} evolution packages`)
+      if (result.missingEntrypoints.length > 0) {
+        console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
+      }
+      if (result.agentPreset) {
+        console.log(`preset:   ${result.agentPreset.destination}${result.agentPreset.installed ? '' : ` (${result.agentPreset.reason})`}`)
+      }
       if (options.dryRun) console.log('dry-run:  no files were written')
     }
   } catch (error) {

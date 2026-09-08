@@ -46,6 +46,25 @@ function requireArg(name) {
 const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
 const platformVersion = requireArg('--platform-version')
+// P2-17: an unresolved external registry version is an error by
+// default (see registryVersion below); this flag is the explicit exemption.
+const allowUnresolvedExternal = argv.includes('--allow-unresolved-external')
+
+// R-06: the two vendored framework ranges the release metadata pins. Sync
+// source: the upstream checkout's vendor/ tags these ranges target
+// (vendor/cordis, vendor/schemastery) — update HERE and the upstream vendor
+// tag in the same change, or the published ranges drift from the validated
+// compat anchor. (zod is likewise double-pinned in tsconfig.base.json + the
+// dependency manifests; a cross-checking guard for it is deliberately
+// deferred — optimization plan §5, R-06b.)
+const VENDORED_CORDIS_RANGE = '^4.0.1'
+const VENDORED_SCHEMASTRY_RANGE = '^3.18.1'
+
+// R-05: the workspace protocols the rewrite understands. A literal
+// `workspace:` spec that does not match must fail loud — silently shipping the
+// literal into a published manifest is exactly the defect class this rewrite
+// exists to prevent.
+const WORKSPACE_SPEC_RE = /^workspace:(\^|~|\*)$/
 
 const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(evolutionRoot, entry.name, 'package.json')))
@@ -89,26 +108,37 @@ function scopedPackageName(name) {
   return scope ? `${scope}/${name.slice('@deepseek-ai/'.length)}` : name
 }
 
-function releaseSpec(name, ourNames, publishedVersions) {
-  if (ourNames.has(name)) return `^${releaseVersion}`
-  if (name === '@deepseek-ai/cordis') return '^4.0.1'
-  if (name === '@deepseek-ai/schemastery') return '^3.18.1'
+function releaseSpec(name, ourNames, publishedVersions, protocol = '^') {
+  if (ourNames.has(name)) return `${protocol === '~' ? '~' : '^'}${releaseVersion}`
+  if (name === '@deepseek-ai/cordis') return VENDORED_CORDIS_RANGE
+  if (name === '@deepseek-ai/schemastery') return VENDORED_SCHEMASTRY_RANGE
   // Platform packages range against the published upstream version, NOT the
   // development baseline — CI guards manifest parity with the compat anchor
   // (verify-platform-ranges.mjs, N-2).
   if (name.startsWith('@deepseek-ai/dsh-')) return `^${platformVersion}`
   const published = publishedVersions[name]
   if (published) return published.startsWith('^') ? published : `^${published}`
+  // Only reachable under --allow-unresolved-external (P2-17).
   return `^${releaseVersion}`
 }
 
-function rewritePackage(pkg, ourNames, publishedVersions) {
+function rewritePackage(pkg, ourNames, publishedVersions, sourceDir) {
   pkg.version = releaseVersion
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
       let rewritten = name
       if (scope && ourNames.has(name)) rewritten = scopedPackageName(name)
-      if (spec === 'workspace:^') pkg[section][name] = releaseSpec(name, ourNames, publishedVersions)
+      if (typeof spec === 'string' && spec.startsWith('workspace:')) {
+        // R-05: accept every common workspace protocol (^, ~, *) —
+        // `workspace:*` / `workspace:~` used to sail through and ship their
+        // literal into the tarball. A protocol outside the whitelist fails
+        // loud instead. `*` publishes as ^<version>: `*` itself would resolve
+        // to anything, and verify-platform-ranges (N-2) demands a ^-range for
+        // platform deps.
+        const match = WORKSPACE_SPEC_RE.exec(spec)
+        if (!match) throw new Error(`prepare-release: ${name} uses unsupported protocol "${spec}" — only workspace:^ / workspace:~ / workspace:* are rewritten; refusing to ship the literal`)
+        pkg[section][name] = releaseSpec(name, ourNames, publishedVersions, match[1])
+      }
       if (rewritten !== name) {
         pkg[section][rewritten] = pkg[section][name]
         delete pkg[section][name]
@@ -120,7 +150,11 @@ function rewritePackage(pkg, ourNames, publishedVersions) {
     pkg.repository = {
       type: 'git',
       url: 'git+https://github.com/lmzhen/dsh-evolution.git',
-      directory: `packages/${pkg.name.split('/')[1]}`,
+      // P2-14 (V10-17): derive from the PACKAGED directory name (the flat
+      // public mirror layout, e.g. packages/evolution-core) — the previous
+      // name-derived path (packages/dsh-evolution-core after the scope
+      // rewrite) never existed, so every npm source link was dead.
+      directory: `packages/${sourceDir}`,
     }
     delete pkg.exports?.['./src/*']
     if (typeof pkg.description === 'string') pkg.description = `${pkg.description} (community build)`
@@ -229,12 +263,28 @@ for (const dir of sourceDirs) {
   const pkg = readJson(join(evolutionRoot, dir, 'package.json'))
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
-      if (spec === 'workspace:^' && !names.has(name)) externalNames.add(name)
+      // R-05: every workspace protocol on a NON-family package makes
+      // it an external whose registry version must be resolved below.
+      if (typeof spec === 'string' && spec.startsWith('workspace:') && !names.has(name)) externalNames.add(name)
     }
   }
 }
 const publishedVersions = {}
-for (const name of externalNames) publishedVersions[name] = registryVersion(name)
+for (const name of externalNames) {
+  const version = registryVersion(name)
+  // P2-17: a failed/empty `npm view` used to fall through to the
+  // `^${releaseVersion}` default — silently writing OUR version into an
+  // EXTERNAL package's range and shipping it. Fail loud; the flag below is
+  // the explicit, visible exemption.
+  if (!version && !allowUnresolvedExternal) {
+    throw new Error(
+      `prepare-release: could not resolve a registry version for external dependency ${name} `
+      + '(npm view failed or returned nothing). Re-run with network access, or pass '
+      + '--allow-unresolved-external to explicitly accept a range against the local release version.',
+    )
+  }
+  publishedVersions[name] = version
+}
 
 const tarballs = []
 for (const dir of sourceDirs) {
@@ -256,7 +306,7 @@ for (const dir of sourceDirs) {
     },
   })
   const manifestPath = join(staged, 'package.json')
-  const manifest = rewritePackage(readJson(manifestPath), new Set(names.keys()), publishedVersions)
+  const manifest = rewritePackage(readJson(manifestPath), new Set(names.keys()), publishedVersions, dir)
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   for (const file of ['cordis.yml', 'cordis.patch.yml', 'agent.cordis.yml', 'preset.yml']) {
     const path = join(staged, file)
@@ -267,6 +317,15 @@ for (const dir of sourceDirs) {
   // later files unrewritten (0.3.0 bug: tools.js kept @deepseek-ai/dsh-*).
   // A materialized array stays re-iterable for each file.
   rewriteScopedJs(staged, [...names.keys()])
+  // R-05: fail fast BEFORE packing when the staged package carries no
+  // built bundle — a missing lib/ used to surface as a raw readdirSync ENOENT
+  // in the validation loop, after every package had already packed. (The
+  // validation loop below unconditionally walks lib/, so lib/ is a hard
+  // prerequisite for every family package.)
+  if (!existsSync(join(staged, 'lib'))) {
+    console.error(`prepare-release: ${dir} has no lib/ build output — run build-lib.mjs first, then prepare-release`)
+    process.exit(1)
+  }
   let packed
   try {
     const raw = JSON.parse(npmPack(staged))

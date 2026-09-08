@@ -24,10 +24,16 @@
  * the same posture as verify-arch-guards; without it the run is the
  * WARN + summary report described above.
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const root = process.argv[2] ?? 'packages/evolution'
+// R-03: a missing root used to surface as a raw ENOENT from readdirSync —
+// report the usage line instead (same posture as verify-dependency-closure).
+if (!existsSync(root)) {
+  console.error(`usage: verify-event-pairing.mjs <packages/evolution-root> [--strict] (root not found: ${root})`)
+  process.exit(2)
+}
 const strict = process.argv.includes('--strict')
 const SKIP = new Set(['node_modules', 'lib', 'dist', '.release-staging', '.git', '.next', 'tsdown'])
 // Externally owned (README): emitted for platform/user wiring, no in-repo

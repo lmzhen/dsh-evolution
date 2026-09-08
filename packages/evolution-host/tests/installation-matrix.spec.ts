@@ -50,7 +50,7 @@ describe('layered installation matrix', () => {
     await ctx.evolutionState.saveReviewState('host-session', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     expect(await ctx.evolutionState.loadReviewState('host-session')).toMatchObject({ turnsSinceMemory: 1 })
 
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('host + agent: adding the agent preset exposes model tools', async () => {
@@ -79,6 +79,6 @@ describe('layered installation matrix', () => {
     expect(ctx.tools.get('memory')).toBeDefined()
     expect(ctx.tools.get('skill_manage')).toBeDefined()
 
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

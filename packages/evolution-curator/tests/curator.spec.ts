@@ -82,7 +82,7 @@ describe('evolution-curator', () => {
     expect(result.nominations).toBeDefined()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('references factor: related_skills frontmatter raises the hub skill score', async () => {
@@ -103,7 +103,7 @@ describe('evolution-curator', () => {
     expect(usage.get('leaf-skill')?.quality_score).toBeGreaterThan(usage.get('hub-skill')?.quality_score ?? 0)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('pins through the marker keep an old skill out of the lifecycle run', async () => {
@@ -135,7 +135,7 @@ describe('evolution-curator', () => {
     expect(again.archived).toEqual(['precious-skill'])
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reentrant run() is skipped with an explicit already-running outcome', async () => {
@@ -155,7 +155,7 @@ describe('evolution-curator', () => {
     expect([first, second].some(result => result.skipped === undefined)).toBe(true)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-27 (F-331): pinned/bundled skills are excluded from the LLM nomination prompt', async () => {
@@ -193,7 +193,7 @@ describe('evolution-curator', () => {
     expect(shown).not.toContain('gamma-skill')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('snapshotFull captures curator state and restoreSnapshot rewinds tree + state', async () => {
@@ -226,7 +226,7 @@ describe('evolution-curator', () => {
     expect(saved).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('auto-start boot check catches up a due persisted state after a restart', async () => {
@@ -254,7 +254,7 @@ describe('evolution-curator', () => {
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('auto-start boot check stays quiet when the persisted state is not due', async () => {
@@ -278,7 +278,7 @@ describe('evolution-curator', () => {
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('gateConsolidations blocks automated merges that touch gated names', () => {
@@ -323,7 +323,7 @@ describe('evolution-curator', () => {
     expect(names).toContain('source-a')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('healthView reports degraded structure only, derived on demand (rc.73 A1)', async () => {
@@ -345,7 +345,7 @@ describe('evolution-curator', () => {
     expect(fat?.verdict).toBe('needs-restructure')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('healthView folds usage churn into the assessment (A2 write-ghost)', async () => {
@@ -377,7 +377,7 @@ describe('evolution-curator', () => {
     expect(rows.some(row => row.name === 'read-skill')).toBe(false)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('suppresses churn rows before any observed read exists (C observation window)', async () => {
@@ -401,7 +401,7 @@ describe('evolution-curator', () => {
     expect(rows.find(row => row.name === 'ghost-skill')).toBeUndefined()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('control-plane folds keep counters and never flatten a malformed usage sidecar (rc.67 K-1)', async () => {
@@ -437,7 +437,7 @@ describe('evolution-curator', () => {
     expect(await io.readText(usagePath)).toBe('{corrupt telemetry')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('refuses consolidation with a missing target', async () => {
@@ -453,7 +453,7 @@ describe('evolution-curator', () => {
     expect(result.message).toContain('not found')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('archives a skill that reached the archive threshold (F1 regression)', async () => {
@@ -488,7 +488,7 @@ describe('evolution-curator', () => {
     expect(record?.archived_at).toBeTruthy()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-15: a crashed archive (dir gone, usage not folded) heals to archived with no failed entry (S5.4)', async () => {
@@ -513,7 +513,7 @@ describe('evolution-curator', () => {
     // skill directory is gone while the usage record is still 'active'. The
     // previous code re-attempted the (doomed) rename every run, reported a
     // permanent failed entry, and never folded the record.
-    await rm(join(skills.root, 'ancient-skill'), { recursive: true, force: true })
+    await rm(join(skills.root, 'ancient-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     const result = await ctx.evolutionCurator.run({ ignoreGates: true })
     expect(result.errors).toEqual([])
     // No permanent failed entry for a skill whose directory is already gone.
@@ -526,7 +526,7 @@ describe('evolution-curator', () => {
     expect(usage.get('ancient-skill')?.archived_at).toBeTruthy()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('F-330 (V4-02): a bundled crashed archive self-heals AND persists suppression from the archive copy marker (0.3.26)', async () => {
@@ -553,7 +553,7 @@ describe('evolution-curator', () => {
     // `bundledNames.has(name)` (a construction subset of treeNames, hence
     // unreachable here) and the suppression never landed — a bundled ghost
     // (dir alive + record archived) re-seeded forever.
-    await rm(join(skills.root, 'bundled-skill'), { recursive: true, force: true })
+    await rm(join(skills.root, 'bundled-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     await mkdir(join(skills.root, '.archive', 'bundled-skill'), { recursive: true })
     await writeFile(join(skills.root, '.archive', 'bundled-skill', '.bundled'), '', 'utf8')
     const result = await ctx.evolutionCurator.run({ ignoreGates: true })
@@ -564,7 +564,7 @@ describe('evolution-curator', () => {
     expect(suppressed.has('bundled-skill')).toBe(true)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-08: a bundled SIBLING archive no longer suppresses a crashed non-bundled skill (0.3.36)', async () => {
@@ -586,7 +586,7 @@ describe('evolution-curator', () => {
     }]]), nodeEvolutionIo())
     // Crashed-archive shape for `foo` (tree dir gone, record still active) and
     // a bundled SIBLING `foo-bar` archive whose name carries the `foo-` prefix.
-    await rm(join(skills.root, 'foo'), { recursive: true, force: true })
+    await rm(join(skills.root, 'foo'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     const stamp = '20260101120000'
     await mkdir(join(skills.root, '.archive', `foo-bar-${stamp}`), { recursive: true })
     await writeFile(join(skills.root, '.archive', `foo-bar-${stamp}`, '.bundled'), '', 'utf8')
@@ -607,7 +607,7 @@ describe('evolution-curator', () => {
     expect(usage.get('foo')?.state).toBe('archived')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-09: a FAILED .archive listing warns instead of silently reading as "not bundled" (0.3.36)', async () => {
@@ -627,7 +627,7 @@ describe('evolution-curator', () => {
       last_used_at: old, last_viewed_at: null, last_patched_at: null,
       state: 'active', pinned: false, archived_at: null,
     }]]), nodeEvolutionIo())
-    await rm(join(skills.root, 'ghost-skill'), { recursive: true, force: true })
+    await rm(join(skills.root, 'ghost-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     // Force the `.archive` listing to fail with a non-"missing" error.
     const io = ctx.evolutionIo.provider()
     const realList = io.list.bind(io)
@@ -646,7 +646,7 @@ describe('evolution-curator', () => {
     vi.restoreAllMocks()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-15 regression: a dry-run heal must NOT persist the archived fold (0.3.19 review)', async () => {
@@ -666,7 +666,7 @@ describe('evolution-curator', () => {
       last_used_at: old, last_viewed_at: null, last_patched_at: null,
       state: 'active', pinned: false, archived_at: null,
     }]]), nodeEvolutionIo())
-    await rm(join(skills.root, 'ancient-skill'), { recursive: true, force: true })
+    await rm(join(skills.root, 'ancient-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     // Dry-run computes on a CLONE of the usage map: the self-heal fold must stay
     // in-memory only (the crash-window record remains 'active' on disk until a
     // REAL run folds it).
@@ -676,7 +676,7 @@ describe('evolution-curator', () => {
     expect(usage.get('ancient-skill')?.archived_at).toBeNull()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('seeds baseline records for tree skills the sidecar has not seen (F8)', async () => {
@@ -698,7 +698,7 @@ describe('evolution-curator', () => {
     expect(usage.has('fresh-skill')).toBe(true)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('dry-run reports what WOULD happen without mutating or pushing out the next run', async () => {
@@ -733,7 +733,7 @@ describe('evolution-curator', () => {
     }
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('defers on first sight even without a state service (P1-7)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-curator-nostate-'))
@@ -754,7 +754,7 @@ describe('evolution-curator', () => {
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('quality-warn scoring drives the SAME run stale window (P1-2)', async () => {
@@ -791,7 +791,7 @@ Aging body.
     expect(usage.get('aging-skill')?.state).toBe('stale')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('paused gate skips automatic passes; manual run and resume still work (G2)', async () => {
@@ -834,7 +834,7 @@ Ancient body.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     // 0.3.28 (release gate): the body itself is fast (~0.2s) but the full
     // parallel suite starved this worker past the default 5s cap — give the
     // test an explicit budget so a loaded CI run cannot flip it.
@@ -864,7 +864,7 @@ Ancient body.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a manual run while paused does not clear the operator pause (rc.43 regression)', async () => {
@@ -945,7 +945,7 @@ Ancient body.
 
     else process.env.DSH_HOME = previous
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 
   })
 
@@ -992,7 +992,7 @@ Ancient body.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-51: a fresh-install manual run anchors the baseline at run time (S5.6)', async () => {
@@ -1021,7 +1021,7 @@ Ancient body.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('control-plane consolidate enforces the full gate set (P1-8)', async () => {
@@ -1110,7 +1110,7 @@ Body of ${name}.
 
     else process.env.DSH_HOME = previous
 
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 
   })
 
@@ -1166,7 +1166,7 @@ Body of ${name}.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('scopeView reports pinned skills as protected through the library view (N-1)', async () => {
@@ -1198,7 +1198,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1269,7 +1269,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1329,7 +1329,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1375,7 +1375,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1414,7 +1414,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1449,7 +1449,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1492,7 +1492,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1532,7 +1532,7 @@ Body of ${name}.
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 
@@ -1557,7 +1557,7 @@ Body of ${name}.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('minIdleFailOpen=false fails closed: a missing agents service defers the run (E-54)', async () => {
@@ -1578,7 +1578,7 @@ Body of ${name}.
     ctx.evolutionCurator.stop()
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-18: stateless composition defers FIRST sight only; the next due run actually curates (0.3.18)', async () => {
@@ -1620,7 +1620,7 @@ Body of ${name}.
     expect(files.some(name => name.startsWith('curator-error-'))).toBe(true)
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-22: error reports are recycled on a failing auto-check and budgeted independently (F-327)', async () => {
@@ -1749,7 +1749,7 @@ it('V9-02: a bundled-marker agent skill produces no failed archive step through 
   expect(result.archived).not.toContain('marker-skill')
   if (previous === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = previous
-  await rm(home, { recursive: true, force: true })
+  await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V8-14: a marker-protected agent skill is protected, never also managed (0.3.47)', () => {

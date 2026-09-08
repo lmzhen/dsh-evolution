@@ -32,6 +32,15 @@ inputs:
       host project graph is commit-bound and must never cross trees).
     required: false
     default: 'true'
+  npm_scope:
+    description: >-
+      npm scope the pack rewrite and the platform-range guard use. R-10: ONE
+      source with the release workflow's NPM_SCOPE env — the workflow passes
+      its env value here explicitly, and this action feeds it to BOTH the pack
+      rewrite (--scope) and the range guard (--our-scope) so the family
+      exemption prefix can never drift from the publish scope.
+    required: false
+    default: '@lmzhen'
 runs:
   using: composite
   steps:
@@ -44,9 +53,15 @@ runs:
 
     - name: Overlay mirror packages into upstream
       shell: bash
+      # R-11: inputs reach run scripts only through env indirection — direct
+      # ${{ inputs.* }} interpolation inside run blocks is a script-injection
+      # surface the moment this composite action is reused with
+      # caller-controlled inputs.
+      env:
+        COPY_HOST_TSCONFIG: ${{ inputs.copy_host_tsconfig }}
       run: |
         mkdir -p upstream/packages/evolution
-        if [ "${{ inputs.copy_host_tsconfig }}" = "true" ]; then
+        if [ "$COPY_HOST_TSCONFIG" = "true" ]; then
           # Baseline job: the mirror owns the root configs — it overlays the
           # pinned dev tree (UPSTREAM_SHA checkout) with OUR base/host files
           # (the baseline tree has no evolution alias paths otherwise).
@@ -68,6 +83,19 @@ runs:
                upstream/packages/evolution/lib \
                upstream/packages/evolution/dist
 
+    - name: Verify layout sync and version alignment (P2-15, V9-01 guard)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The scripts-comparison half is tautological directly after the
+        # overlay copy (the overlay COPIED those files), but the version half
+        # is not: the mirror CHANGELOG head must equal the root manifest and
+        # every package manifest version — the V9-01 incident rewrote 30
+        # manifests and nothing caught it. The second argument anchors the
+        # version guard at the MIRROR checkout root (mirrorDir/../..).
+        node packages/evolution/scripts/verify-layout-sync.mjs \
+          packages/evolution/scripts ../packages/scripts
+
     - uses: pnpm/action-setup@v4
       with:
         version: '11.7.0'
@@ -78,10 +106,25 @@ runs:
         cache: pnpm
         cache-dependency-path: upstream/pnpm-lock.yaml
 
-    - name: Install immutable dependencies
+    - name: Pre-register overlay workspace packages in the lockfile (P2-16)
       shell: bash
       working-directory: upstream
-      run: pnpm install --no-frozen-lockfile
+      run: |
+        # The committed upstream lockfile predates the overlaid
+        # packages/evolution/* workspace members (the upstream globs match
+        # packages/*/*), so a plain install had to run --no-frozen-lockfile and
+        # re-resolve on every run — the same tag could produce different
+        # dependency graphs and the validate "green" was not reproducible.
+        # Resolve ONCE here (--lockfile-only: lockfile update, no node_modules),
+        # recording the resolution in this step's log, then install from the
+        # now-complete lockfile under --frozen-lockfile below.
+        pnpm install --lockfile-only --no-frozen-lockfile
+        echo "pre-registered $(grep -c '^  packages/evolution/' pnpm-lock.yaml || true) evolution importer(s) into the lockfile"
+
+    - name: Install dependencies from the frozen lockfile
+      shell: bash
+      working-directory: upstream
+      run: pnpm install --frozen-lockfile
 
     - name: Build, test and lint
       shell: bash
@@ -102,19 +145,29 @@ runs:
     - name: Pack scoped release
       shell: bash
       working-directory: upstream
+      env:
+        PLATFORM_VERSION: ${{ inputs.platform_version }}
+        NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
         node packages/evolution/scripts/prepare-release.mjs \
           --scope "$NPM_SCOPE" \
           --version "${RELEASE_VERSION#v}" \
-          --platform-version "${{ inputs.platform_version }}"
+          --platform-version "$PLATFORM_VERSION"
 
     - name: Verify platform version ranges (N-2 guard)
       shell: bash
       working-directory: upstream
+      env:
+        PLATFORM_VERSION: ${{ inputs.platform_version }}
+        NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
+        # R-10: --our-scope is passed EXPLICITLY from the same scope the pack
+        # rewrite used — the guard's '@lmzhen' default is no longer an
+        # independent second definition that can silently drift.
         node packages/evolution/scripts/verify-platform-ranges.mjs \
-          --platform-version "${{ inputs.platform_version }}" \
-          --manifest-dir packages/evolution/.release-staging
+          --platform-version "$PLATFORM_VERSION" \
+          --manifest-dir packages/evolution/.release-staging \
+          --our-scope "$NPM_SCOPE"
 
     - name: Verify architecture guards (G7.1)
       shell: bash

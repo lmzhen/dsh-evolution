@@ -128,6 +128,11 @@ const DEFAULT_SUPPRESSED_SOURCES = ['skill-catalog', 'agent-instructions']
  * pair — the persistent `bash` shell and `str_replace_editor`. Issue #11
  * measured this schema anchoring 5/5 at the adapter-default maxTokens while
  * every standard-family schema failed 11/11.
+ *
+ * R-07: this constant IS the default for `bootstrapTools` — omitting
+ * the key now yields exactly this pair. Previously the key was effectively
+ * required (`stringList(undefined)` threw at apply time) while the constant
+ * sat unused, so the documented default existed only as a hidden contract.
  */
 const DEFAULT_BOOTSTRAP_TOOLS = ['bash', 'str_replace_editor']
 
@@ -191,7 +196,10 @@ export function apply(ctx, config) {
       `${name}: unknown config key(s) ${unknown.join(', ')} — allowed keys: ${[...ALLOWED_KEYS].sort().join(', ')}`,
     )
   }
-  const bootstrapTools = stringList(source.bootstrapTools, 'bootstrapTools')
+  // R-07: the documented Minimal pair is the DEFAULT — an omitted
+  // key no longer throws at apply time (the old hidden contract: both callers
+  // happened to pass the list, so the crash path was never exercised).
+  const bootstrapTools = stringList(source.bootstrapTools ?? DEFAULT_BOOTSTRAP_TOOLS, 'bootstrapTools')
   const promoteEvents = parsePromoteOn(source.promoteOn)
   const bootstrapMaxTokens = optionalPositiveInt(source.bootstrapMaxTokens, 'bootstrapMaxTokens')
   const suppressedSources = sourceList(source.suppressedContextSources, 'suppressedContextSources', DEFAULT_SUPPRESSED_SOURCES)

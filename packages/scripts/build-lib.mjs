@@ -7,6 +7,13 @@
  * script builds only the evolution-family packages, resolving the local
  * package tree from this script's own layout:
  *   node packages/scripts/build-lib.mjs
+ *
+ * R-02: this script is only runnable where the project references resolve —
+ * the upstream OVERLAY / dev tree (mirror packages merged into an upstream
+ * checkout, or an upstream dev checkout). The flat public mirror is the
+ * publish carrier only: its tsconfigs reference ../../../vendor/cordis paths
+ * that do not exist in the flat layout, so running this script there fails
+ * with ENOENT by design (see README G5.5).
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'

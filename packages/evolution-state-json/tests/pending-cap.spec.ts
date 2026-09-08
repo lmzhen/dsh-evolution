@@ -53,7 +53,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(Array.isArray(archive)).toBe(true)
     expect(archive).toHaveLength(1)
     expect(archive[0].id).toBe('seed-0')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('produces no archive below the cap', async () => {
@@ -77,7 +77,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const map = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
     expect(Object.values(map).filter(r => r.status === 'approved' || r.status === 'rejected')).toHaveLength(51)
     expect(await io.exists(join(root, 'pending-state-archive.json'))).toBe(false)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('dedupes archive entries when the read-only legacy pending.json re-introduces evicted records (V4-01)', async () => {
@@ -114,7 +114,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(archive.map(record => record.id)).toEqual(Array.from({ length: 10 }, (_, i) => `seed-${i}`))
     const ids = archive.map(record => record.id)
     expect(new Set(ids).size).toBe(ids.length)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rotates the audit sidecar to .bak once it exceeds the archive cap (V4-01)', async () => {
@@ -156,7 +156,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(bak).toHaveLength(5000)
     expect(bak[0].id).toBe('arch-0')
     expect(bak[4999].id).toBe('arch-4999')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('retires a legacy pending.json on first list and never resurrects an archived twin (V5-02)', async () => {
@@ -194,7 +194,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.tryResolvePending('current', 'approved')
     expect((await provider.listPending('pending')).some(record => record.id === 'ghost')).toBe(false)
     expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('evicts by record id even when the map key differs from the id (V5-09)', async () => {
@@ -218,7 +218,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(Object.values(after).some(record => record.id === 'real-oldest')).toBe(false)
     const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
     expect(archive.some(record => record.id === 'real-oldest')).toBe(true)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('collapses historical duplicates inside the archive on load (V5-07)', async () => {
@@ -241,7 +241,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.tryResolvePending('to-resolve', 'approved')
     const collapsed = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
     expect(collapsed.filter(record => record.id === 'dup')).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-22: a collapse ALSO lands when the evicted record is already archived (fresh empty, 0.3.37)', async () => {
@@ -269,7 +269,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     // residue forever.
     const once = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
     expect(once.filter(record => record.id === 'dup')).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-30: eviction is by the oldest entry KEYS — a same-id twin keeps its own slot (0.3.37)', async () => {
@@ -296,7 +296,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const archivedShared = archive.filter(record => record.id === 'shared-id')
     expect(archivedShared).toHaveLength(1)
     expect(archivedShared[0]?.summary).toBe('old')
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-01: a mutation BEFORE retirement cannot fixate an archived ghost twin', async () => {
@@ -319,7 +319,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const current = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
     expect(Object.values(current).some(record => record.id === 'ghost')).toBe(false)
     expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V7-08: rotation REFRESHES the once-read archive id cache (0.3.44)', async () => {
@@ -350,7 +350,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.savePending({ id: 'after-rotate', kind: 'memory', summary: 'n2', args: {}, createdAt: 'now', status: 'pending' })
     const current = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
     expect(Object.values(current).some(record => record.id === 'live-0')).toBe(false)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('does not write an empty .bak when the archive was empty at rotation (V5-10)', async () => {
@@ -370,6 +370,6 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(await io.exists(join(root, 'pending-state-archive.json.bak'))).toBe(false)
     const active = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
     expect(active).toHaveLength(1)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

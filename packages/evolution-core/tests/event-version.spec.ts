@@ -41,7 +41,7 @@ describe('event log version guard (F-338)', () => {
     await io.writeText(path, JSON.stringify({ version: 999, events: v1Events }, null, 2))
     const read = await readEvolutionEvents(io, path)
     expect(read).toEqual({ events: [], malformed: false })
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('appendEvolutionEvent rejects a future-version body and preserves the bytes (F-338)', async () => {
@@ -55,7 +55,7 @@ describe('event log version guard (F-338)', () => {
     })).rejects.toThrow(/version mismatch/)
     // The v2 bytes are untouched — never rewritten down to v1.
     expect(await io.readText(path)).toBe(future)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reports the version TYPE so a string body does not read as a numeric match (V4-48)', async () => {
@@ -71,7 +71,7 @@ describe('event log version guard (F-338)', () => {
     })).rejects.toThrow(/got "1" \(string\)/)
     // The bytes are untouched — never rewritten down to v1.
     expect(await io.readText(path)).toBe(body)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a v1 body still appends normally (F-338 does not break the happy path)', async () => {
@@ -84,6 +84,6 @@ describe('event log version guard (F-338)', () => {
     expect(malformed).toBe(false)
     expect(events).toHaveLength(1)
     expect(events[0]?.seq).toBe(seq)
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

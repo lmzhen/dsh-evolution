@@ -57,10 +57,17 @@ export function applyActivityEvent(
   maxItems: number,
   at = Date.now(),
 ): EvolutionActivityRecord[] {
+  // H-05: EVERY optional field is conditionally spread, so an absent
+  // value leaves the key ABSENT instead of present-with-undefined — the same
+  // 口径 as the executionFailures/executionError pair (V6-10). Previously
+  // policyFingerprint/evidenceQuotes/estimatedInputChars were assigned
+  // unconditionally, so `'x' in record` behaved asymmetrically across the
+  // optional fields (a future bug seed for consumers keying on key presence;
+  // JSON output was already identical since stringify drops undefined).
   const record: EvolutionActivityRecord = {
     sessionId: event.sessionId,
     planId: event.planId,
-    policyFingerprint: event.policyFingerprint,
+    ...event.policyFingerprint !== undefined ? { policyFingerprint: event.policyFingerprint } : {},
     memoryApplied: event.memoryApplied,
     skillApplied: event.skillApplied,
     rejectedOps: event.rejectedOps,
@@ -68,8 +75,8 @@ export function applyActivityEvent(
     // into a clean "0/0" record — keep the failure dimension (V5-19 payload).
     ...event.executionFailures !== undefined ? { executionFailures: event.executionFailures } : {},
     ...event.executionError !== undefined ? { executionError: event.executionError } : {},
-    evidenceQuotes: event.evidenceQuotes,
-    estimatedInputChars: event.estimatedInputChars,
+    ...event.evidenceQuotes !== undefined ? { evidenceQuotes: event.evidenceQuotes } : {},
+    ...event.estimatedInputChars !== undefined ? { estimatedInputChars: event.estimatedInputChars } : {},
     at,
   }
   // A non-positive cap would disable the window entirely (`slice(-0)` keeps
@@ -106,6 +113,13 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
   }
 }
 
+/**
+ * H-06: @internal — test-support API. The runtime listener path
+ * persists through the `transactIo` fold inside `apply()` and never calls
+ * this helper; it is kept only because the tests use it as a read barrier.
+ * Do not extend it into a second production read path (the apply() listener
+ * is the single sink).
+ */
 export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
   return parseActivityContent(await io.readText(activityFile(root)))
 }
