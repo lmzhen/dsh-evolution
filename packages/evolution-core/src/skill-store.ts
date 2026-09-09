@@ -1426,7 +1426,7 @@ export class SkillLibrary {
       // concurrent writer's bytes and reporting success. Refuse instead; the
       // fallback is only for genuine cross-media rename failures.
       if (await this.io.exists(dest)) {
-        return `the destination appeared mid-move (concurrent create or restore); refusing to merge — inspect both trees`
+        return 'the destination appeared mid-move (concurrent create or restore); refusing to merge — inspect both trees'
       }
       // Some IO providers cannot rename across media. Copy the whole tree
       // first so support files are never lost during archival fallback.

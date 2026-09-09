@@ -561,7 +561,7 @@ export class EvolutionCurator extends Service {
     this.mutexDepth += 1
     const prev = this.mutexTail
     let releaseMutex!: () => void
-    this.mutexTail = new Promise<void>(resolve => { releaseMutex = resolve })
+    this.mutexTail = new Promise<void>((resolve) => { releaseMutex = resolve })
     let released = false
     const release = (): void => {
       if (released) return

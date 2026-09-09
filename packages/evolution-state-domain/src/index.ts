@@ -283,7 +283,7 @@ export function apply(ctx: Context): void {
         // delete failure warns instead of surfacing as a failed approve.
         if (resolved.record !== null) {
           const resolvedEntries = [...table.entries()]
-            .map(([key, record]) => ({ key, record: record as PendingRecord }))
+            .map(([key, record]) => ({ key, record }))
             .filter(entry => entry.record.status === 'approved' || entry.record.status === 'rejected')
           const resolvedAtMs = (record: PendingRecord): number => {
             const parsed = Date.parse(record.resolvedAt ?? '')

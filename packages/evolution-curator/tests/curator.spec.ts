@@ -1795,7 +1795,7 @@ describe('P2-5 (v15)/v16: control-plane mutators serialize on the mutex chain', 
       const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
       const release = await internals.acquireMutex()
       let done = false
-      const pending = curator.restore('ghost-skill').then(result => { done = true; return result })
+      const pending = curator.restore('ghost-skill').then((result) => { done = true; return result })
       await new Promise(resolve => setTimeout(resolve, 100))
       expect(done).toBe(false)
       release()
@@ -1824,7 +1824,7 @@ describe('P2-5 (v15)/v16: control-plane mutators serialize on the mutex chain', 
       const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
       const release = await internals.acquireMutex()
       let restoreDone = false
-      const pendingRestore = curator.restore('ghost-skill').then(result => { restoreDone = true; return result })
+      const pendingRestore = curator.restore('ghost-skill').then((result) => { restoreDone = true; return result })
       // run() must SKIP while control-plane work is queued/active.
       const outcome = await curator.run()
       expect(outcome.skipped).toBe('already-running')
@@ -1840,96 +1840,96 @@ describe('P2-5 (v15)/v16: control-plane mutators serialize on the mutex chain', 
   })
 })
 
-  it('P3 (v17): two queued control-plane mutators run SERIALLY (no overlap, FIFO)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-fifo-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-      const curator = ctx.evolutionCurator
-      // Instrument the two mutator bodies to detect overlap.
-      const events: string[] = []
-      let inFlight = 0
-      let maxInFlight = 0
-      const internals = curator as unknown as {
-        restoreMutate(name: string): Promise<{ ok: boolean; message: string }>
-        consolidateMutate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
-        acquireMutex(): Promise<() => void>
-        restore(name: string): Promise<{ ok: boolean; message: string }>
-        consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
-      }
-      internals.restoreMutate = async (name: string) => {
-        events.push('restore:start')
-        inFlight += 1
-        maxInFlight = Math.max(maxInFlight, inFlight)
-        await new Promise(resolve => setTimeout(resolve, 30))
-        inFlight -= 1
-        events.push('restore:end')
-        return { ok: false, message: `not in .archive (${name})` }
-      }
-      internals.consolidateMutate = async (target: string) => {
-        events.push('consolidate:start')
-        inFlight += 1
-        maxInFlight = Math.max(maxInFlight, inFlight)
-        await new Promise(resolve => setTimeout(resolve, 30))
-        inFlight -= 1
-        events.push('consolidate:end')
-        return { ok: false, message: `not in tree (${target})` }
-      }
-      const release = await internals.acquireMutex()
-      const restoreDone = internals.restore('a').then(() => { events.push('restore:done') })
-      const consolidateDone = internals.consolidate('t', ['a']).then(() => { events.push('consolidate:done') })
-      await new Promise(resolve => setTimeout(resolve, 60))
-      // While the mutex is held, NEITHER mutator may have started.
-      expect(events.filter(e => e.endsWith(':start'))).toEqual([])
-      release()
-      await Promise.all([restoreDone, consolidateDone])
-      // Serial: no overlap, FIFO order (restore queued first, runs first;
-      // its .then continuation completes before consolidate starts — the
-      // mutex hands over only at release()).
-      expect(maxInFlight).toBe(1)
-      expect(events).toEqual(['restore:start', 'restore:end', 'restore:done', 'consolidate:start', 'consolidate:end', 'consolidate:done'])
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+it('P3 (v17): two queued control-plane mutators run SERIALLY (no overlap, FIFO)', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-curator-fifo-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    const curator = ctx.evolutionCurator
+    // Instrument the two mutator bodies to detect overlap.
+    const events: string[] = []
+    let inFlight = 0
+    let maxInFlight = 0
+    const internals = curator as unknown as {
+      restoreMutate(name: string): Promise<{ ok: boolean; message: string }>
+      consolidateMutate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
+      acquireMutex(): Promise<() => void>
+      restore(name: string): Promise<{ ok: boolean; message: string }>
+      consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
     }
-  })
+    internals.restoreMutate = async (name: string) => {
+      events.push('restore:start')
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise(resolve => setTimeout(resolve, 30))
+      inFlight -= 1
+      events.push('restore:end')
+      return { ok: false, message: `not in .archive (${name})` }
+    }
+    internals.consolidateMutate = async (target: string) => {
+      events.push('consolidate:start')
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise(resolve => setTimeout(resolve, 30))
+      inFlight -= 1
+      events.push('consolidate:end')
+      return { ok: false, message: `not in tree (${target})` }
+    }
+    const release = await internals.acquireMutex()
+    const restoreDone = internals.restore('a').then(() => { events.push('restore:done') })
+    const consolidateDone = internals.consolidate('t', ['a']).then(() => { events.push('consolidate:done') })
+    await new Promise(resolve => setTimeout(resolve, 60))
+    // While the mutex is held, NEITHER mutator may have started.
+    expect(events.filter(e => e.endsWith(':start'))).toEqual([])
+    release()
+    await Promise.all([restoreDone, consolidateDone])
+    // Serial: no overlap, FIFO order (restore queued first, runs first;
+    // its .then continuation completes before consolidate starts — the
+    // mutex hands over only at release()).
+    expect(maxInFlight).toBe(1)
+    expect(events).toEqual(['restore:start', 'restore:end', 'restore:done', 'consolidate:start', 'consolidate:end', 'consolidate:done'])
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
 
-  it('v17: a REAL in-flight run holds the mutex — a second run skips (already-running)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-runvs-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-      const curator = ctx.evolutionCurator
-      let started = 0
-      let releaseFirst!: () => void
-      const gate = new Promise<void>(resolve => { releaseFirst = resolve })
-      const internals = curator as unknown as { runCore(options?: { ignoreGates?: boolean; dryRun?: boolean }): Promise<unknown> }
-      internals.runCore = async () => {
-        started += 1
-        await gate
-        return { stale: [], archived: [], errors: [], report: { runId: 'held', startedAt: '', finishedAt: '', durationMs: 0 }, skipped: undefined } as never
-      }
-      const first = curator.run()
-      await new Promise(resolve => setTimeout(resolve, 50))
-      expect(started).toBe(1)
-      const second = await curator.run()
-      expect(second.skipped).toBe('already-running')
-      releaseFirst()
-      const firstOutcome = await first
-      expect(started).toBe(1)
-      expect(firstOutcome.report.runId).toBe('held')
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+it('v17: a REAL in-flight run holds the mutex — a second run skips (already-running)', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-curator-runvs-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    const curator = ctx.evolutionCurator
+    let started = 0
+    let releaseFirst!: () => void
+    const gate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const internals = curator as unknown as { runCore(options?: { ignoreGates?: boolean; dryRun?: boolean }): Promise<unknown> }
+    internals.runCore = async () => {
+      started += 1
+      await gate
+      return { stale: [], archived: [], errors: [], report: { runId: 'held', startedAt: '', finishedAt: '', durationMs: 0 }, skipped: undefined }
     }
-  })
+    const first = curator.run()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(started).toBe(1)
+    const second = await curator.run()
+    expect(second.skipped).toBe('already-running')
+    releaseFirst()
+    const firstOutcome = await first
+    expect(started).toBe(1)
+    expect(firstOutcome.report.runId).toBe('held')
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
