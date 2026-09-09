@@ -173,6 +173,10 @@ export function validateCapabilityPackage(
     errors.push('code object is required')
   } else {
     const halves = code as Record<string, unknown>
+    // B-6 (v18): a non-string half used to be treated as empty and the raw
+    // value still rode into the pending record. Reject it explicitly.
+    if (halves.host !== undefined && typeof halves.host !== 'string') errors.push('code.host must be a string')
+    if (halves.client !== undefined && typeof halves.client !== 'string') errors.push('code.client must be a string')
     const host = typeof halves.host === 'string' ? halves.host : ''
     const client = typeof halves.client === 'string' ? halves.client : ''
     if (host.length === 0 && client.length === 0) errors.push('at least one of code.host or code.client is required')

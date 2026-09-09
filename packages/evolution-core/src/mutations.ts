@@ -95,6 +95,14 @@ export async function recordMutation(
         return current
       }
     }
+    // A2-11 (v18): a newer on-disk version is never downgraded by this writer.
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const version = (parsed as { version?: unknown }).version
+      if (typeof version === 'number' && version > MUTATIONS_FILE_VERSION) {
+        console.warn(`mutation audit record dropped: ${mutationsFile(root)} declares version ${version} (newer than ${MUTATIONS_FILE_VERSION}); not overwritten`)
+        return current
+      }
+    }
     const existing = recordsFromParsed(parsed)
     existing.push(record)
     const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing

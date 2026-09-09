@@ -24,6 +24,19 @@ it('quality-warned skills may turn stale earlier without early archive', () => {
   expect(result.archive).toEqual([])
 })
 
+it('B-4 (v18): the FEEDBACK-owned warn pair reaches the union read (short window, no deferral)', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const idle = new Date(now.getTime() - 10 * 86_400_000)
+  const usage = new Map()
+  // Never used, never loaded, 10 days old — the young-skill deferral would
+  // skip it at the 30-day base window; the feedback-owned warn must still put
+  // it into the 7-day short window (that union is the feedback package's whole
+  // advertised purpose, and nothing else in the family writes feedback_warn).
+  usage.set('feedback-warned', { created_by: 'agent', created_at: idle.toISOString(), use_count: 0, view_count: 0, patch_count: 0, last_used_at: idle.toISOString(), last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null, feedback_warn: true })
+  const result = computeLifecycleTransitions(usage, { staleAfterDays: 30, archiveAfterDays: 90, qualityWarnStaleAfterDays: 7 }, now)
+  expect(result.markStale).toEqual(['feedback-warned'])
+})
+
 it('pinned and non-agent skills are untouched', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
   const old = new Date(now.getTime() - 200 * 86_400_000)

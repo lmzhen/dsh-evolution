@@ -29,15 +29,29 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 ]
 
 // F-335 (0.3.23): the older `\b(?:token|...)\b` missed connected keys such as
-// `auth_token=`, `client_secret=`, `access_token=` — `_` is a word char, so
-// `\btoken\b` found no boundary inside `auth_token`. The core word now accepts
-// a `[\w-]+[_\-]` prefix and a `[_\-][\w-]+` suffix, but a *bare* substring is
-// still not a key: `monkey=` stays untouched because its core would start at
-// `m`/`key`, and the prefix alternative needs a `_`/`-` separator (no match).
-// p1 (= label prefix incl. separator, quoted or not) is preserved verbatim.
+// `auth_token=`, `client_secret=`, `access_token=`. The v18 audit (A2-5)
+// found the replacement's value class too narrow: a value containing
+// `@ ! # $ %` or spaces did not match at all and leaked verbatim. The pattern
+// now matches the key + separator, then ANY quoted or unquoted value up to
+// the line end, and masks the value wholesale.
+//
+// The unquoted fallback must NOT exclude the quote characters: a value whose
+// opening quote has no closing quote on this line (a truncated log line, a
+// multi-line JSON value, an escaped quote inside the value) otherwise matched
+// no branch at all, and the regex fell back to "value = one space" — masking
+// the separator and leaking the secret verbatim. The quoted branches still win
+// for well-formed values because they are tried first.
+//
+// A2-6 (v18): the old `(?:\b|[\w-]+[_\-])` prefix was O(n²) on a long word
+// with no separator (100k chars measured ~23-26s, synchronously). The prefix
+// is now anchored by `(^|[^\w-])` and bounded to 64 chars, so the regex is
+// linear in the input and cannot stall the event loop.
+// Capture groups: 1 = leading boundary (kept), 2 = connected prefix (kept),
+// 3 = key (kept), 4 = separator (kept), 5.. = value (masked).
 const INLINE_ASSIGNMENT_PATTERN = new RegExp(
-  '((?:\\b|[\\w-]+[_\\-])(?:token|api[_-]?key|secret|password|passwd)' +
-  '(?:[_\\-][\\w-]+)?\\b[\\s]*[:=][\\s]*["\']?)([A-Z0-9._~+/=\\-]{12,})',
+  '(^|[^\\w-])([\\w-]{0,64}[_\\-])?((?:token|api[_-]?key|secret|password|passwd)' +
+  '(?:[_\\-][\\w-]{0,64})?)\\b([\\s]*[:=][\\s]*)' +
+  '(?:"([^"\\r\\n]*)"|\'([^\'\\r\\n]*)\'|([^\\r\\n]+))',
   'gi',
 )
 
@@ -57,6 +71,7 @@ export function redactSecrets(text: string): string {
   for (const [, pattern] of SECRET_PATTERNS) {
     out = out.replace(pattern, '<redacted>')
   }
-  out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, p1?: string) => `${p1 ?? ''}<redacted>`)
+  out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, lead?: string, prefix?: string, key?: string, separator?: string) =>
+    `${lead ?? ''}${prefix ?? ''}${key ?? ''}${separator ?? ''}<redacted>`)
   return out
 }

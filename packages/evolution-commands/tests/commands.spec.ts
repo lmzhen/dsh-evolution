@@ -1058,4 +1058,15 @@ describe('evolution-commands', () => {
     expect(result.kind).toBe('error')
     expect(result.text).toContain('Invalid --timeout value')
   })
+
+  it('F-14/E-7 (v18): the Config schema defaults maintainTimeoutMs and carries both root keys', () => {
+    const value = (Commands.Config as unknown as {
+      ['~standard']: { validate(input: unknown): { value: { maintainTimeoutMs: number; root: string; skillsRoot: string } } }
+    })['~standard'].validate({}).value
+    expect(value.maintainTimeoutMs).toBe(600_000)
+    // E-7: `root` is canonical, `skillsRoot` the deprecated alias — both must
+    // exist so a legacy deployment still loads and the warn can fire.
+    expect(value.root).toBe('')
+    expect(value.skillsRoot).toBe('')
+  })
 })

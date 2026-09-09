@@ -47,9 +47,15 @@ export function renderFacts(report: DriftReport, options: RenderFactsOptions): s
 
 function renderSignal(signal: DriftSignal, redact: (text: string) => string): string[] {
   const prefix = signal.verdict === 'unknown' ? '[UNKNOWN]' : '[FACT]'
-  const value = redact(signal.value)
+  // A2-13 (v18): a value carrying the closing delimiter (or a raw newline)
+  // could end the facts block early and inject instructions. Escape both.
+  const sanitize = (text: string): string => redact(text)
+    .replaceAll('<<<END FACTS>>>', '<<<END FACTS (escaped)>>>')
+    .replaceAll('\n', ' ')
+    .replaceAll('\r', ' ')
+  const value = sanitize(signal.value)
   const parts = [`${prefix} signal=${signal.id}`, `value=${value}`, `verdict=${signal.verdict}`]
   if (signal.threshold !== undefined) parts.push(`threshold=${signal.threshold}`)
-  if (signal.detail !== undefined) parts.push(`detail=${redact(signal.detail)}`)
+  if (signal.detail !== undefined) parts.push(`detail=${sanitize(signal.detail)}`)
   return [parts.join(' ')]
 }

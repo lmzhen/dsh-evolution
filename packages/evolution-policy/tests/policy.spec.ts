@@ -141,4 +141,15 @@ describe('evolution-policy', () => {
     // by the stronger fail-loud one.
     await expect(ctx.plugin(EvolutionPolicy, { reviewMode: 'orchestrate' as never })).rejects.toThrow(/reviewMode/)
   })
+
+  it('F-14 (v18): configured protectedSkillNames extend the frozen safety list', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionPolicy, { protectedSkillNames: ['house-skill'] })
+    expect(ctx.evolutionPolicy.get().protectedSkillNames).toContain('plan')
+    expect(ctx.evolutionPolicy.get().protectedSkillNames).toContain('house-skill')
+    // Deduplicated: a repeated entry cannot grow the list.
+    const again = new Context()
+    await again.plugin(EvolutionPolicy, { protectedSkillNames: ['house-skill', 'house-skill'] })
+    expect(again.evolutionPolicy.get().protectedSkillNames.filter(name => name === 'house-skill')).toHaveLength(1)
+  })
 })

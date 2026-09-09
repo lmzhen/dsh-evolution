@@ -334,7 +334,11 @@ export function computeScopeView(
 
 function daysSince(iso: string | null, created: string, now: number): number {
   const anchor = iso ?? created
-  return (now - new Date(anchor).getTime()) / 86_400_000
+  // A2-9 (v18): an invalid date used to produce NaN and silently freeze the
+  // lifecycle comparison (every `idle >= threshold` was false).
+  const t = Date.parse(anchor)
+  if (!Number.isFinite(t)) return 0
+  return (now - t) / 86_400_000
 }
 
 export function computeLifecycleTransitions(
@@ -357,17 +361,21 @@ export function computeLifecycleTransitions(
     if (!lifecycleCandidate(name, record, config, bundled, gateSet, protectedNames)) continue
 
     const age = daysSince(null, record.created_at, now.getTime())
-    if (record.use_count === 0 && age < config.staleAfterDays) continue
-
-    const idle = daysSince(latestActivityAt(record), record.created_at, now.getTime())
     // P1-1 (v15): the warn state is the UNION of the curator-owned six-factor
     // pair and the feedback-owned pair — negative feedback must shorten the
     // stale window (that is the feedback package's entire advertised purpose).
-    // The v15 audit found the feedback pair never reached this point alive
-    // (scoreTree overwrote quality_warn first); the union read plus the
-    // feedback-owned field close the dead channel. Field ownership:
-    // see `UsageRecord` in usage.ts.
+    // Field ownership: see `UsageRecord` in usage.ts.
     const qualityWarn = record.quality_warn === true || record.feedback_warn === true
+    // P2-12/E-2 (v18): "never used" means never LOADED — `view_count` is the
+    // in-tree signal (the platform `skill` tool) and `use_count` an external
+    // host signal, so the guard reads both. It used to read `use_count` alone
+    // and therefore deferred EVERY skill younger than staleAfterDays,
+    // including a quality/feedback-warned one whose short window is exactly
+    // what the union read exists for. Warned skills skip the deferral and enter
+    // the normal (short-window) decision; the scope view lists them as watched.
+    if (record.use_count + record.view_count === 0 && !qualityWarn && age < config.staleAfterDays) continue
+
+    const idle = daysSince(latestActivityAt(record), record.created_at, now.getTime())
     const staleAfterDays = qualityWarn && config.qualityWarnStaleAfterDays !== undefined
       ? config.qualityWarnStaleAfterDays
       : config.staleAfterDays

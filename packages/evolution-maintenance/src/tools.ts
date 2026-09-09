@@ -12,7 +12,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { SkillLibrary, redactSecrets, resolveSkillsRoot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, redactSecrets, resolveRootConfig, resolveSkillsRoot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 import { buildEnrichment } from './enrichment.ts'
 import { snapshotFromLibrary } from './drift-scan.ts'
@@ -20,18 +20,26 @@ import { snapshotFromLibrary } from './drift-scan.ts'
 export const name = 'evolution-maintenance-tools'
 
 export interface Config {
-  /** Skill-tree root for probe reads; empty uses skillsRoot(). Align with
-   * tool-skill-manage/skill-usage/evolution-skill-catalog/commands rows (A7). */
+  /** Skill-tree root for probe reads; empty uses the default tree. E-7 (v18):
+   * canonical key — the same `root` every other family row reads. */
+  root?: string | undefined
+  /** Deprecated alias of `root` (E-7, v18); honoured only while `root` is
+   * empty, with a warning; removed after 0.3.65. */
   skillsRoot?: string | undefined
 }
 
 // F1 (P2-18, v11): family Config-schema convention (same as commands).
 export const Config = z.object({
+  root: z.string().default(''),
   skillsRoot: z.string().default(''),
 })
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  const config = rawConfig
+  // E-7 (v18): canonical `root`, deprecated `skillsRoot` alias.
+  const rootConfig = resolveRootConfig(rawConfig)
+  if (rootConfig.usedDeprecatedAlias) {
+    ctx.logger.warn('evolution-maintenance-tools: config "skillsRoot" is deprecated (E-7); use "root" — the alias is honoured until 0.3.65')
+  }
   ctx.inject(['tools'], (toolCtx) => {
     // Single budget-cast on the injected `tools` service (X-6): the previous
     // `toolCtx as unknown as {...}` double-cast was a gratuitous widening —
@@ -68,7 +76,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const target = args.target
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return { signal, detail: ['evolution-io registry not mounted'], ...(target ? { target } : {}) }
-          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
+          const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), ioRegistry.provider())
           // 0.3.9: build snapshots through the SAME enrichment the scan uses
           // (descriptions/supportFiles/quality) — previously the probe fed
           // body-only snapshots and answered "description=missing" while the

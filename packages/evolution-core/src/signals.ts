@@ -51,6 +51,23 @@ const FIX_PATTERNS = [
   /retry(?:ing)? worked|workaround/i,
 ]
 
+/** Text of one persisted content block, or `''` for any other shape.
+ *
+ * Content blocks cross the durable session-log boundary, so their runtime
+ * shape is `unknown` even where the static event type promises
+ * `{ type, text }`: a persisted `content: [null]` (A2-7, v18) used to throw a
+ * TypeError here and the review catch swallowed the whole turn's remaining
+ * signals. Keeping the guard in one helper also keeps the branches free of
+ * conditions the static type already excludes.
+ * @param block - one element of a persisted message `content` array.
+ * @returns the block's text when it is a text block, otherwise an empty string.
+ */
+function textOfBlock(block: unknown): string {
+  if (block === null || typeof block !== 'object') return ''
+  const candidate = block as { type?: unknown; text?: unknown }
+  return candidate.type === 'text' && typeof candidate.text === 'string' ? candidate.text : ''
+}
+
 /** Fold one session event into the current turn observation. */
 export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
   // P1-1 (v11) carried to the remaining branches (N4, v12): the event union
@@ -66,9 +83,7 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     // break the whole signal pipeline — guard and skip instead.
     const content = (data as { content?: unknown }).content
     if (!Array.isArray(content)) return
-    const text = content
-      .map(block => (block as { type?: string; text?: string }).type === 'text' ? (block as { text?: string }).text ?? '' : '')
-      .join(' ')
+    const text = content.map(textOfBlock).join(' ')
     signal.userChars += text.length
     if (CORRECTION_PATTERNS.some(pattern => pattern.test(text))) signal.memorySignal = true
     if (FIX_PATTERNS.some(pattern => pattern.test(text))) signal.skillSignal = true
@@ -82,9 +97,7 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     // — `.content` on an absent message is the same TypeError one level up.
     const message = (data as { message?: { content?: Array<{ type: string; text?: string }> } }).message
     if (!message || !Array.isArray(message.content)) return
-    const text = message.content
-      .map(block => block.type === 'text' ? block.text ?? '' : '')
-      .join(' ')
+    const text = message.content.map(textOfBlock).join(' ')
     signal.assistantChars += text.length
     return
   }

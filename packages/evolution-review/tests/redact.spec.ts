@@ -23,7 +23,11 @@ describe('review redaction', () => {
     expect(out).not.toContain('dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U')
     expect(out).not.toContain('Bearer abcdefghijklmnopqrstuvwxyz')
     expect(out).toContain('token=<redacted>')
-    expect(out).toContain('api_key: "<redacted>"')
+    // A2-5 (v18): the quoted branch consumes the quotes together with the
+    // value, so the redacted line carries the label, the separator and the
+    // mask — no quote survives to hint at a partial value.
+    expect(out).toContain('api_key: <redacted>')
+    expect(out).not.toContain('ABCDEFGHIJKLMNOP')
     expect(out).toContain('<redacted>')
   })
 

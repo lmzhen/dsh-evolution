@@ -117,6 +117,29 @@ function walk(dir) {
 
 walk(root)
 
+// H-6 (v18): a source-tree `.mjs` copy is never legitimate — the runtime is
+// TypeScript under `src/`; scripts live under `scripts/`. The 0.3.63
+// install-layered.mjs duplicate (a 627-line byte-identical copy in a package
+// src/) was invisible to every other guard; this one makes it fail loud.
+{
+  const srcMjs = []
+  const scanSrc = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) { scanSrc(path); continue }
+      if (entry.isFile() && entry.name.endsWith('.mjs')) srcMjs.push(relative(root, path))
+    }
+  }
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const src = join(root, entry.name, 'src')
+    if (existsSync(src)) scanSrc(src)
+  }
+  if (srcMjs.length > 0) {
+    violations.push(`source-tree .mjs file(s) (H-6: scripts belong under scripts/, not package src/): ${srcMjs.join(', ')}`)
+  }
+}
+
 // H2 (v11): a probed evolution service key without ANY provider is the
 // P0-1 class (doctor's evolutionReview ghost) — fail the gate.
 const orphanKeys = [...probedEvolutionKeys].filter(key => !providedEvolutionKeys.has(key))

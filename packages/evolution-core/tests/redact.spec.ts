@@ -43,6 +43,21 @@ describe('redactSecrets (E-1, 0.3.16)', () => {
     expect(redactSecrets(prose)).toBe(prose)
   })
 
+  it('A2-5 (v18): masks the whole value, including a value with no closing quote', () => {
+    // The quoted branch consumes the quotes with the value (the label and the
+    // separator survive), so no partial secret remains on the line.
+    expect(redactSecrets('api_key: "ABCDEFGHIJKLMNOP" here')).toBe('api_key: <redacted> here')
+    // An opening quote with no closing quote on this line — a truncated log
+    // line or a multi-line value — must fall back to the unquoted branch and
+    // mask to the line end. The v18 audit's first cut excluded `"` from that
+    // branch, so no branch matched and the regex masked only the separator's
+    // trailing space, leaking the secret verbatim.
+    expect(redactSecrets('api_key: "ABCDEFGHIJKLMNOP')).toBe('api_key: <redacted>')
+    expect(redactSecrets('token: abc"defghijklmnop')).toBe('token: <redacted>')
+    // A2-5: characters the old value class excluded (spaces, @, #) are covered.
+    expect(redactSecrets('password=p@ss w0rd! #x')).toBe('password=<redacted>')
+  })
+
   it('is idempotent', () => {
     expect(redactSecrets(redactSecrets('use sk-abcdefghij123456 tomorrow'))).toBe('use <redacted> tomorrow')
   })

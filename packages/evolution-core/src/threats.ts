@@ -26,7 +26,11 @@ const FILLER = String.raw`(?:\w+\s+){0,8}`
 const PATTERNS: ThreatPattern[] = [
   // Prompt injection / rule override.
   { label: 'prompt_injection_ignore', category: 'prompt_injection', scope: 'all', regex: new RegExp(String.raw`ignore\s+${FILLER}(?:previous|above|prior|all)\s+${FILLER}instructions`, 'i') },
-  { label: 'disregard_rules', category: 'prompt_injection', scope: 'all', regex: /disregard\s+(?:your|all|any)\s+(?:instructions|rules|guidelines)/i },
+  // P2-2 (v18): the FILLER between the quantifier and the noun closes
+  // "disregard all previous instructions" / "disregard any prior rules",
+  // which the bare form missed while its sibling `prompt_injection_ignore`
+  // already had it.
+  { label: 'disregard_rules', category: 'prompt_injection', scope: 'all', regex: new RegExp(String.raw`disregard\s+${FILLER}(?:your|all|any)\s+${FILLER}(?:instructions|rules|guidelines)`, 'i') },
   { label: 'system_prompt_override', category: 'prompt_injection', scope: 'all', regex: /system\s+prompt\s+override/i },
   { label: 'bypass_restrictions', category: 'prompt_injection', scope: 'all', regex: /act\s+as\s+(?:if|though)\s+(?:you\s+)?(?:have\s+no|don'?t\s+have)\s+(?:restrictions?|limits?|rules)/i },
   { label: 'new_system_prompt', category: 'prompt_injection', scope: 'strict', regex: new RegExp(String.raw`new\s+${FILLER}system\s+${FILLER}prompt`, 'i') },
@@ -77,7 +81,16 @@ const PATTERNS: ThreatPattern[] = [
   { label: 'private_key_block', category: 'hardcoded_secrets', scope: 'all', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
 ]
 
-const ZERO_WIDTH_CHARS = /[\u200b\u200c\u200d\u2060\u2062\u2063\u2064\ufeff]/
+// P2-2 (v18): the invisible/format set now covers the characters the v18
+// probe used to bypass the scan (SOFT HYPHEN, COMBINING GRAPHEME JOINER,
+// ARABIC LETTER MARK, MONGOLIAN VOWEL SEPARATOR, WORD JOINER, deprecated
+// bidi controls, VARIATION SELECTORS) plus the astral TAG block. The `u`
+// flag is required for the `\u{e0000}` range. Homoglyphs (e.g. Cyrillic
+// look-alikes) remain outside this detector by design.
+const INVISIBLE_CHAR_CLASS =
+  '\\u00ad\\u034f\\u061c\\u180e\\u200b\\u200c\\u200d\\u2060\\u2061\\u2062\\u2063\\u2064'
+  + '\\u206a-\\u206f\\ufeff\\ufe00-\\ufe0f'
+const ZERO_WIDTH_CHARS = new RegExp(`[${INVISIBLE_CHAR_CLASS}]|\\u{e0000}-\\u{e007f}`, 'u')
 const BIDI_CHARS = /[\u202a-\u202e\u2066-\u2069]/
 
 const SCOPE_ORDER: Record<ThreatScope, number> = { all: 1, context: 2, strict: 3 }

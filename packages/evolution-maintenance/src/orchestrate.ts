@@ -55,6 +55,8 @@ export interface MaintainRuntime {
 
 export interface MaintainOptions {
   timeoutMs?: number
+  /** E-6 (v18): external cancel signal (session/UI); combined with timeoutMs. */
+  signal?: AbortSignal | undefined
   maxDepth?: number
   model?: string
   provider?: string
@@ -221,6 +223,10 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       protected: options.protected ? options.protected() : undefined,
       catalogInvalid: options.catalogInvalid ? options.catalogInvalid() : undefined,
       usageObserved,
+      // E-9 (v18): a single unreadable SKILL.md is skipped with a trace.
+      onReadError: (name, error) => {
+        runtime.logger?.warn(`evolution-maintenance: skipping unreadable skill "${name}": ${error instanceof Error ? error.message : String(error)}`)
+      },
     })
     if (snapshots.length === 0) {
       // Empty library: no facts to review — do not spend a model call.
@@ -263,7 +269,10 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // hoisted so the catch can consult `signal.aborted` (our own timeout)
     // instead of matching error text. The narrow literals remain only for the
     // platform's unstructured leak of a parent-cancelled run.
-    const signal = AbortSignal.timeout(timeoutMs)
+    // E-6 (v18): honor BOTH the scan timeout and the caller's cancel signal.
+    const signal = options.signal !== undefined
+      ? AbortSignal.any([AbortSignal.timeout(timeoutMs), options.signal])
+      : AbortSignal.timeout(timeoutMs)
     abortSignal = signal
     // 0.3.11 (E-55): route off the same policy as the curator
     // (`evolutionPolicy.get().curatorModel`) instead of a hard-coded maintain

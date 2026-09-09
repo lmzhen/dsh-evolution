@@ -150,6 +150,17 @@ export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map:
       try {
         const probe = JSON.parse(current) as unknown
         if (probe === null || Array.isArray(probe) || typeof probe !== 'object') shapePreserved = true
+        else {
+          const record = probe as Record<string, unknown>
+          // A2-8 (v18): a valid object that is NOT a usage map (any non-object
+          // value, e.g. a future `{version, skills}` wrapper) must keep its
+          // original bytes instead of folding into phantom records.
+          if (Object.values(record).some(value => value === null || typeof value !== 'object' || Array.isArray(value))) shapePreserved = true
+          // A2-11 (v18): a newer on-disk version is never downgraded by this
+          // writer (a skill literally named `version` holds an object, not a
+          // number, so this cannot false-positive on a usage map).
+          if (typeof record.version === 'number' && record.version > 1) shapePreserved = true
+        }
       } catch { return current }
     }
     if (shapePreserved) return current

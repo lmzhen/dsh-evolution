@@ -119,7 +119,10 @@ describe('P2-4: transactCuratorState missing-key optimistic retry', () => {
     ctx.provide('storageDomain', {
       open: async () => ({
         table: () => ({
-          get: async (key: string) => records.get(key) ?? null,
+          // Upstream `Table.get` is synchronous and returns `V | undefined`
+          // (storage-domain domain.ts:48) — model the contract, not an async
+          // shortcut that only works when the caller implicitly awaits.
+          get: (key: string) => records.get(key),
           put: async (key: string, value: unknown) => {
             counters.puts += 1
             records.set(key, value as Record<string, unknown>)

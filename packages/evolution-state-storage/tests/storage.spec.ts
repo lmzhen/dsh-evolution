@@ -50,4 +50,22 @@ describe('evolution-state-storage', () => {
     await selected.transactCuratorState(() => null)
     expect(calls).toEqual(['resolve:x:approved:claim-1', 'claim:x', 'release:x:claim-1', 'transact'])
   })
+
+  it('C-12 (v18): same-object re-registration is idempotent and a stale dispose cannot remove a newer one', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    const one = provider('p1')
+    const first = ctx.evolutionStateStorage.registerProvider(one)
+    // HMR / re-mounted row: the identical object returns the original dispose.
+    expect(ctx.evolutionStateStorage.registerProvider(one)).toBe(first)
+    first()
+    expect(ctx.evolutionStateStorage.hasProviders()).toBe(false)
+    const second = ctx.evolutionStateStorage.registerProvider(one)
+    expect(second).not.toBe(first)
+    // The stale handle must not remove the live registration (generation guard).
+    first()
+    expect(ctx.evolutionStateStorage.hasProviders()).toBe(true)
+    second()
+    expect(ctx.evolutionStateStorage.hasProviders()).toBe(false)
+  })
 })

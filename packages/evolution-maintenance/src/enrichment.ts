@@ -40,7 +40,10 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
   const protectedMap = new Map<string, string>()
   const catalogInvalid = new Map<string, boolean>()
   for (const entry of await library.list()) {
-    if (entry.protectedBy) protectedMap.set(entry.name, entry.protectedBy)
+    // A1-17 (v18): an unknown marker probe is treated as protected, not as
+    // unprotected (see SkillSummary.protectionUnknown).
+    if (entry.protectionUnknown) protectedMap.set(entry.name, 'unknown')
+    else if (entry.protectedBy) protectedMap.set(entry.name, entry.protectedBy)
     const body = (await library.read(entry.name)) as string | null | undefined
     // F-01: the empty-read guard matches drift-scan.ts (null AND
     // undefined) — an injected reader that resolves undefined (instead of the

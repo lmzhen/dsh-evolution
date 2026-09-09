@@ -31,12 +31,19 @@ export const canResolvePending = (status: PendingStatus): boolean => status === 
  * runner FAILURE is retryable); other statuses pass through unchanged. */
 export const releasedStatus = (status: PendingStatus): PendingStatus => status === 'executing' ? 'pending' : status
 
-/** P2-4 (v15): the live pending map/table is BOUNDED — both providers keep at
- * most this many resolved (approved/rejected) records, dropping the oldest by
- * `resolvedAt`. Single source (the v15 audit found the bound was json-only,
- * so domain deployments grew the table without bound). The audit ARCHIVE
- * sidecar that json maintains beyond the cap stays json-specific (domain has
- * no sidecar facility) — declared in both READMEs. */
+/** P2-4 (v15): the live pending map/table is BOUNDED on the RESOLVE path —
+ * `tryResolvePending` drops the oldest resolved (approved/rejected) records by
+ * `resolvedAt` once more than this many exist. Single source (the v15 audit
+ * found the bound was json-only, so domain deployments grew the table without
+ * bound).
+ *
+ * C-6 (v18) contract precision: a direct `savePending` of an already-resolved
+ * record does NOT trigger eviction (the cap is maintained by the resolve
+ * operation, not by the writer), and pending/executing records are never
+ * trimmed. Callers that write resolved audit records themselves own that
+ * growth; the seam's resolve path is what keeps the table bounded.
+ * The audit ARCHIVE sidecar that json maintains beyond the cap stays
+ * json-specific (domain has no sidecar facility) — declared in both READMEs. */
 export const PENDING_RESOLVED_CAP = 200
 
 /**
@@ -123,17 +130,32 @@ declare module '@deepseek-ai/cordis' {
 
 export class EvolutionStateStorageRegistry extends Service {
   private readonly providers = new Map<string, EvolutionStateStorage>()
+  /** C-7 (v18): per-name dispose, mirroring the evolution-io registry. */
+  private readonly disposals = new Map<string, () => void>()
 
   constructor(ctx: Context) {
     super(ctx, 'evolutionStateStorage')
   }
 
+  /** C-7 (v18): re-registering the IDENTICAL provider object is idempotent and
+   * returns the original dispose (HMR / re-mounted row); a DIFFERENT object
+   * under a registered name still fails loud. The dispose carries a generation
+   * guard so a stale handle cannot remove a newer registration. */
   registerProvider(provider: EvolutionStateStorage): () => void {
-    if (this.providers.has(provider.name)) throw new Error(`evolution state storage provider "${provider.name}" already registered`)
-    this.providers.set(provider.name, provider)
-    return () => {
-      if (this.providers.get(provider.name) === provider) this.providers.delete(provider.name)
+    const idempotent = this.providers.get(provider.name) === provider
+    if (!idempotent && this.providers.has(provider.name)) throw new Error(`evolution state storage provider "${provider.name}" already registered`)
+    if (idempotent) {
+      const existing = this.disposals.get(provider.name)
+      if (existing !== undefined) return existing
     }
+    const dispose = (): void => {
+      if (this.disposals.get(provider.name) !== dispose) return
+      this.providers.delete(provider.name)
+      this.disposals.delete(provider.name)
+    }
+    this.providers.set(provider.name, provider)
+    this.disposals.set(provider.name, dispose)
+    return dispose
   }
 
   /** S-07: whether ANY provider is registered. Lets the state

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authoringFeedback, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -727,5 +727,68 @@ it('V6-19: a transact contract violation returns a structured error, not a TypeE
   const result = await lib.update('python-testing', SKILL.replace('Run tests with pytest.', 'Updated.'))
   expect(result.ok).toBe(false)
   expect(result.message).toContain('did not invoke the task')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('A1-17 (v18): a failed marker probe reports protectionUnknown, never "unprotected"', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-unknown-'))
+  // Create the skill through a HEALTHY io first — the failing probes below are
+  // only installed for the listing pass, so create() keeps its normal markers.
+  await new SkillLibrary(root).create('ghost-skill', SKILL.replace('python-testing', 'ghost-skill'), 'foreground')
+  const base = nodeEvolutionIo()
+  const skillDir = join(root, 'ghost-skill')
+  const io = {
+    ...base,
+    // The directory listing fails (EACCES) AND the per-marker fallback probes
+    // fail too — the only honest answer is "unknown".
+    list: async (path: string) => {
+      if (path === skillDir) throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      return base.list(path)
+    },
+    exists: async (path: string) => {
+      if (/\.(pinned|bundled|hub-installed|hermes-managed)$/.test(path)) throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      return base.exists(path)
+    },
+  }
+  const lib = new SkillLibrary(root, io)
+  const summary = (await lib.list()).find(item => item.name === 'ghost-skill')
+  expect(summary?.protectedBy).toBeNull()
+  expect(summary?.protectionUnknown).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('A1-20 (v18): restoring onto a directory without SKILL.md names the real obstacle', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-restore-dir-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('restore-target', SKILL.replace('python-testing', 'restore-target'), 'foreground')
+  expect((await lib.archive('restore-target')).ok).toBe(true)
+  // A partial/hand-made directory squats on the destination — the old probe
+  // only checked SKILL.md and let moveDir fail with a different message.
+  await mkdir(join(root, 'restore-target'), { recursive: true })
+  const result = await lib.restoreFromArchive('restore-target')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('carries no SKILL.md')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('计划 B-4 (v18): SKILL_NAME_RE matches the upstream shape', async () => {
+  expect(SKILL_NAME_RE.test('good-skill')).toBe(true)
+  expect(SKILL_NAME_RE.test('a1')).toBe(true)
+  expect(SKILL_NAME_RE.test('trailing-')).toBe(false)
+  expect(SKILL_NAME_RE.test('double--hyphen')).toBe(false)
+  expect(SKILL_NAME_RE.test('-leading')).toBe(false)
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-name-'))
+  const lib = new SkillLibrary(root)
+  expect((await lib.create('trailing-', SKILL.replace('python-testing', 'trailing-'), 'foreground')).ok).toBe(false)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('E-11 (v18): list() publishes the frontmatter whenToUse routing hint', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-when-'))
+  const lib = new SkillLibrary(root)
+  const body = '---\nname: routed-skill\ndescription: Routed skill.\nwhenToUse: Use for routing checks.\n---\n\n# Routed\n'
+  await lib.create('routed-skill', body, 'foreground')
+  const summary = (await lib.list()).find(item => item.name === 'routed-skill')
+  expect(summary?.whenToUse).toBe('Use for routing checks.')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

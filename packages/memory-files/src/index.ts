@@ -21,6 +21,10 @@ export interface Config {
   root?: string
   /** How many consolidation failures one turn tolerates before the tool tells the model to stop retrying. */
   maxConsolidationFailures?: number
+  /** F-2 (v18): deployment-declared benign threat labels for the MEMORY store.
+   * The skill/guard channels already read this option; without it the
+   * README's "MemoryStore store option" exemption was unreachable. */
+  threatExemptLabels?: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -30,9 +34,10 @@ export const Config: z<Config> = z.object({
   addDatePrefix: z.boolean().default(false),
   root: z.string().default(''),
   maxConsolidationFailures: z.number().min(1).default(DEFAULT_CONSOLIDATION_FAILURES),
+  threatExemptLabels: z.array(z.string()).default([]),
 })
 
-export function apply(ctx: Context, rawConfig: Config): void {
+export function apply(ctx: Context, rawConfig: Config = {}): void {
   // G3.1 (0.3.23): clamp the numeric memory limit at assembly so a 0/negative/
   // NaN/±Infinity value falls back to the package default. A 0 limit is never an
   // "unbounded" meaning (MemoryStore keeps its own internal defense); the schema
@@ -70,6 +75,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
     userCharLimit: config.userCharLimit,
     addDatePrefix: config.addDatePrefix,
     maxConsolidationFailures: config.maxConsolidationFailures,
+    // F-2 (v18): the memory store's own exemption list, now configurable.
+    threatExemptLabels: config.threatExemptLabels,
     ...resolvedRoot !== '' ? { root: resolvedRoot } : {},
     io,
   })

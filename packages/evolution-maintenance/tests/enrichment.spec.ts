@@ -48,7 +48,7 @@ describe('buildEnrichment', () => {
     // guard `continue`s AFTER the marker is recorded (same order as drift-scan).
     const library = {
       async list() {
-        return [{ name: 'ghost-skill', protectedBy: '.pinned' }]
+        return [{ name: 'ghost-skill', protectedBy: '.pinned', protectionUnknown: false }]
       },
       async read() {
         return undefined

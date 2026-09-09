@@ -10,7 +10,7 @@ import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -20,6 +20,14 @@ import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 
 export const name = 'evolution-review'
 export const inject = ['agents']
+
+/** Node's 32-bit timer-delay ceiling (`AbortSignal.timeout`/`setTimeout`):
+ * a larger value throws RangeError. B-2 (v18): without a max, a misconfigured
+ * `reviewTimeoutMs` made `AbortSignal.timeout` throw inside the subagent
+ * start call; the outer catch logged it and silently degraded the review to
+ * the inject path. The schema and the assembly clamp both reject it (same
+ * bound as commands/maintenance). */
+const MAX_TIMER_DELAY_MS = 4_294_967_295
 
 export interface Config {
   reviewEnabled?: boolean
@@ -60,7 +68,10 @@ export interface Config {
    * Empty (the default) resolves through `resolveSkillsRoot` to the shared
    * default root — the historical behavior. A custom root keeps review-created
    * skills in the SAME tree the catalog/tools read instead of writing a
-   * parallel tree the rest of the family cannot see. */
+   * parallel tree the rest of the family cannot see. E-7 (v18): canonical key. */
+  root?: string
+  /** Deprecated alias of `root` (E-7, v18); honoured only while `root` is
+   * empty, with a warning; removed after 0.3.65. */
   skillsRoot?: string
 }
 
@@ -70,7 +81,7 @@ export const Config: z<Config> = z.object({
   memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),
-  reviewTimeoutMs: z.number().min(1).default(DEFAULT_REVIEW_TIMEOUT_MS),
+  reviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_REVIEW_TIMEOUT_MS),
   // P3-4 (v14): the former `executionTimeoutMs` declaration was deleted — no
   // code path ever read it, and keeping a configurable-looking dead field in
   // the schema invited deployments to set something with no effect.
@@ -94,6 +105,8 @@ export const Config: z<Config> = z.object({
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
   // V10-11 (P2-7): empty string keeps the default root (resolveSkillsRoot
   // trims and falls back) — the schema default mirrors the Config contract.
+  // E-7 (v18): `root` is canonical; `skillsRoot` is the deprecated alias.
+  root: z.string().default(''),
   skillsRoot: z.string().default(''),
 })
 
@@ -206,15 +219,18 @@ type ClampedReviewConfig = Config & {
 
 export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedReviewConfig {
   const clamped: string[] = []
-  const field = (name: keyof Config, value: number | undefined, fallback: number, min: number): number => {
-    const result = clampedNumber(value, fallback, { min })
+  const field = (name: keyof Config, value: number | undefined, fallback: number, min: number, max?: number): number => {
+    const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
     if (value !== undefined && result !== value) clamped.push(name)
     return result
   }
   const config = Object.assign({}, rawConfig, {
     memoryInterval: field('memoryInterval', rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
     skillInterval: field('skillInterval', rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
-    reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 1),
+    // B-2 (v18): the 32-bit ceiling is enforced here as well as in the schema
+    // (the schema may be bypassed by a programmatic assembly; clampedNumber
+    // also catches NaN/±Infinity, which z.number() lets through).
+    reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
     reviewContextMessages: field('reviewContextMessages', rawConfig.reviewContextMessages, DEFAULT_REVIEW_CONTEXT_MESSAGES, 1),
     reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, DEFAULT_REVIEW_MESSAGE_CHARS, 1),
     reviewMaxDepth: field('reviewMaxDepth', rawConfig.reviewMaxDepth, 1, 1),
@@ -226,11 +242,16 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
   return config
 }
 
-export function apply(ctx: Context, rawConfig: Config): void {
+export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
   }
   const config = clampReviewConfig(rawConfig, ctx)
+  // E-7 (v18): canonical `root`, deprecated `skillsRoot` alias.
+  const rootConfig = resolveRootConfig(rawConfig)
+  if (rootConfig.usedDeprecatedAlias) {
+    ctx.logger.warn('evolution-review: config "skillsRoot" is deprecated (E-7); use "root" — the alias is honoured until 0.3.65')
+  }
   const turnStarts = new Map<SessionId, number>()
   // P3 (v15): per-mount one-shot for the stateless warn (was module-level).
   let statelessReviewStateWarned = false
@@ -468,6 +489,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
       }
       return
     }
+    // B-3 (v18): a turn woken by our own followup suppresses the cadence
+    // fire above; it must not fall through to the completion channel either
+    // (the same double-review boundary the V10-13 guard protects).
+    if (skipFire) return
     // Cadence waited; the completion channel fires once per session after a
     // task the conversation has proven long (cumulative tool-call threshold),
     // so short conversations are never adapted to at the cost of long ones.
@@ -837,7 +862,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // the library on the hardcoded default root, so a custom-root deployment
       // wrote skills into a tree the catalog/tools never read. Route through
       // the single core resolver (empty config.skillsRoot = default root).
-      const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+      const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
       const op = skillArgs
       const name = op.name ?? ''
       const origin: WriteOrigin = origins.library

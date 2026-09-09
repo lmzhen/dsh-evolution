@@ -11,6 +11,11 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
 
+/** D-6 (v18): exact-segment tail match (the loose substring form matched a
+ * hypothetical `dsh-evolution-allowlist`). */
+const tailOf = (name: string): string => name.slice(name.lastIndexOf('/') + 1)
+const EVOLUTION_BUNDLE_TAILS = new Set(['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset'])
+
 export interface DoctorReport {
   installForm: 'full' | 'host' | 'preset' | 'layered' | 'none'
   /** Aggregated across ALL profiles under `home` (N13, v12): doctor answers
@@ -38,7 +43,7 @@ export function collectEvolutionBundles(home: string): string[] {
         dsh?: { profile?: { bundles?: string[] } }
       }
       for (const name of manifest.dsh?.profile?.bundles ?? []) {
-        if (/evolution-(all|host|preset)/.test(name)) bundles.push(name)
+        if (EVOLUTION_BUNDLE_TAILS.has(tailOf(name))) bundles.push(name)
       }
     } catch {
       // A torn/partial profile manifest never blocks doctor.
@@ -71,9 +76,9 @@ export async function diagnose(
   const bundles = collectEvolutionBundles(home)
   const has = (name: string) => ctx.get(name) !== undefined
 
-  const full = bundles.some(name => /evolution-all/.test(name))
-  const host = bundles.some(name => /evolution-host/.test(name))
-  const preset = bundles.some(name => /evolution-preset/.test(name))
+  const full = bundles.some(name => tailOf(name) === 'dsh-evolution-all')
+  const host = bundles.some(name => tailOf(name) === 'dsh-evolution-host')
+  const preset = bundles.some(name => tailOf(name) === 'dsh-evolution-preset')
   const presetDir = join(home, '.agent-presets', 'evolution')
   const layered = host && existsSync(presetDir)
 

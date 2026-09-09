@@ -385,6 +385,40 @@ describe('learning graph', () => {
     }
   })
 
+  it('E-3 (v18): /graph edit forwards the platform session policy to the approval request', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-e3-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', { register: (definition: unknown) => { handler = definition as typeof handler; return () => {} } })
+      ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
+      ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      // The PLATFORM approval service is the single source of the session
+      // policy (effectiveSessionPolicy); a `never` policy must reach the
+      // evolution approval request so the seam can refuse to stage.
+      ctx.provide('approval', { overrideOf: () => undefined, config: { policy: 'never' } })
+      let captured: { sessionPolicy?: unknown } | undefined
+      ctx.provide('evolutionApproval', {
+        hasRunner: () => true,
+        request: async (input: unknown) => { captured = input as typeof captured; return { action: 'staged', message: 'staged for approval' } },
+      })
+      await ctx.plugin(Graph)
+      const result = await handler!.handler({
+        rawInput: 'edit demo-skill new body',
+        agent: { session: { id: 'sess-e3', header: { origin: 'subagent' } } },
+      })
+      expect(result.kind).toBe('success')
+      expect(captured?.sessionPolicy).toBe('never')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
   it('N1 (v12): /graph delete passes the session too and a never-policy session is not staged', async () => {
     const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1d-'))
     const previousHome = process.env.DSH_HOME

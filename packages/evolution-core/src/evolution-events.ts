@@ -76,6 +76,36 @@ export function eventsFile(home: string): string {
   return join(home, 'evolution', 'events.json')
 }
 
+/** I-5 (v18): one lightweight description of the durable event payload
+ * contract. The log is a FILE boundary (a host, a script or an older version
+ * can write it), so `appendEvolutionEvent` refuses a record no consumer can
+ * fold instead of persisting it and failing silently later. The process event
+ * bus stays unvalidated — that is a typed same-process boundary.
+ * @param event - the candidate event record.
+ * @returns a human-readable issue, or null when the record is well-formed.
+ */
+export function evolutionEventPayloadIssue(event: { type?: unknown } & Partial<EvolutionEvent>): string | null {
+  const type = event.type
+  // `type` is `unknown` on purpose: at this FILE boundary the static union is
+  // not a guarantee, so a non-member (or non-string) is reported.
+  if (typeof type !== 'string') return `unknown event type "${String(type)}"`
+  switch (type) {
+    case 'feedback':
+      if (event.kind !== 'skill' && event.kind !== 'session') return 'feedback event requires kind skill|session'
+      if (event.rating !== 'positive' && event.rating !== 'negative') return 'feedback event requires rating positive|negative'
+      return null
+    case 'maintain':
+      return typeof event.runId === 'string' ? null : 'maintain event requires runId'
+    case 'learn':
+    case 'usage':
+      return null
+    default:
+      // Unreachable for the declared union; reachable when a JS host writes
+      // the file. The cast restores the runtime value the union erased.
+      return `unknown event type "${type as string}"`
+  }
+}
+
 function isEventRecord(event: unknown): event is EvolutionEvent {
   // C-05: NaN passed the bare typeof check — a NaN seq became a Map
   // key that never matches and a sort comparator that never orders. Only a
@@ -163,6 +193,9 @@ export async function listEventArchives(io: EvolutionIoLike, path: string): Prom
  * event can never shadow an archived one in the seq-deduped timeline.
  */
 export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, event: Omit<EvolutionEvent, 'seq' | 'at'>, rotateAt = EVENT_LOG_ROTATE_AT): Promise<number> {
+  // I-5 (v18): refuse an unfoldable record at the durable write boundary.
+  const issue = evolutionEventPayloadIssue(event)
+  if (issue !== null) throw new Error(`evolution event refused: ${issue}`)
   let assigned = 0
   // Empty when the append was refused as malformed; set when it was refused
   // because the log carries a future `version` (F-338). Kept as a prebuilt
@@ -225,7 +258,9 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
  * one-event rotate would archive everything and restart seqs at 1).
  */
 async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionEvent[], rotateAt: number): Promise<EvolutionEvent[]> {
-  if (rotateAt < 2 || events.length < rotateAt) return events
+  // A2-10 (v18): a NaN rotateAt made both comparisons false, so the log
+  // rotated on EVERY append. Treat non-finite as "no rotation".
+  if (!Number.isFinite(rotateAt) || rotateAt < 2 || events.length < rotateAt) return events
   const mid = Math.ceil(events.length / 2)
   const head = events.slice(0, mid)
   const tail = events.slice(mid)

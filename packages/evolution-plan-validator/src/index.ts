@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
-import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, RESTRUCTURE_TARGET_RE } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
   target?: string
@@ -243,9 +243,13 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
       if (!move || typeof move.heading !== 'string' || !move.heading.trim()) {
         return `skill op ${index}: restructure[${moveIndex}] requires a non-empty heading`
       }
-      if (typeof move.to_file !== 'string' || !RESTRUCTURE_TARGET_RE.test(move.to_file)) {
+      if (typeof move.to_file !== 'string') {
         return `skill op ${index}: restructure[${moveIndex}] to_file must be references/<topic>.md`
       }
+      // A1-6 (v18): the single validator also rejects Windows device stems,
+      // so a plan cannot target `references/nul.md` (unmanageable afterwards).
+      const targetIssue = validateRestructureTarget(move.to_file)
+      if (targetIssue) return `skill op ${index}: restructure[${moveIndex}] ${targetIssue}`
     }
   }
   return null

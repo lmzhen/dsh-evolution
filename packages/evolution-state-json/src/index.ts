@@ -160,6 +160,10 @@ const gatePendingRecord = (record: Record<string, unknown>): boolean =>
   typeof record.id === 'string'
   && typeof record.kind === 'string' && PENDING_KINDS.has(record.kind)
   && typeof record.summary === 'string'
+  // C-3 (v18): the domain schema declares `args: z.unknown()`, and zod 4
+  // requires that KEY to exist — a record without it opens fine here but is
+  // refused as `invalid-record` by the domain provider. Align both sides.
+  && 'args' in record
   && typeof record.createdAt === 'string'
   && typeof record.status === 'string' && PENDING_STATUSES.has(record.status)
   && optionalString(record.resolvedAt) && optionalString(record.claimedBy)
@@ -329,7 +333,9 @@ export async function jsonTransact<T>(
       throw writeGateError(`evolution state file "${file}" task returned ${kind} (expected null or a plain JSON object map of records); not written.`)
     }
     // P2-1 (v14): the WRITE-BACK must clear the SAME per-record field gate the
-    // read path and the domain provider (zod at put time) enforce.
+    // read path enforces. (v18 correction: upstream storage-domain's `put` does
+    // NOT parse; the domain provider safeParses at its own write entry and
+    // `open` validates on mount — see evolution-state-domain/src/index.ts.)
     // Without it a record with a wrong field shape was persisted and then
     // quarantined on the next read — a silent loss window ("written, then
     // gone"). Fail loud before any write, exactly like the shape gate above.
@@ -347,7 +353,7 @@ export async function jsonTransact<T>(
   })
 }
 
-export function apply(ctx: Context, rawConfig: Config): void {
+export function apply(ctx: Context, rawConfig: Config = {}): void {
   const root = (rawConfig.root ?? '').trim() || evolutionHome()
   // S-08: an explicit RELATIVE config.root resolves against the
   // process CWD, so two launch modes read two different stores. The
@@ -610,7 +616,9 @@ export function apply(ctx: Context, rawConfig: Config): void {
             const parsed = JSON.parse(current) as unknown
             if (Array.isArray(parsed)) archive = parsed as Array<PendingRecord | null>
           } catch {
-            // unrecoverable archive — best-effort: start fresh
+            // C-9 (v18): preserve the corrupt archive bytes before starting
+            // fresh — the audit copy is the only recovery path.
+            await io().writeText(`${pathOf(PENDING_ARCHIVE_FILE)}.corrupt`, current).catch(() => {})
           }
         }
         // V5-07 (0.3.33): archives written before the dedupe key existed may

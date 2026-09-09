@@ -194,6 +194,7 @@ export class EvolutionReplayDriver {
    * as a read/inspection window. Kept by declaration (same posture as the
    * skill-usage `invalidate()` V6-44 declaration), so it is documented intent
    * rather than undeclared dead code.
+   * @internal Exported for this package's own tests only.
    */
   plansSnapshot(): ReplayPlan[] {
     return [...this.plans]
@@ -204,7 +205,10 @@ export class EvolutionReplayDriver {
     // and `this.plans` used to be handed over by reference, so a consumer
     // sorting/reordering `result.plans` mutated the driver's live leaderboard
     // (inconsistent with `plansSnapshot()`'s deliberate copy).
-    return comparePlans([...this.plans], weights)
+    // C-11 (v18): compare() is public; the constructor clamps its config,
+    // but a caller-supplied weights object must be clamped here too (NaN/negative
+    // weights would produce NaN scores/margins).
+    return comparePlans([...this.plans], clampReplayWeights(weights, this.weights))
   }
 }
 

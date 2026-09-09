@@ -77,7 +77,11 @@ describe('layered installer', () => {
     await runInstaller(home, 'layered')
     await runInstaller(home, 'layered', 'evo-test', ['--uninstall'])
     const manifest = JSON.parse(await readFile(join(home, 'profiles', 'evo-test', 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
-    expect(manifest.dsh?.profile?.bundles).toEqual([])
+    // D-4 (v18): the installer-created profile is seeded from the platform
+    // template (`DEFAULT_PROFILE_BUNDLES` for a name with no template), so the
+    // platform base row survives an evolution uninstall — uninstall removes
+    // evolution bundles, not the profile's platform foundation.
+    expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base'])
     const { readdir } = await import('node:fs/promises')
     expect(await readdir(join(home, 'profiles', 'evo-test', 'node_modules/@deepseek-ai'))).toHaveLength(0)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -140,7 +144,9 @@ describe('layered installer', () => {
     // the value; removing the host bundle removes the injection entirely.
     expect(insertedRows(overlay).some(row => rowId(row) === 'tool-skill')).toBe(false)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-  }, 20_000)
+    // v18: this case spawns the real installer twice (layered + oneclick) and
+    // needs the same budget as its siblings — 20s flaked under full-suite load.
+  }, 60_000)
 
   it('V10-14: cap injection is idempotent and warns when the standard row is absent', async () => {
     // The installer script ships no type declarations, so the function runs in
@@ -222,15 +228,23 @@ describe('layered installer', () => {
     await runInstaller(home, 'layered')
     // The oneclick bundle is the preset package — host ⇄ preset cannot co-exist
     // in one profile (shared rows would double-mount); the installer used to
-    // turn the documented accident into reality.
-    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
+    // turn the documented accident into reality. D-1 (v18) made the check fire
+    // on the agent preset first, so the assertion pins BOTH the documented
+    // E-33 wording and the D-1-specific reason.
+    const failed = runInstaller(home, 'oneclick')
+    await expect(failed).rejects.toThrow(/mutually exclusive install targets \(E-33\)/)
+    await expect(failed).rejects.toThrow(/Evolution agent preset/)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
   it('V6-49: oneclick then layered fails loud (reverse order)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-v649b-'))
     await runInstaller(home, 'oneclick')
-    await expect(runInstaller(home, 'layered')).rejects.toThrow(/mutually exclusive/)
+    // D-1 (v18): the reverse direction now refuses on the one-click bundle
+    // before the host⇄preset check — same E-33 contract, specific reason.
+    const failed = runInstaller(home, 'layered')
+    await expect(failed).rejects.toThrow(/mutually exclusive install targets \(E-33\)/)
+    await expect(failed).rejects.toThrow(/one-click preset bundle/)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
 
@@ -325,4 +339,64 @@ describe('layered installer', () => {
     expect(stdout).not.toContain('bundle:')
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 30_000)
+
+  it('D-1 (v18): --mode agent refuses a profile carrying the one-click preset bundle', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-d1a-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@deepseek-ai/dsh-evolution-preset'] } } }), 'utf8')
+    await expect(runInstaller(home, 'agent', 'evo-test', ['--dry-run'])).rejects.toThrow(/one-click preset bundle/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('D-1 (v18): --mode oneclick refuses when an Evolution agent preset exists', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-d1b-'))
+    await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/agent preset/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('D-2 (v18): uninstalling host from a one-click profile keeps the packages (no phantom row)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-d2-'))
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@deepseek-ai/dsh-evolution-preset'] } } }), 'utf8')
+    const { stdout } = await runInstaller(home, 'host', 'evo-test', ['--uninstall', '--dry-run'])
+    expect(stdout).toMatch(/packages:\s+0/)
+    expect(stdout).toContain('kept:')
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('D-3/D-4 (v18): a fresh profile is seeded with the platform bundles and the mounted bundle is pinned', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-d34-'))
+    // D-4 parity: a name WITH a shipped template seeds that template
+    // (`PROFILE_TEMPLATES.web = base + web-app`), matching upstream initProfile.
+    await runInstaller(home, 'host', 'web')
+    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>
+      dsh?: { profile?: { bundles?: string[] } }
+    }
+    expect(manifest.dsh?.profile?.bundles).toEqual([
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-evolution-host',
+    ])
+    // D-3: the mounted bundle is pinned in dependencies, not only in bundles.
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^0\.\d+\.\d+/)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 60_000)
+
+  it('D-4 (v18): a profile name with no shipped template seeds DEFAULT_PROFILE_BUNDLES', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-d4default-'))
+    // Upstream DEFAULT_PROFILE_BUNDLES is `['@deepseek-ai/dsh-base']`
+    // (app-boot/src/profile.ts:125); the custom name must not inherit the web
+    // template's web-app row.
+    await runInstaller(home, 'host', 'evo-test')
+    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'evo-test', 'package.json'), 'utf8')) as {
+      dsh?: { profile?: { bundles?: string[] } }
+    }
+    expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-evolution-host'])
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 60_000)
+
 })

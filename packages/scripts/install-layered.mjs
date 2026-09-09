@@ -123,6 +123,17 @@ async function copyPackage(source, destination) {
   })
 }
 
+/** D-4 (v18): upstream `initProfile` seeds a named profile with its template
+ * bundles. The hand-rolled copy seeded an EMPTY list, so a profile the
+ * installer created itself lacked the platform base/web-app rows. Platform
+ * packages are always `@deepseek-ai`-scoped (only the family packages are
+ * scope-rewritten at publish). */
+const PROFILE_SEED_BUNDLES = {
+  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+  headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
+}
+const DEFAULT_SEED_BUNDLES = ['@deepseek-ai/dsh-base']
+
 async function ensureProfile(home, profile) {
   const dir = profileDirectory(home, profile)
   await mkdir(dir, { recursive: true })
@@ -132,7 +143,13 @@ async function ensureProfile(home, profile) {
       name: `dsh-profile-${profile}`,
       private: true,
       dependencies: {},
-      dsh: { profile: { bundles: [] } },
+      dsh: {
+        profile: {
+          bundles: [...(Object.prototype.hasOwnProperty.call(PROFILE_SEED_BUNDLES, profile)
+            ? PROFILE_SEED_BUNDLES[profile]
+            : DEFAULT_SEED_BUNDLES)],
+        },
+      },
     }, null, 2) + '\n')
   }
   const patchPath = join(dir, 'cordis.patch.yml')
@@ -153,6 +170,13 @@ async function installBundlePackage(profileDir, bundleName) {
     : []
   if (!bundles.includes(bundleName)) bundles.push(bundleName)
   manifest.dsh.profile.bundles = bundles
+  // D-3 (v18): a mounted bundle row MUST also be pinned in `dependencies`
+  // (the repo's own verify-profile-bundles guard treats a row without a
+  // dependency as a phantom row, and a later pnpm install would prune the
+  // hand-copied packages). Use the release version when known.
+  const version = rootPackageVersion()
+  manifest.dependencies ??= {}
+  manifest.dependencies[bundleName] = /^\d+\.\d+\.\d+/.test(version) ? `^${version}` : '*'
   await writeFile(join(profileDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n')
 }
 
@@ -164,6 +188,12 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
     const source = join(sourceRoot, entry.name)
     if (!existsSync(join(source, 'package.json'))) continue
     const packageName = await readPackageName(source)
+    // D-18 (v18): install and uninstall must use the SAME package set. The
+    // uninstall side filters the SCOPED package directory name; install used
+    // to copy any directory carrying a package.json. (Compare the scope-less
+    // name: source manifests are `@deepseek-ai/dsh-evolution-*`, destination
+    // directories are `dsh-evolution-*`.)
+    if (!EVOLUTION_PREFIXES.some(prefix => scopedName(packageName).startsWith(prefix))) continue
     const destination = join(profileDir, 'node_modules', EVOLUTION_SCOPE, scopedName(packageName))
     copies.push({ packageName, source, destination })
     if (!dryRun) await copyPackage(source, destination)
@@ -425,20 +455,31 @@ export async function uninstall(options = {}) {
   const profile = options.profile ?? 'web'
   const dryRun = options.dryRun === true
   const profileDir = profileDirectory(home, profile)
-  const result = { mode, home, profile, profileDir, removedBundle: null, removedPackages: 0, removedAgentPreset: false }
+  const result = { mode, home, profile, profileDir, removedBundle: null, removedPackages: 0, removedAgentPreset: false, packagesKeptFor: [] }
 
   if (mode === 'host' || mode === 'layered' || mode === 'oneclick') {
     const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
-    // P2-42 carried over (N11, v12): report the REAL outcome — a dry-run or a
-    // manifest without the bundle row does not mean "removed". Only a
-    // non-dry-run removal of an existing row sets `removedBundle`.
-    result.removedBundle = !dryRun && manifestCarriesBundle(profileDir, bundleName) ? bundleName : null
-    if (result.removedBundle !== null) await removeBundleFromProfile(profileDir, bundleName)
+    // D-17 (v18): report the real outcome in dry-run too (the old `!dryRun &&`
+    // made a dry-run uninstall always claim no bundle would be removed).
+    result.removedBundle = manifestCarriesBundle(profileDir, bundleName) ? bundleName : null
+    if (!dryRun && result.removedBundle !== null) await removeBundleFromProfile(profileDir, bundleName)
     // P1-2 (v11): evolution-all is a DEFAULT install target — uninstall must
     // remove its bundle row symmetrically, or the leftover row resolves a
     // package that was just deleted and bricks the profile.
     if (!dryRun) await removeBundleFromProfile(profileDir, BUNDLES.all)
-    result.removedPackages = await removeCopiedEvolutionPackages(profileDir, dryRun)
+    // D-2 (v18): the package set may only be deleted when NO evolution bundle
+    // row remains. Deleting the packages while another row is still mounted
+    // leaves a phantom row that bricks the profile at boot.
+    const tailOf = (name) => String(name).slice(String(name).lastIndexOf('/') + 1)
+    const removedTails = new Set([tailOf(bundleName), 'dsh-evolution-all'])
+    const remaining = dryRun
+      ? detectInstalledBundles(profileDir).filter(name => !removedTails.has(tailOf(name)))
+      : detectInstalledBundles(profileDir)
+    if (remaining.length > 0) {
+      result.packagesKeptFor = remaining
+    } else {
+      result.removedPackages = await removeCopiedEvolutionPackages(profileDir, dryRun)
+    }
   }
   if (mode === 'agent' || mode === 'layered') {
     // P2-42 (v11): report the real outcome — dry-run or an absent preset
@@ -459,19 +500,29 @@ export async function uninstall(options = {}) {
  * refuse up front with the choose-one guidance instead of the user reaching
  * the startup double-mount error.
  */
-export function detectInstalledAllBundle(profileDir) {
+const EVOLUTION_BUNDLE_TAILS = ['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset']
+
+/** D-1 (v18): every evolution bundle row in the profile, scope-agnostic
+ * (exact-segment tail). Used by the three-way mutual-exclusion checks and by
+ * uninstall to decide whether any bundle row would be left behind. */
+export function detectInstalledBundles(profileDir) {
   try {
     const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
-    const bundles = manifest?.dsh?.profile?.bundles
-    // P3 (v15): exact tail match (same discipline as V7-18) — a loose
-    // `/evolution-all/` substring would false-positive on a hypothetical
-    // `dsh-evolution-allowlist` package.
-    // P3 (v16): exact-segment tail (`^` or `/` before the name) — same
-    // discipline as V7-18, so `x-dsh-evolution-all` cannot false-positive.
-    return Array.isArray(bundles) ? bundles.filter(name => /(?:^|\/)dsh-evolution-all$/.test(String(name).trim())) : []
+    const bundles = Array.isArray(manifest?.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
+    return bundles.filter((entry) => {
+      if (typeof entry !== 'string') return false
+      const trimmed = entry.trim()
+      return EVOLUTION_BUNDLE_TAILS.some(tail => trimmed === tail || trimmed.endsWith(`/${tail}`))
+    })
   } catch {
     return []
   }
+}
+
+export function detectInstalledAllBundle(profileDir) {
+  // P3 (v15/v16): exact-segment tail match — a loose substring would
+  // false-positive on `dsh-evolution-allowlist`.
+  return detectInstalledBundles(profileDir).filter(name => /(?:^|\/)dsh-evolution-all$/.test(String(name).trim()))
 }
 
 /** N11 (v12): does this profile's manifest carry the given bundle row?
@@ -515,10 +566,35 @@ export async function install(options = {}) {
         + 'or switch the profile to evolution-host and generate the preset.',
       )
     }
+    // D-1 (v18): the reverse direction was missing — a one-click preset bundle
+    // already mounts the four model rows at profile root, so generating the
+    // agent preset on top double-mounts them (the documented three-way
+    // mutual exclusion). Refuse with the same choose-one guidance.
+    const oneclickBundles = detectInstalledBundles(profileDir)
+      .filter(name => /(?:^|\/)dsh-evolution-preset$/.test(String(name).trim()))
+    if (oneclickBundles.length > 0) {
+      throw new Error(
+        `install-layered: the profile already carries a one-click preset bundle (${oneclickBundles.join(', ')}). `
+        + 'The one-click preset bundle and the layered Evolution preset are mutually exclusive install targets (E-33) — '
+        + 'the one-click bundle already mounts the model tools at profile root, so the layered preset would double-mount them. '
+        + 'Choose ONE: keep the one-click bundle, or uninstall it and install the host bundle + agent preset.',
+      )
+    }
   }
 
   if (needsHost || needsCompat) {
     const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick
+    // D-1 (v18): the one-click preset bundle mounts the four model rows at
+    // profile root; an existing agent preset mounts the same rows in preset
+    // scope. Refuse unless --force explicitly confirms.
+    if (needsCompat && existsSync(agentPresetDirectory(home)) && !force) {
+      throw new Error(
+        `install-layered: the DSH_HOME already carries an Evolution agent preset (${agentPresetDirectory(home)}). `
+        + 'The one-click preset bundle and the layered agent preset are mutually exclusive install targets (E-33) — '
+        + 'both mount the same model rows. Choose ONE '
+        + '(remove the preset directory or pass --force to override explicitly).',
+      )
+    }
     // P1-3 (v11): evolution-all is the DEFAULT full bundle — installing host
     // or oneclick on top must refuse like host⇄preset does (the all patch
     // double-mounts the infra rows, startup fail-loud). The check runs in
@@ -580,9 +656,17 @@ function parseArgs(argv) {
   const options = { mode: 'layered', profile: 'web' }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
-    if (arg === '--mode') options.mode = argv[++i]
-    else if (arg === '--profile') options.profile = argv[++i]
-    else if (arg === '--home') options.home = resolve(argv[++i])
+    // D-15 (v18): a missing value used to fall through silently (`--mode`
+    // kept the default, `--home` threw a bare TypeError from resolve()).
+    const next = () => {
+      const candidate = argv[i + 1]
+      if (candidate === undefined || candidate.startsWith('--')) throw new Error(`${arg} requires a value`)
+      i += 1
+      return candidate
+    }
+    if (arg === '--mode') options.mode = next()
+    else if (arg === '--profile') options.profile = next()
+    else if (arg === '--home') options.home = resolve(next())
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
     else if (arg === '--uninstall') options.uninstall = true
@@ -601,6 +685,9 @@ if (isMain) {
       console.log(`profile:  ${result.profile} (${result.profileDir})`)
       if (result.removedBundle) console.log(`bundle:   ${result.removedBundle}`)
       console.log(`packages: ${result.removedPackages}`)
+      if (result.packagesKeptFor.length > 0) {
+        console.log(`kept:     packages retained for still-mounted bundle(s): ${result.packagesKeptFor.join(', ')}`)
+      }
       console.log(`preset:   ${result.removedAgentPreset}`)
       if (options.dryRun) console.log('dry-run:  no files were written')
     } else {

@@ -188,6 +188,18 @@ export class EvolutionFeedback {
     })
   }
 
+  /** External-producer contract (审计 B-4, v18): nothing inside the family
+   * calls `record` — the upstream `/feedback` command only appends a
+   * `feedback/record` session event carrying free text, which cannot be mapped
+   * to a (target, rating) pair without inventing semantics. A host that wants
+   * feedback-driven curation wires its own command/event to this method; the
+   * curator's union read (`feedback_warn`) then shortens the stale window.
+   * `feedback.spec.ts` pins that channel end to end.
+   * @param target - skill name or session id the rating belongs to.
+   * @param rating - `positive` or `negative`; other values are refused.
+   * @param note - optional free-text note carried into the durable event.
+   * @param kind - `skill` (default `session`) selects the score table.
+   */
   record(target: string, rating: 'positive' | 'negative', note?: string, kind: 'skill' | 'session' = 'session'): void {
     const mode = kind === 'skill' ? 'skills' : 'sessions'
     // Optimistic in-memory update: score()/quality read it synchronously.
@@ -460,6 +472,12 @@ function foldWithDelta(
 
 function applyFeedbackEvent(state: FeedbackState, event: EvolutionEvent, warn: (message: string) => void = () => {}): void {
   if (event.type !== 'feedback') return
+  // B-5 (v18): an invalid/missing kind used to fold into sessions. Skip it
+  // with a warn so a malformed log cannot silently mis-attribute feedback.
+  if (event.kind !== 'skill' && event.kind !== 'session') {
+    warn(`evolution-feedback: skipping feedback event with invalid kind: ${String(event.kind)}`)
+    return
+  }
   // S6.4: only 'positive'/'negative' are valid ratings. Any other value
   // (NaN or an arbitrary string from a malformed log) would fold
   // `record[value] += 1` as NaN into the usage aggregate, so skip with a warn.

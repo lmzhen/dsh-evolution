@@ -130,4 +130,26 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   expect(postResolved?.claimedBy).toBe('claim-c')
   expect(typeof postResolved?.claimedAt).toBe('string')
   expect(typeof postResolved?.resolvedAt).toBe('string')
+
+  // --- I-4 (v18): a malformed record must be REFUSED at the write boundary.
+  // Both providers gate writes (json's field gate, domain's zod schema), and
+  // C-3 aligned them on the required `args` key — a JS caller or a hand-edited
+  // file must not persist a record the other provider would refuse to open. ---
+  await expect(provider.savePending({
+    id: 'c-bad', kind: 'memory', summary: 'bad', createdAt: 'now', status: 'pending',
+  } as PendingRecord)).rejects.toThrow()
+
+  // --- I-4 (v18): mutating a returned record — top level AND nested `args` —
+  // must not poison the medium. The domain provider used to hand back live
+  // objects, so a caller's edit rewrote the in-memory record before any save
+  // (and survived a rejected save). ---
+  const poison = pendingOf('c-poison')
+  poison.args = { nested: { value: 1 } }
+  await provider.savePending(poison)
+  const returned = (await provider.listPending('pending')).find(record => record.id === 'c-poison')!
+  returned.summary = 'poisoned'
+  ;(returned.args as { nested: { value: number } }).nested.value = 99
+  const reread = (await provider.listPending('pending')).find(record => record.id === 'c-poison')!
+  expect(reread.summary).toBe('memory:c-poison')
+  expect((reread.args as { nested: { value: number } }).nested.value).toBe(1)
 }

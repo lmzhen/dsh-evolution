@@ -251,10 +251,12 @@ export async function resolveGraphNode(
       : { ok: true, message: content }
   }
   const entries = await repository.readMemory(parsed.source)
-  const entry = entries[parsed.index]
-  return entry === undefined
-    ? { ok: false, message: `Memory ${parsed.source}[${parsed.index}] does not exist (${entries.length} entries).` }
-    : { ok: true, message: entry }
+  // E-5 (v18): detail must apply the SAME E-21 snapshot check as edit/delete;
+  // an index that shifted since the graph render used to display another entry.
+  const check = readMemoryIndex(parsed, entries)
+  return check.ok
+    ? { ok: true, message: check.entry ?? '' }
+    : { ok: false, message: check.message ?? `Memory ${parsed.source}[${parsed.index}] is not available.` }
 }
 
 interface MemoryLike {

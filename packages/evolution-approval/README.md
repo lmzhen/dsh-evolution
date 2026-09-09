@@ -12,7 +12,8 @@ replayable only when the corresponding tool package is composed.
 Run the companion invariant and tests:
 
 ```sh
-node node_modules/vitest/vitest.mjs run packages/evolution/evolution-approval/tests
+node node_modules/vitest/vitest.mjs run packages/evolution/evolution-approval/tests   # overlay layout
+# flat mirror: node node_modules/vitest/vitest.mjs run packages/evolution-approval/tests
 ```
 
 ## Model Experience

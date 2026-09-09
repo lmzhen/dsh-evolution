@@ -1,8 +1,26 @@
 # Changelog
 
+## 0.3.64 (patch) — v18 收尾批：P1 脱敏泄漏回归修复 + A 类 12 项 + B 类 7 项（C 类保持延后）
+
+- **来源**：`audit-v18/`（7 份子报告）+ `optimization-plan-v18.md` + `completion-report-v18.md` + 独立审查 `dsh-evolution-mirror-independent-review-v18.md`（首轮检出 1 项 P1 回归、6 条用例失败、5 个 oxlint 错误，本版全部关闭）。
+- **行为契约变化（用户/部署可见，逐条）**：
+  1. **脱敏器不再泄漏未闭合引号的值**：值以 `"` 开头且本行无闭合引号（截断日志、多行值）时，A2-5 的首版分支回退成"只掩码一个空格"，原文泄漏；未加引号分支改为整行掩码，合法引号值连引号一起掩码（`api_key: <redacted>`）。
+  2. **技能名加严到上游形态**：`SKILL_NAME_RE` = `/^[a-z0-9]+(?:-[a-z0-9]+)*$/`（拒绝尾随/连续连字符），`skill_manage`/create 对旧名 fail-loud；catalog provider 仍过滤存量树里的旧名，避免一条坏记录中断整个 `ctx.skills` 收集。
+  3. **root 配置键统一**：`evolution-commands` / `evolution-maintenance-tools` / `evolution-review` 改用规范键 `root`；`skillsRoot` 保留为**弃用别名**一个次版本（仅在 `root` 为空时生效并 warn，0.3.65 移除）。
+  4. **catalog 发布 `whenToUse`**：frontmatter 的单行 `whenToUse` 透传给 `ctx.skills`（与上游 filesystem provider 一致，恢复 host/UI 的路由提示）；`metadata` 仍不发布（显式声明）。
+  5. **`SkillSummary.protectionUnknown`**：目录 list 与逐标记探针都失败时，条目报告"保护未知"，curator / 维护面的保护名单按**受保护**处理（此前被当成无保护）。
+  6. **`restoreFromArchive` 拒绝理由准确**：目标目录存在但缺 `SKILL.md` 时给出可行动文案（此前落入 moveDir 的 dest-exists 失败）。
+  7. **domain provider 返回值深拷贝**（`structuredClone`）：调用方原地改返回值（含嵌套 `args`）不再污染 domain 内存；`savePending` 缺必需 `args` 键时与 json 门一致 fail-loud（C-3）。
+  8. **质量分真实化**：`usageFrequency` / `stability` 改用 **`view_count` + `use_count`**（`view_count` 是 in-tree 生产者记录的加载信号，`use_count` 保留为外部宿主信号）——两个因子不再恒为常量。
+  9. **事件日志写边界校验**：`appendEvolutionEvent` 拒绝无法折叠的 payload（未知 `type`、feedback 缺 `kind`/`rating`、maintain 缺 `runId`）。
+  10. **pending cap 语义如实**：`PENDING_RESOLVED_CAP` 只在 resolve 路径维持；直接 `savePending` 已决记录不触发逐出（JSDoc 更正 + 边界用例）。
+- **批次要点**：**A1-13** 删除死分支（`TreeChangePlan.validate`/`preconditions`）与死字段（`SkillSummary.archived`），`WIN32_RESERVED_DEVICE_NAMES` 收回包内；**A1-17** 保护探针 fail-closed；**A1-20** 见上；**F-17** 锁名/锁体常量单源（`LOCK_SUFFIX`/`LOCK_BODY_RE`）；**F-20** 常量/正则/类型单源（`DEFAULT_SKILL_CONTENT_CHARS` 派生自 `MAX_SKILL_CONTENT_CHARS`、support/extra 名正则单源、`events.ts` 用 `ReviewKind`）；**F-16** 审计子集补 `@internal` 语义，其余过度导出按计划分批登记；**I-4** 跨 provider 共享断言补"写坏记录必须被拒"与"返回值修改不污染介质"；**I-5** 见上；**C-12** registry 同对象幂等重注册 + 代际守卫用例；**B-4** feedback `record` 明确为**外部生产者契约**（上游 `/feedback` 只写自由文本事件，无法映射 target/rating）+ 并集读判别用例；**E-3/E-11/F-14** 测试缺口按"红→绿"补齐；**Phase 0** 修 redact 泄漏、catalog 新用例 fixture、installer 三处断言与 domain fake 契约（`Table.get` 是同步 `V | undefined`）、5 处 oxlint。
+- **门禁**：`build-lib`（tsc -b 全 30 包 + tsdown）exit 0；全量 vitest `--maxWorkers=4` **110 spec / 950 用例通过**；oxlint（上游严格配置）0 warning / 0 error；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-layout-sync`（13 脚本一致、版本与 CHANGELOG head 对齐）/ `verify-profile-bundles` 全部 exit 0；installer spec 单独跑 25/25。
+- **保持延后（C 类，触发条件见 `completion-report-v18.md` §5）**：A2-4 跨进程 CAS、C-5 domain cap 原子性、C-10 json 读被写队列阻塞、A1-10 独占创建 seam、A1-15 fsync 失败回传、A2-14 curator N+1、B-11 feedback 重启重放、E-13 多 memory provider、D-5/D-7..D-10 发布链与 CI、计划 §15 非目标。
+
 ## 0.3.63 (patch) — v15→v17 三轮"全量审计 → 修复 → 再审计"闭环（116 项检出，修 107 / 登记 9）
 
-- **来源**：`dsh-evolution-mirror-audit-report-v15/v16/v17.md` + `optimization-plan-v15.md` + `optimization-completion-v15.md` + `dsh-evolution-mirror-final-summary-report.md`。三轮检出 **0 P0 / 2 P1 / 21 P2 / 93 P3**（64 → 32 → 20 收敛）；**无 P0/P1 遗留、P2 清零**。发布前独立复核见 `dsh-evolution-mirror-code-quality-check.md`（镜像↔开发树 55/55 逐字节一致、927/927 用例、20 包 tsc 0 错、四守卫全绿、11 项关键交叉点核实、逐 src diff 缺陷审查无新引入 bug）。
+- **来源**：`dsh-evolution-mirror-audit-report-v15/v16/v17.md` + `optimization-plan-v15.md` + `optimization-completion-v15.md` + `dsh-evolution-mirror-final-summary-report.md`。三轮检出 **0 P0 / 2 P1 / 21 P2 / 93 P3**（64 → 32 → 20 收敛）；**无 P0/P1 遗留、P2 清零**。发布前独立复核见 `dsh-evolution-mirror-code-quality-check.md`（镜像↔开发树 55/55 逐字节一致、927/927 用例、受影响 20 包 tsc 0 错（全仓 30 包）、四守卫全绿、11 项关键交叉点核实、逐 src diff 缺陷审查无新引入 bug）。
 - **行为契约变化（用户/部署可见，逐条）**：
   1. **`skill_manage` 拒绝 win32 保留设备名技能与非法 `absorbed_into`**；支持文件名**保留 `.lock` 后缀**（写锁协议专用）；`remove_file` **拒绝目录**（此前递归删整棵子树且审计无 before 哈希）。
   2. **json 状态写回补记录字段门（fail-loud）**；**pending live 表有界**（cap=200，json 与 domain 两 provider 一致，按 `resolvedAt` 淘汰最旧；审计归档 sidecar 仍为 json 特有）。

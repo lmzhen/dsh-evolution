@@ -259,6 +259,30 @@ async function commitTmp(tmp: string, target: string): Promise<void> {
 }
 
 /**
+ * True when the pid is alive (EPERM = alive but unowned; ESRCH = gone).
+ * V18 single source: the node backend's lock takeover and SkillLibrary's
+ * stranded-lock sweep must use the same liveness rule.
+ */
+export function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException | undefined)?.code === 'EPERM'
+  }
+}
+
+/** F-17 (v18): the write-lock protocol is a cross-module contract — the lock
+ * file is `<target>.lock` and its body is `<pid>:<token>`. This module creates
+ * them (`withWriteLock`) and `skill-store`'s probes/sweepers parse them, so both
+ * consume these two constants instead of repeating the literals. */
+export const LOCK_SUFFIX = '.lock'
+/** Writer-lock body shape: a decimal pid, a colon, then the claim token. A
+ * torn body (no parsable pid) still matches the `\\d+:` prefix rule only when
+ * the pid part is intact, which is what the takeover probe needs. */
+export const LOCK_BODY_RE = /^\d+:[0-9a-f]*$/
+
+/**
  * Build the Node IO backend. `lockAttempts` scales the write-lock retry budget
  * (attempts × 50ms); the default 40 (~2s, rc.69) covers production contention,
  * while contention TESTS on a loaded runner may raise it (e.g. 240 ≈ 12s) —
@@ -274,15 +298,8 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
     // "absent" for its own surface (E-43).
     return code === 'ENOENT' || code === 'ENOTDIR'
   }
-  /** True when the pid is alive (EPERM = alive but unowned; ESRCH = gone). */
-  const isAlive = (pid: number): boolean => {
-    try {
-      process.kill(pid, 0)
-      return true
-    } catch (error) {
-      return (error as NodeJS.ErrnoException | undefined)?.code === 'EPERM'
-    }
-  }
+  /** True when the pid is alive (single source: `isProcessAlive`). */
+  const isAlive = isProcessAlive
   /**
    * V10-07 (P2-1): age threshold for taking over a lock whose body is TORN
    * (non-empty, but the pid prefix does not parse to a positive integer). 1h:
@@ -340,7 +357,7 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
    * forever.
    */
   const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
-    const lock = `${path}.lock`
+    const lock = `${path}${LOCK_SUFFIX}`
     let myClaim = ''
     for (let attempt = 0; attempt < lockAttempts; attempt += 1) {
       // Phase 1 — acquire. ONLY acquisition errors are retryable contention.
@@ -581,7 +598,7 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
     // our live lock; `base.lock.next` is an ownership-free ticket a crashed
     // takeover leaves behind, reclaimed with the same dead-pid/old semantics
     // as the per-attempt reclaim.
-    const lockName = `${base}.lock`
+    const lockName = `${base}${LOCK_SUFFIX}`
     const ticketName = `${lockName}.next`
     // S-10: quarantine copies (the state-json provider's fixed
     // `<file>.corrupt`, and any legacy timestamped `.corrupt-*` series) older
@@ -591,51 +608,60 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
     const CORRUPT_SWEEP_AGE_MS = 7 * 24 * 3_600_000
     for (const name of entries) {
       if (!name.startsWith(prefix) || name === lockName) continue
-      if (!name.endsWith('.tmp')) {
-        if (name === ticketName) {
-          const ticketPath = join(dir, name)
-          try {
-            const body = await readFile(ticketPath, 'utf8').catch(() => '')
-            const holder = Number(body.split(':')[0] ?? '')
-            const st = await stat(ticketPath)
-            // Same semantics as the per-attempt reclaim: dead-pid or >1s-old
-            // tickets are reclaimable (an empty body has no pid to probe, so
-            // only its age proves a crashed creator — V6-04).
-            const dead = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
-            const old = Date.now() - st.mtimeMs > 1000
-            if (dead || old) await rm(ticketPath, { force: true })
-          } catch {
-            // The ticket vanished (or a race with its reaper); nothing to clean.
+      // A1-9 (v18): only a tmp whose EXACT prefix is our base belongs to this
+      // target. The old `startsWith(prefix) && endsWith('.tmp')` shape also
+      // matched a SIBLING target's tmp (`a.md.<pid>.<hex>.tmp` while writing
+      // `a`), parsed its first segment as a pid, and could delete an in-flight
+      // write. The strict shape is exactly what writeDurableTmp mints.
+      const tmpMatch = /^(.*)\.(\d+)\.([0-9a-f]+)\.tmp$/.exec(name)
+      if (tmpMatch !== null && tmpMatch[1] === base) {
+        const tmpPath = join(dir, name)
+        const holder = Number(tmpMatch[2])
+        try {
+          const st = await stat(tmpPath)
+          const deadHolder = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
+          // F-366 (③): this process's own leftover tmp is recycled immediately
+          // (a live writer's tmp is a current write, not a crash artifact);
+          // foreign live pids keep the >1h protection so an in-flight write is
+          // not reaped.
+          const selfLeftover = holder === process.pid
+          if (selfLeftover || (Date.now() - st.mtimeMs > 3_600_000 && deadHolder)) {
+            await rm(tmpPath, { force: true })
           }
-          continue
-        }
-        // S-10: a quarantine copy past the rescue window is removed
-        // (best-effort: a vanished file needs no cleanup).
-        if (name.includes('.corrupt')) {
-          const corruptPath = join(dir, name)
-          try {
-            const st = await stat(corruptPath)
-            if (Date.now() - st.mtimeMs > CORRUPT_SWEEP_AGE_MS) await rm(corruptPath, { force: true })
-          } catch {
-            // The copy vanished (or raced its reaper); nothing to clean.
-          }
+        } catch {
+          // The tmp vanished (or a race with its reaper); nothing to clean.
         }
         continue
       }
-      const tmpPath = join(dir, name)
-      const holder = Number(name.slice(prefix.length, name.length - 4).split('.')[0] ?? '')
-      try {
-        const st = await stat(tmpPath)
-        const deadHolder = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
-        // F-366 (③): this process's own leftover tmp is recycled immediately (a
-        // live writer's tmp is a current write, not a crash artifact); foreign
-        // live pids keep the >1h protection so an in-flight write is not reaped.
-        const selfLeftover = holder === process.pid
-        if (selfLeftover || (Date.now() - st.mtimeMs > 3_600_000 && deadHolder)) {
-          await rm(tmpPath, { force: true })
+      if (name === ticketName) {
+        const ticketPath = join(dir, name)
+        try {
+          const body = await readFile(ticketPath, 'utf8').catch(() => '')
+          const holder = Number(body.split(':')[0] ?? '')
+          const st = await stat(ticketPath)
+          // Same semantics as the per-attempt reclaim: dead-pid or >1s-old
+          // tickets are reclaimable (an empty body has no pid to probe, so
+          // only its age proves a crashed creator — V6-04).
+          const dead = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
+          const old = Date.now() - st.mtimeMs > 1000
+          if (dead || old) await rm(ticketPath, { force: true })
+        } catch {
+          // The ticket vanished (or a race with its reaper); nothing to clean.
         }
-      } catch {
-        // The tmp vanished (or a race with its reaper); nothing to clean.
+        continue
+      }
+      // S-10: a quarantine copy past the rescue window is removed
+      // (best-effort: a vanished file needs no cleanup). A1-1 (v18): the
+      // namespace layer reserves `.corrupt`/`.tmp` suffixes so a user support
+      // file cannot be mistaken for a protocol artifact.
+      if (name.includes('.corrupt')) {
+        const corruptPath = join(dir, name)
+        try {
+          const st = await stat(corruptPath)
+          if (Date.now() - st.mtimeMs > CORRUPT_SWEEP_AGE_MS) await rm(corruptPath, { force: true })
+        } catch {
+          // The copy vanished (or raced its reaper); nothing to clean.
+        }
       }
     }
   }

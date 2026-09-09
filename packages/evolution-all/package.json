@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-all",
   "description": "Full-functionality evolution bundle — DEFAULT install: host automation + model tools, all profile-root",
-  "version": "0.3.63",
+  "version": "0.3.64",
   "publishConfig": {
     "access": "public"
   },
@@ -27,6 +27,7 @@
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [

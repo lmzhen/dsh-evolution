@@ -15,9 +15,9 @@ import type { UsageMap } from './usage.ts'
 import { latestActivityAt } from './usage.ts'
 
 export interface QualityFactors {
-  /** 0.25 — use_count per day of age, capped at 1. */
+  /** 0.25 — skill LOADS per day of age (view_count + use_count), capped at 1. */
   usageFrequency: number
-  /** 0.20 — 1 − patch/use (zero use = stable). */
+  /** 0.20 — 1 − patch/load (zero loads = stable). */
   stability: number
   /** 0.20 — 1 under 30 idle days, linear decay to 0 at 180. */
   recency: number
@@ -52,7 +52,10 @@ function clamp01(value: number): number {
 }
 
 function daysBetween(from: string, now: Date): number {
-  return Math.max(0, (now.getTime() - new Date(from).getTime()) / 86_400_000)
+  // A2-9 (v18): an unparseable timestamp must not poison the score with NaN.
+  const t = Date.parse(from)
+  if (!Number.isFinite(t)) return 0
+  return Math.max(0, (now.getTime() - t) / 86_400_000)
 }
 
 export function computeQualityScores(input: {
@@ -67,10 +70,15 @@ export function computeQualityScores(input: {
     const ageDays = Math.max(1, daysBetween(record.created_at, now))
     const idleDays = daysBetween(latestActivityAt(record) ?? record.created_at, now)
     const patchCount = record.patch_count
-    const useCount = record.use_count
-
-    const usageFrequency = clamp01(useCount / ageDays)
-    const stability = useCount === 0 ? 1 : clamp01(1 - patchCount / useCount)
+    // E-2 / G-1 (v18): a skill is "used" when it is LOADED. The in-tree
+    // producer is the platform `skill` tool's `view` bump (skill-usage
+    // READ_SKILL_TOOL_KIND); `use_count` has no in-tree producer and stays an
+    // EXTERNAL host signal. Summing both makes these two factors real today
+    // while still counting a host that writes `use` — no durable-format change
+    // and no silent refactor of the published field.
+    const loadCount = record.use_count + record.view_count
+    const usageFrequency = clamp01(loadCount / ageDays)
+    const stability = loadCount === 0 ? 1 : clamp01(1 - patchCount / loadCount)
     const recency = idleDays < 30 ? 1 : clamp01(1 - (idleDays - 30) / 150)
     const references = clamp01((input.referenceCounts?.get(name) ?? 0) / 3)
     const mutationMaturity = patchCount === 0 ? 0.3 : patchCount === 1 ? 0.4 : clamp01((patchCount - 1) / Math.max(1, ageDays / 30))

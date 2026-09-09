@@ -7,7 +7,7 @@ import { basename, join } from 'node:path'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
-import { scanMemoryThreats, THREAT_EXEMPT_HINT, type ScanOptions } from './threats.ts'
+import { scanMemoryThreats, type ScanOptions } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
 export { ENTRY_DELIMITER } from './constants.ts'
@@ -151,12 +151,20 @@ export class MemoryStore {
   /** V10-03 (P2-18): the strict-scan write gate. A block message names the hit
    * label (scanMemoryThreats already embeds it) plus the self-heal hint. */
   private memoryThreatBlock(text: string): string | null {
-    const threat = scanMemoryThreats(text, undefined, this.threatScanOptions())
-    return threat === null ? null : threat + THREAT_EXEMPT_HINT
+    // A2-16 (v18): scanMemoryThreats already appends its exemption hint;
+    // appending THREAT_EXEMPT_HINT here duplicated the sentence.
+    return scanMemoryThreats(text, undefined, this.threatScanOptions())
   }
 
   limitFor(target: MemoryTarget): number {
     return target === 'memory' ? this.memoryLimit : this.userLimit
+  }
+
+  /** P2-1 (v18): the generated date prefix participates in duplicate detection
+   * only when THIS store writes it. With addDatePrefix=false a fact's own
+   * leading `## YYYY-MM-DD\n` is content, not a generated prefix. */
+  private dedupeKey(entry: string): string {
+    return this.addDatePrefix ? stripDatePrefix(entry) : entry
   }
 
   /**
@@ -347,7 +355,11 @@ export class MemoryStore {
     }
 
     const entries = [...new Set(normalizeEntries(raw))]
-    if (entries.some(entry => stripDatePrefix(entry) === content)) {
+    // P2-1 (v18): only strip the generated date prefix when THIS store writes
+    // one (see dedupeKey). With addDatePrefix=false a user fact may
+    // legitimately start with `## YYYY-MM-DD\n`; stripping it made
+    // `add('alpha')` a false duplicate of a stored `## 2020-01-01\nalpha`.
+    if (entries.some(entry => this.dedupeKey(entry) === content)) {
       this.resetFailures()
       return { result: { ok: true, message: `Entry already exists (no duplicate added).${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
     }
@@ -430,7 +442,7 @@ export class MemoryStore {
         if (hasEntryDelimiter(entryBody)) {
           return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
-        if (!working.some(entry => stripDatePrefix(entry) === body)) {
+        if (!working.some(entry => this.dedupeKey(entry) === body)) {
           working.push(entryBody)
         }
         continue

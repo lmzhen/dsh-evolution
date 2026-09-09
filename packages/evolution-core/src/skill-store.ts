@@ -9,8 +9,8 @@
 
 import { basename, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
-import { scanContentThreats, THREAT_EXEMPT_HINT, type ScanOptions } from './threats.ts'
-import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { scanContentThreats, type ScanOptions } from './threats.ts'
+import { LOCK_BODY_RE, LOCK_SUFFIX, isProcessAlive, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -43,8 +43,15 @@ export interface SkillSummary {
   description: string
   path: string
   protectedBy: string | null
+  /** A1-17 (v18): the marker probe itself failed (EACCES/EIO), so "no marker"
+   * cannot be told apart from "directory unreadable". Consumers must treat this
+   * as protected, never as unprotected. */
+  protectionUnknown: boolean
   managed: boolean
-  archived: boolean
+  /** E-11 (v18): the frontmatter `whenToUse` routing hint, published so the
+   * platform catalog keeps it while this provider shadows the upstream
+   * filesystem provider. Absent when the frontmatter has none. */
+  whenToUse?: string
 }
 
 export interface SkillActionResult {
@@ -83,8 +90,13 @@ export const MAX_RESTRUCTURE_MOVES = 5
  * refused as traversal (an orphan file the user could not touch). */
 export const RESTRUCTURE_TARGET_RE = /^references\/[a-z0-9](?!.*\.\.)[a-z0-9._-]*\.md$/
 
+/** F-20 (v18): the character rule shared by support-file names and snapshot
+ * `extras/` entry names. The two exported names used to carry the same literal
+ * independently; both now derive from this one. */
+const SUPPORT_ENTRY_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
+
 /** Extra file name carried inside a snapshot's `extras/` directory. */
-export const SNAPSHOT_EXTRA_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
+export const SNAPSHOT_EXTRA_NAME_RE = SUPPORT_ENTRY_NAME_RE
 
 /** An opaque side file stored under a snapshot's `extras/` (curator state etc.). */
 export interface SnapshotExtra {
@@ -137,6 +149,23 @@ export function resolveSkillsRoot(config: { root?: string | undefined } = {}): s
   return (config.root ?? '').trim() || skillsRoot()
 }
 
+/** E-7 (v18): every family row reads ONE root key. `root` is canonical;
+ * `skillsRoot` is a deprecated alias honoured only while `root` is empty (so a
+ * deployment that sets both keeps the canonical one) and removed after 0.3.65.
+ * Callers log their own deprecation warning.
+ * @param config - the raw plugin config, carrying `root` and/or `skillsRoot`.
+ * @returns the effective root (empty when neither key is set) and whether the
+ * deprecated alias supplied it.
+ */
+export function resolveRootConfig(
+  config: { root?: string | undefined; skillsRoot?: string | undefined } = {},
+): { root: string; usedDeprecatedAlias: boolean } {
+  const root = (config.root ?? '').trim()
+  if (root !== '') return { root, usedDeprecatedAlias: false }
+  const alias = (config.skillsRoot ?? '').trim()
+  return alias === '' ? { root: '', usedDeprecatedAlias: false } : { root: alias, usedDeprecatedAlias: true }
+}
+
 /**
  * Map a requesting session onto the two origin surfaces (rc.44 plan M2-2.3):
  * the APPROVAL surface treats every delegated subagent as the autonomous
@@ -169,6 +198,16 @@ function skillDir(root: string, name: string): string {
 export function markerEntryName(marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
   return `.${marker}`
 }
+
+/** F-17 (v18): the root-level lock files a DESTRUCTIVE MOVER must treat as an
+ * active writer (skill body + the two marker writers). Single source with
+ * `markerEntryName`/`LOCK_SUFFIX` so a renamed marker cannot silently drop out
+ * of the ghost-writer probe. */
+const MARKER_LOCK_NAMES: readonly string[] = [
+  `SKILL.md${LOCK_SUFFIX}`,
+  `.pinned${LOCK_SUFFIX}`,
+  `.hermes-managed${LOCK_SUFFIX}`,
+]
 
 function markerPath(dir: string, marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
   return join(dir, markerEntryName(marker))
@@ -462,7 +501,7 @@ async function listNames(root: string, io: EvolutionIoLike): Promise<string[]> {
  * `[a-z0-9._-]`) — drive-colon / odd-character / uppercase names can no
  * longer reach the filesystem through writeSupportFile / patch /
  * removeSupportFile. */
-const SUPPORT_FILE_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
+const SUPPORT_FILE_NAME_RE = SUPPORT_ENTRY_NAME_RE
 
 /** C-18: win32 reserves these stems with ANY extension (`nul.md` hits the
  * NUL device), and they are fully inside the charset above — so the reserved
@@ -470,11 +509,23 @@ const SUPPORT_FILE_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
  * cannot refuse them. Exported single source: `badName` (skill directories,
  * P2-11/v15) and `validateSupportPath` (support-file stems, C-18) both
  * consume this one set — a third copy would drift. */
-export const WIN32_RESERVED_DEVICE_NAMES: ReadonlySet<string> = new Set([
+const WIN32_RESERVED_DEVICE_NAMES: ReadonlySet<string> = new Set([
   'con', 'prn', 'aux', 'nul',
   'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
   'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
 ])
+
+/** A1-6 (v18): the regex alone admits `references/nul.md` (a Windows device
+ * stem), which the support-file layer refuses. Restructure must use the same
+ * rule, or it creates an orphan the later patch/write/remove paths refuse.
+ * Single source shared with the plan validator. */
+export function validateRestructureTarget(filePath: string): string | null {
+  if (!RESTRUCTURE_TARGET_RE.test(filePath)) return `toFile must be references/<topic>.md (got "${filePath}").`
+  const file = filePath.slice(filePath.lastIndexOf('/') + 1)
+  const stem = file.split('.')[0]?.toLowerCase() ?? ''
+  if (WIN32_RESERVED_DEVICE_NAMES.has(stem)) return `toFile "${filePath}" uses a Windows reserved device name.`
+  return null
+}
 
 function validateSupportPath(filePath: string): string | null {
   const normalized = filePath.replace(/\\/g, '/')
@@ -493,8 +544,14 @@ function validateSupportPath(filePath: string): string | null {
     // named `*.lock` would be indistinguishable from a writer lock for the
     // archive/restore probes and could be swept as residue by
     // deleteStrandedLocks.
-    if (part.toLowerCase().endsWith('.lock')) {
+    if (part.toLowerCase().endsWith(LOCK_SUFFIX)) {
       return `Unsupported file name "${part}" — the .lock suffix is reserved for the writer-lock protocol.`
+    }
+    // A1-1 (v18): `.corrupt` and `.tmp` are the io layer's protocol artifacts
+    // (quarantine copy / durable-write tmp). A user support file with either
+    // suffix was eligible for sweepStaleTmps deletion; reserve them too.
+    if (part.toLowerCase().endsWith('.corrupt') || part.toLowerCase().endsWith('.tmp')) {
+      return `Unsupported file name "${part}" — the .corrupt/.tmp suffixes are reserved for the state/IO protocols.`
     }
     const stem = part.split('.')[0]?.toLowerCase() ?? ''
     if (WIN32_RESERVED_DEVICE_NAMES.has(stem)) {
@@ -683,10 +740,6 @@ interface TreeChangePlan {
   origin: WriteOrigin
   protection: 'write' | 'delete' | 'none'
   writes: TreeChangeWrite[]
-  /** Semantic validation of the plan (caller context: source existence, mode rules…). */
-  validate?: (ctx: { dir: string; currentMd: string | null }) => string | null
-  /** Direction-guard mount (R1-1): checked before any write; empty today. */
-  preconditions?: Array<(ctx: { dir: string }) => Promise<string | null>>
   auditAction: string
   auditSummary: string
   eventAction: string
@@ -863,8 +916,9 @@ export class SkillLibrary {
    * label (scanContentThreats already embeds it) plus the self-heal hint, so a
    * false-positive rewrite direction is actionable instead of a dead end. */
   private contentThreatBlock(content: string): string | null {
-    const threat = scanContentThreats(content, undefined, this.threatScanOptions())
-    return threat === null ? null : threat + THREAT_EXEMPT_HINT
+    // A2-16 (v18): scanContentThreats already appends its exemption hint;
+    // appending THREAT_EXEMPT_HINT here duplicated the sentence.
+    return scanContentThreats(content, undefined, this.threatScanOptions())
   }
 
   async list(): Promise<SkillSummary[]> {
@@ -883,25 +937,45 @@ export class SkillLibrary {
       // N+1 convergence); the marker set matches deleteProtection(). Names are
       // matched through markerEntryName() so the scan sees exactly the names
       // markerPath() would probe (N-1).
-      let entries: string[] = []
+      // A1-17 (v18): a listing failure is NOT "no markers". The pre-P2-6 code
+      // probed each marker with exists(), and losing that distinction made a
+      // protected skill read as unprotected. Keep the listing fast path, fall
+      // back to the per-marker probes on the error path, and report `null`
+      // (unknown) when even the probes fail.
+      let entries: string[] | null = null
       try {
         entries = await this.io.list(dir)
       } catch {
-        // A listing failure must not hide the skill; markers report absent.
+        entries = null
       }
-      const has = (marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed') => entries.includes(markerEntryName(marker))
-      const protectedBy = has('bundled') ? 'bundled' : has('hub-installed') ? 'hub-installed' : has('pinned') ? 'pinned' : null
+      type Marker = 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'
+      const probeMarker = async (marker: Marker): Promise<boolean | null> => {
+        if (entries !== null) return entries.includes(markerEntryName(marker))
+        try {
+          return await this.io.exists(join(dir, markerEntryName(marker)))
+        } catch {
+          return null
+        }
+      }
+      const [bundled, hubInstalled, pinned, hermesManaged] = await Promise.all([
+        probeMarker('bundled'), probeMarker('hub-installed'), probeMarker('pinned'), probeMarker('hermes-managed'),
+      ])
+      const protectedBy = bundled === true ? 'bundled' : hubInstalled === true ? 'hub-installed' : pinned === true ? 'pinned' : null
       // C-17: type-gate the description — a corrupt frontmatter value
       // (e.g. `description: 123` surviving as a number) must not leak into the
       // string-typed summary field.
       const parsedDescription = parsed?.frontmatter.description
+      // E-11 (v18): type-gate like the description — upstream throws on a
+      // non-string whenToUse, so only a non-empty string is published.
+      const parsedWhenToUse = parsed?.frontmatter.whenToUse
       summaries.push({
         name,
         description: typeof parsedDescription === 'string' ? parsedDescription : '',
         path: dir,
         protectedBy,
-        managed: has('hermes-managed'),
-        archived: false,
+        protectionUnknown: [bundled, hubInstalled, pinned, hermesManaged].some(value => value === null),
+        managed: hermesManaged === true,
+        ...typeof parsedWhenToUse === 'string' && parsedWhenToUse.trim() !== '' ? { whenToUse: parsedWhenToUse } : {},
       })
     }
     return summaries
@@ -1158,6 +1232,14 @@ export class SkillLibrary {
    * marker write is the only state change; content is untouched.
    */
   async setPinned(name: string, pinned: boolean, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+    // A1-14 (v18): pin/unpin is a protection mutation and must be ordered with
+    // the other single-file mutators on the in-process serial chain — a
+    // concurrent update could otherwise pass its protection check before the
+    // marker lands and rewrite a skill the user just froze.
+    return await this.serial(() => this.setPinnedCore(name, pinned, origin))
+  }
+
+  private async setPinnedCore(name: string, pinned: boolean, origin: WriteOrigin): Promise<SkillActionResult> {
     const normalized = name.trim()
     // C-12 (v10 audit): the inline badName() copy is gone — every entry guard
     // reads the single source, so a limits change cannot fork the message.
@@ -1231,16 +1313,23 @@ export class SkillLibrary {
     // overwrote the winner's bytes (double audit, double event). In-lock
     // re-check: current bytes present -> structured refusal, nothing written.
     let existsAtCommit = false
+    let taskRan = false
     if (this.transact) {
       await this.transact(this.io, createPath, (current) => {
+        taskRan = true
         if (current !== null) { existsAtCommit = true; return current }
         return onDisk
       })
     } else if (await this.io.exists(createPath)) {
+      taskRan = true
       existsAtCommit = true
     } else {
+      taskRan = true
       await this.io.writeText(createPath, onDisk)
     }
+    // A1-22 (v18): a contract-violating transact that never invokes the
+    // task used to report success with no file. Mirror runSingleWrite.
+    if (!taskRan) return { ok: false, message: 'internal error: the create transaction did not invoke the task; no file was written' }
     if (existsAtCommit) return { ok: false, message: `Skill "${normalized}" already exists.` }
     // Any non-foreground writer (review channel OR delegated subagent) is an
     // agent-authored skill: mark it managed so the lifecycle owns it.
@@ -1477,7 +1566,7 @@ export class SkillLibrary {
   private async hasWriteLock(dir: string): Promise<boolean> {
     // P3 (v17): marker writers (pin / hermes-managed) hold root-level locks
     // too — include them in the signal set.
-    const markerLocks = [join(dir, 'SKILL.md.lock'), join(dir, '.pinned.lock'), join(dir, '.hermes-managed.lock')]
+    const markerLocks = MARKER_LOCK_NAMES.map(name => join(dir, name))
     for (const lock of markerLocks) {
       if (await this.isWriterLock(lock)) return true
     }
@@ -1491,7 +1580,7 @@ export class SkillLibrary {
         return true
       }
       for (const entry of entries) {
-        if (!entry.endsWith('.lock')) continue
+        if (!entry.endsWith(LOCK_SUFFIX)) continue
         if (await this.isWriterLock(join(dir, supportDir, entry))) return true
       }
     }
@@ -1504,34 +1593,74 @@ export class SkillLibrary {
    * or be swept as residue — the v16 first cut matched on suffix alone,
    * which permanently refused archiving and deleted user content on restore. */
   private async isWriterLock(lockPath: string): Promise<boolean> {
-    const body = await this.io.readText(lockPath).catch(() => null)
+    let body: string | null
+    try {
+      body = await this.io.readText(lockPath)
+    } catch {
+      // A1-8 (v18): a real read failure (EACCES/EIO) must not read as "no
+      // lock" — the mover would proceed while a writer may hold it. Only a
+      // missing read (the seam's null) is "no lock".
+      return true
+    }
     if (body === null) return false
-    return /^\d+:[0-9a-f]*$/.test(body.trim())
+    return LOCK_BODY_RE.test(body.trim())
   }
 
-  /** P2 (v16): best-effort removal of lock residue inside a RESTORED tree —
-   * a `.lock` that a pre-restore crash or TOCTOU stranded in `.archive`
-   * cannot have a live writer (restore refuses when the live root is
-   * locked), and if left in place its body (a live pid on a single-host
-   * deployment) structurally closes the writer's self-heal path. */
+  /** P2 (v16): best-effort removal of lock residue inside a RESTORED tree.
+   * A1-2/A1-7 (v18): the sweep now covers the marker locks the probe checks
+   * (`SKILL.md.lock`/`.pinned.lock`/`.hermes-managed.lock`) and only removes
+   * a lock whose holder pid is NOT alive — a live writer's lock is never
+   * stolen by the sweep. A dead-pid residue would otherwise permanently
+   * refuse archive/restore. */
   private async deleteStrandedLocks(dir: string): Promise<void> {
     // P2 (v17): the body-shape check keeps user support files named
     // `*.lock` (verified: restore used to delete them) out of the sweep.
     await this.sweepLockIfStranded(join(dir, 'SKILL.md.lock'))
+    await this.sweepLockIfStranded(join(dir, '.pinned.lock'))
+    await this.sweepLockIfStranded(join(dir, '.hermes-managed.lock'))
     for (const supportDir of SUPPORT_DIRS) {
       let entries: string[] = []
       try { entries = await this.io.list(join(dir, supportDir)) } catch { continue }
       for (const entry of entries) {
-        if (entry.endsWith('.lock')) await this.sweepLockIfStranded(join(dir, supportDir, entry))
+        if (entry.endsWith(LOCK_SUFFIX)) await this.sweepLockIfStranded(join(dir, supportDir, entry))
       }
     }
   }
 
   /** Remove `lockPath` only when its body has the writer-lock `pid:token`
-   * shape; anything else (a user support file) is left untouched. */
+   * shape AND the holder pid is not alive; anything else (a user support file
+   * or a live writer's lock) is left untouched. */
   private async sweepLockIfStranded(lockPath: string): Promise<void> {
     const body = await this.io.readText(lockPath).catch(() => null)
-    if (body === null || !/^\d+:[0-9a-f]*$/.test(body.trim())) return
+    if (body === null) return
+    const match = /^(\d+):[0-9a-f]*$/.exec(body.trim())
+    if (match === null) return
+    const pid = Number(match[1])
+    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) return
+    await this.io.remove(lockPath).catch(() => {})
+  }
+
+  /** A1-4 (v18): a manifest-declared name is copied with `join(root, name)`;
+   * only a single, non-traversing path component is safe. Dotfiles
+   * (`.usage.json`) stay allowed — sidecars are legitimately dot-prefixed. */
+  private safeSnapshotEntryName(name: string): boolean {
+    return name !== '' && name !== '.' && name !== '..'
+      && !name.includes('/') && !name.includes('\\')
+      && basename(name) === name
+  }
+
+  /** A1-7 (v18): a root-level lock whose holder is alive must refuse the
+   * restore; a dead residue is swept so a crashed writer cannot block
+   * recovery. A non-lock body shape is left alone (user file). */
+  private async refuseLiveLockOrSweep(lockPath: string, label: string): Promise<void> {
+    const body = await this.io.readText(lockPath).catch(() => null)
+    if (body === null) return
+    const match = /^(\d+):[0-9a-f]*$/.exec(body.trim())
+    if (match === null) return
+    const pid = Number(match[1])
+    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) {
+      throw new Error(`snapshot restore refused: ${label} is being written (write lock present); retry once the write completes`)
+    }
     await this.io.remove(lockPath).catch(() => {})
   }
 
@@ -1818,9 +1947,10 @@ export class SkillLibrary {
       if (typeof move.heading !== 'string' || !move.heading.trim()) {
         return { ok: false, message: 'Every restructure move needs a non-empty heading.' }
       }
-      if (!RESTRUCTURE_TARGET_RE.test(move.toFile)) {
-        return { ok: false, message: `toFile must be references/<topic>.md (got "${move.toFile}").` }
-      }
+      // A1-6 (v18): reuse the single validator (regex + Windows device stems)
+      // so restructure cannot mint a target the support-file layer refuses.
+      const targetIssue = validateRestructureTarget(move.toFile)
+      if (targetIssue) return { ok: false, message: targetIssue }
     }
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
@@ -1906,17 +2036,21 @@ export class SkillLibrary {
         ? await this.deleteProtection(name)
         : null
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
-    for (const precondition of plan.preconditions ?? []) {
-      const issue = await precondition({ dir })
-      if (issue) return { ok: false, message: issue }
-    }
     // Pre-read EVERY write target: the rollback bytes are kernel-owned and the
     // caller cannot fabricate them. The same read feeds the append semantics of
     // restructure (the caller re-reads for its own construction — kernel reads
     // again because the bytes it restores must be the bytes on disk at commit).
     const landing: Array<{ target: string; content: string; previous: string | null }> = []
     for (const write of plan.writes) {
-      const previous = await this.io.readText(write.target).catch(() => null)
+      // A1-11 (v18): a read failure (EACCES/EIO) is NOT "missing" —
+      // treating it as null made the rollback delete a file it could not
+      // restore. Refuse the whole plan before any write.
+      let previous: string | null
+      try {
+        previous = await this.io.readText(write.target)
+      } catch (error) {
+        return { ok: false, message: `Tree change refused: cannot safely pre-read ${write.target} (${error instanceof Error ? error.message : String(error)}); no writes were performed` }
+      }
       if (Buffer.byteLength(write.content, 'utf8') > this.limits.maxSkillFileBytes) {
         return { ok: false, message: `Write exceeds ${this.limits.maxSkillFileBytes} bytes: ${write.target}` }
       }
@@ -1924,8 +2058,6 @@ export class SkillLibrary {
       if (threat) return { ok: false, message: threat }
       landing.push({ target: write.target, content: write.content, previous })
     }
-    const semantic = plan.validate?.({ dir, currentMd: md }) ?? null
-    if (semantic) return { ok: false, message: semantic }
     const written: Array<{ target: string; previous: string | null }> = []
     try {
       for (const entry of landing) {
@@ -1962,8 +2094,18 @@ export class SkillLibrary {
     // entry; on win32 the mkdir fails with a raw errno (documented).
     const bad = this.badName(name, { allowReserved: true })
     if (bad) return { ok: false, message: bad }
-    if (await this.io.exists(join(this.dirOf(name), 'SKILL.md'))) {
-      return { ok: false, message: `Skill "${name}" already exists in the active root; refusing to overwrite.` }
+    // A1-20 (v18): probe the destination DIRECTORY, not only its SKILL.md. A
+    // directory without SKILL.md (partial/hand-made) used to fall through to
+    // moveDir's dest-exists failure, whose message named a different obstacle.
+    const dest = this.dirOf(name)
+    if (await this.io.exists(dest)) {
+      const hasSkillFile = await this.io.exists(join(dest, 'SKILL.md'))
+      return {
+        ok: false,
+        message: hasSkillFile
+          ? `Skill "${name}" already exists in the active root; refusing to overwrite.`
+          : `Skill directory "${name}" already exists in the active root but carries no SKILL.md; remove or repair it before restoring.`,
+      }
     }
     const archiveRoot = join(this.root, '.archive')
     let entries: string[]
@@ -1982,7 +2124,6 @@ export class SkillLibrary {
     }
     if (!chosen) return { ok: false, message: `Skill "${name}" is not in .archive.` }
     const source = join(archiveRoot, chosen)
-    const dest = this.dirOf(name)
     // Symlink guard (G7): restoring a symlinked archive entry would recreate a
     // link in the active tree instead of the real content — refuse first.
     if (this.io.isSymlink) {
@@ -2087,7 +2228,12 @@ export class SkillLibrary {
     // directories must be removed file by file).
     const before = await this.io.readText(target).catch(() => null)
     if (before === null) return { ok: false, message: `"${filePath}" is not a readable regular file — remove the files inside it one by one.` }
-    await this.io.remove(target)
+    // A1-5 (v18): a bare `io.remove` does not participate in the write-lock
+    // protocol, so a cross-instance/process writer could land its rename after
+    // our read and have the bytes deleted while it reports success. Route the
+    // delete through the same per-path transact lock (returning null = remove).
+    if (this.transact) await this.transact(this.io, target, () => null)
+    else await this.io.remove(target)
     await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
@@ -2115,10 +2261,14 @@ export class SkillLibrary {
     try {
       const names = await listNames(this.root, this.io)
       // Parallel copies: snapshot backups touch disjoint directories, and the
-      // per-path write locks never contend (P2-6).
-      await Promise.all(names.map(async (name) => {
+      // per-path write locks never contend (P2-6). A1-18 (v18): allSettled
+      // (not all) so the cleanup below cannot race a still-running copy and
+      // leave a manifest-less orphan directory behind.
+      const copyResults = await Promise.allSettled(names.map(async (name) => {
         await this.io.copy(this.dirOf(name), join(dest, name))
       }))
+      const copyFailure = copyResults.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+      if (copyFailure) throw copyFailure.reason
       // Sidecar co-snapshot: a rollback that restores the tree but leaves the
       // post-archival usage/suppression state behind would immediately let the
       // curator re-decide on stale records (rollback integrity).
@@ -2142,9 +2292,11 @@ export class SkillLibrary {
       }
       const validExtras = extras.filter(extra => SNAPSHOT_EXTRA_NAME_RE.test(extra.name))
       const extraNames = validExtras.map(extra => extra.name)
-      await Promise.all(validExtras.map(async (extra) => {
+      const extraResults = await Promise.allSettled(validExtras.map(async (extra) => {
         await this.io.writeText(join(dest, 'extras', extra.name), extra.content)
       }))
+      const extraFailure = extraResults.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+      if (extraFailure) throw extraFailure.reason
       await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({
         reason,
         createdAt: new Date().toISOString(),
@@ -2171,10 +2323,16 @@ export class SkillLibrary {
     if (raw === null) return null
     try {
       const manifest = JSON.parse(raw) as Partial<SnapshotManifest>
+      // A1-3 (v18): `skills` is the authoritative list that drives the
+      // destructive clear. A manifest without it (or with a non-array value)
+      // is invalid — returning `[]` here made restore clear the whole tree and
+      // report success. The caller refuses an existing-but-invalid manifest
+      // before touching the live tree.
+      if (!Array.isArray(manifest.skills)) return null
       return {
         reason: typeof manifest.reason === 'string' ? manifest.reason : '',
         createdAt: typeof manifest.createdAt === 'string' ? manifest.createdAt : '',
-        skills: Array.isArray(manifest.skills) ? manifest.skills : [],
+        skills: manifest.skills,
         sidecars: Array.isArray(manifest.sidecars) ? manifest.sidecars : [],
         ...typeof manifest.hasArchive === 'boolean' ? { hasArchive: manifest.hasArchive } : {},
         extras: Array.isArray(manifest.extras) ? manifest.extras : [],
@@ -2207,6 +2365,9 @@ export class SkillLibrary {
       if (manifest === null) continue
       out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt, reason: manifest.reason })
     }
+    // A1-21 (v18): the manifest's createdAt is the authoritative recency
+    // (same-millisecond random-suffix names can sort wrongly by name).
+    out.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '') || b.path.localeCompare(a.path))
     return out
   }
 
@@ -2274,12 +2435,63 @@ export class SkillLibrary {
    * restoreLatestSnapshot so a failed restore can roll itself back (E-13).
    */
   private async restoreSnapshotIntoRoot(snapshotPath: string): Promise<void> {
+    // A1-3 (v18): read and validate the manifest BEFORE clearing anything.
+    // The old order cleared the active tree first, then treated an
+    // unreadable/skills-less manifest as "restore nothing" and still reported
+    // ok:true. A manifest.json that exists but cannot be parsed is corruption,
+    // not a legacy snapshot, and must refuse before the destructive clear.
+    const manifest = await this.readSnapshotManifest(snapshotPath)
+    if (manifest === null) {
+      if (await this.io.exists(join(snapshotPath, 'manifest.json'))) {
+        throw new Error(`snapshot ${snapshotPath} has an unreadable manifest.json; refusing to clear the active tree`)
+      }
+    } else {
+      // A1-4 (v18): every manifest-declared name is a path component copied
+      // into the skills root — reject traversal/absolute shapes up front.
+      for (const name of [...manifest.skills, ...manifest.sidecars]) {
+        if (!this.safeSnapshotEntryName(name)) {
+          throw new Error(`snapshot ${snapshotPath} declares an unsafe entry name ${JSON.stringify(name)}; refusing to restore`)
+        }
+      }
+      // A1-3 (v18): a manifest that declares no skills while the snapshot
+      // directory contains entries is inconsistent (a corrupted/truncated
+      // manifest); clearing to an empty tree would lose the live library.
+      if (manifest.skills.length === 0) {
+        const snapshotEntries = await this.io.list(snapshotPath)
+        const hasSkillEntries = snapshotEntries.some(entry => entry !== 'manifest.json' && entry !== 'extras' && entry !== '.archive')
+        if (hasSkillEntries) {
+          throw new Error(`snapshot ${snapshotPath} declares no skills but contains entries; refusing to clear the active tree`)
+        }
+      }
+    }
     let rootEntries: string[]
     try {
       rootEntries = await this.io.list(this.root)
     } catch {
       rootEntries = []
     }
+    // A1-7 (v18): the snapshot channel has no writer probe in v17. Refuse while
+    // a skill writer is active; dead lock residue is swept first so a crashed
+    // writer does not block recovery. Root-level sidecar locks are checked the
+    // same way (a live `.usage.json.lock` must not be deleted by the clear).
+    for (const entry of rootEntries) {
+      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json') continue
+      if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) {
+        await this.refuseLiveLockOrSweep(join(this.root, entry), entry)
+        continue
+      }
+      const dir = join(this.root, entry)
+      if (await this.io.exists(join(dir, 'SKILL.md'))) {
+        await this.deleteStrandedLocks(dir)
+        if (await this.hasWriteLock(dir)) {
+          throw new Error(`snapshot restore refused: skill "${entry}" is being written (write lock present); retry once the write completes`)
+        }
+      }
+    }
+    // A1-19 (v18): a snapshot that does not carry `.curator-suppressed.json`
+    // must roll the live one away too (otherwise a post-snapshot suppression
+    // survives as a ghost). The manifest branch copies it back when present.
+    const restoresSuppressed = manifest !== null && manifest.sidecars.includes('.curator-suppressed.json')
     // F-316 (0.3.25): only the system directories and the durable sidecars are
     // survived by a snapshot restore. A dot-entry that appeared AFTER the
     // snapshot (e.g. a fresh `.usage.json`) used to be kept by the blanket
@@ -2290,19 +2502,19 @@ export class SkillLibrary {
     // real history and stays. `.curator-suppressed.json` is a co-snapshotted
     // sidecar and comes back with the snapshot (a later suppression made after
     // the snapshot is rolled back with it — the correct rollback semantics).
+    // A1-7 (v18): lock files are protocol state, never snapshot content; the
+    // clear skips them (a live one was refused above, a dead one swept).
     for (const entry of rootEntries) {
-      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json') continue
+      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json') continue
+      if (entry === '.curator-suppressed.json' && restoresSuppressed) continue
+      if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) continue
       await this.io.remove(join(this.root, entry))
     }
-    const manifest = await this.readSnapshotManifest(snapshotPath)
     if (manifest === null) {
-      // Legacy snapshot without a readable manifest: restore every entry
-      // except the manifest and extras (extras are owner state, never
-      // skills-root content).
-      for (const entry of await this.io.list(snapshotPath)) {
-        if (entry === 'manifest.json' || entry === 'extras') continue
-        await this.io.copy(join(snapshotPath, entry), join(this.root, entry))
-      }
+      // A1-16 (v18): a manifest-less snapshot is not supported (listSnapshots
+      // already skips it). Refuse explicitly instead of the old per-entry
+      // copy branch, which merged `.archive` instead of replacing it.
+      throw new Error(`snapshot ${snapshotPath} has no readable manifest.json; refusing to restore`)
     } else {
       for (const name of manifest.skills) {
         await this.io.copy(join(snapshotPath, name), join(this.root, name))

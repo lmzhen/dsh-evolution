@@ -75,7 +75,12 @@ describe('evolution-state-domain', () => {
         attempts += 1
         if (attempts === 1) throw new Error('busy')
         return {
-          table: () => ({ get: async () => null, put: async () => {}, entries: () => [], update: async () => null }),
+          // Upstream `Table.get(key)` is SYNCHRONOUS and returns `V | undefined`
+          // (storage-domain domain.ts:48). The fake must match: an `async`
+          // get returned a Promise, which the old `?? null` returned directly
+          // from the async provider (implicitly awaited) — the C-2 copy read
+          // spread it into `{}` instead.
+          table: () => ({ get: () => undefined, put: async () => {}, entries: () => [], update: async () => null }),
           close: async () => { closed = true },
         } as never
       },
@@ -98,7 +103,8 @@ describe('evolution-state-domain', () => {
         attempts += 1
         if (attempts <= 2) throw new Error(`simulated busy #${attempts}`)
         return {
-          table: () => ({ get: async () => null, put: async () => {}, entries: () => [], update: async () => null }),
+          // Same synchronous `get` contract as the fake above.
+          table: () => ({ get: () => undefined, put: async () => {}, entries: () => [], update: async () => null }),
           close: async () => {},
         } as never
       },

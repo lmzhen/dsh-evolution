@@ -230,7 +230,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         : warned
           ? ' quality:⚠'
           : ''
-      return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${summary.protectedBy ? ` [${summary.protectedBy}]` : ''}`
+      // A1-17 (v18): a failed marker probe is shown as `protection:unknown`
+      // rather than omitted — the model must not read a listing as unprotected.
+      const protection = summary.protectionUnknown ? ' [protection:unknown]' : summary.protectedBy ? ` [${summary.protectedBy}]` : ''
+      return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${protection}`
     })
     const groups = computeDedupGroups({ contents: new Map(await Promise.all(list.map(async summary => [summary.name, (await library.read(summary.name)) ?? ''] as const))) })
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)

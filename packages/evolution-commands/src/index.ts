@@ -7,7 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
@@ -19,10 +19,13 @@ import { fileURLToPath } from 'node:url'
 export const name = 'evolution-commands'
 
 export interface Config {
-  /** Skill-tree root for maintain/restructure; empty uses skillsRoot().
-   * Align with tool-skill-manage/skill-usage/evolution-skill-catalog rows (A7).
-   * 0.3.22 (G3.2, F-342): resolved through resolveSkillsRoot() so an empty/
-   * whitespace value falls back to the default instead of a CWD-relative root. */
+  /** Skill-tree root for maintain/restructure; empty uses the default tree.
+   * E-7 (v18): canonical key — the same `root` every other family row reads,
+   * resolved through resolveSkillsRoot() so an empty/whitespace value falls
+   * back to the default instead of a CWD-relative root. */
+  root?: string | undefined
+  /** Deprecated alias of `root` (E-7, v18): honoured only while `root` is
+   * empty, with a warning; removed after 0.3.65. */
   skillsRoot?: string | undefined
   /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
    * secondary calls inside the window return the previous runId instead of
@@ -51,6 +54,7 @@ export interface Config {
 // its `.min()` at the loader (the runtime clamp stays as the second layer for
 // direct construction/NaN). The interface above stays as the static face.
 export const Config = z.object({
+  root: z.string().default(''),
   skillsRoot: z.string().default(''),
   maintainCooldownMs: z.number().min(0).default(30_000),
   maintainTimeoutMs: z.number().min(1).default(600_000),
@@ -62,6 +66,13 @@ import { buildEnrichment } from '@deepseek-ai/dsh-evolution-maintenance'
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
+  // E-7 (v18): one root key for the whole family — resolve `root` (canonical)
+  // with `skillsRoot` accepted as a deprecated alias for one minor version.
+  const rootConfig = resolveRootConfig(rawConfig)
+  if (rootConfig.usedDeprecatedAlias) {
+    ctx.logger.warn('evolution-commands: config "skillsRoot" is deprecated (E-7); use "root" — the alias is honoured until 0.3.65')
+  }
+  const skillsRootValue = rootConfig.root
   let lastMaintainAt = 0
   let lastMaintainRunId = ''
   // 0.3.11 single-flight: 0.3.5 discovered the cooldown never covers in-flight
@@ -127,9 +138,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'curator run') {
-          const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; report: { runId: string; snapshotPath?: string } }> } | undefined
+          const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; skipped?: string; report: { runId: string; snapshotPath?: string } }> } | undefined
           if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const result = await curator.run({ ignoreGates: true })
+          // D-12 (v18): a reentrant run that was skipped must not be reported
+          // as a completed 0/0/0 pass.
+          if (result.skipped !== undefined) {
+            return ok(`Curator run skipped (${result.skipped}): no curation pass was executed.\nrunId=${result.report.runId}`)
+          }
           return ok(`Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
         }
         if (input === 'curator pause' || input === 'curator resume') {
@@ -310,7 +326,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // no subagent call, no cooldown (the cooldown guards LLM calls).
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
-          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
+          const library = new SkillLibrary(resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider())
           const enrichment = await buildEnrichment(ctx, library)
           const snapshots = await snapshotFromLibrary(library, {
             descriptions: enrichment.descriptions,
@@ -385,7 +401,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // AND failure.
           try {
             maintainInFlightSince = Date.now()
-            const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider())
+            const library = new SkillLibrary(resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider())
             const enrichment = await buildEnrichment(ctx, library)
             const outcome = await runMaintain(
               // E-55 (0.3.18): same-source model routing — the maintain subagent
@@ -404,6 +420,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               },
               {
                 timeoutMs: runTimeoutMs,
+                // E-6 (v18): UI/session cancellation must stop the scan, not
+                // just wait for the 600s timeout.
+                signal: invocation.signal,
                 descriptions: () => enrichment.descriptions,
                 supportFiles: () => enrichment.supportFiles,
                 quality: () => enrichment.quality,
@@ -508,7 +527,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // field is named `threatExemptLabels` (P2-18 core batch; the field
           // name is the linkage contract, keep in sync). Empty/omitted keeps
           // the strict scan unchanged.
-          const library = new SkillLibrary(resolveSkillsRoot({ root: config.skillsRoot }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, config.threatExemptLabels ?? [])
+          const library = new SkillLibrary(resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, config.threatExemptLabels ?? [])
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
           if (!result.ok) return err(result.message)
           // Same mutating observation surface as skill_manage performs for the
@@ -548,20 +567,18 @@ interface CommandRuntimeLike {
  */
 function resolveAgentPresetDir(importMetaUrl: string): string {
   const dir = dirname(fileURLToPath(importMetaUrl))
-  const siblingCandidate = join(dir, '..', 'dsh-evolution-agent-preset')
-  const candidates = [siblingCandidate, join(dir, '..', '..', 'evolution-agent')]
-  for (const candidate of candidates) {
-    if (existsSync(join(candidate, 'agent.cordis.yml')) && existsSync(join(candidate, 'preset.yml'))) return candidate
-  }
+  // D-13 (v18): the overlay sibling is `evolution-agent` two levels up
+  // (`packages/evolution/<pkg>/src` or `packages/<pkg>/src`). The old first
+  // candidate `join(dir, '..', 'dsh-evolution-agent-preset')` pointed INSIDE
+  // this package in every layout (dead path).
+  const overlayCandidate = join(dir, '..', '..', 'evolution-agent')
+  if (existsSync(join(overlayCandidate, 'agent.cordis.yml')) && existsSync(join(overlayCandidate, 'preset.yml'))) return overlayCandidate
   try {
     return dirname(createRequire(importMetaUrl).resolve('@deepseek-ai/dsh-evolution-agent-preset/package.json'))
   } catch {
-    // S6.6-1 (E-64): last-resort sibling path, already probed by the loop above
-    // and known not to hold both files — the caller's existsSync guard turns it
-    // into a clean error. This replaces the old `candidates[0] ?? join(...)`
-    // fallback whose `?? join(...)` right side was dead (siblingCandidate is
-    // never null) and which re-derived an already-failed path.
-    return siblingCandidate
+    // S6.6-1 (E-64): last-resort overlay path; the caller's existsSync guard
+    // turns a wrong path into a clean error.
+    return overlayCandidate
   }
 }
 
@@ -719,6 +736,8 @@ export function atomicWriteFiles(
 interface CommandInvocation {
   rawInput?: string
   agent: { inject(message: unknown): void }
+  /** E-6 (v18): the platform's cancel signal; forwarded to the maintenance scan. */
+  signal?: AbortSignal
 }
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.

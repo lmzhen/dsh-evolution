@@ -70,7 +70,7 @@ repeating the same prose.
 
 | Package | Role |
 |---|---|
-| `evolution-core` | Shared pure stores/prompts/signals/constants (no Cordis plugin entry) |
+| `evolution-core` | Shared pure stores/prompts/signals/constants; no main Cordis plugin entry (ships the `./invariant` companion entry only) |
 | `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
@@ -78,11 +78,11 @@ repeating the same prose.
 | `evolution-plan-validator` | Deterministic validation for model-produced plans |
 | `evolution-state-storage` / `-domain` / `-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
 | `evolution-approval` | Hermes-style staged/pending writes over `evolutionState` |
-| `evolution-threat` | `tools/pre-execute` content threat guard |
+| `evolution-threat` | `tools.guard` content threat guard |
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
 | `evolution-activity` | Durable audit store for self-evolution plan outcomes (`evolution/plan-applied`) |
-| `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
+| `evolution-feedback` | Durable feedback → `feedback_score`/`feedback_warn` → curator (union-read with `quality_warn`) |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | The `/evolution` command surface (approval queue, curator, maintenance, presets) — full enumeration under "Command surface" below |
@@ -126,7 +126,7 @@ single source with the input hint and the emitted help/README text):
 | autonomy | auto / reviewed / observe | `approval.enabled` (profile row), `reviewEnabled` (evolution-review), `/evolution pending\|approve\|reject` |
 | scope | global / per-session | package choice — evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
 | curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` (evolution-curator) |
-| memoryInjection | on / off | `memoryEnabled` (tool-memory: guidance + snapshot injection) |
+| memoryInjection | on / off | `memoryEnabled` (tool-memory: the whole row is a no-op when off — no `memory` tool registration and no guidance/snapshot injection) |
 | threatStrictness | strict / exempt-list | `threatExemptLabels` — per config site: the evolution-threat row, the tool-skill-manage row, the evolution-commands row, and the SkillLibrary/MemoryStore store options (P2-18 + P2-4) |
 
 Fine-grained knobs run into the three-level appendix: **daily** (review
@@ -219,17 +219,21 @@ Use the legacy preset overlay on a standard DSH host:
 This one-click preset, the `all` bundle and the layered `evolution-host`
 layout are ALTERNATIVE installs (mutual exclusion, E-33) — install one, not
 two, or the shared infra rows mount twice and startup fails loud. The one-click
-preset carries its own `evolution-maintenance-tools` row and its own
-`session-query-sqlite` index override; the `tool-skill` 60-char catalog cap
-override is evolution-host-owned and a preset-alone install runs the platform
-catalog default (add the override yourself if you want the cap — the 60-char
-authoring bar enforced by tool-skill-manage still applies regardless).
+preset carries its own `evolution-maintenance-tools` row, its own
+`session-query-sqlite` index override and the same root-level `tool-skill`
+60-char catalog cap override as the host bundle. Sessions running under an
+agent preset read the PRESET-scope `tool-skill` row, which no profile patch
+can reach; the layered flow injects the cap onto that row at generation time
+(V10-14). The 60-char authoring bar enforced by tool-skill-manage applies
+regardless.
 
 Or compose manually — order matters because provider rows declare `inject`.
 This mirrors the row set shipped by the two bundles (evolution-host infra +
-evolution-agent model tools); the DSH profile HOST provides the storage
-facility (`storage`/`storage-json`/`storage-domain`), which this preset never
-owns — `evolution-state-domain` joins it only when mounted (D-30):
+evolution-agent model tools); in the OVERLAY the DSH profile HOST provides the storage facility
+(`storage`/`storage-json`/`storage-domain`), which this preset does not own;
+the standalone `evolution-preset` package declares those storage packages as
+dependencies and mounts them from its own `cordis.yml`. `evolution-state-domain`
+joins only when mounted (D-30):
 
 ```yaml
 - id: evolution-policy
@@ -295,8 +299,8 @@ owns — `evolution-state-domain` joins it only when mounted (D-30):
 # evolution-host bundle.
 - id: session-query-sqlite
   config:
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH ?? dshHomePath('evolution', 'session-query.db'))
-    openAt: !!js process.env.DSH_EVOLUTION_SESSION_QUERY || 'startup'
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
+    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
 - id: tool-skill
   config:
     catalogDescriptionMaxLength: 60
@@ -307,7 +311,7 @@ owns — `evolution-state-domain` joins it only when mounted (D-30):
 1. Model writes only `memory` and `skills`; policy/prompts/routing/state are
    never model-writable. `evolution-policy` installs a monotonic
    `ctx.tools.guard` and `evolution-plan-validator` rejects forbidden fields.
-2. Every mutation is gated by `tools/pre-execute` threat scan and, when
+2. Every mutation is gated by the `tools.guard` threat scan (the pre-execute allow path) and, when
    enabled, the staged approval service. Approved writes replay through the
    exact runner they were registered with.
 3. Skill destruction is never a hard delete: archival moves to `.archive/`,
@@ -315,14 +319,14 @@ owns — `evolution-state-domain` joins it only when mounted (D-30):
 4. Review plans require event-sequence evidence bounded by the session seq;
    invalid ops are dropped while valid ops still apply.
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media
-   decisions out of policy code; native packages perform no node:fs IO of
-   their own.
+   decisions out of policy code; media providers perform no node:fs IO of
+   their own (commands' preset/doctor helpers are the explicit direct-fs exception).
 
 ## Development: the two layouts and their tsconfigs
 
 Dev source lives at `packages/evolution/*`; the mirrored publication repo uses
 the flat form `packages/evolution-*`. The repo `tsconfig.base.json` /
-`tsconfig.host.json` carry the `@deepseek-ai/dsh-evolution*`/`@lmzhen` alias
+`tsconfig.host.json` carry the `@deepseek-ai/dsh-evolution*` alias (the publish chain rewrites the scope; no `@lmzhen` alias exists in tsconfig)
 lines and project references as `./packages/evolution/<pkg>` paths. Those
 `packages/evolution/...` paths resolve ONLY in the full upstream checkout (the
 dev tree or the CI overlay built against it) — they are not resolvable as a

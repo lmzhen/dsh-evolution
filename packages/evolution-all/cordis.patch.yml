@@ -7,7 +7,7 @@
 # session gets the automation AND the memory/skill tools AND the
 # SKILLS/MEMORY guidance injection, with no agent-preset step.
 #
-# THREE-WAY DRIFT GUARD (bundle-mutual-exclusion.spec):
+# THREE-WAY DRIFT GUARD (evolution-host/tests/bundle-mutual-exclusion.spec.ts):
 #   - every infra row block below must stay byte-identical to
 #     evolution-host/cordis.patch.yml (same id/name/config/disabled);
 #   - the four model rows must stay byte-identical to

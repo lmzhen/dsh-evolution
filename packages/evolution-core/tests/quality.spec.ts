@@ -4,6 +4,7 @@ import { computeQualityScores, computeDedupGroups, computePrefixClusters, normal
 function record(now: Date, overrides: Partial<{
   created_at: string
   use_count: number
+  view_count: number
   patch_count: number
   last_used_at: string | null
 }> = {}) {
@@ -11,7 +12,7 @@ function record(now: Date, overrides: Partial<{
     created_by: 'agent' as const,
     created_at: overrides.created_at ?? new Date(now.getTime() - 100 * 86_400_000).toISOString(),
     use_count: overrides.use_count ?? 0,
-    view_count: 0,
+    view_count: overrides.view_count ?? 0,
     patch_count: overrides.patch_count ?? 0,
     last_used_at: overrides.last_used_at ?? null,
     last_viewed_at: null,
@@ -37,6 +38,20 @@ it('computes the six quality factors with weighted score', () => {
   expect(score!.factors.recency).toBe(1)
   expect(score!.factors.richness).toBeCloseTo(0.175, 5)
   expect(score!.warn).toBe(false)
+})
+
+it('E-2/G-1 (v18): view_count feeds the load factors (use_count is an external signal)', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const usage = new Map([['loaded-skill', record(now, {
+    view_count: 20,
+    patch_count: 4,
+    last_used_at: new Date(now.getTime() - 5 * 86_400_000).toISOString(),
+  })]])
+  const score = computeQualityScores({ usage, now }).get('loaded-skill')!
+  // 20 loads over 100 days — a real number, not the constant 0 the old
+  // use_count-only formula produced for every production record.
+  expect(score.factors.usageFrequency).toBeCloseTo(0.2, 5)
+  expect(score.factors.stability).toBeCloseTo(1 - 4 / 20, 5)
 })
 
 it('flags a long-idle, never-used skill as low quality', () => {

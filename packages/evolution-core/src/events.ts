@@ -14,11 +14,13 @@
  */
 
 import type {} from '@deepseek-ai/cordis'
+import type { ReviewKind } from './signals.ts'
 
 export interface EvolutionReviewScheduledEvent {
   /** Owning session (payload v2): process events carry no session envelope. */
   sessionId: string
-  kind: 'memory' | 'skill' | 'combined'
+  /** F-20 (v18): single definition point — `ReviewKind` in signals.ts. */
+  kind: ReviewKind
   toolCalls: number
   userChars: number
   assistantChars: number

@@ -233,6 +233,17 @@ describe('tool-memory', () => {
     expect(result.message).toContain('No operations provided')
     expect(approvals).toBe(0)
   })
+
+  it('F-14 (v18): memoryEnabled:false makes the whole row a no-op (no memory tool)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(ToolMemory, { memoryEnabled: false })
+    expect(ctx.tools.get('memory')).toBeUndefined()
+  })
 })
 
 async function makeTmp(): Promise<string> {

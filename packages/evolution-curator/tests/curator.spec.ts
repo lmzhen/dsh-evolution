@@ -1933,3 +1933,11 @@ it('v17: a REAL in-flight run holds the mutex — a second run skips (already-ru
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+
+it('F-14 (v18): curatorProvider defaults to deepseek-official and is configurable', () => {
+  const schema = EvolutionCurator.Config as unknown as {
+    ['~standard']: { validate(input: unknown): { value: { curatorProvider: string } } }
+  }
+  expect(schema['~standard'].validate({}).value.curatorProvider).toBe('deepseek-official')
+  expect(schema['~standard'].validate({ curatorProvider: 'local-llm' }).value.curatorProvider).toBe('local-llm')
+})

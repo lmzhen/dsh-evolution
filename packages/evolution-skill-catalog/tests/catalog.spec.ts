@@ -101,4 +101,59 @@ describe('evolution-skill-catalog', () => {
     expect((await ctx.skills.get('other-skill'))?.name).toBe('other-skill')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('P1-1 (v18): an upstream-invalid name or empty description is not published (and does not break snapshot)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-publishable-'))
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(Catalog, { root })
+    const io = ctx.evolutionIo.provider('node')
+    const make = (name: string, frontmatter: string) => `---\nname: ${name}\n${frontmatter}---\n\n# ${name}\n\nBody.\n`
+    // The mirror name guard permits a trailing hyphen; upstream SKILL_NAME
+    // does not. It must be filtered, not forwarded (one bad candidate aborts
+    // the whole upstream collection, breaking agent/pre-step every turn).
+    // Each skill is a DIRECTORY carrying SKILL.md: `SkillLibrary.list()` walks
+    // `root/<name>/SKILL.md` (listNames), so a file named `root/<name>` is not
+    // an entry at all and would make this test pass vacuously on an empty tree.
+    await io.writeText(join(root, 'trailing-', 'SKILL.md'), make('trailing-', 'description: Valid description but invalid name.\n'))
+    // A description-less SKILL.md is visible to the curator (C-14) but must
+    // not reach the platform registry (upstream refuses empty descriptions).
+    await io.writeText(join(root, 'no-description', 'SKILL.md'), make('no-description', ''))
+    await io.writeText(join(root, 'good-skill', 'SKILL.md'), make('good-skill', 'description: A valid skill.\n'))
+    ctx.emit('evolution/skills-refresh')
+    const names = (await ctx.skills.snapshot()).skills.map(skill => skill.name)
+    expect(names).toContain('good-skill')
+    expect(names).not.toContain('trailing-')
+    expect(names).not.toContain('no-description')
+    // get() applies the same filter (the valid-name/empty-description case
+    // actually reaches the provider; the trailing-hyphen case is rejected by
+    // the upstream registry before the provider is consulted).
+    expect(await ctx.skills.get('trailing-')).toBeUndefined()
+    expect(await ctx.skills.get('no-description')).toBeUndefined()
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('F-14 (v18): includeSkillNames/excludeSkillNames gate publication', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-filter-'))
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(Catalog, { root, includeSkillNames: ['keep-me'], excludeSkillNames: ['skip-me'] })
+    const io = ctx.evolutionIo.provider('node')
+    for (const name of ['keep-me', 'skip-me', 'other']) {
+      await io.writeText(join(root, name, 'SKILL.md'), `---\nname: ${name}\ndescription: A skill.\n---\n\n# ${name}\n`)
+    }
+    ctx.emit('evolution/skills-refresh')
+    const names = (await ctx.skills.snapshot()).skills.map(skill => skill.name)
+    // An allow-list of one: everything else is invisible, including the
+    // explicitly excluded name (exclude wins over the implicit allow).
+    expect(names).toContain('keep-me')
+    expect(names).not.toContain('skip-me')
+    expect(names).not.toContain('other')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
 })

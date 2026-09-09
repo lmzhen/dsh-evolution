@@ -29,16 +29,17 @@ Single-file writes (`update`, `patch`, `writeSupportFile`)
 additionally run the read and the write inside `transactIo` when a caller
 injects a `transact` into the constructor — that is the cross-process lock, so
 two processes sharing `DSH_HOME` cannot interleave their RMW on one file.
-`create` writes a new file and `archive`/`consolidate` already own a two-phase
-commit, so they deliberately stay outside the serial chain.
+`create` is INSIDE the serial chain and, when a transact backend is bound, its
+exists check runs inside the same per-file transact (v18); `archive`/`consolidate`
+are rename-based two-phase paths and stay outside the single-file serial chain.
 
-**0.3.46 residual (documented, per G2.5 precedent):** the low-frequency
-single-file entry points `create`, `archive`, `removeSupportFile` and
-`setPinned` still perform an unlocked read→write (their per-file read is not
-inside the serial/transact task). The race needs a same-process concurrent
-mutator on the SAME skill file, which the serialized entry points above make
-unlikely; the exposure is acknowledged and not locked (收益不抵锁面扩大 —
-adding locks to four low-frequency entry points is not worth the surface).
+**v18 residual (updated):** `create`, `removeSupportFile` and `setPinned` now
+run on the serial chain (`removeSupportFile`'s delete also goes through the
+per-file transact), so the remaining single-file residual is the protection
+TOCTOU (a marker check outside the transact) and the multi-file two-phase
+paths `archive`/`consolidate`/`restructure`. The race needs a concurrent
+mutator on the SAME skill file/package; the exposure is acknowledged and the
+protection check is the next candidate (see the v18 optimization plan, E-5).
 
 When the backend provides `transact` (nodeEvolutionIo and the io adapter do),
 the constructor binds it BY DEFAULT since 0.3.27 — the single-file entry points
@@ -47,8 +48,9 @@ the constructor binds it BY DEFAULT since 0.3.27 — the single-file entry point
 instantiation, so same-file concurrent writes from different processes no
 longer resolve to last-writer-wins there. An explicit `transact` argument
 overrides the default binding. The two-phase paths deliberately stay outside
-that lock: `create` (exists probe + write) can still double-pass the probe
-across processes, `archive`/`consolidate` are rename-based with best-effort
+that lock: `create`'s exists probe runs inside the transact when a transact
+backend is bound (v18), so only a transact-less custom backend can still
+double-pass the probe across processes; `archive`/`consolidate` are rename-based with best-effort
 rollback (an archive loser's rollback surfaces the raw failure when the source
 vanished), and `restructure`'s multi-file swap can expose an interleaved tree
 to a concurrent reader. These residual windows are documented rather than

@@ -93,7 +93,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 `curator scope` · `mutations` · `restore`（快照恢复） ·
 `consolidate <target> <sources...> [--plan <runId>]` · `skill restore <name>` ·
 `skills health` · `skills refresh` · `learn [request]` ·
-`maintain [--timeout <ms> | --facts]` · `preset install` ·
+`maintain [--timeout=<ms> | --facts]` · `preset install` ·
 `restructure <name> "<heading>" <to_file> [--plan <runId>]` · `replay`
 
 （裸 `/evolution` 输出同一清单。）
@@ -245,7 +245,7 @@ usage telemetry
 ### 治理
 
 ```text
-tools/pre-execute   威胁扫描
+tools.guard   威胁扫描
 tools.guard         不可变策略拒绝
 evolution-approval  stage -> approve/reject -> 审计
 evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
@@ -270,7 +270,7 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 | autonomy | auto / reviewed / observe | `approval.enabled`（profile 行）、`reviewEnabled`（evolution-review）、`/evolution pending\|approve\|reject` |
 | scope | global / per-session | 包选择：evolution-all（全局，默认）vs host + Evolution 预设（按会话） |
 | curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours`（evolution-curator） |
-| memoryInjection | on / off | `memoryEnabled`（tool-memory：指引与快照注入） |
+| memoryInjection | on / off | `memoryEnabled`（tool-memory：关闭时整行为 no-op——不注册 `memory` 工具，也不注入指引/快照） |
 | threatStrictness | strict / 豁免清单 | threat 配置 + `threatExemptLabels`（core SkillLibrary/MemoryStore 选项） |
 
 细粒度旋钮分三档（日常 / 调优 / 高危——如 maxOpsPerPlan、chars 上限、review/curator 模型选择：直接影响花费与行为），见英文 README `Configuration dials` 下说明。
@@ -282,6 +282,7 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 | `DSH_EVOLUTION_SESSION_QUERY` | profile 配置（bundle patch `!!js`） | `startup` / `first-search` / `never`；非法值归一为 `startup` |
 | `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile 配置（`!!js`） | 索引路径；空串回退 `$DSH_HOME/evolution/session-query.db` |
 | `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | 插件代码（core `env.ts`） | `1` 将预设 delta 行冲突从 fail-loud 降为 warn+双行保留 |
+| `EVOLUTION_SCOPE` | 仅源码安装器（`install-layered.mjs`、`test-support/row-contract.ts`） | 写入生成的 profile/preset 行的 scope；默认取包自身 scope。插件运行时不读取 |
 
 所有稳定 row id 都可通过 profile 覆盖：
 

@@ -147,19 +147,40 @@ export function apply(ctx: Context): void {
     name: PROVIDER_DOMAIN,
 
     async loadReviewState(sessionId) {
-      return (await ensure()).table(REVIEW_STATE_TABLE).get(sessionId) ?? null
+      // C-2 (v18): return a DEEP copy — the caller (advanceReview) mutates the
+      // record before save, and `args`-carrying records share nested objects
+      // with the domain map; a rejected save must not leave the domain's
+      // in-memory record ahead of the medium (the json provider serializes, so
+      // it is deep by construction).
+      const record = (await ensure()).table(REVIEW_STATE_TABLE).get(sessionId)
+      return record === undefined ? null : structuredClone(record)
     },
 
     async saveReviewState(sessionId, record) {
-      await (await ensure()).table(REVIEW_STATE_TABLE).put(sessionId, record)
+      // P2-1 (v18): upstream storage-domain validates stored records only on
+      // open(); a blind put here would persist a bad record and make the WHOLE
+      // evolution domain fail to open with `invalid-record` on the next mount.
+      // Validate at the write boundary and persist the parsed value.
+      const parsed = reviewStateSchema.safeParse(record)
+      if (!parsed.success) {
+        throw new Error(`evolution-state-domain: refusing to persist an invalid review-state record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
+      }
+      await (await ensure()).table(REVIEW_STATE_TABLE).put(sessionId, parsed.data)
     },
 
     async loadCuratorState() {
-      return (await ensure()).table(CURATOR_STATE_TABLE).get(CURATOR_STATE_KEY) ?? null
+      const record = (await ensure()).table(CURATOR_STATE_TABLE).get(CURATOR_STATE_KEY)
+      return record === undefined ? null : structuredClone(record)
     },
 
     async saveCuratorState(record) {
-      await (await ensure()).table(CURATOR_STATE_TABLE).put(CURATOR_STATE_KEY, record)
+      // P2-1 (v18): same write-boundary validation as saveReviewState — the
+      // domain `put` itself does not parse, only `open()` does.
+      const parsed = curatorStateSchema.safeParse(record)
+      if (!parsed.success) {
+        throw new Error(`evolution-state-domain: refusing to persist an invalid curator-state record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
+      }
+      await (await ensure()).table(CURATOR_STATE_TABLE).put(CURATOR_STATE_KEY, parsed.data)
     },
 
     async transactCuratorState(task) {
@@ -202,11 +223,24 @@ export function apply(ctx: Context): void {
 
     async listPending(status: PendingStatus = 'pending') {
       const table = (await ensure()).table(PENDING_TABLE)
-      return [...table.entries()].map(([, value]) => value).filter(record => record.status === status)
+      // C-2 (v18): deep copies, so a consumer cannot mutate the domain map
+      // (including the nested `args` object of a pending record).
+      return [...table.entries()].map(([, value]) => structuredClone(value)).filter(record => record.status === status)
     },
 
     async savePending(record) {
-      await (await ensure()).table(PENDING_TABLE).put(record.id, record)
+      // C-3 (v18): `args` is a REQUIRED key (the json provider's gate refuses a
+      // record without it, and zod's `z.unknown()` requires the key too) — a
+      // record that omits it must be refused by BOTH providers, not normalized.
+      if (!Object.prototype.hasOwnProperty.call(record, 'args')) {
+        throw new Error('evolution-state-domain: refusing to persist a pending record without the required "args" key')
+      }
+      // P2-1 (v18): write-boundary validation.
+      const parsed = pendingSchema.safeParse({ ...record, args: record.args })
+      if (!parsed.success) {
+        throw new Error(`evolution-state-domain: refusing to persist an invalid pending record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
+      }
+      await (await ensure()).table(PENDING_TABLE).put(record.id, parsed.data)
     },
 
     async claimPending(id, claimId) {
@@ -226,7 +260,7 @@ export function apply(ctx: Context): void {
         // paths may hand back the internal record object; an in-place mutation
         // by the caller would silently poison the domain map (the json
         // provider returns copies).
-        return slot.record === null ? null : { ...slot.record }
+        return slot.record === null ? null : structuredClone(slot.record)
       } catch (error: unknown) {
         // Missing key is the benign "no such pending record" outcome; a
         // closed domain or backend failure must surface so approval reports
@@ -298,8 +332,10 @@ export function apply(ctx: Context): void {
           }
         }
         const rawRecord: unknown = record
-        if (resolved.record === null) return { record: rawRecord === null ? null : { ...(rawRecord as PendingRecord) }, applied: false }
-        return { record: { ...resolved.record }, applied: true }
+        if (resolved.record === null) {
+          return { record: rawRecord === null ? null : structuredClone(rawRecord as PendingRecord), applied: false }
+        }
+        return { record: structuredClone(resolved.record), applied: true }
       } catch (error: unknown) {
         // v3-round self-check: only missing-key is benign; closed/backend errors propagate.
         if (error instanceof DomainError && error.code === 'missing-key') return { record: null, applied: false }

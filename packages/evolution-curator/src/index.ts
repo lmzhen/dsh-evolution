@@ -26,6 +26,14 @@ import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
 
 const DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS = 7
 
+/** B-10 (v18): the optional LLM nomination pass gets its own timeout so a
+ * hung/unresponsive provider cannot hold the control-plane mutex forever
+ * (`run()` never returns; `restore()`/`consolidate()` queue behind it).
+ * 120s matches the review subagent default; the 32-bit ceiling is Node's
+ * timer-delay limit (`AbortSignal.timeout` throws above it). */
+const DEFAULT_CURATOR_REVIEW_TIMEOUT_MS = 120_000
+const MAX_TIMER_DELAY_MS = 4_294_967_295
+
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -68,6 +76,8 @@ export interface Config {
   bootGraceSeconds?: number
   /** Max tokens for the optional LLM nomination pass. */
   curatorReviewMaxTokens?: number
+  /** Timeout (ms) for the optional LLM nomination pass (B-10, v18). */
+  curatorReviewTimeoutMs?: number
   /** Structure-health soft body limit (chars) — see DEFAULT_HEALTH_THRESHOLDS (rc.73 A1). */
   healthSoftBodyChars?: number
   /** Structure-health stamp-density ceiling per KB — see DEFAULT_HEALTH_THRESHOLDS. */
@@ -148,6 +158,7 @@ export class EvolutionCurator extends Service {
     // timer Node would fire immediately.
     bootGraceSeconds: z.number().min(0).default(DEFAULT_CURATOR_BOOT_GRACE_SECONDS),
     curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS),
+    curatorReviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CURATOR_REVIEW_TIMEOUT_MS),
     healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
     healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
     healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
@@ -170,11 +181,23 @@ export class EvolutionCurator extends Service {
   private readonly referencedSkillNames: ReadonlySet<string>
   private readonly bootGraceSeconds: number
   private readonly curatorReviewMaxTokens: number
+  private readonly curatorReviewTimeoutMs: number
   private readonly healthSoftBodyChars: number
   private readonly healthStampDensityPerKb: number
   private readonly healthChurnMinPatches: number
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
+  /** B-8 (v18): set by the fiber disposer; a triggered autoCheck must not
+   * keep mutating the tree after the plugin was disposed. */
+  private disposed = false
+
+  /** B-8 (v18): read the disposal flag through a method. The only assignment
+   * lives in the disposer closure, which TypeScript's flow analysis cannot
+   * see, so a direct `this.disposed` read narrows to the literal `false` and
+   * the runtime check would be reported as dead code by `no-unnecessary-condition`. */
+  private isDisposed(): boolean {
+    return this.disposed
+  }
   private bootCheck: NodeJS.Timeout | undefined
   /** 0.3.18 (E-18): stateless first-run defer fires ONCE per process — the
    * in-memory clock is seeded and later due runs must proceed, or the
@@ -205,6 +228,13 @@ export class EvolutionCurator extends Service {
     this.intervalHours = field('intervalHours', config.intervalHours, DEFAULT_CURATOR_INTERVAL_HOURS, 1)
     this.staleAfterDays = field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS, 1)
     this.archiveAfterDays = field('archiveAfterDays', config.archiveAfterDays, DEFAULT_ARCHIVE_AFTER_DAYS, 1)
+    // A2-17 (v18): a stale threshold above the archive threshold makes the
+    // engine reactivate stale records instead of archiving them. Clamp the
+    // archive window up to the stale window and say so.
+    if (this.archiveAfterDays < this.staleAfterDays) {
+      this.ctx.logger.warn(`evolution-curator: archiveAfterDays (${this.archiveAfterDays}) < staleAfterDays (${this.staleAfterDays}); using staleAfterDays as the archive threshold`)
+      this.archiveAfterDays = this.staleAfterDays
+    }
     this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
     this.qualityWarnStaleAfterDays = field('qualityWarnStaleAfterDays', config.qualityWarnStaleAfterDays, DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS, 1)
@@ -216,6 +246,7 @@ export class EvolutionCurator extends Service {
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
     this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0, 3600)
     this.curatorReviewMaxTokens = field('curatorReviewMaxTokens', config.curatorReviewMaxTokens, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1)
+    this.curatorReviewTimeoutMs = field('curatorReviewTimeoutMs', config.curatorReviewTimeoutMs, DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS)
     this.healthSoftBodyChars = field('healthSoftBodyChars', config.healthSoftBodyChars, DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1)
     this.healthStampDensityPerKb = field('healthStampDensityPerKb', config.healthStampDensityPerKb, DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1)
     this.healthChurnMinPatches = field('healthChurnMinPatches', config.healthChurnMinPatches, DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1)
@@ -225,6 +256,7 @@ export class EvolutionCurator extends Service {
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
+        this.disposed = true
         this.stop()
       }
     }, 'evolution-curator.stop')
@@ -246,7 +278,7 @@ export class EvolutionCurator extends Service {
   }
 
   start(): void {
-    if (!this.enabled || this.timer) return
+    if (this.isDisposed() || !this.enabled || this.timer) return
     // Catch-up check after the boot grace (restart with a due persisted state
     // must not wait a full interval; services mounting during boot must not
     // see a half-built host). The regular hourly tick keeps the schedule
@@ -322,6 +354,7 @@ export class EvolutionCurator extends Service {
    * surfaced once instead of silently meaning "never runs".
    */
   private async autoCheck(): Promise<void> {
+    if (this.isDisposed()) return
     // 0.3.18 (E-7): the unattended tick (boot catch-up / hourly interval) must
     // be self-contained — a transient filesystem error (Windows EBUSY/EPERM,
     // lock contention) inside loadCuratorState/run used to surface as an
@@ -334,6 +367,7 @@ export class EvolutionCurator extends Service {
         this.ctx.logger.warn(`evolution-curator: evolution-state is not mounted — the curation interval baseline is this process's lifetime only (default interval ${DEFAULT_CURATOR_INTERVAL_HOURS}h), so automatic curation will not fire again until the process has been alive that long. Mount evolution-state (evolution-host/all bundle) for a durable schedule.`)
       }
       const persisted = await stateService?.loadCuratorState()
+      if (this.isDisposed()) return
       const last = persisted?.lastRunAt ?? this.lastRun
       if (Date.now() - last >= this.lifecycle().intervalHours * 3_600_000) {
         await this.run()
@@ -408,6 +442,10 @@ export class EvolutionCurator extends Service {
         model,
         messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-evolution-curator', form: 'notice', summary: 'curator review' } })],
         maxTokens: this.curatorReviewMaxTokens,
+        // B-10 (v18): a hung provider must not hold the control-plane mutex
+        // forever; the abort lands in the existing catch (advisory empty
+        // nominations), and the run/restore/consolidate chain continues.
+        signal: AbortSignal.timeout(this.curatorReviewTimeoutMs),
       })) assembler.push(chunk)
       const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
       const parsed = parseCuratorNominations(text)
@@ -466,6 +504,18 @@ export class EvolutionCurator extends Service {
    * is reversible.
    */
   async restoreSnapshot(): Promise<SkillActionResult & { extras?: Array<{ name: string; content: string }> }> {
+    // B-1/A2-3 (v18): the fourth control-plane mutator joins the SAME promise
+    // chain as run()/restore()/consolidate() — a whole-tree rollback + full
+    // curator-state write must never interleave with an in-flight run.
+    const release = await this.acquireMutex()
+    try {
+      return await this.restoreSnapshotCore()
+    } finally {
+      release()
+    }
+  }
+
+  private async restoreSnapshotCore(): Promise<SkillActionResult & { extras?: Array<{ name: string; content: string }> }> {
     const stateService = this.curatorStateService()
     const currentState = await stateService?.loadCuratorState()
     const extras = currentState === null || currentState === undefined
@@ -1267,7 +1317,11 @@ export class EvolutionCurator extends Service {
   private async protectedNameMap(): Promise<Map<string, string>> {
     const map = new Map<string, string>()
     for (const summary of await this.skills.list()) {
-      if (summary.protectedBy !== null) map.set(summary.name, summary.protectedBy)
+      // A1-17 (v18): a failed marker probe reads as protection-UNKNOWN and must
+      // join the protected set — the alternative (treating it as unprotected)
+      // would let the curator nominate a possibly pinned/bundled skill.
+      if (summary.protectionUnknown) map.set(summary.name, 'unknown')
+      else if (summary.protectedBy !== null) map.set(summary.name, summary.protectedBy)
     }
     return map
   }
@@ -1310,15 +1364,21 @@ export class EvolutionCurator extends Service {
     // rc.67 K-1: the control plane folds through the same transact-backed RMW
     // as the automated path — a whole-file saveUsage here would clobber a
     // concurrent tool-side bump and would flatten a malformed sidecar to empty.
-    await mutateUsage(this.skills.root, this.io, (disk) => {
-      for (const source of sources) {
-        const record = disk.get(source)
-        if (record) {
-          record.state = 'archived'
-          record.archived_at = new Date().toISOString()
+    // B-7 (v18): the tree move already landed; a failed usage fold must not
+    // turn a completed consolidate into a thrown control-plane error.
+    try {
+      await mutateUsage(this.skills.root, this.io, (disk) => {
+        for (const source of sources) {
+          const record = disk.get(source)
+          if (record) {
+            record.state = 'archived'
+            record.archived_at = new Date().toISOString()
+          }
         }
-      }
-    })
+      })
+    } catch (error) {
+      this.ctx.logger.warn(`evolution-curator: failed to persist consolidate usage state: ${error instanceof Error ? error.message : String(error)}`)
+    }
     return result
   }
 
@@ -1342,13 +1402,19 @@ export class EvolutionCurator extends Service {
     const result = await this.skills.restoreFromArchive(name)
     if (!result.ok) return result
     // rc.67 K-1: same transact-backed, malformed-safe fold as consolidate.
-    await mutateUsage(this.skills.root, this.io, (disk) => {
-      const record = disk.get(name)
-      if (record) {
-        record.state = 'active'
-        record.archived_at = null
-      }
-    })
+    // B-7 (v18): same best-effort posture as consolidate — the archive move
+    // already landed.
+    try {
+      await mutateUsage(this.skills.root, this.io, (disk) => {
+        const record = disk.get(name)
+        if (record) {
+          record.state = 'active'
+          record.archived_at = null
+        }
+      })
+    } catch (error) {
+      this.ctx.logger.warn(`evolution-curator: failed to persist restore usage state: ${error instanceof Error ? error.message : String(error)}`)
+    }
     const suppressed = new Set(await loadSuppressedNames(this.skills.root, this.io))
     if (suppressed.has(name)) {
       try {

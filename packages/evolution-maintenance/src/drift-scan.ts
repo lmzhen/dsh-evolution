@@ -17,6 +17,9 @@ export interface SkillLibraryLike {
 }
 
 export interface SnapshotOptions {
+  /** E-9 (v18): called when one skill's body cannot be read; the scan skips
+   * that skill instead of aborting the whole run. */
+  onReadError?: ((name: string, error: unknown) => void) | undefined
   /** Support-file relative paths per skill name, when the caller has them. */
   supportFiles?: ReadonlyMap<string, readonly string[]> | undefined
   /** Parsed frontmatter description per skill name, when available. */
@@ -45,7 +48,14 @@ export async function snapshotFromLibrary(
   const entries = await library.list()
   const snapshots: DriftSkillSnapshot[] = []
   for (const entry of entries) {
-    const body = await library.read(entry.name)
+    // E-9 (v18): a single EACCES/EIO read used to reject the whole scan.
+    let body: string | null | undefined
+    try {
+      body = await library.read(entry.name)
+    } catch (error) {
+      options.onReadError?.(entry.name, error)
+      continue
+    }
     if (body === undefined || body === null) continue
     snapshots.push({
       name: entry.name,

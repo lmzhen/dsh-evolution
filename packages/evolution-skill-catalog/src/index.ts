@@ -20,7 +20,7 @@ import type {
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { evolutionIoAdapter, resolveSkillsRoot, SkillLibrary, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, resolveSkillsRoot, SkillLibrary, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'
@@ -66,6 +66,24 @@ export const Config: z<Config> = z.object({
  */
 const EVOLUTION_SKILL_RANK = 390
 
+/**
+ * The mirror's `SKILL_NAME_RE` now carries the same shape (计划 B-4, v18), but
+ * this provider still filters: an EXISTING tree entry created before the
+ * tightening (trailing/consecutive hyphen) must not be forwarded, because
+ * upstream `validateCandidate` throws on it and that throw aborts the WHOLE
+ * `ctx.skills` collection (the caller is outside the provider try/catch),
+ * taking down `agent/pre-step` and the `skill` tool for the session.
+ */
+const UPSTREAM_SKILL_NAME_RE = SKILL_NAME_RE
+
+/** Upstream `validateCandidate` also refuses an empty description; the
+ * mirror's `SkillLibrary.list()` legitimately reports `''` for a 0-byte or
+ * malformed SKILL.md (C-14 keeps it visible to the curator). Such an entry
+ * must not reach the platform registry. */
+function publishableSkill(name: string, description: string): boolean {
+  return UPSTREAM_SKILL_NAME_RE.test(name) && description.trim().length > 0
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const invocation: SkillInvocationPolicy = {
     modelInvocable: rawConfig.modelInvocable ?? true,
@@ -76,6 +94,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const included = new Set(rawConfig.includeSkillNames ?? [])
   const excluded = new Set(rawConfig.excludeSkillNames ?? [])
   const visible = (name: string) => (included.size === 0 || included.has(name)) && !excluded.has(name)
+  // P1-1 (v18): one warn per unpublishable name — a malformed entry is an
+  // operator-visible data problem, but a per-call warn would flood the log
+  // once per snapshot/list/get.
+  const warnedUnpublishable = new Set<string>()
+  const warnUnpublishable = (name: string, description: string): void => {
+    if (warnedUnpublishable.has(name)) return
+    warnedUnpublishable.add(name)
+    ctx.logger.warn(`evolution-skill-catalog: not publishing "${name}" — ${description.trim().length === 0 ? 'empty description' : 'name is not accepted by the upstream skill registry'} (fix the SKILL.md frontmatter; the curator still sees the entry)`)
+  }
   let control: SkillProviderControl | undefined
   // 0.3.18 (S4.5, X-7): process-internal summaries cache — every `get()` used
   // to run a full tree scan (read + parse every SKILL.md). Dropped on
@@ -112,11 +139,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const provider: SkillProvider = {
     name: 'dsh-evolution',
 
-    async list(_options: SkillLookupOptions) {
+    async list(options: SkillLookupOptions) {
+      // E-10 (v18): the upstream registry aborts discovery; honor the signal
+      // before and after the tree scan so a cancelled call settles promptly.
+      options.signal?.throwIfAborted()
       const all = await summaries()
-      return all.filter(summary => visible(summary.name)).map(summary => ({
+      options.signal?.throwIfAborted()
+      return all.filter((summary) => {
+        if (!visible(summary.name)) return false
+        if (!publishableSkill(summary.name, summary.description)) {
+          warnUnpublishable(summary.name, summary.description)
+          return false
+        }
+        return true
+      }).map(summary => ({
         name: summary.name,
         description: summary.description,
+        // E-11 (v18): the upstream provider publishes `whenToUse` from the
+        // frontmatter; this shadowing provider must too, or the host/UI routing
+        // hint disappears while it shadows `skill-filesystem`.
+        ...summary.whenToUse !== undefined ? { whenToUse: summary.whenToUse } : {},
         invocation,
         source: 'user-dsh' as const,
         provider: 'dsh-evolution',
@@ -127,17 +169,25 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }))
     },
 
-    async get(candidate: SkillCandidate): Promise<SkillDefinition | undefined> {
+    async get(candidate: SkillCandidate, options?: SkillLookupOptions): Promise<SkillDefinition | undefined> {
+      options?.signal?.throwIfAborted()
       const name = candidate.name
       if (!visible(name)) return undefined
       const all = await summaries()
       const summary = all.find(item => item.name === name)
       if (!summary) return undefined
+      // P1-1 (v18): get() is the second publish path — an invalid candidate
+      // must not reach the upstream registry here either.
+      if (!publishableSkill(summary.name, summary.description)) {
+        warnUnpublishable(summary.name, summary.description)
+        return undefined
+      }
       const content = await library.read(name)
       if (content === null) return undefined
       return {
         name,
         description: summary.description,
+        ...summary.whenToUse !== undefined ? { whenToUse: summary.whenToUse } : {},
         invocation,
         source: 'user-dsh',
         provider: 'dsh-evolution',

@@ -100,7 +100,7 @@ export const Config: z<Config> = z.object({
   entryPreviewChars: z.number().min(1).default(DEFAULT_ENTRY_PREVIEW_CHARS),
 })
 
-export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
+export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void> {
   if (!rawConfig.memoryEnabled) return
   // V6-06 (0.3.35): assembly-time clamp — a 0/negative/NaN/±Infinity value
   // falls back to the default instead of turning every echoed entry into a
@@ -166,7 +166,6 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
     entries: string[]
     chars: number
     limit: number
-    pending_id?: string
   }> {
     const result = normalized.operations
       ? await ctx.memory.applyBatch(normalized.target, normalized.operations)

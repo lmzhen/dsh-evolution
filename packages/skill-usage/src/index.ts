@@ -221,9 +221,15 @@ export class SkillUsageRegistry extends Service {
     // now land on the same key.
     const normalized = name.trim()
     await this.mutate((map) => {
-      if (kind === 'use') bumpUse(map, normalized, at)
-      else if (kind === 'view') bumpView(map, normalized, at)
-      else bumpPatch(map, normalized, at)
+      // E-4 (v18): an unknown kind used to fall into the patch branch. A
+      // closed-union switch keeps the three arms exhaustive and makes a
+      // JavaScript caller's bad kind fail loud instead of mis-recording a patch.
+      switch (kind) {
+        case 'use': bumpUse(map, normalized, at); break
+        case 'view': bumpView(map, normalized, at); break
+        case 'patch': bumpPatch(map, normalized, at); break
+        default: throw new Error(`skill-usage: unknown record kind ${String(kind)}`)
+      }
     })
   }
 
@@ -280,6 +286,7 @@ export class SkillUsageRegistry extends Service {
    * next call without a cache flush; this waits for queued work to drain.
    * V6-44 (0.3.37): test-support API — no production consumer uses it
    * (tests use it as a drain barrier); kept by declaration.
+   * @internal Exported for this package's own tests only.
    */
   async invalidate(): Promise<void> {
     await this.chain

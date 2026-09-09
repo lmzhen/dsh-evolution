@@ -22,8 +22,14 @@
 
 // ── Fixed protocol / format / security invariants ────────────────────────────
 
-/** Skill frontmatter `name` validated for the file name (lowercase + hyphen). */
-export const SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+/** Skill frontmatter `name` validated for the file name (lowercase + hyphen).
+ * 计划 B-4 (v18): tightened to the UPSTREAM `SKILL_NAME` shape
+ * (`/^[a-z0-9]+(?:-[a-z0-9]+)*$/`, packages/skill/skill/src/index.ts:20). The
+ * old form admitted trailing/consecutive hyphens, which upstream
+ * `validateCandidate` throws on — and that throw aborts the WHOLE `ctx.skills`
+ * collection. The catalog provider still filters such legacy tree entries so
+ * an existing tree cannot break a session. */
+export const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /** Allowed skill support-file subdirectories (path-traversal boundary). */
 export const SUPPORT_DIRS = ['references', 'templates', 'scripts', 'assets'] as const
@@ -70,7 +76,10 @@ export const DEFAULT_MEMORY_CHAR_LIMIT = 2200
 export const DEFAULT_USER_CHAR_LIMIT = 1375
 /** Consolidation-failure backoff cap, shared by MemoryStore and memory-files' Config default. */
 export const DEFAULT_CONSOLIDATION_FAILURES = 3
-export const DEFAULT_SKILL_CONTENT_CHARS = 100_000
+/** F-20 (v18): the authored-body budget and the hard ceiling are the same
+ * number today. Derive it so a future divergence is one edit, not two names
+ * that silently disagree. */
+export const DEFAULT_SKILL_CONTENT_CHARS = MAX_SKILL_CONTENT_CHARS
 /** P3-19 (v14): defaults that were written twice (schema `.default()` AND the
  * clamp fallback literal) now have one home per value. */
 export const DEFAULT_REVIEW_TIMEOUT_MS = 120_000

@@ -1,22 +1,24 @@
 # Installing dsh-evolution
 
-Two supported layouts:
+Four supported install forms. **`dsh-evolution-all` is the DEFAULT** (most
+complete, no preset step); the other three are alternatives. Never mount two
+of the bundles in one profile — they insert the same infrastructure rows and
+the cordis loader fails loud on duplicate ids.
 
-| Layout | What is installed | Model tools |
-|---|---|---|
-| Layered | `dsh-evolution-host` bundle + `Evolution` agent preset | Exposed only to sessions selecting the preset |
-| One-click | `dsh-evolution-preset` compatibility bundle | Exposed to every session in the profile |
+| Form | Bundle / preset | Model tools | Notes |
+|---|---|---|---|
+| **All (default)** | `dsh-evolution-all` | profile-wide | infra + `memory`/`skill_manage` + guidance, no preset step |
+| Host + agent preset | `dsh-evolution-host` + `Evolution` agent preset | only sessions selecting the preset | recommended when tools must be opt-in |
+| One-click | `dsh-evolution-preset` compatibility bundle | profile-wide | one-shot compatibility form |
+| Agent only | `Evolution` agent preset | only sessions selecting the preset | requires the host bundle (or the agent-preset packages) installed separately |
 
-The layered layout is recommended for production.
-
-> ⚠️ **`dsh-evolution-host` and `dsh-evolution-preset` are mutually exclusive
-> install targets — never add both bundles to the same profile.** The host
-> bundle is infrastructure only (no profile-wide model tools); the preset bundle
-> is the one-click compatibility bundle that also exposes the model tools
-> profile-wide. They share the self-evolution infrastructure rows, so mounting
-> both double-registers that infrastructure and, if their shared configs ever
-> diverged, would produce an ambiguous composition. Choose one per profile: the
-> layered host/agent layout (recommended) or the one-click preset layout.
+> ⚠️ **`dsh-evolution-all`, `dsh-evolution-host` and `dsh-evolution-preset`
+> are mutually exclusive in one profile**, and the layered `Evolution` agent
+> preset is exclusive with `dsh-evolution-all` / `dsh-evolution-preset` (the
+> same four model rows would double-mount). They share the self-evolution
+> infrastructure rows, so mounting two double-registers that infrastructure
+> and the loader aborts at startup. Choose ONE form per profile; the repo's
+> `packages/scripts/verify-profile-bundles.mjs` checks the bundle rows.
 
 ## Prerequisites
 
@@ -97,7 +99,7 @@ Equivalent to the legacy `dsh-evolution-preset` profile bundle.
 
 ## 5. Production install
 
-Official upstream bundles, when published by DeepSeek:
+Family bundles in the overlay `@deepseek-ai` scope (community-maintained; publishing rewrites the scope to `@lmzhen`):
 
 ```bash
 dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
@@ -144,14 +146,35 @@ Add these to `<home>/profiles/<profile>/cordis.patch.yml`.
 
 ### Override memory/skill roots
 
+The skill tree is read/written by EIGHT rows. Since 0.3.64 they all read the
+SAME key `root` (`skillsRoot` is a deprecated alias on `evolution-commands`,
+`evolution-review` and `evolution-maintenance-tools`: honoured only while
+`root` is empty, with a warning, removed after 0.3.65). Setting only
+`skill-usage.root` moves the `.usage.json` sidecar but NOT the skill tree, so
+telemetry silently targets a different directory. Keep every row below on the
+same path (and set `memory-files.root` for the memory files):
+
 ```yaml
 - id: memory-files
   config:
     root: /srv/agent-data/memories
 
+- id: tool-skill-manage
+  config: { root: /srv/agent-data/skills }
+- id: evolution-skill-catalog
+  config: { root: /srv/agent-data/skills }
 - id: skill-usage
-  config:
-    root: /srv/agent-data/skills
+  config: { root: /srv/agent-data/skills }
+- id: evolution-curator
+  config: { root: /srv/agent-data/skills }
+- id: evolution-learning-graph
+  config: { root: /srv/agent-data/skills }
+- id: evolution-commands
+  config: { root: /srv/agent-data/skills }
+- id: evolution-review
+  config: { root: /srv/agent-data/skills }
+- id: evolution-maintenance-tools
+  config: { root: /srv/agent-data/skills }
 ```
 
 ### Use JSON state even when a storage-domain exists

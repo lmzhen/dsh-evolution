@@ -37,7 +37,13 @@ let tag = 'next'
 const dryRun = hasFlag('--dry-run')
 const provenance = !hasFlag('--no-provenance')
 const interactive = hasFlag('--interactive')
-const groupRaw = argv.includes('--groups') ? argv[argv.indexOf('--groups') + 1] : undefined
+const groupIndex = argv.indexOf('--groups')
+const groupRaw = groupIndex >= 0 ? argv[groupIndex + 1] : undefined
+// D-11 (v18): a bare `--groups` used to fall through to "no limit" and
+// publish EVERY group; require a value like --tag/--only do.
+if (groupIndex >= 0 && (groupRaw === undefined || groupRaw === '' || groupRaw.startsWith('--'))) {
+  throw new Error('--groups requires a positive integer (a bare flag would publish every group)')
+}
 const groupLimit = groupRaw === undefined ? undefined : Number(groupRaw)
 if (groupLimit !== undefined && (!Number.isInteger(groupLimit) || groupLimit <= 0)) {
   throw new Error(`--groups requires a positive integer, got ${groupRaw} — a non-positive value slices the publish order to nothing (0) or drops trailing groups (negative) yet still reports complete`)

@@ -109,6 +109,20 @@ describe('memory-files', () => {
     expect(await ctx.memory.read('user')).toContain('new fact')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('F-14 (v18): providerName renames the registered provider and addDatePrefix writes the date header', async () => {
+    const root = await makeTmp()
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root, providerName: 'custom-files', addDatePrefix: true })
+    // The provider is reachable under the CONFIGURED name, not the default.
+    await ctx.memory.applyBatch('custom-files', [{ action: 'add', facts: 'prefixed fact' }])
+    const entries = await ctx.memory.read('custom-files')
+    expect(entries.some(entry => /^## \d{4}-\d{2}-\d{2}\nprefixed fact$/.test(entry))).toBe(true)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })
 
 async function makeTmp(): Promise<string> {

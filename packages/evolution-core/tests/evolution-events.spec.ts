@@ -239,4 +239,17 @@ describe('evolution event log (rc.68)', () => {
     expect(after.events.map(event => event.seq)).toEqual([1, 2])
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('I-5 (v18): refuses an unfoldable payload at the durable write boundary', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-guard-'))
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    await expect(appendEvolutionEvent(io, path, { type: 'feedback', target: 'x' } as never)).rejects.toThrow(/requires kind/)
+    await expect(appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill' } as never)).rejects.toThrow(/requires rating/)
+    await expect(appendEvolutionEvent(io, path, { type: 'maintain' } as never)).rejects.toThrow(/requires runId/)
+    await expect(appendEvolutionEvent(io, path, { type: 'nope' } as never)).rejects.toThrow(/unknown event type/)
+    // A well-formed record still appends; the refusals wrote nothing.
+    expect(await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })).toBe(1)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })
