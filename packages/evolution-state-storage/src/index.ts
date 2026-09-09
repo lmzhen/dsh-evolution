@@ -12,6 +12,8 @@ import { Context, Service } from '@deepseek-ai/cordis'
 // S-06: the state-stack magic strings (singleton key, file names,
 // provider names, table names) are single-sourced here.
 export * from './constants.ts'
+// P2-12/14/15/16/18 (v19): the record contract both providers consume.
+export * from './record-contract.ts'
 
 /** 0.3.17 (S3.5, D-4): 'skill_batch' removed — nothing ever created one
  * (dead enum member); the historic value, if it ever reached disk, is read as

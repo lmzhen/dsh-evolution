@@ -179,3 +179,34 @@ it('P3-22 (v14): unicode findings are scope-independent but still exemptable', (
   expect(scanThreats(text, 'strict', 65_536, { excludeLabels: ['unicode_zero_width'] })).toEqual([])
   expect(scanMemoryThreats(text, 65_536, { excludeLabels: ['unicode_zero_width'] })).toBeNull()
 })
+
+it('P1-1 (v19): ordinary emoji and typography do NOT block; the smuggling core does', () => {
+  // 误伤面：VS16/VS15、ZWJ emoji 序列、软连字符、ZWNJ 都是日常内容。
+  for (const text of [
+    'I love this \u2764\ufe0f',
+    '\u26a0\ufe0f warning',
+    '\u2714\ufe0f done',
+    'family \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67',
+    're\u00admarkable (pasted from a PDF)',
+    '\u0645\u06cc\u200c\u0631\u0648\u0645', // Persian with ZWNJ
+    'plain text only',
+    '\u4f60\u597d\u554a',
+  ]) {
+    expect(evaluateThreat(text, 'strict').blocked, text).toBe(false)
+    expect(scanMemoryThreats(text)).toBeNull()
+  }
+  // Typography is still reported (audit trail), never blocking.
+  const report = evaluateThreat('I love this \u2764\ufe0f', 'strict')
+  expect(report.findings.some(finding => finding.label === 'unicode_typography' && finding.severity === 'report')).toBe(true)
+  // 命中面：隐写核心必须仍然被拒。
+  for (const text of [
+    'invisible\u200bmarker', // ZWSP
+    'word\u2060joiner', // WORD JOINER
+    'a\u200db', // ZWJ between ordinary characters
+    'bidi\u202elocked', // bidi override
+    'tag\u{e0041}smuggle', // astral TAG block (P2-6: the v18 regex missed it)
+    'bom\ufeffmark',
+  ]) {
+    expect(evaluateThreat(text, 'strict').blocked, JSON.stringify(text)).toBe(true)
+  }
+})

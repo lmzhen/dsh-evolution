@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
@@ -146,13 +146,13 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     })
     await ctx.plugin(JsonState, { root })
     const provider = ctx.evolutionStateStorage.provider('json')
-    expect(await provider.listPending()).toEqual([])
+    // P2-17 (v19): when the rescue copy cannot be written, the gate REFUSES to
+    // rewrite the file — the malformed record stays in it instead of vanishing
+    // from both the main file and the (unwritten) copy.
+    await expect(provider.listPending()).rejects.toThrow(/write-back carries/)
     const writesAfterFirst = writes
-    await provider.listPending()
-    // Before N2: a failed write still set the rewrite key, so the second read
-    // skipped the copy and the write count stayed flat. The key must remain
-    // unset so every read retries (red-to-green discriminator; the absolute
-    // count is layout-dependent — listPending touches several record maps).
+    // The rewrite key stays unset, so the next access retries the copy.
+    await expect(provider.listPending()).rejects.toThrow(/write-back carries/)
     expect(writes).toBeGreaterThan(writesAfterFirst)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
@@ -168,15 +168,23 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ z1: zombie }))
     await provider.listPending()
     expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
-    // ② the file turns fully corrupt — quarantine overwrites the SAME copy
-    // with the whole-file snapshot (key K stays unless invalidated, P2-1).
+    // ② the file turns fully corrupt — the whole-file quarantine must NOT
+    // overwrite the existing rescue copy (P2-19, v19): it lands in a stamped
+    // sibling and the first copy stays intact.
     await io.writeText(join(root, 'pending-state.json'), '{corrupt')
     await expect(provider.listPending()).rejects.toThrow()
-    expect(await io.readText(corruptPath)).toBe('{corrupt')
+    expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
+    const stamped = (await readdir(root)).filter(name => name.startsWith('pending-state.json.corrupt.'))
+    expect(stamped).toHaveLength(1)
+    expect(await io.readText(join(root, stamped[0]!))).toBe('{corrupt')
     // ③ the operator fixes the JSON; the failing set is the same — the gate
     // must REWRITE the scoped copy, not trust the stale key+on-disk pair.
+    // P2-19: the payload is identical, so the FIXED name is reused (no extra
+    // stamped sibling) and the rescue copy holds the scoped records again.
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ z1: zombie }))
     await provider.listPending()
+    const stampedAfter = (await readdir(root)).filter(name => name.startsWith('pending-state.json.corrupt.'))
+    expect(stampedAfter).toHaveLength(stamped.length)
     expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })

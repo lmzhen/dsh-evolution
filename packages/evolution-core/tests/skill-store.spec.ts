@@ -820,3 +820,78 @@ it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a dura
   expect((await lib.listMutations()).some(m => m.skillName === 'durable-skill' && m.action === 'update')).toBe(true)
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
+
+it('P2-2 (v19): create and setPinned tolerate a post-commit fsync failure too', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-durability2-'))
+  const base = nodeEvolutionIo()
+  const io = {
+    ...base,
+    transact: undefined,
+    writeText: async (path: string, content: string) => {
+      await base.writeText(path, content)
+      throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
+    },
+  }
+  const lib = new SkillLibrary(root, io)
+  const created = await lib.create('durable-create', SKILL.replace('python-testing', 'durable-create'), 'foreground')
+  expect(created.ok).toBe(true)
+  expect(created.message).toContain('durability unconfirmed')
+  expect(await lib.read('durable-create')).toContain('durable-create')
+  // The marker write has the same semantics: reporting a failure would make
+  // the retry answer "already pinned" for a marker that landed.
+  const pinned = await lib.setPinned('durable-create', true, 'foreground')
+  expect(pinned.ok).toBe(true)
+  expect(pinned.message).toContain('durability unconfirmed')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('P1-2 (v19): a healthy empty-tree snapshot WITH sidecars restores (guard reads manifest.sidecars)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-snap-sidecar-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('only-skill', SKILL.replace('python-testing', 'only-skill'), 'foreground')
+  // The co-snapshotted sidecars every real deployment has (usage/suppression).
+  await writeFile(join(root, '.usage.json'), JSON.stringify({ 'only-skill': { created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 0, view_count: 1, patch_count: 0, last_used_at: null, last_viewed_at: '2026-01-01T00:00:00.000Z', last_patched_at: null, state: 'active', pinned: false, archived_at: null } }), 'utf8')
+  await writeFile(join(root, '.curator-suppressed.json'), JSON.stringify({ version: 1, names: ['legacy-skill'] }), 'utf8')
+  expect((await lib.archive('only-skill')).ok).toBe(true)
+  expect((await lib.list()).length).toBe(0)
+  // The scenario: the curator archived everything, then a snapshot was taken
+  // (empty tree + the co-snapshotted sidecars).
+  await lib.snapshotAll('empty-tree')
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok, restored.message).toBe(true)
+  // The snapshot captured the EMPTY tree — the point is that restoring it is
+  // possible at all, and that the co-snapshotted sidecar comes back.
+  expect((await lib.list()).length).toBe(0)
+  expect((JSON.parse(await readFile(join(root, '.usage.json'), 'utf8')) as Record<string, unknown>)['only-skill']).toBeDefined()
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('P1-2 (v19): a truncated manifest (declares no skills, directory has UNDECLARED entries) is still refused', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-snap-truncated-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('ghost-skill', SKILL.replace('python-testing', 'ghost-skill'), 'foreground')
+  const snap = await lib.snapshotAll('truncated')
+  const manifestPath = join(snap, 'manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>
+  await writeFile(manifestPath, JSON.stringify({ ...manifest, skills: [] }), 'utf8')
+  const result = await lib.restoreLatestSnapshot()
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('undeclared entries')
+  expect((await lib.list()).map(item => item.name)).toContain('ghost-skill')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('P2-4 (v19): a non-string manifest entry is refused structurally, not with a TypeError', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-snap-nonstring-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('real-skill', SKILL.replace('python-testing', 'real-skill'), 'foreground')
+  const snap = await lib.snapshotAll('non-string')
+  const manifestPath = join(snap, 'manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>
+  await writeFile(manifestPath, JSON.stringify({ ...manifest, skills: [123, null] }), 'utf8')
+  const result = await lib.restoreLatestSnapshot()
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('unsafe entry name')
+  expect(result.message).not.toContain('is not a function')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})

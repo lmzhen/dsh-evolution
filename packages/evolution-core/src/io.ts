@@ -665,7 +665,12 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
       // (best-effort: a vanished file needs no cleanup). A1-1 (v18): the
       // namespace layer reserves `.corrupt`/`.tmp` suffixes so a user support
       // file cannot be mistaken for a protocol artifact.
-      if (name.includes('.corrupt')) {
+      // P2-1 (v19): the sweep predicate must match the NAMING rule
+      // (`validateSupportPath` reserves names ending in `.corrupt`), so a user
+      // support file such as `overview.md.corrupt-backup.md` — creatable
+      // because it does not END in `.corrupt` — is not deleted after 7 days.
+      // The stamped quarantine copies (`<file>.corrupt.<epoch>`) are swept.
+      if (/\.corrupt(\.\d+)?$/.test(name)) {
         const corruptPath = join(dir, name)
         try {
           const st = await stat(corruptPath)

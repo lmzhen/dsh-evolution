@@ -486,6 +486,14 @@ export function authoringFeedback(frontmatter: Frontmatter): AuthoringFeedback {
   return { descriptionChars: description.length, over60, hasColon, lines }
 }
 
+/** A1-15 (v18) / P2-2 (v19): the io layer marks an error `committed: true` when
+ * the rename landed and only the directory fsync failed. Every single-file
+ * writer must treat that as "written, durability unconfirmed" — never as a
+ * plain failure (which a caller would retry, or a two-phase caller roll back). */
+function isCommittedOnly(error: unknown): boolean {
+  return (error as { committed?: unknown } | undefined)?.committed === true
+}
+
 async function listNames(root: string, io: EvolutionIoLike): Promise<string[]> {
   const entries = await io.list(root)
   const names: string[] = []
@@ -1270,6 +1278,7 @@ export class SkillLibrary {
     if (origin === 'background_review') {
       return { ok: false, message: 'Only the foreground (user or the main agent) may pin or unpin skills.' }
     }
+    let durabilityWarning = ''
     const dir = this.dirOf(normalized)
     const marker = markerPath(dir, 'pinned')
     const existing = await this.io.exists(marker)
@@ -1278,14 +1287,24 @@ export class SkillLibrary {
     if (!await this.io.exists(join(dir, 'SKILL.md'))) {
       return { ok: false, message: `Skill "${normalized}" not found.` }
     }
-    if (pinned) await this.io.writeText(marker, '')
-    else await this.io.remove(marker)
+    if (pinned) {
+      try {
+        await this.io.writeText(marker, '')
+      } catch (error) {
+        // P2-2 (v19): the marker landed; only the dir fsync failed. Reporting
+        // a failure here made the retry say "already pinned".
+        if (!isCommittedOnly(error)) throw error
+        durabilityWarning = error instanceof Error ? error.message : String(error)
+      }
+    } else {
+      await this.io.remove(marker)
+    }
     await this.audit(normalized, pinned ? 'pin' : 'unpin', null, null, pinned ? 'pinned' : 'unpinned')
     return {
       ok: true,
-      message: pinned
+      message: `${pinned
         ? `Skill "${normalized}" pinned: protected from deletion, background review, and the lifecycle.`
-        : `Skill "${normalized}" unpinned.`,
+        : `Skill "${normalized}" unpinned.`}${durabilityWarning === '' ? '' : ` (warning: the write landed but the directory fsync failed — durability unconfirmed: ${durabilityWarning})`}`,
       path: dir,
     }
   }
@@ -1336,18 +1355,30 @@ export class SkillLibrary {
     // re-check: current bytes present -> structured refusal, nothing written.
     let existsAtCommit = false
     let taskRan = false
+    let createDurabilityWarning = ''
     if (this.transact) {
-      await this.transact(this.io, createPath, (current) => {
-        taskRan = true
-        if (current !== null) { existsAtCommit = true; return current }
-        return onDisk
-      })
+      try {
+        await this.transact(this.io, createPath, (current) => {
+          taskRan = true
+          if (current !== null) { existsAtCommit = true; return current }
+          return onDisk
+        })
+      } catch (error) {
+        // P2-2 (v19): the SKILL.md landed; only the dir fsync failed.
+        if (!isCommittedOnly(error)) throw error
+        createDurabilityWarning = error instanceof Error ? error.message : String(error)
+      }
     } else if (await this.io.exists(createPath)) {
       taskRan = true
       existsAtCommit = true
     } else {
       taskRan = true
-      await this.io.writeText(createPath, onDisk)
+      try {
+        await this.io.writeText(createPath, onDisk)
+      } catch (error) {
+        if (!isCommittedOnly(error)) throw error
+        createDurabilityWarning = error instanceof Error ? error.message : String(error)
+      }
     }
     // A1-22 (v18): a contract-violating transact that never invokes the
     // task used to report success with no file. Mirror runSingleWrite.
@@ -1360,7 +1391,12 @@ export class SkillLibrary {
     }
     await this.audit(normalized, 'create', null, onDisk, 'created')
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
-    return { ok: true, message: `Skill "${normalized}" created.`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
+    return {
+      ok: true,
+      message: `Skill "${normalized}" created.${createDurabilityWarning === '' ? '' : ` (warning: the write landed but the directory fsync failed — durability unconfirmed: ${createDurabilityWarning})`}`,
+      path: dir,
+      ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}),
+    }
   }
 
   async update(rawName: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
@@ -1664,8 +1700,11 @@ export class SkillLibrary {
 
   /** A1-4 (v18): a manifest-declared name is copied with `join(root, name)`;
    * only a single, non-traversing path component is safe. Dotfiles
-   * (`.usage.json`) stay allowed — sidecars are legitimately dot-prefixed. */
-  private safeSnapshotEntryName(name: string): boolean {
+   * (`.usage.json`) stay allowed — sidecars are legitimately dot-prefixed.
+   * P2-4 (v19): a non-string entry (`skills: [123]`) is refused structurally
+   * instead of throwing `name.includes is not a function`. */
+  private safeSnapshotEntryName(name: unknown): boolean {
+    if (typeof name !== 'string') return false
     return name !== '' && name !== '.' && name !== '..'
       && !name.includes('/') && !name.includes('\\')
       && basename(name) === name
@@ -1675,7 +1714,16 @@ export class SkillLibrary {
    * restore; a dead residue is swept so a crashed writer cannot block
    * recovery. A non-lock body shape is left alone (user file). */
   private async refuseLiveLockOrSweep(lockPath: string, label: string): Promise<void> {
-    const body = await this.io.readText(lockPath).catch(() => null)
+    // P2-5 (v19): a read failure is NOT "no lock". The v18 shape swallowed it
+    // (`.catch(() => null)`) and let the restore proceed over a possibly-live
+    // writer — the opposite direction of `isWriterLock`'s fail-closed rule in
+    // this same file. Refuse the restore instead.
+    let body: string | null
+    try {
+      body = await this.io.readText(lockPath)
+    } catch (error) {
+      throw new Error(`snapshot restore refused: cannot verify ${label} (${error instanceof Error ? error.message : String(error)}); a live writer may hold it`)
+    }
     if (body === null) return
     const match = /^(\d+):[0-9a-f]*$/.exec(body.trim())
     if (match === null) return
@@ -2479,10 +2527,15 @@ export class SkillLibrary {
     // not a legacy snapshot, and must refuse before the destructive clear.
     const manifest = await this.readSnapshotManifest(snapshotPath)
     if (manifest === null) {
-      if (await this.io.exists(join(snapshotPath, 'manifest.json'))) {
-        throw new Error(`snapshot ${snapshotPath} has an unreadable manifest.json; refusing to clear the active tree`)
-      }
-    } else {
+      // A1-16 + P2-3 (v19): the refusal must precede EVERY destructive step.
+      // The v18 shape cleared the active tree first and only then rejected a
+      // manifest-less snapshot, so a manifest lost between listSnapshots and
+      // this restore emptied the live library before failing.
+      throw new Error(await this.io.exists(join(snapshotPath, 'manifest.json'))
+        ? `snapshot ${snapshotPath} has an unreadable manifest.json; refusing to clear the active tree`
+        : `snapshot ${snapshotPath} has no readable manifest.json; refusing to restore`)
+    }
+    {
       // A1-4 (v18): every manifest-declared name is a path component copied
       // into the skills root — reject traversal/absolute shapes up front.
       for (const name of [...manifest.skills, ...manifest.sidecars]) {
@@ -2491,13 +2544,19 @@ export class SkillLibrary {
         }
       }
       // A1-3 (v18): a manifest that declares no skills while the snapshot
-      // directory contains entries is inconsistent (a corrupted/truncated
-      // manifest); clearing to an empty tree would lose the live library.
+      // directory contains UNDECLARED entries is inconsistent (a corrupted/
+      // truncated manifest); clearing to an empty tree would lose the live
+      // library. P1-2 (v19): the allowed set is derived from the manifest's own
+      // declaration — `snapshotAll` co-copies the usage/suppression sidecars
+      // into the snapshot root and lists them in `manifest.sidecars`, so the
+      // v18 hardcoded three-name list rejected every healthy empty-tree
+      // snapshot and killed the rollback channel.
       if (manifest.skills.length === 0) {
         const snapshotEntries = await this.io.list(snapshotPath)
-        const hasSkillEntries = snapshotEntries.some(entry => entry !== 'manifest.json' && entry !== 'extras' && entry !== '.archive')
-        if (hasSkillEntries) {
-          throw new Error(`snapshot ${snapshotPath} declares no skills but contains entries; refusing to clear the active tree`)
+        const declared = new Set<string>(['manifest.json', 'extras', '.archive', ...manifest.skills, ...manifest.sidecars])
+        const undeclared = snapshotEntries.filter(entry => !declared.has(entry))
+        if (undeclared.length > 0) {
+          throw new Error(`snapshot ${snapshotPath} declares no skills but contains undeclared entries (${undeclared.join(', ')}); refusing to clear the active tree`)
         }
       }
     }
@@ -2528,7 +2587,7 @@ export class SkillLibrary {
     // A1-19 (v18): a snapshot that does not carry `.curator-suppressed.json`
     // must roll the live one away too (otherwise a post-snapshot suppression
     // survives as a ghost). The manifest branch copies it back when present.
-    const restoresSuppressed = manifest !== null && manifest.sidecars.includes('.curator-suppressed.json')
+    const restoresSuppressed = manifest.sidecars.includes('.curator-suppressed.json')
     // F-316 (0.3.25): only the system directories and the durable sidecars are
     // survived by a snapshot restore. A dot-entry that appeared AFTER the
     // snapshot (e.g. a fresh `.usage.json`) used to be kept by the blanket
@@ -2547,18 +2606,15 @@ export class SkillLibrary {
       if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) continue
       await this.io.remove(join(this.root, entry))
     }
-    if (manifest === null) {
-      // A1-16 (v18): a manifest-less snapshot is not supported (listSnapshots
-      // already skips it). Refuse explicitly instead of the old per-entry
-      // copy branch, which merged `.archive` instead of replacing it.
-      throw new Error(`snapshot ${snapshotPath} has no readable manifest.json; refusing to restore`)
-    } else {
-      for (const name of manifest.skills) {
-        await this.io.copy(join(snapshotPath, name), join(this.root, name))
-      }
-      for (const sidecar of manifest.sidecars) {
-        await this.io.copy(join(snapshotPath, sidecar), join(this.root, sidecar))
-      }
+    // P2-3 (v19): `manifest` is non-null here — the refusal above precedes the
+    // clear, so this branch cannot leave an emptied tree behind.
+    for (const name of manifest.skills) {
+      await this.io.copy(join(snapshotPath, name), join(this.root, name))
+    }
+    for (const sidecar of manifest.sidecars) {
+      await this.io.copy(join(snapshotPath, sidecar), join(this.root, sidecar))
+    }
+    {
       // Archive is part of the whole-state rollback: a snapshot that carried
       // `.archive/` replaces the current one; a snapshot with no archive
       // means the archive content post-dates it, so it is rolled away too

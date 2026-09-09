@@ -152,4 +152,32 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   const reread = (await provider.listPending('pending')).find(record => record.id === 'c-poison')!
   expect(reread.summary).toBe('memory:c-poison')
   expect((reread.args as { nested: { value: number } }).nested.value).toBe(1)
+
+  // --- P2-15 (v19): a non-cloneable payload is refused by BOTH providers at
+  // the write boundary. The domain read path deep-clones every record, so a
+  // single poisoned record would break every later read for every status. ---
+  await expect(provider.savePending({
+    ...pendingOf('c-uncloneable'), args: { fn: () => {} },
+  } as unknown as PendingRecord)).rejects.toThrow()
+
+  // --- P2-14 (v19): mutating the CALLER's args after save must not change the
+  // stored record (the domain provider used to store the reference). ---
+  const aliased = pendingOf('c-alias')
+  aliased.args = { nested: { value: 1 } }
+  await provider.savePending(aliased)
+  ;(aliased.args as { nested: { value: number } }).nested.value = 99
+  const aliasedBack = (await provider.listPending('pending')).find(record => record.id === 'c-alias')!
+  expect((aliasedBack.args as { nested: { value: number } }).nested.value).toBe(1)
+
+  // --- P2-16 (v19): a malformed schemaVersion is refused by both providers
+  // (json used to accept and rewrite it; domain refused it). ---
+  await expect(provider.saveCuratorState({
+    lastRunAt: 1, runCount: 0, lastSummary: 'x', paused: false, schemaVersion: -1,
+  } as unknown as CuratorStateRecord)).rejects.toThrow()
+
+  // --- P2-18 (v19): unknown fields are PRESERVED by both providers (zod's
+  // default strip used to delete them on the domain side only). ---
+  await provider.savePending({ ...pendingOf('c-extra'), extraField: 'kept' } as unknown as PendingRecord)
+  const extraBack = (await provider.listPending('pending')).find(record => record.id === 'c-extra') as unknown as { extraField?: string }
+  expect(extraBack.extraField).toBe('kept')
 }

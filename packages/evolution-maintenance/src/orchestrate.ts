@@ -262,8 +262,10 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // V6-29 (0.3.36): AbortSignal.timeout accepts up to 2^32-1 ms — a larger
     // value throws a synchronous RangeError that only the outer catch would
     // translate (obscuring the cause). Validate the domain up front.
-    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 0xFFFFFFFF) {
-      return { ok: false, recommendationCount: 0, error: `maintain: --timeout must be a positive integer in ms, at most 4294967295; got ${String(timeoutMs)}` }
+    // P2-10 (v19): the real ceiling is 2^31-1; [2^31, 2^32-1] does not throw,
+    // it warns and silently becomes 1ms — the message already said 2147483647.
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 0x7FFFFFFF) {
+      return { ok: false, recommendationCount: 0, error: `maintain: --timeout must be a positive integer in ms, at most 2147483647; got ${String(timeoutMs)}` }
     }
     // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
     // hoisted so the catch can consult `signal.aborted` (our own timeout)

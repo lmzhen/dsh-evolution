@@ -193,7 +193,14 @@ describe('evolution-commands', () => {
       },
     })
     await ctx.plugin(Commands)
-    const result = await captured!.handler({ rawInput: 'restore snap' })
+    // P2-11 (v19): an unexpected tail is REFUSED — the v11 shape silently ran a
+    // whole-tree rollback, so `/evolution restore <name>` (a missing `skill `
+    // prefix) triggered the destructive path by accident.
+    const rejected = await captured!.handler({ rawInput: 'restore snap' })
+    expect(rejected.kind).toBe('error')
+    expect(rejected.text).toContain('takes no arguments')
+    expect(calls).toEqual([])
+    const result = await captured!.handler({ rawInput: 'restore' })
     expect(result.kind).toBe('success')
     expect(result.text).toContain('Restored skill tree from /path')
     expect(calls).toEqual(['restoreSnapshot'])
@@ -1057,6 +1064,11 @@ describe('evolution-commands', () => {
     const result = await captured!.handler({ rawInput: 'maintain --timeout 5000000000' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('Invalid --timeout value')
+    // P2-10 (v19): 2^31..2^32-1 does NOT throw — Node warns and silently sets
+    // 1ms, so the command must reject it like the RangeError case.
+    const overflow = await captured!.handler({ rawInput: 'maintain --timeout 2147483648' })
+    expect(overflow.kind).toBe('error')
+    expect(overflow.text).toContain('Invalid --timeout value')
   })
 
   it('F-14/E-7 (v18): the Config schema defaults maintainTimeoutMs and carries both root keys', () => {

@@ -13,8 +13,11 @@ import { z } from 'zod'
 import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import {
+  assertCloneable,
   canClaimPending,
   canResolvePending,
+  cloneRecord,
+  recordIssue,
   releasedStatus,
   CURATOR_STATE_KEY,
   CURATOR_STATE_TABLE,
@@ -43,7 +46,7 @@ export const reviewStateSchema = z.object({
   turnsSinceMemory: z.number().int().nonnegative(),
   turnsSinceSkill: z.number().int().nonnegative(),
   lastTurn: z.number().int().nonnegative(),
-})
+}).loose()
 
 /**
  * Curator-state record schema of the storage-domain table.
@@ -57,7 +60,7 @@ export const curatorStateSchema = z.object({
   runCount: z.number().int().nonnegative(),
   lastSummary: z.string(),
   paused: z.boolean(),
-})
+}).loose()
 
 /**
  * Pending record schema of the storage-domain table.
@@ -81,7 +84,7 @@ export const pendingSchema = z.object({
   // from the medium lost its attribution. Added so the round-trip keeps them.
   origin: z.string().optional(),
   sessionId: z.string().optional(),
-})
+}).loose()
 
 /**
  * The evolution storage-domain spec: three schema-validated KV tables.
@@ -160,12 +163,16 @@ export function apply(ctx: Context): void {
       // P2-1 (v18): upstream storage-domain validates stored records only on
       // open(); a blind put here would persist a bad record and make the WHOLE
       // evolution domain fail to open with `invalid-record` on the next mount.
-      // Validate at the write boundary and persist the parsed value.
+      // P2-12/15 (v19): the gate is the SEAM's shared contract (same one the
+      // json provider applies), and the stored value is a deep copy so the
+      // caller cannot mutate the authoritative in-memory record afterwards.
+      const issue = recordIssue(REVIEW_STATE_TABLE, record) ?? assertCloneable(record)
+      if (issue !== null) throw new Error(`evolution-state-domain: refusing to persist an invalid review-state record: ${issue}`)
       const parsed = reviewStateSchema.safeParse(record)
       if (!parsed.success) {
         throw new Error(`evolution-state-domain: refusing to persist an invalid review-state record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
       }
-      await (await ensure()).table(REVIEW_STATE_TABLE).put(sessionId, parsed.data)
+      await (await ensure()).table(REVIEW_STATE_TABLE).put(sessionId, cloneRecord(parsed.data))
     },
 
     async loadCuratorState() {
@@ -176,21 +183,35 @@ export function apply(ctx: Context): void {
     async saveCuratorState(record) {
       // P2-1 (v18): same write-boundary validation as saveReviewState — the
       // domain `put` itself does not parse, only `open()` does.
+      // P2-12/15 (v19): shared seam gate + deep copy.
+      const issue = recordIssue(CURATOR_STATE_TABLE, record) ?? assertCloneable(record)
+      if (issue !== null) throw new Error(`evolution-state-domain: refusing to persist an invalid curator-state record: ${issue}`)
       const parsed = curatorStateSchema.safeParse(record)
       if (!parsed.success) {
         throw new Error(`evolution-state-domain: refusing to persist an invalid curator-state record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
       }
-      await (await ensure()).table(CURATOR_STATE_TABLE).put(CURATOR_STATE_KEY, parsed.data)
+      await (await ensure()).table(CURATOR_STATE_TABLE).put(CURATOR_STATE_KEY, cloneRecord(parsed.data))
     },
 
     async transactCuratorState(task) {
       const table = (await ensure()).table(CURATOR_STATE_TABLE)
+      // P2-12 (v19): the task's output is validated with the SAME seam gate as
+      // the direct save paths — this fourth write path used to bypass every
+      // check, so a consumer returning a malformed record persisted it and the
+      // next `open()` failed the whole domain with `invalid-record`.
+      const guarded = (current: CuratorStateRecord | null): CuratorStateRecord | null => {
+        const next = task(current)
+        if (next === null) return null
+        const issue = recordIssue(CURATOR_STATE_TABLE, next) ?? assertCloneable(next)
+        if (issue !== null) throw new Error(`evolution-state-domain: refusing to persist an invalid curator-state record: ${issue}`)
+        return cloneRecord(next)
+      }
       // Atomic read-modify-write on the domain write chain: `task` sees the
       // record current at its queue slot, so a setPaused racing the run-core
       // bookkeeping write never interleaves. task returns null to keep the
       // record unchanged (the domain update primitive cannot delete).
       try {
-        await table.update(CURATOR_STATE_KEY, current => task(current) ?? current)
+        await table.update(CURATOR_STATE_KEY, current => guarded(current) ?? current)
         return
       } catch (error) {
         if (!(error instanceof DomainError && error.code === 'missing-key')) throw error
@@ -209,14 +230,14 @@ export function apply(ctx: Context): void {
       // possibility (no conditional-put primitive on the domain seam), not a
       // "races no third party" guarantee.
       try {
-        await table.update(CURATOR_STATE_KEY, current => task(current) ?? current)
+        await table.update(CURATOR_STATE_KEY, current => guarded(current) ?? current)
         return
       } catch (error) {
         if (!(error instanceof DomainError && error.code === 'missing-key')) throw error
       }
       // Fresh install, still no record: seed by applying the task to null and
-      // putting the result (delete when null).
-      const next = task(null)
+      // putting the result (delete when null) — same seam gate as above.
+      const next = guarded(null)
       if (next !== null) await table.put(CURATOR_STATE_KEY, next)
       else await table.delete(CURATOR_STATE_KEY)
     },
@@ -225,22 +246,27 @@ export function apply(ctx: Context): void {
       const table = (await ensure()).table(PENDING_TABLE)
       // C-2 (v18): deep copies, so a consumer cannot mutate the domain map
       // (including the nested `args` object of a pending record).
-      return [...table.entries()].map(([, value]) => structuredClone(value)).filter(record => record.status === status)
+      // P2-15 (v19): filter BEFORE cloning — the v18 shape cloned every record
+      // first, so one non-cloneable record (a function in `args`, which the
+      // write gate now refuses) would have thrown for every status.
+      return [...table.entries()]
+        .filter(([, value]) => value.status === status)
+        .map(([, value]) => structuredClone(value))
     },
 
     async savePending(record) {
-      // C-3 (v18): `args` is a REQUIRED key (the json provider's gate refuses a
-      // record without it, and zod's `z.unknown()` requires the key too) — a
-      // record that omits it must be refused by BOTH providers, not normalized.
-      if (!Object.prototype.hasOwnProperty.call(record, 'args')) {
-        throw new Error('evolution-state-domain: refusing to persist a pending record without the required "args" key')
-      }
-      // P2-1 (v18): write-boundary validation.
+      // C-3 (v18) + P2-12/15 (v19): the seam's shared gate covers the required
+      // `args` key, every field type and cloneability — the same checks the
+      // json provider applies, so neither medium can persist what the other
+      // would refuse. The stored value is a deep copy (P2-14: `args` used to be
+      // shared by reference with the caller).
+      const issue = recordIssue(PENDING_TABLE, record) ?? assertCloneable(record)
+      if (issue !== null) throw new Error(`evolution-state-domain: refusing to persist an invalid pending record: ${issue}`)
       const parsed = pendingSchema.safeParse({ ...record, args: record.args })
       if (!parsed.success) {
         throw new Error(`evolution-state-domain: refusing to persist an invalid pending record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
       }
-      await (await ensure()).table(PENDING_TABLE).put(record.id, parsed.data)
+      await (await ensure()).table(PENDING_TABLE).put(record.id, cloneRecord(parsed.data))
     },
 
     async claimPending(id, claimId) {
@@ -315,6 +341,13 @@ export function apply(ctx: Context): void {
         // instead of localeCompare so both providers agree on ordering;
         // (3) eviction is best-effort: the resolve has already committed, so a
         // delete failure warns instead of surfacing as a failed approve.
+        // P2-13 (v19) residual, stated precisely: upstream `Table.delete`
+        // decides existence at its own queue slot, so a `savePending` enqueued
+        // AFTER the synchronous `table.get` re-check below but BEFORE the
+        // delete job would be deleted. Closing that window needs a conditional
+        // delete primitive the seam does not have (the audit's C-5 direction);
+        // the re-check narrows it and in-tree mounts use randomUUID ids, so it
+        // requires a third-party/hand-written id reused across the window.
         if (resolved.record !== null) {
           const resolvedEntries = [...table.entries()]
             .map(([key, record]) => ({ key, record }))

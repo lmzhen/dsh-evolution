@@ -27,7 +27,7 @@ export const inject = ['agents']
  * start call; the outer catch logged it and silently degraded the review to
  * the inject path. The schema and the assembly clamp both reject it (same
  * bound as commands/maintenance). */
-const MAX_TIMER_DELAY_MS = 4_294_967_295
+const MAX_TIMER_DELAY_MS = 2_147_483_647
 
 export interface Config {
   reviewEnabled?: boolean

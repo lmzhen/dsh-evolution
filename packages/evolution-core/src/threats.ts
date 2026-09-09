@@ -2,9 +2,16 @@
  * Threat scanning for agent-authored memory and skill content.
  *
  * Ported as a small, dependency-free subset of Hermes Agent's
- * `tools/threat_patterns.py` + hermes-claw `threats.ts`. The policy is the
- * load-bearing part: ANY in-scope hit blocks. Severity and category are
- * metadata for diagnostics only.
+ * `tools/threat_patterns.py` + hermes-claw `threats.ts`.
+ *
+ * Policy (P1-1, v19): a finding either BLOCKS the write or only REPORTS.
+ * Blocking is reserved for shapes with no legitimate use in stored knowledge
+ * (prompt-injection phrasing, credential exfiltration, the invisible-character
+ * smuggling core). Typography and presentation characters that are legitimate
+ * in ordinary prose — variation selectors (❤️), zero-width non-joiner, soft
+ * hyphen from PDF paste, Arabic letter mark, Mongolian vowel separator — are
+ * REPORT findings: they stay visible to operators and tests but never reject a
+ * write. Blocking them turned every emoji into a security event.
  */
 
 import { clampedNumber } from './numeric.ts'
@@ -15,6 +22,9 @@ export interface ThreatFinding {
   label: string
   category: string
   scope: ThreatScope
+  /** P1-1 (v19): `block` (default) refuses the write; `report` is an audit
+   * trail entry only. Absent means `block`. */
+  severity?: 'block' | 'report'
 }
 
 interface ThreatPattern extends ThreatFinding {
@@ -81,16 +91,25 @@ const PATTERNS: ThreatPattern[] = [
   { label: 'private_key_block', category: 'hardcoded_secrets', scope: 'all', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
 ]
 
-// P2-2 (v18): the invisible/format set now covers the characters the v18
-// probe used to bypass the scan (SOFT HYPHEN, COMBINING GRAPHEME JOINER,
-// ARABIC LETTER MARK, MONGOLIAN VOWEL SEPARATOR, WORD JOINER, deprecated
-// bidi controls, VARIATION SELECTORS) plus the astral TAG block. The `u`
-// flag is required for the `\u{e0000}` range. Homoglyphs (e.g. Cyrillic
-// look-alikes) remain outside this detector by design.
+// P2-2 (v18) added an invisible/format set; P1-1 (v19) splits it by intent
+// after the first cut rejected ordinary prose and emoji:
+//   - BLOCKING: the smuggling core. Zero-width breaks/joiners with no prose
+//     use (ZWSP, WORD JOINER, invisible operators, deprecated format
+//     controls, BOM), COMBINING GRAPHEME JOINER, and the astral TAG block —
+//     note the TAG range must live INSIDE the character class (P2-6: the v18
+//     form wrote it after the class, where it matched the literal text).
+//   - REPORT: typography/presentation characters that are smuggling vectors
+//     only when abused: soft hyphen (PDF paste), Arabic letter mark, Mongolian
+//     vowel separator, ZWNJ (Persian/Arabic typography), variation selectors
+//     VS1-16 (emoji/text presentation, e.g. ❤️).
+//   - ZWJ (U+200D) blocks only OUTSIDE an emoji sequence: 👨‍👩‍👧 is a joined
+//     sequence and must pass; a ZWJ between ordinary words must not.
+// Homoglyphs (e.g. Cyrillic look-alikes) remain outside this detector by design.
 const INVISIBLE_CHAR_CLASS =
-  '\\u00ad\\u034f\\u061c\\u180e\\u200b\\u200c\\u200d\\u2060\\u2061\\u2062\\u2063\\u2064'
-  + '\\u206a-\\u206f\\ufeff\\ufe00-\\ufe0f'
-const ZERO_WIDTH_CHARS = new RegExp(`[${INVISIBLE_CHAR_CLASS}]|\\u{e0000}-\\u{e007f}`, 'u')
+  '\\u034f\\u200b\\u2060\\u2061\\u2062\\u2063\\u2064\\u206a-\\u206f\\ufeff\\u{e0000}-\\u{e007f}'
+const ZERO_WIDTH_CHARS = new RegExp(`[${INVISIBLE_CHAR_CLASS}]`, 'u')
+const ZWJ_OUTSIDE_EMOJI = /(?<!\p{Extended_Pictographic})\u200d(?!\p{Extended_Pictographic})/u
+const TYPOGRAPHY_CHARS = /[\u00ad\u061c\u180e\u200c\ufe00-\ufe0f]/
 const BIDI_CHARS = /[\u202a-\u202e\u2066-\u2069]/
 
 const SCOPE_ORDER: Record<ThreatScope, number> = { all: 1, context: 2, strict: 3 }
@@ -138,15 +157,17 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   const windowSize = clampedNumber(maxScanChars, 65_536, { min: PATTERN_OVERLAP + 1 })
   const findings: ThreatFinding[] = []
   const excluded = new Set(options.excludeLabels ?? [])
-  // P3-22 (v14): unicode obfuscation is scope-INDEPENDENT by design — invisible
-  // and bidi characters are never legitimate in stored knowledge, so they block
-  // even under `scope: 'all'`. The exemption surface still applies: a
-  // deployment that knows a label is benign can allowlist it like any other.
-  // P3 (v15): the finding carries scope:'all' — pattern findings report their
-  // own pattern scope, and these checks apply at EVERY scope, so echoing the
-  // requested scope here was diagnostic noise, not information.
-  if (ZERO_WIDTH_CHARS.test(text) && !excluded.has('unicode_zero_width')) {
+  // P3-22 (v14): unicode obfuscation is scope-INDEPENDENT by design — the
+  // smuggling core is never legitimate in stored knowledge, so it blocks even
+  // under `scope: 'all'`. The exemption surface still applies: a deployment
+  // that knows a label is benign can allowlist it like any other.
+  // P1-1 (v19): the typography set reports without blocking (see the class
+  // comment above); ZWJ is judged by context.
+  if ((ZERO_WIDTH_CHARS.test(text) || ZWJ_OUTSIDE_EMOJI.test(text)) && !excluded.has('unicode_zero_width')) {
     findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope: 'all' })
+  }
+  if (TYPOGRAPHY_CHARS.test(text) && !excluded.has('unicode_typography')) {
+    findings.push({ label: 'unicode_typography', category: 'unicode_obfuscation', scope: 'all', severity: 'report' })
   }
   if (BIDI_CHARS.test(text) && !excluded.has('unicode_bidi_override')) {
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope: 'all' })
@@ -186,10 +207,12 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   return findings
 }
 
-/** Blocking policy: any hit blocks. `severity` is deliberately not a gate. */
+/** Blocking policy (P1-1, v19): a finding blocks unless it is explicitly
+ * `report`-only. Pattern findings carry no severity and therefore block as
+ * before. */
 export function evaluateThreat(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): { blocked: boolean; findings: ThreatFinding[] } {
   const findings = scanThreats(text, scope, maxScanChars, options)
-  return { blocked: findings.length > 0, findings }
+  return { blocked: findings.some(finding => finding.severity !== 'report'), findings }
 }
 
 /** User-facing block message for memory writes. */

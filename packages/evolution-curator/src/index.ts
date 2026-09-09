@@ -32,7 +32,7 @@ const DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS = 7
  * 120s matches the review subagent default; the 32-bit ceiling is Node's
  * timer-delay limit (`AbortSignal.timeout` throws above it). */
 const DEFAULT_CURATOR_REVIEW_TIMEOUT_MS = 120_000
-const MAX_TIMER_DELAY_MS = 4_294_967_295
+const MAX_TIMER_DELAY_MS = 2_147_483_647
 
 
 declare module '@deepseek-ai/cordis' {
@@ -1138,6 +1138,9 @@ export class EvolutionCurator extends Service {
       let skipped: string[] = []
       await mutateUsage(root, this.io, (disk) => {
         skipped = foldCuratorFields(disk, usage, stateOwned, runStartStates)
+      }, {
+        // P2-9 (v19): a quarantined sidecar keeps folding but must be visible.
+        onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) },
       })
       if (skipped.length > 0) {
         this.ctx.logger.warn(`evolution-curator: lifecycle fold skipped ${skipped.length} name(s) whose on-disk state moved during the run (a concurrent curator/tool won): ${skipped.join(', ')}`)
@@ -1392,7 +1395,7 @@ export class EvolutionCurator extends Service {
             record.archived_at = new Date().toISOString()
           }
         }
-      })
+      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) } })
     } catch (error) {
       this.ctx.logger.warn(`evolution-curator: failed to persist consolidate usage state: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -1428,7 +1431,7 @@ export class EvolutionCurator extends Service {
           record.state = 'active'
           record.archived_at = null
         }
-      })
+      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) } })
     } catch (error) {
       this.ctx.logger.warn(`evolution-curator: failed to persist restore usage state: ${error instanceof Error ? error.message : String(error)}`)
     }

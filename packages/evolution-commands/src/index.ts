@@ -254,6 +254,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // P0-2 (v11): the bare `restore` (registry/README documented usage)
           // fell into the help branch — the handler only matched the
           // argument-carrying shape. Both forms now reach restoreSnapshot.
+          // P2-11 (v19): reject an unexpected tail. The v11 shape accepted any
+          // argument and silently ran a WHOLE-TREE rollback, so an operator who
+          // typed `/evolution restore <name>` (missing the `skill ` prefix)
+          // triggered the destructive path by accident.
+          const tail = input.slice('restore'.length).trim()
+          if (tail !== '') {
+            return err(`\`restore\` takes no arguments (got "${tail}"). Use \`restore\` for a whole-tree rollback, or \`skill restore <name>\` for one skill.`)
+          }
           const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           return result.ok ? ok(result.message) : err(result.message)
@@ -355,13 +363,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // V6-29 (0.3.36): AbortSignal.timeout throws a RangeError above 2^32-1
           // — reject the domain explicitly instead of surfacing the platform
           // error from a `--timeout` typo.
-          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0 || runTimeoutMs > 0xFFFFFFFF) {
+          // P2-10 (v19): the real ceiling is 2^31-1. Node accepts [2^31, 2^32-1]
+          // without throwing, warns, and silently sets 1ms — a "legal" value
+          // that aborts the scan immediately. The message below already said
+          // 2147483647; the comparison now agrees with it.
+          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0 || runTimeoutMs > 0x7FFFFFFF) {
             // P2-20 (F3, v11): name the ACTUAL source — a bad config value used
             // to be reported as a `--timeout` CLI typo and permanently
             // deadlock maintain (the user had no CLI flag to fix).
             return err(maintainArgs[1]
-              ? 'Invalid --timeout value: expected a positive integer number of milliseconds up to 4294967295 (e.g. /evolution maintain --timeout 600000).'
-              : 'The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to 4294967295. Fix the evolution-commands row config (maintainTimeoutMs), then retry.')
+              ? 'Invalid --timeout value: expected a positive integer number of milliseconds up to 2147483647 (e.g. /evolution maintain --timeout 600000).'
+              : 'The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to 2147483647. Fix the evolution-commands row config (maintainTimeoutMs), then retry.')
           }
           if (maintainInFlightSince > 0) {
             const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))

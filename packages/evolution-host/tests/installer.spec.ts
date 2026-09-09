@@ -382,7 +382,10 @@ describe('layered installer', () => {
       '@deepseek-ai/dsh-evolution-host',
     ])
     // D-3: the mounted bundle is pinned in dependencies, not only in bundles.
-    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^0\.\d+\.\d+/)
+    // P2-22 (v19): the range must come from the FAMILY package — an overlay
+    // checkout used to pin the host repo's root version (0.1.x) here, and the
+    // loose /^\^0\.\d+\.\d+/ form accepted it.
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^0\.3\./)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
@@ -396,6 +399,33 @@ describe('layered installer', () => {
       dsh?: { profile?: { bundles?: string[] } }
     }
     expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-evolution-host'])
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 60_000)
+
+  it('P1-3 (v19): uninstall removes the D-3 dependency row together with the bundle row', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-dep-'))
+    await runInstaller(home, 'host', 'evo-test')
+    const manifestPath = join(home, 'profiles', 'evo-test', 'package.json')
+    const before = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      dependencies?: Record<string, string>
+      dsh?: { profile?: { bundles?: string[] } }
+    }
+    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^0\.3\./)
+    expect(before.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-host')
+    // P1-3: the journal records what the installer wrote.
+    const journalPath = join(home, 'profiles', 'evo-test', '.evolution-install.json')
+    const journal = JSON.parse(await readFile(journalPath, 'utf8')) as { bundle?: string; dependencyAdded?: boolean }
+    expect(journal.bundle).toBe('@deepseek-ai/dsh-evolution-host')
+    expect(journal.dependencyAdded).toBe(true)
+    await runInstaller(home, 'host', 'evo-test', ['--uninstall'])
+    const after = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      dependencies?: Record<string, string>
+      dsh?: { profile?: { bundles?: string[] } }
+    }
+    // The residue that used to make the next pnpm materialization fail E404.
+    expect(after.dependencies?.['@deepseek-ai/dsh-evolution-host']).toBeUndefined()
+    expect(after.dsh?.profile?.bundles ?? []).not.toContain('@deepseek-ai/dsh-evolution-host')
+    expect(existsSync(journalPath)).toBe(false)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 

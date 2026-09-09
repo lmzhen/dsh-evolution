@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.65 (patch) — v19 审计闭环：3 个 P1 回归修复 + 26 项 P2（含 state seam 契约下沉与安装台账）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v19.md`（3×P1 + 26×P2，报告的门禁结论经独立实跑复现）。本版按"**从实际场景需要的设计理念**"取向修复，而不只是打补丁：守卫的合法集合必须**派生自生产者的声明**、同一设施只允许**一个方向**、"保字节"必须**可观测**、平台边界按**平台真值**、模型可见面要么**已解析**要么不存在。
+- **P1（日常操作即可触发，全部关闭）**：
+  1. **威胁扫描不再误拒 emoji 与合法排版**（`threats.ts`）：VS15/16（❤️ ⚠️ ✔️）、ZWNJ（波斯/阿拉伯排版）、软连字符（PDF 粘贴）、ALM、MVS 改为 `severity:'report'`——保留审计痕迹但**不阻断写入**；ZWJ 仅在**不与 emoji 相邻**时阻断（👨‍👩‍👧 放行、词间 ZWJ 仍拒）；隐写核心（ZWSP/WORD JOINER/不可见运算符/废弃格式符/BOM/CGJ/双向控制）与 **TAG 区间**（v18 把区间写在字符类之外，等于空操作）仍阻断。
+  2. **空技能树快照可恢复**（`skill-store.ts`）：守卫的合法集合改为 `manifest.skills ∪ manifest.sidecars ∪ {manifest.json, extras, .archive}` **派生**（此前硬编码三名字，拒绝了 `snapshotAll` 自己放进快照根目录的 `.usage.json`/`.curator-suppressed.json`，导致"树被清空后快照 + 回滚通道整体失效"）；恢复顺序改为**先验证后破坏**（manifest-less 拒绝不再发生在清树之后）；非字符串 manifest 条目结构化拒绝（不再抛 `name.includes is not a function`）。
+  3. **卸载闭环**（`install-layered.mjs`）：新增 `<profile>/.evolution-install.json` 安装台账（bundle 行 / 依赖行 / 拷包清单 / preset），卸载时删除依赖行与台账本身——此前 D-3 写入的 `dependencies[...]` 在卸载后残留，下一次 `dsh plugin add`/`pnpm install` 必然 E404；依赖 range 取**家族包版本**而非宿主根 `package.json`（overlay 布局此前写入 `^0.1.x`）。
+- **结构层（一次收口 6 项 P2）**：record 契约下沉到 `evolution-state-storage`（新增 `recordIssue`/`assertCloneable`/`cloneRecord`/`UNKNOWN_FIELD_POLICY='preserve'`），json 与 domain 两个 provider 的**所有**写路径过同一道门：`transactCuratorState` 不再绕过校验、写侧深拷贝（`args` 别名）、`listPending` 先 filter 后 clone、domain schemas 改 `.loose()`（未知字段不再被 zod strip）；跨 provider 一致性 harness 补"坏输入必拒 / 好输入必收 / 未知字段保留 / 非可克隆拒绝"四向断言。
+- **回归类 P2**：timer 上限按 Node 真值 **2^31-1**（schema 与 `maintain --timeout` 门同步；`2^31..2^32-1` 此前被静默置为 1ms）；`redactSecrets` 的值改为**整行**且分隔符不再跨行（`api_key:` 不再吞掉下一行，`token="a"b"c"` 不再残留尾部）；`.corrupt` 清扫谓词与命名规则同源；锁探针方向统一为 fail-closed；`/evolution restore <tail>` 显式拒绝（此前静默执行整树回滚）；graph 通道转发 `threatExemptLabels`；`packages/INSTALL.md` 同步四形态；usage 形状守卫改为"**隔离坏条目 + 一次性 warn + 好条目继续服务**"（此前保字节但静默冻结全部写入）；json 隔离副本写失败时**不再重写主文件**（坏记录保留）、同内容复用固定名 / 不同内容带戳（永不覆盖唯一救援副本）。
+- **纪律层**：每个安全/校验改动同时补"命中（坏输入必拒）+ 误伤（日常合法输入必过）"双向用例；每个能拒绝恢复的守卫补"健康输入必过"用例（P1-2 正是缺这一类）。
+- **门禁**：`build-lib`（tsc -b 全 30 包 + tsdown）exit 0；全量 vitest `--maxWorkers=4` 通过；oxlint（上游严格配置）0/0；dependency-closure / arch-guards --strict / event-pairing --strict / layout-sync / profile-bundles 全 exit 0；installer 单独跑通过。
+- **仍延后（触发条件见 `completion-report-v18.md` §5 与 v19 §4.1）**：C-10 json 读被写队列阻塞、A1-10 独占创建 seam、A2-14 curator N+1、B-11 feedback 重启重放、E-13 多 memory provider、计划 §15 非目标；P2-13 的逐出残余窗口（同步 `get` 与排队 `delete` 之间）已如实文档化，闭合需要 seam 的条件删除原语。
+
 ## 0.3.64 (patch) — v18 收尾批：P1 脱敏泄漏回归修复 + A 类 12 项 + B 类 7 项 + C 类 8 项（余下 C 类延后）
 
 - **来源**：`audit-v18/`（7 份子报告）+ `optimization-plan-v18.md` + `completion-report-v18.md` + 独立审查 `dsh-evolution-mirror-independent-review-v18.md`（首轮检出 1 项 P1 回归、6 条用例失败、5 个 oxlint 错误，本版全部关闭）。

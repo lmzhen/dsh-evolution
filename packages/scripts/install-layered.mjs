@@ -39,6 +39,21 @@ const BUNDLES = {
 }
 const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
 
+/** P2-22 (v19): the version to pin is the FAMILY's. The ancestor walk below
+ * reaches the HOST repo's root package.json in an overlay/dev checkout (0.1.x)
+ * and pinned the bundle to a range that has nothing to do with the family; the
+ * bundle package's own manifest is the authority. The ancestor walk stays as a
+ * fallback for trees that ship no bundle source. */
+function familyVersion() {
+  try {
+    const version = JSON.parse(readFileSync(join(packageSourceRoot(), 'evolution-host', 'package.json'), 'utf8')).version
+    if (typeof version === 'string' && /^\d+\.\d+\.\d+/.test(version)) return version
+  } catch {
+    // fall through to the ancestor walk
+  }
+  return rootPackageVersion()
+}
+
 function rootPackageVersion() {
   // The release version the current tree is building toward lives in the repo
   // root package.json (the mirror root carries the real 0.3.x). Walk up from
@@ -173,11 +188,33 @@ async function installBundlePackage(profileDir, bundleName) {
   // D-3 (v18): a mounted bundle row MUST also be pinned in `dependencies`
   // (the repo's own verify-profile-bundles guard treats a row without a
   // dependency as a phantom row, and a later pnpm install would prune the
-  // hand-copied packages). Use the release version when known.
-  const version = rootPackageVersion()
+  // hand-copied packages). P2-22 (v19): the range comes from the family.
+  const version = familyVersion()
   manifest.dependencies ??= {}
+  const addedDependency = !Object.prototype.hasOwnProperty.call(manifest.dependencies, bundleName)
   manifest.dependencies[bundleName] = /^\d+\.\d+\.\d+/.test(version) ? `^${version}` : '*'
   await writeFile(join(profileDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n')
+  return { addedDependency, dependencyRange: manifest.dependencies[bundleName] }
+}
+
+/** P1-3 (v19): the install journal. Every profile-level write the installer
+ * makes (bundle row, dependency row, copied packages, agent preset) is
+ * recorded here so uninstall can replay it in reverse instead of guessing.
+ * Absent for installs made by 0.3.64 and earlier — uninstall falls back to the
+ * name-based rules for those. */
+const INSTALL_JOURNAL = '.evolution-install.json'
+
+async function writeInstallJournal(profileDir, journal, dryRun) {
+  if (dryRun) return
+  await writeFile(join(profileDir, INSTALL_JOURNAL), JSON.stringify(journal, null, 2) + '\n')
+}
+
+async function readInstallJournal(profileDir) {
+  try {
+    return JSON.parse(await readFile(join(profileDir, INSTALL_JOURNAL), 'utf8'))
+  } catch {
+    return null
+  }
 }
 
 async function copyAllEvolutionPackages(profileDir, dryRun) {
@@ -232,6 +269,15 @@ async function removeBundleFromProfile(profileDir, bundleName) {
   const matched = bundles.filter(name => typeof name === 'string' && (name === bundleName || name.endsWith(`/${tail}`)))
   if (matched.length === 0) return false
   manifest.dsh.profile.bundles = bundles.filter(name => !matched.includes(name))
+  // P1-3 (v19): the D-3 dependency row must go with the bundle row. Leaving it
+  // behind pointed the profile at a package that is deleted right after, so
+  // the next `dsh plugin add` / `pnpm install` in that profile failed E404.
+  const dependencies = manifest.dependencies
+  if (dependencies !== null && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+    for (const key of Object.keys(dependencies)) {
+      if (key === bundleName || key.endsWith(`/${tail}`)) delete dependencies[key]
+    }
+  }
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   return true
 }
@@ -467,6 +513,9 @@ export async function uninstall(options = {}) {
     // remove its bundle row symmetrically, or the leftover row resolves a
     // package that was just deleted and bricks the profile.
     if (!dryRun) await removeBundleFromProfile(profileDir, BUNDLES.all)
+    // P1-3 (v19): the journal has been replayed (rows + dependency removed);
+    // delete it so a later install starts from a clean record.
+    if (!dryRun) await rm(join(profileDir, INSTALL_JOURNAL), { force: true })
     // D-2 (v18): the package set may only be deleted when NO evolution bundle
     // row remains. Deleting the packages while another row is still mounted
     // leaves a phantom row that bricks the profile at boot.
@@ -641,7 +690,22 @@ export async function install(options = {}) {
     }
     result.bundle = bundleName
     result.copied = await copyAllEvolutionPackages(profileDir, dryRun)
-    if (!dryRun) await installBundlePackage(profileDir, bundleName)
+    if (!dryRun) {
+      const dependency = await installBundlePackage(profileDir, bundleName)
+      // P1-3 (v19): record exactly what this run wrote into the profile so
+      // uninstall can reverse it (and a later run can tell an idempotent
+      // re-install from a fresh one).
+      await writeInstallJournal(profileDir, {
+        version: 1,
+        scope: EVOLUTION_SCOPE,
+        bundle: bundleName,
+        dependencyAdded: dependency.addedDependency,
+        dependencyRange: dependency.dependencyRange,
+        copied: result.copied.map(entry => entry.packageName),
+        agentPreset: needsAgent,
+        at: new Date().toISOString(),
+      }, dryRun)
+    }
     result.missingEntrypoints = missingEntrypoints(result.copied)
   }
 

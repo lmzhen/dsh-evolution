@@ -46,12 +46,18 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 // with no separator (100k chars measured ~23-26s, synchronously). The prefix
 // is now anchored by `(^|[^\w-])` and bounded to 64 chars, so the regex is
 // linear in the input and cannot stall the event loop.
+// P2-7/P2-8 (v19): the value is the WHOLE rest of the line — one branch, no
+// quoted/unquoted alternation. Two defects forced this: the separator's `[\s]*`
+// matched a newline, so `api_key:` with no same-line value swallowed the NEXT
+// line; and the quoted branch short-circuited at the first inner quote, leaving
+// `token="a"b"c" tail` as `token=<redacted>b"c" tail`. Over-masking a line is
+// acceptable for a redactor; leaking or eating an unrelated line is not.
 // Capture groups: 1 = leading boundary (kept), 2 = connected prefix (kept),
-// 3 = key (kept), 4 = separator (kept), 5.. = value (masked).
+// 3 = key (kept), 4 = separator (kept), 5 = value (masked).
 const INLINE_ASSIGNMENT_PATTERN = new RegExp(
   '(^|[^\\w-])([\\w-]{0,64}[_\\-])?((?:token|api[_-]?key|secret|password|passwd)' +
-  '(?:[_\\-][\\w-]{0,64})?)\\b([\\s]*[:=][\\s]*)' +
-  '(?:"([^"\\r\\n]*)"|\'([^\'\\r\\n]*)\'|([^\\r\\n]+))',
+  '(?:[_\\-][\\w-]{0,64})?)\\b([\\t ]*[:=][\\t ]*)' +
+  '([^\\r\\n]+)',
   'gi',
 )
 

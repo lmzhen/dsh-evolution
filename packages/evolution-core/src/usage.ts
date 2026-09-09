@@ -137,7 +137,19 @@ export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutio
  * cannot interleave its RMW and lose a counter update. Callers keep their own
  * single-process serialize chain as the second layer.
  */
-export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map: UsageMap) => void | Promise<void>): Promise<void> {
+export interface UsageMutateOptions {
+  /** P2-9 (v19): called when malformed entries had to be quarantined before the
+   * task could run. The guard preserves bytes AND keeps the facility working;
+   * this callback is how that stays observable. */
+  onQuarantine?: ((message: string) => void) | undefined
+}
+
+export async function mutateUsage(
+  root: string,
+  io: EvolutionIoLike,
+  task: (map: UsageMap) => void | Promise<void>,
+  options: UsageMutateOptions = {},
+): Promise<void> {
   await transactIo(io, usageFile(root), async (current) => {
     // P3 (v3 audit): a malformed sidecar is never overwritten by the RMW —
     // JSON.parse swallow→empty then persist would destroy recoverable telemetry.
@@ -146,25 +158,35 @@ export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map:
     // persisting that would DESTROY the original bytes (mutations.ts and the
     // suppression sidecar both keep array compat; usage is the odd one out).
     let shapePreserved = false
+    let recovered: string | null = null
     if (current !== null) {
       try {
         const probe = JSON.parse(current) as unknown
         if (probe === null || Array.isArray(probe) || typeof probe !== 'object') shapePreserved = true
         else {
           const record = probe as Record<string, unknown>
-          // A2-8 (v18): a valid object that is NOT a usage map (any non-object
-          // value, e.g. a future `{version, skills}` wrapper) must keep its
-          // original bytes instead of folding into phantom records.
-          if (Object.values(record).some(value => value === null || typeof value !== 'object' || Array.isArray(value))) shapePreserved = true
+          const isMalformed = (value: unknown): boolean => value === null || typeof value !== 'object' || Array.isArray(value)
           // A2-11 (v18): a newer on-disk version is never downgraded by this
           // writer (a skill literally named `version` holds an object, not a
           // number, so this cannot false-positive on a usage map).
           if (typeof record.version === 'number' && record.version > 1) shapePreserved = true
+          else if (Object.values(record).some(isMalformed)) {
+            // P2-9 (v19): the v18 shape guard preserved the bytes but silently
+            // FROZE every later write — telemetry counts and the curator's
+            // lifecycle fold stopped landing with no throw and no warn. Keep
+            // the original bytes in a quarantine copy, warn, and continue with
+            // the good entries so the facility heals itself.
+            const bad = Object.keys(record).filter(key => isMalformed(record[key]))
+            const corruptPath = `${usageFile(root)}.corrupt`
+            await io.writeText(corruptPath, current).catch(() => {})
+            recovered = JSON.stringify(Object.fromEntries(Object.entries(record).filter(([, value]) => !isMalformed(value))))
+            options.onQuarantine?.(`usage sidecar ${usageFile(root)} carried ${bad.length} malformed entr${bad.length === 1 ? 'y' : 'ies'} (${bad.slice(0, 5).join(', ')}); the original bytes were copied to ${corruptPath} and the remaining entries continue to be served`)
+          }
         }
       } catch { return current }
     }
     if (shapePreserved) return current
-    const map = parseUsage(current)
+    const map = parseUsage(recovered ?? current)
     await task(map)
     return JSON.stringify(Object.fromEntries(map.entries()), null, 2)
   })

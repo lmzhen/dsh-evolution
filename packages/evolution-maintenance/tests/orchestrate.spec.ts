@@ -199,10 +199,15 @@ describe('runMaintain', () => {
     }
     // AbortSignal.timeout throws a synchronous RangeError above 2^32-1; the
     // guard rejects the value up front with a readable message.
+    // P2-10 (v19): the ceiling is the 32-bit SIGNED limit — [2^31, 2^32-1]
+    // does not throw, it warns and silently becomes 1ms.
     const outcome = await runMaintain(never, { timeoutMs: 5_000_000_000 })
     expect(outcome.ok).toBe(false)
     expect(outcome.error ?? '').toContain('--timeout must be a positive integer')
-    expect(outcome.error ?? '').toContain('4294967295')
+    expect(outcome.error ?? '').toContain('2147483647')
+    const overflow = await runMaintain(never, { timeoutMs: 2_147_483_648 })
+    expect(overflow.ok).toBe(false)
+    expect(overflow.error ?? '').toContain('2147483647')
   })
 
   it('V6-38: a field-embedded standalone Notes: line is sanitized so it can never read as the section header (0.3.36)', async () => {

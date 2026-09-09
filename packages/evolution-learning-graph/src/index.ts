@@ -281,10 +281,17 @@ export interface Config {
    * the graph on the SAME skills tree the tools/catalog read under a
    * custom-root deployment (previously the default root was hardcoded). */
   root?: string
+  /** P2-26 (v19): the deployment's benign threat labels. The graph edit/delete
+   * channel writes skill content through the same SkillLibrary as the tools,
+   * so it must honour the same exemption list — without it a label allowed on
+   * the tool channel was refused here, and the refusal named a config key this
+   * channel could not reach. */
+  threatExemptLabels?: string[]
 }
 
 export const Config: z<Config> = z.object({
   root: z.string().default(''),
+  threatExemptLabels: z.array(z.string()).default([]),
 })
 
 /**
@@ -383,7 +390,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // V10-11 (P2-7): the resolver now reads THIS package's Config.root
           // (empty = the shared default root), so a custom-root deployment no
           // longer has the graph edit/delete write the wrong tree.
-          return new SkillLibrary(graphSkillsRoot, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+          return new SkillLibrary(graphSkillsRoot, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, [...(rawConfig.threatExemptLabels ?? [])])
         }
 
         async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {

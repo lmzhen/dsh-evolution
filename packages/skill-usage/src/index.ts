@@ -206,6 +206,9 @@ export class SkillUsageRegistry extends Service {
       let outcome = undefined as T | undefined
       await mutateUsage(this.root, this.io, async (map) => {
         outcome = await task(map)
+      }, {
+        // P2-9 (v19): a quarantined sidecar keeps working but must be visible.
+        onQuarantine: (message) => { this.ctx.logger.warn(`skill-usage: ${message}`) },
       })
       return outcome as T
     })

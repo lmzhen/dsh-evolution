@@ -1,12 +1,15 @@
 # Installing dsh-evolution
 
-Three supported layouts (0.3.54 route B — default is most-complete first):
+Four supported install forms (P2-23, v19 — this copy mirrors the repository
+root `INSTALL.md`; `dsh-evolution-all` is the DEFAULT and the other three are
+alternatives):
 
-| Layout | What is installed | Model tools |
-|---|---|---|
-| **Full (DEFAULT)** | `dsh-evolution-all` bundle (infra + model tools, profile-root) | Exposed to **every** session — the recommended new-install path |
-| Layered | `dsh-evolution-host` bundle + `Evolution` agent preset | Exposed only to sessions selecting the preset |
-| One-click | `dsh-evolution-preset` compatibility bundle | Exposed to every session in the profile |
+| Form | Bundle / preset | Model tools | Notes |
+|---|---|---|---|
+| **All (default)** | `dsh-evolution-all` | profile-wide | infra + `memory`/`skill_manage` + guidance, no preset step |
+| Host + agent preset | `dsh-evolution-host` + `Evolution` agent preset | only sessions selecting the preset | recommended when tools must be opt-in |
+| One-click | `dsh-evolution-preset` compatibility bundle | profile-wide | one-shot compatibility form |
+| Agent only | `Evolution` agent preset | only sessions selecting the preset | requires the host bundle (or the agent-preset packages) installed separately |
 
 The full `all` bundle is the new-install default; `host` is the shrink path
 (same automation, no model tools). Shrinking = uninstall `all`, install `host`.

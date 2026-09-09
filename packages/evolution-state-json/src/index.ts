@@ -11,24 +11,30 @@ import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { evolutionHome, makeSerialQueue, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
+  assertCloneable,
   canClaimPending,
   canResolvePending,
+  recordIssue,
   releasedStatus,
   CURATOR_STATE_FILE,
   CURATOR_STATE_KEY,
+  CURATOR_STATE_TABLE,
   PENDING_ARCHIVE_BAK_FILE,
   PENDING_ARCHIVE_FILE,
   PENDING_LEGACY_FILE,
   PENDING_RESOLVED_CAP as SEAM_PENDING_RESOLVED_CAP,
   PENDING_STATE_FILE,
+  PENDING_TABLE,
   PROVIDER_JSON,
   REVIEW_STATE_FILE,
+  REVIEW_STATE_TABLE,
   type CuratorStateRecord,
   type EvolutionStateStorage,
   type PendingRecord,
   type PendingResolution,
   type PendingStatus,
   type ReviewStateRecord,
+  type SeamRecordTable,
 } from '@deepseek-ai/dsh-evolution-state-storage'
 import { isAbsolute, join } from 'node:path'
 
@@ -96,8 +102,20 @@ const QUARANTINE_ERROR_NAME = 'EvolutionStateCorruptFile'
  * accumulate. The old `.corrupt-<stamp>-<rand>` name minted a fresh file on
  * EVERY read of a corrupt file: unbounded growth with no sweep. The fixed
  * copy is swept after 7 days by the node backend's sweepStaleTmps (S-10). */
+/** P2-19 (v19): pick the quarantine destination. The documented fixed name is
+ * reused when it already holds the SAME bytes (a repeated read of one corrupt
+ * file must still yield exactly one copy — V10-05's bounded-growth rule); a
+ * DIFFERENT payload gets a stamped sibling so the earlier rescue copy is never
+ * overwritten. The node backend's 7-day `.corrupt` sweep bounds the set. */
+async function quarantineTarget(io: () => EvolutionIoLike, base: string, content: string): Promise<string> {
+  if (!(await io().exists(base).catch(() => false))) return base
+  const existing = await io().readText(base).catch(() => null)
+  return existing === content ? base : `${base}.${Date.now()}`
+}
+
 async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string): Promise<never> {
-  const dest = `${join(root, file)}.corrupt`
+  const base = `${join(root, file)}.corrupt`
+  const dest = await quarantineTarget(io, base, raw)
   // P2-27 (v11): a failed rescue copy must not claim "original preserved" —
   // the operator follows the message to a file that does not exist. The main
   // failure stays fail-loud either way; only the diagnosis gets honest.
@@ -141,40 +159,19 @@ function firstNonRecordValue(parsed: unknown): string | null {
 // stays symmetric). A record failing its gate is quarantined to the same
 // fixed `<file>.corrupt` copy (V10-05) and EXCLUDED from the result —
 // isolated, never a silent pass-through, and always a visible rescue target.
-const isNonNegInt = (value: unknown): boolean =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 0
-const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
-const PENDING_KINDS = new Set(['memory', 'skill', 'capability'])
-const PENDING_STATUSES = new Set(['pending', 'executing', 'approved', 'rejected'])
-
-const gateReviewRecord = (record: Record<string, unknown>): boolean =>
-  isNonNegInt(record.turnsSinceMemory) && isNonNegInt(record.turnsSinceSkill) && isNonNegInt(record.lastTurn)
-
-const gateCuratorRecord = (record: Record<string, unknown>): boolean =>
-  typeof record.lastRunAt === 'number' && Number.isFinite(record.lastRunAt) && record.lastRunAt >= 0
-  && isNonNegInt(record.runCount)
-  && typeof record.lastSummary === 'string'
-  && typeof record.paused === 'boolean'
-
-const gatePendingRecord = (record: Record<string, unknown>): boolean =>
-  typeof record.id === 'string'
-  && typeof record.kind === 'string' && PENDING_KINDS.has(record.kind)
-  && typeof record.summary === 'string'
-  // C-3 (v18): the domain schema declares `args: z.unknown()`, and zod 4
-  // requires that KEY to exist — a record without it opens fine here but is
-  // refused as `invalid-record` by the domain provider. Align both sides.
-  && 'args' in record
-  && typeof record.createdAt === 'string'
-  && typeof record.status === 'string' && PENDING_STATUSES.has(record.status)
-  && optionalString(record.resolvedAt) && optionalString(record.claimedBy)
-  && optionalString(record.claimedAt) && optionalString(record.origin)
-  && optionalString(record.sessionId)
+// P2-12/14/15/16/18 (v19): the per-record field gate is now the SEAM's shared
+// contract (evolution-state-storage/record-contract) — the hand-written
+// predicates that used to live here drifted from the domain provider's zod
+// schemas (args key, schemaVersion, cloneability). Provider packages still do
+// not depend on each other: both consume the seam package.
+const gateFor = (table: SeamRecordTable) => (record: Record<string, unknown>): boolean =>
+  recordIssue(table, record) === null && assertCloneable(record) === null
 
 const RECORD_FIELD_GATES: Record<string, (record: Record<string, unknown>) => boolean> = {
-  [REVIEW_STATE_FILE]: gateReviewRecord,
-  [CURATOR_STATE_FILE]: gateCuratorRecord,
-  [PENDING_STATE_FILE]: gatePendingRecord,
-  [PENDING_LEGACY_FILE]: gatePendingRecord,
+  [REVIEW_STATE_FILE]: gateFor(REVIEW_STATE_TABLE),
+  [CURATOR_STATE_FILE]: gateFor(CURATOR_STATE_TABLE),
+  [PENDING_STATE_FILE]: gateFor(PENDING_TABLE),
+  [PENDING_LEGACY_FILE]: gateFor(PENDING_TABLE),
 }
 
 /** V11-B1 (P2-23): shared per-record field-gate scan for BOTH paths (readJson
@@ -246,8 +243,8 @@ async function ensureCorruptCopy(
   root: string,
   file: string,
   bad: Record<string, unknown>,
-): Promise<void> {
-  const corruptPath = `${join(root, file)}.corrupt`
+): Promise<boolean> {
+  const base = `${join(root, file)}.corrupt`
   // P3 (v16, correcting the v15 first cut; refined v17): the dedupe key is a
   // PER-RECORD SHAPE digest — for every failing record id, the record's own
   // field names + value TYPES. (The v15 attempt walked `Object.entries(bad)`
@@ -262,15 +259,18 @@ async function ensureCorruptCopy(
       ? Object.entries(record as Record<string, unknown>).map(([field, value]) => `${field}:${Array.isArray(value) ? 'array' : typeof value}`).sort()
       : [typeof record],
   })).sort((a, b) => a.id.localeCompare(b.id)))
-  if (corruptWritten.get(file) === corruptKey && await io().exists(corruptPath)) return
-  const wrote = await io().writeText(corruptPath, JSON.stringify(bad, null, 2)).then(() => true).catch(() => false)
+  if (corruptWritten.get(file) === corruptKey && await io().exists(base)) return true
+  const payload = JSON.stringify(bad, null, 2)
+  const dest = await quarantineTarget(io, base, payload)
+  const wrote = await io().writeText(dest, payload).then(() => true).catch(() => false)
   if (wrote) {
     corruptWritten.set(file, corruptKey)
     corruptWriteWarned.delete(file)
   } else if (!corruptWriteWarned.has(file)) {
     corruptWriteWarned.add(file)
-    ctx.logger.warn(`evolution-state-json: could not write quarantine copy "${corruptPath}" for ${Object.keys(bad).length} failed record(s) — the main file keeps them; the copy is retried on the next access`)
+    ctx.logger.warn(`evolution-state-json: could not write quarantine copy "${dest}" for ${Object.keys(bad).length} failed record(s) — the main file keeps them; the copy is retried on the next access`)
   }
+  return wrote
 }
 
 export async function jsonTransact<T>(
@@ -319,8 +319,17 @@ export async function jsonTransact<T>(
         // wrote .corrupt with zero observable trace — same warn/rewrite
         // discipline as the read path now applies (deduped per file).
         reportGateViolation(ctx, file, failing)
-        await ensureCorruptCopy(ctx, io, root, file, bad)
-        parsed = good as T
+        // P2-17 (v19): only drop the malformed records from the write-back when
+        // the rescue copy actually landed. The v18 shape warned "the main file
+        // keeps them" but rewrote the file without them regardless — a failed
+        // copy (disk full / permissions) plus any later mutation destroyed the
+        // only recoverable bytes in BOTH places.
+        const preserved = await ensureCorruptCopy(ctx, io, root, file, bad)
+        if (preserved) {
+          parsed = good as T
+        } else {
+          ctx.logger.warn(`evolution-state-json: keeping ${failing.length} malformed record(s) in ${file} — the quarantine copy could not be written, so rewriting the file without them would destroy the only copy`)
+        }
       }
     }
     const next = await task(parsed)

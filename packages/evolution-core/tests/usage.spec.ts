@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { applyCuratorFields, emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
@@ -20,6 +20,23 @@ describe('usage sidecar field normalization (P2-3)', () => {
     const disk3 = new Map([['a', make('archived')]])
     expect(foldCuratorFields(disk3, curated, new Set(), new Map([['a', 'active']]))).toEqual([])
     expect(disk3.get('a')?.state).toBe('archived')
+  })
+
+  it('P2-9 (v19): malformed entries are quarantined and the good entries keep serving', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-quarantine-'))
+    const io = nodeEvolutionIo()
+    const good = { created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 0, view_count: 0, patch_count: 0, last_used_at: null, last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null }
+    await writeFile(join(root, '.usage.json'), JSON.stringify({ 'skill-a': null, 'skill-b': good }), 'utf8')
+    let warned = ''
+    // The v18 shape guard preserved the bytes but FROZE every later write with
+    // no throw and no warn; now the bad entry is quarantined and the task runs.
+    await mutateUsage(root, io, (map) => { map.get('skill-b')!.view_count = 3 }, { onQuarantine: (message) => { warned = message } })
+    expect(warned).toContain('malformed')
+    expect(await readFile(join(root, '.usage.json.corrupt'), 'utf8')).toContain('skill-a')
+    const map = await loadUsage(root, io)
+    expect(map.get('skill-b')?.view_count).toBe(3)
+    expect(map.has('skill-a')).toBe(false)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-20: a top-level ARRAY sidecar reads as empty — no phantom "0"/"1" records (0.3.37)', async () => {
