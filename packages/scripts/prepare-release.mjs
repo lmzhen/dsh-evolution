@@ -46,9 +46,6 @@ function requireArg(name) {
 const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
 const platformVersion = requireArg('--platform-version')
-// P2-17: an unresolved external registry version is an error by
-// default (see registryVersion below); this flag is the explicit exemption.
-const allowUnresolvedExternal = argv.includes('--allow-unresolved-external')
 
 // R-06: the two vendored framework ranges the release metadata pins. Sync
 // source: the upstream checkout's vendor/ tags these ranges target
@@ -82,20 +79,6 @@ function npmPack(cwd) {
   return execFileSync('npm', ['pack', '--json'], { cwd, encoding: 'utf8' })
 }
 
-function registryVersion(name) {
-  const command = process.platform === 'win32'
-    ? ['cmd.exe', ['/c', 'npm', 'view', name, 'version']]
-    : ['npm', ['view', name, 'version']]
-  try {
-    const last = execFileSync(command[0], command[1], { encoding: 'utf8' }).trim().split(String.fromCharCode(10)).pop() ?? ''
-    // P3 (v15): npm may print notice/warning lines on stdout for some versions
-    // — only accept output that actually looks like a semver.
-    return /^\d+\.\d+\.\d+/.test(last) ? last : ''
-  } catch {
-    return ''
-  }
-}
-
 function currentGitSha() {
   const command = process.platform === 'win32'
     ? ['cmd.exe', ['/c', 'git', 'rev-parse', 'HEAD']]
@@ -111,7 +94,7 @@ function scopedPackageName(name) {
   return scope ? `${scope}/${name.slice('@deepseek-ai/'.length)}` : name
 }
 
-function releaseSpec(name, ourNames, publishedVersions, protocol = '^') {
+function releaseSpec(name, ourNames, protocol = '^') {
   if (ourNames.has(name)) return `${protocol === '~' ? '~' : '^'}${releaseVersion}`
   if (name === '@deepseek-ai/cordis') return VENDORED_CORDIS_RANGE
   if (name === '@deepseek-ai/schemastery') return VENDORED_SCHEMASTRY_RANGE
@@ -119,13 +102,15 @@ function releaseSpec(name, ourNames, publishedVersions, protocol = '^') {
   // development baseline — CI guards manifest parity with the compat anchor
   // (verify-platform-ranges.mjs, N-2).
   if (name.startsWith('@deepseek-ai/dsh-')) return `^${platformVersion}`
-  const published = publishedVersions[name]
-  if (published) return published.startsWith('^') ? published : `^${published}`
-  // Only reachable under --allow-unresolved-external (P2-17).
-  return `^${releaseVersion}`
+  // D-7 (v18): the `npm view` registry lookup that used to sit here was dead
+  // for the current dependency set — all 16 external workspace deps hit a
+  // branch above — while costing 16 network calls per pack (and a fail-loud
+  // escape hatch that could never fire). A NEW external must not silently ship
+  // our release version as its range: name it here and pin its range.
+  throw new Error(`prepare-release: no range rule for external dependency ${name} — add a branch to releaseSpec with the version range to publish`)
 }
 
-function rewritePackage(pkg, ourNames, publishedVersions, sourceDir) {
+function rewritePackage(pkg, ourNames, sourceDir) {
   pkg.version = releaseVersion
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
@@ -140,7 +125,7 @@ function rewritePackage(pkg, ourNames, publishedVersions, sourceDir) {
         // platform deps.
         const match = WORKSPACE_SPEC_RE.exec(spec)
         if (!match) throw new Error(`prepare-release: ${name} uses unsupported protocol "${spec}" — only workspace:^ / workspace:~ / workspace:* are rewritten; refusing to ship the literal`)
-        pkg[section][name] = releaseSpec(name, ourNames, publishedVersions, match[1])
+        pkg[section][name] = releaseSpec(name, ourNames, match[1])
       }
       if (rewritten !== name) {
         pkg[section][rewritten] = pkg[section][name]
@@ -261,33 +246,6 @@ mkdirSync(distNext, { recursive: true })
 mkdirSync(stagingNext, { recursive: true })
 
 const names = new Map(sourceDirs.map(dir => [readJson(join(evolutionRoot, dir, 'package.json')).name, dir]))
-const externalNames = new Set()
-for (const dir of sourceDirs) {
-  const pkg = readJson(join(evolutionRoot, dir, 'package.json'))
-  for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
-    for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
-      // R-05: every workspace protocol on a NON-family package makes
-      // it an external whose registry version must be resolved below.
-      if (typeof spec === 'string' && spec.startsWith('workspace:') && !names.has(name)) externalNames.add(name)
-    }
-  }
-}
-const publishedVersions = {}
-for (const name of externalNames) {
-  const version = registryVersion(name)
-  // P2-17: a failed/empty `npm view` used to fall through to the
-  // `^${releaseVersion}` default — silently writing OUR version into an
-  // EXTERNAL package's range and shipping it. Fail loud; the flag below is
-  // the explicit, visible exemption.
-  if (!version && !allowUnresolvedExternal) {
-    throw new Error(
-      `prepare-release: could not resolve a registry version for external dependency ${name} `
-      + '(npm view failed or returned nothing). Re-run with network access, or pass '
-      + '--allow-unresolved-external to explicitly accept a range against the local release version.',
-    )
-  }
-  publishedVersions[name] = version
-}
 
 const tarballs = []
 for (const dir of sourceDirs) {
@@ -309,7 +267,7 @@ for (const dir of sourceDirs) {
     },
   })
   const manifestPath = join(staged, 'package.json')
-  const manifest = rewritePackage(readJson(manifestPath), new Set(names.keys()), publishedVersions, dir)
+  const manifest = rewritePackage(readJson(manifestPath), new Set(names.keys()), dir)
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   for (const file of ['cordis.yml', 'cordis.patch.yml', 'agent.cordis.yml', 'preset.yml']) {
     const path = join(staged, file)
@@ -397,6 +355,20 @@ for (const item of tarballs) {
           failures.push(`${item.name}: export ${name}.${sub} -> ${value} is missing from the tarball`)
         }
       }
+    }
+  }
+  // D-8 (v18): the manifest can DECLARE a bundle/preset file the tarball does
+  // not ship — a `files` whitelist regression then publishes a package
+  // `dsh plugin add` cannot mount while every check above stays green.
+  const bundlePatch = manifest.dsh?.bundle?.patch
+  if (typeof bundlePatch === 'string' && !inShipped(bundlePatch)) {
+    failures.push(`${item.name}: manifest dsh.bundle.patch -> ${bundlePatch} is missing from the tarball`)
+  }
+  // The preset container is mountable only with BOTH compositions; the
+  // exports map is the declaration that says "this package is that container".
+  if (manifest.exports?.['./agent.cordis.yml'] !== undefined || manifest.exports?.['./preset.yml'] !== undefined) {
+    for (const rel of ['agent.cordis.yml', 'preset.yml']) {
+      if (!inShipped(rel)) failures.push(`${item.name}: preset container is missing ${rel}`)
     }
   }
 }

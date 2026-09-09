@@ -251,10 +251,21 @@ async function fsyncDirectory(path: string): Promise<void> {
 async function commitTmp(tmp: string, target: string): Promise<void> {
   try {
     await renameWithRetry(tmp, target)
-    await fsyncDirectory(dirname(target))
   } catch (error) {
     await rm(tmp, { force: true }).catch(() => {})
     throw error
+  }
+  try {
+    await fsyncDirectory(dirname(target))
+  } catch (error) {
+    // A1-15 (v18): the rename already landed, so the bytes ARE on disk and the
+    // tmp is gone. Mark the failure so the write path can still audit/notify
+    // and report "written, durability unconfirmed" instead of a plain failure
+    // that a two-phase caller would try to roll back (deleting a visible write).
+    throw Object.assign(
+      new Error(`commitTmp: ${target} was renamed but the directory fsync failed: ${error instanceof Error ? error.message : String(error)}`),
+      { committed: true, cause: error },
+    )
   }
 }
 

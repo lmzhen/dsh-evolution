@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.64 (patch) — v18 收尾批：P1 脱敏泄漏回归修复 + A 类 12 项 + B 类 7 项（C 类保持延后）
+## 0.3.64 (patch) — v18 收尾批：P1 脱敏泄漏回归修复 + A 类 12 项 + B 类 7 项 + C 类 8 项（余下 C 类延后）
 
 - **来源**：`audit-v18/`（7 份子报告）+ `optimization-plan-v18.md` + `completion-report-v18.md` + 独立审查 `dsh-evolution-mirror-independent-review-v18.md`（首轮检出 1 项 P1 回归、6 条用例失败、5 个 oxlint 错误，本版全部关闭）。
 - **行为契约变化（用户/部署可见，逐条）**：
@@ -14,9 +14,14 @@
   8. **质量分真实化**：`usageFrequency` / `stability` 改用 **`view_count` + `use_count`**（`view_count` 是 in-tree 生产者记录的加载信号，`use_count` 保留为外部宿主信号）——两个因子不再恒为常量。
   9. **事件日志写边界校验**：`appendEvolutionEvent` 拒绝无法折叠的 payload（未知 `type`、feedback 缺 `kind`/`rating`、maintain 缺 `runId`）。
   10. **pending cap 语义如实**：`PENDING_RESOLVED_CAP` 只在 resolve 路径维持；直接 `savePending` 已决记录不触发逐出（JSDoc 更正 + 边界用例）。
-- **批次要点**：**A1-13** 删除死分支（`TreeChangePlan.validate`/`preconditions`）与死字段（`SkillSummary.archived`），`WIN32_RESERVED_DEVICE_NAMES` 收回包内；**A1-17** 保护探针 fail-closed；**A1-20** 见上；**F-17** 锁名/锁体常量单源（`LOCK_SUFFIX`/`LOCK_BODY_RE`）；**F-20** 常量/正则/类型单源（`DEFAULT_SKILL_CONTENT_CHARS` 派生自 `MAX_SKILL_CONTENT_CHARS`、support/extra 名正则单源、`events.ts` 用 `ReviewKind`）；**F-16** 审计子集补 `@internal` 语义，其余过度导出按计划分批登记；**I-4** 跨 provider 共享断言补"写坏记录必须被拒"与"返回值修改不污染介质"；**I-5** 见上；**C-12** registry 同对象幂等重注册 + 代际守卫用例；**B-4** feedback `record` 明确为**外部生产者契约**（上游 `/feedback` 只写自由文本事件，无法映射 target/rating）+ 并集读判别用例；**E-3/E-11/F-14** 测试缺口按"红→绿"补齐；**Phase 0** 修 redact 泄漏、catalog 新用例 fixture、installer 三处断言与 domain fake 契约（`Table.get` 是同步 `V | undefined`）、5 处 oxlint。
-- **门禁**：`build-lib`（tsc -b 全 30 包 + tsdown）exit 0；全量 vitest `--maxWorkers=4` **110 spec / 950 用例通过**；oxlint（上游严格配置）0 warning / 0 error；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-layout-sync`（13 脚本一致、版本与 CHANGELOG head 对齐）/ `verify-profile-bundles` 全部 exit 0；installer spec 单独跑 25/25。
-- **保持延后（C 类，触发条件见 `completion-report-v18.md` §5）**：A2-4 跨进程 CAS、C-5 domain cap 原子性、C-10 json 读被写队列阻塞、A1-10 独占创建 seam、A1-15 fsync 失败回传、A2-14 curator N+1、B-11 feedback 重启重放、E-13 多 memory provider、D-5/D-7..D-10 发布链与 CI、计划 §15 非目标。
+  11. **提交后 fsync 失败不再当作"写失败"**（A1-15）：rename 已落盘、仅目录 fsync 失败时，`commitTmp` 抛出带 `committed: true` 的错误，写路径仍记 audit/发 mutation 事件并返回"已写入但持久性未确认"的告警（此前两阶段调用方会回滚/重试一次已经可见的写）。
+  12. **curator 生命周期折叠改为 CAS**（A2-4）：`foldCuratorFields` 仅在磁盘 state 仍等于本 run 起点 state 时写 lifecycle 对；被并发进程改过的名字跳过并 warn（此前跨进程双 run 可把 `archived` 回退为 `stale`）。
+  13. **domain pending cap 逐出前复检**（C-5）：删除前重读该 key，只有仍是同一条已决记录（status + `resolvedAt` 未变）才删——同 id 被并发重新挂载的活记录不会被误删。
+  14. **发布链网络依赖收敛**（D-7）：删除 `prepare-release` 中不可达的 registry 版本解析、每次 pack 的 16 次 `npm view` 与死逃生口 `--allow-unresolved-external`；遇到**新增**外部依赖时改为 fail-loud（必须在 `releaseSpec` 里显式给出 range）。
+  15. **tarball 门禁补覆盖**（D-8）：校验 `manifest.dsh.bundle.patch` 与 preset 容器的 `agent.cordis.yml`/`preset.yml` 确实在 tarball 内（此前 `files` 白名单回归会绿灯发出装不上的 bundle）。
+- **批次要点**：**A1-13** 删除死分支（`TreeChangePlan.validate`/`preconditions`）与死字段（`SkillSummary.archived`），`WIN32_RESERVED_DEVICE_NAMES` 收回包内；**A1-17** 保护探针 fail-closed；**A1-20** 见上；**F-17** 锁名/锁体常量单源（`LOCK_SUFFIX`/`LOCK_BODY_RE`）；**F-20** 常量/正则/类型单源（`DEFAULT_SKILL_CONTENT_CHARS` 派生自 `MAX_SKILL_CONTENT_CHARS`、support/extra 名正则单源、`events.ts` 用 `ReviewKind`）；**F-16** 审计子集补 `@internal` 语义，其余过度导出按计划分批登记；**I-4** 跨 provider 共享断言补"写坏记录必须被拒"与"返回值修改不污染介质"；**I-5** 见上；**C-12** registry 同对象幂等重注册 + 代际守卫用例；**B-4** feedback `record` 明确为**外部生产者契约**（上游 `/feedback` 只写自由文本事件，无法映射 target/rating）+ 并集读判别用例；**E-3/E-11/F-14** 测试缺口按"红→绿"补齐；**D-5** release.yml 与 evolution-validate 的 5 个 Action 全部固定 commit SHA；**D-9** `copy_host_tsconfig` 的现状如实注释（`tsc -b tsconfig.host.json` 目前会报测试文件类型错，接线需先修那些错）；**D-10** publish 取 baseline 产物这一取舍写入 workflow 注释；**Phase 0** 修 redact 泄漏、catalog 新用例 fixture、installer 三处断言与 domain fake 契约（`Table.get` 是同步 `V | undefined`）、5 处 oxlint。
+- **门禁**：`build-lib`（tsc -b 全 30 包 + tsdown）exit 0；全量 vitest `--maxWorkers=4` **110 spec / 953 用例通过**；oxlint（上游严格配置）0 warning / 0 error；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-layout-sync`（13 脚本一致、版本与 CHANGELOG head 对齐）/ `verify-profile-bundles` 全部 exit 0；installer spec 单独跑 25/25。
+- **保持延后（C 类，触发条件见 `completion-report-v18.md` §5）**：C-10 json 读被写队列阻塞（架构性）、A1-10 独占创建 seam（计划判定不划算）、A2-14 curator N+1（无实测）、B-11 feedback 重启重放（需新 API）、E-13 多 memory provider（假想需求）、计划 §15 非目标。
 
 ## 0.3.63 (patch) — v15→v17 三轮"全量审计 → 修复 → 再审计"闭环（116 项检出，修 107 / 登记 9）
 

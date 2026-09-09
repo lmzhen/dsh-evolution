@@ -4,6 +4,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { applyCuratorFields, emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 describe('usage sidecar field normalization (P2-3)', () => {
+  it('A2-4 (v18): the lifecycle fold is compare-and-set on the run-start state', () => {
+    const make = (state: 'active' | 'stale' | 'archived') => ({ ...emptyRecord(), state, archived_at: state === 'archived' ? '2026-01-01T00:00:00.000Z' : null })
+    const curated = new Map([['a', make('stale')]])
+    // The disk moved to `archived` after this run read `active` — a concurrent
+    // curator's archive must win, not be reverted to this run's stale snapshot.
+    const disk = new Map([['a', make('archived')]])
+    expect(foldCuratorFields(disk, curated, new Set(['a']), new Map([['a', 'active']]))).toEqual(['a'])
+    expect(disk.get('a')?.state).toBe('archived')
+    // A matching run-start state still folds the lifecycle pair.
+    const disk2 = new Map([['a', make('active')]])
+    expect(foldCuratorFields(disk2, curated, new Set(['a']), new Map([['a', 'active']]))).toEqual([])
+    expect(disk2.get('a')?.state).toBe('stale')
+    // A name this run did NOT transition folds only the meta pair (H-1 intact).
+    const disk3 = new Map([['a', make('archived')]])
+    expect(foldCuratorFields(disk3, curated, new Set(), new Map([['a', 'active']]))).toEqual([])
+    expect(disk3.get('a')?.state).toBe('archived')
+  })
+
   it('V6-20: a top-level ARRAY sidecar reads as empty — no phantom "0"/"1" records (0.3.37)', async () => {
     // `Object.entries([...])` produced "0"/"1" phantom skill records and the
     // RMW would persist them as an object map — the one guard the entry

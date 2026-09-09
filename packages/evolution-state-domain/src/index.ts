@@ -326,6 +326,17 @@ export function apply(ctx: Context): void {
           resolvedEntries.sort((a, b) => resolvedAtMs(a.record) - resolvedAtMs(b.record))
           const evicted = resolvedEntries.slice(0, Math.max(0, resolvedEntries.length - SEAM_PENDING_RESOLVED_CAP))
           for (const entry of evicted) {
+            // C-5 (v18): the entries() snapshot and this delete are separate
+            // operations, and the domain seam has no conditional write — a
+            // concurrent savePending can re-mount the SAME key as a live
+            // pending record in between (third-party/hand-written ids; in-tree
+            // mounts use randomUUID). Re-read and refuse to evict unless the
+            // record is still the resolved one the snapshot measured.
+            const current = table.get(entry.key)
+            const stillResolved = current !== undefined
+              && (current.status === 'approved' || current.status === 'rejected')
+              && current.resolvedAt === entry.record.resolvedAt
+            if (!stillResolved) continue
             await table.delete(entry.key).catch((error: unknown) => {
               ctx.logger.warn(`evolution-state-domain: pending-cap eviction for "${entry.key}" failed (will retry on the next resolve): ${error instanceof Error ? error.message : String(error)}`)
             })

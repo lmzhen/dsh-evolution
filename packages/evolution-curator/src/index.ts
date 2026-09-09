@@ -688,6 +688,10 @@ export class EvolutionCurator extends Service {
     const rawUsage: UsageMap = await loadUsage(root, this.io)
     // Dry-run computes on clones so the persisted lifecycle state is untouched.
     const usage: UsageMap = dryRun ? new Map([...rawUsage].map(([name, record]) => [name, { ...record }])) : rawUsage
+    // A2-4 (v18): the lifecycle state each name had at RUN START — the
+    // transitions engine below mutates `usage` in place, so this snapshot is
+    // the only basis the fold can compare-and-set against.
+    const runStartStates = new Map([...usage].map(([name, record]) => [name, record.state as string]))
     const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
     // One GateSet instance per run (decision B) shared by the lifecycle
@@ -768,6 +772,8 @@ export class EvolutionCurator extends Service {
       // 'active'), and a concurrent curator run's archive/restore must never be
       // reverted by a stale snapshot.
       stateOwned: new Set([...result.transitions.map(t => t.name), ...archiveCandidates]),
+      // A2-4 (v18): the CAS basis for the lifecycle fold (see runStartStates).
+      runStartStates,
       failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
     })
     if (!dryRun) this.lastRun = Date.now()
@@ -934,6 +940,8 @@ export class EvolutionCurator extends Service {
     recommendPool: Set<string>
     /** Names this run actually transitioned (rc.72 H-1 lifecycle ownership). */
     stateOwned?: ReadonlySet<string>
+    /** A2-4 (v18): run-start lifecycle state per name, the CAS basis for the fold. */
+    runStartStates?: ReadonlyMap<string, string>
   }): Promise<{
     archivedSkills: Array<{ name: string; path: string; reason: string }>
     errors: string[]
@@ -942,6 +950,7 @@ export class EvolutionCurator extends Service {
   }> {
     if (input.dryRun) return { archivedSkills: [], errors: [], suppressedChanged: false, consolidated: [] }
     const { archiveCandidates, nominations, treeNames, usage, bundledNames, suppressedNames, root, failedFrom } = input
+    const runStartStates = input.runStartStates
     const errors: string[] = []
     const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
     const executedConsolidations: CuratorConsolidation[] = []
@@ -1124,7 +1133,15 @@ export class EvolutionCurator extends Service {
       // same transact-backed mutateUsage the tool side uses, at FIELD
       // granularity — a whole-record set would clobber a concurrent tool-side
       // counter bump between the run-start load and this save.
-      await mutateUsage(root, this.io, (disk) => { foldCuratorFields(disk, usage, stateOwned) })
+      // A2-4 (v18): the lifecycle pair is compare-and-set against the run-start
+      // state; names a concurrent process moved are reported and left alone.
+      let skipped: string[] = []
+      await mutateUsage(root, this.io, (disk) => {
+        skipped = foldCuratorFields(disk, usage, stateOwned, runStartStates)
+      })
+      if (skipped.length > 0) {
+        this.ctx.logger.warn(`evolution-curator: lifecycle fold skipped ${skipped.length} name(s) whose on-disk state moved during the run (a concurrent curator/tool won): ${skipped.join(', ')}`)
+      }
     } catch {
       // Best-effort: curation decisions already landed; a failed usage flush
       // must not surface as a run error after the fact.

@@ -117,9 +117,11 @@ describe('memory-files', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(MemoryFiles, { root, providerName: 'custom-files', addDatePrefix: true })
-    // The provider is reachable under the CONFIGURED name, not the default.
-    await ctx.memory.applyBatch('custom-files', [{ action: 'add', facts: 'prefixed fact' }])
-    const entries = await ctx.memory.read('custom-files')
+    // The provider registers under the CONFIGURED name; the memory/user TARGETS
+    // are a separate axis and stay unchanged.
+    expect(ctx.memory.provider('custom-files').name).toBe('custom-files')
+    await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'prefixed fact' }])
+    const entries = await ctx.memory.read('memory')
     expect(entries.some(entry => /^## \d{4}-\d{2}-\d{2}\nprefixed fact$/.test(entry))).toBe(true)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })

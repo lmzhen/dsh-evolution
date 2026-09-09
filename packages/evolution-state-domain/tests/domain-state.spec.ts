@@ -250,4 +250,44 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
     expect(resolved.some(r => r.id === 'p1')).toBe(true)
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('C-5 (v18): the cap eviction re-reads and never deletes a key re-mounted as a live record', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    const records = new Map<string, Record<string, unknown>>()
+    const deleted: string[] = []
+    const liveRemount = { id: 'p0', kind: 'memory', summary: 're-mounted', args: {}, createdAt: 'now', status: 'pending' }
+    // 201 resolved records + one to resolve, so TWO evictions are due: p0
+    // (re-mounted live → skipped) and p1 (still resolved → evicted).
+    for (let i = 0; i < 201; i += 1) {
+      records.set(`p${i}`, { id: `p${i}`, kind: 'memory', summary: `p${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString() })
+    }
+    records.set('pusher', { id: 'pusher', kind: 'memory', summary: 'pusher', args: {}, createdAt: 'now', status: 'pending' })
+    ctx.provide('storageDomain', {
+      open: async () => ({
+        table: () => ({
+          // The snapshot still lists p0 as resolved (it was taken before the
+          // re-mount), while the re-read sees the LIVE record a concurrent
+          // savePending put back under the same key.
+          get: (key: string) => (key === 'p0' ? liveRemount : records.get(key)),
+          put: async (key: string, value: unknown) => { records.set(key, value as Record<string, unknown>) },
+          delete: async (key: string) => { deleted.push(key); records.delete(key) },
+          entries: () => records.entries(),
+          update: async (key: string, fn: (current: never) => never) => {
+            const next = fn(records.get(key) as never) as Record<string, unknown>
+            records.set(key, next)
+            return next
+          },
+        }),
+        close: async () => {},
+      }) as never,
+    })
+    await ctx.plugin(DomainState)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    expect((await provider.tryResolvePending('pusher', 'approved')).applied).toBe(true)
+    // p0 was re-mounted as a live pending record: the eviction must skip it…
+    expect(deleted).not.toContain('p0')
+    // …while the next-oldest resolved record still gets evicted (the loop ran).
+    expect(deleted).toContain('p1')
+  })
 })

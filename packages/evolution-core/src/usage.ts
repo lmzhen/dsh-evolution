@@ -215,7 +215,15 @@ export function applyCuratorMetaFields(disk: UsageRecord, curated: UsageRecord):
  * transitioned — a concurrent curator run's archive/restore is never reverted
  * by a stale snapshot; without it both pairs apply everywhere.
  */
-export function foldCuratorFields(disk: UsageMap, curated: UsageMap, stateOwned?: ReadonlySet<string>): void {
+export function foldCuratorFields(
+  disk: UsageMap,
+  curated: UsageMap,
+  stateOwned?: ReadonlySet<string>,
+  runStartStates?: ReadonlyMap<string, string>,
+): string[] {
+  // A2-4 (v18): names whose lifecycle fold was REFUSED because the on-disk
+  // state no longer equals the run-start state (another process moved them).
+  const skipped: string[] = []
   for (const [name, record] of curated) {
     const diskRecord = disk.get(name)
     if (!diskRecord) {
@@ -223,8 +231,22 @@ export function foldCuratorFields(disk: UsageMap, curated: UsageMap, stateOwned?
       continue
     }
     applyCuratorMetaFields(diskRecord, record)
-    if (stateOwned === undefined || stateOwned.has(name)) applyCuratorLifecycleFields(diskRecord, record)
+    if (stateOwned === undefined || stateOwned.has(name)) {
+      // A2-4 (v18): compare-and-set on the lifecycle pair. The run-start state
+      // is the basis this run decided from; a different on-disk state means a
+      // concurrent run/process already moved the skill, and its archive or
+      // restore must win rather than be reverted to this run's stale snapshot.
+      // An unknown start state keeps the previous behavior — the name is in
+      // `stateOwned` precisely because this run transitioned it.
+      const expected = runStartStates?.get(name)
+      if (expected !== undefined && diskRecord.state !== expected) {
+        skipped.push(name)
+        continue
+      }
+      applyCuratorLifecycleFields(diskRecord, record)
+    }
   }
+  return skipped
 }
 
 /** Whole-file usage write (V6-37, 0.3.37): this is the ONE path that bypasses

@@ -874,12 +874,30 @@ export class SkillLibrary {
       // an existing file is preserved and a missing one stays missing (M-4).
       return o.write ?? (current ?? null)
     }
+    let durabilityWarning = ''
+    const committedOnly = (error: unknown): boolean => (error as { committed?: unknown } | undefined)?.committed === true
     if (this.transact) {
-      await this.transact(this.io, path, run)
+      try {
+        await this.transact(this.io, path, run)
+      } catch (error) {
+        // A1-15 (v18): the rename landed and only the parent-directory fsync
+        // failed. The bytes are visible, so this is NOT a failed write: keep the
+        // audit/event below and report the durability warning instead of
+        // letting a caller roll back (or retry) a write that already happened.
+        if (!committedOnly(error)) throw error
+        durabilityWarning = error instanceof Error ? error.message : String(error)
+      }
     } else {
       const current = await this.io.readText(path)
       const next = await run(current)
-      if (next !== null && next !== current) await this.io.writeText(path, next)
+      if (next !== null && next !== current) {
+        try {
+          await this.io.writeText(path, next)
+        } catch (error) {
+          if (!committedOnly(error)) throw error
+          durabilityWarning = error instanceof Error ? error.message : String(error)
+        }
+      }
     }
     const o = outcome
     // V6-19 (0.3.37): a transact backend that violates the contract (never
@@ -893,7 +911,11 @@ export class SkillLibrary {
       await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary)
     }
     if (o.write !== null && o.event) this.notifyMutation(o.event)
-    return o.result
+    // A1-15 (v18): audit and the mutation event ran even when only the fsync
+    // failed — say so in the result instead of pretending the write failed.
+    return durabilityWarning === '' || !o.result.ok
+      ? o.result
+      : { ...o.result, message: `${o.result.message} (warning: the write landed but the directory fsync failed — durability unconfirmed: ${durabilityWarning})` }
   }
 
   /** Notify the mutation observer after a successful write; observers must never fail the mutation. */
@@ -2059,9 +2081,18 @@ export class SkillLibrary {
       landing.push({ target: write.target, content: write.content, previous })
     }
     const written: Array<{ target: string; previous: string | null }> = []
+    let durabilityWarning = ''
     try {
       for (const entry of landing) {
-        await this.io.writeText(entry.target, entry.content)
+        try {
+          await this.io.writeText(entry.target, entry.content)
+        } catch (error) {
+          // A1-15 (v18): a post-rename dir-fsync failure means the bytes DID
+          // land — rolling back would delete a visible write, and the audit/
+          // event below must still run. Record it and keep going.
+          if ((error as { committed?: unknown } | undefined)?.committed !== true) throw error
+          durabilityWarning = error instanceof Error ? error.message : String(error)
+        }
         written.push({ target: entry.target, previous: entry.previous })
       }
     } catch (error) {
@@ -2078,7 +2109,13 @@ export class SkillLibrary {
     }
     await this.audit(name, plan.auditAction, md, landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')?.content ?? md, plan.auditSummary)
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
-    return { ok: true, message: `${plan.eventAction} "${name}" succeeded.`, path: dir }
+    return {
+      ok: true,
+      message: durabilityWarning === ''
+        ? `${plan.eventAction} "${name}" succeeded.`
+        : `${plan.eventAction} "${name}" succeeded (warning: the write landed but the directory fsync failed — durability unconfirmed: ${durabilityWarning})`,
+      path: dir,
+    }
   }
 
   /**

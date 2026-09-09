@@ -792,3 +792,31 @@ it('E-11 (v18): list() publishes the frontmatter whenToUse routing hint', async 
   expect(summary?.whenToUse).toBe('Use for routing checks.')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
+
+it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a durability warning', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-durability-'))
+  await new SkillLibrary(root).create('durable-skill', SKILL.replace('python-testing', 'durable-skill'), 'foreground')
+  const base = nodeEvolutionIo()
+  // The rename landed; only the parent-directory fsync failed (the marker the
+  // io layer attaches). A plain failure would make the caller roll back — or
+  // retry — a write that is already visible on disk.
+  const io = {
+    ...base,
+    // Drop the transact seam so the store takes its single-write path and calls
+    // THIS writeText (the node backend's transact writes through module-level
+    // helpers and would bypass the injected failure).
+    transact: undefined,
+    writeText: async (path: string, content: string) => {
+      await base.writeText(path, content)
+      throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
+    },
+  }
+  const lib = new SkillLibrary(root, io)
+  const updated = await lib.update('durable-skill', SKILL.replace('python-testing', 'durable-skill').replace('Run tests with pytest.', 'Updated after the fsync failure.'), 'foreground')
+  expect(updated.ok).toBe(true)
+  expect(updated.message).toContain('durability unconfirmed')
+  // The bytes ARE on disk and the audit trail recorded the write.
+  expect(await lib.read('durable-skill')).toContain('Updated after the fsync failure.')
+  expect((await lib.listMutations()).some(m => m.skillName === 'durable-skill' && m.action === 'update')).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
