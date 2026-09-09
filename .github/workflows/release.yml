@@ -56,6 +56,12 @@ jobs:
         id: upstream
         shell: bash
         run: |
+          # P3 (v15) anchor semantics: UPSTREAM_SHA is the DEV baseline
+          # (validate-only job) and may trail the release tag by many commits;
+          # the compat job below pins the RELEASE tree via dsh-v${PLATFORM_VERSION}.
+          # A trailing SHA is expected, not an error — do not "fix" it upward
+          # without re-running the full dev-tree typecheck against the newer
+          # upstream project graph.
           SHA="$(tr -d '[:space:]' < UPSTREAM_SHA)"
           test -n "$SHA"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"

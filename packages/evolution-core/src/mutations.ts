@@ -39,19 +39,25 @@ export function contentHash(content: string): string {
 function parseMutationRecords(raw: string | null): MutationRecord[] {
   if (raw === null) return []
   try {
-    const parsed = JSON.parse(raw) as unknown
-    const records = Array.isArray(parsed)
-      ? parsed
-      : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { records?: unknown }).records)
-        ? (parsed as { records: unknown[] }).records
-        : []
-    return records.filter((entry): entry is MutationRecord =>
-      typeof entry === 'object' && entry !== null && typeof (entry as MutationRecord).skillName === 'string'
-      && typeof (entry as MutationRecord).action === 'string'
-      && typeof (entry as MutationRecord).at === 'string')
+    return recordsFromParsed(JSON.parse(raw) as unknown)
   } catch {
     return []
   }
+}
+
+/** Field-level shape guard shared by the parse and the recordMutation write
+ * path (P3/v15: the guard's JSON.parse and this parse used to run twice over
+ * the same bytes inside one transact). */
+function recordsFromParsed(parsed: unknown): MutationRecord[] {
+  const records = Array.isArray(parsed)
+    ? parsed
+    : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { records?: unknown }).records)
+      ? (parsed as { records: unknown[] }).records
+      : []
+  return records.filter((entry): entry is MutationRecord =>
+    typeof entry === 'object' && entry !== null && typeof (entry as MutationRecord).skillName === 'string'
+    && typeof (entry as MutationRecord).action === 'string'
+    && typeof (entry as MutationRecord).at === 'string')
 }
 
 export async function loadMutations(root: string, io: EvolutionIoLike = nodeEvolutionIo()): Promise<MutationRecord[]> {
@@ -70,16 +76,26 @@ export async function recordMutation(
   // read and write and lose an audit record.
   await transactIo(io, mutationsFile(root), (current) => {
     // P3 (v3 audit): never overwrite a malformed audit file with a re-serialized empty.
+    // P3 (v15): parse exactly ONCE — the malformed guard and the record
+    // extraction used to JSON.parse the same bytes twice inside one transact
+    // (the guard distinguishes malformed-JSON-preserve from
+    // valid-but-shapeless-migrate, which is why the two checks are separate
+    // even though the parse is shared).
+    let parsed: unknown = []
     if (current !== null) {
-      try { JSON.parse(current) } catch {
-        // C-08: the drop used to be fully silent; warn once so a
-        // corrupted audit file is observable. Still best-effort — no retry,
-        // and the mutation itself never fails on auditing.
+      try {
+        parsed = JSON.parse(current)
+      } catch {
+        // C-08: the drop is not silent — every append against the malformed
+        // file warns (the wording used to claim "warn once"; the guard has no
+        // once-guard and each dropped append is independently worth seeing).
+        // Still best-effort — no retry, and the mutation itself never fails
+        // on auditing.
         console.warn(`mutation audit record dropped: ${mutationsFile(root)} is malformed and was not overwritten`)
         return current
       }
     }
-    const existing = parseMutationRecords(current)
+    const existing = recordsFromParsed(parsed)
     existing.push(record)
     const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing
     return JSON.stringify({ version: MUTATIONS_FILE_VERSION, records: trimmed }, null, 2)

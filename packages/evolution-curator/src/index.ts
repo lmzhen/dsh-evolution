@@ -6,7 +6,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { BlockAssembler, createUserMessage, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
@@ -107,6 +107,12 @@ export function gateConsolidations(
 ): CuratorConsolidation[] {
   // Decision B: the same GateSet the lifecycle engine reads - and it now also
   // blocks protected builtins (e.g. `plan`) that the name-set check missed.
+  // P3 (v15, verification pending): this gate covers marker/name protection for
+  // BOTH directions, but the merge-executor's own marker check is the last
+  // line of defence for `into` — `SkillLibrary.consolidate` calls
+  // `writeProtection(targetName)` (see skill-store.ts consolidate) and refuses
+  // pinned/bundled targets on its own. If that ever stops holding, this is
+  // where a `into` marker pre-filter must be added.
   const gateSet = gates instanceof EvolutionGateSet ? gates : new EvolutionGateSet(gates)
   return consolidations.filter(n => !gateSet.isBlocked(n.from) && !gateSet.isBlocked(n.into))
 }
@@ -135,7 +141,11 @@ export class EvolutionCurator extends Service {
     referencedSkillNames: z.array(z.string()).default([]),
     autoStart: z.boolean().default(true),
     // bootGraceSeconds 0 is a legitimate "no grace" (setTimeout(0)); negative
-    // values are rejected.
+    // values are rejected. C2 (v15): the 32-bit setTimeout ceiling is enforced
+    // at the ASSEMBLY clamp (`field(..., max)`) — the schema stays min-only so
+    // NaN/±Infinity keep passing through to the clamp (G3.1 doctrine), while a
+    // valid-but-huge number falls back to the default instead of arming a
+    // timer Node would fire immediately.
     bootGraceSeconds: z.number().min(0).default(DEFAULT_CURATOR_BOOT_GRACE_SECONDS),
     curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS),
     healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
@@ -166,7 +176,6 @@ export class EvolutionCurator extends Service {
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
   private bootCheck: NodeJS.Timeout | undefined
-  private running = false
   /** 0.3.18 (E-18): stateless first-run defer fires ONCE per process — the
    * in-memory clock is seeded and later due runs must proceed, or the
    * persisted===null defer repeats forever (no state service to persist). */
@@ -188,8 +197,8 @@ export class EvolutionCurator extends Service {
     // `bootGraceSeconds` legitimately allow 0; every other numeric field clamps
     // to at least 1. Warn once when a user-supplied value had to be corrected.
     const clamped: string[] = []
-    const field = (name: string, value: number | undefined, fallback: number, min: number): number => {
-      const result = clampedNumber(value, fallback, { min })
+    const field = (name: string, value: number | undefined, fallback: number, min: number, max?: number): number => {
+      const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
       if (value !== undefined && result !== value) clamped.push(name)
       return result
     }
@@ -205,7 +214,7 @@ export class EvolutionCurator extends Service {
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
-    this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0)
+    this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0, 3600)
     this.curatorReviewMaxTokens = field('curatorReviewMaxTokens', config.curatorReviewMaxTokens, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1)
     this.healthSoftBodyChars = field('healthSoftBodyChars', config.healthSoftBodyChars, DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1)
     this.healthStampDensityPerKb = field('healthStampDensityPerKb', config.healthStampDensityPerKb, DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1)
@@ -322,7 +331,7 @@ export class EvolutionCurator extends Service {
       const stateService = this.curatorStateService()
       if (stateService === undefined && !this.statelessStateWarned) {
         this.statelessStateWarned = true
-        this.ctx.logger.warn('evolution-curator: evolution-state is not mounted — the curation interval baseline is this process\'s lifetime only (default interval 168h), so automatic curation will not fire again until the process has been alive that long. Mount evolution-state (evolution-host/all bundle) for a durable schedule.')
+        this.ctx.logger.warn(`evolution-curator: evolution-state is not mounted — the curation interval baseline is this process's lifetime only (default interval ${DEFAULT_CURATOR_INTERVAL_HOURS}h), so automatic curation will not fire again until the process has been alive that long. Mount evolution-state (evolution-host/all bundle) for a durable schedule.`)
       }
       const persisted = await stateService?.loadCuratorState()
       const last = persisted?.lastRunAt ?? this.lastRun
@@ -365,14 +374,12 @@ export class EvolutionCurator extends Service {
   async recommend(candidates: string[], options: { dryRun?: boolean } = {}): Promise<CuratorNominations> {
     const empty: CuratorNominations = { prunings: [], consolidations: [], warnings: [] }
     if (candidates.length === 0) return empty
-    const llm = this.ctx.get('llm') as {
-      stream(options: {
-        provider: string
-        model: string
-        messages: unknown[]
-        maxTokens: number
-      }): AsyncIterable<StreamChunk>
-    } | undefined
+    // P2-13 (v15): consume the REAL upstream type instead of a hand-written
+    // structural cast — an upstream field rename/signature drift now fails
+    // `tsc` at the mirror instead of breaking at runtime after an upgrade.
+    // The hand-written shape was: { stream(options: { provider; model;
+    // messages: unknown[]; maxTokens }) }.
+    const llm = this.ctx.get('llm')
     if (!llm) return empty
     const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } | undefined } | undefined
     const model = policy?.get()?.curatorModel ?? 'deepseek-v4-pro'
@@ -502,18 +509,28 @@ export class EvolutionCurator extends Service {
    * skipped with an explicit `already-running` outcome.
    */
   async run(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
-    if (this.running) {
+    // P1 (v16): run() joins the SAME control-plane mutex as restore/consolidate.
+    // The skip decision is made on `mutexDepth` BEFORE enqueueing: a manual run
+    // arriving behind a queued restore/in-flight run skips (E-7 semantics
+    // preserved); a restore arriving behind a run queues (P2-5 semantics).
+    // mutexDepth is incremented SYNCHRONOUSLY inside acquireMutex, so this
+    // check is atomic with respect to every other entrant's request.
+    if (this.mutexDepth > 0) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport('already-running', new Date().toISOString()),
         skipped: 'already-running',
       }
     }
-    this.running = true
+    const release = await this.acquireMutex()
     try {
       return await this.runCore(options)
     } finally {
-      this.running = false
+      // P3 (v17): release FIRST — everything after it (retention, logging)
+      // must not be able to hold the mutex hostage (a synchronous throw from
+      // logger.warn would otherwise leave mutexDepth permanently elevated and
+      // silently kill the whole control plane).
+      release()
       // V4-22: recycle the report history on EVERY run end (success or failure).
       // Previously retention only ran on the successful report-write path, so a
       // host that kept throwing accumulated curator-error-*.json unbounded.
@@ -523,6 +540,36 @@ export class EvolutionCurator extends Service {
         this.ctx.logger.warn(`evolution-curator: failed to retain reports: ${error instanceof Error ? error.message : String(error)}`)
       }
     }
+  }
+
+  /**
+   * P1 (v16): the control-plane mutex — ONE promise chain serializing run(),
+   * restore() and consolidate(). Replaces the v15 draft (`running` flag +
+   * `runSettled` polling), which could (a) spin forever on an
+   * already-resolved promise while a control-plane mutator held the flag
+   * (micro-task starvation: the flag's reset lives behind IO the spun loop
+   * never lets run) and (b) let two queued waiters wake into the same idle
+   * window and mutate concurrently. Here the chain IS the mutex: an entrant
+   * increments `mutexDepth` synchronously (so run()'s skip check sees queued
+   * work), awaits the previous tail, and the returned release resolves the
+   * tail for the next entrant. Double-release is a no-op.
+   */
+  private mutexDepth = 0
+  private mutexTail: Promise<void> = Promise.resolve()
+
+  private acquireMutex(): Promise<() => void> {
+    this.mutexDepth += 1
+    const prev = this.mutexTail
+    let releaseMutex!: () => void
+    this.mutexTail = new Promise<void>(resolve => { releaseMutex = resolve })
+    let released = false
+    const release = (): void => {
+      if (released) return
+      released = true
+      this.mutexDepth -= 1
+      releaseMutex()
+    }
+    return prev.then(() => release)
   }
 
   private async runCore(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
@@ -721,20 +768,29 @@ export class EvolutionCurator extends Service {
     // the whole read → transform → write now runs as ONE atomic
     // transactCuratorState, and `current` is the value at its queue slot, so a
     // concurrent setPaused's update is never overwritten by a stale snapshot.
-    await stateService?.transactCuratorState((current) => {
-      const pausedNow = current?.paused ?? false
-      return {
-        schemaVersion: 1,
-        // E-51 (S5.6): a fresh-install manual run must anchor the interval
-        // baseline at the run's OWN time, not the process-construction clock
-        // (`this.lastRun`); take Date.now() at the save point. A dry-run is a
-        // preview: it must not push the next scheduled pass out.
-        lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : Date.now(),
-        runCount: dryRun ? (persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
-        lastSummary: summary,
-        paused: pausedNow,
-      }
-    })
+    // C1 (v15): best-effort like every other run-side persistence (report/
+    // suppressed/usage all catch) — a state-storage failure must not turn the
+    // already-landed mutations into a thrown run; the cost is a missing
+    // runCount tick and a repeat tick next hour (E-15 makes the rerun
+    // idempotent), instead of an unhandled run failure.
+    try {
+      await stateService?.transactCuratorState((current) => {
+        const pausedNow = current?.paused ?? false
+        return {
+          schemaVersion: 1,
+          // E-51 (S5.6): a fresh-install manual run must anchor the interval
+          // baseline at the run's OWN time, not the process-construction clock
+          // (`this.lastRun`); take Date.now() at the save point. A dry-run is a
+          // preview: it must not push the next scheduled pass out.
+          lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : Date.now(),
+          runCount: dryRun ? (persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
+          lastSummary: summary,
+          paused: pausedNow,
+        }
+      })
+    } catch (error) {
+      this.ctx.logger.warn(`evolution-curator: failed to persist run bookkeeping: ${error instanceof Error ? error.message : String(error)}`)
+    }
     return {
       stale: result.markStale,
       archived: archivedSkills.map(item => item.name),
@@ -768,6 +824,11 @@ export class EvolutionCurator extends Service {
 
   /**
    * F13 six-factor quality scoring, persisted onto the usage records.
+   * P1-1 (v15): these are the CURATOR-owned fields (`quality_score`/
+   * `quality_warn`) — this method must never touch the feedback-owned
+   * `feedback_*` pair (the lifecycle engine reads the union of both warn
+   * flags, so overwriting feedback here is what used to make negative
+   * feedback decision-irrelevant; field ownership on `UsageRecord`).
    */
   private async scoreTree(usage: UsageMap, treeNames: Set<string>): Promise<void> {
     const supportDirs = new Map<string, number>()
@@ -1217,6 +1278,18 @@ export class EvolutionCurator extends Service {
    * records into `archived` state. Snapshot-then-mutate, never a hard delete.
    */
   async consolidate(target: string, sources: string[]): Promise<SkillActionResult> {
+    // P2-5 (v15)/v16: join the control-plane mutex — the mutation serializes
+    // behind any in-flight run/restore/consolidate, and a run attempting to
+    // start during the mutation gets the clean `already-running` skip.
+    const release = await this.acquireMutex()
+    try {
+      return await this.consolidateMutate(target, sources)
+    } finally {
+      release()
+    }
+  }
+
+  private async consolidateMutate(target: string, sources: string[]): Promise<SkillActionResult> {
     // Control-plane gate (rc.42 audit P1-8): the manual path once checked
     // only excludeSkillNames, bypassing the referenced/suppressed/protected
     // protections the automated nomination gate enforces. The same GateSet
@@ -1254,6 +1327,17 @@ export class EvolutionCurator extends Service {
    * and reset its usage state, keeping the recoverable-archive invariant.
    */
   async restore(name: string): Promise<SkillActionResult> {
+    // P2-5 (v15)/v16: join the control-plane mutex (same fold-ownership race
+    // as consolidate).
+    const release = await this.acquireMutex()
+    try {
+      return await this.restoreMutate(name)
+    } finally {
+      release()
+    }
+  }
+
+  private async restoreMutate(name: string): Promise<SkillActionResult> {
     await this.snapshotFull('pre-restore')
     const result = await this.skills.restoreFromArchive(name)
     if (!result.ok) return result

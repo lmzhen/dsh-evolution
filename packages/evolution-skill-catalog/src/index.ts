@@ -79,14 +79,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let control: SkillProviderControl | undefined
   // 0.3.18 (S4.5, X-7): process-internal summaries cache — every `get()` used
   // to run a full tree scan (read + parse every SKILL.md). Dropped on
-  // `evolution/skill-mutated` (in-band writes). The root-mtime probe below is
-  // a best-effort SECOND signal: it only notices a change to the skills root
-  // DIRECTORY itself, so a nested skill's content edit, or a change that does
-  // not touch the root's mtime, is NOT detected — the E-71 test pins that
-  // (`catalog.spec.ts`: a new skill directory stays invisible until
-  // `evolution/skills-refresh`). Out-of-band changes therefore require the
-  // explicit refresh (decision C keeps no filesystem watcher); see README
-  // Known Limitations.
+  // `evolution/skill-mutated` (in-band writes) and on `evolution/skills-refresh`.
+  // P3 (v15, A1 correction; refined v16 after upstream re-read): the
+  // root-mtime probe is a best-effort SECOND signal that only fires when this
+  // provider is CONSULTED — it is not the reason an out-of-band write stays
+  // invisible from `ctx.skills.list()`. E-71's pinned invisibility comes from
+  // the UPSTREAM skill registry: `snapshot()`/`list()` resolve against the
+  // collectCache and never call providers until a `control.invalidate()`
+  // bumps the revision (the refresh event / `evolution/skill-mutated` do
+  // that; a new root-level directory DOES touch the root's mtime, so the
+  // probe itself would catch it — if it were ever asked). `ctx.skills.get()`
+  // of an ALREADY-INDEXED name still calls `provider.get()` per invocation,
+  // so an out-of-band CONTENT edit becomes visible there immediately (with a
+  // stale description from the summaries cache); a NEW name stays invisible.
+  // Out-of-band structural changes therefore require the explicit refresh
+  // (decision C keeps no filesystem watcher); see README Known Limitations.
   let summariesCache: SkillSummary[] | null = null
   let summariesStamp: number | null = null
   async function summaries(): Promise<SkillSummary[]> {

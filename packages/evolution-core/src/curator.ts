@@ -315,8 +315,12 @@ export function computeScopeView(
     if (record.pinned || bundled || suppressed || protectedNames?.has(name) === true || isBuiltin) protectedSet.add(name)
     if (lifecycleCandidate(name, record, config, bundled, gateSet, protectedNames)) {
       managed.push(name)
-      if (record.state === 'stale' || record.quality_warn === true) watched.push(name)
-      if (record.quality_warn === true) qualityWarned.push(name)
+      // P1-1 (v15): the warn buckets read the UNION of the curator six-factor
+      // pair and the feedback pair (same union as the lifecycle engine's
+      // stale-window decision, so the view predicts the engine).
+      const warned = record.quality_warn === true || record.feedback_warn === true
+      if (record.state === 'stale' || warned) watched.push(name)
+      if (warned) qualityWarned.push(name)
     }
   }
   return {
@@ -356,7 +360,14 @@ export function computeLifecycleTransitions(
     if (record.use_count === 0 && age < config.staleAfterDays) continue
 
     const idle = daysSince(latestActivityAt(record), record.created_at, now.getTime())
-    const qualityWarn = record.quality_warn === true
+    // P1-1 (v15): the warn state is the UNION of the curator-owned six-factor
+    // pair and the feedback-owned pair — negative feedback must shorten the
+    // stale window (that is the feedback package's entire advertised purpose).
+    // The v15 audit found the feedback pair never reached this point alive
+    // (scoreTree overwrote quality_warn first); the union read plus the
+    // feedback-owned field close the dead channel. Field ownership:
+    // see `UsageRecord` in usage.ts.
+    const qualityWarn = record.quality_warn === true || record.feedback_warn === true
     const staleAfterDays = qualityWarn && config.qualityWarnStaleAfterDays !== undefined
       ? config.qualityWarnStaleAfterDays
       : config.staleAfterDays
@@ -368,8 +379,16 @@ export function computeLifecycleTransitions(
         result.archive.push(name)
       } else if (idle >= staleAfterDays) {
         record.state = 'stale'
+        // P3 (v16/v17): attribute the warn source so a curator report can tell
+        // a user's negative feedback apart from the six-factor score. Tie-break
+        // (both flags true): FEEDBACK wins — it is the more informative,
+        // user-visible signal; both sources apply the same short window, so
+        // this is report attribution only.
+        const warnSource = record.feedback_warn === true
+          ? 'feedback-warn stale'
+          : 'quality-warn stale'
         const reason = qualityWarn
-          ? `idle ${Math.round(idle)}d >= quality-warn stale ${staleAfterDays}d`
+          ? `idle ${Math.round(idle)}d >= ${warnSource} ${staleAfterDays}d`
           : `idle ${Math.round(idle)}d >= ${staleAfterDays}d`
         result.transitions.push({ name, from: 'active', to: 'stale', reason })
         result.markStale.push(name)

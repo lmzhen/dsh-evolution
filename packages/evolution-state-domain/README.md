@@ -23,4 +23,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - Requires the host-plane `storage-domain` facility. The bundle row stays dormant when it is absent.
+- P2-4 (v15): the live pending table is BOUNDED — resolved (approved/rejected) records are kept to the most recent `PENDING_RESOLVED_CAP` (200, seam constant in `evolution-state-storage`); the oldest by `resolvedAt` are deleted on resolve. The audit ARCHIVE sidecar that the json provider maintains beyond the cap is json-specific (the domain seam has no sidecar facility) — resolved records past the cap are gone, not archived.
 

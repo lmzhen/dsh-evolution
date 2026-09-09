@@ -40,6 +40,11 @@ const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous
 // production consumer — expected orphans.
 const EXEMPT_ORPHANS = new Set(['evolution/review-scheduled', 'evolution/review-error'])
 const EMIT_RE = /\w*[Cc]tx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
+// P3 (v15) known boundary: these regexes match LITERAL single/double-quoted
+// event names only. `ctx.emit('evolution/' + variable)` and template-literal
+// names are invisible to this gate — any future dynamic event name must come
+// with a literal registration in evolution-core/src/events.ts AND an updated
+// regex here (fail loud rather than silently zero-counting).
 // V4-31 (0.3.26) + V5-01 (0.3.30): receivers follow the camelCase `<x>ctx`
 // naming (ioCtx/commandCtx/approvalCtx/toolCtx — activity listens on
 // `ioCtx.on(...)`), and `\w*ctx` is case-SENSITIVE — it matched only bare

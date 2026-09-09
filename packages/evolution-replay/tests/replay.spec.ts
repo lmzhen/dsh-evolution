@@ -99,4 +99,26 @@ describe('evolution-replay', () => {
     expect(plan.rejectedOps).toBe(0)
     expect(Number.isNaN(plan.acceptedOps)).toBe(false)
   })
+
+  it('P2-2 (v15): NaN evidenceQuotes cannot poison the scored dimension; negatives are counters', () => {
+    const driver = new EvolutionReplayDriver()
+    // The v14 fix covered only 3/6 numeric fields — `typeof NaN === 'number'`
+    // let evidenceQuotes straight into scorePlan (evidence IS scored) and the
+    // comparator degenerated (`b.score - a.score` -> NaN).
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'p', memoryApplied: 2, skillApplied: 1, rejectedOps: 0, evidenceQuotes: NaN, estimatedInputChars: Infinity, executionFailures: NaN })
+    const plan = driver.plansSnapshot()[0]!
+    expect(plan.evidenceQuotes).toBe(3) // missing/malformed keeps the applied-ops heuristic
+    expect(plan.estimatedInputChars).toBe(0)
+    expect(plan.executionFailures).toBe(0)
+    const result = driver.compare()
+    // Winner selection used to be implementation-defined (NaN comparator);
+    // with finite scores the policy id resolves deterministically.
+    expect(result.winner).toBe('p')
+    expect(Number.isNaN(result.margin)).toBe(false)
+    // Negative counters read as malformed (a counter cannot be negative).
+    const driver2 = new EvolutionReplayDriver()
+    driver2.record({ sessionId: 's', planId: 'r', policyFingerprint: 'p', memoryApplied: -5, skillApplied: 1, rejectedOps: 0 })
+    expect(driver2.plansSnapshot()[0]?.acceptedOps).toBe(1)
+    expect(driver2.plansSnapshot()[0]?.memoryOps).toBe(0)
+  })
 })

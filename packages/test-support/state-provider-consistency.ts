@@ -97,6 +97,19 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   expect(released?.claimedBy).toBeUndefined()
   expect(released?.claimedAt).toBeUndefined()
 
+  // --- E1 (v15): claim-scoped resolve (expectedClaimId) is provider-wide
+  // contract — a foreign claimId refuses; the owner succeeds; the unscoped
+  // form still works. (v14 shipped this on json with zero domain coverage.) ---
+  const scoped = pendingOf('c-scoped')
+  await provider.savePending(scoped)
+  await provider.claimPending('c-scoped', 'claim-owner')
+  const foreignScope = await provider.tryResolvePending('c-scoped', 'approved', 'claim-foreign')
+  expect(foreignScope.applied).toBe(false)
+  expect((await provider.listPending('executing')).map(record => record.id)).toContain('c-scoped')
+  const ownerScope = await provider.tryResolvePending('c-scoped', 'approved', 'claim-owner')
+  expect(ownerScope.applied).toBe(true)
+  expect(ownerScope.record?.status).toBe('approved')
+
   // --- status filtering is consistent (a pending record is not 'approved') ---
   const filt = pendingOf('c-filter')
   await provider.savePending(filt)

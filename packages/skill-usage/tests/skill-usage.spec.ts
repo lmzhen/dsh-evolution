@@ -231,17 +231,17 @@ describe('skill-usage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
-  it('N5 (v12): setQuality trims like the authoring entries (no silent quality drop)', async () => {
+  it('P1-1 (v15): setFeedbackQuality trims and writes the FEEDBACK-owned fields (no silent drop)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-usage-n5q-'))
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
     await ctx.skillUsage.record('demo', 'use')
-    await ctx.skillUsage.setQuality('  demo  ', 0.42, true)
+    await ctx.skillUsage.setFeedbackQuality('  demo  ', 0.42, true)
     const record = (await ctx.skillUsage.report()).get('demo')
-    expect(record?.quality_score).toBe(0.42)
-    expect(record?.quality_warn).toBe(true)
+    expect(record?.feedback_score).toBe(0.42)
+    expect(record?.feedback_warn).toBe(true)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 

@@ -187,8 +187,10 @@ describe('tool-skill-manage', () => {
     // so mutation maturity is not inflated by mere creation.
     const patchesBefore = (await ctx.skillUsage.report()).get('audit-skill')?.patch_count ?? 0
     expect(patchesBefore).toBe(0)
-    const skip = await execute({ action: 'skip' })
-    expect(skip.isError).toBe(false)
+    // P3 (v15): 'skip' was removed from the enum (zero callers, dead surface) —
+    // 'list' is the remaining read-only probe for the counter assertion.
+    const listing = await execute({ action: 'list' })
+    expect(listing.isError).toBe(false)
     // Read-only actions neither bump counters nor emit mutation events. The
     // usage sidecar may be shared across fixtures, so assert on the delta.
     expect(mutationEvents).toBe(1)
@@ -210,7 +212,7 @@ describe('tool-skill-manage', () => {
       signal: new AbortController().signal,
     })
     await execute({ action: 'create', name: 'warned-skill', content: SKILL.replace('boundary-skill', 'warned-skill') })
-    await ctx.skillUsage.setQuality('warned-skill', 0.1, true)
+    await ctx.skillUsage.setFeedbackQuality('warned-skill', 0.1, true)
     const review = await execute({ action: 'review' })
     expect(review.isError).toBe(false)
     const message = (review.value as { message?: string } | undefined)?.message ?? ''

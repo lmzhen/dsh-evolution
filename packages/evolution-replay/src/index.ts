@@ -149,7 +149,14 @@ export class EvolutionReplayDriver {
     // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
     // with NaN and every score derived from it. Same finite-number discipline
     // as the other guarded fields below.
-    const count = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0)
+    // P2-2 (v15): the guard now covers ALL SIX numeric fields — the first cut
+    // left `evidenceQuotes`/`estimatedInputChars`/`executionFailures` on bare
+    // `typeof` checks, and `typeof NaN === 'number'` let them straight into
+    // `scorePlan` (evidence is a scored dimension) — the exact poisoning the
+    // fix claimed to close. `count` also refuses negatives: a counter cannot
+    // be negative and a negative value distorts the ranking.
+    const count = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
+    const countOr = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback)
     const memoryApplied = count(plan.memoryApplied)
     const skillApplied = count(plan.skillApplied)
     this.plans.push({
@@ -161,8 +168,11 @@ export class EvolutionReplayDriver {
       rejectedOps: count(plan.rejectedOps),
       memoryOps: memoryApplied,
       skillOps: skillApplied,
-      evidenceQuotes: typeof plan.evidenceQuotes === 'number' ? plan.evidenceQuotes : memoryApplied + skillApplied,
-      estimatedInputChars: typeof plan.estimatedInputChars === 'number' ? plan.estimatedInputChars : 0,
+      // A missing evidenceQuotes keeps the E-76-era heuristic (≈ applied ops);
+      // a malformed one (NaN/∞/negative) is treated the same way instead of
+      // poisoning the scored dimension.
+      evidenceQuotes: countOr(plan.evidenceQuotes, memoryApplied + skillApplied),
+      estimatedInputChars: count(plan.estimatedInputChars),
       // V6-10 (0.3.36): keep the failure dimension for the leaderboard —
       // a plan whose ops all failed must not score as a clean empty plan.
       // E4 (P1-10, v11): the failure dimension is a REPORT-ONLY field (shown
@@ -172,7 +182,7 @@ export class EvolutionReplayDriver {
       // rejected ops were prevented, failed ops were attempted). The V6-10
       // comment above was the only place claiming a score equality it does
       // not implement; the score function below is the authority.
-      executionFailures: typeof plan.executionFailures === 'number' ? plan.executionFailures : 0,
+      executionFailures: count(plan.executionFailures),
       ...typeof plan.executionError === 'string' ? { executionError: plan.executionError } : {},
     })
     if (this.plans.length > this.maxPlans) this.plans.shift()
@@ -190,7 +200,11 @@ export class EvolutionReplayDriver {
   }
 
   compare(weights: ReplayWeights = this.weights): ReplayResult {
-    return comparePlans(this.plans, weights)
+    // P3 (v15): sort on a COPY — `comparePlans` sorts its argument in place,
+    // and `this.plans` used to be handed over by reference, so a consumer
+    // sorting/reordering `result.plans` mutated the driver's live leaderboard
+    // (inconsistent with `plansSnapshot()`'s deliberate copy).
+    return comparePlans([...this.plans], weights)
   }
 }
 

@@ -87,7 +87,10 @@ function registryVersion(name) {
     ? ['cmd.exe', ['/c', 'npm', 'view', name, 'version']]
     : ['npm', ['view', name, 'version']]
   try {
-    return execFileSync(command[0], command[1], { encoding: 'utf8' }).trim().split(String.fromCharCode(10)).pop() ?? ''
+    const last = execFileSync(command[0], command[1], { encoding: 'utf8' }).trim().split(String.fromCharCode(10)).pop() ?? ''
+    // P3 (v15): npm may print notice/warning lines on stdout for some versions
+    // — only accept output that actually looks like a semver.
+    return /^\d+\.\d+\.\d+/.test(last) ? last : ''
   } catch {
     return ''
   }
@@ -444,16 +447,10 @@ if (stagedButUnlisted.length > 0 || listedButUnstaged.length > 0) {
 }
 writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups.map(group => group.map(dir => nameByDir[dir])), null, 2) + '\n')
 
-const smokeDeps = {}
-for (const item of tarballs) smokeDeps[item.name] = `file:${distRoot.split(String.fromCharCode(92)).join('/')}/${item.file}`
-const ourNameSet = new Set(names.keys())
-for (const name of externalNames) smokeDeps[name] = releaseSpec(name, ourNameSet, publishedVersions)
-writeFileSync(join(distNext, 'smoke-package.json'), JSON.stringify({
-  name: 'evo-release-smoke',
-  private: true,
-  version: '0.0.0',
-  dependencies: smokeDeps,
-}, null, 2) + '\n')
+// P3 (v15): the `smoke-package.json` artifact was removed — nothing in the
+// repo (workflows, scripts, docs) ever read it; it was residue of a
+// historical manual smoke-install flow. `publish-order.json` above stays:
+// the publish step consumes it.
 
 // Atomic swap: only now that the whole build (and its guard) passed do the
 // live `.release-staging` and `dist` replace their `.next` siblings. A failed

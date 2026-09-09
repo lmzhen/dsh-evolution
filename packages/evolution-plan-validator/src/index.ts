@@ -168,6 +168,13 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
 }
 
 function validateMemoryOp(op: MemoryOp, context: ValidationContext, index: number): string | null {
+  // P2-1 (v15): field-level type guard — `??` chains only paper over
+  // null/undefined, so a non-string truthy field (e.g. `facts: {...}`)
+  // reached `.trim()` and threw a TypeError out of the "deterministic
+  // validator", failing the WHOLE review round (the exact shape E-60 killed
+  // at the op level). Reject per-op instead.
+  const badField = malformedStringField(op, ['facts', 'content', 'old_text', 'target'])
+  if (badField) return `memory op ${index}: field ${badField} must be a string`
   if (!hasValidEvidence(op.evidence, context.sessionSeq)) return `memory op ${index}: evidence is required and must reference a valid session seq`
   for (const key of FORBIDDEN_KEYS) if (key in op) return `memory op ${index}: forbidden field ${key}`
   if (op.target !== 'memory' && op.target !== 'user') return `memory op ${index}: target must be memory or user`
@@ -181,7 +188,25 @@ function validateMemoryOp(op: MemoryOp, context: ValidationContext, index: numbe
   return null
 }
 
+/** P2-1 (v15): the string-typed fields the executors dereference with
+ * `.trim()`/`.length`. `target` is included for memory ops because the
+ * engine compares it against literals. */
+function malformedStringField(op: object, fields: readonly string[]): string | null {
+  const record = op as Record<string, unknown>
+  for (const field of fields) {
+    const value = record[field]
+    if (value !== undefined && value !== null && typeof value !== 'string') return field
+  }
+  return null
+}
+
 function validateSkillOp(op: SkillOp, context: ValidationContext, index: number): string | null {
+  // P2-1 (v15): field-level type guard (see validateMemoryOp).
+  // v16 (P2 follow-up): `file_path` added — the executors pass it verbatim
+  // into validateSupportPath's string replace; a non-string truthy value
+  // used to escape the validator and TypeError mid-plan.
+  const badField = malformedStringField(op, ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'])
+  if (badField) return `skill op ${index}: field ${badField} must be a string`
   for (const key of FORBIDDEN_KEYS) if (key in op) return `skill op ${index}: forbidden field ${key}`
   const name = (op.name ?? '').trim()
   if (!name) return `skill op ${index}: name is required`
@@ -205,7 +230,11 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   // field (e.g. content:'') shadow a huge new_string.
   const writeBytes = [op.file_content ?? '', op.content ?? '', op.new_string ?? '']
     .reduce((max, value) => Math.max(max, value.length), 0)
-  if (action === 'write_file' && !(op.file_content ?? op.content ?? '').trim()) return `skill op ${index}: write_file requires file_content`
+  // P3 (v15): executor parity — the executor reads `args.file_content ?? ''`
+  // ONLY (tool-skill-manage executeCore), so the validator's `?? op.content`
+  // fallback used to admit a write_file that then wrote an EMPTY support file
+  // and counted a successful write. Same field, or it does not pass.
+  if (action === 'write_file' && !(op.file_content ?? '').trim()) return `skill op ${index}: write_file requires file_content`
   if (writeBytes > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
   if (action === 'restructure') {
     if (!Array.isArray(op.restructure) || op.restructure.length === 0) return `skill op ${index}: restructure requires a non-empty restructure list`

@@ -357,6 +357,9 @@ describe('learning graph', () => {
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       let captured: { sessionId?: unknown; session?: unknown; args?: { origin?: unknown } } | undefined
       ctx.provide('evolutionApproval', {
+        // P2-7 (v15): hasRunner is part of the staging contract (the graph
+        // pre-checks it before staging).
+        hasRunner: () => true,
         request: async (input: unknown) => {
           captured = input as typeof captured
           return { action: 'staged', message: 'staged for approval' }
@@ -405,6 +408,9 @@ describe('learning graph', () => {
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       let captured: { sessionId?: unknown; session?: unknown } | undefined
       ctx.provide('evolutionApproval', {
+        // P2-7 (v15): hasRunner is part of the staging contract (the graph
+        // pre-checks it before staging).
+        hasRunner: () => true,
         request: async (input: unknown) => {
           captured = input as typeof captured
           return { action: 'allow', message: 'allowed' }
@@ -414,6 +420,103 @@ describe('learning graph', () => {
       await handler!.handler({ rawInput: 'delete demo-skill', agent: { session: { id: 'sess-n1d', header: { origin: 'foreground' } } } })
       expect(captured?.sessionId).toBe('sess-n1d')
       expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1d')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('P2-6 (v15)/v16: /graph edit memory:* stages through the approval seam with a runner-replayable payload', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1m-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map<string, unknown>(),
+      })
+      // The memory stub mirrors the file-backed store: readMemoryIndex
+      // resolves index 0 against this list, and applyBatch is what the direct
+      // path would have called.
+      ctx.provide('memory', {
+        read: async () => ['existing entry body'],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      let captured: { kind?: unknown; summary?: unknown; args?: unknown } | undefined
+      ctx.provide('evolutionApproval', {
+        hasRunner: () => true,
+        request: async (input: unknown) => {
+          captured = input as typeof captured
+          return { action: 'staged', message: 'staged for approval' }
+        },
+      })
+      await ctx.plugin(Graph)
+      const result = await handler!.handler({
+        rawInput: 'edit memory:user:0 replacement body',
+        agent: { session: { id: 'sess-mem', header: { origin: 'foreground' } } },
+      })
+      expect(result.kind).toBe('success')
+      // P2-6: the memory branch goes through the approval seam (v15 batch),
+      // staged in the tool-memory runner's replay shape.
+      expect(captured?.kind).toBe('memory')
+      expect(captured?.summary).toBe('graph edit memory:user:0')
+      const args = captured?.args as { target?: string; operations?: Array<{ action?: string; old_text?: string; facts?: string }> }
+      expect(args.target).toBe('user')
+      expect(args.operations?.[0]).toMatchObject({ action: 'replace', old_text: 'existing entry body', facts: 'replacement body' })
+      // The direct path never ran: applyBatch is not stubbed to record, and a
+      // stub returning ok would still be fine — assert via the stage message.
+      expect(result.text).toContain('staged for approval')
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('P2-7 (v15)/v16: /graph edit memory:* refuses when staging will happen but no memory runner is mounted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1mr-'))
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const ctx = new Context()
+      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map<string, unknown>(),
+      })
+      ctx.provide('memory', {
+        read: async () => ['existing entry body'],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      ctx.provide('evolutionApproval', {
+        // Host-only assembly: approval enabled, the tool-memory runner row absent.
+        isEnabled: true,
+        hasRunner: (kind: string) => kind !== 'memory',
+        request: async () => { throw new Error('request must not be called when the pre-check refuses') },
+      })
+      await ctx.plugin(Graph)
+      const result = await handler!.handler({
+        rawInput: 'edit memory:user:0 replacement body',
+        agent: { session: { id: 'sess-mem2', header: { origin: 'foreground' } } },
+      })
+      expect(result.kind).toBe('error')
+      expect(result.text).toContain('cannot be staged')
+      expect(result.text).toContain('tool-memory')
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome

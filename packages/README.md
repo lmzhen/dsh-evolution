@@ -6,6 +6,17 @@ policy, prompts, routing, state, and audit history are control-plane data.
 
 > Community-published packages under `@lmzhen` are maintained by the
 > dsh-evolution community and are not official DeepSeek releases.
+>
+> **UPSTREAM SCOPE OCCUPANCY (P2-12, v15).** In the monorepo/overlay the
+> family occupies the upstream `@deepseek-ai` scope; publishing rewrites the
+> scope to `@lmzhen`. All `dsh-evolution-*` names are family-owned; five of
+> them are the mirror-only MEMORY SEAM + TOOL packages with no upstream
+> counterpart and the highest collision risk — `@deepseek-ai/dsh-memory`,
+> `@deepseek-ai/dsh-skill-usage`, `@deepseek-ai/dsh-memory-files`,
+> `@deepseek-ai/dsh-tool-memory`, `@deepseek-ai/dsh-tool-skill-manage`.
+> UPSTREAM UPGRADE CHECK: re-verify this list on every upstream bump — if the
+> upstream introduces a same-named package, the overlay would double-provide /
+> shadow it and the seam must be renamed or reconciled BEFORE merging.
 
 
 ## Package map
@@ -27,7 +38,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-feedback` | Durable feedback → `quality_score`/`quality_warn` → curator |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
-| `evolution-commands` | `/evolution pending|approve|reject|curator run|curator report|restore` |
+| `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
 | `evolution-capability` | Staged non-executing governance adapter for Creator-mode capability packages |
 | `evolution-host` | Host-plane infrastructure bundle (no model tools) |
@@ -52,7 +63,7 @@ pins the equality).
 | `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
 | `/evolution approve <id>` | replay an approved staged write through its runner |
 | `/evolution reject <id>` | drop a staged write without running it |
-| `/evolution doctor` | read-only self-check: install form, conflicts, env, services |
+| `/evolution doctor [--json]` | read-only self-check: install form, conflicts, env, services (--json feeds scripts) |
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
 | `/evolution mutations` | list skill-mutation audit records |
 | `/evolution restore` | restore skills from the latest snapshot |

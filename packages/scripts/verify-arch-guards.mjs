@@ -48,7 +48,7 @@ const strict = process.argv.includes('--strict') || process.env.DSH_EVOLUTION_AR
 const CORE_SRC = 'evolution-core/src'
 const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
-const DSH_HOME_RE = /process\.env\.DSH_HOME/
+const DSH_HOME_RE = /process\.env\.DSH_HOME|process\.env\[['\"]DSH_HOME['\"]\]/
 const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolicy/
 let checkedCount = 0
 
@@ -146,7 +146,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — no DSH_HOME reads outside ${CORE_SRC}, no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC}`)
+  console.log(`verify-arch-guards: OK — no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC}`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78

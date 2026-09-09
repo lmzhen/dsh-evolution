@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'
+import type { ToolGuard } from '@deepseek-ai/dsh-tools'
 
 export const name = 'evolution-threat'
 export const inject = ['tools']
@@ -114,9 +115,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // guards and listeners receive the same arguments, so keeping both would
   // double-scan every write-tool call on the hot path.
   ctx.inject(['tools'], (toolCtx) => {
-    const tools = toolCtx.get('tools') as {
-      guard(guard: (exec: { name: string; arguments: unknown }) => string | undefined): () => void
-    }
+    // P2-13 (v15): the REAL upstream guard type — an upstream signature drift
+    // now fails `tsc` at the mirror instead of surfacing at runtime after an
+    // upgrade. (The hand-written shape was
+    // { guard(guard: (exec: { name; arguments }) => string | undefined): () => void }.)
+    const tools = toolCtx.get('tools') as { guard(guard: ToolGuard): () => void }
     toolCtx.effect(() => tools.guard((exec) => {
       const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars, scanOptions)
       return hit ?? undefined

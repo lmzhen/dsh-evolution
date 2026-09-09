@@ -313,7 +313,12 @@ export class MemoryStore {
    */
   private async addCore(target: MemoryTarget, facts: string, raw: string): Promise<{ result: MemoryApplyResult; write: string | null }> {
     const content = facts.trim()
-    if (!content) return { result: this.failure(target, 'Content cannot be empty.', []), write: null }
+    // P3 (v15): structured rejection, NOT `this.failure()` — failure() feeds
+    // the consolidation-failure backoff counter, and an empty-facts validation
+    // error is not a write failure (same discipline as applyBatchCore's
+    // inline empty-facts rejection). Unreachable via the public entries
+    // (addChained pre-trims), kept as a defence against future callers.
+    if (!content) return { result: { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     // The oversized guard runs pre-transact in add(); drift is derived from
     // the locked view below.
     const drift = this.driftFromRaw(target, raw)

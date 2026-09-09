@@ -347,13 +347,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // Semantic skill-skill edges (B-line G3): read each usage-known
           // skill and collect its related_skills through the shared parser —
           // the same source the quality references factor uses.
+          // P3 (v15): reads run concurrently — the serial loop made `/graph`
+          // latency O(N) round-trips on a large library; `skills.read` is
+          // safe to fan out (the io seam serializes writes, reads are
+          // independent), and the map insertion order stays usage-key order.
           const skills = withSkills()
+          const names = [...usageMap.keys()]
+          const contents = await Promise.all(names.map(name => skills.read(name)))
           const related = new Map<string, string[]>()
-          for (const name of usageMap.keys()) {
-            const content = await skills.read(name)
-            if (content === null) continue
+          names.forEach((name, index) => {
+            const content = contents[index]
+            if (content === null || content === undefined) return
             related.set(name, relatedSkillNames(content, name))
-          }
+          })
           const graph = buildLearningGraph(usageMap, memoryEntries, userEntries, related)
           // F-10: bound the rendered output — node lines cover the
           // whole usage set plus every memory entry, and edge lines are the
@@ -402,6 +408,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // `origins.library` (which is 'subagent' for a subagent invocation).
             const origins = resolveOrigins(session?.header?.origin)
             if (approval) {
+              // P2-7 (v15)/P3 (v16): staging pre-check — the skill runner lives
+              // in tool-skill-manage, an AGENT-preset row, while this command is
+              // a HOST row; in a host-only + approval-enabled assembly the stage
+              // below used to create a pending record no approver could ever
+              // replay. `hasRunner` is the seam's dedicated pre-check surface.
+              // v16: the refusal only fires when staging will ACTUALLY happen
+              // (approval enabled, session policy not 'never', and foreground
+              // writes stage) — the first cut refused allow-direct combos that
+              // never needed a runner.
+              const sessionPolicyEdit = effectiveSessionPolicy(ctx, session)
+              const stagesForeground = approval.stageForeground !== false
+              const willStage = approval.isEnabled !== false
+                && sessionPolicyEdit !== 'never'
+                && (origins.approval === 'background_review' || stagesForeground)
+              if (willStage && !approval.hasRunner('skill')) {
+                return err('Graph skill write cannot be staged: no skill replay runner is registered — mount the tool-skill-manage row (evolution-agent preset) or disable evolution-approval.')
+              }
               // P2-34 (v11): the graph surface is marked in the summary so the
               // audit record names where the write came from. N1 (v12): the
               // command invocation DOES carry the agent (evolution-commands
@@ -409,7 +432,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // rides the request and the approval service derives the platform
               // session policy — a `never`-policy session now stages nothing
               // instead of being treated as foreground.
-              const sessionPolicy = effectiveSessionPolicy(ctx, session)
+              const sessionPolicy = sessionPolicyEdit
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph edit ${parsed.name}`,
@@ -440,6 +463,37 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const entries = await memory.read(parsed.source)
           const check = readMemoryIndex(parsed, entries)
           if (!check.ok) return err(check.message ?? 'Memory index check failed.')
+          // P2-6 (v15): the SAME approval seam the `memory` tool uses — the
+          // skill branch above stages, and an approval-enabled deployment must
+          // not have a graph path that lands the same kind of write directly.
+          // Staged args mirror the tool-memory runner's replay shape
+          // (MemoryWriteArgs), so approve replays byte-for-byte what this
+          // branch would have done.
+          const memoryApproval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+          if (memoryApproval) {
+            // P3 (v16): refuse only when staging will actually happen (same
+            // refinement as the skill branch) and carry the entry INDEX in the
+            // summary — `graph edit memory:user` on index 0 and 3 used to
+            // produce identical audit lines.
+            const originsM = resolveOrigins(session?.header?.origin)
+            const sessionPolicyM = effectiveSessionPolicy(ctx, session)
+            const willStage = memoryApproval.isEnabled !== false
+              && sessionPolicyM !== 'never'
+              && (originsM.approval === 'background_review' || memoryApproval.stageForeground !== false)
+            if (willStage && !memoryApproval.hasRunner('memory')) {
+              return err('Graph memory write cannot be staged: no memory replay runner is registered — mount the tool-memory row (evolution-host/evolution-all bundle) or disable evolution-approval.')
+            }
+            const decision = await memoryApproval.request({
+              kind: 'memory',
+              summary: `graph edit memory:${parsed.source}:${parsed.index}`,
+              args: { target: parsed.source, operations: [{ action: 'replace', old_text: check.entry ?? '', facts: content }] },
+              origin: originsM.approval,
+              ...session?.id ? { sessionId: session.id } : {},
+              ...session ? { session } : {},
+              ...sessionPolicyM !== undefined ? { sessionPolicy: sessionPolicyM } : {},
+            })
+            if (decision.action === 'staged') return ok(decision.message)
+          }
           const result = await memory.applyBatch(parsed.source, [{ action: 'replace', old_text: check.entry ?? '', facts: content }])
           return result.ok ? ok(result.message) : err(result.message)
         }
@@ -453,10 +507,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // (the audit's noted gap was approval + the edit patch counter).
             const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
             if (approval) {
-              // N1 (v12): session-riding request — same pattern as the edit
-              // branch above (see the comment there).
+              // P2-7 (v15): staging pre-check (see the edit branch — the skill
+              // runner is an agent-preset row, not guaranteed on a host-only
+              // assembly).
+              // P3 (v16): the refusal fires only when staging will actually
+              // happen (approval enabled, session policy not 'never',
+              // foreground writes stage).
               const origins = resolveOrigins(session?.header?.origin)
               const sessionPolicy = effectiveSessionPolicy(ctx, session)
+              const willStage = approval.isEnabled !== false
+                && sessionPolicy !== 'never'
+                && (origins.approval === 'background_review' || approval.stageForeground !== false)
+              if (willStage && !approval.hasRunner('skill')) {
+                return err('Graph skill delete cannot be staged: no skill replay runner is registered — mount the tool-skill-manage row (evolution-agent preset) or disable evolution-approval.')
+              }
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph delete ${parsed.name}`,
@@ -479,6 +543,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const entries = await memory.read(parsed.source)
           const check = readMemoryIndex(parsed, entries)
           if (!check.ok) return err(check.message ?? 'Memory index check failed.')
+          // P2-6 (v15): approval seam for deletes too (see the edit branch).
+          const memoryApproval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+          if (memoryApproval) {
+            // P3 (v16): see the edit branch — stage-only refusal + index in
+            // the summary.
+            const origins = resolveOrigins(session?.header?.origin)
+            const sessionPolicy = effectiveSessionPolicy(ctx, session)
+            const willStage = memoryApproval.isEnabled !== false
+              && sessionPolicy !== 'never'
+              && (origins.approval === 'background_review' || memoryApproval.stageForeground !== false)
+            if (willStage && !memoryApproval.hasRunner('memory')) {
+              return err('Graph memory delete cannot be staged: no memory replay runner is registered — mount the tool-memory row (evolution-host/evolution-all bundle) or disable evolution-approval.')
+            }
+            const decision = await memoryApproval.request({
+              kind: 'memory',
+              summary: `graph delete memory:${parsed.source}:${parsed.index}`,
+              args: { target: parsed.source, operations: [{ action: 'remove', old_text: check.entry ?? '' }] },
+              origin: origins.approval,
+              ...session?.id ? { sessionId: session.id } : {},
+              ...session ? { session } : {},
+              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
+            })
+            if (decision.action === 'staged') return ok(decision.message)
+          }
           const result = await memory.applyBatch(parsed.source, [{ action: 'remove', old_text: check.entry ?? '' }])
           return result.ok ? ok(result.message) : err(result.message)
         }

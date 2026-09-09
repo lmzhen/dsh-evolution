@@ -55,20 +55,30 @@ describe('EvolutionIoRegistry', () => {
     expect(ctx2.evolutionIo.hasProvider('c')).toBe(false)
   })
 
-  it('P3-11 (v14): hasProvider lets a re-mounting provider stay idempotent, duplicates still fail loud', async () => {
+  it('P2-3 (v15): identical-object re-registration is idempotent; a DIFFERENT object under the name still fails loud', async () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     const calls: string[] = []
-    ctx.evolutionIo.registerProvider(fake('node', calls), { default: true })
-    expect(ctx.evolutionIo.hasProvider('node')).toBe(true)
-    // A different provider under a taken name is still refused.
+    // The io-node singleton shape: ONE object, registered on every mount.
+    const provider = fake('node', calls)
+    const dispose1 = ctx.evolutionIo.registerProvider(provider, { default: true })
+    // Same OBJECT again (a second apply / re-mounted row) — no throw, no
+    // duplicate registration, and the returned dispose is identity-guarded.
+    const dispose2 = ctx.evolutionIo.registerProvider(provider, { default: true })
+    expect(ctx.evolutionIo.provider().name).toBe('node')
     expect(() => ctx.evolutionIo.registerProvider(fake('node'))).toThrow(/already registered/)
     // The seam hands back the registered object itself (no wrapper), so every
     // consumer method reaches the backend unchanged.
-    const provider = ctx.evolutionIo.provider()
     await provider.readText('/x')
     await provider.writeText('/x')
     await provider.exists('/x')
     expect(calls).toEqual(['read:/x', 'write:/x', 'exists:/x'])
+    // Disposing is idempotent: the idempotent re-registration returns the
+    // SAME dispose instance, so whichever handle fires first removes the
+    // registration and every later call is a no-op.
+    dispose2()
+    expect(() => ctx.evolutionIo.provider()).toThrow(/no evolution IO provider/)
+    dispose1()
+    expect(() => ctx.evolutionIo.provider()).toThrow(/no evolution IO provider/)
   })
 })

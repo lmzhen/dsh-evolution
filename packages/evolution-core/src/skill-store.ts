@@ -467,8 +467,10 @@ const SUPPORT_FILE_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/
 /** C-18: win32 reserves these stems with ANY extension (`nul.md` hits the
  * NUL device), and they are fully inside the charset above — so the reserved
  * set is checked on the first-dot prefix as well; the charset close alone
- * cannot refuse them. */
-const WIN32_RESERVED_DEVICE_NAMES: ReadonlySet<string> = new Set([
+ * cannot refuse them. Exported single source: `badName` (skill directories,
+ * P2-11/v15) and `validateSupportPath` (support-file stems, C-18) both
+ * consume this one set — a third copy would drift. */
+export const WIN32_RESERVED_DEVICE_NAMES: ReadonlySet<string> = new Set([
   'con', 'prn', 'aux', 'nul',
   'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
   'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
@@ -485,6 +487,14 @@ function validateSupportPath(filePath: string): string | null {
   for (const part of parts.slice(1)) {
     if (!SUPPORT_FILE_NAME_RE.test(part)) {
       return `Unsupported file name "${part}" — use lowercase letters, digits, dots, hyphens, and underscores (leading letter or digit).`
+    }
+    // P2-1 (v17): the `.lock` suffix is RESERVED for the io writer-lock
+    // protocol (`<file>.lock` lives next to its file). A user support file
+    // named `*.lock` would be indistinguishable from a writer lock for the
+    // archive/restore probes and could be swept as residue by
+    // deleteStrandedLocks.
+    if (part.toLowerCase().endsWith('.lock')) {
+      return `Unsupported file name "${part}" — the .lock suffix is reserved for the writer-lock protocol.`
     }
     const stem = part.split('.')[0]?.toLowerCase() ?? ''
     if (WIN32_RESERVED_DEVICE_NAMES.has(stem)) {
@@ -944,10 +954,21 @@ export class SkillLibrary {
    * are the deliberate exceptions — their names come from `listNames()`, i.e.
    * from the tree itself, never from caller input.
    */
-  private badName(name: string): string | null {
+  private badName(name: string, opts: { allowReserved?: boolean } = {}): string | null {
     const normalized = name.trim()
     if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
       return `Invalid skill name "${normalized}". Use lowercase letters, digits, and hyphens (<= ${this.limits.maxNameLength}).`
+    }
+    // P2-11 (v15): win32 reserves these stems for ANY directory component —
+    // the same set the support-file layer has refused since C-18 — so a skill
+    // directory named `nul`/`com1` would die with a raw system errno instead
+    // of a structured refusal. POSIX deployments lose nothing real: these
+    // stems are device mnemonics, not useful skill names (fail-closed).
+    // P3 (v16): the MOVERS (archive / restoreFromArchive) pass
+    // `allowReserved` — refusal here would strand legacy reserved-name skills
+    // created before this guard with no API path to archive or recover them.
+    if (!opts.allowReserved && WIN32_RESERVED_DEVICE_NAMES.has(normalized)) {
+      return `"${normalized}" is a Windows reserved device name and cannot be used as a skill name.`
     }
     return null
   }
@@ -986,7 +1007,10 @@ export class SkillLibrary {
     const name = rawName.trim()
     // P1-1 (v14): invalid names are refused here too (same rationale as
     // writeProtection) — the returned string is the refusal reason.
-    const badName = this.badName(name)
+    // P3 (v17): reserved names pass here — deleteProtection answers MARKER
+    // protection, and archive() needs to move a legacy reserved-name skill
+    // (the v16 escape hatch) without its own subsequent call being re-blocked.
+    const badName = this.badName(name, { allowReserved: true })
     if (badName) return badName
 
     const dir = this.dirOf(name)
@@ -1200,7 +1224,24 @@ export class SkillLibrary {
     // F-337: hash the bytes that actually land on disk (write uses
     // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
     const onDisk = finalContent.trimEnd() + '\n'
-    await this.io.writeText(join(dir, 'SKILL.md'), onDisk)
+    const createPath = join(dir, 'SKILL.md')
+    // P3 (v17): the already-exists refusal moves INSIDE the cross-process
+    // transact — the lock-free probe above could be raced by a concurrent
+    // create on another instance/process, and the later write silently
+    // overwrote the winner's bytes (double audit, double event). In-lock
+    // re-check: current bytes present -> structured refusal, nothing written.
+    let existsAtCommit = false
+    if (this.transact) {
+      await this.transact(this.io, createPath, (current) => {
+        if (current !== null) { existsAtCommit = true; return current }
+        return onDisk
+      })
+    } else if (await this.io.exists(createPath)) {
+      existsAtCommit = true
+    } else {
+      await this.io.writeText(createPath, onDisk)
+    }
+    if (existsAtCommit) return { ok: false, message: `Skill "${normalized}" already exists.` }
     // Any non-foreground writer (review channel OR delegated subagent) is an
     // agent-authored skill: mark it managed so the lifecycle owns it.
     if (origin !== 'foreground') {
@@ -1220,10 +1261,13 @@ export class SkillLibrary {
   }
 
   private async updateCore(name: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
-    const dir = this.dirOf(name)
-    const path = join(dir, 'SKILL.md')
+    // P3 (v15): guard BEFORE dirOf — same order as patchCore, so no path
+    // string is ever built from an unvalidated name (dirOf does not touch IO,
+    // so this is consistency hygiene, not a reachable gap).
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
+    const dir = this.dirOf(name)
+    const path = join(dir, 'SKILL.md')
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     const validation = validateFrontmatter(content, name, this.limits)
@@ -1364,12 +1408,139 @@ export class SkillLibrary {
     })
   }
 
+  /**
+   * P2-9 (v15): the destructive directory move shared by archive and
+   * restoreFromArchive — rename first, copy+remove fallback when the backend
+   * cannot rename across media (V5-35), with the E-14 rollback when the
+   * fallback's source removal fails. Returns a failure MESSAGE on a failed
+   * move (caller wraps into a structured result) or undefined on success.
+   */
+  private async moveDir(dir: string, dest: string): Promise<string | undefined> {
+    try {
+      await this.io.rename(dir, dest)
+      return undefined
+    } catch {
+      // P2 (v17): rename failing because the DESTINATION appeared mid-move
+      // (concurrent create/restore on the same name) must NOT fall through to
+      // the copy fallback — `cp force` merges trees, silently overwriting the
+      // concurrent writer's bytes and reporting success. Refuse instead; the
+      // fallback is only for genuine cross-media rename failures.
+      if (await this.io.exists(dest)) {
+        return `the destination appeared mid-move (concurrent create or restore); refusing to merge — inspect both trees`
+      }
+      // Some IO providers cannot rename across media. Copy the whole tree
+      // first so support files are never lost during archival fallback.
+      // V5-35 (0.3.32): a concurrent archiver may have already moved the
+      // source (or the rename failed for another transcient reason) — surface
+      // the fallback failure as a result instead of a raw ENOENT.
+      try {
+        await this.io.copy(dir, dest)
+      } catch (copyError) {
+        return `the move fell back to copy but failed (${copyError instanceof Error ? copyError.message : String(copyError)}); the tree stays where it is`
+      }
+      try {
+        await this.io.remove(dir)
+        return undefined
+      } catch (error) {
+        // 0.3.16 (E-14): a failed remove left the tree in BOTH locations, and
+        // the source was never counted as moved so a rollback loop would not
+        // clean it. Undo the copy we just made; if even that fails, say so
+        // instead of rethrowing the remove error.
+        const reason = error instanceof Error ? error.message : String(error)
+        try {
+          await this.io.remove(dest)
+          return `the copy succeeded but the source could not be removed (${reason}); the copied tree was rolled back`
+        } catch {
+          return `the copy succeeded but the source could not be removed (${reason}) and the copied tree could not be rolled back — the tree now exists in BOTH locations; clean up manually`
+        }
+      }
+    }
+  }
+
+  /**
+   * P2 (v16): the write-lock probe for the DESTRUCTIVE MOVERS (archive /
+   * restoreFromArchive). A byte-writer mid-flight is the ghost-generator —
+   * after the move its transact commit re-creates `<dir>/…` (mkdir
+   * recursive) and the tree ends half-archived. The signal is the writer's
+   * own lock file, and its PLACEMENT (inside the moved directory) is why the
+   * mover must PROBE-and-REFUSE instead of acquiring it: an acquired lock
+   * would be renamed into `.archive` with the tree, stranding a phantom live
+   * lock (the v16 audit proved the probe→rename TOCTOU does exactly that,
+   * and restore would later move the residue back into the live root).
+   * Coverage: `SKILL.md.lock` (update/patch of the body) plus one level of
+   * each support dir (write_file's lock sits next to its file). Residual:
+   * NESTED support-subdir locks and the probe→rename TOCTOU itself remain
+   * fail-safe (renameWithRetry rides the write out; the writer's locked
+   * re-read refuses on the moved-away file), and a residue `.lock` from a
+   * CRASHED writer also refuses — correct: inspect, don't archive.
+   */
+  private async hasWriteLock(dir: string): Promise<boolean> {
+    // P3 (v17): marker writers (pin / hermes-managed) hold root-level locks
+    // too — include them in the signal set.
+    const markerLocks = [join(dir, 'SKILL.md.lock'), join(dir, '.pinned.lock'), join(dir, '.hermes-managed.lock')]
+    for (const lock of markerLocks) {
+      if (await this.isWriterLock(lock)) return true
+    }
+    for (const supportDir of SUPPORT_DIRS) {
+      let entries: string[]
+      try { entries = await this.io.list(join(dir, supportDir)) } catch {
+        // P3 (v17): fail-CLOSED — a real list failure (EACCES/EIO; a missing
+        // dir reads as [] per the seam contract) must refuse the move, not
+        // read as "no locks". The v16 draft's `continue` re-opened the ghost
+        // window exactly when the filesystem is misbehaving.
+        return true
+      }
+      for (const entry of entries) {
+        if (!entry.endsWith('.lock')) continue
+        if (await this.isWriterLock(join(dir, supportDir, entry))) return true
+      }
+    }
+    return false
+  }
+
+  /** P2 (v17): a file only counts as a writer lock when its body has the
+   * `pid:token` shape the io layer writes. User support files legitimately
+   * named `*.lock` (allowed by SUPPORT_FILE_NAME_RE) must not trip the probe
+   * or be swept as residue — the v16 first cut matched on suffix alone,
+   * which permanently refused archiving and deleted user content on restore. */
+  private async isWriterLock(lockPath: string): Promise<boolean> {
+    const body = await this.io.readText(lockPath).catch(() => null)
+    if (body === null) return false
+    return /^\d+:[0-9a-f]*$/.test(body.trim())
+  }
+
+  /** P2 (v16): best-effort removal of lock residue inside a RESTORED tree —
+   * a `.lock` that a pre-restore crash or TOCTOU stranded in `.archive`
+   * cannot have a live writer (restore refuses when the live root is
+   * locked), and if left in place its body (a live pid on a single-host
+   * deployment) structurally closes the writer's self-heal path. */
+  private async deleteStrandedLocks(dir: string): Promise<void> {
+    // P2 (v17): the body-shape check keeps user support files named
+    // `*.lock` (verified: restore used to delete them) out of the sweep.
+    await this.sweepLockIfStranded(join(dir, 'SKILL.md.lock'))
+    for (const supportDir of SUPPORT_DIRS) {
+      let entries: string[] = []
+      try { entries = await this.io.list(join(dir, supportDir)) } catch { continue }
+      for (const entry of entries) {
+        if (entry.endsWith('.lock')) await this.sweepLockIfStranded(join(dir, supportDir, entry))
+      }
+    }
+  }
+
+  /** Remove `lockPath` only when its body has the writer-lock `pid:token`
+   * shape; anything else (a user support file) is left untouched. */
+  private async sweepLockIfStranded(lockPath: string): Promise<void> {
+    const body = await this.io.readText(lockPath).catch(() => null)
+    if (body === null || !/^\d+:[0-9a-f]*$/.test(body.trim())) return
+    await this.io.remove(lockPath).catch(() => {})
+  }
+
   async archive(rawName: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
 
-    const badName = this.badName(name)
+    const badName = this.badName(name, { allowReserved: true })
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
@@ -1397,6 +1568,12 @@ export class SkillLibrary {
       if (options.absorbedInto.trim() === name) {
         return { ok: false, message: 'absorbed_into cannot be the skill being archived (cannot absorb into itself).' }
       }
+      // P2-8 (v15): absorbedInto reaches dirOf below — the same guard every
+      // other path-building entry applies must hold here too, or
+      // `absorbed_into: '../x'` builds a probe path outside the skills root
+      // and the raw value lands in .archive-reason / the audit summary.
+      const intoBad = this.badName(options.absorbedInto.trim())
+      if (intoBad) return { ok: false, message: `absorbed_into: ${intoBad}` }
       const target = await this.io.readText(join(this.dirOf(options.absorbedInto), 'SKILL.md'))
       if (!target) return { ok: false, message: `absorbed_into="${options.absorbedInto}" does not exist.` }
     }
@@ -1419,36 +1596,13 @@ export class SkillLibrary {
       const link = await this.io.isSymlink(dir)
       if (link === true) return { ok: false, message: `Skill "${name}" is a symlink; refusing to archive it.` }
     }
-    try {
-      await this.io.rename(dir, dest)
-    } catch {
-      // Some IO providers cannot rename across media. Copy the whole tree
-      // first so support files are never lost during archival fallback.
-      // V5-35 (0.3.32): a concurrent archiver may have already moved the
-      // source (or the rename failed for another transcient reason) — surface
-      // the fallback failure as a result instead of a raw ENOENT.
-      try {
-        await this.io.copy(dir, dest)
-      } catch (copyError) {
-        const why = copyError instanceof Error ? copyError.message : String(copyError)
-        return { ok: false, message: `Skill "${name}" archive fell back to copy but failed (${why}); the skill stays where it is.` }
-      }
-      try {
-        await this.io.remove(dir)
-      } catch (error) {
-        // 0.3.16 (E-14): a failed remove left the skill in BOTH the active
-        // root and .archive, and the source was never counted as archived so
-        // consolidate rollback would not clean it. Undo the copy we just made;
-        // if even that fails, say so instead of rethrowing the remove error.
-        const reason = error instanceof Error ? error.message : String(error)
-        try {
-          await this.io.remove(dest)
-          return { ok: false, message: `Archive copy succeeded but the source could not be removed (${reason}); the copied archive was rolled back.` }
-        } catch {
-          return { ok: false, message: `Archive copy succeeded but the source could not be removed (${reason}) and the archive copy could not be rolled back — the skill now exists in BOTH the active root and .archive; clean up manually.` }
-        }
-      }
+    // P2-9 (v15)/v16: probe-and-refuse while any writer is active (see
+    // `hasWriteLock` for the signal set and the placement rationale).
+    if (await this.hasWriteLock(dir)) {
+      return { ok: false, message: `Skill "${name}" is being written (write lock present); retry archiving once the write completes.` }
     }
+    const moveFailure = await this.moveDir(dir, dest)
+    if (moveFailure !== undefined) return { ok: false, message: `Skill "${name}" archive failed: ${moveFailure}.` }
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
     // P2-9 (v14): the move already landed, so a failed metadata write must NOT
     // abort the archive — the caller (consolidate) would then report a rollback
@@ -1741,7 +1895,7 @@ export class SkillLibrary {
    */
   private async applyTreeChange(plan: TreeChangePlan): Promise<SkillActionResult> {
     const name = plan.name.trim()
-    const badName = this.badName(name)
+    const badName = this.badName(name, { allowReserved: true })
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
@@ -1804,8 +1958,9 @@ export class SkillLibrary {
     const name = rawName.trim()
     // P2-2 (v11): the inline regex + hand-written message bypassed badName()
     // (C-12 single source — the regex carries no length bound, so a >64-char
-    // name used to pass here).
-    const bad = this.badName(name)
+    // name used to pass here). Reserved names allowed: recovery of a legacy
+    // entry; on win32 the mkdir fails with a raw errno (documented).
+    const bad = this.badName(name, { allowReserved: true })
     if (bad) return { ok: false, message: bad }
     if (await this.io.exists(join(this.dirOf(name), 'SKILL.md'))) {
       return { ok: false, message: `Skill "${name}" already exists in the active root; refusing to overwrite.` }
@@ -1834,22 +1989,32 @@ export class SkillLibrary {
       const link = await this.io.isSymlink(source)
       if (link === true) return { ok: false, message: `Archived entry "${chosen}" is a symlink; refusing to restore it.` }
     }
-    try {
-      await this.io.rename(source, dest)
-    } catch {
-      try {
-        await this.io.copy(source, dest)
-        await this.io.remove(source)
-      } catch (error) {
-        // 0.3.16 (E-13 follow-up): the fallback failure must come back as a
-        // structured result, never a rejection — consolidates call this in a
-        // rollback loop and a throw there would replace the rollback report.
-        return { ok: false, message: `Restore of "${name}" from .archive failed: ${error instanceof Error ? error.message : String(error)}` }
-      }
+    // P2-9 (v15): same writer-collision probe as archive — restoring ONTO a
+    // skill a writer is mid-write on would drop the new bytes behind the
+    // restored tree.
+    if (await this.hasWriteLock(dest)) {
+      return { ok: false, message: `Skill "${name}" is being written (write lock present); retry restoring once the write completes.` }
     }
+    const moveFailure = await this.moveDir(source, dest)
+    if (moveFailure !== undefined) {
+      // 0.3.16 (E-13 follow-up): the fallback failure must come back as a
+      // structured result, never a rejection — consolidates call this in a
+      // rollback loop and a throw there would replace the rollback report.
+      return { ok: false, message: `Restore of "${name}" from .archive failed: ${moveFailure}` }
+    }
+    // P2 (v16): scrub lock residue that rode inside the archived entry (a
+    // crashed writer, or the archive-probe TOCTOU strand) — a live-pid lock
+    // landing in the live root structurally closes the writers' self-heal and
+    // would keep the restored skill unwritable until process restart.
+    await this.deleteStrandedLocks(dest)
     if (await this.io.exists(join(dest, '.archive-reason'))) {
       await this.io.remove(join(dest, '.archive-reason'))
     }
+    // P3 (v15): `.mutations.json` documents "records every skill mutation" —
+    // restore (including consolidate's rollback restores) was the one
+    // mutation invisible in the audit history. before=null (absent from the
+    // tree), after=the restored SKILL.md bytes (best-effort read).
+    await this.audit(name, 'restore', null, await this.io.readText(join(dest, 'SKILL.md')).catch(() => null), `restored from ${source}`)
     this.notifyMutation({ action: 'restore', name, skillDir: dest })
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
@@ -1863,9 +2028,11 @@ export class SkillLibrary {
   }
 
   private async writeSupportFileCore(name: string, filePath: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
-    const dir = this.dirOf(name)
+    // P3 (v17): guard BEFORE dirOf — the last holdout of the old order
+    // (updateCore/patchCore/removeSupportFileCore all check first).
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
+    const dir = this.dirOf(name)
     if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${name}" not found.` }
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
@@ -1912,7 +2079,14 @@ export class SkillLibrary {
     if (validation) return { ok: false, message: validation }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     if (!await this.io.exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
+    // P2-10 (v15): `io.remove` is a recursive rm, so a DIRECTORY path passed
+    // as file_path (nested support dirs are a feature) would wipe the whole
+    // subtree with only a null audit `before` — bytes gone without a hash.
+    // A regular file always reads as a string here; exists+unreadable means
+    // directory (EISDIR) or an unreadable file — refuse both (fail-closed;
+    // directories must be removed file by file).
     const before = await this.io.readText(target).catch(() => null)
+    if (before === null) return { ok: false, message: `"${filePath}" is not a readable regular file — remove the files inside it one by one.` }
     await this.io.remove(target)
     await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
@@ -2148,6 +2322,15 @@ export class SkillLibrary {
       } else if (manifest.hasArchive === false) {
         await this.io.remove(archiveRoot)
       }
+    }
+    // P3 (v17): the snapshot channel has the same stranded-lock hazard as
+    // restoreFromArchive (v16 fixed only that entry point) — a writer lock
+    // that rode into the snapshot rides back into the live root here, where
+    // its live-pid body structurally closes the writers' self-heal. Sweep
+    // every restored skill directory best-effort.
+    for (const entry of await this.io.list(this.root)) {
+      if (entry.startsWith('.')) continue
+      await this.deleteStrandedLocks(join(this.root, entry))
     }
   }
 }

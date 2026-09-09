@@ -209,3 +209,22 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
+
+describe('v17: mutateUsage preserves wrong-shape sidecars', () => {
+  it('P3 (v17): a top-level ARRAY sidecar is preserved verbatim by mutateUsage (no {} overwrite)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-shape-'))
+    const io = nodeEvolutionIo()
+    const file = usageFile(root)
+    const original = '[ "legacy array shape" ]'
+    await writeFile(file, original, 'utf8')
+    await mutateUsage(root, io, (map) => {
+      map.set('demo', { ...emptyRecord(), created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z' })
+    })
+    // The wrong-shape bytes are PRESERVED (never overwritten with {}), and
+    // reading still yields an empty map (no phantom records).
+    const after = await import('node:fs/promises').then(m => m.readFile(file, 'utf8'))
+    expect(after).toBe(original)
+    expect((await loadUsage(root, io)).size).toBe(0)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+})

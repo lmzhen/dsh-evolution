@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.63 (patch) — v15→v17 三轮"全量审计 → 修复 → 再审计"闭环（116 项检出，修 107 / 登记 9）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v15/v16/v17.md` + `optimization-plan-v15.md` + `optimization-completion-v15.md` + `dsh-evolution-mirror-final-summary-report.md`。三轮检出 **0 P0 / 2 P1 / 21 P2 / 93 P3**（64 → 32 → 20 收敛）；**无 P0/P1 遗留、P2 清零**。发布前独立复核见 `dsh-evolution-mirror-code-quality-check.md`（镜像↔开发树 55/55 逐字节一致、927/927 用例、20 包 tsc 0 错、四守卫全绿、11 项关键交叉点核实、逐 src diff 缺陷审查无新引入 bug）。
+- **行为契约变化（用户/部署可见，逐条）**：
+  1. **`skill_manage` 拒绝 win32 保留设备名技能与非法 `absorbed_into`**；支持文件名**保留 `.lock` 后缀**（写锁协议专用）；`remove_file` **拒绝目录**（此前递归删整棵子树且审计无 before 哈希）。
+  2. **json 状态写回补记录字段门（fail-loud）**；**pending live 表有界**（cap=200，json 与 domain 两 provider 一致，按 `resolvedAt` 淘汰最旧；审计归档 sidecar 仍为 json 特有）。
+  3. **feedback 写独立的 `feedback_score` / `feedback_warn` 字段**（不再写 curator 拥有的 `quality_score`/`quality_warn`）；生命周期陈旧窗与 scope 警告面读 **`quality_warn || feedback_warn` 并集**——负反馈重新影响策展决策（此前被 `scoreTree` 每轮覆写，通道实际是死的）。
+  4. **approval**：reject / capability 路径 claim-scoped resolve（并发写者不再被 stomp）；capability 拒绝文案如实（点明实际放行原因）；`bootGraceSeconds` 钳制上限 3600。
+  5. **`plan-validator`**：非字符串字段按 op 拒绝（此前 TypeError 使整轮 review 失败）；`write_file` 仅认 `file_content`（与执行器一致，不再回退 `content` 写出空文件）。
+  6. **`/graph edit|delete memory:*` 在 approval 启用部署下走 staged 审批**（与 memory 工具同缝）；staged 前置 `hasRunner` 预检（无 runner 时给出可行动错误而非造出不可重放的 pending）。
+  7. **`skill_manage` 枚举删除 `skip`**（死面）；review 删除死配置 `executionTimeoutMs`；`EVOLUTION_ENV_KEYS` 死导出删除。
+  8. **`/evolution doctor [--json]` 进入单源命令表**；consolidate/restructure 用法补 `[--plan <runId>]`。
+  9. **上游 scope 占用清单与弱契约 cast 类型化**（`llm`/`ToolGuard`/`PromptSection`/`PromptContext` 等改用真实上游类型；升级安全，非运行时变化）。
+- **批次要点**：**B1** 写边界名称守卫矩阵全覆盖（`patch`/探测四方法/`absorbedInto`/保留名/移动者逃生通道）、moveDir 探-拒与降级守卫、create 存在性移入跨进程 transact、`renderContext` 单代序列化；**B2** 审批 claim-scoped 全路径、io 注册表身份幂等 + 代际守卫、curator stateless 一次性 warn、远程 subagent 限制文档化、io 默认 provider 显式化；**B3** 命令表/env 表/发布 scope 口径单源、patch 注释与 pin 口径、失实注释清理、镜像工程面边界声明；**B4** io 错误分类（`isSymlink` 只对缺失返回 null）、原子写保留目标 mode、锁体形状校验（`pid:token`，用户 `*.lock` 支持文件不再误判/误删）、威胁规则边界（`.envrc` 不误报、JWT 形态检测、unicode 可豁免）、activity/replay 有限数守卫、记忆备份与过滤提示；**B5** 默认值单点（5 个 `DEFAULT_*`）、门禁降噪（N4 死兜底清单下线，78 行误报消失）、接缝包契约用例、模块级状态语义注释、其余小项。
+- **门禁**：全量 **110 spec / 927 用例通过**（`--maxWorkers=4`；个别慢用例贴近默认 5s 超时，高负载下可能抖动——以 CI 为准）；受影响 20 包 `tsc --noEmit` exit 0；arch-guards / event-pairing / dependency-closure / profile-bundles 四守卫全绿；发布前独立复核另跑：镜像↔开发树 55/55 sha256 一致、P1-1 与 P2-1 两条真实红→绿实证。
+- **登记不修（9 项，均有触发条件）**：curator 无 state 时 interval 基线=进程寿命（已告警）；远程 subagent 子读不可见（README Known Limitations）；domain 侧无归档 sidecar；threat 逐字段扫描分片绕过（Hermes 同源）；policy 不下探嵌套对象；moveDir 探针→rename TOCTOU 残余（fail-safe）；嵌套支持子目录锁不在探针深度；seam 层锁判别物料未暴露；`.lock` 后缀保留对既有用户文件的存量影响（升级说明）。
+
 ## 0.3.62 (patch) — v14 全量审计优化批：安全边界 + 契约对称 + 鲁棒性 + 单源文档（B1–B5 全量，49 文件 / +772 −145 / 20 条新判别用例）
 
 - **来源**：`dsh-evolution-mirror-audit-report-v14.md`（1×P1 + 9×P2 + 39×P3，首次全量审计）→ `optimization-plan-v14.md`（B1–B5 五批 + §7 扩展点 + §8 非目标）→ 实施完成情况见 `optimization-completion-v14.md`（含发布前独立复核章节：镜像↔开发树 46/46 sha256 一致、110 files/898 tests、21 包 tsc 0、oxlint 0/0、四道守卫 exit 0、P1-1 与 P2-1 两条真实红→绿实证）。

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { computeLifecycleTransitions, computeScopeView, lifecycleCandidate, parseCuratorNominations, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { computeLifecycleTransitions, computeScopeView, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
 it('curator transitions active -> stale -> archived by idle time', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')
@@ -201,4 +201,54 @@ it('V6-36: a protected builtin lands in the protected bucket of the scope view (
   const view = computeScopeView(usage, { staleAfterDays: 30, archiveAfterDays: 90 })
   expect(view.managed).toEqual([])
   expect(view.protected).toEqual(['plan'])
+})
+
+it('P1-1 (v15): feedback_warn ALONE applies the short quality-warn stale window', () => {
+  // The v15 audit graded the feedback->lifecycle channel P1-dead: scoreTree
+  // overwrites quality_warn before this engine reads it, so the feedback
+  // package's advertised purpose (negative feedback accelerates stale)
+  // never fired. The engine now reads the UNION of both warn flags — here
+  // with quality_warn ABSENT and feedback_warn set (the post-fix steady
+  // state while a curator run has not yet recomputed anything).
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const idle = new Date(now.getTime() - 10 * 86_400_000)
+  const usage = new Map()
+  usage.set('disliked-skill', { created_by: 'agent', created_at: idle.toISOString(), use_count: 1, view_count: 0, patch_count: 0, last_used_at: idle.toISOString(), last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null, feedback_warn: true })
+  const result = computeLifecycleTransitions(usage, { staleAfterDays: 30, archiveAfterDays: 90, qualityWarnStaleAfterDays: 7 }, now)
+  expect(result.markStale).toEqual(['disliked-skill'])
+  expect(result.transitions[0]?.reason).toContain('feedback-warn stale 7d')
+})
+
+it('P3 (v17): both warn flags true attributes to feedback (tie-break, documented)', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const idle = new Date(now.getTime() - 10 * 86_400_000)
+  const usage = new Map()
+  usage.set('both-warned', { created_by: 'agent', created_at: idle.toISOString(), use_count: 1, view_count: 0, patch_count: 0, last_used_at: idle.toISOString(), last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null, quality_warn: true, feedback_warn: true })
+  const result = computeLifecycleTransitions(usage, { staleAfterDays: 30, archiveAfterDays: 90, qualityWarnStaleAfterDays: 7 }, now)
+  expect(result.markStale).toEqual(['both-warned'])
+  expect(result.transitions[0]?.reason).toContain('feedback-warn stale 7d')
+})
+
+it('P1-1 (v15): foldCuratorFields never overwrites the feedback-owned pair', () => {
+  // Field-ownership contract (UsageRecord): scoreTree's recomputed meta pair
+  // refreshes quality_* tree-wide, but feedback_* belongs to the feedback
+  // channel and must survive a curator run intact — that is what keeps the
+  // decision input alive between the feedback write and the next run.
+  const disk = new Map([['x', { created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 1, view_count: 0, patch_count: 0, last_used_at: null, last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null, feedback_score: -1, feedback_warn: true } as UsageRecord]])
+  const curated = new Map([['x', { created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 1, view_count: 0, patch_count: 0, last_used_at: null, last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null, quality_score: 0.9, quality_warn: false } as UsageRecord]])
+  foldCuratorFields(disk, curated)
+  const record = disk.get('x')!
+  expect(record.quality_score).toBe(0.9)
+  expect(record.quality_warn).toBe(false)
+  expect(record.feedback_score).toBe(-1)
+  expect(record.feedback_warn).toBe(true)
+})
+
+it('P1-1 (v15): the scope view warns on the union (predicts the engine)', () => {
+  const now = new Date('2026-08-01T00:00:00.000Z')
+  const recent = new Date(now.getTime() - 2 * 86_400_000)
+  const usage = new Map()
+  usage.set('fb-skill', { created_by: 'agent', created_at: recent.toISOString(), use_count: 1, view_count: 0, patch_count: 0, last_used_at: recent.toISOString(), last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null, feedback_warn: true })
+  const view = computeScopeView(usage, { staleAfterDays: 30, archiveAfterDays: 90 })
+  expect(view.qualityWarned).toContain('fb-skill')
 })

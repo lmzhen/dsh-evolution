@@ -18,6 +18,7 @@ import {
   releasedStatus,
   CURATOR_STATE_KEY,
   CURATOR_STATE_TABLE,
+  PENDING_RESOLVED_CAP as SEAM_PENDING_RESOLVED_CAP,
   PENDING_TABLE,
   PROVIDER_DOMAIN,
   REVIEW_STATE_TABLE,
@@ -267,6 +268,35 @@ export function apply(ctx: Context): void {
           resolved.record = { ...current, status, resolvedAt: new Date().toISOString() }
           return resolved.record
         })
+        // P2-4 (v15): the live pending table is bounded by the seam contract
+        // (`PENDING_RESOLVED_CAP`, the same number the json provider enforces)
+        // — the domain table used to grow without bound because json's
+        // cap/archive had no domain counterpart. json's audit ARCHIVE sidecar
+        // stays json-specific (no sidecar facility on the domain seam).
+        // P2 (v16): three corrections to the first cut — (1) the budget counts
+        // RESOLVED records only (pending/executing no longer shrink it), which
+        // is what the seam JSDoc and json's `enforceResolvedCap` already say;
+        // (2) a missing/unparseable resolvedAt sorts LAST (json parity — an
+        // unknown time must not make a record the oldest), via Date.parse
+        // instead of localeCompare so both providers agree on ordering;
+        // (3) eviction is best-effort: the resolve has already committed, so a
+        // delete failure warns instead of surfacing as a failed approve.
+        if (resolved.record !== null) {
+          const resolvedEntries = [...table.entries()]
+            .map(([key, record]) => ({ key, record: record as PendingRecord }))
+            .filter(entry => entry.record.status === 'approved' || entry.record.status === 'rejected')
+          const resolvedAtMs = (record: PendingRecord): number => {
+            const parsed = Date.parse(record.resolvedAt ?? '')
+            return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed
+          }
+          resolvedEntries.sort((a, b) => resolvedAtMs(a.record) - resolvedAtMs(b.record))
+          const evicted = resolvedEntries.slice(0, Math.max(0, resolvedEntries.length - SEAM_PENDING_RESOLVED_CAP))
+          for (const entry of evicted) {
+            await table.delete(entry.key).catch((error: unknown) => {
+              ctx.logger.warn(`evolution-state-domain: pending-cap eviction for "${entry.key}" failed (will retry on the next resolve): ${error instanceof Error ? error.message : String(error)}`)
+            })
+          }
+        }
         const rawRecord: unknown = record
         if (resolved.record === null) return { record: rawRecord === null ? null : { ...(rawRecord as PendingRecord) }, applied: false }
         return { record: { ...resolved.record }, applied: true }

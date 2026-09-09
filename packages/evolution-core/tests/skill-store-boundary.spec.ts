@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, loadMutations } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 function fakeIo(): EvolutionIoLike & { files: Map<string, string> } {
@@ -237,5 +237,185 @@ describe('V14 name-guard unification and archive metadata', () => {
     // report "rolled back" while the tree stays archived.
     expect(await io.exists('/skills/.archive/boundary-skill/SKILL.md')).toBe(true)
     expect((await lib.listMutations()).some(record => record.skillName === 'boundary-skill' && record.action === 'archive')).toBe(true)
+  })
+})
+
+describe('V15 write-boundary closures', () => {
+  it('P2-8: archive refuses a traversal absorbed_into instead of probing outside the root', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    io.files.set('/outside/SKILL.md', SKILL.replace('boundary-skill', 'outside'))
+    io.files.set('/outside/secret.txt', 'TOP SECRET')
+    const before = io.files.get('/outside/secret.txt')
+    const result = await lib.archive('boundary-skill', { absorbedInto: '../outside' })
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('absorbed_into')
+    // Nothing outside the root was read/renamed, and the skill stays live.
+    expect(io.files.get('/outside/secret.txt')).toBe('TOP SECRET')
+    expect(before).toBe('TOP SECRET')
+    expect(await lib.read('boundary-skill')).not.toBeNull()
+  })
+
+  it('P2-11: a win32 reserved device stem is refused as a skill name (structured, not raw errno)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    for (const name of ['con', 'nul', 'com1', 'lpt9']) {
+      const created = await lib.create(name, SKILL.replace('boundary-skill', name), 'foreground')
+      expect(created.ok, name).toBe(false)
+      expect(created.message, name).toContain('Windows reserved device name')
+      expect(await io.exists(`/skills/${name}/SKILL.md`), name).toBe(false)
+    }
+  })
+
+  it('P2-10: remove_file refuses a DIRECTORY path instead of recursively wiping it', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    await lib.writeSupportFile('boundary-skill', 'references/sub/one.md', 'ONE')
+    await lib.writeSupportFile('boundary-skill', 'references/sub/two.md', 'TWO')
+    const removed = await lib.removeSupportFile('boundary-skill', 'references/sub')
+    expect(removed.ok).toBe(false)
+    expect(removed.message).toContain('not a readable regular file')
+    // Both files survive.
+    expect(await io.readText('/skills/boundary-skill/references/sub/one.md')).toBe('ONE')
+    expect(await io.readText('/skills/boundary-skill/references/sub/two.md')).toBe('TWO')
+  })
+
+  it('P2-9: archive succeeds through a transact-capable backend (lock path), moving the whole tree', async () => {
+    // fakeIo has NO transact; layer one on top with the transact contract
+    // (read -> task -> write, null deletes) so the P2-9 lock path runs.
+    const base = fakeIo()
+    const io: EvolutionIoLike & { files: Map<string, string> } = {
+      ...base,
+      files: base.files,
+      async transact(path, task) {
+        const current = await base.readText(path)
+        const next = await task(current)
+        if (next === null) await base.remove(path)
+        else if (next !== current) await base.writeText(path, next)
+      },
+    }
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    await lib.writeSupportFile('boundary-skill', 'references/detail.md', '# Detail')
+    const archived = await lib.archive('boundary-skill')
+    expect(archived.ok).toBe(true)
+    expect(await io.readText(`${archived.path}/SKILL.md`)).toBeTruthy()
+    expect(await io.readText(`${archived.path}/references/detail.md`)).toBe('# Detail')
+    expect(await io.exists('/skills/boundary-skill')).toBe(false)
+  })
+
+  it('P3: restoreFromArchive writes an audit record (the one mutation that used to be invisible)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    await lib.archive('boundary-skill')
+    const restored = await lib.restoreFromArchive('boundary-skill')
+    expect(restored.ok).toBe(true)
+    const mutations = await loadMutations('/skills', io)
+    expect(mutations.some(record => record.skillName === 'boundary-skill' && record.action === 'restore')).toBe(true)
+  })
+})
+
+describe('V17 lock-probe and lock-sweep precision', () => {
+  it('P3 (v17): a writer-shaped lock in a support dir refuses the archive', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    await lib.writeSupportFile('boundary-skill', 'references/note.md', '# note')
+    // A writer lock for the support file (pid:token body — the io layer's shape).
+    io.files.set('/skills/boundary-skill/references/note.md.lock', '4242:deadbeef')
+    const archived = await lib.archive('boundary-skill')
+    expect(archived.ok).toBe(false)
+    expect(archived.message).toContain('write lock present')
+    expect(await io.exists('/skills/boundary-skill/SKILL.md')).toBe(true)
+  })
+
+  it('P2 (v17): a user support file named *.lock does NOT block archiving (body-shape probe)', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    // Legacy tree: the file predates the reserved suffix; its body is user content.
+    io.files.set('/skills/boundary-skill/references/timer.lock', 'MY TIMER STATE v3')
+    const archived = await lib.archive('boundary-skill')
+    expect(archived.ok).toBe(true)
+    // The user file rides along into the archive untouched.
+    expect(await io.readText('/skills/.archive/boundary-skill/references/timer.lock')).toBe('MY TIMER STATE v3')
+  })
+
+  it('P2 (v17): write_file refuses the reserved .lock suffix', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    const result = await lib.writeSupportFile('boundary-skill', 'references/timer.lock', 'state')
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('.lock suffix is reserved')
+    expect(await io.exists('/skills/boundary-skill/references/timer.lock')).toBe(false)
+  })
+
+  it('P3 (v17): restore sweeps a stranded writer lock but keeps user files', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    await lib.writeSupportFile('boundary-skill', 'references/note.md', '# note')
+    // Simulate a stranded writer lock that rode into .archive (a crash or the
+    // archive-probe TOCTOU — lib.archive itself would now refuse a live lock).
+    await io.copy('/skills/boundary-skill', '/skills/.archive/boundary-skill')
+    await io.remove('/skills/boundary-skill')
+    // The stranded writer lock rides in the archived entry (body pid:token).
+    io.files.set('/skills/.archive/boundary-skill/references/note.md.lock', '4242:deadbeef')
+    expect(await io.exists('/skills/.archive/boundary-skill/SKILL.md')).toBe(true)
+    expect(await io.exists('/skills/.archive/boundary-skill/references/note.md.lock')).toBe(true)
+    const restored = await lib.restoreFromArchive('boundary-skill')
+    expect(restored.ok).toBe(true)
+    // The stranded lock is swept; the real support file survives.
+    expect(await io.exists('/skills/boundary-skill/references/note.md.lock')).toBe(false)
+    expect(await io.readText('/skills/boundary-skill/references/note.md')).toBe('# note')
+  })
+
+  it('P3 (v17): marker writer locks (.pinned.lock) refuse the archive too', async () => {
+    const io = fakeIo()
+    const lib = new SkillLibrary('/skills', io)
+    await lib.create('boundary-skill', SKILL, 'foreground')
+    io.files.set('/skills/boundary-skill/.pinned.lock', '4242:deadbeef')
+    const archived = await lib.archive('boundary-skill')
+    expect(archived.ok).toBe(false)
+    expect(archived.message).toContain('write lock present')
+  })
+
+  it('P2 (v17): create refuses atomically when the skill appears at commit time', async () => {
+    // Layer a transact over the fake in which a CONCURRENT creator lands the
+    // file between create's lock-free probe and the in-lock re-check — the
+    // v17 fix refuses there instead of overwriting the winner.
+    const base = fakeIo()
+    let concurrentCreated = false
+    const io: EvolutionIoLike & { files: Map<string, string> } = {
+      ...base,
+      files: base.files,
+      async exists(path) {
+        // create's early probe sees nothing; the transact re-check must catch it.
+        if (!concurrentCreated && path.replaceAll('\\', '/').endsWith('/raced/SKILL.md')) return false
+        return base.exists(path)
+      },
+      async transact(path, task) {
+        if (!concurrentCreated && path.replaceAll('\\', '/').endsWith('/raced/SKILL.md')) {
+          concurrentCreated = true
+          // The concurrent creator uses DIFFERENT bytes: if the loser's write
+          // went through, the assertion below would see 'LOSER' and fail.
+          await base.writeText(path, SKILL.replace('boundary-skill', 'raced').replace('Boundary test skill.', 'WINNER description'))
+        }
+        const current = await base.readText(path)
+        const next = await task(current)
+        if (next === null) await base.remove(path)
+        else if (next !== current) await base.writeText(path, next)
+      },
+    }
+    const lib = new SkillLibrary('/skills', io)
+    const created = await lib.create('raced', SKILL.replace('boundary-skill', 'raced'), 'foreground')
+    expect(created.ok).toBe(false)
+    expect(created.message).toContain('already exists')
+    // The concurrent creator's bytes were NOT overwritten by the loser.
+    expect(io.files.get('/skills/raced/SKILL.md')).toContain('WINNER description')
   })
 })

@@ -31,6 +31,14 @@ export const canResolvePending = (status: PendingStatus): boolean => status === 
  * runner FAILURE is retryable); other statuses pass through unchanged. */
 export const releasedStatus = (status: PendingStatus): PendingStatus => status === 'executing' ? 'pending' : status
 
+/** P2-4 (v15): the live pending map/table is BOUNDED — both providers keep at
+ * most this many resolved (approved/rejected) records, dropping the oldest by
+ * `resolvedAt`. Single source (the v15 audit found the bound was json-only,
+ * so domain deployments grew the table without bound). The audit ARCHIVE
+ * sidecar that json maintains beyond the cap stays json-specific (domain has
+ * no sidecar facility) — declared in both READMEs. */
+export const PENDING_RESOLVED_CAP = 200
+
 /**
  * Claim lifecycle (S3.3): pending →(claim)→ executing →(resolve)→ approved/rejected.
  * release() rolls executing back to pending (failure path). A crash between

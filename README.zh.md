@@ -58,7 +58,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 安装完成后运行一次内置自检确认形态：
 
 ```bash
-/evolution doctor          # 人类可读自检（安装形态/冲突/env/服务清单 + 建议动作）
+/evolution doctor [--json] # 人类可读自检（安装形态/冲突/env/服务清单 + 建议动作）；--json 供脚本消费
 /evolution doctor --json   # 脚本友好
 ```
 
@@ -88,7 +88,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 `packages/evolution-commands/src/registry.ts` 注册表（hint / help / README 表格的单源）的
 全量枚举，版本以 CHANGELOG head 为准（不在此处钉死版本号）：
 
-`pending [--detail]` · `approve <id>` · `reject <id>` · `curator run` ·
+`pending [--detail]` · `approve <id>` · `reject <id>` · `doctor [--json]` · `curator run` ·
 `curator pause` · `curator resume` · `curator status` · `curator report` ·
 `curator scope` · `mutations` · `restore`（快照恢复） ·
 `consolidate <target> <sources...> [--plan <runId>]` · `skill restore <name>` ·

@@ -181,8 +181,9 @@ runs:
       working-directory: upstream
       run: |
         # 0.3.23: strict mode is on — N1/N2 are zero-tolerance (single-source
-        # contracts); 0.3.25 flipped N3 into the gate too (numeric clamps); N4
-        # stays a warn-only listing (many `?? xId` are legitimate defaults).
+        # contracts); 0.3.25 flipped N3 into the gate too (numeric clamps);
+        # P3-2 (v14): the warn-only N4 "dead-fallback" listing was removed
+        # (78/78 false positives), so the gate is N1/N2/N3 + H2 ghost keys.
         node packages/evolution/scripts/verify-arch-guards.mjs packages/evolution --strict
 
     - name: Verify event pairing (G7.3)

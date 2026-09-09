@@ -22,6 +22,16 @@ export interface UsageRecord {
   archived_at: string | null
   quality_score?: number | undefined
   quality_warn?: boolean | undefined
+  /** P1-1 (v15): feedback-owned quality signal. Field ownership contract —
+   * `quality_score`/`quality_warn` are written ONLY by the curator's
+   * six-factor `scoreTree`; `feedback_score`/`feedback_warn` are written ONLY
+   * by the feedback channel (`SkillUsageRegistry.setFeedbackQuality`);
+   * `foldCuratorFields` refreshes the quality_* pair tree-wide and must never
+   * touch feedback_*. The lifecycle engine and the scope view read the UNION
+   * of both warn flags, which is what makes negative feedback decision-
+   * relevant again. */
+  feedback_score?: number | undefined
+  feedback_warn?: boolean | undefined
 }
 
 export type UsageMap = Map<string, UsageRecord>
@@ -91,6 +101,8 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
     archived_at: nullableTimestamp(raw.archived_at) ? raw.archived_at : base.archived_at,
     quality_score: typeof raw.quality_score === 'number' && Number.isFinite(raw.quality_score) ? raw.quality_score : undefined,
     quality_warn: typeof raw.quality_warn === 'boolean' ? raw.quality_warn : undefined,
+    feedback_score: typeof raw.feedback_score === 'number' && Number.isFinite(raw.feedback_score) ? raw.feedback_score : undefined,
+    feedback_warn: typeof raw.feedback_warn === 'boolean' ? raw.feedback_warn : undefined,
   }
 }
 
@@ -129,9 +141,18 @@ export async function mutateUsage(root: string, io: EvolutionIoLike, task: (map:
   await transactIo(io, usageFile(root), async (current) => {
     // P3 (v3 audit): a malformed sidecar is never overwritten by the RMW —
     // JSON.parse swallow→empty then persist would destroy recoverable telemetry.
+    // P3 (v17): the same preserve applies to "valid JSON, wrong top-level
+    // shape" (array/scalar) — parseUsage folds those to an empty map, and
+    // persisting that would DESTROY the original bytes (mutations.ts and the
+    // suppression sidecar both keep array compat; usage is the odd one out).
+    let shapePreserved = false
     if (current !== null) {
-      try { JSON.parse(current) } catch { return current }
+      try {
+        const probe = JSON.parse(current) as unknown
+        if (probe === null || Array.isArray(probe) || typeof probe !== 'object') shapePreserved = true
+      } catch { return current }
     }
+    if (shapePreserved) return current
     const map = parseUsage(current)
     await task(map)
     return JSON.stringify(Object.fromEntries(map.entries()), null, 2)
@@ -163,6 +184,9 @@ export function applyCuratorLifecycleFields(disk: UsageRecord, curated: UsageRec
  * Copy the recomputed meta pair (quality_score/quality_warn + the
  * marker-mirrored pin flag) — refreshed tree-wide each run by design, so a
  * concurrent curator run's lifecycle changes are never reverted by them.
+ * P1-1 (v15): the feedback pair (`feedback_score`/`feedback_warn`) is
+ * deliberately NOT copied — it is feedback-owned (see the field-ownership
+ * contract on {@link UsageRecord}) and must survive curator runs untouched.
  */
 export function applyCuratorMetaFields(disk: UsageRecord, curated: UsageRecord): void {
   disk.quality_score = curated.quality_score

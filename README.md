@@ -105,7 +105,7 @@ single source with the input hint and the emitted help/README text):
 | `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
 | `/evolution approve <id>` | replay an approved staged write through its runner |
 | `/evolution reject <id>` | drop a staged write without running it |
-| `/evolution doctor` | read-only self-check: install form, conflicts, env, services |
+| `/evolution doctor [--json]` | read-only self-check: install form, conflicts, env, services (--json feeds scripts) |
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
 | `/evolution mutations` | list skill-mutation audit records |
 | `/evolution restore` | restore skills from the latest snapshot |
@@ -127,7 +127,7 @@ single source with the input hint and the emitted help/README text):
 | scope | global / per-session | package choice — evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
 | curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` (evolution-curator) |
 | memoryInjection | on / off | `memoryEnabled` (tool-memory: guidance + snapshot injection) |
-| threatStrictness | strict / exempt-list | threat Config + `threatExemptLabels` (SkillLibrary/MemoryStore option, P2-18) |
+| threatStrictness | strict / exempt-list | `threatExemptLabels` — per config site: the evolution-threat row, the tool-skill-manage row, the evolution-commands row, and the SkillLibrary/MemoryStore store options (P2-18 + P2-4) |
 
 Fine-grained knobs run into the three-level appendix: **daily** (review
 intervals, curator cadence), **tuning** (health thresholds, quality weights),

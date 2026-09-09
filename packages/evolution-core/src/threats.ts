@@ -129,11 +129,14 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   // and bidi characters are never legitimate in stored knowledge, so they block
   // even under `scope: 'all'`. The exemption surface still applies: a
   // deployment that knows a label is benign can allowlist it like any other.
+  // P3 (v15): the finding carries scope:'all' — pattern findings report their
+  // own pattern scope, and these checks apply at EVERY scope, so echoing the
+  // requested scope here was diagnostic noise, not information.
   if (ZERO_WIDTH_CHARS.test(text) && !excluded.has('unicode_zero_width')) {
-    findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope })
+    findings.push({ label: 'unicode_zero_width', category: 'unicode_obfuscation', scope: 'all' })
   }
   if (BIDI_CHARS.test(text) && !excluded.has('unicode_bidi_override')) {
-    findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope })
+    findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope: 'all' })
   }
   const normalized = text.normalize('NFKC')
   const windows: string[] = []

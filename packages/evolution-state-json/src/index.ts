@@ -19,6 +19,7 @@ import {
   PENDING_ARCHIVE_BAK_FILE,
   PENDING_ARCHIVE_FILE,
   PENDING_LEGACY_FILE,
+  PENDING_RESOLVED_CAP as SEAM_PENDING_RESOLVED_CAP,
   PENDING_STATE_FILE,
   PROVIDER_JSON,
   REVIEW_STATE_FILE,
@@ -51,9 +52,10 @@ export const Config: z<Config> = z.object({
 
 /** 0.3.22 (F-336): resolved (approved/rejected) audit records are capped in
  * the LIVE pending map so a long-running deployment never grows it without
- * bound; the oldest over the cap are archived (made package-private so the
- * archive sidecar and the provider enforce one number). */
-const PENDING_RESOLVED_CAP = 200
+ * bound; the oldest over the cap are archived. P2-4 (v15): the number lives
+ * on the seam (`SEAM_PENDING_RESOLVED_CAP`) so the domain provider enforces
+ * the same bound; the archive sidecar below stays json-specific. */
+const PENDING_RESOLVED_CAP = SEAM_PENDING_RESOLVED_CAP
 
 /** 0.3.27 (V4-01): the audit sidecar (pending-state-archive.json) is bounded
  * at this many resolved records. Past it the oldest history rotates to a
@@ -217,6 +219,17 @@ const corruptWritten = new Map<string, string>()
 // `.corrupt` existence probe in ensureCorruptCopy re-checks the actual root).
 const corruptWriteWarned = new Set<string>()
 
+/** P3 (v15): name carried by the two fail-loud write gates in `jsonTransact`
+ * (task-return shape, write-back field gate) so best-effort wrappers —
+ * `retireLegacyOnce` is the one that matters — rethrow instead of deferring. */
+const WRITE_GATE_ERROR_NAME = 'EvolutionStateWriteGate'
+
+function writeGateError(message: string): Error {
+  const error = new Error(message)
+  error.name = WRITE_GATE_ERROR_NAME
+  return error
+}
+
 function reportGateViolation(ctx: Context, file: string, failing: Array<[string, unknown]>): void {
   if (recordGateWarned.has(file)) return
   recordGateWarned.add(file)
@@ -231,7 +244,20 @@ async function ensureCorruptCopy(
   bad: Record<string, unknown>,
 ): Promise<void> {
   const corruptPath = `${join(root, file)}.corrupt`
-  const corruptKey = JSON.stringify(Object.keys(bad).sort())
+  // P3 (v16, correcting the v15 first cut; refined v17): the dedupe key is a
+  // PER-RECORD SHAPE digest — for every failing record id, the record's own
+  // field names + value TYPES. (The v15 attempt walked `Object.entries(bad)`
+  // one level too high: `field` was the record id and `typeof value` was
+  // always 'object'.) HONEST LIMITS: the key is shape-sensitive, not
+  // value-sensitive — two reads of the same record with different VALUES of
+  // the same fields still dedupe to one rescue copy, and the key size is
+  // bounded by the bad records' own field count (values never enter it).
+  const corruptKey = JSON.stringify(Object.entries(bad).map(([id, record]) => ({
+    id,
+    fields: typeof record === 'object' && record !== null
+      ? Object.entries(record as Record<string, unknown>).map(([field, value]) => `${field}:${Array.isArray(value) ? 'array' : typeof value}`).sort()
+      : [typeof record],
+  })).sort((a, b) => a.id.localeCompare(b.id)))
   if (corruptWritten.get(file) === corruptKey && await io().exists(corruptPath)) return
   const wrote = await io().writeText(corruptPath, JSON.stringify(bad, null, 2)).then(() => true).catch(() => false)
   if (wrote) {
@@ -300,17 +326,21 @@ export async function jsonTransact<T>(
     // Fail loud before any write.
     if (next !== null && RECORD_MAP_FILES.has(file) && !isPlainRecord(next)) {
       const kind = Array.isArray(next) ? 'an array' : typeof next
-      throw new Error(`evolution state file "${file}" task returned ${kind} (expected null or a plain JSON object map of records); not written.`)
+      throw writeGateError(`evolution state file "${file}" task returned ${kind} (expected null or a plain JSON object map of records); not written.`)
     }
     // P2-1 (v14): the WRITE-BACK must clear the SAME per-record field gate the
-    // read path (:342-362) and the domain provider (zod at put time) enforce.
+    // read path and the domain provider (zod at put time) enforce.
     // Without it a record with a wrong field shape was persisted and then
     // quarantined on the next read — a silent loss window ("written, then
     // gone"). Fail loud before any write, exactly like the shape gate above.
+    // P3 (v15): these throws carry WRITE_GATE_ERROR_NAME so a caller that
+    // wraps best-effort around transact (retireLegacyOnce) can tell
+    // "contract-violating write" (must surface) from "storage hiccup"
+    // (may defer).
     if (next !== null && RECORD_MAP_FILES.has(file)) {
       const failing = gateScan(file, next)
       if (failing.length > 0) {
-        throw new Error(`evolution state file "${file}" write-back carries ${failing.length} record(s) that fail the field gate (${failing.map(([id]) => id).join(', ')}); not written.`)
+        throw writeGateError(`evolution state file "${file}" write-back carries ${failing.length} record(s) that fail the field gate (${failing.map(([id]) => id).join(', ')}); not written.`)
       }
     }
     return next === null ? null : JSON.stringify(next, null, 2)
@@ -482,7 +512,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
       // (set in quarantine below); everything else keeps the best-effort
       // retirement semantics (the file simply stays until a later safe
       // point) but now warns instead of vanishing without a trace.
-      if (error instanceof Error && error.name === QUARANTINE_ERROR_NAME) throw error
+      if (error instanceof Error && (error.name === QUARANTINE_ERROR_NAME || error.name === WRITE_GATE_ERROR_NAME)) throw error
+      // v16 note: the WRITE_GATE rethrow is FORWARD DEFENSE and currently
+      // unreachable — both transact inputs (legacy + fresh) are gate-
+      // sanitized before this point. If it ever fires it means the
+      // sanitize-then-merge invariant broke, and listPending must fail loud
+      // (no silent legacy-only downgrade) until the file is fixed.
       ctx.logger.warn(`evolution-state-json: legacy pending retirement deferred: ${error instanceof Error ? error.message : String(error)}`)
       // P2-26 (v11): the old catch returned the WHOLE legacy map — archived
       // ghost twins escaped into the read view ("visible but never claimable"

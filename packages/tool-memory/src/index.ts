@@ -7,7 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
 import { clampedNumber, resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
 
@@ -117,9 +117,13 @@ export async function apply(ctx: Context, rawConfig: Config): Promise<void> {
   // The mount-time renderContext() is also failure-tolerant: without a
   // registered memory provider the snapshot degrades to empty (self-corrects
   // at the first successful write through the applied-event listener).
+  // P2-13 (v15): the REAL upstream types (a zero-arg `text` closure satisfies
+  // PromptContext's `(ctx) => string`) — upstream signature drift now fails
+  // `tsc` at the mirror. (The hand-written shape was { section({name,order,
+  // text}): () => void; context({name,order,text}): () => void } | undefined.)
   const systemPrompt = ctx.get('systemPrompt') as {
-    section(section: { name: string; order: number; text: string }): () => void
-    context(context: { name: string; order: number; text: () => string }): () => void
+    section(section: PromptSection): () => void
+    context(context: PromptContext): () => void
   } | undefined
   let snapshotText = ''
   try {

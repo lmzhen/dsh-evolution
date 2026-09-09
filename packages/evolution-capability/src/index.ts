@@ -64,6 +64,11 @@ export class EvolutionCapability extends Service {
 
   private readonly limits: Required<Config>
 
+  /** P3 (v15): single source for the default limits — the Config schema and
+   * `validateCapabilityPackage`'s standalone default used to repeat the same
+   * three numbers (drift risk). */
+  static readonly DEFAULT_LIMITS: Required<Config> = { maxNameLength: 64, maxPurposeLength: 200, maxCodeChars: 65_536 }
+
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCapability')
     // G3.1 (0.3.23): every numeric limit is clamped to at least 1. 0/negative
@@ -78,9 +83,9 @@ export class EvolutionCapability extends Service {
       return result
     }
     this.limits = {
-      maxNameLength: field('maxNameLength', config.maxNameLength, 64),
-      maxPurposeLength: field('maxPurposeLength', config.maxPurposeLength, 200),
-      maxCodeChars: field('maxCodeChars', config.maxCodeChars, 65_536),
+      maxNameLength: field('maxNameLength', config.maxNameLength, EvolutionCapability.DEFAULT_LIMITS.maxNameLength),
+      maxPurposeLength: field('maxPurposeLength', config.maxPurposeLength, EvolutionCapability.DEFAULT_LIMITS.maxPurposeLength),
+      maxCodeChars: field('maxCodeChars', config.maxCodeChars, EvolutionCapability.DEFAULT_LIMITS.maxCodeChars),
     }
     if (clamped.length > 0) {
       ctx.logger.warn(`evolution-capability: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
@@ -103,14 +108,21 @@ export class EvolutionCapability extends Service {
     }
     const decision = await approval.request({
       kind: 'capability',
-      summary: `capability ${pkg.name}`,
-      args: pkg,
+      summary: `capability ${pkg.name.trim()}`,
+      // P3 (v15): store the VALIDATED (trimmed) shape, not the raw input —
+      // `name: ' demo '` used to pass validation and land in the pending
+      // record (and later Creator activation) with whitespace intact.
+      args: { ...pkg, name: pkg.name.trim(), purpose: pkg.purpose.trim() },
       origin,
     })
     if (decision.action !== 'staged') {
       // P3 (v3 audit): a capability submission must ALWAYS stage — the
       // allow-direct path would dead-end capability evolution silently.
-      return { ok: false, message: 'Capability submission requires staged approval: set approval.stageForeground=true (it keeps capability submissions paused for review; allow would bypass the audit).' }
+      // P3 (v15): the refusal names the ACTUAL cause (decision.message covers
+      // all three allow paths: disabled, session policy 'never', and
+      // foreground with stageForeground=false) instead of pointing only at
+      // stageForeground.
+      return { ok: false, message: `Capability submission requires staged approval and must never skip the audit; approval allowed a direct write (${decision.message}). Check the session approval policy and the approval stageForeground setting.` }
     }
     return { ok: true, pendingId: decision.pendingId, message: decision.message }
   }
@@ -141,7 +153,7 @@ export interface CapabilityLimits {
 
 export function validateCapabilityPackage(
   pkg: unknown,
-  limits: CapabilityLimits = { maxNameLength: 64, maxPurposeLength: 200, maxCodeChars: 65_536 },
+  limits: CapabilityLimits = EvolutionCapability.DEFAULT_LIMITS,
 ): CapabilityValidation {
   const errors: string[] = []
   if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) {

@@ -67,6 +67,11 @@ export type ApprovalLike = {
   run(kind: PendingKind, args: unknown, intent?: { interface: 'background_review' }): Promise<{ ok: boolean; message: string }>
   hasRunner(kind: PendingKind): boolean
   isEnabled?: boolean
+  /** P3 (v16): whether foreground-origin writes stage (learning-graph's
+   * hasRunner pre-check reads it so it only refuses writes that would
+   * actually be staged). Optional: absent means "unknown" and callers must
+   * not pre-refuse on it. */
+  stageForeground?: boolean
   registerRunner(kind: PendingKind, runner: WriteRunner): () => void
   list(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string): Promise<{ ok: boolean; message: string }>
@@ -120,14 +125,20 @@ export class EvolutionApproval extends Service {
   })
 
   private readonly enabled: boolean
-  private readonly stageForeground: boolean
+  private readonly stageForegroundConfig: boolean
+  /** P3 (v16): public read for staging pre-checks (learning-graph refuses a
+   * stage that no runner could replay only when foreground writes stage at
+   * all). Mirrors `this.stageForeground`. */
+  get stageForeground(): boolean {
+    return this.stageForegroundConfig
+  }
   private readonly runners = new Map<PendingKind, WriteRunner>()
   private readonly inFlight = new Map<string, Promise<{ ok: boolean; message: string }>>()
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionApproval')
     this.enabled = config.enabled ?? false
-    this.stageForeground = config.stageForeground ?? true
+    this.stageForegroundConfig = config.stageForeground ?? true
   }
 
   private state(): EvolutionStateLike {
@@ -262,7 +273,11 @@ export class EvolutionApproval extends Service {
         // writer (the cap rotation magnified it into a misleading claim).
         return { ok: false, message: `Pending write "${id}" is not in the pending window (rotated or resolved).` }
       }
-      const resolution = await this.state().tryResolvePending(id, 'rejected')
+      // P3 (v15): the claim is HELD here — pass it so a concurrent unscoped
+      // writer cannot be stomped (same scoping the approve main path uses
+      // since v14). The stuck-executing rescue above deliberately stays
+      // unscoped (F-204: it holds no claim by design).
+      const resolution = await this.state().tryResolvePending(id, 'rejected', claimId)
       if (!resolution.applied || !resolution.record) {
         // 0.3.17 (E-61): the claim stays HELD otherwise — the reject path was
         // asymmetric with approve (which releases on every failure branch).
@@ -332,8 +347,15 @@ export class EvolutionApproval extends Service {
     const runner = this.runners.get(record.kind)
     if (!runner) {
       if (record.kind === 'capability') {
-        const resolution = await this.state().tryResolvePending(id, 'approved')
-        if (!resolution.applied) return { ok: false, message: `Pending write "${id}" was already resolved.` }
+        // P3 (v15): claim-scoped like the other paths — and when a concurrent
+        // writer won the race, mirror the memory/skill divergence message
+        // instead of a bare "already resolved".
+        const resolution = await this.state().tryResolvePending(id, 'approved', claimId)
+        if (!resolution.applied) {
+          const rejected = (await this.state().listPending('rejected')).find(item => item.id === id)
+          if (rejected) return { ok: false, message: `Capability "${id}" was approved, but the record was resolved to "rejected" concurrently — no code ran and nothing needs replaying; verify before re-submitting.` }
+          return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
+        }
         return { ok: true, message: 'Capability approved for manual activation in Creator mode (no code was executed).' }
       }
       await this.state().releasePendingClaim(id, claimId)
@@ -391,6 +413,9 @@ function normalizeSummary(input: { kind: PendingKind; summary: string; args: unk
   // P3-39 (v14): match the DELETE semantics, not one caller's prefix spelling —
   // learning-graph stages the same operation as "graph delete X" and used to
   // miss the archive warning that review's "skill delete X" got.
-  if (input.kind === 'skill' && /(?:^|\s)delete\s/.test(trimmed)) return `${trimmed} (warning: archive)`
+  // P3 (v15): anchor to the known command spellings so an add/patch whose
+  // SUMMARY merely contains the word "delete" (e.g. `skill create how to
+  // delete dupes`) is not mislabelled as an archiving operation.
+  if (input.kind === 'skill' && /^(?:skill|graph)\s+delete\s/.test(trimmed)) return `${trimmed} (warning: archive)`
   return trimmed
 }

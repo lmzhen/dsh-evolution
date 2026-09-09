@@ -56,7 +56,10 @@ it('a large body with no support groups is flagged as scatter', () => {
 })
 
 it('custom thresholds drive the same rules', () => {
-  const assessment = assessStructureHealth({ skillName: 't', bodyChars: 2_500, supportGroups: 0 }, { softBodyChars: 1_000, stampDensityPerKb: 5 })
+  // E3 (v15): explicit all-fields literal — SkillHealthThresholds requires
+  // churnMinPatches; the old two-field literal only compiled because test
+  // type-coverage let it slip.
+  const assessment = assessStructureHealth({ skillName: 't', bodyChars: 2_500, supportGroups: 0 }, { softBodyChars: 1_000, stampDensityPerKb: 5, churnMinPatches: DEFAULT_HEALTH_THRESHOLDS.churnMinPatches })
   expect(assessment.verdict).toBe('needs-restructure')
 })
 

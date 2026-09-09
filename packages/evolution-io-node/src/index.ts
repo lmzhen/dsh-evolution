@@ -21,18 +21,22 @@ void _nodeProviderIsSeam
 export const name = 'evolution-io-node'
 export const inject = ['evolutionIo']
 
+// P2-3 (v15): the provider is a MODULE-level singleton. `nodeEvolutionIo()`
+// carries no per-instance state (its cross-call bookkeeping, e.g.
+// `pendingSelfCleanup`, is already module-level in core), so instances are
+// interchangeable — a single identity makes the registry's identical-object
+// idempotency work: a second apply (HMR / re-mounted row) re-registers the
+// SAME object and gets the original dispose instead of "already registered".
+const provider: EvolutionIo = { name: 'node', ...nodeEvolutionIo() }
+
 export function apply(ctx: Context): void {
-  const provider: EvolutionIo = {
-    name: 'node',
-    ...nodeEvolutionIo(),
-  }
-  // P3-11 (v14): a second apply (HMR or a re-mounted row) must not throw
-  // "already registered" — our own provider being present is the idempotent
-  // case; a DIFFERENT provider under the same name still fails loud in
-  // registerProvider.
-  if (ctx.evolutionIo.hasProvider(provider.name)) return
   // P2-7 (v14): declare the node backend as the nameless `provider()` default
   // so an additionally registered backend cannot silently become the one every
   // production consumer resolves.
+  // P2-3 (v15): no `hasProvider` early-return — the v14 early-return made the
+  // "foreign provider under the same name fails loud" contract UNREACHABLE
+  // (any name collision was silently swallowed, and the second mount silently
+  // dropped its default declaration and dispose). The registry now
+  // distinguishes: identical object → idempotent; different object → throw.
   ctx.effect(() => ctx.evolutionIo.registerProvider(provider, { default: true }), 'evolution-io-node.provider')
 }

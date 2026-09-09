@@ -22,3 +22,4 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - Persists through the IO seam; quality propagation into skill usage requires the `skillUsage` service.
+- P1-1 (v15): feedback writes the FEEDBACK-OWNED `feedback_score`/`feedback_warn` usage fields. The lifecycle engine and the scope view read the union `quality_warn || feedback_warn`, so a negative feedback shortens the stale window even though the curator's six-factor run always recomputes `quality_warn` itself.

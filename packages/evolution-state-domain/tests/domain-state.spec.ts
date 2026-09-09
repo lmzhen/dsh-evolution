@@ -174,3 +174,77 @@ describe('P2-4: transactCuratorState missing-key optimistic retry', () => {
     expect(counters.puts).toBe(1)
   })
 })
+
+describe('V15 pending-table bound and claim-scoped resolve', () => {
+  const record = (id: string, status: 'pending' | 'approved' | 'rejected', resolvedAt?: string) => ({
+    id, kind: 'skill' as const, summary: `s ${id}`, args: {}, createdAt: '2026-01-01T00:00:00Z',
+    status, ...(resolvedAt ? { resolvedAt } : {}),
+  })
+
+  it('E1 (v15): claim-scoped resolve refuses a foreign claim (same rule as json)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc4-'))
+    const ctx = await mount(home)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    await provider.savePending(record('p1', 'pending'))
+    const claimed = await provider.claimPending('p1', 'claim-a')
+    expect(claimed?.status).toBe('executing')
+    // A foreign claimId cannot resolve it; the owner can.
+    const foreign = await provider.tryResolvePending('p1', 'approved', 'claim-b')
+    expect(foreign.applied).toBe(false)
+    expect((await provider.listPending('executing')).some(r => r.id === 'p1')).toBe(true)
+    const owner = await provider.tryResolvePending('p1', 'approved', 'claim-a')
+    expect(owner.applied).toBe(true)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('P2-4 (v15)/v16: the cap counts RESOLVED records only — pending rows never shrink the audit budget', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc5-'))
+    const ctx = await mount(home)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    // 199 resolved records (resolvedAt ascending) — one below the cap.
+    for (let i = 0; i < 199; i += 1) {
+      await provider.savePending(record(`p${i}`, 'approved', new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()))
+    }
+    // Resolving the 200th stays within the cap (nothing evicted).
+    await provider.savePending(record('p199', 'pending'))
+    expect((await provider.tryResolvePending('p199', 'approved')).applied).toBe(true)
+    expect(await provider.listPending('approved')).toHaveLength(200)
+    // The 201st resolve crosses the cap. P2 (v16): the budget is the RESOLVED
+    // count — the concurrent PENDING row does not enlarge the eviction, so
+    // exactly ONE resolved record (the oldest, p0) is evicted. (The v15 first
+    // cut used the whole-table length here and over-evicted two.)
+    await provider.savePending(record('live', 'pending'))
+    await provider.savePending(record('p200', 'pending'))
+    expect((await provider.tryResolvePending('p200', 'approved')).applied).toBe(true)
+    const resolved = await provider.listPending('approved')
+    expect(resolved).toHaveLength(200)
+    expect(resolved.some(r => r.id === 'p0')).toBe(false)
+    expect(resolved.some(r => r.id === 'p1')).toBe(true)
+    expect((await provider.listPending('pending')).some(r => r.id === 'live')).toBe(true)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('P2 (v16): a resolved record without resolvedAt sorts LAST (json parity, never the eviction victim)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc6-'))
+    const ctx = await mount(home)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    // 199 stamped resolved records + ONE decided record with NO resolvedAt
+    // (legacy/hand-made shape) = exactly at cap. json keeps unknown-time
+    // records longest (MAX_SAFE_INTEGER) — the domain provider must agree.
+    for (let i = 0; i < 199; i += 1) {
+      await provider.savePending(record(`p${i}`, 'approved', new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()))
+    }
+    const unknown = { ...record('no-time', 'approved'), resolvedAt: undefined }
+    await provider.savePending(unknown)
+    // The 201st resolve crosses the cap: the victim must be the OLDEST
+    // STAMPED record (p0), never the unknown-time one.
+    await provider.savePending(record('pusher', 'pending'))
+    expect((await provider.tryResolvePending('pusher', 'approved')).applied).toBe(true)
+    const resolved = await provider.listPending('approved')
+    expect(resolved).toHaveLength(200)
+    expect(resolved.some(r => r.id === 'no-time')).toBe(true)
+    expect(resolved.some(r => r.id === 'p0')).toBe(false)
+    expect(resolved.some(r => r.id === 'p1')).toBe(true)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+})

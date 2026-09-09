@@ -145,4 +145,39 @@ describe('evolution-plan-validator', () => {
     expect(result.accepted.memoryOps).toHaveLength(1)
     expect(result.accepted.memoryOps[0]?.action).toBe('add')
   })
+
+  it('P2-1 (v15): a non-string truthy field is a per-op REJECTION, not a TypeError', () => {
+    // The E-60 contract: the caller hands the validator MODEL OUTPUT — a
+    // malformed FIELD must not throw (which failed the whole review round);
+    // it rejects the single op like every other malformed shape.
+    const result = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: { body: 'object facts' }, evidence: [{ event_seq: 1 }] } as unknown as MemoryOp],
+      skillOps: [{ action: 'patch', name: 42, old_string: 'x', new_string: 'y', evidence: [{ event_seq: 1 }] } as unknown as MemoryOp],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.accepted.memoryOps).toHaveLength(0)
+    expect(result.accepted.skillOps).toHaveLength(0)
+    expect(result.rejected.some(r => r.reason.includes('facts must be a string'))).toBe(true)
+    expect(result.rejected.some(r => r.reason.includes('name must be a string'))).toBe(true)
+  })
+
+  it('P2 (v16): file_path joins the field-type guard (executor-side TypeError class)', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [{ target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }],
+      skillOps: [{ action: 'write_file', name: 'demo', file_path: 42, file_content: 'body', evidence: [{ event_seq: 1 }] } as unknown as MemoryOp],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected.some(r => r.reason.includes('file_path must be a string'))).toBe(true)
+  })
+
+  it('P3 (v15): write_file is gated on file_content ONLY (executor parity)', () => {
+    // The old `?? op.content` fallback admitted a write_file whose executor
+    // write landed an EMPTY support file.
+    const result = validateEvolutionPlan({
+      memoryOps: [{ target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }],
+      skillOps: [{ action: 'write_file', name: 'demo', content: 'content only', evidence: [{ event_seq: 1 }] }],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected.some(r => r.reason.includes('write_file requires file_content'))).toBe(true)
+  })
 })

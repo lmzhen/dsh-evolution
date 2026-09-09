@@ -285,8 +285,16 @@ export class SkillUsageRegistry extends Service {
     await this.chain
   }
 
-  /** Write feedback-derived quality onto the usage sidecar; curator reads it. */
-  async setQuality(name: string, score: number, warn: boolean): Promise<void> {
+  /** P1-1 (v15): write the FEEDBACK-owned quality signal onto the usage
+   * sidecar. Renamed from `setQuality` (it no longer writes the fields the
+   * name claims): the curator's six-factor `scoreTree` overwrites
+   * `quality_score`/`quality_warn` on every run BEFORE the lifecycle engine
+   * reads them, so feedback written to those fields was a dead channel — the
+   * value never survived to a decision. The lifecycle engine and the scope
+   * view now read the union `quality_warn || feedback_warn`, so a negative
+   * feedback is decision-relevant again. Field-ownership contract: see
+   * `UsageRecord` in evolution-core/usage.ts. */
+  async setFeedbackQuality(name: string, score: number, warn: boolean): Promise<void> {
     // N5 (v12): trim — feedback calls this with the raw target; an untrimmed
     // key used to silently miss the trimmed record (quality_score never
     // persisted, no ghost key, no error).
@@ -294,8 +302,8 @@ export class SkillUsageRegistry extends Service {
     await this.mutate((map) => {
       const record = map.get(normalized)
       if (!record) return
-      record.quality_score = score
-      record.quality_warn = warn
+      record.feedback_score = score
+      record.feedback_warn = warn
     })
   }
 }

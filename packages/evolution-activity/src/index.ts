@@ -99,6 +99,10 @@ export function serializeActivity(items: EvolutionActivityRecord[]): string {
 export function parseActivityContent(raw: string | null): EvolutionActivityRecord[] {
   if (raw === null) return []
   const isCount = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value)
+  // `at` is epoch-ms (finite number) — a hand-edited NaN/missing timestamp
+  // would render as "Invalid Date" in every report.
+  const isTimestampEpochMs = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value)
+  const isOptionalCount = (value: unknown): boolean => value === undefined || isCount(value)
   try {
     const parsed = JSON.parse(raw) as unknown
     const items = typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { items?: unknown }).items)
@@ -113,7 +117,15 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
       // (same finite-number discipline feedback applies to its own records).
       && isCount((item as EvolutionActivityRecord).memoryApplied)
       && isCount((item as EvolutionActivityRecord).skillApplied)
-      && isCount((item as EvolutionActivityRecord).rejectedOps))
+      && isCount((item as EvolutionActivityRecord).rejectedOps)
+      // P3 (v15): `at` is the timestamp every report renders; the optional
+      // numeric dimensions must stay finite for the same reason as the
+      // counters. A hand-edited sidecar entry missing/NaN on any of these is
+      // dropped instead of half-parsed.
+      && isTimestampEpochMs((item as EvolutionActivityRecord).at)
+      && isOptionalCount((item as EvolutionActivityRecord).executionFailures)
+      && isOptionalCount((item as EvolutionActivityRecord).evidenceQuotes)
+      && isOptionalCount((item as EvolutionActivityRecord).estimatedInputChars))
   } catch {
     // Malformed sidecar is treated as empty; observability is best-effort.
     return []

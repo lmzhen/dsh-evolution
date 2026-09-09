@@ -19,6 +19,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampedNumber, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -88,7 +89,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // so it is read via the soft `ctx.get` probe — unlike `approval`, a hard
   // dependency declared in `inject`. The two styles are deliberate per
   // dependency strength (M-7).
-  const systemPrompt = ctx.get('systemPrompt') as { section(section: { name: string; order: number; text: string }): () => void } | undefined
+  // P2-13 (v16): the REAL upstream type (family-completes the v15 batch —
+  // tool-memory was migrated, this call site was missed).
+  const systemPrompt = ctx.get('systemPrompt') as { section(section: PromptSection): () => void } | undefined
   if (systemPrompt) {
     ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: 900, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
   }
@@ -123,11 +126,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
   }
 
-  async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[]; pending_id?: string }> {
+  async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[] }> {
     const action = args.action
     const name = args.name ?? ''
     if (action === 'review') return { ok: true, message: await buildSkillReviewText(), skills: [] }
-    if (action === 'skip') return { ok: true, message: 'Skipped; no skill changes this pass.', skills: [] }
     if (action === 'list') {
       const list = await library.list()
       return { ok: true, message: `Listed ${list.length} skills.`, skills: list.map(s => s.name) }
@@ -176,9 +178,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // Lifecycle scope: curator only manages usage records created by the
       // background review pipeline. Keep the native runner aligned with the
       // legacy facade here, or review-created skills silently escape the
-      // stale/archive lifecycle. Read-only actions (list/review/skip) must
+      // stale/archive lifecycle. Read-only actions (list/review) must
       // never bump counters or emit mutation events.
-      const mutating = action !== 'list' && action !== 'review' && action !== 'skip' && action !== 'pin' && action !== 'unpin'
+      const mutating = action !== 'list' && action !== 'review' && action !== 'pin' && action !== 'unpin'
       // Any non-foreground writer (review channel OR delegated subagent) is an
       // agent-authored skill and must enter the lifecycle as such.
       if (name && action === 'create') {
@@ -210,17 +212,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function buildSkillReviewText(): Promise<string> {
     const list = await library.list()
     const report = await ctx.skillUsage.report()
+    // P1-1 (v15): the warn surface reads the UNION of the curator six-factor
+    // pair and the feedback pair (field ownership on `UsageRecord` in core) —
+    // negative feedback lands in feedback_warn and must show up here.
+    const warnedFlag = (name: string): boolean => {
+      const record = report.get(name)
+      return record?.quality_warn === true || record?.feedback_warn === true
+    }
     const lines = list.map((summary) => {
       const record = report.get(summary.name)
+      // P3 (v16): the ⚠ marker reads the union flag directly — a skill warned
+      // ONLY by feedback (curator not yet run, no quality_score) lands in the
+      // aggregate "Warning skills" line and must carry the ⚠ too.
+      const warned = warnedFlag(summary.name)
       const quality = record?.quality_score !== undefined
-        ? ` quality:${record.quality_score.toFixed(2)}${record.quality_warn ? '⚠' : ''}`
-        : ''
+        ? ` quality:${record.quality_score.toFixed(2)}${warned ? '⚠' : ''}`
+        : warned
+          ? ' quality:⚠'
+          : ''
       return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${summary.protectedBy ? ` [${summary.protectedBy}]` : ''}`
     })
     const groups = computeDedupGroups({ contents: new Map(await Promise.all(list.map(async summary => [summary.name, (await library.read(summary.name)) ?? ''] as const))) })
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
     const warned = list
-      .filter(summary => report.get(summary.name)?.quality_warn === true)
+      .filter(summary => warnedFlag(summary.name))
       .map(summary => summary.name)
     // Aggregate quality guidance: one line for the whole library instead of
     // per-turn injection — the 60-char catalog contract and prefix-cache
@@ -237,13 +252,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.tools.register(defineTool({
     name: 'skill_manage',
     description:
-      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
+      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit/update take full SKILL.md content (edit is an alias of update); patch applies old_string -> new_string; delete archives to .archive (absorbed_into names an umbrella skill); write_file/remove_file add or remove one support file under references/ or scripts/; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'skip', 'pin', 'unpin'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'pin', 'unpin'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -287,7 +302,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
-      if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'skip' && args.action !== 'pin' && args.action !== 'unpin') {
+      if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
         const decision = await approval.request({
           kind: 'skill',
           summary: `skill ${args.action ?? '?'} ${args.name ?? ''}`.trim(),

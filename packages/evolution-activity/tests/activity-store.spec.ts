@@ -327,8 +327,10 @@ function serialize(items: EvolutionActivityRecord[]): string {
 
 
   it('P3-23 (v14): a malformed counter in a persisted entry drops that entry instead of propagating NaN', () => {
-    const good = { planId: 'p1', sessionId: 's1', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 }
-    const bad = { planId: 'p2', sessionId: 's1', memoryApplied: 'two', skillApplied: 0, rejectedOps: 0 }
+    // P3 (v15): `at` is a REQUIRED field (epoch-ms) — both fixtures carry it;
+    // the malformed COUNTER remains the drop trigger under test.
+    const good = { planId: 'p1', sessionId: 's1', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: Date.now() }
+    const bad = { planId: 'p2', sessionId: 's1', memoryApplied: 'two', skillApplied: 0, rejectedOps: 0, at: Date.now() }
     const parsed = parseActivityContent(JSON.stringify({ version: ACTIVITY_FILE_VERSION, items: [good, bad] }))
     expect(parsed.map(item => item.planId)).toEqual(['p1'])
   })

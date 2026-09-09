@@ -87,6 +87,14 @@ if (scanned === 0) {
   process.exit(1)
 }
 
+// P3 (v15): the sibling of the F-103 vacuous pass — manifests exist but NONE
+// carries a @deepseek-ai/dsh-* platform dependency (e.g. every dependency
+// rewritten away upstream). "OK — 0 range(s)" would validate nothing.
+if (checked === 0) {
+  console.error(`verify-platform-ranges: ${scanned} manifest(s) scanned under ${manifestDir} but 0 @deepseek-ai/dsh-* platform dependency ranges found — nothing to verify (vacuous pass); check the staged tree.`)
+  process.exit(1)
+}
+
 if (failures.length > 0) {
   console.error(`verify-platform-ranges: ${failures.length} platform dependency range(s) drifted from ^${platformVersion}:`)
   console.error(failures.join('\n'))

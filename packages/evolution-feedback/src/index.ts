@@ -2,8 +2,15 @@
  * Feedback-to-quality scoring for self-evolution.
  *
  * Feedback is durable through `ctx.evolutionIo` (when mounted) and skill
- * feedback feeds `quality_score` / `quality_warn` on the usage record, so
- * curator decisions can consume it deterministically.
+ * feedback feeds the FEEDBACK-OWNED `feedback_score` / `feedback_warn` pair on
+ * the usage record. P1-1 (v15): this package used to write
+ * `quality_score`/`quality_warn` — but the curator's six-factor `scoreTree`
+ * overwrote those fields on every run BEFORE the lifecycle engine read them,
+ * so the advertised "curator decisions consume feedback deterministically"
+ * channel was dead. The lifecycle engine and the scope view now read the
+ * union `quality_warn || feedback_warn`, and the curator never writes the
+ * feedback pair (field-ownership contract on `UsageRecord` in
+ * evolution-core/usage.ts).
  *
  * Persistence (rc.68): the EVENTS LOG (`evolution/events.json`, via
  * `evolution-core/evolution-events.ts`) is the single source of truth —
@@ -271,10 +278,15 @@ export class EvolutionFeedback {
   }
 
   snapshot(): FeedbackState {
-    return {
-      skills: { ...this.state.skills },
-      sessions: { ...this.state.sessions },
+    // P3 (v15): deep-enough copy — the records themselves are copied too, so
+    // a consumer mutating a snapshot record can no longer poison the live
+    // state (the old shape shared record objects with the live aggregate).
+    const copyRecords = (table: Record<string, FeedbackRecord>): Record<string, FeedbackRecord> => {
+      const out: Record<string, FeedbackRecord> = {}
+      for (const [key, record] of Object.entries(table)) out[key] = { ...record }
+      return out
     }
+    return { skills: copyRecords(this.state.skills), sessions: copyRecords(this.state.sessions) }
   }
 
   /** Await the pending record-task chain (unload safety; rc.66). */
@@ -504,7 +516,9 @@ function synthesizeFeedbackEvents(aggregate: FeedbackState): EvolutionEvent[] {
 export const name = 'evolution-feedback'
 
 export interface Config {
-  /** Score below which curator receives quality_warn for a skill. */
+  /** Score below which the FEEDBACK pair flips to warned (P1-1, v15: written
+   * to `feedback_score`/`feedback_warn`; the lifecycle engine reads the union
+   * with the curator-owned `quality_warn`). */
   qualityWarnThreshold?: number
   /** Explicit boot-cache file path; empty derives $DSH_HOME/evolution/feedback.json.
    * The event log always stays at $DSH_HOME/evolution/events.json (derived from
@@ -526,7 +540,11 @@ export function resolveQualityWarnThreshold(config: Config): number {
 }
 
 interface SkillUsageLike {
-  setQuality(name: string, score: number, warn: boolean): Promise<void>
+  /** P1-1 (v15): renamed from `setQuality` — writes the feedback-owned
+   * `feedback_score`/`feedback_warn` pair, not the curator-owned
+   * `quality_score`/`quality_warn` (which scoreTree overwrote before the
+   * lifecycle engine ever read them). */
+  setFeedbackQuality(name: string, score: number, warn: boolean): Promise<void>
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -579,7 +597,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (kind !== 'skill') return
       const score = feedback.score(target, 'skill')
       const warn = score < qualityWarnThreshold
-      void skillUsage.setQuality(target, score, warn).catch((error: unknown) => {
+      void skillUsage.setFeedbackQuality(target, score, warn).catch((error: unknown) => {
         skillCtx.logger.warn(error)
       })
     }

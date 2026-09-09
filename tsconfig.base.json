@@ -33,6 +33,10 @@
       "@deepseek-ai/dsh-evolution-feedback": ["./packages/evolution/evolution-feedback/src/index.ts"],
       "@deepseek-ai/dsh-evolution-activity": ["./packages/evolution/evolution-activity/src/index.ts"],
       "@deepseek-ai/dsh-evolution-replay": ["./packages/evolution/evolution-replay/src/index.ts"],
+      // P3 (v15): pnpm-store path is MIRROR-local only. The baseline CI job
+      // copies this file into the upstream tree, where this exact path may not
+      // exist — TS falls back to node_modules resolution, which is intended.
+      // The compat job avoids the issue via inject-evolution-paths.mjs.
       "zod": ["./node_modules/.pnpm/zod@4.4.3/node_modules/zod"],
       "@deepseek-ai/dsh-evolution-state-storage": ["./packages/evolution/evolution-state-storage/src/index.ts"],
       "@deepseek-ai/dsh-evolution-capability": ["./packages/evolution/evolution-capability/src/index.ts"],

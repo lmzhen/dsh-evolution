@@ -153,6 +153,17 @@ interface SubagentLike {
   }>
 }
 
+// P3 (v16): the interface was accidentally declared TWICE (verbatim copies —
+// TS declaration merging silently allowed it). Merged back to one. The
+// v15 "use the real upstream type" intent stays a documented anchor instead:
+// the upstream `SubagentRun.localAgent` type is not importable from the
+// mirror's pinned tree, so this structural view remains.
+// P2-13 (v15) VERSION ANCHOR: `localAgent` is upstream `SubagentRun.localAgent`
+// (subagent/src/types.ts) narrowed from `Agent | undefined` to
+// `{ session: Session } | undefined` — we read only `.session`. Upstream
+// documents "local runs always carry a session"; if a future upstream allows a
+// session-less local handle, this type will NOT catch it (re-verify on every
+// upstream bump).
 interface MemoryLike {
   applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
 }
@@ -163,9 +174,11 @@ interface MemoryLike {
 // G4.5 (F-209): the evolution-state service is optional. When it is absent the
 // memory/skill cadence state is not persisted and every turn restarts from a
 // clean baseline — a silent "memory/skill review never adapts across turns".
-// Surface the loss ONCE per process (a per-turn warn on an intentionally
-// stateless deployment is noise).
-let statelessReviewStateWarned = false
+// P3 (v15): the warn flag moved from module scope into the `apply` closure —
+// the module-level one stayed true forever across plugin re-mounts, so a
+// re-mounted stateless review was PERMANENTLY silent; per-apply matches the
+// curator's per-instance v14 flag (warn once per mount, again after re-mount).
+// A per-turn warn on an intentionally stateless deployment is still noise.
 
 /**
  * G3.1 (0.3.23): clamp the numeric review config at assembly so a 0/negative/
@@ -219,6 +232,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
   }
   const config = clampReviewConfig(rawConfig, ctx)
   const turnStarts = new Map<SessionId, number>()
+  // P3 (v15): per-mount one-shot for the stateless warn (was module-level).
+  let statelessReviewStateWarned = false
   // Completion-channel state (E-59f): these two are deliberately NOT persisted
   // to ReviewState. A process restart resets the "session is proven-long"
   // counter and the "completion already injected" flag — which is ACCEPTED:
@@ -711,7 +726,14 @@ export function apply(ctx: Context, rawConfig: Config): void {
     // message; the failure dimension now surfaces on the event AND a warn.
     try {
       for (const op of plan.memoryOps ?? []) {
-        if (!Array.isArray(op.evidence) || op.evidence.length === 0) continue
+        // C4 (v15): a validator-bypassed op is RECORDED, not silently dropped —
+        // it lands in failedOps (warn + zero-landing notice) so a loosened
+        // validator contract can never make an op evaporate without a trace.
+        if (!Array.isArray(op.evidence) || op.evidence.length === 0) {
+          ok = false
+          failedOps.push(`memory ${op.action ?? 'add'} ${op.target}: missing evidence (defense-in-depth rejection)`)
+          continue
+        }
         const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
         const normalized = { target, action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text }
         const result = approval
@@ -724,7 +746,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
         }
       }
       for (const op of plan.skillOps ?? []) {
-        if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) continue
+        // C4 (v15): see the memory loop — recorded, never silently dropped.
+        if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) {
+          ok = false
+          failedOps.push(`skill ${op.action ?? 'patch'} ${op.name ?? '<unnamed>'}: missing evidence or name (defense-in-depth rejection)`)
+          continue
+        }
         const args = { ...op, evidence: op.evidence }
         // The registered skill runner expects the { operation, origin } wrapper;
         // passing it on both the pending record and the replay keeps the
@@ -844,7 +871,10 @@ export function apply(ctx: Context, rawConfig: Config): void {
         }
         return archived
       }
-      if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? op.content ?? '', origin)
+      // P3 (v16): no `?? op.content` fallback — the validator (plan-validator
+      // write_file gate) and the approval runner (tool-skill-manage) are both
+      // file_content-only; the fallback here was a dead-but-divergent branch.
+      if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? '', origin)
       if (op.action === 'remove_file') return await library.removeSupportFile(name, op.file_path ?? '', origin)
       if (op.action === 'restructure') {
         const moves = (op.restructure ?? [])

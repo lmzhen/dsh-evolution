@@ -90,6 +90,9 @@ describe('evolution-skill-catalog', () => {
     // Direct filesystem write WITHOUT any evolution event (git pull of a new
     // skill directory). Invisible until the explicit refresh signal — the
     // documented out-of-band limitation (decision C: no filesystem watcher).
+    // P3 (v15): the invisibility is the UPSTREAM registry's collect cache
+    // (get/list are served without consulting providers until
+    // control.invalidate bumps the revision), not this provider's caches.
     await base.writeText(join(root, 'other-skill', 'SKILL.md'), make('other-skill', 'Second skill.'))
     expect(await ctx.skills.get('other-skill')).toBeUndefined()
     ctx.emit('evolution/skills-refresh')

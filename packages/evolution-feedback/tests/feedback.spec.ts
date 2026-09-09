@@ -30,7 +30,7 @@ describe('evolution-feedback', () => {
     expect(ctx.evolutionFeedback.score('python-testing')).toBeCloseTo(1 / 3)
   })
 
-  it('persists across restarts and feeds quality_score into skill usage', async () => {
+  it('persists across restarts and feeds feedback_warn into skill usage (P1-1, v15)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-'))
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = home
@@ -46,7 +46,9 @@ describe('evolution-feedback', () => {
     // give the serialized persistence/quality writes a chance to settle
     await ctx.evolutionFeedback.waitIdle()
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect((await ctx.skillUsage.report()).get('python-testing')?.quality_warn).toBe(true)
+    // P1-1 (v15): feedback writes the FEEDBACK-OWNED pair — the curator-owned
+    // quality_warn stays untouched (scoreTree owns it).
+    expect((await ctx.skillUsage.report()).get('python-testing')?.feedback_warn).toBe(true)
 
     const ctx2 = new Context()
     await ctx2.plugin(EvolutionIoRegistry)
@@ -676,8 +678,8 @@ describe('evolution-feedback', () => {
     const ctx = new Context()
     const callsA: string[] = []
     const callsB: string[] = []
-    const stubA = { setQuality: async (name: string) => { callsA.push(name) } }
-    const stubB = { setQuality: async (name: string) => { callsB.push(name) } }
+    const stubA = { setFeedbackQuality: async (name: string) => { callsA.push(name) } }
+    const stubB = { setFeedbackQuality: async (name: string) => { callsB.push(name) } }
     const fiberA = await ctx.plugin({ name: 'stub-skill-usage-a', apply: (c) => { c.provide('skillUsage', stubA) } })
     Feedback.apply(ctx)
     // Establish the wiring on the first instance (the inject fiber activates on
