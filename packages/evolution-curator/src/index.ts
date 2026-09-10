@@ -603,6 +603,17 @@ export class EvolutionCurator extends Service {
    * increments `mutexDepth` synchronously (so run()'s skip check sees queued
    * work), awaits the previous tail, and the returned release resolves the
    * tail for the next entrant. Double-release is a no-op.
+   *
+   * v20 (C-3) cross-layer note: this chain serializes CURATOR operations
+   * only. The review subagent channel writes through its own SkillLibrary
+   * and shares NO mutex with this service; the cross-layer exclusion is
+   * skill-store's per-file write lock + the F-17 marker probe (a destructive
+   * mover refuses a directory whose writer lock is alive), so a collision
+   * degrades to a recorded failed op + snapshot rollback, never a torn
+   * write. Automatic passes are kept out of the session-active window by the
+   * min-idle gate; a manual run (`ignoreGates`) bypasses that gate and is
+   * the one realistic interleave window — documented, accepted (plan v20
+   * C-3①). The same statement lives on evolution-review's `reviewInFlight`.
    */
   private mutexDepth = 0
   private mutexTail: Promise<void> = Promise.resolve()
@@ -667,13 +678,22 @@ export class EvolutionCurator extends Service {
     // baseline here so the NEXT tick compares against a fresh clock.
     if (!ignoreGates && persisted === null && (stateService !== undefined || !this.statelessFirstRunDeferred)) {
       if (stateService) {
-        await stateService.saveCuratorState({
-          schemaVersion: 1,
-          lastRunAt: Date.now(),
-          runCount: 0,
-          lastSummary: 'first-run-deferred',
-          paused: false,
-        })
+        // v20 (C-4): best-effort like every other run-side persistence (see
+        // the C1 discipline on the bookkeeping transact below) — a transient
+        // state-storage failure must not turn the first-run DEFER into a
+        // thrown run. Nothing advanced here, so the next tick simply re-enters
+        // this branch and retries the seed.
+        try {
+          await stateService.saveCuratorState({
+            schemaVersion: 1,
+            lastRunAt: Date.now(),
+            runCount: 0,
+            lastSummary: 'first-run-deferred',
+            paused: false,
+          })
+        } catch (error) {
+          this.ctx.logger.warn(`evolution-curator: failed to persist the first-run baseline: ${error instanceof Error ? error.message : String(error)}`)
+        }
       } else {
         this.lastRun = Date.now()
         this.statelessFirstRunDeferred = true
@@ -692,6 +712,21 @@ export class EvolutionCurator extends Service {
     // transitions engine below mutates `usage` in place, so this snapshot is
     // the only basis the fold can compare-and-set against.
     const runStartStates = new Map([...usage].map(([name, record]) => [name, record.state as string]))
+    // v21 (L-4): B-8 mid-run gate. Dispose used to only clear the TIMER — an
+    // in-flight pass kept mutating the tree (snapshot, archive, consolidate)
+    // for minutes after unload, emitting through a dead fiber. Checked at the
+    // mutation boundaries below; before THIS gate nothing has landed, so an
+    // empty early return stays safe. The warn keeps the abort cause observable
+    // (v23 BR-2: the report's `failed` filter cannot carry a free-form abort
+    // message, so the log line is the only place the reason appears).
+    if (this.isDisposed()) {
+      this.ctx.logger.warn('evolution-curator: run aborted before the archive phase (plugin disposed mid-run)')
+      return {
+        stale: [], archived: [], errors: ['run aborted: evolution-curator was disposed mid-run'],
+        report: this.skippedReport(runId, startedAt),
+        skipped: 'disposed',
+      }
+    }
     const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
     // One GateSet instance per run (decision B) shared by the lifecycle
@@ -964,6 +999,18 @@ export class EvolutionCurator extends Service {
     // consolidation sources) — a concurrent curator run's archive/restore must
     // never be reverted by this run's stale snapshot.
     const stateOwned = new Set(input.stateOwned ?? [])
+    // v21 (L-4) / v22 (R-1): mid-run dispose gate — archive is the first
+    // tree-mutating phase. NOTE: this method's declared return shape is
+    // `{archivedSkills, errors, suppressedChanged, consolidated}` (runCore
+    // destructures it), so the abort reports through `errors` — the earlier
+    // attempt returned a runCore-shaped object with out-of-scope identifiers
+    // and would have thrown ReferenceError when triggered. Nothing has landed
+    // before this point, so the empty account is honest; the warn keeps the
+    // cause observable (v23 BR-2).
+    if (this.isDisposed()) {
+      this.ctx.logger.warn('evolution-curator: run aborted at the archive gate (plugin disposed mid-run)')
+      return { archivedSkills: [], errors: ['run aborted: evolution-curator was disposed mid-run'], suppressedChanged: false, consolidated: [] }
+    }
     for (const name of archiveCandidates) {
       // E-15 (S5.4) two-phase self-heal: the archive rename (skills.archive
       // moves the directory into .archive) and the usage sidecar fold
@@ -1081,7 +1128,19 @@ export class EvolutionCurator extends Service {
       }
     }
     const alreadyArchived = new Set(archiveCandidates)
-    for (const nomination of nominations.consolidations) {
+    // v21 (L-4) / v22 (R-1) / v23 (BR-1): mid-run dispose gate — consolidation
+    // is the second tree-mutating phase. This gate must NOT early-return: the
+    // archive loop above has already moved directories and collected real
+    // accounts, so the suppression persist and usage fold below HAVE to run
+    // for them (an empty return reported archived:0 while the tree was
+    // mutated, and skipped both persistence phases). Skip only the loop.
+    let consolidationDisposed = false
+    if (this.isDisposed()) {
+      consolidationDisposed = true
+      errors.push('run aborted: evolution-curator was disposed mid-run — consolidation skipped; archives that landed above are still accounted')
+      this.ctx.logger.warn('evolution-curator: consolidation phase skipped (plugin disposed mid-run); archive accounts above are preserved')
+    }
+    for (const nomination of consolidationDisposed ? [] : nominations.consolidations) {
       if (alreadyArchived.has(nomination.from)) continue
       if (!treeNames.has(nomination.from) || !treeNames.has(nomination.into)) {
         errors.push(`${nomination.from}: consolidation target or source missing from the skill tree`)

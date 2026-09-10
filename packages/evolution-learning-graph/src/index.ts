@@ -13,7 +13,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { SKILL_NAME_RE, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -442,10 +442,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // session policy — a `never`-policy session now stages nothing
               // instead of being treated as foreground.
               const sessionPolicy = sessionPolicyEdit
+              // v23 (AP-3): stage-time staleness hash — the replay refuses a
+              // full-content overwrite of a skill that changed between staging
+              // and approval (same contract as the tool/review stagings).
+              const stageCurrent = await withSkills().read(parsed.name).catch(() => null)
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph edit ${parsed.name}`,
-                args: { operation: { action: 'update', name: parsed.name, content }, origin: origins.approval, libraryOrigin: origins.library },
+                args: {
+                  operation: {
+                    action: 'update',
+                    name: parsed.name,
+                    content,
+                    ...(stageCurrent !== null ? { staged_from_sha256: contentHash(stageCurrent) } : {}),
+                  },
+                  origin: origins.approval,
+                  libraryOrigin: origins.library,
+                },
                 origin: origins.approval,
                 ...session?.id ? { sessionId: session.id } : {},
                 ...session ? { session } : {},
@@ -490,7 +503,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               && sessionPolicyM !== 'never'
               && (originsM.approval === 'background_review' || memoryApproval.stageForeground !== false)
             if (willStage && !memoryApproval.hasRunner('memory')) {
-              return err('Graph memory write cannot be staged: no memory replay runner is registered — mount the tool-memory row (evolution-host/evolution-all bundle) or disable evolution-approval.')
+              // v20 (D-3): the tool-memory row lives in evolution-all and the
+              // evolution-preset overlay — the HOST bundle deliberately does
+              // not carry it (host patch: "memory seam … no model tool"), so
+              // the old "evolution-host/evolution-all" wording sent host-only
+              // operators looking for a row that is not there.
+              return err('Graph memory write cannot be staged: no memory replay runner is registered — mount the tool-memory row (evolution-all bundle, or the evolution-preset overlay; the host bundle does not carry it) or disable evolution-approval.')
             }
             const decision = await memoryApproval.request({
               kind: 'memory',
@@ -563,7 +581,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               && sessionPolicy !== 'never'
               && (origins.approval === 'background_review' || memoryApproval.stageForeground !== false)
             if (willStage && !memoryApproval.hasRunner('memory')) {
-              return err('Graph memory delete cannot be staged: no memory replay runner is registered — mount the tool-memory row (evolution-host/evolution-all bundle) or disable evolution-approval.')
+              // v20 (D-3): see the edit branch — the host bundle does not
+              // carry the tool-memory row.
+              return err('Graph memory delete cannot be staged: no memory replay runner is registered — mount the tool-memory row (evolution-all bundle, or the evolution-preset overlay; the host bundle does not carry it) or disable evolution-approval.')
             }
             const decision = await memoryApproval.request({
               kind: 'memory',

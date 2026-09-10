@@ -39,7 +39,6 @@
       // The compat job avoids the issue via inject-evolution-paths.mjs.
       "zod": ["./node_modules/.pnpm/zod@4.4.3/node_modules/zod"],
       "@deepseek-ai/dsh-evolution-state-storage": ["./packages/evolution/evolution-state-storage/src/index.ts"],
-      "@deepseek-ai/dsh-evolution-capability": ["./packages/evolution/evolution-capability/src/index.ts"],
       "@deepseek-ai/dsh-evolution-skill-catalog": ["./packages/evolution/evolution-skill-catalog/src/index.ts"],
       "@deepseek-ai/dsh-evolution-state-json": ["./packages/evolution/evolution-state-json/src/index.ts"],
       "@deepseek-ai/dsh-evolution-state-domain": ["./packages/evolution/evolution-state-domain/src/index.ts"],

@@ -52,6 +52,15 @@ for (const name of new Set([...dev, ...mirror])) {
   }
 }
 
+// v21 (S-6): name the vacuous pass. In the CI overlay the scripts tree was
+// JUST copied from the comparison target (P2-37), so an all-equal result
+// verifies nothing about the hand-maintained dev↔mirror sync — the real
+// check only runs at release time from the true dev tree. Saying so on every
+// all-equal run keeps the green from being mistaken for a verified sync.
+if (failures.length === 0 && dev.length > 0 && dev.length === mirror.length) {
+  console.log('verify-layout-sync: notice — all compared files are byte-identical. If one tree was just copied from the other (overlay CI), this run verifies nothing about the dev↔mirror scripts sync; the authoritative check runs from the real dev tree at release time.')
+}
+
 // V9-01 (0.3.50): committed-preview contract — the first "## x.y.z" heading in
 // the mirror-root CHANGELOG must equal every package manifest version AND the
 // root package.json version. dcebd8c rewrote 30 manifests to the dev baseline

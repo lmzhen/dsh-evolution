@@ -28,6 +28,8 @@ export const UNKNOWN_FIELD_POLICY = 'preserve' as const
 const isNonNegInt = (value: unknown): boolean =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
 const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
+// 'capability' accepts records written by a ≤0.3.65 install; its producer was
+// removed in 0.3.66 (see PendingKind).
 const PENDING_KINDS = new Set(['memory', 'skill', 'capability'])
 const PENDING_STATUSES = new Set(['pending', 'executing', 'approved', 'rejected'])
 

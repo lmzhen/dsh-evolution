@@ -5,7 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
+import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
@@ -531,6 +531,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!toFile.startsWith('references/')) return err('to_file must live under references/ (log/detail destination).')
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
+          // v20 (D-2 / P2-8): the write joins the approval seam like every
+          // other user-facing skill write — an approval-enabled deployment
+          // must not have a command path that lands the same kind of write
+          // directly (the family contract learning-graph's P2-6 states for
+          // /graph). When the service is absent, disabled, or staging will
+          // not happen, `request` returns 'allow' and the direct write below
+          // runs unchanged. The pre-check refuses only the combination that
+          // would stage a record nobody could ever replay (P1-9 trap).
+          if (approval) {
+            const sessionPolicy = effectiveSessionPolicy(ctx, undefined)
+            const willStage = approval.isEnabled !== false
+              && sessionPolicy !== 'never'
+              && approval.stageForeground !== false
+            if (willStage && !approval.hasRunner('skill')) {
+              return err('Restructure cannot be staged: no skill replay runner is registered — mount the tool-skill-manage row (evolution-agent preset, or evolution-all) or disable evolution-approval.')
+            }
+            const decision = await approval.request({
+              kind: 'skill',
+              summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
+              args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              origin: 'foreground',
+            })
+            if (decision.action === 'staged') {
+              return ok(`${decision.message}${planRunId ? `\n[audit] plan=${planRunId}` : ''}`)
+            }
+          }
           // V8-08 (0.3.47): the command's restructure write joins the single
           // write-sink discipline — the skill-catalog cache invalidation
           // event fires like every other mutating construction point.

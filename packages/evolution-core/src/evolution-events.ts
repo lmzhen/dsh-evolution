@@ -230,14 +230,15 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
     const events = await rotateIfDue(io, path, v1EventRecords(parsedBody), rotateAt)
     // P2-1 (v11): a single rotate pass — the second call was either a no-op
     // (production threshold) or a double rotation (small test thresholds).
+    // v23 (ML-3): seq continues from the max of BOTH the active file and the
+    // archive names. The old `if (maxSeq === 0)` gate only consulted the
+    // archives when the active was empty — an active ROLLED BACK to an older
+    // backup (manual restore) kept a maxSeq below the archived range, so new
+    // events reused archived seqs and the timeline merge's "active wins" rule
+    // silently shadowed the archived records.
     let maxSeq = events.reduce((max, entry) => Math.max(max, entry.seq), 0)
-    if (maxSeq === 0) {
-      // The active is empty/missing: seq continues from the highest ARCHIVE
-      // name (archives always carry lower seqs than a present active, so this
-      // branch is only reached when the active is gone or newly rebuilt).
-      for (const name of await listEventArchives(io, path)) {
-        maxSeq = Math.max(maxSeq, Number.parseInt(name.slice(EVENT_ARCHIVE_PREFIX.length, name.length - 5), 10))
-      }
+    for (const name of await listEventArchives(io, path)) {
+      maxSeq = Math.max(maxSeq, Number.parseInt(name.slice(EVENT_ARCHIVE_PREFIX.length, name.length - 5), 10))
     }
     const record: EvolutionEvent = { ...event, seq: maxSeq + 1, at: new Date().toISOString() }
     assigned = record.seq

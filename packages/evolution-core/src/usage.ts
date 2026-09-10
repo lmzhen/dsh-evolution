@@ -157,33 +157,64 @@ export async function mutateUsage(
     // shape" (array/scalar) — parseUsage folds those to an empty map, and
     // persisting that would DESTROY the original bytes (mutations.ts and the
     // suppression sidecar both keep array compat; usage is the odd one out).
+    // v21 (L-1): the WHOLE-FILE branches (unparsable JSON / array / scalar)
+    // used to freeze every later RMW as a SILENT no-op — telemetry counts,
+    // feedback and the curator's lifecycle fold all stopped landing with no
+    // throw and no warn (the exact defect shape the v19 P2-9 note fixed for
+    // the malformed-ENTRIES case). Same healing posture as state-json's E-9:
+    // quarantine the original bytes, warn via onQuarantine, continue with an
+    // empty map. A FAILED quarantine copy keeps the freeze but says so — the
+    // bytes on disk stay the only recovery source, so overwriting them is
+    // refused (v21 L-2, the P2-17 discipline state-json already follows).
     let shapePreserved = false
     let recovered: string | null = null
+    const quarantineCopy = async (): Promise<boolean> => {
+      const corruptPath = `${usageFile(root)}.corrupt`
+      return io.writeText(corruptPath, current as string).then(() => true, () => false)
+    }
     if (current !== null) {
+      let parsed: Record<string, unknown> | null = null
       try {
         const probe = JSON.parse(current) as unknown
-        if (probe === null || Array.isArray(probe) || typeof probe !== 'object') shapePreserved = true
-        else {
-          const record = probe as Record<string, unknown>
-          const isMalformed = (value: unknown): boolean => value === null || typeof value !== 'object' || Array.isArray(value)
-          // A2-11 (v18): a newer on-disk version is never downgraded by this
-          // writer (a skill literally named `version` holds an object, not a
-          // number, so this cannot false-positive on a usage map).
-          if (typeof record.version === 'number' && record.version > 1) shapePreserved = true
-          else if (Object.values(record).some(isMalformed)) {
-            // P2-9 (v19): the v18 shape guard preserved the bytes but silently
-            // FROZE every later write — telemetry counts and the curator's
-            // lifecycle fold stopped landing with no throw and no warn. Keep
-            // the original bytes in a quarantine copy, warn, and continue with
-            // the good entries so the facility heals itself.
-            const bad = Object.keys(record).filter(key => isMalformed(record[key]))
-            const corruptPath = `${usageFile(root)}.corrupt`
-            await io.writeText(corruptPath, current).catch(() => {})
-            recovered = JSON.stringify(Object.fromEntries(Object.entries(record).filter(([, value]) => !isMalformed(value))))
-            options.onQuarantine?.(`usage sidecar ${usageFile(root)} carried ${bad.length} malformed entr${bad.length === 1 ? 'y' : 'ies'} (${bad.slice(0, 5).join(', ')}); the original bytes were copied to ${corruptPath} and the remaining entries continue to be served`)
-          }
+        if (probe !== null && typeof probe === 'object' && !Array.isArray(probe)) parsed = probe as Record<string, unknown>
+      } catch { parsed = null }
+      if (parsed === null) {
+        // Whole-file corruption (unparsable JSON) or wrong top-level shape
+        // (array/scalar): quarantine + warn + restart empty (parseUsage folds
+        // the preserved bytes to an empty map below).
+        const copied = await quarantineCopy()
+        if (!copied) {
+          options.onQuarantine?.(`usage sidecar ${usageFile(root)} is unreadable; the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable (telemetry is frozen until the file is recovered manually)`)
+          return current
         }
-      } catch { return current }
+        options.onQuarantine?.(`usage sidecar ${usageFile(root)} is unreadable (unparsable JSON or wrong top-level shape); the original bytes were copied to ${usageFile(root)}.corrupt and the sidecar restarts empty`)
+      } else {
+        const record = parsed
+        const isMalformed = (value: unknown): boolean => value === null || typeof value !== 'object' || Array.isArray(value)
+        // A2-11 (v18): a newer on-disk version is never downgraded by this
+        // writer (a skill literally named `version` holds an object, not a
+        // number, so this cannot false-positive on a usage map). v21 (L-1):
+        // the freeze now says so — the old silence was indistinguishable from
+        // a dead pipeline.
+        if (typeof record.version === 'number' && record.version > 1) {
+          options.onQuarantine?.(`usage sidecar ${usageFile(root)} carries schema version ${String(record.version)} (> this runtime) — writes stay frozen and the bytes preserved until the runtime is upgraded`)
+          shapePreserved = true
+        } else if (Object.values(record).some(isMalformed)) {
+          // P2-9 (v19): keep the original bytes in a quarantine copy, warn,
+          // and continue with the good entries so the facility heals itself.
+          // v21 (L-2): when the rescue copy ITSELF fails, refuse the write
+          // instead of destroying the only recoverable bytes — and never
+          // claim a copy exists when it does not.
+          const bad = Object.keys(record).filter(key => isMalformed(record[key]))
+          const copied = await quarantineCopy()
+          if (!copied) {
+            options.onQuarantine?.(`usage sidecar ${usageFile(root)} carried ${bad.length} malformed entr${bad.length === 1 ? 'y' : 'ies'} (${bad.slice(0, 5).join(', ')}); the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable`)
+            return current
+          }
+          recovered = JSON.stringify(Object.fromEntries(Object.entries(record).filter(([, value]) => !isMalformed(value))))
+          options.onQuarantine?.(`usage sidecar ${usageFile(root)} carried ${bad.length} malformed entr${bad.length === 1 ? 'y' : 'ies'} (${bad.slice(0, 5).join(', ')}); the original bytes were copied to ${usageFile(root)}.corrupt and the remaining entries continue to be served`)
+        }
+      }
     }
     if (shapePreserved) return current
     const map = parseUsage(recovered ?? current)

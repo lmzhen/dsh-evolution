@@ -505,17 +505,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   async function retireLegacyOnce(
     legacy: Record<string, PendingRecord>,
-    current: Record<string, PendingRecord> | null,
   ): Promise<Record<string, PendingRecord>> {
     if (legacyMigrated) return {}
     try {
-      const archivedIds = await readArchivedIds()
-      const retired = filterLegacy(legacy, current, archivedIds)
-      // V6-02 (0.3.34): the transact task takes the lock-INSIDE re-read as its
-      // argument — a closure over the pre-lock snapshot could overwrite a
-      // concurrent writer's newer state between the probe and the lock (Y
-      // staged → vanished, or X approved → reverted to pending → replayable).
-      await jsonTransact(ctx, io, root, PENDING_STATE_FILE, fresh => ({ ...retired, ...(fresh ?? {}) }))
+      // v22 (LOCK-3): the archived-id filter now runs INSIDE the transact task
+      // against a FRESH archive read, matching the four mutation paths (they
+      // call `await mergedWithFilteredLegacy(...)` inside their tasks). The
+      // previous shape snapshotted archivedIds OUTSIDE the lock: a retire
+      // racing a full add→resolve→cap-evict cycle on the same id re-imported
+      // the legacy `pending` twin after its resolved record had been evicted
+      // to the archive — a replayable ghost the V5-02 merge exists to prevent.
+      // Gate fix (0.3.66): the old `current` parameter was left unused by that
+      // move (the fresh basis comes from the transact task), so it is gone.
+      const retired: Record<string, PendingRecord> = {}
+      await jsonTransact(ctx, io, root, PENDING_STATE_FILE, async (fresh) => {
+        const merged: Record<string, PendingRecord> = { ...(fresh ?? {}) }
+        const archivedIds = await readArchivedIds()
+        for (const [id, record] of Object.entries(legacy)) {
+          if (id in merged) continue
+          if (archivedIds.has(id)) continue
+          merged[id] = record
+          retired[id] = record
+        }
+        return merged
+      })
       await io().rename(pathOf(PENDING_LEGACY_FILE), `${pathOf(PENDING_LEGACY_FILE)}.migrated`)
       legacyMigrated = true
       return retired
@@ -548,7 +561,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE),
     ])
     if (legacy !== null) {
-      const retired = await retireLegacyOnce(legacy, current)
+      const retired = await retireLegacyOnce(legacy)
       return { ...retired, ...(current ?? {}) }
     }
     return { ...(current ?? {}) }
@@ -573,7 +586,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * live work and are never trimmed. Returns the pruned map (rather than
    * mutating in place) plus the evicted records. */
   function enforceResolvedCap(map: Record<string, PendingRecord>): { map: Record<string, PendingRecord>; evicted: PendingRecord[] } {
-    const resolved = Object.values(map).filter(record => record.status === 'approved' || record.status === 'rejected')
+    // v23 (AP-1): capability approvals are EXEMPT from the audit cap — the
+    // Creator-mode contract reads the LIVE approved list (`approvedPackage`)
+    // and a capability is never re-submit-able for the same package, so an
+    // eviction would make an approved capability permanently unactivatable.
+    // They are rare (manual submits) and cannot grow without limit.
+    const resolved = Object.values(map).filter(record =>
+      (record.status === 'approved' || record.status === 'rejected')
+      && record.kind !== 'capability')
     if (resolved.length <= PENDING_RESOLVED_CAP) return { map, evicted: [] }
     const overflow = resolved.length - PENDING_RESOLVED_CAP
     // V5-09 (0.3.29): an unparseable resolvedAt sorts as "oldest-unknown" (same
@@ -626,8 +646,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (Array.isArray(parsed)) archive = parsed as Array<PendingRecord | null>
           } catch {
             // C-9 (v18): preserve the corrupt archive bytes before starting
-            // fresh — the audit copy is the only recovery path.
-            await io().writeText(`${pathOf(PENDING_ARCHIVE_FILE)}.corrupt`, current).catch(() => {})
+            // fresh — the audit copy is the only recovery path. v21 (L-3):
+            // when the rescue copy ITSELF fails to write, return `current` so
+            // this append is skipped instead of overwriting the corrupt file
+            // with the fresh array below — the recoverable bytes stay on disk
+            // (P2-17 discipline) and the next append retries the rescue. The
+            // outer catch still guards the resolve, and its warn covers the
+            // skip only if this refusal THROWS, so surface it explicitly.
+            const rescued = await io().writeText(`${pathOf(PENDING_ARCHIVE_FILE)}.corrupt`, current).then(() => true, () => false)
+            if (!rescued) {
+              ctx.logger.warn(`evolution-state-json: corrupt ${PENDING_ARCHIVE_FILE} could not be quarantined to .corrupt — skipping this audit append to preserve the recoverable bytes`)
+              return current
+            }
           }
         }
         // V5-07 (0.3.33): archives written before the dedupe key existed may

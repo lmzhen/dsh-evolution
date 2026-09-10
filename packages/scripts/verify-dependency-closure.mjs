@@ -10,8 +10,9 @@
  *
  * Severe (fail): missing declaration for any import whose target is not
  * declared in dependencies|peerDependencies. The multi-line type-only form
- * over-reports as a value import (safe direction); dynamic `import()` calls
- * are invisible to the line scanner (documented limitation).
+ * over-reports as a value import (safe direction); only a dynamic `import()`
+ * NOT at line start is invisible to the line scanner (documented limitation —
+ * v21 S-7: line-start `import('…')` is now counted as the value import it is).
  *
  * Usage: node verify-dependency-closure.mjs <packages-root>
  * Exit 0 when every package's imports are declared; exit 1 listing the
@@ -40,14 +41,19 @@ function declared(pkg) {
 }
 
 // A line is type-only when it carries no VALUE import: `import type {..}` /
-// `export type {..}` / `import('...')` inline types are the only forms we
-// exempt; a mixed `import { type A, b }` counts as a value import (safe:
-// over-reports rather than under-reports).
+// `export type {..}` are the only forms we exempt; a mixed
+// `import { type A, b }` counts as a value import (safe: over-reports rather
+// than under-reports). v21 (S-7): the former third exemption
+// (`/^import\s*\(\s*['"]@deepseek-ai\//`) also matched a LINE-START dynamic
+// value import (`import('@deepseek-ai/x').then(…)`), which is a REAL runtime
+// dependency — an undeclared one was silently waived (under-report, the
+// opposite of this file's declared failure direction). Inline type positions
+// (`foo: import('…').T`) never START a line with `import(`, and the rare
+// wrapped type-only continuation now over-reports — the safe direction.
 function typeOnlyImport(line) {
   const body = line.trim()
   return /^import\s+type\b/.test(body)
     || /^export\s+type\b/.test(body)
-    || /^import\s*\(\s*['"]@deepseek-ai\//.test(body)
 }
 
 for (const dir of readdirSync(root)) {

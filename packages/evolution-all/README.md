@@ -19,13 +19,14 @@ Installing this bundle mounts everything at **profile-root** level in one step:
 
 | Bundle | Row set | Notes |
 |---|---|---|
-| `@lmzhen/dsh-evolution-all` | infra + 4 model tools | **DEFAULT** — most complete first |
-| `@lmzhen/dsh-evolution-host` | infra only | Same automation, no model tools (a profile can run evolution without exposing `memory`/`skill_manage`) |
+| `@lmzhen/dsh-evolution-all` | infra + 4 model tools (+ read-only `maintenance_probe`) | **DEFAULT** — most complete first |
+| `@lmzhen/dsh-evolution-host` | infra only | Same automation, no memory/skill model tools (a profile can run evolution without exposing `memory`/`skill_manage`; the read-only `maintenance_probe` diagnostic ships with it) |
 | `@lmzhen/dsh-evolution-preset` | ≡ all row set | one-click **compatibility** form, kept for legacy |
 
 **These are ALTERNATIVE install targets.** Mounting two of them (e.g. `all` +
 `host`) fails loud at startup (`invariants: already registered`) — install
-exactly one. Removing the model tools = uninstall `all`, install `host`.
+exactly one. Removing the memory/skill model tools = uninstall `all`, install
+`host` (the read-only `maintenance_probe` ships with host too).
 
 ## Advanced: per-session tools (layered)
 

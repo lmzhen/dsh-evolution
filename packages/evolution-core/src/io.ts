@@ -49,11 +49,17 @@ export interface EvolutionIoLike {
    * milliseconds since epoch, or `null` when unknown (unsupported backend,
    * missing path, stat failure). Intended as a cheap invalidation stamp for a
    * cached directory listing; a backend without it keeps event-driven
-   * invalidation only. V9-07 (0.3.51): as of this release NO in-tree consumer
-   * calls it — skill-catalog invalidation is event-driven
-   * (`evolution/skill-mutated` / `evolution/skills-refresh`). The probe stays
-   * as a backend contract extension point; document it here before wiring a
-   * consumer.
+   * invalidation only. v20 correction: the former "NO in-tree consumer" note
+   * (V9-07, 0.3.51) went stale — there are now FOUR in-tree consumers, and a
+   * custom backend that omits `mtime` degrades them silently (every call
+   * site is optional-call + null-fallback, so omission stays legal):
+   *   - evolution-skill-catalog: root-mtime stamp on the summaries cache —
+   *     the second, out-of-band invalidation signal next to the
+   *     `evolution/skill-mutated` / `evolution/skills-refresh` events;
+   *   - evolution-curator: run-report recency ordering (2 call sites);
+   *   - evolution-commands: `.bak` freshness probe in the preset installer.
+   * With `mtime` absent, catalog invalidation degrades to purely
+   * event-driven. Register new consumers here (the seam contract).
    */
   mtime?(this: void, path: string): Promise<number | null>
 }
@@ -148,6 +154,18 @@ const RENAME_RETRY_MAX_ATTEMPTS = 6
  * A non-transient code surfaces immediately; a persistent EPERM/EBUSY
  * rethrows with a pointer at the usual causes instead of a bare errno.
  * `fn` is the rename primitive, injectable for deterministic tests.
+ *
+ * v22 (LOCK-5) documented platform limit: POSIX rename-over-existing is
+ * atomic for concurrent READERS, but Windows MoveFileExW(REPLACE_EXISTING)
+ * can make the target briefly invisible (ENOENT) while the replacement is in
+ * flight. The retry budget above covers the WRITE side only — a LOCKLESS
+ * reader (`readText`/`readJson` on a path it does not hold the lock for) can
+ * observe that window and see "missing" for a file that was just committed.
+ * Verified harmless today: every lockless-read consumer treats the transient
+ * miss as self-healing state (no consumer persists a read of null into a
+ * write), and distinguishing that ENOENT from a genuinely absent file in
+ * `readText` would tax every ordinary missing-file probe. Revisit only if a
+ * consumer appears that must never transiently miss.
  *
  * @param tmp - the source path to rename.
  * @param target - the destination path.
@@ -290,8 +308,18 @@ export function isProcessAlive(pid: number): boolean {
 export const LOCK_SUFFIX = '.lock'
 /** Writer-lock body shape: a decimal pid, a colon, then the claim token. A
  * torn body (no parsable pid) still matches the `\\d+:` prefix rule only when
- * the pid part is intact, which is what the takeover probe needs. */
-export const LOCK_BODY_RE = /^\d+:[0-9a-f]*$/
+ * the pid part is intact, which is what the takeover probe needs. The capture
+ * group feeds `parseLockBody` (v20 A-1: skill-store's sweepers consume this
+ * helper instead of re-inlining a third regex copy — F-17 single-source). */
+export const LOCK_BODY_RE = /^(\d+):[0-9a-f]*$/
+/** Parse a writer-lock body into its holder pid. `null` when the body does
+ * not have the `pid:token` shape at all (e.g. a user support file named
+ * `*.lock`) — callers leave such files alone. A shape-matching body always
+ * yields a number (possibly `0`, which `isProcessAlive` treats as dead). */
+export function parseLockBody(body: string): number | null {
+  const match = LOCK_BODY_RE.exec(body.trim())
+  return match === null ? null : Number(match[1])
+}
 
 /**
  * Build the Node IO backend. `lockAttempts` scales the write-lock retry budget
@@ -517,7 +545,22 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
               // exclusive create cannot succeed while the lock name exists,
               // and same-pid self-heal never fires for a foreign dead pid) —
               // so the removed file IS the dead lock, not a live claim.
-              const verify = await readFile(lock, 'utf8').catch(() => '')
+              // v22 (LOCK-2): an UNREADABLE lock here means another contender
+              // that won this same takeover already removed it — the name is
+              // free, so release the ticket and retry our own create. Mapping
+              // the ENOENT to `''` (the old `.catch(() => '')`) made the
+              // byte-equality check pass, the empty-body liveness probe read
+              // pid 0, and the rm below delete a LIVE lock a third writer had
+              // created in between (double-hold, lost RMW).
+              const verifyRead = await readFile(lock, 'utf8').then(
+                body => ({ ok: true as const, body }),
+                () => ({ ok: false as const, body: '' }),
+              )
+              if (!verifyRead.ok) {
+                await rm(ticket, { force: true }).catch(() => {})
+                continue
+              }
+              const verify = verifyRead.body
               if (verify === holderContent) {
                 // C-27: the staleEmpty shape cannot name its creator
                 // from an empty body, so re-parse the FRESH body right before

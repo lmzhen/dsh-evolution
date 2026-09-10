@@ -201,6 +201,13 @@ it('consolidate rollback reports sources it could not restore instead of silentl
       if (failTargetWrite && path.includes('target-skill')) throw new Error('target write blocked')
       return real.writeText(path, content)
     },
+    // v22 (LOCK-1): tree-change writes now commit through the CAS transact —
+    // whose tmp+rename does NOT route through io.writeText — so the failure
+    // injection sits at the layer the commit actually uses.
+    transact: async (path: string, task: (current: string | null) => string | null) => {
+      if (failTargetWrite && path.includes('target-skill')) throw new Error('target write blocked')
+      return real.transact(path, task)
+    },
   }
   const lib = new SkillLibrary(root, io)
   await lib.create('target-skill', USABLE('target-skill'), 'foreground')

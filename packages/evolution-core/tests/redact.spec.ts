@@ -73,3 +73,25 @@ describe('redactSecrets (E-1, 0.3.16)', () => {
     expect(redactSecrets('use sk-abcdefghij123456 tomorrow')).toBe('use <redacted> tomorrow')
   })
 })
+
+describe('v22 (SEC-4): provider token shapes the original set missed', () => {
+  it('masks npm / Stripe / GitHub fine-grained / Google keys and URL passwords', () => {
+    expect(redactSecrets('npm_abcdefghij1234567890ABCD')).toBe('<redacted>')
+    expect(redactSecrets('sk_live_abcdefghijklmnopqrst')).toBe('<redacted>')
+    expect(redactSecrets('rk_live_abcdefghijklmnopqrst')).toBe('<redacted>')
+    expect(redactSecrets('github_pat_11ABCDEF0123456789012345678901234')).toBe('<redacted>')
+    expect(redactSecrets('AIzaSyA1234567890abcdefghijklmnopqrstuv')).toBe('<redacted>')
+    // 连接串：只掩码口令段，scheme/user 保留可诊断。
+    expect(redactSecrets('postgresql://admin:S3cr3t@host/db')).toBe('postgresql://admin:<redacted>@host/db')
+  })
+
+  it('masks the AWS secret key only on a line that already shows a redaction or aws/secret context', () => {
+    // 配对行：AKIA 已被掩码，同行的 40 位 secret 不再残留（重组缺口）。
+    const paired = redactSecrets('aws: AKIA1234567890ABCDEF / wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')
+    expect(paired).not.toContain('wJalrXUtnFEMI')
+    expect(paired).toContain('aws:')
+    // 无上下文的 40 位 base64ish 串（常见于普通文本）不脱敏。
+    const benign = 'const hash = abcdefghij1234567890ABCDEFGHIJabcdefghij'
+    expect(redactSecrets(benign)).toBe(benign)
+  })
+})

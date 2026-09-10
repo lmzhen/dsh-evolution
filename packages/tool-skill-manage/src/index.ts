@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -78,6 +78,11 @@ interface SkillWriteArgs {
   absorbed_into?: string
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; to_file?: string }>
+  /** v23 (AP-3): stage-time content hash of the target skill, attached to
+   * update/edit stagings so the replay can refuse a stale full-content
+   * overwrite (memory carries old_text for the same purpose). Absent on
+   * legacy records and on non-staging paths — the guard is opt-in. */
+  staged_from_sha256?: string
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -134,7 +139,39 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const list = await library.list()
       return { ok: true, message: `Listed ${list.length} skills.`, skills: list.map(s => s.name) }
     }
+    // v20 (D-1, V8-09 sibling): the schema does not strictly guarantee scalar
+    // shapes (the F-07 class of garbage that slipped past the schema), and a
+    // non-string scalar used to escape as a bare TypeError from SkillLibrary
+    // (`name.trim()` / `md.includes(...)`). Family posture: a STRUCTURED
+    // refusal, same as the restructure array guard below. Absent/undefined
+    // stays legal — the branches below already default it.
+    const scalarArgs = args as Record<string, unknown>
+    for (const field of ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const) {
+      const value = scalarArgs[field]
+      if (value !== undefined && value !== null && typeof value !== 'string') {
+        return { ok: false, message: `skill_manage: "${field}" must be a string (got ${typeof value}); refusing the write.`, skills: [] }
+      }
+    }
     let feedbackLines: string[] = []
+    // v23 (AP-3): replay staleness guard for full-content updates. A staged
+    // update/edit carries the sha256 of the skill as it existed at STAGING
+    // time; if the live content has changed since, the full-content overwrite
+    // would silently roll back the intermediate edit (memory replays carry
+    // old_text for exactly this scenario). Refusing lets approve release the
+    // record back to pending — fail-safe, like the memory path. Records
+    // without the hash (legacy, or staggers that do not attach it) keep the
+    // previous last-writer-wins behavior.
+    if ((action === 'edit' || action === 'update') && typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== '') {
+      const currentContent = await library.read(name).catch(() => null)
+      const actual = contentHash(currentContent ?? '')
+      if (currentContent === null || actual !== args.staged_from_sha256) {
+        return {
+          ok: false,
+          message: `Skill "${name}" changed after this write was staged (content ${currentContent === null ? 'no longer exists' : 'hash mismatch'}); refusing to replay the stale snapshot. Re-apply the edit to stage a fresh copy.`,
+          skills: [],
+        }
+      }
+    }
     // P0 authoring feedback: every create/update reports the description
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
@@ -159,10 +196,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // V8-09 (0.3.47): `args.restructure` is an ARRAY — a non-array payload
       // (garbage that slipped past the schema) used to throw a bare `.map`
       // TypeError; the family posture is a structured refusal instead.
+      // v20 (D-1): the move fields get the same treatment — a non-string
+      // `heading`/`to_file` used to flow past `?? ''` (only nullish defaults)
+      // into the library's string ops.
       const moves = Array.isArray(args.restructure) ? args.restructure : []
       result = await library.restructure(name, moves.map(move => ({
-        heading: move.heading ?? '',
-        toFile: move.to_file ?? '',
+        heading: typeof move.heading === 'string' ? move.heading : '',
+        toFile: typeof move.to_file === 'string' ? move.to_file : '',
       })), origin)
     }
     else if (action === 'pin') result = await library.setPinned(name, true, origin)
@@ -306,6 +346,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
+        // v23 (AP-3): full-content updates carry the stage-time content hash so
+        // the replay (executeCore staleness guard) can refuse a stale overwrite.
+        // A missing current skill stays unhashed — the replay surfaces "not
+        // found" naturally.
+        if ((args.action === 'update' || args.action === 'edit') && typeof args.name === 'string' && args.name !== '') {
+          const stageCurrent = await library.read(args.name).catch(() => null)
+          if (stageCurrent !== null) (args as { staged_from_sha256?: string }).staged_from_sha256 = contentHash(stageCurrent)
+        }
         const decision = await approval.request({
           kind: 'skill',
           summary: `skill ${args.action ?? '?'} ${args.name ?? ''}`.trim(),

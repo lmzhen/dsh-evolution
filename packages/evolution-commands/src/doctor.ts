@@ -28,6 +28,9 @@ export interface DoctorReport {
   envIssues: string[]
   services: { review: boolean; curator: boolean; approval: boolean; skillUsage: boolean; io: boolean }
   pendingCount: number | null
+  /** v23 (AP-2): claimed-but-crashed records — the only state that needs an
+   * operator action (reject) to clear; surfaced separately from pending. */
+  executingCount: number | null
   actions: string[]
 }
 
@@ -101,13 +104,21 @@ export async function diagnose(
   }
 
   let pendingCount: number | null = null
+  let executingCount: number | null = null
   const approvalService = ctx.get('evolutionApproval') as { list?: (status: string) => Promise<unknown[]> } | undefined
   if (approvalService?.list) {
     try {
       const rows = await approvalService.list('pending')
       pendingCount = Array.isArray(rows) ? rows.length : null
+      // v23 (AP-2): 'executing' is the one state that can NOT resolve itself —
+      // a claimed-but-crashed approve is only ever cleared by an operator
+      // reject. Hiding it made doctor report "pending: 0" while a stuck
+      // record sat in the queue (visible only via /evolution pending).
+      const executing = await approvalService.list('executing')
+      executingCount = Array.isArray(executing) ? executing.length : null
     } catch {
       pendingCount = null
+      executingCount = null
     }
   }
 
@@ -121,8 +132,11 @@ export async function diagnose(
   if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')
   if (services.review && !services.curator) actions.push('Curator service is not mounted — automatic curation is off; verify the host/all bundle row set is complete.')
   if (pendingCount === null && services.approval) actions.push('Approval service is mounted but pending listing failed — check the evolution state service.')
+  // v23 (AP-2): a stuck EXECUTING record can only be cleared by an operator
+  // reject (approve refuses to re-execute it) — surface it as a next step.
+  if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are stuck EXECUTING (the approving run crashed) — inspect with /evolution pending and reject them after verifying the write effect.`)
 
-  return { installForm, bundles, conflicts, envIssues: env, services, pendingCount, actions }
+  return { installForm, bundles, conflicts, envIssues: env, services, pendingCount, executingCount, actions }
 }
 
 export function renderDoctorText(report: DoctorReport): string {
@@ -131,6 +145,7 @@ export function renderDoctorText(report: DoctorReport): string {
     `bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
     `services: review=${report.services.review} curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
+    `executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`,
   ]
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))

@@ -73,7 +73,13 @@ function injectCatalogDescriptionCap(composition: string): string {
       const next = lines[j] ?? ''
       if (next.trim() === '') break
       if (!/^\s/.test(next)) break
-      if (/^\s+config:(\s|$)/.test(next)) hasConfig = true
+      // v22 (PRE-3): anchor `config:` to the ITEM's own child indent (exactly
+      // two spaces — the `- id:` row sits at column 0). The old `\s+` form
+      // matched a `config:` at ANY depth inside the item's sub-maps, so a
+      // platform preset that grew a nested config map silently skipped the
+      // cap injection with no diagnostic (the missed-cap warn fires only when
+      // the ROW itself is absent).
+      if (/^ {2}config:(\s|$)/.test(next)) hasConfig = true
       end = j
     }
     if (hasConfig) continue

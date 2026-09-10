@@ -225,27 +225,25 @@ vitest run packages/evolution-review/tests/anchored-smoke.spec.ts
 Uninstalling only removes the profile row or preset directory; memory, skills,
 state, reports, and approval history remain under `$DSH_HOME`.
 
-## Capability governance (optional package)
+## Capability evolution (retired in 0.3.66)
 
-`evolution-capability` is a staged, non-executing adapter for Creator mode. It
-validates a capability package shape and submits it through the same pending
-audit trail as memory/skills. Activation remains in Creator mode:
+`evolution-capability` was removed from this repository. It staged a Creator-mode
+capability package — an object carrying `code.host` / `code.client` halves — into
+the same pending queue as memory and skills, without executing anything:
+approval recorded intent only, and activation stayed a manual Creator-mode step.
 
-```ts
-await ctx.evolutionCapability.submit({
-  name: 'my-capability',
-  purpose: 'One sentence purpose.',
-  code: { host: 'export function apply() {}' },
-})
-```
+It was retired because that split cannot work. An approval that does not gate
+execution is a log, and the owner of the log is not the owner of the effect; the
+dynamic-package lifecycle (`cordis_define` / `cordis_run`, its approval, and its
+run history) belongs to the platform Creator mode, which is where a capability is
+created and activated. The package never had a production consumer either — no
+bundle mounted it, no model-facing tool reached it, and its only in-tree caller
+was the install document.
 
-It **is not mounted by the evolution-host bundle** (rc.51 D-9): the host stays
-minimal, and deployments that use Creator mode add the row themselves:
-
-```yaml
-- id: evolution-capability
-  name: '@lmzhen/dsh-evolution-capability'
-```
-
-It fails closed while `evolution-approval` is disabled, and it never executes
-`code` itself.
+The last published version, `@lmzhen/dsh-evolution-capability@0.3.65`, remains
+installable from npm; no later version is published. Do not add the row to a
+profile — nothing maintains it. Records staged by an install that used it
+(≤0.3.65) stay readable: they still appear in `/evolution pending`, where approve
+records intent and reject drops them. Capability-shaped work belongs either in
+Creator mode or, when the durable artifact is knowledge rather than code, in
+`memory` and `skills`.

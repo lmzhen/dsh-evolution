@@ -1,11 +1,15 @@
 # Full-functionality evolution bundle (DEFAULT install target).
 #
 # This layer = evolution-host's entire infrastructure plane ∪ the four
-# model-facing tool rows (tool-memory / tool-skill-manage / tool-session-query
-# / evolution-skill-catalog), all mounted at PROFILE-ROOT level: installing
+# agent-preset-class model tool rows (tool-memory / tool-skill-manage /
+# tool-session-query / evolution-skill-catalog), all mounted at PROFILE-ROOT
+# level: installing
 # @lmzhen/dsh-evolution-all is the default "most complete first" path — every
 # session gets the automation AND the memory/skill tools AND the
 # SKILLS/MEMORY guidance injection, with no agent-preset step.
+# (v20 wording: the host plane inside this bundle also carries the read-only
+# `maintenance_probe` schema via its evolution-maintenance-tools row — a
+# fifth model-visible surface beyond the four rows above.)
 #
 # THREE-WAY DRIFT GUARD (evolution-host/tests/bundle-mutual-exclusion.spec.ts):
 #   - every infra row block below must stay byte-identical to
@@ -68,9 +72,9 @@
       config:
         enabled: false
         stageForeground: true
-    # D-9 (rc.51): `evolution-capability` is no longer part of the host bundle
-    # — staged, non-executing Creator-mode adapter with no live consumer; keep
-    # the host mount minimal and let deployments opt in by adding the row.
+    # Retired (0.3.66): `evolution-capability` source was removed — approval that
+    # does not gate execution is only a log, and the dynamic-package lifecycle
+    # belongs to the platform Creator mode.
     - id: evolution-threat
       name: '@deepseek-ai/dsh-evolution-threat'
 

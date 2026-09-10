@@ -200,7 +200,6 @@
     { "path": "./packages/evolution/evolution-state" },
     { "path": "./packages/evolution/evolution-state-storage" },
     { "path": "./packages/evolution/evolution-state-json" },
-    { "path": "./packages/evolution/evolution-capability" },
     { "path": "./packages/evolution/evolution-skill-catalog" },
     { "path": "./packages/evolution/evolution-state-domain" },
     { "path": "./packages/evolution/evolution-replay" },

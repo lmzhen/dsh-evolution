@@ -43,9 +43,9 @@
 #     install-layered injection (V10-14) regardless. `host` and the preset are
 #     ALTERNATIVE install targets: never install both (either form), or shared
 #     rows would mount twice (E-33).
-#   - `evolution-capability` is held out of the composition too (D-9, rc.51) —
-#     a staged Creator-mode governance seam with no live consumer; adopters
-#     add the row on top.
+#   - `evolution-capability` was retired in 0.3.66 (source removed): approval
+#     that does not gate execution is only a log, and the dynamic-package
+#     lifecycle belongs to the platform Creator mode.
 #
 # The legacy `@deepseek-ai/dsh-evolution` facade was retired from publishing
 # after the v0.1.0-rc.18 release tag (see docs/codebase-audit-rc16.md); this
@@ -111,8 +111,9 @@
   config:
     enabled: false
     stageForeground: true
-# D-9 (rc.51): `evolution-capability` is held out of the preset too — staged
-# Creator-mode governance with no live consumer; adopters add the row on top.
+# Retired (0.3.66): `evolution-capability` was removed — approval that does not
+# gate execution is only a log, and the dynamic-package lifecycle belongs to the
+# platform Creator mode.
 - id: evolution-threat
   name: '@deepseek-ai/dsh-evolution-threat'
 

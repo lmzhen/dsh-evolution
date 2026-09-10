@@ -17,8 +17,14 @@
  * to the directory holding the package folders. Only the mirror carries a
  * CHANGELOG.md; without one (dev twin, layout-sync parity only) it is a no-op
  * that never rewrites canonical dev manifests.
+ *
+ * v22 (PRE-2): every rewrite is tmp+rename atomic and each file is parsed in
+ * its own try/catch with failures collected and reported at the end. The old
+ * direct writeFileSync + parse-abort loop left a TRUNCATED manifest on an
+ * interrupted run, and every later run aborted on that same file — a
+ * permanently unself-healing carrier plus a mixed-version mirror.
  */
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { changelogHead } from './lib-changelog.mjs'
@@ -41,26 +47,54 @@ if (!match) {
 }
 const VERSION = match
 
+/** tmp+rename atomic manifest rewrite (same discipline as inject-evolution-
+ * paths F-352 / the installer F-354): a crash mid-write leaves a tmp file,
+ * never a truncated manifest. */
+function rewriteAtomically(manifestPath, manifest) {
+  const tmp = `${manifestPath}.tmp`
+  writeFileSync(tmp, JSON.stringify(manifest, null, 2) + '\n')
+  renameSync(tmp, manifestPath)
+}
+
 let changed = 0
+const failures = []
 for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue
   const manifestPath = join(packagesRoot, entry.name, 'package.json')
   if (!existsSync(manifestPath)) continue
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  if (manifest.version === VERSION) continue
-  manifest.version = VERSION
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
-  changed++
+  try {
+    // Per-file isolation: one unreadable manifest is REPORTED, not a loop
+    // abort — the old parse-abort left every later manifest unaligned while
+    // the broken file also blocked its own repair.
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.version === VERSION) continue
+    manifest.version = VERSION
+    rewriteAtomically(manifestPath, manifest)
+    changed++
+  } catch (error) {
+    failures.push(`${entry.name}: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 const rootManifestPath = join(dirname(packagesRoot), 'package.json')
 if (existsSync(rootManifestPath)) {
-  const rootManifest = JSON.parse(readFileSync(rootManifestPath, 'utf8'))
-  if (rootManifest.version !== VERSION) {
-    rootManifest.version = VERSION
-    writeFileSync(rootManifestPath, JSON.stringify(rootManifest, null, 2) + '\n')
-    changed++
+  try {
+    const rootManifest = JSON.parse(readFileSync(rootManifestPath, 'utf8'))
+    if (rootManifest.version !== VERSION) {
+      rootManifest.version = VERSION
+      rewriteAtomically(rootManifestPath, rootManifest)
+      changed++
+    }
+  } catch (error) {
+    failures.push(`root package.json: ${error instanceof Error ? error.message : String(error)}`)
   }
+}
+
+if (failures.length > 0) {
+  console.error(`normalize-mirror: ${failures.length} manifest(s) could not be aligned to ${VERSION}:`)
+  console.error(failures.join('\n'))
+  console.error('normalize-mirror: fix or delete the broken manifest(s) and re-run — the rest of the tree was still aligned.')
+  process.exit(1)
 }
 
 console.log(`normalize-mirror: ${changed} manifest(s) aligned to ${VERSION}`)

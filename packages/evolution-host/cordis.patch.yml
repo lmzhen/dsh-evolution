@@ -2,10 +2,12 @@
 #
 # This layer owns the shared self-evolution INFRASTRUCTURE: registries,
 # providers, control plane, background review/curator, and observability.
-# It deliberately registers NO model-facing tools. Model tools are the
+# It registers NO memory/skill model tools; `memory`/`skill_manage` are the
 # agent-preset layer (see ../evolution-agent/agent.cordis.yml), so a profile
-# can run evolution automation without exposing `memory`/`skill_manage` to
-# every session.
+# can run evolution automation without exposing them to every session.
+# v20 correction (E-1): the former "NO model-facing tools" claim was false —
+# the bundle carries exactly ONE read-only model-visible tool, the
+# `maintenance_probe` row below (its only model-facing surface).
 - insert:
     # ── control plane ───────────────────────────────────────────────────────
     - id: evolution-policy
@@ -55,9 +57,9 @@
       config:
         enabled: false
         stageForeground: true
-    # D-9 (rc.51): `evolution-capability` is no longer part of the host bundle
-    # — staged, non-executing Creator-mode adapter with no live consumer; keep
-    # the host mount minimal and let deployments opt in by adding the row.
+    # Retired (0.3.66): `evolution-capability` source was removed — approval that
+    # does not gate execution is only a log, and the dynamic-package lifecycle
+    # belongs to the platform Creator mode.
     - id: evolution-threat
       name: '@deepseek-ai/dsh-evolution-threat'
 

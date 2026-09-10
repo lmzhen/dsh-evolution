@@ -50,9 +50,12 @@ describe('EvolutionIoRegistry', () => {
     ctx2.evolutionIo.registerProvider(fake('a'))
     ctx2.evolutionIo.registerProvider(fake('b'))
     expect(ctx2.evolutionIo.provider().name).toBe('a')
-    expect(ctx2.evolutionIo.hasProvider('a')).toBe(true)
-    expect(ctx2.evolutionIo.hasProvider('b')).toBe(true)
-    expect(ctx2.evolutionIo.hasProvider('c')).toBe(false)
+    // v20 (A-3): hasProvider() was removed (same zero-consumer rationale as
+    // hasProviders() in P3-D1) — presence probes go through provider(),
+    // which fails loud on a missing name.
+    expect(ctx2.evolutionIo.provider('a').name).toBe('a')
+    expect(ctx2.evolutionIo.provider('b').name).toBe('b')
+    expect(() => ctx2.evolutionIo.provider('c')).toThrow(/not registered/)
   })
 
   it('P2-3 (v15): identical-object re-registration is idempotent; a DIFFERENT object under the name still fails loud', async () => {

@@ -1,8 +1,9 @@
 # Installing dsh-evolution
 
-Four supported install forms (P2-23, v19 — this copy mirrors the repository
-root `INSTALL.md`; `dsh-evolution-all` is the DEFAULT and the other three are
-alternatives):
+Four supported install forms (P2-23, v19 — a companion to the repository
+root `INSTALL.md`, focused on the bundle/preset matrix; the root copy is
+canonical for the source-install and scope details. `dsh-evolution-all` is
+the DEFAULT and the other three are alternatives):
 
 | Form | Bundle / preset | Model tools | Notes |
 |---|---|---|---|
@@ -12,12 +13,14 @@ alternatives):
 | Agent only | `Evolution` agent preset | only sessions selecting the preset | requires the host bundle (or the agent-preset packages) installed separately |
 
 The full `all` bundle is the new-install default; `host` is the shrink path
-(same automation, no model tools). Shrinking = uninstall `all`, install `host`.
+(same automation, no memory/skill model tools — the read-only
+`maintenance_probe` diagnostic remains). Shrinking = uninstall `all`, install `host`.
 
 > ⚠️ **`dsh-evolution-all`, `dsh-evolution-host` and `dsh-evolution-preset` are
 > mutually exclusive install targets — never add more than one of these bundles
 > to the same profile.** `all` and the preset expose the model tools
-> profile-wide; `host` is infrastructure only. They share the self-evolution
+> profile-wide; `host` is infrastructure only (plus the read-only
+> `maintenance_probe` diagnostic). They share the self-evolution
 > infrastructure rows, so mounting two double-registers that infrastructure
 > and fails loud at startup (invariants: already registered). The layered
 > layout (host + Evolution agent preset) is ALSO exclusive with `all` — the
@@ -102,13 +105,16 @@ Equivalent to the legacy `dsh-evolution-preset` profile bundle.
 
 ## 5. Production install
 
-Official upstream bundles, when published by DeepSeek:
+Family bundles in the overlay `@deepseek-ai` scope (community-maintained;
+publishing rewrites the scope to `@lmzhen` — the `@deepseek-ai` names below
+resolve only from a source/overlay checkout, not from npm):
 
 ```bash
 dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
 ```
 
-Community bundles under the personal scope `@lmzhen`:
+Community bundles under the personal scope `@lmzhen` (what npm actually
+serves today):
 
 ```bash
 pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-host
@@ -211,27 +217,23 @@ vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
 Uninstalling only removes the profile row or preset directory; memory, skills,
 state, reports, and approval history remain under `$DSH_HOME`.
 
-## Capability governance (optional package)
+## Capability evolution (retired in 0.3.66)
 
-`evolution-capability` is a staged, non-executing adapter for Creator mode. It
-validates a capability package shape and submits it through the same pending
-audit trail as memory/skills. Activation remains in Creator mode:
+`evolution-capability` was removed. It staged a Creator-mode capability package
+(an object with `code.host`/`code.client` halves) into the same pending queue as
+memory and skills, without executing anything — approval recorded intent only,
+and activation stayed a manual Creator-mode step.
 
-```ts
-await ctx.evolutionCapability.submit({
-  name: 'my-capability',
-  purpose: 'One sentence purpose.',
-  code: { host: 'export function apply() {}' },
-})
-```
+Retired because that split cannot work: an approval that does not gate execution
+is a log, and the log's owner is not the effect's owner. The dynamic-package
+lifecycle — `cordis_define` / `cordis_run`, its approval, and its run history —
+belongs to the platform Creator mode, which is where a capability is created.
+The package never had a production consumer: no bundle mounted it, no model-facing
+tool reached it, and its only in-tree caller was this document.
 
-It **is not mounted by the evolution-host bundle** (rc.51 D-9): the host stays
-minimal, and deployments that use Creator mode add the row themselves:
-
-```yaml
-- id: evolution-capability
-  name: '@deepseek-ai/dsh-evolution-capability'
-```
-
-It fails closed while `evolution-approval` is disabled, and it never executes
-`code` itself.
+`@lmzhen/dsh-evolution-capability@0.3.65` (the last published version) stays
+installable from npm; no later version will be published. Records staged by an
+install that used it (≤0.3.65) stay readable: they still appear in
+`/evolution pending`, where approve records intent and reject drops them.
+Capability-shaped work belongs either in Creator mode or, when the durable
+artifact is knowledge rather than code, in `memory` and `skills`.

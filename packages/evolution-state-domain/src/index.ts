@@ -71,6 +71,9 @@ export const pendingSchema = z.object({
   id: z.string(),
   // 0.3.17 (S3.5, D-4): 'skill_batch' is gone — nothing ever created one, and
   // the TYPE no longer carries it (legacy-looking values parse as unknown).
+  // 0.3.66: 'capability' stays for rows written before its producer was removed
+  // (see PendingKind) — this schema is what `open()` validates every stored
+  // record against, so one such row must not fail the whole domain at mount.
   kind: z.union([z.literal('memory'), z.literal('skill'), z.literal('capability')]),
   summary: z.string(),
   args: z.unknown(),
@@ -270,6 +273,18 @@ export function apply(ctx: Context): void {
     },
 
     async claimPending(id, claimId) {
+      // v20 (A-4) provider contract, applies to EVERY guarded RMW below
+      // (claim/resolve/release/transact): a REJECTED transition returns
+      // `current` unchanged, and the upstream domain `update` primitive
+      // persists unconditionally — so a rejection still costs one no-op
+      // backend write plus one `domain/changed` event. This is accepted
+      // seam behavior, NOT a bug: the seam has no conditional-write
+      // primitive, short-circuiting here would break the atomicity the
+      // update callback provides, and the json provider's byte-identical
+      // short-circuit (core io.ts `next !== current`) is the documented
+      // asymmetry between the two media. Consequences: duplicate approve/
+      // resolve clicks and "null = keep" transacts churn one write each;
+      // `domain/changed` listeners must tolerate no-op puts.
       const table = (await ensure()).table(PENDING_TABLE)
       try {
         const slot = { record: null as PendingRecord | null }
@@ -351,7 +366,12 @@ export function apply(ctx: Context): void {
         if (resolved.record !== null) {
           const resolvedEntries = [...table.entries()]
             .map(([key, record]) => ({ key, record }))
-            .filter(entry => entry.record.status === 'approved' || entry.record.status === 'rejected')
+            .filter(entry => (entry.record.status === 'approved' || entry.record.status === 'rejected')
+              // v23 (AP-1): capability approvals exempt from the audit cap —
+              // `approvedPackage` reads the LIVE approved list and a capability
+              // cannot be re-submitted, so eviction would make it permanently
+              // unactivatable (same rule as json's enforceResolvedCap).
+              && entry.record.kind !== 'capability')
           const resolvedAtMs = (record: PendingRecord): number => {
             const parsed = Date.parse(record.resolvedAt ?? '')
             return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed

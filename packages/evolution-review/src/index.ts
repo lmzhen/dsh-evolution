@@ -10,7 +10,7 @@ import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, contentHash, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -290,11 +290,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // reviews (a 120s window is long) could fuzzyPatch the same file
   // concurrently. While set, turn/end signals still accumulate (state was
   // already advanced above) but never spawn a second subagent.
+  // v20 (C-3) cross-layer contract: the ONLY writer exclusion shared with the
+  // curator is skill-store's per-file write lock + the F-17 marker probe (a
+  // destructive mover refuses a directory whose writer lock is alive) —
+  // curator's acquireMutex serializes its OWN package only. Automatic curator
+  // passes stay out of the session-active window via the min-idle gate; a
+  // manual `/evolution curator run` (ignoreGates) is the one realistic
+  // interleave window: the loser records a failed op and the snapshot stays
+  // the rollback path. Accepted + documented (plan v20 C-3①); the same
+  // statement lives on evolution-curator's acquireMutex.
   let reviewInFlight = false
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
   ctx.on('session/event', (session, event) => {
-    if (event.type === 'turn/start') turnStarts.set(session.id, session.seq - 1)
+    // v20 (C-5): subagent sessions never reach the fold — the turn/end handler
+    // early-returns on `origin === 'subagent'` BEFORE the delete — so their
+    // entries used to sit in the map until the 128-threshold sweep. Don't set
+    // what no consumer can read.
+    if (event.type === 'turn/start' && session.header.origin !== 'subagent') turnStarts.set(session.id, session.seq - 1)
     if (event.type !== 'turn/end') return
     // Counter sweep (rc.42 audit P1-10): the per-session maps grow with every
     // session that ever emitted a turn event, and the platform has no
@@ -417,8 +430,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
         } else {
-          const started = await trySubagentReview(session, agent, pendingKind, signal)
-          if (started) {
+          const reviewOutcome = await trySubagentReview(session, agent, pendingKind, signal)
+          if (reviewOutcome === true) {
             // V8-03 (0.3.48): the emit is a protection domain (V5-19③/F-334
             // discipline) — a throwing listener used to escape the flush,
             // skip the counter reset below and re-deliver the same kind next
@@ -435,9 +448,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             } catch (emitError) {
               ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
             }
-          } else {
+          } else if (reviewOutcome !== 'deferred') {
             // Subagent path failed at the END — fall back to the prompt delivery
             // (still at completion; there is no later boundary to defer to).
+            // 'deferred' (v20 C-1) is NOT here: trySubagentReview queued the
+            // prompt itself and delivers it when the in-flight window closes —
+            // the old immediate inject let the parent model write while the
+            // subagent could still executePlan, the exact concurrent-writer
+            // window E-19's single-flight exists to prevent.
             try {
               deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review')
             } catch (injectError) {
@@ -553,14 +571,64 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     } else agent.inject(message)
   }
 
-  async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean> {
+  // v20 (C-2): the subagent leg is timeout-guarded by its own AbortSignal,
+  // but the write leg (executePlan → memory/approval IO) had NO timeout — a
+  // hung await used to leave `reviewInFlight` set forever and silently
+  // degrade the subagent channel to inject for the whole process lifetime.
+  // Race the wait with a timer: on timeout the rejection falls into the
+  // pipeline catch (returns false → caller falls back to inject) and the
+  // finally above has already reset the single-flight flag and drained the
+  // deferred queue.
+  // v21 (R-1) correction of the v20 wording: the abandoned write leg does NOT
+  // get an audit trail — the result notice and the `evolution/plan-applied`
+  // emit live AFTER the awaited call, so a timeout skips them entirely. The
+  // abandoned op may still land WITHOUT any record, and the fallback inject
+  // re-opens the concurrent-writer window until its IO settles (bounded by
+  // the underlying IO error handling). The catch below warns explicitly.
+  const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => { reject(new Error(`dsh-evolution-review: ${label} timed out after ${ms}ms`)) }, ms)
+      promise.then(
+        (value) => { clearTimeout(timer); resolve(value) },
+        (error: unknown) => { clearTimeout(timer); reject(error instanceof Error ? error : new Error(String(error))) },
+      )
+    })
+
+  // v20 (C-1): fallback prompts queued while a review subagent was in flight.
+  // Capped so a pathological pile-up cannot grow unboundedly (the drain point
+  // is the `finally` in trySubagentReview, and C-2 bounds the window itself).
+  const deferredFallbackReviews: Array<{ agent: import('@deepseek-ai/dsh-agent').Agent; kind: ReviewKind }> = []
+  const DEFERRED_REVIEW_CAP = 16
+  // v21 (L-5): drop queued fallback prompts on dispose — delivering them after
+  // unload would inject through a dead plugin fiber. Scope note: the whole
+  // single-flight mechanism (flag + queue) is PER-MOUNT state; an HMR reload
+  // starts a fresh instance whose flag is false while the old instance's run
+  // may still be in flight. That reload window is covered by the same
+  // per-file locks + marker probe as the curator cross-layer contract (see
+  // the E-19/C-3 comment), not by this flag.
+  ctx.effect(() => () => { deferredFallbackReviews.length = 0 }, 'dsh-evolution-review.deferred-drain')
+
+  async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred'> {
     if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentLike | undefined
     if (!subagents) return false
     // 0.3.18 (E-19) single-flight: another review is running (the window can
-    // be 120s). The caller injects the review prompt instead — the review
-    // still happens on THIS turn, just never concurrently with a subagent.
-    if (reviewInFlight) return false
+    // be 120s). The review still happens on THIS turn, just never concurrently
+    // with a subagent.
+    if (reviewInFlight) {
+      // v20 (C-1 / P1-3): the old path returned false and the caller injected
+      // the review prompt IMMEDIATELY — the parent model started writing via
+      // its tools while the in-flight subagent could still `executePlan`, the
+      // exact concurrent-writer window this single-flight flag exists to
+      // prevent. Queue the prompt; the `finally` below delivers it right after
+      // the window closes (E-19's stated invariant now actually holds).
+      if (deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
+        deferredFallbackReviews.push({ agent, kind })
+      } else {
+        ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropping one fallback review prompt`)
+      }
+      return 'deferred'
+    }
     reviewInFlight = true
     try {
       // One authoritative policy read (E-57): the former PolicyLike view and
@@ -639,7 +707,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const acceptedSkillOps = validation.accepted.skillOps ?? []
         const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-        const executed = await executePlan(validation.accepted, session)
+        // v20 (C-2): the write leg gets the same deadline class as the
+        // subagent leg (config value is schema-clamped ≤ 2^31-1). A timeout
+        // rejects into the pipeline catch below — the single-flight flag is
+        // reset in the finally either way, so the channel recovers instead of
+        // silently degrading to inject for the process lifetime.
+        const executed = await withTimeout(executePlan(validation.accepted, session), config.reviewTimeoutMs, 'review plan execution')
         const actions = executed.actions
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
@@ -722,9 +795,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // visible. Log the reason so a silent "review never fires" is debuggable,
       // and fall through to the synchronous inject path (caller returns false).
       ctx.logger.warn(`dsh-evolution-review: subagent review failed: ${error instanceof Error ? error.message : String(error)}`)
+      // v21 (R-1): a plan-execution timeout abandons the write leg mid-flight —
+      // the result notice and plan-applied emit live AFTER the awaited call
+      // and never run for it. Say so: the abandoned op may still land WITHOUT
+      // an audit record while the fallback inject (caller side) is already
+      // writing; reconcile by hand if late writes show up.
+      if (error instanceof Error && error.message.includes('plan execution timed out')) {
+        ctx.logger.warn('dsh-evolution-review: plan execution abandoned on timeout — any late write it lands has NO plan-applied record and races the fallback inject; inspect the skill tree and usage sidecar')
+      }
       return false
     } finally {
       reviewInFlight = false
+      // v20 (C-1): flush prompts deferred while the window was open — AFTER
+      // the reset, so the parent-model writer never overlaps the subagent
+      // writer. Delivery failures stay warn-only (best-effort, same as the
+      // caller-side fallback).
+      const deferred = deferredFallbackReviews.splice(0)
+      for (const { agent: waitingAgent, kind: waitingKind } of deferred) {
+        try {
+          deliverMessage(waitingAgent, reviewPrompt(waitingKind), 'auto-review')
+        } catch (injectError) {
+          ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+        }
+      }
     }
   }
 
@@ -735,6 +828,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const sessionId = session?.id
     const memory = ctx.get('memory') as MemoryLike | undefined
     const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+    // v23 (AP-3): read-only library for the stage-time staleness hash attached
+    // to full-content skill updates (see the ops loop below). Null when the io
+    // registry is absent — the hash is then simply not attached.
+    const hashLibrary = (() => {
+      const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+      if (!io) return null
+      return new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()))
+    })()
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
     const origins = resolveOrigins(undefined, true)
     const actions: string[] = []
@@ -778,6 +879,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           continue
         }
         const args = { ...op, evidence: op.evidence }
+        // v23 (AP-3): stage-time staleness hash for full-content updates —
+        // same contract as the tool's staging (the runner refuses a replay
+        // whose live content no longer matches). Review ops re-read through a
+        // lightweight read-only library; patch ops carry old_string anchors
+        // and need no hash.
+        if ((args.action === 'update' || args.action === 'edit') && hashLibrary && typeof args.name === 'string' && args.name !== '') {
+          const stageCurrent = await hashLibrary.read(args.name).catch(() => null)
+          if (stageCurrent !== null) (args as { staged_from_sha256?: string }).staged_from_sha256 = contentHash(stageCurrent)
+        }
         // The registered skill runner expects the { operation, origin } wrapper;
         // passing it on both the pending record and the replay keeps the
         // background_review origin in the approval-disabled (default) path too.

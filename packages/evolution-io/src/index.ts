@@ -93,14 +93,12 @@ export class EvolutionIoRegistry extends Service {
     return dispose
   }
 
-  /** Whether a provider with this exact name is mounted. */
-  hasProvider(name: string): boolean {
-    return this.providers.has(name)
-  }
-
   // P3-D1 (v15): the speculative `hasProviders()` from v14 was removed — zero
   // consumers (the lazy/boot-time probe it was written for reads the
   // state-storage registry's own `hasProviders`).
+  // v20 (A-3): `hasProvider(name)` removed for the same reason — its only
+  // callers were this package's own spec; a presence probe goes through
+  // `provider(name)`, which fails loud on a missing name.
 
   provider(name?: string): EvolutionIo {
     if (name) {

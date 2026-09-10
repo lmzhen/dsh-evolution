@@ -47,6 +47,22 @@ const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
 const platformVersion = requireArg('--platform-version')
 
+// v21 (S-4): reconcile the release version with the PACKAGE MANIFESTS before
+// anything is staged. The install side (install-layered familyVersion)
+// re-derives the family version from evolution-host/package.json, so a
+// --version that drifted from the manifests publishes cleanly and then bricks
+// every scoped install with "staging was built for X but this tree is Y" —
+// a mismatch must fail HERE, naming both sides.
+{
+  const manifestVersion = JSON.parse(readFileSync(join(evolutionRoot, 'evolution-host', 'package.json'), 'utf8')).version
+  if (manifestVersion !== releaseVersion) {
+    throw new Error(
+      `prepare-release: --version ${releaseVersion} != package manifests ${manifestVersion} — `
+      + 'bump the manifests/CHANGELOG (normalize-mirror) or pass the matching --version',
+    )
+  }
+}
+
 // R-06: the two vendored framework ranges the release metadata pins. Sync
 // source: the upstream checkout's vendor/ tags these ranges target
 // (vendor/cordis, vendor/schemastery) — update HERE and the upstream vendor
@@ -101,7 +117,9 @@ function releaseSpec(name, ourNames, protocol = '^') {
   // Platform packages range against the published upstream version, NOT the
   // development baseline — CI guards manifest parity with the compat anchor
   // (verify-platform-ranges.mjs, N-2).
-  if (name.startsWith('@deepseek-ai/dsh-')) return `^${platformVersion}`
+  if (name.startsWith('@deepseek-ai/dsh-')) {
+    return `^${platformVersion}`
+  }
   // D-7 (v18): the `npm view` registry lookup that used to sit here was dead
   // for the current dependency set — all 16 external workspace deps hit a
   // branch above — while costing 16 network calls per pack (and a fail-loud
@@ -401,7 +419,7 @@ const publishGroups = [
   ['evolution-maintenance'],
   ['tool-memory', 'tool-skill-manage'],
   ['evolution-review', 'evolution-curator', 'evolution-commands'],
-  ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog', 'evolution-capability'],
+  ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog'],
   ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
 // P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale

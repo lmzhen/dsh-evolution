@@ -48,8 +48,9 @@ until the interval/usage window opens, so nothing writes on boot. The first
 memory entry arrives after a review decides a conversation fact is worth
 keeping; the first skill edit arrives after a review proposes a change the
 conversation supports. Everything is visible in `/evolution doctor` (form,
-services, pending) and every write shows in `/evolution mutations`. Stop any
-of it with M3 (infrastructure only) or M2 gates per-write.
+services, pending) and every write shows in `/evolution mutations`. To gate
+the background writes, use M2 (human approval); M3 removes only the model
+tools — its automation keeps running.
 
 ### Install modes (M1-M4)
 
@@ -87,8 +88,7 @@ repeating the same prose.
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | The `/evolution` command surface (approval queue, curator, maintenance, presets) — full enumeration under "Command surface" below |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
-| `evolution-capability` | Staged non-executing governance adapter for Creator-mode capability packages |
-| `evolution-host` | Host-plane infrastructure bundle (no model tools) |
+| `evolution-host` | Host-plane infrastructure bundle (no memory/skill model tools; ships the read-only `maintenance_probe` diagnostic) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | One-command aggregate entry (host + model tools) |

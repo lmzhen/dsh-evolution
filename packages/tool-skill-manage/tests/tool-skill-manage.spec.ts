@@ -5,6 +5,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
@@ -91,6 +92,75 @@ describe('tool-skill-manage', () => {
     const message = (created.value as { message?: string } | undefined)?.message ?? ''
     expect(message).toContain('Authoring check:')
     expect(message).toContain('exceeds the 60-char authoring bar')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('v20 (D-1): a non-string scalar arg is refused structurally, not as a bare TypeError', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`scalar-guard-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: args,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    // A non-string `name` / `old_string` used to escape as a bare TypeError
+    // from SkillLibrary (`name.trim is not a function` / `md.includes`) when
+    // garbage slipped past the schema (the F-07/V8-09 class). Whichever line
+    // fires — schema validation first, the executeCore scalar guard second —
+    // the refusal is STRUCTURED, never a raw TypeError (same shape as the
+    // V8-09 restructure test above).
+    const badName = await execute({ action: 'create', name: 42, content: SKILL })
+    expect(badName.isError).toBe(true)
+    const nameBox = badName.value as { message?: string } | undefined
+    expect(nameBox?.message ?? '').not.toContain('TypeError')
+    const badPatch = await execute({ action: 'patch', name: 'scalar-guard-skill', old_string: 7 })
+    expect(badPatch.isError).toBe(true)
+    const patchBox = badPatch.value as { message?: string } | undefined
+    expect(patchBox?.message ?? '').not.toContain('TypeError')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('v21 (R-2): the scalar gate itself is reached through the approval replay runner (schema bypassed)', async () => {
+    // The tool schema rejects a non-string scalar BEFORE executeCore, so the
+    // previous test can only prove the refusal is structured end-to-end. The
+    // approval replay runner (`evolutionApproval.run('skill', args)`) invokes
+    // executeCore DIRECTLY with no schema in front — the exact route a forged
+    // pending record would take — so this test drives the new gate itself.
+    const { ctx, root, previousHome } = await setup()
+    const pending: Array<unknown> = []
+    ctx.provide('evolutionState', {
+      listPending: async () => pending,
+      savePending: async (record: unknown) => { pending.push(record) },
+      tryResolvePending: async () => ({ record: null, applied: false }),
+      claimPending: async () => null,
+      releasePendingClaim: async () => {},
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    expect(ctx.evolutionApproval.hasRunner('skill')).toBe(true)
+
+    const run = (operation: Record<string, unknown>) => ctx.evolutionApproval.run('skill', {
+      operation,
+      origin: 'foreground',
+      libraryOrigin: 'foreground',
+    }, { interface: 'background_review' })
+    const badName = await run({ action: 'create', name: 42, content: SKILL })
+    expect(badName.ok).toBe(false)
+    expect(badName.message).toContain('"name" must be a string')
+    const badPatch = await run({ action: 'patch', name: 'scalar-guard-skill', old_string: 7 })
+    expect(badPatch.ok).toBe(false)
+    expect(badPatch.message).toContain('"old_string" must be a string')
+    // A restructure move with non-string fields is coerced to '' and refused
+    // by the library's own structured heading check — also never a TypeError.
+    const badMove = await run({ action: 'restructure', name: 'scalar-guard-skill', restructure: [{ heading: 9, to_file: 'references/x.md' }] })
+    expect(badMove.ok).toBe(false)
+    expect(badMove.message).not.toContain('TypeError')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

@@ -229,37 +229,67 @@ describe('usage sidecar field normalization (P2-3)', () => {
     })
   })
 
-  it('a malformed sidecar is never overwritten by the RMW (P3)', async () => {
+  it('v21 (L-1): a malformed sidecar is QUARANTINED, warned, and the sidecar heals — never a silent freeze', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-evo-malformed-'))
     const io = nodeEvolutionIo()
-    await io.writeText(usageFile(root), '{corrupted telemetry')
+    const original = '{corrupted telemetry'
+    await io.writeText(usageFile(root), original)
+    // v21 (L-1): the old contract froze every later RMW as a silent no-op —
+    // telemetry stopped landing with no throw and no warn. The new contract
+    // follows state-json's E-9 posture: quarantine the original bytes, warn,
+    // and heal so the facility keeps serving.
+    const warnings: string[] = []
     await mutateUsage(root, io, (map) => {
-      const record = getRecord(map, 'should-not-persist')
+      const record = getRecord(map, 'healed-after-quarantine')
       record.use_count = 1
-    })
-    expect(await io.readText(usageFile(root))).toBe('{corrupted telemetry')
+    }, { onQuarantine: (message) => { warnings.push(message) } })
+    expect(warnings.length).toBe(1)
+    expect(warnings[0]).toContain('unreadable')
+    // The recoverable bytes survived in the .corrupt copy.
+    expect(await io.readText(`${usageFile(root)}.corrupt`)).toBe(original)
+    // The sidecar healed: the task's write landed on the fresh map.
+    expect(await io.readText(usageFile(root))).toContain('healed-after-quarantine')
+    // The suppressed sidecar keeps its own semantics (unchanged by L-1).
     await io.writeText(join(root, '.curator-suppressed.json'), 'not-json either')
     await updateSuppressedNames(root, io, (names) => { names.add('x') })
     expect(await io.readText(join(root, '.curator-suppressed.json'))).toBe('not-json either')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+
+  it('v21 (L-1): a newer on-disk schema version freezes writes WITH a warn (never downgraded silently)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-futurever-'))
+    const io = nodeEvolutionIo()
+    const original = JSON.stringify({ version: 99, demo: { use_count: 3 } })
+    await io.writeText(usageFile(root), original)
+    const warnings: string[] = []
+    await mutateUsage(root, io, () => {}, { onQuarantine: (message) => { warnings.push(message) } })
+    expect(warnings.length).toBe(1)
+    expect(warnings[0]).toContain('schema version 99')
+    // Bytes preserved verbatim — the freeze is deliberate for future versions.
+    expect(await io.readText(usageFile(root))).toBe(original)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
 })
 
 describe('v17: mutateUsage preserves wrong-shape sidecars', () => {
-  it('P3 (v17): a top-level ARRAY sidecar is preserved verbatim by mutateUsage (no {} overwrite)', async () => {
+  it('v21 (L-1): a top-level ARRAY sidecar is quarantined and the sidecar heals (warn surfaced)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-usage-shape-'))
     const io = nodeEvolutionIo()
     const file = usageFile(root)
     const original = '[ "legacy array shape" ]'
     await writeFile(file, original, 'utf8')
+    const warnings: string[] = []
     await mutateUsage(root, io, (map) => {
       map.set('demo', { ...emptyRecord(), created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z' })
-    })
-    // The wrong-shape bytes are PRESERVED (never overwritten with {}), and
-    // reading still yields an empty map (no phantom records).
-    const after = await import('node:fs/promises').then(m => m.readFile(file, 'utf8'))
-    expect(after).toBe(original)
-    expect((await loadUsage(root, io)).size).toBe(0)
+    }, { onQuarantine: (message) => { warnings.push(message) } })
+    // v21 (L-1): the wrong-shape bytes are preserved VERBATIM in the .corrupt
+    // copy (never silently overwritten with {}), a warning names the file,
+    // and the live sidecar heals with the task's entries.
+    expect(await import('node:fs/promises').then(m => m.readFile(`${file}.corrupt`, 'utf8'))).toBe(original)
+    expect(warnings.length).toBe(1)
+    expect(warnings[0]).toContain('.corrupt')
+    expect(await import('node:fs/promises').then(m => m.readFile(file, 'utf8'))).toContain('demo')
+    expect((await loadUsage(root, io)).has('demo')).toBe(true)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

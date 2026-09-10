@@ -10,7 +10,7 @@
 import { basename, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
-import { LOCK_BODY_RE, LOCK_SUFFIX, isProcessAlive, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { LOCK_BODY_RE, LOCK_SUFFIX, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -208,6 +208,9 @@ const MARKER_LOCK_NAMES: readonly string[] = [
   `.pinned${LOCK_SUFFIX}`,
   `.hermes-managed${LOCK_SUFFIX}`,
 ]
+
+/** v23 (ML-1): `.archive` retention window (see pruneExpiredArchives). */
+const ARCHIVE_RETENTION_DAYS = 365
 
 function markerPath(dir: string, marker: 'bundled' | 'hub-installed' | 'pinned' | 'hermes-managed'): string {
   return join(dir, markerEntryName(marker))
@@ -947,7 +950,8 @@ export class SkillLibrary {
    * false-positive rewrite direction is actionable instead of a dead end. */
   private contentThreatBlock(content: string): string | null {
     // A2-16 (v18): scanContentThreats already appends its exemption hint;
-    // appending THREAT_EXEMPT_HINT here duplicated the sentence.
+    // a store-side append duplicated the sentence (the old THREAT_EXEMPT_HINT
+    // export was removed in v21 — see threats.ts THREAT_EXEMPTION_HINT).
     return scanContentThreats(content, undefined, this.threatScanOptions())
   }
 
@@ -1296,6 +1300,24 @@ export class SkillLibrary {
         if (!isCommittedOnly(error)) throw error
         durabilityWarning = error instanceof Error ? error.message : String(error)
       }
+      // v22 (LOCK-4): the SKILL.md probe above is lock-free and the marker
+      // write itself holds no writer lock, so a concurrent archive moving the
+      // directory in between left writeText's `mkdir(recursive)` holding the
+      // old path open as a SKILL.md-less ghost (restore then refused that
+      // name forever, with no log pointing at the cause). Re-check and undo:
+      // if the body vanished while we wrote, the marker (and the dir it just
+      // recreated) goes away with it and the caller gets a structured
+      // failure instead of a silently pinned ghost.
+      if (!(await this.io.exists(join(dir, 'SKILL.md')))) {
+        await this.io.remove(marker).catch(() => {})
+        // v23 (BR-5): remove the recreated directory only when OUR marker is
+        // its LAST remaining entry — a concurrent restore's single rename can
+        // land a full directory between the exists probe and this point, and
+        // the recursive remove must never take it.
+        const leftovers = await this.io.list(dir).catch(() => [] as string[])
+        if (leftovers.length === 0) await this.io.remove(dir).catch(() => {})
+        return { ok: false, message: `Skill "${normalized}" was archived concurrently while pinning; the partial marker was removed — retry after the mover settles.` }
+      }
     } else {
       await this.io.remove(marker)
     }
@@ -1338,6 +1360,18 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     const dir = this.dirOf(normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `Skill "${normalized}" already exists.` }
+    // v21 (D-6): NTFS and macOS default filesystems match names case-
+    // insensitively while the skill namespace is lowercase-only — a hand-
+    // maintained tree carrying `My-Tool/` made create('my-tool') diverge
+    // across platforms (exists-refusal on win32, silently created beside it
+    // on POSIX, vanishing after a git/WSL round-trip). Probe the listing for
+    // a case-variant and refuse with the variant named, so the refusal reads
+    // the same everywhere. Read paths stay platform-native (fail-closed).
+    for (const entry of await this.io.list(this.root).catch(() => [] as string[])) {
+      if (typeof entry === 'string' && entry !== normalized && entry.toLowerCase() === normalized.toLowerCase()) {
+        return { ok: false, message: `Skill "${normalized}" collides with the existing case-variant directory "${entry}" (skill names are lowercase-only); rename one of them.` }
+      }
+    }
     // C-15: a pre-existing directory carrying a protection marker is
     // refused — the same writeProtection() verdict update/patch apply — so
     // create() can no longer drop a SKILL.md into a bundled/hub-installed
@@ -1386,8 +1420,20 @@ export class SkillLibrary {
     if (existsAtCommit) return { ok: false, message: `Skill "${normalized}" already exists.` }
     // Any non-foreground writer (review channel OR delegated subagent) is an
     // agent-authored skill: mark it managed so the lifecycle owns it.
+    // v22 (LOCK-4): the marker lands only while the body we just wrote is
+    // still on disk — a concurrent archive moving the fresh directory away
+    // would otherwise let writeText's mkdir resurrect the old path as a
+    // SKILL.md-less ghost (same compensating cleanup as setPinnedCore).
     if (origin !== 'foreground') {
       await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
+      if (!(await this.io.exists(createPath))) {
+        await this.io.remove(markerPath(dir, 'hermes-managed')).catch(() => {})
+        // v23 (BR-5): same content re-check as setPinnedCore — never recurse
+        // away a directory a concurrent restore just landed.
+        const leftovers = await this.io.list(dir).catch(() => [] as string[])
+        if (leftovers.length === 0) await this.io.remove(dir).catch(() => {})
+        return { ok: false, message: `Skill "${normalized}" was archived concurrently while being created; the partial marker was removed — retry once the mover settles.` }
+      }
     }
     await this.audit(normalized, 'create', null, onDisk, 'created')
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
@@ -1673,9 +1719,10 @@ export class SkillLibrary {
   private async deleteStrandedLocks(dir: string): Promise<void> {
     // P2 (v17): the body-shape check keeps user support files named
     // `*.lock` (verified: restore used to delete them) out of the sweep.
-    await this.sweepLockIfStranded(join(dir, 'SKILL.md.lock'))
-    await this.sweepLockIfStranded(join(dir, '.pinned.lock'))
-    await this.sweepLockIfStranded(join(dir, '.hermes-managed.lock'))
+    // v20 (A-1): the three root-level names come from MARKER_LOCK_NAMES
+    // (F-17 single source) instead of re-inlined literals — a renamed marker
+    // can no longer silently drop out of the sweep.
+    for (const markerLock of MARKER_LOCK_NAMES) await this.sweepLockIfStranded(join(dir, markerLock))
     for (const supportDir of SUPPORT_DIRS) {
       let entries: string[] = []
       try { entries = await this.io.list(join(dir, supportDir)) } catch { continue }
@@ -1691,9 +1738,10 @@ export class SkillLibrary {
   private async sweepLockIfStranded(lockPath: string): Promise<void> {
     const body = await this.io.readText(lockPath).catch(() => null)
     if (body === null) return
-    const match = /^(\d+):[0-9a-f]*$/.exec(body.trim())
-    if (match === null) return
-    const pid = Number(match[1])
+    // v20 (A-1): consume the shared `parseLockBody` instead of the previously
+    // inlined third copy of the lock-body regex (F-17 single-source contract).
+    const pid = parseLockBody(body)
+    if (pid === null) return
     if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) return
     await this.io.remove(lockPath).catch(() => {})
   }
@@ -1725,9 +1773,10 @@ export class SkillLibrary {
       throw new Error(`snapshot restore refused: cannot verify ${label} (${error instanceof Error ? error.message : String(error)}); a live writer may hold it`)
     }
     if (body === null) return
-    const match = /^(\d+):[0-9a-f]*$/.exec(body.trim())
-    if (match === null) return
-    const pid = Number(match[1])
+    // v20 (A-1): shared `parseLockBody` (F-17 single-source) — same shape
+    // rule as `sweepLockIfStranded` above.
+    const pid = parseLockBody(body)
+    if (pid === null) return
     if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) {
       throw new Error(`snapshot restore refused: ${label} is being written (write lock present); retry once the write completes`)
     }
@@ -2133,7 +2182,33 @@ export class SkillLibrary {
     try {
       for (const entry of landing) {
         try {
-          await this.io.writeText(entry.target, entry.content)
+          if (this.transact) {
+            // v22 (LOCK-1): CAS write — the previous blind writeText committed
+            // plan-time bytes over whatever was on disk, so a concurrent
+            // patch/update (another process, shared DSH_HOME) between the
+            // pre-read above and this write was silently overwritten (lost
+            // update; both writers reported success). The task only commits
+            // when the disk still holds the pre-read baseline; any drift
+            // aborts the plan into the rollback below.
+            // P3 (v22; gate fix 0.3.66): the flag lives in a holder so the
+            // control-flow analysis (which cannot see the transact callback's
+            // assignment) does not narrow it to a literal `false`.
+            const drift = { seen: false }
+            await this.transact(this.io, entry.target, (current) => {
+              if (current !== entry.previous) {
+                drift.seen = true
+                return current
+              }
+              return entry.content
+            })
+            if (drift.seen) {
+              throw new Error(`concurrent modification detected: ${entry.target} changed after the plan was computed (a concurrent writer won the race); no further writes were performed`)
+            }
+          } else {
+            // No transact backend: the previous blind write (the class was
+            // constructed without cross-process exclusion anyway).
+            await this.io.writeText(entry.target, entry.content)
+          }
         } catch (error) {
           // A1-15 (v18): a post-rename dir-fsync failure means the bytes DID
           // land — rolling back would delete a visible write, and the audit/
@@ -2326,12 +2401,40 @@ export class SkillLibrary {
 
 
   /**
+   * v23 (ML-1): `.archive` retention. Archived skills are recoverable history,
+   * but nothing bounded their growth — the curator auto-archives idle skills,
+   * consolidation and manual deletes take the same path, and every snapshot
+   * copies the whole `.archive` (keep-5 retention amplifies it ×6). Entries
+   * older than this many days are pruned at snapshot time. Generous by
+   * design: a year-old auto-archive is effectively dead recoverability.
+   * Backends without the mtime probe skip pruning (no false deletes on
+   * unknown age).
+   */
+  private async pruneExpiredArchives(): Promise<void> {
+    const archiveRoot = join(this.root, '.archive')
+    if (!this.io.mtime) return
+    let entries: string[] = []
+    try { entries = await this.io.list(archiveRoot) } catch { return }
+    const cutoff = Date.now() - ARCHIVE_RETENTION_DAYS * 86_400_000
+    for (const entry of entries) {
+      const entryPath = join(archiveRoot, entry)
+      const mtime = await this.io.mtime(entryPath).catch(() => null)
+      if (mtime === null || mtime > cutoff) continue
+      await this.io.remove(entryPath).catch(() => {})
+      console.warn(`skill-store: pruned archived skill "${entry}" (older than ${ARCHIVE_RETENTION_DAYS} days; recoverable from snapshots until they rotate)`)
+    }
+  }
+
+  /**
    * Snapshot the recoverable skills state: active tree, usage/suppression
    * sidecars, `.archive/` and caller-supplied extras. `extras` are opaque
    * side files the Snapshot owner cares about (curator state); they are
    * listed in the manifest and only those names are ever read back.
    */
   async snapshotAll(reason = 'pre-mutation', extras: SnapshotExtra[] = []): Promise<string> {
+    // v23 (ML-1): retention runs BEFORE the copy, so the snapshot does not
+    // enshrine entries that are about to be pruned.
+    await this.pruneExpiredArchives()
     const backupRoot = join(this.root, '.backups')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     let dest = join(backupRoot, `skills-${stamp}`)
@@ -2447,7 +2550,15 @@ export class SkillLibrary {
     for (const name of entries.sort().reverse()) {
       if (!name.startsWith('skills-')) continue
       const manifest = await this.readSnapshotManifest(join(backupRoot, name))
-      if (manifest === null) continue
+      if (manifest === null) {
+        // v23 (ML-2): a manifest-less/corrupt snapshot used to ESCAPE the
+        // retention window entirely (list → skip → never reaped), and each
+        // orphan is a full tree+.archive copy. Surface it with an empty
+        // createdAt — the sort treats '' as oldest, so retainSnapshots evicts
+        // orphans FIRST while a genuinely recent valid snapshot stays ahead.
+        out.push({ path: join(backupRoot, name), createdAt: '', reason: 'unreadable or missing manifest (orphan snapshot)' })
+        continue
+      }
       out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt, reason: manifest.reason })
     }
     // A1-21 (v18): the manifest's createdAt is the authoritative recency

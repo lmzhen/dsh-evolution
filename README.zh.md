@@ -75,7 +75,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 |---|---|---|
 | M1 全自动（默认） | 后台自己积累记忆与技能 | `add @lmzhen/dsh-evolution-all` |
 | M2 人审把关 | 进化可以，每步先给我看 | M1 + `approval.enabled: true`（`/evolution pending\|approve\|reject`） |
-| M3 只装底座 | 先别让它写任何东西 | `add @lmzhen/dsh-evolution-host` |
+| M3 只装底座 | 去掉模型工具；后台自动化照常运行（把关写盘用 M2） | `add @lmzhen/dsh-evolution-host` |
 | M4 按会话启用（进阶） | 只在指定会话生效 | host + `/evolution preset install`（与 M1 互斥） |
 
 > [!WARNING]
@@ -110,7 +110,6 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 | 威胁扫描 | 写入前检测 prompt injection、泄露、密钥和混淆 |
 | 使用遥测 | 每个技能的 use / view / patch sidecar |
 | 可观测性 | session projection、replay/A-B、feedback 质量分、learning graph |
-| Capability 治理 | 验证并暂存 Creator-mode capability 包，绝不自动执行模型代码 |
 
 ## 安装方式
 
@@ -174,7 +173,8 @@ node packages/scripts/install-layered.mjs \
 ```
 
 模式：`oneclick`（兼容 `dsh-evolution-preset` bundle）、`layered`（host bundle +
-Evolution agent preset，推荐）、`host`（仅基础设施，无模型工具）、`agent`（仅预设）。
+Evolution agent preset，推荐）、`host`（仅基础设施，无记忆/技能模型工具，自带只读
+`maintenance_probe` 诊断）、`agent`（仅预设）。
 `--mode layered --uninstall` 移除安装器添加的所有内容但保留记忆、技能、状态、报告和
 审批历史。`EVOLUTION_SCOPE` 选择包 scope（源码树默认 `@deepseek-ai`；`@lmzhen` 需要
 `prepare-release` 产出的 `.release-staging`）。
@@ -193,11 +193,11 @@ curator 节奏（`interval` / `minIdleHours`）、决定哪些会话选 Evolutio
 |---|---|
 | 单 Agent 完整自进化 | one-click preset |
 | 多会话共享自进化基础设施 | host bundle + Evolution preset |
-| 只要自动化，不要模型工具 | host-only |
+| 只要自动化，不要记忆/技能模型工具（后台自动化照常运行） | host-only |
 | Standard preset | host bundle；模型工具保持隐藏 |
 | Anchored Standard preset | host bundle + `dev_tool_search` 解锁工具 |
 | Minimal preset | 服务挂载，但 complete persona 抑制进化提示 |
-| Creator mode | host bundle + capability 治理，代码手动激活 |
+| Creator mode | host bundle（能力包走平台 Creator 模式，见 0.3.66 退役说明） |
 
 **典型用途：**
 
@@ -248,7 +248,6 @@ usage telemetry
 tools.guard   威胁扫描
 tools.guard         不可变策略拒绝
 evolution-approval  stage -> approve/reject -> 审计
-evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 ```
 
 ## 兼容性
@@ -325,7 +324,7 @@ evolution-capability 验证 + 暂存 Creator 包，绝不执行代码
 
 1. 模型只能修改 memory 和 skills。
 2. policy、prompt、routing、approval、state 不是模型可写数据。
-3. capability 包只验证和暂存，绝不自动执行。
+3. 动态插件（能力包）不在本家族的写入面内：创建、审批与激活归平台 Creator 模式；0.3.66 起本家族的 capability 适配器已移除。
 4. 技能删除是归档；curator 先快照；审批写入通过精确 runner 重放。
 5. 依赖缺失时优雅降级，例如没有 storage-domain 时使用 JSON provider。
 

@@ -152,7 +152,8 @@ export class MemoryStore {
    * label (scanMemoryThreats already embeds it) plus the self-heal hint. */
   private memoryThreatBlock(text: string): string | null {
     // A2-16 (v18): scanMemoryThreats already appends its exemption hint;
-    // appending THREAT_EXEMPT_HINT here duplicated the sentence.
+    // a store-side append duplicated the sentence (the old THREAT_EXEMPT_HINT
+    // export was removed in v21 — see threats.ts THREAT_EXEMPTION_HINT).
     return scanMemoryThreats(text, undefined, this.threatScanOptions())
   }
 

@@ -100,10 +100,14 @@ describe('V10-13 (P2-9): skillReviewTrigger both — one review per completed tu
       skillReviewCompletionMinToolCalls: 1,
     })
     emitEnd(1)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    // Exactly ONE review reached the model, and it is the cadence prompt —
-    // not the completion channel's "task complete" variant.
-    expect(delivered).toHaveLength(1)
+    // v21 (T-7): waitFor instead of a fixed 50ms window — under load the
+    // (single) delivery may land late, and a mutex regression whose second
+    // injection arrives after the window used to pass silently.
+    await vi.waitFor(() => {
+      // Exactly ONE review reached the model, and it is the cadence prompt —
+      // not the completion channel's "task complete" variant.
+      expect(delivered).toHaveLength(1)
+    })
     expect(delivered[0]).toContain('[Auto-review')
     expect(delivered[0]).not.toContain('task complete')
   })
@@ -132,8 +136,10 @@ describe('V10-13 (P2-9): skillReviewTrigger both — one review per completed tu
       skillReviewCompletionMinToolCalls: 20,
     })
     emitEnd(1)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(delivered).toHaveLength(1)
+    // v21 (T-7): waitFor (see the test above) instead of a fixed 50ms sleep.
+    await vi.waitFor(() => {
+      expect(delivered).toHaveLength(1)
+    })
     expect(delivered[0]).toContain('task complete')
   })
 })

@@ -56,14 +56,19 @@ const PATTERNS: ThreatPattern[] = [
   { label: 'deception_hide', category: 'deception', scope: 'all', regex: new RegExp(String.raw`do\s+not\s+${FILLER}tell\s+${FILLER}the\s+user`, 'i') },
   { label: 'leak_system_prompt', category: 'deception', scope: 'context', regex: new RegExp(String.raw`output\s+${FILLER}(?:system|initial)\s+prompt`, 'i') },
   { label: 'context_exfil', category: 'exfiltration', scope: 'strict', regex: /(?:include|output|print|share)\s+(?:the\s+)?(?:conversation|chat\s+history|previous\s+messages|(?:full|entire)\s+context)/i },
-  { label: 'send_to_url', category: 'exfiltration', scope: 'strict', regex: /(?:send|post|upload|transmit)\s+[^\n]{0,512}\s+(?:to|at)\s+https?:\/\//i },
+  // v22 (SEC-2): the gap may now cross newlines (`[\s\S]{0,512}?`, lazy for
+  // proximity) — the old `[^\n]{0,512}` form let a C2 instruction split its
+  // verb and URL across lines ("send the full report\n…\nto https://…"),
+  // which no in-scope pattern caught.
+  { label: 'send_to_url', category: 'exfiltration', scope: 'strict', regex: /(?:send|post|upload|transmit)\s+[\s\S]{0,512}?\s+(?:to|at)\s+https?:\/\//i },
 
   // Shell-based secret exfiltration. V8-13 (0.3.47): `\b` word boundaries —
   // the bare `cat`/`curl`/`wget` substrings matched inside `concat`/`scurl`
   // prose (`[^\n]{0,512}` can be empty), locking EVERY write; the C2 table
   // next to this one already uses `\b` — this row now matches that discipline.
-  { label: 'exfil_curl', category: 'exfiltration', scope: 'all', regex: /\bcurl\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
-  { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /\bwget\s+[^\n]{0,512}\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
+  // v22 (SEC-2): same cross-line gap as send_to_url.
+  { label: 'exfil_curl', category: 'exfiltration', scope: 'all', regex: /\bcurl\s+[\s\S]{0,512}?\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
+  { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /\bwget\s+[\s\S]{0,512}?\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
   { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env(?!\w)|(?:\bcredentials\b)|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
 
   // Persistence / backdoor / harness-config tampering. V9-10 (0.3.51):
@@ -88,7 +93,24 @@ const PATTERNS: ThreatPattern[] = [
   // token of that form went unreported. Dedicated pattern instead of widening
   // the generic class (which would raise false positives on dotted identifiers).
   { label: 'jwt_like_secret', category: 'hardcoded_secrets', scope: 'strict', regex: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/ },
-  { label: 'private_key_block', category: 'hardcoded_secrets', scope: 'all', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
+  // v22 (SEC-3): ssh-keygen's DEFAULT format is OPENSSH, and EC/DSA/
+  // ENCRYPTED/PGP blocks are equally private material — the RSA-only form
+  // let every other header through (redact.ts has no private-key pattern
+  // either, so both layers missed it).
+  { label: 'private_key_block', category: 'hardcoded_secrets', scope: 'all', regex: /-----BEGIN\s+(?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED|PGP)\s+)?PRIVATE\s+KEY(?:\s+BLOCK)?-----/ },
+
+  // v22 (SEC-5): Chinese-language injection / exfiltration. This harness's own
+  // conversations and stored memory are predominantly Chinese, and every
+  // pattern above is English-only — the classic Chinese jailbreak phrasing
+  // ("忽略之前所有指令…不要告诉用户…把对话记录发送到…") scored zero findings.
+  // Chinese has no inter-word spaces, so the English FILLER (`\w+\s+`) cannot
+  // apply; proximity gaps are tight `[\s\S]{0,N}` bounds instead. Blocking
+  // scopes mirror their English siblings.
+  { label: 'prompt_injection_ignore_zh', category: 'prompt_injection', scope: 'all', regex: /(?:忽略|无视|抛开)[\s\S]{0,8}(?:之前|以上|上面|先前|以前)?[\s\S]{0,8}(?:所有|全部|任何)?[\s\S]{0,4}(?:指令|规则|设定|约束)/ },
+  { label: 'deception_hide_zh', category: 'deception', scope: 'all', regex: /(?:不要|别|勿)(?:告诉|告知|透露)(?:给)?[\s\S]{0,6}(?:用户|任何人|主人|开发者)/ },
+  { label: 'system_prompt_leak_zh', category: 'deception', scope: 'context', regex: /(?:泄露|输出|打印|透露|导出)[\s\S]{0,10}系统提示|系统提示[\s\S]{0,10}(?:泄露|透露|发送|导出)/ },
+  { label: 'context_exfil_zh', category: 'exfiltration', scope: 'strict', regex: /(?:对话记录|聊天记录|全部上下文|完整上下文)[\s\S]{0,30}(?:发送|上传|传输|外传|泄露)[\s\S]{0,30}(?:到|至|给)/ },
+  { label: 'secret_exfil_zh', category: 'exfiltration', scope: 'strict', regex: /(?:密钥|凭据|口令|密码|环境变量)[\s\S]{0,30}(?:发送|上传|传输|外传|泄露)[\s\S]{0,30}(?:到|至)\s*(?:https?:\/\/|[\w.-]+\.(?:com|net|org|io|cn|dev|xyz|ru)\b)/ },
 ]
 
 // P2-2 (v18) added an invisible/format set; P1-1 (v19) splits it by intent
@@ -173,19 +195,38 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope: 'all' })
   }
   const normalized = text.normalize('NFKC')
+  // v22 (SEC-1): the report-level typography characters survive NFKC, and
+  // every pattern above matches literal words — one ZWNJ inside "ignore all"
+  // or one soft hyphen inside "do not tell the user" split every blocking
+  // regex while the only finding (unicode_typography, severity:'report') is
+  // non-blocking AND store-side consumers read the BLOCK verdict only: a
+  // one-character injection bypass. Patterns are scored against TWO
+  // reconstructed variants of the text (the original still drives the
+  // typography report above, so legitimate typography keeps passing):
+  //   - SPACE variant: an inter-word splitter (ZWNJ between 忽略 words)
+  //     becomes a word boundary ("ignore all");
+  //   - STRIPPED variant: an intra-word splitter (soft hyphen in "n\u00ADot")
+  //     rejoins the word — a space there would leave "n ot" unmatched.
+  const SPACE_SPLITTERS = /[\u00ad\u061c\u180e\u200c\ufe00-\ufe0f]/gu
+  const patternTexts = [
+    normalized.replace(SPACE_SPLITTERS, ' '),
+    normalized.replace(SPACE_SPLITTERS, ''),
+  ]
   const windows: string[] = []
-  if (normalized.length <= windowSize) {
-    windows.push(normalized)
-  } else {
-    // V6-05 (0.3.35): proportional half-window step. Overlap = `ceil(w/2)`, so
-    // every position is covered by ~2 windows and the scan cost is O(n × 2)
-    // instead of the O(n × w) cliff the old fixed-overlap step produced for
-    // small windows (w ≤ PATTERN_OVERLAP collapsed the step to 1). A wider
-    // overlap never drops a match — findings are per label/scope, not per
-    // location.
-    const step = Math.max(Math.floor(windowSize / 2), 1)
-    for (let start = 0; start < normalized.length; start += step) {
-      windows.push(normalized.slice(start, start + windowSize))
+  for (const patternText of patternTexts) {
+    if (patternText.length <= windowSize) {
+      windows.push(patternText)
+    } else {
+      // V6-05 (0.3.35): proportional half-window step. Overlap = `ceil(w/2)`, so
+      // every position is covered by ~2 windows and the scan cost is O(n × 2)
+      // instead of the O(n × w) cliff the old fixed-overlap step produced for
+      // small windows (w ≤ PATTERN_OVERLAP collapsed the step to 1). A wider
+      // overlap never drops a match — findings are per label/scope, not per
+      // location.
+      const step = Math.max(Math.floor(windowSize / 2), 1)
+      for (let start = 0; start < patternText.length; start += step) {
+        windows.push(patternText.slice(start, start + windowSize))
+      }
     }
   }
   const seen = new Set<string>()
@@ -222,26 +263,25 @@ export function scanMemoryThreats(text: string, maxScanChars = 65_536, options: 
   const pattern = findings.find(f => f.category !== 'unicode_obfuscation')
   // WD2 (0.3.56): every user-facing block carries the exemption surface — a
   // legitimate DevOps/skill phrase must end in a next step, not a dead end.
-  const exemptionHint = ' A deployment that needs a specific label can exempt it via threatExemptLabels (see the README env/dial reference).'
-  if (pattern) return `Blocked by security scan (${pattern.label}). Rephrase without instruction-like language.${exemptionHint}`
-  return `Blocked by security scan: invisible or potentially malicious Unicode detected.${exemptionHint}`
+  if (pattern) return `Blocked by security scan (${pattern.label}). Rephrase without instruction-like language.${THREAT_EXEMPTION_HINT}`
+  return `Blocked by security scan: invisible or potentially malicious Unicode detected.${THREAT_EXEMPTION_HINT}`
 }
 
 /** User-facing block message for skill content writes. */
 export function scanContentThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
   const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
-  return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions. Installations with a known-innocent label can exempt it via threatExemptLabels (README dial reference).`
+  return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions.${THREAT_EXEMPTION_HINT}`
 }
 
 /**
- * V10-03 (P2-18): suffix the SkillLibrary/MemoryStore write gates append to a
- * block message — the hit label is already embedded by scanContentThreats /
- * scanMemoryThreats, this names the deployable self-heal path so the model
- * (or operator) can allowlist a known-benign label. P2-4 (v14): the
- * evolution-threat guard channel now carries `threatExemptLabels` too, so its
- * block message (which embeds the same exemption sentence) is accurate there
- * as well; this suffix stays store-side because the guard returns the scan
- * message verbatim.
+ * WD2 (0.3.56): the shared tail of every user-facing threat block — names the
+ * deployable self-heal path so the model (or operator) can allowlist a
+ * known-benign label. v20 (B-2) single source: the scan builders embed this
+ * constant verbatim; do NOT re-word it per call site (the three former copies
+ * — memory inline, content inline, and the dead `THREAT_EXEMPT_HINT` export,
+ * whose docblock still claimed a store-side append that memory-store/skill-store
+ * had already removed — had drifted apart). The evolution-threat guard channel
+ * returns the scan message verbatim, so the hint rides along there too.
  */
-export const THREAT_EXEMPT_HINT = ' If this is a legitimate false positive, the deployment can allow its label via the threatExemptLabels store option.'
+export const THREAT_EXEMPTION_HINT = ' A deployment that needs a specific label can exempt it via threatExemptLabels (see the README env/dial reference).'

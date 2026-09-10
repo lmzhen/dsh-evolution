@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -8,6 +8,11 @@ import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
+
+// Every case mounts the upstream storage domain (Storage + DomainFacility), which
+// is slow enough that the 5s default times out under a full-suite pool — the same
+// reason layout-sync / platform-range / guard-scripts raise their ceiling.
+vi.setConfig({ testTimeout: 30_000 })
 
 async function mount(home: string) {
   const ctx = new Context()

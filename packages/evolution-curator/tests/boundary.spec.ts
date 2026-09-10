@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,6 +7,15 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '../src/index.ts'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
+
+// v21 (T-8): some tests restore DSH_HOME only on the success path — one
+// failing assertion used to leak a temp-dir DSH_HOME into later tests in the
+// worker. Restore after EVERY test regardless of outcome.
+const REAL_DSH_HOME = process.env.DSH_HOME
+afterEach(() => {
+  if (REAL_DSH_HOME === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = REAL_DSH_HOME
+})
 
 async function mount(_home: string, config: ConstructorParameters<typeof EvolutionCurator>[1] = {}) {
   const ctx = new Context()

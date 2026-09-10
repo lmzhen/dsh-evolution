@@ -27,12 +27,6 @@ describe('evolution-preset dependency contract (S7.1, E-4 — 0.3.16)', () => {
     }
   })
 
-  it('does not mount evolution-capability (D-9: held out of the preset — its row was once declared but never depended on)', () => {
-    for (const row of rows) {
-      expect(rowName(row)).not.toBe('@deepseek-ai/dsh-evolution-capability')
-    }
-  })
-
   it('declares the bundle patch entry for profile resolution', () => {
     expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
   })

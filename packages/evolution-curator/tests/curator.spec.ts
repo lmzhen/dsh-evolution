@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,6 +7,16 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+
+// v21 (T-8): most tests below set DSH_HOME and restore it only on the SUCCESS
+// path — one failing assertion used to leak a temp-dir DSH_HOME into every
+// later test in the worker (cascading failures / false greens). This hook
+// restores the real value after EVERY test regardless of outcome.
+const REAL_DSH_HOME = process.env.DSH_HOME
+afterEach(() => {
+  if (REAL_DSH_HOME === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = REAL_DSH_HOME
+})
 
 /** Plain skill body used by the merge-chain fixtures. */
 function basicBody(name: string): string {
@@ -427,14 +437,21 @@ describe('evolution-curator', () => {
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     expect(usage.get('source-a')).toMatchObject({ use_count: 42, view_count: 7, state: 'archived' })
     expect(usage.get('source-a')?.archived_at).toBeTruthy()
-    // A malformed sidecar must survive a restore byte-for-byte: the pre-K-1
-    // path parsed malformed as empty and rewrote an empty map over it.
+    // A malformed sidecar must survive a restore: the pre-K-1 path parsed
+    // malformed as empty and rewrote an empty map over it. v21 (L-1): the
+    // bytes now survive in the `.corrupt` quarantine copy (warned) while the
+    // live sidecar heals and the restore still lands — never a SILENT
+    // overwrite, and never a silent freeze either. (The restore's lifecycle
+    // fold has nothing to fold onto a freshly healed empty map, so counters
+    // for the restored skill are not resurrected — that loss is inherent to
+    // the sidecar having been corrupt; the skill directory move still lands.)
     const io = nodeEvolutionIo()
     const usagePath = join(skills.root, '.usage.json')
     await io.writeText(usagePath, '{corrupt telemetry')
     const restored = await ctx.evolutionCurator.restore('source-a')
     expect(restored.ok).toBe(true)
-    expect(await io.readText(usagePath)).toBe('{corrupt telemetry')
+    expect(await io.readText(`${usagePath}.corrupt`)).toBe('{corrupt telemetry')
+    expect(await io.readText(usagePath)).not.toBe('{corrupt telemetry')
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.3.66 (patch) — v20–v23 四轮审计闭环：15×P1 + 62×P2 全部处置（4 个审计批合并发布 + capability 包退役）
+
+> **合并说明**：以下四个批次是 2026-09-09～09-10 的"审计 → 修复 → 回归审计"四轮闭环（合计 77 项：0×P0 / 15×P1 / 62×P2），全部改动集中在本版发布；每批的发现数与主题见其小标题。回归审计连续在后续批次中抓到前三批自身引入的缺陷（批 2 引入 2 项、批 3 引入 1×P1 + 2 项边角），共同形态是"用例全绿但语义有缺陷"。本版另含一项**非审计**改动：批 5（capability 包退役），理由与范围见其小节。
+>
+> **发布门禁（本版实测）**：`build-lib`（tsc -b 全 29 包 + tsdown）exit 0；oxlint（上游严格配置）0 warnings / 0 errors；dependency-closure / arch-guards --strict / event-pairing --strict / layout-sync / profile-bundles 全 exit 0。全量 vitest **109 spec**（用例 964 → 965，见批 5）：**空载实测 109/964 全绿**；此后本机被无关负载占满，installer / curator / catalog 的 wall-clock 用例在 5–60s 上限上超时（同一文件 193s → 566s，纯环境性 2.9× 膨胀；失败用例单跑全部复现为绿，证据见批 5）。**注**：合并发布前复核发现四批改动带 3 个 tsc 错误 + 9 个 lint 错误（未使用导入/参数、箭头函数风格、恒假条件、隐式 any 索引），已在本版一并修复——此前批次只用 vitest 验证，未跑 tsc/oxlint。
+
+### 批 5（capability 包退役）— 生产层删除 + 消费层保留 + 台账结案
+
+- **来源**：用户裁决——"这个包其实是可删除的，但删除了不知道会不会对之前的 npm 包产生影响，不如未来就设置成默认不安装好了"。核查结论：**"默认不安装"已是现状**（rc.51 起无任何 bundle 挂载它；0.3.65 起 `private: true` + 发布链排除，不会有新版本）；**发布侧零影响**（无任何已发布包依赖它，且 `prepare-release` 的依赖守卫正是为这条线而加；已发布 tarball 不可变，装过的人不受影响）；故剩余决策只有"源码留不留"，裁决为**删除**。
+- **退役理由（架构级）**：capability 把"批准"复制了一份到自己队列，却把"执行"留给平台 Creator 模式（批准消息即 `manual activation in Creator mode (no code was executed)`）。**审批若不约束执行，就只是日志**，而日志的所有者不是效果的所有者——记录权在 evolution、生效权在平台，两边都不完整（批 4 SC-1 那条"npm 无法解析"的告警本身也是错的：实测 0.3.65 仍可安装）。它同时与家族纲领冲突（`README.md`："模型只能写 memory 和 skills；policy/prompt/routing/state 是控制面"）——动态插件恰是那份控制面清单里的东西，因此它只能靠"什么都不做"来保证安全。
+- **删除范围（生产层）**：`packages/evolution-capability/` 整目录（src / invariant / 2 个 spec / README / manifest / tsconfig）；`tsconfig.base.json` 路径别名与 `tsconfig.host.json` 工程引用；`scripts/prepare-release.mjs` 的 `UNPUBLISHED_DIRS` 机制（含 v21 S-2 的依赖守卫——删包后该机制零消费者）；`evolution-preset` 契约 spec 中针对它的负向断言（删包后恒真）；host / all / preset 三处 D-9 注释改为退役说明；dev 树 `pnpm-lock.yaml` 的 importer 条目。
+- **保留范围（消费层，附理由）**：`PendingKind`、`PENDING_KINDS`、domain 读 schema、approval 的 capability 分支**全部保留**，并在 4 处标注为"读兼容成员"：≤0.3.65 安装写入的记录必须仍能加载、在 `/evolution pending` 列出、并被 approve/reject。删掉该成员会让这些记录成为孤儿（domain `open()` 解析失败 + 写门禁拒绝解析写）——即"删生产者、留读者"。
+- **文档**：根 `INSTALL.md` 与 `packages/INSTALL.md` 的 Capability 节改写为退役说明（**取代批 4 SC-1 的 "Dormant and NOT published" 措辞**）；根 `README.md` / `README.zh.md` 的包表行、治理图与安全边界第 3 条同步；`packages/README.md` 包表行删除；`docs/deferred-items-v10.md` 的 **H-09b 结案**（触发条件成立 → 退役，附复审前置条件）。
+- **全量 diff 复核（退役批自检）**：被删源码以 `git archive f8e2a5f` 归档备查（7 文件）；确认删除包的导出名（`EvolutionCapability` / `validateCapabilityPackage` / `CapabilityPackage` / `CapabilityLimits` …）全仓零引用；包集合与发布顺序的来源全部是目录派生（`prepare-release` 与 `normalize-mirror` 的 `readdirSync`、`publish-scoped` 读 staging 清单），无硬编码清单；`.release-staging` / `*tsbuildinfo` / 根 `node_modules` 均无残留。复核中发现并处置三项：
+  - **保留分支失去唯一覆盖**：approval 的 capability 分支此前只被已删的 `capability.spec.ts` 覆盖（`approval.spec.ts` 的 V9-12「无 runner」用例走的是 memory 的通用分支）→ 新增用例钉住兼容承诺：无 runner 时可暂存、可批准、返回 `no code was executed`、记录进入 approved 列表。
+  - **`domain-state.spec.ts` 缺显式超时**：该文件每个用例都挂载上游 `Storage` / `DomainFacility`，却是同类文件里唯一用 vitest 5s 默认值的（layout-sync / platform-range / guard-scripts 都用 `vi.setConfig({ testTimeout: 30_000 })`）→ 补齐。**同一风险在 CI**：`evolution-validate` 的 vitest 未传 `--maxWorkers`（默认并发更高）。此项是测试配置，不改产品行为，若要最小 diff 可单独回退。
+  - **自撰注释的失实部分已更正**：原写「写门禁会拒绝解析写」只对 json provider 成立；按实测改为各自事实——json 把该行隔离到 `<file>.corrupt` 并拒绝解析写，domain 在 mount 时校验全表、单条坏行会让整个域以 `invalid-record` 打不开。
+- **清理与文档**：`evolution-host` / `evolution-preset` 的 `node_modules` 中指向已删包的悬空符号链接（旧安装遗留；`pnpm install` 亦会回收）；dev 树 `pnpm-lock.yaml` 的 importer 条目（CI 用 `--lockfile-only` 重生成，故仅为本地整洁）。`docs/`：`integration-plan-m0-g8.md` 的 D-9 条目补「0.3.66 退役」指针；`upstream-contract-checklist.md` 第 5 条把 `AbortSignal.timeout` 上限从 `4_294_967_295` 更正为 `2_147_483_647`（v19 P2-10 已改代码，清单未跟上）；`hermes-alignment-map.md` 的 v21 勘误从镜像回灌 dev——此前只改了镜像，而发布链的 dev→mirror robocopy 会在下次发布把它覆盖回去（本次复核抓到的实际隐患）。
+- **全量测试的环境证据**：失败形态**只有** `Test timed out`，无断言失败。同一份代码：installer 文件 193s（15:14 空载）→ 304s（16:24）→ 566s（16:14，与无关的 `D:\worker-test\openclaw` agent 进程同时运行）；把失败用例单跑即全绿——installer 两个 V6-49 为 13.3s / 12.2s，curator `pins through the marker` 为 1.5s，catalog 整文件为 2.5s。故本地全量的红判定为环境性；最终以 CI（全新 runner、默认 `--maxWorkers`）复核。
+- **发布**：`0.3.66` 发布集合仍为 **29 个包**（capability 自 0.3.65 起已被排除），故本次删除**不改变任何发布产物**，只改仓库形态；npm 上 `@lmzhen/dsh-evolution-capability@0.3.65` 保持可装、不再有新版本。
+
+### 批 4（v23 审计闭环）— 2 个 P1 + 13 个 P2（修复批回归 + 审批状态机端到端 + 记忆管线/数据生命周期 + 三批自洽性）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v23.md`。**回归审查第三轮连续在修复批中抓到引入缺陷**（BR-1 为批 3 引入），闸门/生命周期类修复必须有独立回归 pass。
+- **BR-1（P1·批3引入）**：curator 合并阶段的 dispose 闸门不再提前返回——归档循环上方已真实落盘的账目（archivedSkills/抑制/usage 折叠）在闸门触发时仍完整持久化（旧写法报告 archived:0 而树已被改，且跳过两个持久化阶段）；只跳过合并循环本体。
+- **BR-2（P2）**：三处 dispose 闸门/中止均补 `logger.warn`（报告的 `failed` 过滤器无法承载自由文本中止原因，日志是唯一可见渠道）。
+- **BR-3/BR-4（P2×2，journal 记账语义）**：journal 恢复"依赖行后即写基础账"（preset 阶段崩溃仍留可回放记录），preset 落地后再刷新 `agentPreset`；重装不再把先前 layered 安装的 `agentPreset:true` 记账覆盖为 `false`（否则 layered 卸载永久跳过 preset 删除）。
+- **BR-5（P2）**：pin/create 的补偿清理在递归删除目录前复核"目录仅剩本 marker"（并发 restore 落位不再被误删）；createCore 非前台路径同步。
+- **AP（P2×3，审批状态机端到端）**：AP-1 capability 批准记录豁免 `PENDING_RESOLVED_CAP` 驱逐（json+domain 两侧；否则 approvedPackage 读不到、已批准能力永久不可激活）；AP-2 doctor 新增 `executingCount` 统计、渲染行与 next-step 提示（executing 是唯一只能由 operator reject 清除的状态，旧自检不可见）；AP-3 skill 全量 update/edit 的审批重放加**陈旧快照防护**——三个 stage 点（tool/review/graph）附带 `staged_from_sha256`，重放时内容不匹配即结构化拒绝并退回 pending（与 memory 的 old_text 防护对齐；无 hash 的旧记录保持原行为）。
+- **ML（P2×3，数据生命周期）**：ML-1 `.archive` 新增保留策略（快照前清理超过 365 天的归档条目，无 mtime 探测的后端跳过；keep-5 快照的 ×6 放大随之有界）；ML-2 manifest 缺失/损坏的孤儿快照进入保留窗口（createdAt 置空排最旧、优先被驱逐，不再永久逃逸）；ML-3 事件 seq 续接取 active 与归档文件名的最大值（active 被回退到旧备份时不再复用归档 seq 遮蔽历史）。
+- **SC（1×P1 + 3×P2，三批自洽性）**：SC-1 根 INSTALL.md 的 Capability 节改写为"Dormant and NOT published"（原文仍教用户安装已停止发布的 `@lmzhen/dsh-evolution-capability`，照做即 npm 解析失败）；SC-2 evolution-all/README 的模型面计数补第五只读面；SC-3 README 正文移除批间过程注记；SC-4 memory-store/skill-store 两处注释更新对已删除旧常量名的引用。
+- **测试**：111 文件 / 973 用例全绿（与批 3 持平；threats/redact 新用例已在批 3 计入）。
+
+### 批 3（v22 审计闭环）— 5 个 P1 + 11 个 P2（回归审查 + 锁机制/内容安全/preset 组装深查）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v22.md`（4 路分片：v21 修复批回归审查 + 跨进程锁逐行 + 内容安全 + preset 生成器）。**回归审查在本批 v21 修复中抓到 2 个引入缺陷**（闸门作用域写错、journal 删除位置回退）——修复批自身需要被审计。
+- **R-1（P1·批2引入）**：curator 后两处 dispose 闸门返回 `applyMutations` 的真实形状（此前引用不在作用域的 `runId/startedAt` 且返回 runCore 形状，触发即 ReferenceError）。
+- **R-2（P1·批2引入）**：journal 删除收回回放分支内、仅在 keep/removed 判定后执行——`--mode agent` 与"包被保留"的卸载不再丢失台账（否则后续卸载落入前缀回退、误删手工安装包）。
+- **R-3（P2）**：isMain 判定改 `realpathSync` + win32 大小写归一（v21 S-8 的 pathToFileURL 方案经实测对盘符大小写/符号链接仍无效）。
+- **LOCK-1（P1）**：restructure/consolidate 的树变更写从"锁外预读 + 盲写"改为 **CAS 条件事务写**——磁盘字节仍等于预读基线才提交，漂移即结构化失败并回滚（此前跨进程并发 patch 被静默覆盖、双双报成功）。
+- **LOCK-2..4（P2×3）**：空锁残留接管时 verify 读失败（对端已删）改为释放 ticket 重试而非 `rm(force)`（消除删掉第三者活锁的双持窗口）；`retireLegacyOnce` 的 archivedIds 过滤移入 transact 任务锁内（消除 cap 驱逐窗口复活 pending 幽灵）；pin/create 的 marker 写入后补 exists(SKILL.md) 复查 + 补偿清理（与 archive 竞态不再留下卡死 restore 的幽灵目录）。
+- **SEC（1×P1 + 3×P2，威胁模式面升级）**：SEC-1 report 级排版字符（ZWNJ/软连字符等）不再能拆散 blocking 正则——模式匹配在"空格重建 + 删除重建"两个变体文本上进行（实测一行 ZWNJ 即可绕过全部注入检测且 report 被静默丢弃）；SEC-2 外泄模式间隙允许跨行；SEC-3 私钥块头补 OPENSSH/EC/DSA/ENCRYPTED/PGP；SEC-4 redact 补 npm/Stripe/GitHub fine-grained/Google 密钥、URL 内嵌口令（保留 scheme/user）与 AWS secret 的配对行脱敏；SEC-5 新增 5 条中文注入/外泄模式（含误伤面负例）。
+- **PRE（1×P1 + 2×P2）**：PRE-1 agent preset 的互斥检查扩展到 **home 内全部 profiles**（preset 是全局产物，旧守卫只探测目标 profile，跨 profile 的 all/oneclick 组合可漏放成启动双挂载）；PRE-2 normalize-mirror 改 tmp+rename 原子写 + 逐文件隔离（中断不再留下永久损坏的 manifest 与混合版本树）；PRE-3 cap 注入的 `config:` 探测锚定条目自身缩进（防 platform preset 嵌套后静默失效），core 与 installer 两侧同步。
+- **LOCK-5（记录性）**：Windows rename 覆盖对无锁读者的瞬时 ENOENT 窗口在 `renameWithRetry` 契约中显式文档化（全部无锁读下游已核实为自愈语义，不加全局读重试以免拖慢普通缺失探测）。
+- **测试**：threats 新增 SEC-1 绕过回归 + 中文/私钥/跨行用例（含误伤面负例）；redact 新增 2 组新形态用例；skill-store T-14 测试的写失败注入点随 CAS 提交层同步（transact 层拦截）。**111 文件 / 973 用例全绿**（较批 2 +6）。
+
+### 批 2（v21 审计闭环）— 5 个 P1 + 24 个 P2（scripts 首次深查 + 生命周期/平台/测试质量横切）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v21.md`（含对本地批 1 的回归审查：除 2 条 P2 外全部 hunk 干净）。执行原则同优化计划 v20：最小 diff、单一来源优先、文档向代码事实对齐。
+- **S-1（P1，安装台账"只写不读"）**：uninstall 真正消费 journal——`dependencyAdded:false` 时保留用户预先 pin 的依赖行；包删除按 journal 记录的拷包清单精确定位（无 journal 的 ≤0.3.64 旧安装回退前缀规则）；preset 仅在 journal 记录"本安装器实际安装"时才删除；journal 改为在全部逆向动作与 keep 判定之后删除（旧代码先删且注释谎称"已回放"）；journal 记录真实值（`agentPreset` 记实际安装结果而非意图）。
+- **L-1/L-2（P1+P2，usage sidecar 整文件损坏静默冻结）**：不可解析/错误顶层数组形状 → 隔离副本（`.corrupt`）+ onQuarantine 告警 + 自愈重启（对齐 state-json E-9 姿态）；未来 schema 版本保持冻结但明确告警（永不静默降级）；隔离副本**写失败时拒绝本次写入**（保留可恢复字节，P2-17 纪律），消息不再谎称"已拷贝"。同族 **L-3**：state-json pending 审计档抢救副本失败时跳过本次追加并 warn。
+- **D-1/D-2（P1×2，文档与行为相反）**：README/README.zh 的"用 M3 停掉写入"更正为"M2 把关后台写、M3 仅移除模型工具（自动化照常）"；6 处 "no model tools / infrastructure only" 绝对化措辞改齐（host 自带只读 `maintenance_probe`），packages/INSTALL.md 的"镜像根 INSTALL"声明与 §5 scope 指引更正（npm 实际发布在 `@lmzhen`）。
+- **T-1（P1，sidecar 事务门卫形同虚设）**：具名条目改为**函数体级** transactIo 检查（旧实现文件级子串 + 匹配调用点的正则，被审函数改回裸读写照样绿）；清单数量从 `>=7` 改为精确钉死。
+- **scripts 其余（P2×6）**：S-2 对 UNPUBLISHED_DIRS 包的依赖在 releaseSpec 显式 throw（此前静默落平台版本范围）；S-3 agent preset 组成解析前置到任何 profile 变更之前（消除半安装态）；S-4 `--version` 与包 manifest 版本 staging 前对账（消除"发布成功、安装被拒"缝隙）；S-5 `--mode agent` 不再创建幽灵 web profile；S-6 verify-layout-sync 全等结果输出"此次运行未验证手工同步"告示；S-7 行首动态值导入不再误豁免为 type-only（转为保守过报）；S-8 isMain 判定改 pathToFileURL（Windows 小写盘符/符号链接下 CLI 静默空转）。
+- **生命周期（P2×3）**：L-4 curator 三个变更阶段（快照/归档/合并）加 dispose 中途闸门；L-5 review 卸载时清空延迟队列并在注释中声明单飞为 per-mount 状态（重载窗口由 per-file 锁 + marker 探测覆盖）；R-1 修正 withTimeout 超时分支的失实注释并在 catch 中显式告警"被放弃的写入无审计记录"。
+- **平台（P2）**：D-6 `create` 对大小写变体目录拒绝（NTFS/POSIX 行为分叉收口，读路径保持平台原生）。
+- **测试质量（P2×7 + R-2）**：T-2 agent 行契约改为总集钉死（pinnedRowIds 使无 id 行显形）；T-3 insertedRows 合并全部 insert 块（旧版只看第一块）；T-4 README 命令表改双向顺序比对 + 表尾多余行检查；T-5 P1-9 fail-closed 预检补正向对照（0-landing 通知必须到达）；T-7 互斥守卫改 vi.waitFor；T-8 curator 两 spec 增加 DSH_HOME afterEach 兜底；R-2 新增经 approval replay runner 直达标量闸门的用例（schema 旁路路径）。期间依测试结果修正两处误判：approve 并发语义为 dedupe 合流（两调用共享同一成功结果，非"一胜一败"）；restore 对损坏 sidecar 的状态折叠无可折对象（计数损失是损坏固有代价，目录移动照常落盘）。
+- **测试计数**：111 文件 / 967 用例全绿（较 v20 批 +2：R-2 runner 闸门用例、L-1 未来版本冻结告警用例）。
+
+### 批 1（v20 审计落地）— 3 个 P1 + 14 个 P2 按《分层分组优化计划 v20》修复
+
+- **来源**：`dsh-evolution-mirror-audit-report-v20.md` + `dsh-evolution-mirror-optimization-plan-v20.md`。执行原则：不新增包 / 不新增服务 / 不重设计协议；契约与注释向代码事实对齐；漂移副本收敛回既有单一来源；每项最小 diff。
+- **P1-3（review 单飞被 fallback 打破）**：`reviewInFlight` 命中时不再立即向父会话注入 review prompt——改入队延迟投递（上限 16），在单飞窗口关闭的 `finally` 中统一投递，E-19 声称的"绝不与 subagent 并发写"自此真正成立；调用方以 `true | 'deferred' | false` 三态区分。
+- **P1-2（review/curator 跨包并发写）**：按计划 C-3① 先契约化——在 review `reviewInFlight` 与 curator `acquireMutex` 两侧写明：跨层唯一互斥是 skill-store per-file 锁 + F-17 marker 探测，`ignoreGates` 手动 run 的交错窗口如实声明（失败 op + 快照回滚兜底）；advisory 令牌暂缓，待真实碰撞日志。
+- **P1-1（host "零模型工具"契约不成立）**：文档向事实对齐——host patch 头注、host README（Model Experience 四处 + 已知限制）、host package.json description 统一改为"基础设施 + 唯一只读模型面 `maintenance_probe`"；evolution-all patch 头注改为"四个 agent-preset 类模型行 + host 面只读探针"。装配行为零变化。
+- **引擎**：executePlan 写入腿加 `withTimeout`（预算=reviewTimeoutMs，此前挂起会让 `reviewInFlight` 永久为真、subagent 通道整进程降级）；curator first-run-defer 的 `saveCuratorState` 补 best-effort catch（对齐本文件 C1 纪律）；subagent 会话不再写入 `turnStarts`（其条目原本只能等 128 阈值清扫）。
+- **治理**：`effectiveSessionPolicy` 对 `config` 改可选形状读取（与 :312 同款；裸 stub 平台服务不再 TypeError），`ApprovalPolicyLike` 停止导出（全仓零外部消费者）；删除死常量 `THREAT_EXEMPT_HINT`（docblock 与事实相反），豁免提示三份漂移副本收敛为单一 `THREAT_EXEMPTION_HINT`；evolution-capability 停止发布（`private: true` + prepare-release 排除，源码保留）。
+- **基础层**：`LOCK_BODY_RE` 加捕获组并新增 `parseLockBody`，skill-store 两处内联锁体正则与 `deleteStrandedLocks` 三处硬编码 marker 名全部收敛回单一来源（F-17）；`mtime` seam 的"无在树消费者"失实注释更正为列出 4 个真实消费者及其静默降级后果；删除零消费者死 API `hasProvider`（对齐 P3-D1 先例）。
+- **状态缝**：state-domain 在 claim 路径写明 provider 契约——被 guard 拒绝的 RMW = 一次 no-op 持久化写 + 一条 changed 事件，属接受的行为（seam 无条件写原语，与 json provider 的字节级短路为文档化不对称）。
+- **工具/命令面**：`skill_manage` 标量参数（name/content/old_string/new_string/file_path/file_content/absorbed_into）非字符串一律结构化拒绝（此前以裸 TypeError 逃逸，V8-09 同族），restructure move 字段同步收紧；`/evolution restructure` 接入 approval seam（`hasRunner('skill')` 预检 + staging，沿用 learning-graph P2-6 pattern；approval 关闭/放行场景直写行为不变）；learning-graph 记忆写拒绝提示更正为"evolution-all / preset overlay（host 不携带该行）"。
+- **文档**：`packages/README.md` 环境变量表补齐 `DSH_EVOLUTION_DELTA_PATH`、`DSH_EVOLUTION_ARCH_STRICT`（env.ts "lists every key" 声明自此为真）。
+- **新增用例**：approval 裸 stub 降级为 `ask`（B-1）、skill_manage 非字符串标量结构化拒绝（D-1）；io.spec 的 `hasProvider` 断言改走 `provider()` fail-loud 路径。
+
 ## 0.3.65 (patch) — v19 审计闭环：3 个 P1 回归修复 + 26 项 P2（含 state seam 契约下沉与安装台账）
 
 - **来源**：`dsh-evolution-mirror-audit-report-v19.md`（3×P1 + 26×P2，报告的门禁结论经独立实跑复现）。本版按"**从实际场景需要的设计理念**"取向修复，而不只是打补丁：守卫的合法集合必须**派生自生产者的声明**、同一设施只允许**一个方向**、"保字节"必须**可观测**、平台边界按**平台真值**、模型可见面要么**已解析**要么不存在。

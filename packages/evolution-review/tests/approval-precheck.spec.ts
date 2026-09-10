@@ -74,11 +74,19 @@ describe('review approval pre-check (P1-9)', () => {
     })
 
     const session = ctx.sessions.create(SessionId('review-precheck'))
+    // v21 (T-5): capture the wake/inject channel — the zero-landing notice is
+    // the observable END of the refusal path, and asserting it is the positive
+    // control that proves the pipeline actually RAN (without it, a broken
+    // fixture that never triggered the pipeline also passed `applied === 0`).
+    const injected: string[] = []
     ctx.agents.register({
       id: session.id,
       session,
       ctx,
-      inject: () => {},
+      inject: (message: unknown) => {
+        const box = message as { content?: Array<{ type: string; text?: string }> } | null
+        injected.push(box?.content?.[0]?.text ?? '')
+      },
     } as unknown as Agent)
 
     session.append('turn/start', { turn: 1 })
@@ -91,6 +99,11 @@ describe('review approval pre-check (P1-9)', () => {
     // onTurnEnd is async-void: wait out the poll window (the pipeline must
     // have visited the op by then — and REFUSED it).
     await new Promise(resolve => setTimeout(resolve, 200))
+    // v21 (T-5): positive control FIRST — the pipeline must have executed the
+    // plan and delivered the zero-landing notice through the inject channel.
+    // If this fails, the fixture never triggered the pipeline and the
+    // fail-closed assertions below are vacuous.
+    expect(injected.some(text => text.includes('0 ops landed'))).toBe(true)
     // Enabled approval is an operator gate: with no replay runner the write
     // is REFUSED (fail closed) — it must NOT land through a silent bypass.
     expect(applied).toBe(0)

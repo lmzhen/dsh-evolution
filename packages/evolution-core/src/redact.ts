@@ -23,6 +23,12 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
   ['gitlab token', /glpat-[A-Za-z0-9_-]{16,}/g],
   ['slack token', /xox[baprs]-[A-Za-z0-9-]{10,}/g],
   ['jwt', /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g],
+  // v22 (SEC-4): provider token shapes the original set missed (each verified
+  // to pass redactSecrets verbatim before this change).
+  ['npm token', /npm_[A-Za-z0-9]{20,}/g],
+  ['stripe key', /[sr]k_(?:live|test)_[A-Za-z0-9]{16,}/g],
+  ['github fine-grained token', /github_pat_[A-Za-z0-9_]{20,}/g],
+  ['google api key', /AIza[0-9A-Za-z_-]{30,}/g],
   // F-335 (0.3.23): case-insensitive (`bearer`), and `\s+` so a tab or run of
   // spaces between `Bearer` and the token is still masked (`Bearer\t...`).
   ['bearer credential', /Bearer[\s]+[a-z0-9._~+/=\-]{16,}/gi],
@@ -61,6 +67,11 @@ const INLINE_ASSIGNMENT_PATTERN = new RegExp(
   'gi',
 )
 
+// v22 (SEC-4): a scheme://user:password@host URL — only the password segment
+// is masked; the group-preserving replace keeps the scheme/user readable so a
+// connection string stays diagnosable.
+const URL_CREDENTIALS_PATTERN = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s/@]+)@/gi
+
 /**
  * Mask credential-shaped text before it crosses a session boundary.
  * @param text - the text about to be sent to a model outside this session.
@@ -70,14 +81,25 @@ export function redactSecrets(text: string): string {
   // 0.3.16 (E-1): the generic replacer once keyed on `p1 === undefined` to
   // distinguish "no capture group" — but for a capture-group-free regex the
   // second callback argument is the match OFFSET (a number), so the output
-  // carried the offset (e.g. 'use 4<redacted> tomorrow'). The seven plain
-  // patterns now take a literal replacement; only the inline-assignment
-  // pattern has a real capture group (the label prefix) and keeps its part.
+  // carried the offset (e.g. 'use 4<redacted> tomorrow'). The plain patterns
+  // now take a literal replacement; only the patterns with a real capture
+  // group (the inline-assignment label prefix, the URL scheme/user) keep
+  // their parts.
   let out = text
   for (const [, pattern] of SECRET_PATTERNS) {
     out = out.replace(pattern, '<redacted>')
   }
+  out = out.replace(URL_CREDENTIALS_PATTERN, (_match, lead?: string) => `${lead ?? ''}<redacted>@`)
   out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, lead?: string, prefix?: string, key?: string, separator?: string) =>
     `${lead ?? ''}${prefix ?? ''}${key ?? ''}${separator ?? ''}<redacted>`)
+  // v22 (SEC-4): an AWS SECRET access key is a bare 40-char base64ish run —
+  // far too common in legitimate text to mask unconditionally. It is masked
+  // only on a line that already shows a redaction or an aws/secret keyword
+  // (the paired access key id was just masked there), closing the
+  // id-redacted-but-secret-residual reassembly gap.
+  out = out.split('\n').map((line) => {
+    if (!/<redacted>/.test(line) && !/\baws\b|\bAKIA\b|\bsecret\b/i.test(line)) return line
+    return line.replace(/(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])/g, '<redacted>')
+  }).join('\n')
   return out
 }

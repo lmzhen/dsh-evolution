@@ -78,10 +78,13 @@ export type ApprovalLike = {
   reject(id: string): Promise<{ ok: boolean; message: string }>
 }
 
-/** 0.3.23 (G4.8): the ONE shape of the platform approval-policy probe that
- * `effectiveSessionPolicy` reads. The model tools used to copy this view
- * locally (F-341). */
-export interface ApprovalPolicyLike {
+/** 0.3.23 (G4.8): the shape of the platform approval-policy probe that the
+ * two in-file readers below cast to. v20 (B-1): no longer exported — a
+ * monorepo-wide grep found zero external consumers (the tools import
+ * `effectiveSessionPolicy` only), so the former "ONE shared shape" docblock
+ * overstated its reach. `config` stays optional-typed at the READ sites
+ * because the runtime platform service can be a bare stub without it. */
+interface ApprovalPolicyLike {
   overrideOf(session: unknown): 'ask' | 'never' | undefined
   config: { policy?: 'ask' | 'never' }
 }
@@ -93,7 +96,11 @@ export interface ApprovalPolicyLike {
 export function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 'never' | undefined {
   const approval = ctx.get('approval') as ApprovalPolicyLike | undefined
   if (!approval || session === undefined) return undefined
-  return approval.overrideOf(session) ?? approval.config.policy ?? 'ask'
+  // v20 (B-1): same optional-shape read as `deriveSessionPolicy` below — the
+  // config field is optional at runtime (a bare platform stub), and the
+  // former direct `approval.config.policy` deref turned a stub into a
+  // TypeError on every caller (each /graph write probes this helper).
+  return approval.overrideOf(session) ?? (approval as Partial<ApprovalPolicyLike>).config?.policy ?? 'ask'
 }
 
 interface EvolutionStateLike {
@@ -347,6 +354,9 @@ export class EvolutionApproval extends Service {
     const runner = this.runners.get(record.kind)
     if (!runner) {
       if (record.kind === 'capability') {
+        // 0.3.66: the producer is gone (the adapter was removed), but a record
+        // staged by a ≤0.3.65 install stays answerable — and answering it
+        // records intent only, so nothing needs replaying.
         // P3 (v15): claim-scoped like the other paths — and when a concurrent
         // writer won the race, mirror the memory/skill divergence message
         // instead of a bare "already resolved".

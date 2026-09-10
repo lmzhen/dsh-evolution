@@ -17,7 +17,16 @@ export * from './record-contract.ts'
 
 /** 0.3.17 (S3.5, D-4): 'skill_batch' removed — nothing ever created one
  * (dead enum member); the historic value, if it ever reached disk, is read as
- * an unknown kind by consumers rather than minted here. */
+ * an unknown kind by consumers rather than minted here.
+ *
+ * 0.3.66: 'capability' is retained with NO producer — the evolution-capability
+ * adapter was removed. It is a read-compatibility member: state written by an
+ * install that used that adapter (≤0.3.65) still holds such records, and they
+ * must keep loading, listing in `/evolution pending`, and answering approve or
+ * reject. Dropping it would strand them two ways: json quarantines the row to
+ * `<file>.corrupt` and refuses the resolving write, while the domain provider
+ * validates every stored record at mount, so one such row fails the whole domain
+ * with `invalid-record`. */
 export type PendingKind = 'memory' | 'skill' | 'capability'
 /** 0.3.17 (S3.3, E-24): 'executing' = claimed, runner in flight — a fresh
  * claim only takes 'pending', and resolve accepts 'pending'/'executing', so a

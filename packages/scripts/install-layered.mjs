@@ -16,9 +16,9 @@
 
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
 
 const MODES = new Set(['host', 'agent', 'layered', 'oneclick'])
@@ -97,7 +97,14 @@ function packageSourceRoot() {
 }
 
 export function resolveHome(env = process.env) {
-  return env.DSH_HOME?.trim() ? resolve(env.DSH_HOME) : join(homedir(), '.dsh')
+  // v21 (D-5): trim the value we RESOLVE — the old form tested `trim()` but
+  // returned the raw value (core fixed the identical V8-06/C-11 shape in
+  // state-store.ts), so `DSH_HOME=" /x "` persisted with literal spaces, and
+  // the extra resolve() expanded relative paths against the INSTALLER's CWD
+  // instead of the runtime's — packages landed in a home tree the plugins
+  // never read.
+  const home = env.DSH_HOME?.trim()
+  return home ? resolve(home) : join(homedir(), '.dsh')
 }
 
 export function profileDirectory(home, profile) {
@@ -204,8 +211,7 @@ async function installBundlePackage(profileDir, bundleName) {
  * name-based rules for those. */
 const INSTALL_JOURNAL = '.evolution-install.json'
 
-async function writeInstallJournal(profileDir, journal, dryRun) {
-  if (dryRun) return
+async function writeInstallJournal(profileDir, journal) {
   await writeFile(join(profileDir, INSTALL_JOURNAL), JSON.stringify(journal, null, 2) + '\n')
 }
 
@@ -255,7 +261,7 @@ function missingEntrypoints(copies) {
   }).map(({ packageName }) => packageName)
 }
 
-async function removeBundleFromProfile(profileDir, bundleName) {
+async function removeBundleFromProfile(profileDir, bundleName, options = {}) {
   const manifestPath = join(profileDir, 'package.json')
   if (!existsSync(manifestPath)) return false
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
@@ -272,10 +278,16 @@ async function removeBundleFromProfile(profileDir, bundleName) {
   // P1-3 (v19): the D-3 dependency row must go with the bundle row. Leaving it
   // behind pointed the profile at a package that is deleted right after, so
   // the next `dsh plugin add` / `pnpm install` in that profile failed E404.
-  const dependencies = manifest.dependencies
-  if (dependencies !== null && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
-    for (const key of Object.keys(dependencies)) {
-      if (key === bundleName || key.endsWith(`/${tail}`)) delete dependencies[key]
+  // v21 (S-1): when the install journal proves the installer did NOT add this
+  // dependency (the user had pinned it before), keep the user's row — the
+  // journal-less fallback (≤0.3.64) keeps the unconditional removal.
+  const keepDependency = options.keepDependency === true
+  if (!keepDependency) {
+    const dependencies = manifest.dependencies
+    if (dependencies !== null && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+      for (const key of Object.keys(dependencies)) {
+        if (key === bundleName || key.endsWith(`/${tail}`)) delete dependencies[key]
+      }
     }
   }
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
@@ -439,7 +451,11 @@ export function injectToolSkillCap(composition) {
       const next = lines[j] ?? ''
       if (next.trim() === '') break
       if (!/^\s/.test(next)) break
-      if (/^\s+config:(\s|$)/.test(next)) hasConfig = true
+      // v22 (PRE-3): anchor `config:` to the item's own child indent (two
+      // spaces) — byte-identical with core preset-composition.ts. The old
+      // `\s+` form matched a `config:` at any depth, silently skipping the
+      // cap when a platform preset grew nested config maps.
+      if (/^ {2}config:(\s|$)/.test(next)) hasConfig = true
       end = j
     }
     if (hasConfig) continue
@@ -458,11 +474,11 @@ export function injectToolSkillCap(composition) {
   return lines.join('\n')
 }
 
-async function installAgentPreset(home, dryRun, force) {
+async function installAgentPreset(home, dryRun, force, standardComposition) {
   const destination = agentPresetDirectory(home)
-  // The generated composition always resolves, also in dry-run: a preset that
-  // cannot be built from the runtime platform should be reported up front.
-  const standardComposition = await resolveStandardComposition()
+  // v21 (S-3): the composition is resolved by install() BEFORE any profile
+  // mutation and passed in here — resolution failures now abort before the
+  // host side has committed anything.
   // DSH_EVOLUTION_DELTA_PATH lets tests (and one-off builds) inject the delta
   // fragment; the packaged evolution-agent/agent.cordis.yml stays the default.
   const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
@@ -502,20 +518,24 @@ export async function uninstall(options = {}) {
   const dryRun = options.dryRun === true
   const profileDir = profileDirectory(home, profile)
   const result = { mode, home, profile, profileDir, removedBundle: null, removedPackages: 0, removedAgentPreset: false, packagesKeptFor: [] }
+  // v21 (S-1): consume the journal when present (installs made by this
+  // installer since 0.3.65) so the reverse actions scope themselves to what
+  // the installer ACTUALLY wrote. Journal-less installs (≤0.3.64) keep the
+  // name-based fallback rules below.
+  const journal = await readInstallJournal(profileDir)
 
   if (mode === 'host' || mode === 'layered' || mode === 'oneclick') {
     const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
     // D-17 (v18): report the real outcome in dry-run too (the old `!dryRun &&`
     // made a dry-run uninstall always claim no bundle would be removed).
     result.removedBundle = manifestCarriesBundle(profileDir, bundleName) ? bundleName : null
-    if (!dryRun && result.removedBundle !== null) await removeBundleFromProfile(profileDir, bundleName)
+    if (!dryRun && result.removedBundle !== null) {
+      await removeBundleFromProfile(profileDir, bundleName, { keepDependency: journal?.dependencyAdded === false })
+    }
     // P1-2 (v11): evolution-all is a DEFAULT install target — uninstall must
     // remove its bundle row symmetrically, or the leftover row resolves a
     // package that was just deleted and bricks the profile.
     if (!dryRun) await removeBundleFromProfile(profileDir, BUNDLES.all)
-    // P1-3 (v19): the journal has been replayed (rows + dependency removed);
-    // delete it so a later install starts from a clean record.
-    if (!dryRun) await rm(join(profileDir, INSTALL_JOURNAL), { force: true })
     // D-2 (v18): the package set may only be deleted when NO evolution bundle
     // row remains. Deleting the packages while another row is still mounted
     // leaves a phantom row that bricks the profile at boot.
@@ -526,19 +546,51 @@ export async function uninstall(options = {}) {
       : detectInstalledBundles(profileDir)
     if (remaining.length > 0) {
       result.packagesKeptFor = remaining
+      // v22 (R-2): a full uninstall did NOT complete (another bundle row still
+      // holds packages) — keep the journal for the uninstall that will
+      // actually replay it.
+    } else if (journal !== null && Array.isArray(journal.copied)) {
+      // v21 (S-1): journal-guided removal — delete exactly the packages THIS
+      // installer copied (tails of the recorded scoped names), not every
+      // scope entry that happens to match the family prefixes (a manually
+      // installed or platform-shipped same-prefix package must survive).
+      const scopeDir = join(profileDir, 'node_modules', EVOLUTION_SCOPE)
+      const recorded = journal.copied.filter(name => typeof name === 'string' && name.length > 0)
+      if (!dryRun) {
+        for (const fullName of recorded) {
+          await rm(join(scopeDir, fullName.slice(fullName.lastIndexOf('/') + 1)), { recursive: true, force: true })
+        }
+      }
+      result.removedPackages = recorded.length
+      // v22 (R-2): the replay completed — NOW the record can go. Deleted
+      // inside the mode branch and only after the keep/removed decision, so
+      // `--mode agent` (which never replays) and kept-package runs (oneclick
+      // install + `uninstall --mode host`) preserve it.
+      if (!dryRun) await rm(join(profileDir, INSTALL_JOURNAL), { force: true })
     } else {
       result.removedPackages = await removeCopiedEvolutionPackages(profileDir, dryRun)
+      // v22 (R-2): journal-less legacy fallback completed — same rule.
+      if (!dryRun && journal !== null) await rm(join(profileDir, INSTALL_JOURNAL), { force: true })
     }
   }
   if (mode === 'agent' || mode === 'layered') {
     // P2-42 (v11): report the real outcome — dry-run or an absent preset
     // directory does not mean "deleted".
+    // v21 (S-1): the journal records whether THIS installer installed the
+    // preset — a pre-existing preset (exists && !force skip) must survive the
+    // uninstall of a preset-less host install.
+    const presetSkippedByInstall = journal !== null && journal.agentPreset === false
     const presetDir = agentPresetDirectory(home)
-    if (!dryRun && existsSync(presetDir)) {
+    if (!dryRun && existsSync(presetDir) && !presetSkippedByInstall) {
       await rm(presetDir, { recursive: true, force: true })
       result.removedAgentPreset = true
     }
   }
+  // v22 (R-2): the journal is consumed and deleted INSIDE the replaying mode
+  // branch above (and only after the keep/removed decision) — the v21 attempt
+  // placed an unconditional delete here, which discarded the record for
+  // `--mode agent` runs and for uninstall modes whose reverse actions were
+  // skipped (packages kept), re-opening the S-1 over-deletion hole.
   return result
 }
 
@@ -594,12 +646,50 @@ export async function install(options = {}) {
   const profile = options.profile ?? 'web'
   const dryRun = options.dryRun === true
   const force = options.force === true
-  const profileDir = dryRun ? profileDirectory(home, profile) : await ensureProfile(home, profile)
-  const result = { mode, home, profile, profileDir, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
 
   const needsHost = mode === 'host' || mode === 'layered'
   const needsAgent = mode === 'agent' || mode === 'layered'
   const needsCompat = mode === 'oneclick'
+
+  // v21 (S-3): resolve the standard preset composition BEFORE any profile
+  // mutation — the old order committed bundle rows/copies and only tried to
+  // build the preset afterwards, leaving a half-installed profile (host
+  // mounted, preset missing) when the resolution failed. Resolution is
+  // read-only and the "reported up front" intent at installAgentPreset now
+  // actually holds.
+  const standardComposition = needsAgent ? await resolveStandardComposition() : undefined
+
+  // v21 (S-5): agent mode never writes the profile (its deliverable is the
+  // preset directory) — do not CREATE one as a side effect. ensureProfile
+  // used to run unconditionally, seeding a fresh DSH_HOME with a web profile
+  // carrying a dependency-less bundle row that violates this script's own
+  // D-3 rule. Read-only probes (conflict checks) tolerate a missing profile.
+  const profileDir = dryRun || mode === 'agent'
+    ? profileDirectory(home, profile)
+    : await ensureProfile(home, profile)
+  const result = { mode, home, profile, profileDir, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
+  // v21 (S-1): the bundle-dependency outcome, recorded onto the journal at the
+  // end of the run (null in dry-run — no journal is written then anyway).
+  let dependencyInfo = null
+  // v23 (BR-3): journal payload builder — called once right after the
+  // dependency row (the base record) and once after the preset phase (with
+  // the refreshed preset accounting). Reads the mutable closables at call
+  // time, so each write describes the state reached so far.
+  const journalPayload = (presetInstalled) => ({
+    version: 1,
+    scope: EVOLUTION_SCOPE,
+    bundle: result.bundle,
+    dependencyAdded: dependencyInfo?.addedDependency === true,
+    dependencyRange: dependencyInfo?.dependencyRange,
+    copied: result.copied.map(entry => entry.packageName),
+    agentPreset: presetInstalled,
+    at: new Date().toISOString(),
+  })
+  // v23 (BR-3/BR-4): the PRIOR journal's accounting. A reinstall must not
+  // reset the `agentPreset` bookkeeping of an earlier layered install — a
+  // `--mode host` reinstall used to overwrite it with `false`, making the
+  // already-installed preset unremovable by `uninstall --mode layered`.
+  const priorJournal = await readInstallJournal(profileDir)
 
   // 0.3.54 (route B): the full bundle mounts the SAME model rows at profile
   // root — generating the layered preset on top would double-mount them
@@ -627,6 +717,33 @@ export async function install(options = {}) {
         + 'The one-click preset bundle and the layered Evolution preset are mutually exclusive install targets (E-33) — '
         + 'the one-click bundle already mounts the model tools at profile root, so the layered preset would double-mount them. '
         + 'Choose ONE: keep the one-click bundle, or uninstall it and install the host bundle + agent preset.',
+      )
+    }
+    // v22 (PRE-1): the two checks above probe only the TARGET profile, but the
+    // Evolution agent preset is a HOME-GLOBAL artifact
+    // ($DSH_HOME/.agent-presets/evolution — see agentPresetDirectory). An
+    // evolution-all / one-click row in ANY OTHER profile of this DSH_HOME
+    // composes the same startup double-mount once the user selects the
+    // preset, so the exclusion has to sweep every profile in the home.
+    const profilesRoot = join(home, 'profiles')
+    const conflictingProfiles = []
+    if (existsSync(profilesRoot)) {
+      for (const entry of await readdir(profilesRoot, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue
+        const dir = profileDirectory(home, entry.name)
+        if (dir === profileDir) continue
+        for (const name of detectInstalledBundles(dir)) {
+          if (/(?:^|\/)dsh-evolution-(all|preset)$/.test(String(name).trim())) {
+            conflictingProfiles.push(`${entry.name}: ${name}`)
+          }
+        }
+      }
+    }
+    if (conflictingProfiles.length > 0) {
+      throw new Error(
+        `install-layered: other profile(s) in this DSH_HOME already carry a full-model-rows bundle — ${conflictingProfiles.join('; ')}. `
+        + 'The Evolution agent preset is HOME-GLOBAL and would double-mount those model rows at startup. '
+        + 'Uninstall the bundle there, or keep using that profile instead of the layered preset.',
       )
     }
   }
@@ -691,26 +808,28 @@ export async function install(options = {}) {
     result.bundle = bundleName
     result.copied = await copyAllEvolutionPackages(profileDir, dryRun)
     if (!dryRun) {
-      const dependency = await installBundlePackage(profileDir, bundleName)
-      // P1-3 (v19): record exactly what this run wrote into the profile so
-      // uninstall can reverse it (and a later run can tell an idempotent
-      // re-install from a fresh one).
-      await writeInstallJournal(profileDir, {
-        version: 1,
-        scope: EVOLUTION_SCOPE,
-        bundle: bundleName,
-        dependencyAdded: dependency.addedDependency,
-        dependencyRange: dependency.dependencyRange,
-        copied: result.copied.map(entry => entry.packageName),
-        agentPreset: needsAgent,
-        at: new Date().toISOString(),
-      }, dryRun)
+      dependencyInfo = await installBundlePackage(profileDir, bundleName)
+      // v23 (BR-3): the BASE journal lands right after the dependency row (the
+      // baseline position, restored) — a crash during the preset phase must
+      // still leave a replayable record. `agentPreset` carries the PRIOR
+      // journal's accounting until this run actually (re)installs the preset
+      // (v23 BR-4: a `--mode host` reinstall must not reset it to false).
+      await writeInstallJournal(profileDir, journalPayload(priorJournal?.agentPreset === true))
     }
     result.missingEntrypoints = missingEntrypoints(result.copied)
   }
 
   if (needsAgent) {
-    result.agentPreset = await installAgentPreset(home, dryRun, force)
+    result.agentPreset = await installAgentPreset(home, dryRun, force, standardComposition)
+  }
+
+  // P1-3 (v19) + v21 (S-1) + v23 (BR-3/BR-4): the FINAL journal refreshes the
+  // preset accounting with this run's actual outcome — `true` when the preset
+  // was really (re)installed, otherwise the PRIOR journal's accounting is
+  // preserved (a skipped preset still exists on disk and its uninstall
+  // deliverable must not be lost to a host/oneclick reinstall).
+  if (!dryRun && result.bundle !== null) {
+    await writeInstallJournal(profileDir, journalPayload(result.agentPreset?.installed === true || priorJournal?.agentPreset === true))
   }
 
   return result
@@ -739,7 +858,23 @@ function parseArgs(argv) {
   return options
 }
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+// v22 (R-3, supersedes v21 S-8): compare REAL paths with case-insensitive
+// fallback on Windows. The two prior attempts both failed in practice:
+// raw string equality broke on lowercase drive letters and symlinked
+// invocations, and pathToFileURL alone preserves the argv[1] drive case
+// (`file:///d:/...` vs `import.meta.url`'s `file:///D:/...`) — either way
+// the CLI exited 0 SILENTLY without doing anything, the most dangerous
+// failure shape for an installer. realpathSync resolves symlinks on both
+// sides; the win32 lowercase compare absorbs drive-letter case.
+const isMain = process.argv[1] !== undefined && (() => {
+  try {
+    const invoked = pathToFileURL(realpathSync(process.argv[1])).href
+    const self = pathToFileURL(realpathSync(fileURLToPath(import.meta.url))).href
+    return invoked === self || (process.platform === 'win32' && invoked.toLowerCase() === self.toLowerCase())
+  } catch {
+    return false
+  }
+})()
 if (isMain) {
   try {
     const options = parseArgs(process.argv.slice(2))

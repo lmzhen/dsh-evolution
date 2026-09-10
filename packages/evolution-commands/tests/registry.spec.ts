@@ -17,10 +17,21 @@ describe('command registry (WD1, 0.3.55)', () => {
     // README must be byte-identical to renderCommandTable() (the old test
     // inlined its own escape logic and never called the function, so a
     // renderer drift silently passed).
-    const rendered = renderCommandTable()
-    for (const line of rendered.split('\n')) {
-      expect(readme, `README must contain the rendered line: ${line}`).toContain(line)
+    // v21 (T-4): make the pin TWO-way. The old containment form
+    // (rendered ⊆ README, arbitrary positions) passed with a stale leftover
+    // command row still sitting in the README table. Locate the rendered
+    // block in sequence and require: (a) every rendered line matches in
+    // order, (b) no extra table row follows the block.
+    const renderedLines = renderCommandTable().split('\n')
+    const readmeLines = readme.split('\n')
+    const start = readmeLines.findIndex(line => line === renderedLines[0])
+    if (start === -1) {
+      throw new Error(`README command table drifted: first rendered row not found:\n${renderedLines[0]}`)
     }
+    expect(readmeLines.slice(start, start + renderedLines.length)).toEqual(renderedLines)
+    const afterBlock = readmeLines[start + renderedLines.length]
+    expect(afterBlock === undefined || !afterBlock.startsWith('|'),
+      `README carries an extra command row after the rendered table: ${afterBlock}`).toBe(true)
   })
 
   it('T-WD2: every registry entry carries a non-empty summary', () => {

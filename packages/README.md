@@ -41,8 +41,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
-| `evolution-capability` | Staged non-executing governance adapter for Creator-mode capability packages |
-| `evolution-host` | Host-plane infrastructure bundle (no model tools) |
+| `evolution-host` | Host-plane infrastructure bundle (no memory/skill model tools; ships the read-only `maintenance_probe` diagnostic) |
 | `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
@@ -98,6 +97,8 @@ pins the equality).
 | DSH_EVOLUTION_SESSION_QUERY_PATH | profile config (`!!js`) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
 | DSH_EVOLUTION_ALLOW_ROW_COLLISIONS | plugin code (core env.ts) | `1` downgrades delta-row collision from fail-loud to warn+keep-both |
 | EVOLUTION_SCOPE | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. Plugin runtime never reads it |
+| DSH_EVOLUTION_DELTA_PATH | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment path the layered installer composes from; default stays the packaged `evolution-agent/agent.cordis.yml`. Plugin runtime never reads it |
+| DSH_EVOLUTION_ARCH_STRICT | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
 
 ## Composition
 

@@ -216,8 +216,16 @@ describe('evolution-approval', () => {
       ctx.evolutionApproval.approve(decision.pendingId!),
       ctx.evolutionApproval.approve(decision.pendingId!),
     ])
+    // v21 (T-6) correction of the first tightening attempt: CONCURRENT
+    // approve calls are coalesced by the in-flight dedupe (`approve:${id}`),
+    // so both callers share the SAME single execution and the same ok:true —
+    // there is no "loser" to demand ok:false from. The audit-lying shape the
+    // original finding worried about is the SEQUENTIAL double approve, and
+    // that is pinned separately (V4-18: the second approve reports ok:false
+    // "already resolved"). The pin here stays: exactly ONE runner execution,
+    // and both concurrent callers observe its success.
     expect(applied).toBe(1)
-    expect([a.ok, b.ok].filter(Boolean).length).toBeGreaterThanOrEqual(1)
+    expect([a.ok, b.ok].every(Boolean)).toBe(true)
 
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
@@ -429,6 +437,28 @@ describe('evolution-approval', () => {
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('0.3.66: a capability record outlives the retired adapter — stageable and answerable with no runner', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-capability-'))
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    // The adapter that produced capability writes was removed in 0.3.66, so a
+    // record staged by a ≤0.3.65 install is the only consumer this kind has left:
+    // staging must still work with no runner, and approving must resolve it
+    // without executing anything.
+    const decision = await ctx.evolutionApproval.request({ kind: 'capability', summary: 'capability demo', args: { name: 'demo' }, origin: 'foreground' })
+    expect(decision.action).toBe('staged')
+    const approved = await ctx.evolutionApproval.approve(decision.pendingId!)
+    expect(approved.ok).toBe(true)
+    expect(approved.message).toContain('no code was executed')
+    expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   describe('effectiveSessionPolicy (G4.8, F-341)', () => {
     it('returns undefined when the platform approval service is not mounted', () => {
       const ctx = new Context()
@@ -456,6 +486,16 @@ describe('evolution-approval', () => {
     it('defaults to ask when neither override nor config policy is present', () => {
       const ctx = new Context()
       ctx.provide('approval', { overrideOf: () => undefined, config: {} })
+      expect(effectiveSessionPolicy(ctx, {})).toBe('ask')
+    })
+
+    it('v20 (B-1): a bare platform stub WITHOUT a config field degrades to ask instead of throwing', () => {
+      // The runtime platform service can be a bare stub (`config` absent) —
+      // the direct `approval.config.policy` deref used to TypeError here on
+      // every caller (each /graph write probes this helper), while the
+      // in-class deriveSessionPolicy had already been hardened (V6-27).
+      const ctx = new Context()
+      ctx.provide('approval', { overrideOf: () => undefined })
       expect(effectiveSessionPolicy(ctx, {})).toBe('ask')
     })
   })
