@@ -164,10 +164,13 @@ runs:
         PLATFORM_VERSION: ${{ inputs.platform_version }}
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
-        node packages/evolution/scripts/prepare-release.mjs \
-          --scope "$NPM_SCOPE" \
-          --version "${RELEASE_VERSION#v}" \
-          --platform-version "$PLATFORM_VERSION"
+        # A tag packs its own semver; a main push packs the dev placeholder
+        # `RELEASE_VERSION`, which deliberately does not match the manifests —
+        # `--dev-build` declares that (v21 S-4 reconciliation is skipped there,
+        # and that staging is never published: the publish job is tag-gated).
+        ARGS=(--scope "$NPM_SCOPE" --version "${RELEASE_VERSION#v}" --platform-version "$PLATFORM_VERSION")
+        if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
+        node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
 
     - name: Verify platform version ranges (N-2 guard)
       shell: bash

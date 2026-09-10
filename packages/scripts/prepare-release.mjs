@@ -21,6 +21,12 @@
  *   node packages/scripts/build-lib.mjs
  *   node packages/scripts/prepare-release.mjs \
  *     --scope @lmzhen --version 0.1.0-rc.NN --platform-version 0.1.1-rc.NN
+ *
+ * `--dev-build` marks a NON-RELEASE pack: a main-branch CI push packs with the
+ * dev placeholder `RELEASE_VERSION` (see release.yml) so the pack step and the
+ * publish dry-run still run there, and this flag says so explicitly — version
+ * reconciliation is skipped, the staging is unpublishable, and the release path
+ * (tags) never passes it.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -46,6 +52,9 @@ function requireArg(name) {
 const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
 const platformVersion = requireArg('--platform-version')
+// Explicit non-release pack (main-branch CI): never inferred from the version
+// string, so a real release that passes a wrong --version still fails below.
+const devBuild = argv.includes('--dev-build')
 
 // v21 (S-4): reconcile the release version with the PACKAGE MANIFESTS before
 // anything is staged. The install side (install-layered familyVersion)
@@ -56,10 +65,17 @@ const platformVersion = requireArg('--platform-version')
 {
   const manifestVersion = JSON.parse(readFileSync(join(evolutionRoot, 'evolution-host', 'package.json'), 'utf8')).version
   if (manifestVersion !== releaseVersion) {
-    throw new Error(
-      `prepare-release: --version ${releaseVersion} != package manifests ${manifestVersion} — `
-      + 'bump the manifests/CHANGELOG (normalize-mirror) or pass the matching --version',
-    )
+    if (devBuild) {
+      console.log(
+        `prepare-release: dev build — version reconciliation skipped (manifests ${manifestVersion}, staging ${releaseVersion}); `
+        + 'this staging is a CI diagnostic and is not publishable',
+      )
+    } else {
+      throw new Error(
+        `prepare-release: --version ${releaseVersion} != package manifests ${manifestVersion} — `
+        + 'bump the manifests/CHANGELOG (normalize-mirror) or pass the matching --version',
+      )
+    }
   }
 }
 
