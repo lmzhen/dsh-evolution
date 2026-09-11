@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionStateStorageRegistry, { REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
 
 // Every case mounts the upstream storage domain (Storage + DomainFacility), which
@@ -26,6 +26,28 @@ async function mount(home: string) {
 }
 
 describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-202)', () => {
+  it('V27 S4: the task receives a COPY, so mutating it in place cannot reach the store', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-s4-'))
+    const ctx = await mount(home)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    await provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false }))
+    // The storage-domain update callback hands out the LIVE stored object, and
+    // upstream requires it not be mutated in place. A task that mutated it and
+    // then failed validation would otherwise leave the mutation in the provider
+    // while the write was refused — json hands a freshly parsed object, so this
+    // also keeps the two providers aligned.
+    await provider.transactCuratorState((current) => {
+      if (current !== null) {
+        current.runCount = 999
+        current.lastSummary = 'mutated in place'
+        current.paused = true
+      }
+      return null // refuse the write (null = keep the current record)
+    })
+    expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('seeds a missing key when the task returns a record', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc-'))
     const ctx = await mount(home)
@@ -187,6 +209,30 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
   const record = (id: string, status: 'pending' | 'approved' | 'rejected', resolvedAt?: string) => ({
     id, kind: 'skill' as const, summary: `s ${id}`, args: {}, createdAt: '2026-01-01T00:00:00Z',
     status, ...(resolvedAt ? { resolvedAt } : {}),
+  })
+
+  it('V27 G2.2: the review-state session cap bounds the domain table (json parity)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-reviewcap-'))
+    const ctx = await mount(home)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    // One save past the cap. Every save stamps its own row and runs the eviction
+    // pass, so the steady state is exactly REVIEW_STATE_SESSION_CAP rows — the
+    // same bound the json provider enforces (the audit found this branch had no
+    // domain-side coverage at all).
+    for (let index = 0; index < REVIEW_STATE_SESSION_CAP + 1; index += 1) {
+      await provider.saveReviewState(`s-${index}`, { turnsSinceMemory: index, turnsSinceSkill: 0, lastTurn: index })
+    }
+    // The just-saved session is always present (it is exempt from eviction).
+    expect(await provider.loadReviewState(`s-${REVIEW_STATE_SESSION_CAP}`))
+      .toEqual({ turnsSinceMemory: REVIEW_STATE_SESSION_CAP, turnsSinceSkill: 0, lastTurn: REVIEW_STATE_SESSION_CAP })
+    // Count what survived: exactly the cap (the oldest stamp loses — asserting a
+    // SPECIFIC key would depend on same-millisecond stamp ties).
+    let alive = 0
+    for (let index = 0; index < REVIEW_STATE_SESSION_CAP + 1; index += 1) {
+      if (await provider.loadReviewState(`s-${index}`) !== null) alive += 1
+    }
+    expect(alive).toBe(REVIEW_STATE_SESSION_CAP)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E1 (v15): claim-scoped resolve refuses a foreign claim (same rule as json)', async () => {

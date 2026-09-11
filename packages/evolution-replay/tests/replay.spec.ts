@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { comparePlans, clampReplayWeights, Config, EvolutionReplayDriver } from '../src/index.ts'
+import { comparePlans, clampReplayWeights, Config, DEFAULT_WEIGHTS, EvolutionReplayDriver } from '../src/index.ts'
 
 describe('evolution-replay', () => {
   it('groups recorded plans by policy fingerprint instead of the random plan id', () => {
@@ -57,7 +57,7 @@ describe('evolution-replay', () => {
     const clamped = clampReplayWeights({ accepted: 0, rejectedPenalty: -1, evidence: NaN, cost: Infinity })
     expect(clamped).toEqual({ accepted: 10, rejectedPenalty: 15, evidence: 2, cost: 0.001 })
     // cost = 0 is legal (no cost penalty), so it is retained.
-    expect(clampReplayWeights({ cost: 0 }).cost).toBe(0)
+    expect(clampReplayWeights({ ...DEFAULT_WEIGHTS, cost: 0 }).cost).toBe(0)
     // Valid custom values are preserved per field.
     expect(clampReplayWeights({ accepted: 20, rejectedPenalty: 30, evidence: 3, cost: 0.01 }).rejectedPenalty).toBe(30)
     expect(clampReplayWeights({ accepted: 20, rejectedPenalty: 30, evidence: 3, cost: 0.01 }).accepted).toBe(20)
@@ -86,7 +86,7 @@ describe('evolution-replay', () => {
     expect(silent).toEqual([])
     // cost = 0 is legal ("no cost penalty"), so it is not flagged.
     const costWarns: string[] = []
-    new EvolutionReplayDriver({ weights: { cost: 0 } }, message => costWarns.push(message))
+    new EvolutionReplayDriver({ weights: { ...DEFAULT_WEIGHTS, cost: 0 } }, message => costWarns.push(message))
     expect(costWarns).toEqual([])
   })
 
@@ -133,5 +133,30 @@ describe('evolution-replay', () => {
     driver2.record({ sessionId: 's', planId: 'r', policyFingerprint: 'p', memoryApplied: -5, skillApplied: 1, rejectedOps: 0 })
     expect(driver2.plansSnapshot()[0]?.acceptedOps).toBe(1)
     expect(driver2.plansSnapshot()[0]?.memoryOps).toBe(0)
+  })
+
+  it('V27 INS-05: the pre-backfill dedupe window is bounded (FIFO) and still dedupes the newest ids', () => {
+    // `preBackfillIds` was cleared only inside backfill(), so a sidecar load that
+    // never succeeded let every live plan id accumulate for the process
+    // lifetime. Past the cap the OLDEST ids drop out: the window is finite, and
+    // the newest ids — the ones a still-pending read window can replay — stay
+    // deduped. Both directions are observable at the leaderboard.
+    const cap = 4096
+    const driver = new EvolutionReplayDriver({ maxPlans: cap + 10 })
+    const plan = (id: string) => ({ sessionId: 's', planId: id, policyFingerprint: id, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    for (let index = 0; index < cap + 1; index += 1) driver.record(plan(`pre-${index}`))
+    expect(driver.plansSnapshot()).toHaveLength(cap + 1)
+    // The oldest id fell out of the tracking set → the sidecar copy is recorded
+    // again; the newest is still tracked → it is dropped as a duplicate.
+    driver.backfill([
+      { ...plan('pre-0'), at: 1 },
+      { ...plan(`pre-${cap}`), at: 2 },
+    ])
+    const ids = driver.plansSnapshot().map(entry => entry.policyId)
+    expect(ids.filter(id => id === 'pre-0')).toHaveLength(2)
+    expect(ids.filter(id => id === `pre-${cap}`)).toHaveLength(1)
+    // The latch is one-shot: a second backfill never re-adds anything.
+    driver.backfill([{ ...plan('pre-1'), at: 3 }])
+    expect(driver.plansSnapshot().filter(entry => entry.policyId === 'pre-1')).toHaveLength(1)
   })
 })

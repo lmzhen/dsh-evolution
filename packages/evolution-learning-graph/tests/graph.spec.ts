@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,11 +8,88 @@ import { join } from 'node:path'
 import * as Graph from '../src/index.ts'
 import { buildLearningGraph, graphDensity, memorySnapshotOf, parseGraphNodeId, readMemoryIndex, renderNodeLine, resolveGraphNode } from '../src/index.ts'
 
+/** The registered /graph handler, captured through a stub `commands` service. */
+type GraphHandler = { handler(invocation: CommandInvocation): Promise<{ kind: 'success' | 'error'; text: string }> }
+
+/**
+ * V27 G5.2: a `CommandInvocation` for the registered handler. The platform type
+ * carries a branded `commandId`, an AbortSignal and the FULL Agent surface; the
+ * graph reads only `rawInput` and `agent.session`, so the fixture supplies
+ * exactly those — the assertion is confined to `agent` here, with the reason.
+ * @param rawInput - text after the command name.
+ * @param session - session id/origin the handler should see.
+ * @returns the invocation to hand to the handler.
+ */
+function invocationOf(rawInput: string, session: { id?: string; header?: { origin?: string } } = {}): CommandInvocation {
+  return {
+    commandId: 'graph-test' as CommandInvocation['commandId'],
+    rawInput,
+    signal: new AbortController().signal,
+    agent: { session: { id: 'graph-test-session', header: {}, ...session } } as unknown as CommandInvocation['agent'],
+  }
+}
+
 describe('learning graph', () => {
   it('links memory entries to skills by token overlap', () => {
     const usage = new Map([['python-testing', {}], ['git-workflow', {}]])
     const graph = buildLearningGraph(usage, ['Project uses python-testing and pytest'])
     expect(graph.edges.some(e => e.type === 'memory_skill' && e.to === 'python-testing')).toBe(true)
+  })
+
+  it('V27 INS-04: one unreadable skill file drops its edges instead of the whole graph', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-graph-ins04-'))
+    const skillsRoot = join(root, 'skills')
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const healthy = '---\nname: healthy-skill\ndescription: healthy\n---\n\nBody.\n'
+      const broken = '---\nname: broken-skill\ndescription: broken\n---\n\nBody.\n'
+      await mkdir(join(skillsRoot, 'healthy-skill'), { recursive: true })
+      await mkdir(join(skillsRoot, 'broken-skill'), { recursive: true })
+      await writeFile(join(skillsRoot, 'healthy-skill', 'SKILL.md'), healthy, 'utf8')
+      await writeFile(join(skillsRoot, 'broken-skill', 'SKILL.md'), broken, 'utf8')
+      const ctx = new Context()
+      let handler: GraphHandler | undefined
+      ctx.provide('commands', {
+        register: (definition: unknown) => {
+          handler = definition as typeof handler
+          return () => {}
+        },
+      })
+      ctx.provide('skillUsage', {
+        report: async () => new Map([['healthy-skill', {}], ['broken-skill', {}]]),
+      })
+      ctx.provide('memory', {
+        read: async () => [],
+        applyBatch: async () => ({ ok: true, message: 'ok' }),
+      })
+      // One skill's read fails the way a real EACCES/EMFILE does: `SkillLibrary`
+      // re-throws everything but EISDIR, and the unbounded `Promise.all` used to
+      // let that abort the whole `/graph`.
+      const io = nodeEvolutionIo()
+      ctx.provide('evolutionIo', {
+        provider: () => ({
+          ...io,
+          readText: async (path: string) => {
+            if (path.includes('broken-skill')) throw new Error('EACCES: simulated unreadable skill')
+            return await io.readText(path)
+          },
+        }),
+      })
+      const warnings: string[] = []
+      const originalWarn = ctx.logger.warn.bind(ctx.logger)
+      ctx.logger.warn = ((message: string) => { warnings.push(message); originalWarn(message) }) as typeof ctx.logger.warn
+      await ctx.plugin(Graph, { root: skillsRoot })
+      const result = await handler!.handler(invocationOf(''))
+      expect(result.kind).toBe('success')
+      expect(result.text).toContain('healthy-skill')
+      expect(result.text).toContain('broken-skill')
+      expect(warnings.some(message => message.includes('could not be read'))).toBe(true)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
   })
 
   it('memory nodes embed a snapshot token so edit/delete detect index drift (F15 parity + E-21)', () => {
@@ -194,7 +272,7 @@ describe('learning graph', () => {
     try {
       const ctx = new Context()
       const names = Array.from({ length: 250 }, (_, i) => `cap-skill-${String(i).padStart(3, '0')}`)
-      let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -210,7 +288,7 @@ describe('learning graph', () => {
       })
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       await ctx.plugin(Graph)
-      const result = await handler!.handler({ rawInput: '' })
+      const result = await handler!.handler(invocationOf(''))
       expect(result.kind).toBe('success')
       expect(result.text).toContain('● cap-skill-000')
       expect(result.text).toContain('…50 more')
@@ -237,7 +315,7 @@ describe('learning graph', () => {
       await writeFile(join(configuredRoot, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Configured root demo.\n---\n\nConfigured-root body.\n', 'utf8')
 
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -253,7 +331,7 @@ describe('learning graph', () => {
       })
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       await ctx.plugin(Graph, { root: configuredRoot })
-      const found = await handler!.handler({ rawInput: 'detail demo-skill' })
+      const found = await handler!.handler(invocationOf('detail demo-skill'))
       expect(found.kind).toBe('success')
       expect(found.text).toContain('Configured-root body.')
       // The default tree is genuinely empty, proving the read used the config.
@@ -276,7 +354,7 @@ describe('learning graph', () => {
       })
       ctxDefault.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       await ctxDefault.plugin(Graph)
-      const missing = await defaultHandler!.handler({ rawInput: 'detail demo-skill' })
+      const missing = await defaultHandler!.handler(invocationOf('detail demo-skill'))
       expect(missing.kind).toBe('error')
       expect(missing.text).toContain('not found')
     } finally {
@@ -297,7 +375,7 @@ describe('learning graph', () => {
       const content = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n'
       await writeFile(join(skillDir, 'SKILL.md'), content, 'utf8')
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -317,13 +395,13 @@ describe('learning graph', () => {
       await ctx.plugin(Graph)
       // Re-save the exact on-disk content: core update returns noop:true, so the
       // graph branch must NOT count it (V4-13 — previously it counted on result.ok).
-      const noop = await handler!.handler({ rawInput: `edit demo-skill ${content}` })
+      const noop = await handler!.handler(invocationOf(`edit demo-skill ${content}`))
       expect(noop.kind).toBe('success')
       expect(noop.text).toContain('unchanged')
       expect(recordCalls).toBe(0)
       // A real content edit still counts exactly once.
       const changed = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody changed\n'
-      const real = await handler!.handler({ rawInput: `edit demo-skill ${changed}` })
+      const real = await handler!.handler(invocationOf(`edit demo-skill ${changed}`))
       expect(real.kind).toBe('success')
       expect(real.text).toContain('updated')
       expect(recordCalls).toBe(1)
@@ -340,7 +418,7 @@ describe('learning graph', () => {
     process.env.DSH_HOME = root
     try {
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -366,10 +444,7 @@ describe('learning graph', () => {
         },
       })
       await ctx.plugin(Graph)
-      const result = await handler!.handler({
-        rawInput: 'edit demo-skill new body',
-        agent: { session: { id: 'sess-n1', header: { origin: 'subagent' } } },
-      })
+      const result = await handler!.handler(invocationOf('edit demo-skill new body', { id: 'sess-n1', header: { origin: 'subagent' } }))
       expect(result.kind).toBe('success')
       // The approval service derives the platform session policy from these —
       // before N1 the graph sent neither and documented the absence as a
@@ -391,7 +466,7 @@ describe('learning graph', () => {
     process.env.DSH_HOME = root
     try {
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', { register: (definition: unknown) => { handler = definition as typeof handler; return () => {} } })
       ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
       ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
@@ -406,10 +481,7 @@ describe('learning graph', () => {
         request: async (input: unknown) => { captured = input as typeof captured; return { action: 'staged', message: 'staged for approval' } },
       })
       await ctx.plugin(Graph)
-      const result = await handler!.handler({
-        rawInput: 'edit demo-skill new body',
-        agent: { session: { id: 'sess-e3', header: { origin: 'subagent' } } },
-      })
+      const result = await handler!.handler(invocationOf('edit demo-skill new body', { id: 'sess-e3', header: { origin: 'subagent' } }))
       expect(result.kind).toBe('success')
       expect(captured?.sessionPolicy).toBe('never')
     } finally {
@@ -425,7 +497,7 @@ describe('learning graph', () => {
     process.env.DSH_HOME = root
     try {
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -451,7 +523,7 @@ describe('learning graph', () => {
         },
       })
       await ctx.plugin(Graph)
-      await handler!.handler({ rawInput: 'delete demo-skill', agent: { session: { id: 'sess-n1d', header: { origin: 'foreground' } } } })
+      await handler!.handler(invocationOf('delete demo-skill', { id: 'sess-n1d', header: { origin: 'foreground' } }))
       expect(captured?.sessionId).toBe('sess-n1d')
       expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1d')
     } finally {
@@ -467,7 +539,7 @@ describe('learning graph', () => {
     process.env.DSH_HOME = root
     try {
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -494,10 +566,7 @@ describe('learning graph', () => {
         },
       })
       await ctx.plugin(Graph)
-      const result = await handler!.handler({
-        rawInput: 'edit memory:user:0 replacement body',
-        agent: { session: { id: 'sess-mem', header: { origin: 'foreground' } } },
-      })
+      const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem', header: { origin: 'foreground' } }))
       expect(result.kind).toBe('success')
       // P2-6: the memory branch goes through the approval seam (v15 batch),
       // staged in the tool-memory runner's replay shape.
@@ -522,7 +591,7 @@ describe('learning graph', () => {
     process.env.DSH_HOME = root
     try {
       const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: { session?: { id?: string; header?: { origin?: string } } } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+      let handler: GraphHandler | undefined
       ctx.provide('commands', {
         register: (definition: unknown) => {
           handler = definition as typeof handler
@@ -544,10 +613,7 @@ describe('learning graph', () => {
         request: async () => { throw new Error('request must not be called when the pre-check refuses') },
       })
       await ctx.plugin(Graph)
-      const result = await handler!.handler({
-        rawInput: 'edit memory:user:0 replacement body',
-        agent: { session: { id: 'sess-mem2', header: { origin: 'foreground' } } },
-      })
+      const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem2', header: { origin: 'foreground' } }))
       expect(result.kind).toBe('error')
       expect(result.text).toContain('cannot be staged')
       expect(result.text).toContain('tool-memory')

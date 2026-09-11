@@ -129,8 +129,18 @@ export class EvolutionReplayDriver {
   /** V26-05 (v25): plan ids recorded live BEFORE the backfill settled. A
    * plan-applied landing inside the one-shot `loadActivity` read window is
    * recorded live AND persisted into the sidecar the backfill is reading —
-   * `backfill()` drops those ids so the event is not counted twice. */
+   * `backfill()` drops those ids so the event is not counted twice.
+   *
+   * V27 INS-05: the set is BOUNDED. `backfill()` is the only place that cleared
+   * it, so a sidecar load that never succeeded (the inject callback's catch
+   * warns and does not retry until the io dependency is replaced) let every
+   * live plan id accumulate for the process lifetime. Past
+   * PRE_BACKFILL_ID_CAP the oldest ids are dropped: the dedupe window is then
+   * finite, and a dropped duplicate can at worst repeat an entry inside the
+   * `maxPlans` window instead of growing memory without bound. */
   private readonly preBackfillIds = new Set<string>()
+  /** Upper bound on {@link EvolutionReplayDriver.preBackfillIds} (V27 INS-05). */
+  private static readonly PRE_BACKFILL_ID_CAP = 4096
   private readonly weights: ReplayWeights
 
   constructor(config: Config = {}, warn: (message: string) => void = () => {}) {
@@ -163,7 +173,16 @@ export class EvolutionReplayDriver {
     // V26-05 (v25): while the one-shot backfill is in flight, live plan ids
     // are tracked so `backfill()` can drop the same events arriving from the
     // sidecar (the activity store persists them concurrently with the read).
-    if (!this.backfilled) this.preBackfillIds.add(plan.planId)
+    if (!this.backfilled) {
+      this.preBackfillIds.add(plan.planId)
+      // V27 INS-05: FIFO eviction (Set iteration order is insertion order), so
+      // the tracking set cannot grow without bound while a backfill is pending.
+      while (this.preBackfillIds.size > EvolutionReplayDriver.PRE_BACKFILL_ID_CAP) {
+        const oldest = this.preBackfillIds.keys().next().value
+        if (oldest === undefined) break
+        this.preBackfillIds.delete(oldest)
+      }
+    }
     // P3-23 (v14): the op counters arrive from a persisted session event, so a
     // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
     // with NaN and every score derived from it. Same finite-number discipline

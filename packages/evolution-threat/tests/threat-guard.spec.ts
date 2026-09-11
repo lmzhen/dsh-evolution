@@ -90,7 +90,12 @@ describe('evolution-threat', () => {
       [-Infinity, 65_536],
     ]
     for (const [value, expected] of cases) {
-      expect(ThreatGuard.resolveMaxScanChars({ maxScanChars: value }), `maxScanChars=${String(value)}`).toBe(expected)
+      // An undefined value falls back to the default; the Config field is
+      // optional without `| undefined`, so the key is OMITTED for that case
+      // (resolveMaxScanChars reads it through `??`, making the omitted key and
+      // an explicit undefined identical).
+      const config = value === undefined ? {} : { maxScanChars: value }
+      expect(ThreatGuard.resolveMaxScanChars(config), `maxScanChars=${String(value)}`).toBe(expected)
     }
   })
 

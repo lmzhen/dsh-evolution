@@ -64,7 +64,7 @@ describe('evolution-approval', () => {
       const events = (session as { events?: Array<{ type: string; data: { policy: string } }> }).events
       if (!events) return undefined
       for (let index = events.length - 1; index >= 0; index -= 1) {
-        if (events[index]?.type === 'approval/policy') return events[index].data.policy as 'ask' | 'never'
+        if (events[index]?.type === 'approval/policy') return events[index]!.data.policy as 'ask' | 'never'
       }
       return undefined
     }

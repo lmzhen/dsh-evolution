@@ -147,9 +147,11 @@ Add these to `<home>/profiles/<profile>/cordis.patch.yml`.
 ### Override memory/skill roots
 
 The skill tree is read/written by EIGHT rows. Since 0.3.64 they all read the
-SAME key `root` (`skillsRoot` is a deprecated alias on `evolution-commands`,
-`evolution-review` and `evolution-maintenance-tools`: honoured only while
-`root` is empty, with a warning, removed after 0.3.65). Setting only
+SAME key `root`. The old `skillsRoot` key (`evolution-commands`,
+`evolution-review` and `evolution-maintenance-tools` still declare it) was
+retired at 0.3.65: setting it now FAILS THE LOAD with "config \"skillsRoot\"
+was removed after 0.3.65 — rename the key to \"root\"", so a deployment cannot
+keep pointing at a root nobody reads. Setting only
 `skill-usage.root` moves the `.usage.json` sidecar but NOT the skill tree, so
 telemetry silently targets a different directory. Keep every row below on the
 same path (and set `memory-files.root` for the memory files):

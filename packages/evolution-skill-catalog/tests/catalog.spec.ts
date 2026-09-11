@@ -39,6 +39,28 @@ describe('evolution-skill-catalog', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('V27 G5.3: the published content is the BODY, matching the upstream filesystem provider', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-content-'))
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(Catalog, { root })
+    const io = ctx.evolutionIo.provider('node')
+    const skillDir = join(root, 'body-skill')
+    const content = '---\nname: body-skill\ndescription: Body contract test.\n---\n\n# Body\n\nDo body work.\n'
+    await io.writeText(join(skillDir, 'SKILL.md'), content)
+    ctx.emit('evolution/skill-mutated', { action: 'create', name: 'body-skill' })
+    const definition = await ctx.skills.get('body-skill')
+    // The frontmatter block is the catalog's routing metadata, not model-visible
+    // skill content: the upstream filesystem provider publishes
+    // `parsed.body.trim()`, and this provider shadows it for the same skills.
+    expect(definition?.content).toBe('# Body\n\nDo body work.')
+    expect(definition?.content ?? '').not.toContain('---')
+    expect(definition?.description).toBe('Body contract test.')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('X-7: repeated get() reuses the summaries cache; refresh drops it (0.3.18)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-cache-'))
     const ctx = new Context()

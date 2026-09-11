@@ -56,7 +56,16 @@ export async function snapshotFromLibrary(
       options.onReadError?.(entry.name, error)
       continue
     }
-    if (body === undefined || body === null) continue
+    if (body === undefined || body === null) {
+      // V27 M-02: a `list()` entry whose body reads as null is NOT an empty
+      // library — it is a directory the reader could not turn into a skill (no
+      // SKILL.md, or a name the skill-name rule refuses while the directory is
+      // still listed). The old silent skip let a wholly unreadable tree present
+      // itself to `runMaintain` as "no skills", which the scan then reported as
+      // a clean verdict. The trace is what makes that state visible.
+      options.onReadError?.(entry.name, new Error('no readable SKILL.md (missing file, or the directory name is not a valid skill name)'))
+      continue
+    }
     snapshots.push({
       name: entry.name,
       body,

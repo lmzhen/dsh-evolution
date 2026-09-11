@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.68 (patch) — v27 三轮批次闭环：12×P1 + 52×P2 处置 + 四条新门禁 + 测试类型检查接通
+
+> **范围**：v27 全量审计（P0=0 / P1=12 / P2=52）按 `dsh-evolution-mirror-optimization-plan-v27.md` 的批次 1（G0 止血，5 步）、批次 2（G1+G2+G4，13 步）、批次 3（G3+G5+G6+G7+G8，19 步）全部落地；另处置审计列为 P2/suspect 的 CC-4 / M-07 / S4 / INS-04 / INS-05 五项。
+> **发布门禁（本版实测）**：`build-lib` exit 0；`tsc -b tsconfig.host.json` **0 错**（含全部测试文件，D-9 本版首次接通）；`vitest run packages/evolution` **110 文件 / 1021 用例全绿**；`oxlint` 0 warnings / 0 errors；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-declared-config --strict` 全 exit 0；负载敏感锁组 17/17 @ pinned 4 worker，并在 3 进程并发下 4 轮 × 3 = 12/12；dev↔mirror 双树 0 差异。
+> **行为变化需知的四点**：① replay 打分不再对"未读被跳过"二次计罚（R-03：`rejectedOps` 只统计校验拒绝，新增 `skippedUnread`）；② `ctx.skills` catalog 发布的 `content` 改为**正文**（不含 frontmatter），与上游 `skill-filesystem` 对齐；③ frontmatter 取值改走**真 YAML**（块标量仍受支持），围栏判定与上游逐字 `---` 对齐（仅容忍 `\r`）；④ `skillsRoot` 别名**退役**——再设置会**加载即报错**。
+
+### 批次 1（G0 止血，12×P1）
+- 写锁协议：接管分支不再把 `readFile` 失败伪造成"空体锁"（这是负载下双持的根因）；空体锁阈值 1s→30s；每次提交前 `assertOwned()` 复核锁体归属，丢锁抛 `LostWriteLock` 并重做整个 RMW（EVO-IO-01）。
+- 快照恢复：`manifest.skipped.length > 0` 视为不完整，破坏性清空前拒绝（真·空树 `skipped=[]` 行为不变）。
+- frontmatter：块标量头（`>`/`|`）不再被当普通标量加引号（core-a-07）；`extras` 逐项净化且读取移到破坏性替换前（core-a-01）。
+- 脱敏：JSON 形态 `"password": "hunter2"` 被遮蔽（CB-1）；`/evolution learn` 改 followup-first，无 `followup` 时降级 `inject`（U-1）。
+- 报告/门控：维护笔记在 `no_issues` 也渲染（M-01）；空库三态诊断（M-02）；curator 报告新增中止/未归属字段（CUR-2）；review 队列满丢弃路径恢复 latch 且不误清计数（R-01/R-03）。
+
+### 批次 2（G1 事务 / G2 契约单源 / G4 报告诚实）
+- G1：`decideTakeover` 纯函数 + 接管协议常量单源；锁创建与写体合并为单次 `writeFile(flag:'wx')`（消除 0 字节窗口）；`committed:true` 在 `transactIo` 单点容忍；隔离副本清扫覆盖四种历史命名。
+- G2：frontmatter 单一解析入口（`readFrontmatterBlock` + `parseFrontmatter`/`frontmatterCatalogInvalid` 两个投影：取值走真 YAML，严格解析拒绝时才回落行扫描并由 `catalogInvalid` 报出）；漂移判据单点（`drifted` + `driftRefusal`，两个写路径与 `detectDrift` 共用同一谓词）；memory 写路径单骨架（`chainedWrite`）；cap 算术单点（`selectPendingOverflow` / `selectSessionOverflow`，state-json 与 state-domain 共用）；`MAX_TIMER_DELAY_MS` 上收 core（review 里那份重复定义删除）、`DEFAULT_*` 收敛、`skillsRoot` 别名退役。
+- G4：curator 报告 `aborted` / `unattributed` 落盘并渲染；`rejectedOps` 口径修复 + 新增 `skippedUnread`；计划执行的超时/中止路径账目诚实（`onLanded`，超时分支也补发已落地账目）；队列满丢弃与 cadence 计数对称回滚。
+
+### 批次 3（G3 门禁 / G5 模型契约 / G6 装配 / G7 验证 / G8 收口）
+- G3：新增 `verify-declared-config.mjs`——把"声明了会生效"的配置逐条判可达性（row-mounted / profile-root / preset-composer），上游面事实带 `packages/bundle/*` 源锚点，claimed 的 composer 可达必须由代码锚点证明；门禁复现并报出 T-1（web profile 下 `tool-skill` 行被上游 `disabled:true`，60 字上限只经预设组合器可达）。提示词字段集 == 校验器 schema 字段集（双向比对，落为 self-consistency 第 ⑥ 条）。`verify-event-pairing.mjs` 扩展持久化事件"只写不读"检查：`feedback` 有生产读者，`learn`/`usage`/`maintain` 显式登记为外部契约观测日志（各带理由）。
+- G5：`skill_manage` 描述补 `replace_all` / `file_path` 语义与逐 action 必填参数，缺参给可执行文案，首次命中多锚点时报告"替换了第 1/N 处"；命令缝（`/evolution` 与 `/graph`）改用上游 `@deepseek-ai/dsh-commands` 真实类型（本地结构视图删除，上游形状变更现在会使本族编译失败）；catalog `content` 对齐上游"正文"语义。
+- G6：README 明确 60 字上限的**真实可达面**（profile-root 仅 headless/base 生效；web 下由预设组合器注入；非组合器生成的预设仍是平台默认）；approval 模块文档不再声称 curator 写入也暂存，`sessionPolicy` 标注为"平台 approval 服务在场时被忽略的兜底"；`memory` 服务新增 `provider` pin（未满足时注册期 warn、首次读写硬失败）；doctor 的 `all × 预设产物目录` 同居冲突可检出。
+- G7：`tsc -b tsconfig.host.json` 接入 CI 并修掉 73 个测试文件类型错误（D-9 闭环）；新增负载敏感锁组 runner 与 CI 固定并发步骤；双实现等价性/单点用例；INS-04（`/graph` 读扇出分批 + 单个文件读失败不再毁掉整张图）、INS-05（`preBackfillIds` FIFO 上限）、CC-4（矛盾超时配置按归档下界处置而非"复活"）、M-07（quality_low 强制不再被带空白的目录名绕过）、S4（`transactCuratorState` 的 task 收到副本）五项边界用例。
+- G8：`skillsRoot` 过期承诺清零（JSDoc 与 INSTALL 改为事实）；归档写 `.archive-name` 标记，使 0 字节 SKILL.md 的归档仍可按名 restore，且无匹配时给出事实文案而非"不在 .archive"；`applyTreeChange` 只在回滚真的成功时才说"已回滚"（回滚失败会点名目标）；FIFO/cap 等注释与实现对齐；根 README 包表与 `packages/README` 统一。
+
+### 门禁与校验体系（本版新增/变更）
+- 新增 `verify-declared-config.mjs`（CI 以 `--strict` 运行）与 `run-load-sensitive.mjs`（固定 4 worker、`--retry=0`、组内 17 条，匹配数不足即判失败——防止改名导致空转）。
+- CI（`.github/actions/evolution-validate/action.yml`）新增两步：测试文件类型检查（仅 baseline 作业）、负载敏感锁组固定并发运行。
+- 记账与偏离（详见 `packages/docs/v27-batch2-3-execution-plan.md`）：G0.2 采用"提交点所有权复核 + 空体锁阈值调整"而非删除按年龄接管分支；G5.1 仅在描述中声明逐 action 必填（工具 schema 只能表达无条件必填）；G6.1 的"row enabled 且 config 生效"由 `verify-declared-config` 的 sourced 表覆盖，而非 installer.spec 断言；G2.2 的 cap 纯函数落在 `evolution-state-storage`（seam 契约归 seam 所有）。
+
 ## 0.3.67 (patch) — v24–v26 三轮审计闭环：3×P1 + 46×P2 全部处置 + 回归测试夹具修正
 
 > **范围**：v24 全量审计 → 全部修复 → v25 对修复的继续审计 → 修正 → v26 再审计 → 修正，三轮合计 3×P1 + 46×P2，全部闭环，零遗留 P0–P2。三个 P1 均为并发/生命周期类，且后两个 P1 都是在对前一轮修复的复审中发现的。

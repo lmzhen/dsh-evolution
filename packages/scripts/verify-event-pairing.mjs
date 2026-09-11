@@ -16,6 +16,19 @@
  * count as a consumer, and tests that emit into a spy don't count as a
  * producer of the product contract.
  *
+ * V27 G3.3 — persisted-log coverage: the durable event log
+ * (`evolution-core/src/evolution-events.ts`, `$DSH_HOME/evolution/events.json`)
+ * declares a `type` union, and the bus check above cannot see it. Every member
+ * of that union must have a production READER — a fold that discriminates the
+ * type — or an explicit entry in EXEMPT_PERSISTED_TYPES stating why the record
+ * is an external-contract observation (a user, script or UI reads the timeline)
+ * instead. The check also pins two declaration/implementation pairs: the union
+ * must equal the payload validator's case set (an append the validator does not
+ * know), and no reader may discriminate a type the union does not declare.
+ * Reader detection is scoped to production files that consume the persisted
+ * record type (`EvolutionEvent` in the text), because a session-bus
+ * discriminant such as `event.type !== 'tool/call'` judges a different union.
+ *
  * Usage (works from BOTH layouts: dev `packages/evolution/scripts/…`, flat
  * mirror `packages/scripts/…`; the packages root argument is the evolution
  * tree regardless of layout):
@@ -52,8 +65,44 @@ const EMIT_RE = /\w*[Cc]tx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
 // were covered were never counted. `(\w*[Cc]tx)` covers both spellings.
 const ON_RE = /\w*[Cc]tx\.on\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
 
+/** File declaring the persisted event log's record type. */
+const PERSISTED_EVENT_FILE = 'evolution-core/src/evolution-events.ts'
+
+/**
+ * Persisted types with no in-repo fold, declared here WITH the reason the
+ * record still earns its place. Both are durable observation records of the
+ * self-improvement timeline: `events.json` is documented for users, scripts and
+ * the UI (feedback before/after a learn on one target), which is an external
+ * contract this gate cannot verify from the source tree.
+ */
+const EXEMPT_PERSISTED_TYPES = new Map([
+  ['learn', 'timeline record of a `/evolution learn` start (request + source); read by users/scripts/UI from events.json, no in-repo fold'],
+  ['usage', 'observation-window anchor; the curator\'s usageObserved() gate reads the usage SIDECAR (view_count > 0), so this event is the durable timeline record of the same moment rather than an in-repo input'],
+  ['maintain', 'one record per maintenance scan (verdict + recommendation count + runId) for the timeline; no in-repo fold'],
+])
+
 const emitted = new Map()
 const listened = new Map()
+/** Production files that consume the persisted record type, by relative path. */
+const eventConsumers = new Map()
+
+/**
+ * Read the persisted log's declared type union and the payload validator's case
+ * set from the declaration file.
+ * @returns `{ declared, cases }`, or `null` when the file or union is unreadable.
+ */
+function persistedEventTypes() {
+  const file = join(root, PERSISTED_EVENT_FILE)
+  if (!existsSync(file)) return null
+  const text = readFileSync(file, 'utf8')
+  const body = /export interface EvolutionEvent \{([\s\S]*?)\n\}/.exec(text)?.[1]
+  if (body === undefined) return null
+  const unionLine = /^\s*type:\s*(.+)$/m.exec(body)?.[1] ?? ''
+  const declared = new Set([...unionLine.matchAll(/'([a-z_]+)'/g)].map(match => match[1]))
+  const switchAt = text.indexOf('switch (type) {')
+  const cases = new Set(switchAt < 0 ? [] : [...text.slice(switchAt).matchAll(/case '([a-z_]+)':/g)].map(match => match[1]))
+  return { declared, cases }
+}
 
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -65,6 +114,7 @@ function walk(dir) {
       const rel = relative(root, path).split('\\').join('/')
       if (!rel.includes('/src/')) continue
       const text = readFileSync(path, 'utf8')
+      if (text.includes('EvolutionEvent')) eventConsumers.set(rel, text)
       for (const match of text.matchAll(EMIT_RE)) {
         const name = match[1]
         if (!emitted.has(name)) emitted.set(name, [])
@@ -109,10 +159,84 @@ if (dangling.length > 0) {
 if (exemptOrphans.length > 0) {
   console.log(`verify-event-pairing: exempt external-owner orphan(s) (README): ${exemptOrphans.sort().join(', ')}`)
 }
-console.log(`verify-event-pairing: summary — ${orphans.length} orphan(s), ${dangling.length} dangling listener(s), ${exemptOrphans.length} declared exempt`)
+
+// V27 G3.3: persisted-log type coverage (see the header). A reader is a
+// production file that discriminates the type OF A VALUE TYPED AS THE PERSISTED
+// RECORD: textual file scoping alone is not enough, because the same file also
+// judges session events (`event.type !== 'tool/call'`) and unrelated unions
+// (`case 'view':` on a usage action).
+const persisted = persistedEventTypes()
+const persistedViolations = []
+const readers = new Map()
+if (persisted === null || persisted.declared.size === 0) {
+  persistedViolations.push(`cannot read the persisted event type union from ${PERSISTED_EVENT_FILE} — a vacant scan is not a coverage result`)
+} else {
+  for (const [rel, text] of eventConsumers) {
+    if (rel === PERSISTED_EVENT_FILE) continue
+    // Value names statically typed as the record (scalars), plus loop variables
+    // over an `EvolutionEvent[]` collection.
+    const typedNames = new Set([...text.matchAll(/(\w+)\s*:\s*EvolutionEvent\b/g)].map(match => match[1]))
+    for (const arrayMatch of text.matchAll(/(\w+)\s*:\s*EvolutionEvent\[\]/g)) {
+      const collection = arrayMatch[1]
+      for (const loopMatch of text.matchAll(new RegExp(`for \\(const (\\w+) of ${collection}\\)`, 'g'))) typedNames.add(loopMatch[1])
+    }
+    for (const name of typedNames) {
+      const types = new Set()
+      const comparisons = [
+        new RegExp(`\\b${name}\\.type\\s*(?:===|!==)\\s*'([a-z_]+)'`, 'g'),
+        new RegExp(`'([a-z_]+)'\\s*(?:===|!==)\\s*${name}\\.type`, 'g'),
+      ]
+      for (const pattern of comparisons) {
+        for (const match of text.matchAll(pattern)) if (match[1]) types.add(match[1])
+      }
+      const switchPattern = new RegExp(`switch \\(${name}\\.type\\)\\s*\\{([^}]*)\\}`, 'g')
+      for (const match of text.matchAll(switchPattern)) {
+        for (const caseMatch of (match[1] ?? '').matchAll(/case '([a-z_]+)':/g)) if (caseMatch[1]) types.add(caseMatch[1])
+      }
+      for (const type of types) {
+        if (!readers.has(type)) readers.set(type, new Set())
+        readers.get(type).add(rel)
+      }
+    }
+  }
+  for (const type of [...persisted.declared].sort()) {
+    const readBy = readers.get(type)
+    if (readBy !== undefined) continue
+    if (EXEMPT_PERSISTED_TYPES.has(type)) continue
+    persistedViolations.push(`persisted type "${type}" is written but never read in production — attach a reader or add it to EXEMPT_PERSISTED_TYPES with the reason the record is an external contract`)
+  }
+  for (const type of [...readers.keys()].sort()) {
+    if (!persisted.declared.has(type)) {
+      persistedViolations.push(`reader discriminates persisted type "${type}", which ${PERSISTED_EVENT_FILE} does not declare (${[...readers.get(type)].join(', ')}) — stale or misspelled discriminant`)
+    }
+  }
+  for (const type of [...EXEMPT_PERSISTED_TYPES.keys()].sort()) {
+    if (!persisted.declared.has(type)) persistedViolations.push(`EXEMPT_PERSISTED_TYPES lists "${type}", which is no longer a declared persisted type — drop the stale exemption`)
+    else if (readers.has(type)) persistedViolations.push(`EXEMPT_PERSISTED_TYPES lists "${type}", but production now reads it (${[...readers.get(type)].join(', ')}) — drop the exemption`)
+  }
+  const missingCases = [...persisted.declared].filter(type => !persisted.cases.has(type)).sort()
+  const extraCases = [...persisted.cases].filter(type => !persisted.declared.has(type)).sort()
+  if (missingCases.length > 0) persistedViolations.push(`evolutionEventPayloadIssue does not validate declared type(s): ${missingCases.join(', ')} — the file boundary would accept a record no consumer can fold`)
+  if (extraCases.length > 0) persistedViolations.push(`evolutionEventPayloadIssue validates undeclared type(s): ${extraCases.join(', ')}`)
+}
+
+const typeReport = persisted === null
+  ? 'unreadable'
+  : [...persisted.declared].sort().map(type => {
+    const readBy = readers.get(type)
+    if (readBy !== undefined) return `${type}=reader(${[...readBy].join(', ')})`
+    return EXEMPT_PERSISTED_TYPES.has(type) ? `${type}=exempt(external contract)` : `${type}=ORPHAN`
+  }).join(', ')
+console.log(`verify-event-pairing: persisted log type(s) in ${PERSISTED_EVENT_FILE}: ${typeReport}`)
+for (const violation of persistedViolations) {
+  console.warn(`verify-event-pairing: ${strict ? 'FAIL' : 'WARN'} — ${violation}`)
+}
+
+console.log(`verify-event-pairing: summary — ${orphans.length} orphan(s), ${dangling.length} dangling listener(s), ${exemptOrphans.length} declared exempt, ${persistedViolations.length} persisted-type violation(s)`)
 // V5-15 (0.3.30): strict = the arch-guards posture — any orphan or dangling
 // listener is a broken wiring contract the review would otherwise miss.
-if (strict && (orphans.length > 0 || dangling.length > 0)) {
-  console.error(`verify-event-pairing [strict]: ${orphans.length} orphan(s), ${dangling.length} dangling listener(s) — fix the wiring (or declare an exempt owner in README)`)
+const failures = orphans.length + dangling.length + persistedViolations.length
+if (strict && failures > 0) {
+  console.error(`verify-event-pairing [strict]: ${orphans.length} orphan(s), ${dangling.length} dangling listener(s), ${persistedViolations.length} persisted-type violation(s) — fix the wiring (or declare an exempt owner in README / EXEMPT_PERSISTED_TYPES with its reason)`)
   process.exit(1)
 }

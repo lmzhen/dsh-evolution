@@ -36,8 +36,14 @@ describe('evolution-maintenance tools registration', () => {
       await mkdir(skillDir, { recursive: true })
       await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Probe root test.\n---\n\n# Demo\n\nbody\n', 'utf8')
       const probePath = join(skillDir, 'SKILL.md')
-      for (const cfg of [{ skillsRoot: '' }, { skillsRoot: undefined }, {}]) {
-        const ctx = new Context()
+      // V4-16: an empty, a whitespace-only, and an ABSENT skillsRoot all fall
+      // back to the default root. A literal `skillsRoot: undefined` cannot be
+      // expressed here: the loader's config type derives from the schemastery
+      // ObjectS, whose optional fields admit `string | null` and not
+      // `undefined` under exactOptionalPropertyTypes. `resolveRootConfig` and
+      // `assertSkillsRootAliasRetired` both normalize through `?? ''`, so the
+      // absent key is exactly the retired-undefined case under test.
+      for (const cfg of [{ skillsRoot: '' }, { skillsRoot: '   ' }, {}] satisfies MaintenanceTools.Config[]) {        const ctx = new Context()
         const registered: Array<{ name?: string; execute: (args: unknown, exec: unknown) => Promise<unknown> }> = []
         ctx.provide('tools', {
           register: (definition: unknown) => {

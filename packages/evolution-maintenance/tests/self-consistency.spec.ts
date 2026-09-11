@@ -1,6 +1,6 @@
 /**
- * 011 §7 self-consistency suite — the four compile-time tests that keep the
- * template vocabulary and the mechanical facts/probe layer aligned:
+ * 011 §7 self-consistency suite — the compile-time tests that keep the template
+ * vocabulary and the mechanical facts/probe layer aligned:
  *   ① vocabulary: every template placeholder resolves via DRIFT_SIGNAL_NOUNS;
  *      rendered text carries no unresolved placeholders; the noun table and
  *      the probe signal set are the same vocabulary.
@@ -12,8 +12,14 @@
  *      (stamp density over the threshold) exactly as the template claims.
  *   ④ plan evidence closure — owned by validate-plan.spec (rejects evidence
  *      outside the facts block); referenced here, not duplicated.
+ *   ⑤ usage_observed / stamp_density agreement between probe and facts.
+ *   ⑥ output contract: the prompt's declared field set IS the validator's
+ *      schema field set (V27 G3.2) — a field the template promises but nothing
+ *      validates, or a field the validator requires but the template never
+ *      names, fails here.
  */
 
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   DRIFT_SIGNAL_NOUNS,
@@ -32,6 +38,46 @@ function templateSignalRefs(): Set<string> {
     if (id) refs.add(id)
   }
   return refs
+}
+
+const CONTRACT_HEADING = '## 6. 输出契约'
+
+/**
+ * Field names the maintain prompt declares in its §6 output-contract block.
+ * Derived from the shipped template text, so a prompt-side edit that adds or
+ * drops a field moves this set.
+ * @returns the declared field names.
+ */
+function promptContractFields(): Set<string> {
+  const start = MAINTAIN_PROMPT.indexOf(CONTRACT_HEADING)
+  expect(start).toBeGreaterThan(-1)
+  const nextHeading = MAINTAIN_PROMPT.indexOf('\n## ', start + CONTRACT_HEADING.length)
+  const block = MAINTAIN_PROMPT.slice(start, nextHeading < 0 ? undefined : nextHeading)
+  const fields = new Set<string>()
+  for (const match of block.matchAll(/(?:^|[\s{,[])([a-z_]+):/gm)) {
+    if (match[1]) fields.add(match[1])
+  }
+  expect(fields.size).toBeGreaterThan(0)
+  return fields
+}
+
+/**
+ * Field names the validator's schema declares, read from its own interfaces —
+ * the object the plan normalization emits, not a re-typed list.
+ * @returns the schema field names.
+ */
+function schemaFields(): Set<string> {
+  const source = readFileSync(new URL('../src/validate-plan.ts', import.meta.url), 'utf8')
+  const fields = new Set<string>()
+  for (const name of ['MaintainPlan', 'MaintainPlanItem']) {
+    const body = new RegExp(`export interface ${name} \\{([^}]*)\\}`).exec(source)?.[1] ?? ''
+    expect(body.length).toBeGreaterThan(0)
+    for (const match of body.matchAll(/^\s{2}([a-z_]+)\??:/gm)) {
+      if (match[1]) fields.add(match[1])
+    }
+  }
+  expect(fields.size).toBeGreaterThan(0)
+  return fields
 }
 
 describe('011 self-consistency', () => {
@@ -157,5 +203,16 @@ describe('011 self-consistency', () => {
     expect(bigProbe).toContain('/KB')
     const bigFact = computeDriftSignals(bigSnaps).skills[0]?.signals.find(signal => signal.id === 'stamp_density')
     expect(bigFact?.value).toContain('/KB')
+  })
+
+  it('⑥ output contract: the prompt field set IS the validator schema field set (V27 G3.2)', () => {
+    // Both sides are derived from their own source: the prompt side from the
+    // shipped §6 template text, the schema side from the validator's own
+    // interfaces. A field the template promises but no validator requires would
+    // let the model invent it; a validator field the template never names would
+    // reject output nobody could have produced. Both fail here.
+    const declared = [...promptContractFields()].sort()
+    const enforced = [...schemaFields()].sort()
+    expect(declared).toEqual(enforced)
   })
 })

@@ -67,7 +67,17 @@ export interface CuratorRunReport {
   llmNominations: string[]
   archiveCandidates: string[]
   archived: CuratorArchivedSkill[]
+  /** Failures attributable to a SKILL NAME (`<name>: …`). V27 CUR-2: this field
+   * is the skill-attributable subset only — run-level facts (an abort, a phase
+   * that could not start) live in `aborted`/`unattributed` so a report can no
+   * longer show `failed: 0` for a run that was cut short. */
   failed: CuratorFailedSkill[]
+  /** V27 CUR-2: the run stopped early (e.g. disposed mid-run, timeout). The
+   * string names the phase that did not complete; absent on a full run. */
+  aborted?: string
+  /** V27 CUR-2: error strings that could not be attributed to a skill name.
+   * They were previously collected in memory and then dropped on write. */
+  unattributed?: string[]
   /** Consolidations actually executed this run (source absorbed into target). */
   consolidated?: CuratorConsolidation[]
   snapshotPath?: string
@@ -86,6 +96,10 @@ export interface CuratorReportInput {
   archiveCandidates: readonly string[]
   archived: readonly CuratorArchivedSkill[]
   failed: readonly CuratorFailedSkill[]
+  /** V27 CUR-2: run-level abort reason (see CuratorRunReport.aborted). */
+  aborted?: string
+  /** V27 CUR-2: errors with no skill name to attribute them to. */
+  unattributed?: readonly string[]
   consolidated?: readonly CuratorConsolidation[]
   snapshotPath?: string
   llmReviewEnabled?: boolean
@@ -103,6 +117,8 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
     archiveCandidates: [...input.archiveCandidates],
     archived: [...input.archived],
     failed: [...input.failed],
+    ...input.aborted === undefined ? {} : { aborted: input.aborted },
+    ...input.unattributed === undefined || input.unattributed.length === 0 ? {} : { unattributed: [...input.unattributed] },
     ...input.consolidated === undefined ? {} : { consolidated: [...input.consolidated] },
     ...input.snapshotPath === undefined ? {} : { snapshotPath: input.snapshotPath },
     ...input.llmReviewEnabled === undefined ? {} : { llmReviewEnabled: input.llmReviewEnabled },
@@ -125,6 +141,13 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
     `- **LLM nominations**: ${report.llmNominations.length}`,
     `- **Archived**: ${report.archived.length}`,
     `- **Failed**: ${report.failed.length}`,
+    // V27 CUR-2: an aborted run says so on the summary line — the digest is the
+    // only artefact an operator reads, and "Failed: 0" over a run that was cut
+    // short is the false-clean signal the audit flagged.
+    ...report.aborted === undefined ? [] : [`- **Aborted**: ${report.aborted}`],
+    ...report.unattributed === undefined || report.unattributed.length === 0
+      ? []
+      : [`- **Unattributed errors**: ${report.unattributed.length}`],
     ...report.snapshotPath === undefined ? [] : [`- **Snapshot**: ${report.snapshotPath}`],
     ...report.llmReviewEnabled === undefined ? [] : [`- **llmReview**: ${report.llmReviewEnabled}`],
     ...report.nominationsWarnings === undefined || report.nominationsWarnings.length === 0 ? [] : [`- **Nomination warnings**: ${report.nominationsWarnings.join('; ')}`],
@@ -134,6 +157,7 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
     ...lines,
     ...section('Archived', report.archived.map(item => `${item.name} (${item.reason})`)),
     ...section('Failed', report.failed.map(item => `${item.name}: ${item.reason}`)),
+    ...section('Unattributed', report.unattributed ?? []),
     ...section('Stale candidates', report.staleCandidates),
     ...section('LLM nominations', report.llmNominations),
     '',
@@ -402,15 +426,24 @@ export function computeLifecycleTransitions(
         result.markStale.push(name)
       }
     } else {
-      if (idle < staleAfterDays) {
-        record.state = 'active'
-        result.transitions.push({ name, from: 'stale', to: 'active', reason: `recent activity ${Math.round(idle)}d` })
-        result.reactivate.push(name)
-      } else if (idle >= config.archiveAfterDays) {
+      // V27 CC-4: the archive bound is checked FIRST here, mirroring the active
+      // branch above. The old order tested `idle < staleAfterDays` first, so a
+      // contradictory configuration (warn window longer than the archive
+      // window, e.g. qualityWarnStaleAfterDays=60 with archiveAfterDays=45)
+      // REACTIVATED a stale skill at idle=50d instead of archiving it — the two
+      // branches disagreed about the same idle value, and the pair is not
+      // validated anywhere. With the archive bound first, the harder bound
+      // always wins, and the behavior is otherwise unchanged (for
+      // archiveAfterDays >= staleAfterDays the two orders are equivalent).
+      if (idle >= config.archiveAfterDays) {
         record.state = 'archived'
         record.archived_at = now.toISOString()
         result.transitions.push({ name, from: 'stale', to: 'archived', reason: `idle ${Math.round(idle)}d >= ${config.archiveAfterDays}d` })
         result.archive.push(name)
+      } else if (idle < staleAfterDays) {
+        record.state = 'active'
+        result.transitions.push({ name, from: 'stale', to: 'active', reason: `recent activity ${Math.round(idle)}d` })
+        result.reactivate.push(name)
       }
     }
   }

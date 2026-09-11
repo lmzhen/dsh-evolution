@@ -40,7 +40,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const resolved = await provider.tryResolvePending('to-resolve', 'approved')
     expect(resolved.applied).toBe(true)
 
-    const map = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     const resolvedIds = Object.values(map).filter(r => r.status === 'approved' || r.status === 'rejected').map(r => r.id)
     expect(resolvedIds).toHaveLength(200)
     expect(resolvedIds).not.toContain('seed-0')
@@ -49,10 +49,10 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(map['keep-pending']?.status).toBe('pending')
     expect(map['keep-executing']?.status).toBe('executing')
 
-    const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(Array.isArray(archive)).toBe(true)
     expect(archive).toHaveLength(1)
-    expect(archive[0].id).toBe('seed-0')
+    expect(archive[0]!.id).toBe('seed-0')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
@@ -74,7 +74,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
 
     const resolved = await provider.tryResolvePending('to-resolve', 'approved')
     expect(resolved.applied).toBe(true)
-    const map = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect(Object.values(map).filter(r => r.status === 'approved' || r.status === 'rejected')).toHaveLength(51)
     expect(await io.exists(join(root, 'pending-state-archive.json'))).toBe(false)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -105,7 +105,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
       expect((await provider.tryResolvePending(`r-${i}`, 'approved')).applied).toBe(true)
     }
 
-    const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     // Without dedupe, each resolve re-archives seed-0/seed-1 (they keep coming
     // back from legacy) and the sidecar grows without bound. With dedupe each
     // seed is archived exactly once.
@@ -147,15 +147,15 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect((await provider.tryResolvePending('to-resolve', 'approved')).applied).toBe(true)
 
     // Active sidecar restarted from the batch that overflowed it (one record).
-    const active = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const active = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(active).toHaveLength(1)
-    expect(active[0].id).toBe('live-0')
+    expect(active[0]!.id).toBe('live-0')
     // The full pre-rotation history was preserved.
     expect(await io.exists(join(root, 'pending-state-archive.json.bak'))).toBe(true)
-    const bak = JSON.parse(await io.readText(join(root, 'pending-state-archive.json.bak'))) as PendingRecord[]
+    const bak = JSON.parse((await io.readText(join(root, 'pending-state-archive.json.bak')))!) as PendingRecord[]
     expect(bak).toHaveLength(5000)
-    expect(bak[0].id).toBe('arch-0')
-    expect(bak[4999].id).toBe('arch-4999')
+    expect(bak[0]!.id).toBe('arch-0')
+    expect(bak[4999]!.id).toBe('arch-4999')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
@@ -167,7 +167,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
 
     // Upgrade shape: the legacy file holds a pending twin of an id the archive
     // already saw (approved long ago, cap-rotated out of current). Without
-    // retirement the rotation re-exposes the stale `pending` copy — claimable
+    // retirement the rotation re-exposes the stale `pending` copy —claimable
     // and replayed with months-old staged args.
     const legacy: Record<string, PendingRecord> = {
       ghost: { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'pending' },
@@ -182,7 +182,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await io.writeText(join(root, 'pending-state-archive.json'), JSON.stringify([
       { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' },
     ]))
-    // The live map is already at the cap — no ghost twin resolved in current.
+    // The live map is already at the cap —no ghost twin resolved in current.
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify({ current: { id: 'current', kind: 'memory', summary: 'c', args: {}, createdAt: 'now', status: 'pending' } }))
 
     const firstList = await provider.listPending('pending')
@@ -213,10 +213,10 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
 
     await provider.tryResolvePending('to-resolve', 'approved')
-    const after = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    const after = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     // The oldest record was archived AND actually left the map (key mismatch must not defeat eviction).
     expect(Object.values(after).some(record => record.id === 'real-oldest')).toBe(false)
-    const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(archive.some(record => record.id === 'real-oldest')).toBe(true)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
@@ -239,7 +239,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' }
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
     await provider.tryResolvePending('to-resolve', 'approved')
-    const collapsed = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const collapsed = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(collapsed.filter(record => record.id === 'dup')).toHaveLength(1)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
@@ -267,19 +267,19 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     // The eviction appended nothing new (the record was archived already) —
     // pre-fix the collapse-only round returned `current` and left the disk
     // residue forever.
-    const once = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const once = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(once.filter(record => record.id === 'dup')).toHaveLength(1)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
-  it('V6-30: eviction is by the oldest entry KEYS — a same-id twin keeps its own slot (0.3.37)', async () => {
+  it('V6-30: eviction is by the oldest entry KEYS —a same-id twin keeps its own slot (0.3.37)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-json-v630-'))
     const ctx = await mount(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     const map: Record<string, PendingRecord> = {}
     // Two entries SHARE one id under different keys; only the older one is in
-    // the eviction window — it must leave with its own key while the twin
+    // the eviction window —it must leave with its own key while the twin
     // stays (pre-fix: both left, one was archived).
     map['twin-old'] = { id: 'shared-id', kind: 'memory', summary: 'old', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' }
     map['twin-new'] = { id: 'shared-id', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2021-01-01T00:00:00.000Z' }
@@ -289,10 +289,10 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' }
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
     await provider.tryResolvePending('to-resolve', 'approved')
-    const after = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    const after = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect('twin-new' in after).toBe(true)
     expect('twin-old' in after).toBe(false)
-    const archive = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     const archivedShared = archive.filter(record => record.id === 'shared-id')
     expect(archivedShared).toHaveLength(1)
     expect(archivedShared[0]?.summary).toBe('old')
@@ -306,7 +306,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const io = ctx.evolutionIo.provider('node')
     // Upgrade shape: legacy holds the pending twin of an id the archive saw
     // (its resolved copy was cap-rotated out). The FIRST state operation is a
-    // MUTATION (savePending) — before any listPending/retirement.
+    // MUTATION (savePending) —before any listPending/retirement.
     await io.writeText(join(root, 'pending.json'), JSON.stringify({
       ghost: { id: 'ghost', kind: 'skill', summary: 'old staged write', args: { facts: 'old' }, createdAt: 'now', status: 'pending' },
     }))
@@ -316,7 +316,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.savePending({ id: 'fresh', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' })
     // The write path applied the same archive exclusion: the ghost twin never
     // reached current, so it can never be claimed + replayed.
-    const current = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    const current = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect(Object.values(current).some(record => record.id === 'ghost')).toBe(false)
     expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -331,7 +331,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     //    (empty archive).
     await provider.savePending({ id: 'first', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' })
     // 2) Resolving the fresh pending evicts the oldest resolved record and
-    //    appends it to the archive — the id the cache never saw (only the
+    //    appends it to the archive —the id the cache never saw (only the
     //    oldest entry leaves; ARCHIVE_RESOLVED_CAP keeps the sidecar small).
     const live: Record<string, PendingRecord> = {}
     for (let i = 0; i < 200; i += 1) {
@@ -341,14 +341,14 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify(live))
     await provider.tryResolvePending('to-resolve', 'approved')
     // 3) Without the refresh a stale cache excludes NOTHING for the id the
-    //    append just added — the ghost twin of `live-0` (now archived) slips
+    //    append just added —the ghost twin of `live-0` (now archived) slips
     //    in through a later mutation before any list. The legacy KEY must
     //    match the record id (filterLegacy compares keys against the id set).
     await io.writeText(join(root, 'pending.json'), JSON.stringify({
       'live-0': { id: 'live-0', kind: 'skill', summary: 'ghost twin', args: { facts: 'old' }, createdAt: 'now', status: 'pending' },
     }))
     await provider.savePending({ id: 'after-rotate', kind: 'memory', summary: 'n2', args: {}, createdAt: 'now', status: 'pending' })
-    const current = JSON.parse(await io.readText(join(root, 'pending-state.json'))) as Record<string, PendingRecord>
+    const current = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect(Object.values(current).some(record => record.id === 'live-0')).toBe(false)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
@@ -368,7 +368,7 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.tryResolvePending('to-resolve', 'approved')
     // First rotation with an EMPTY archive: no `[]`-backed .bak residue.
     expect(await io.exists(join(root, 'pending-state-archive.json.bak'))).toBe(false)
-    const active = JSON.parse(await io.readText(join(root, 'pending-state-archive.json'))) as PendingRecord[]
+    const active = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(active).toHaveLength(1)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })

@@ -13,6 +13,16 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+/** The `memory` tool's declared output schema, as the tests read it back. */
+interface MemoryToolResult {
+  ok: boolean
+  message: string
+  entries: string[]
+  chars: number
+  limit: number
+  pending_id?: string
+}
+
 function fakeAgent(): Agent {
   return {
     session: {
@@ -72,7 +82,7 @@ describe('tool-memory execution boundaries', () => {
     // chain degrades to the default origin and the write proceeds.
     const tool = ctx.tools.get('memory')!
     const execArg = { agent: {} } as unknown as Parameters<typeof tool.execute>[1]
-    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'sessionless write' }, execArg)
+    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'sessionless write' }, execArg) as MemoryToolResult
     expect(result.ok).toBe(true)
     expect(await ctx.memory.read('memory')).toContain('sessionless write')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

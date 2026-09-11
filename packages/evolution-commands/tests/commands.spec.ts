@@ -49,9 +49,9 @@ describe('evolution-commands', () => {
     expect(missing.kind).toBe('error')
   })
 
-  it('learn injects the standards-guided prompt into the invoking agent (rc.67)', async () => {
+  it('V27 G0.5 (U-1): learn delivers through the WAKING channel (followup-first, inject fallback)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void; followup?(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', {
       register: (definition: unknown) => {
         captured = definition as typeof captured
@@ -59,22 +59,34 @@ describe('evolution-commands', () => {
       },
     })
     const injected: unknown[] = []
+    const followed: unknown[] = []
     await ctx.plugin(Commands)
-    const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>', agent: { inject: (message: unknown) => injected.push(message) } })
-    // The command result only feeds the UI; the agent receives the message.
-    expect(withRequest.text).toContain('Learning request sent')
-    expect(withRequest.text).not.toContain('THE REQUEST:')
-    expect(injected).toHaveLength(1)
-    const message = injected[0] as { content: Array<{ text?: string }>; source?: { plugin?: string }; role?: string }
+    // A host that exposes the waking primitive: the prompt must NOT go through
+    // `inject` (send 'next-step', wakeup=false) — a slash command opens no turn,
+    // so the queued prompt would sit unread until the user wrote something else
+    // while the command reported success.
+    const wakingAgent = { inject: (message: unknown) => injected.push(message), followup: (message: unknown) => followed.push(message) }
+    const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>', agent: wakingAgent })
+    expect(withRequest.text).toContain('Follow it now')
+    expect(injected).toHaveLength(0)
+    expect(followed).toHaveLength(1)
+    const message = followed[0] as { content: Array<{ text?: string }>; source?: { plugin?: string }; role?: string }
     // UserMessage contract: role is required and minted by createUserMessage.
     expect(message.role).toBe('user')
     expect(message.source?.plugin).toBe('dsh-evolution-commands')
     expect(message.content?.[0]?.text).toContain('distill the auth flow from <url>')
     expect(message.content?.[0]?.text).toContain('skill_manage')
     // Empty argument falls back to the "what we just did" guidance.
-    const empty = await captured!.handler({ rawInput: 'learn', agent: { inject: (message: unknown) => injected.push(message) } })
-    expect(empty.text).toContain('Learning request sent')
-    expect((injected[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
+    const empty = await captured!.handler({ rawInput: 'learn', agent: wakingAgent })
+    expect(empty.text).toContain('Follow it now')
+    expect((followed[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
+    // A host without `followup` degrades to inject AND says so honestly —
+    // claiming "Follow it now" over a non-waking queue is what the audit
+    // flagged as a silent no-op.
+    const fallback = await captured!.handler({ rawInput: 'learn check the retry budget', agent: { inject: (message: unknown) => injected.push(message) } })
+    expect(fallback.text).toContain('no wake-up channel')
+    expect(fallback.text).not.toContain('Follow it now')
+    expect(injected).toHaveLength(1)
   })
 
   it('skills health renders degraded structure rows or a clean verdict (rc.73 A1)', async () => {
@@ -325,7 +337,7 @@ describe('evolution-commands', () => {
     expect(missingSkill.kind).toBe('error')
   })
 
-  it('restructure succeeds end-to-end on a temp library via Config.skillsRoot', async () => {
+  it('restructure succeeds end-to-end on a temp library via Config.root', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'evo-commands-restructure-'))
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
@@ -355,9 +367,9 @@ describe('evolution-commands', () => {
       ctx.provide('evolutionIo', {
         provider: () => io,
       })
-      // Config.skillsRoot is the command-facing root (A7 alignment) — the
+      // Config.root is the command-facing root (A7 alignment) — the
       // temp root keeps the mutation off the real library.
-      await ctx.plugin(Commands, { skillsRoot: root })
+      await ctx.plugin(Commands, { root: root })
       const result = await captured!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
       expect(result.kind).toBe('success')
       expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
@@ -403,7 +415,7 @@ describe('evolution-commands', () => {
           }
         },
       })
-      await ctx.plugin(Commands, { skillsRoot: root })
+      await ctx.plugin(Commands, { root: root })
       const result = await captured!.handler({ rawInput: 'maintain' })
       expect(result.kind).toBe('success')
       // Enriched facts: the unlinked support file is reported as a real over,
@@ -447,7 +459,7 @@ describe('evolution-commands', () => {
       // maintainCooldownMs: 0 — the cooldown is module-level transient state,
       // and an earlier test already ran `maintain` (would block this run and
       // skip the subagent call, leaving the signal capture undefined).
-      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
       const bad = await captured!.handler({ rawInput: 'maintain --timeout 0' })
       expect(bad.kind).toBe('error')
       expect(bad.text).toContain('Invalid --timeout')
@@ -484,7 +496,7 @@ describe('evolution-commands', () => {
           markSpawned?.()
           // First spawn stays deferred (to hold the scan in flight); later
           // spawns complete immediately so the post-settle re-trigger awaits.
-          const plan = { text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }
+          const plan = { text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
           if (starts === 1) {
             return {
               result: new Promise((resolve) => {
@@ -495,7 +507,7 @@ describe('evolution-commands', () => {
           return { result: Promise.resolve(plan) }
         },
       })
-      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
       const first = handler!.handler({ rawInput: 'maintain' }) // pends on the deferred run
       // 0.3.14 (P2-1): the flag is set BEFORE the first await, so a second
       // trigger racing inside the enrich window must already see "running" —
@@ -547,7 +559,7 @@ describe('evolution-commands', () => {
         }) as unknown as ReturnType<typeof nodeEvolutionIo>,
       })
       ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
-      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 60_000 })
+      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 60_000 })
       const first = await handler!.handler({ rawInput: 'maintain' })
       expect(first.kind).toBe('error')
       expect(first.text).toContain('Maintenance scan failed')
@@ -582,7 +594,7 @@ describe('evolution-commands', () => {
           return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) }
         },
       })
-      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
       const unknown = await handler!.handler({ rawInput: 'maintain --foo' })
       expect(unknown.kind).toBe('error')
       expect(unknown.text).toContain('Unknown maintain arguments')
@@ -617,7 +629,7 @@ describe('evolution-commands', () => {
       // source-tree tool), and P1-2's symptom lived here before this batch.
       const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
       ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
-      await ctx.plugin(Commands, { skillsRoot: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+      await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
       const result = await handler!.handler({ rawInput: 'preset install' })
       expect(result.kind).toBe('success')
       const target = join(home, '.agent-presets', 'evolution')
@@ -657,7 +669,7 @@ describe('evolution-commands', () => {
       // A standard that already carries tool-memory would mount the row twice
       // if merged — the composition must refuse instead of shadowing it.
       ctx.provide('agentPresets', { read: async () => '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n' })
-      await ctx.plugin(Commands, { skillsRoot: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+      await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
       const result = await handler!.handler({ rawInput: 'preset install' })
       expect(result.kind).toBe('error')
       expect(result.text).toContain('collide')
@@ -692,7 +704,7 @@ describe('evolution-commands', () => {
           throw new Error('--facts must never spawn a subagent')
         },
       })
-      await ctx.plugin(Commands, { skillsRoot: root })
+      await ctx.plugin(Commands, { root: root })
       const result = await captured!.handler({ rawInput: 'maintain --facts' })
       expect(result.kind).toBe('success')
       expect(result.text).toContain('MECHANICAL_FACTS')
@@ -736,7 +748,7 @@ describe('evolution-commands', () => {
           return { result: Promise.resolve({ text: 'x', structured: plan }) }
         },
       })
-      await ctx.plugin(Commands, { maintainCooldownMs: 60_000, skillsRoot: root })
+      await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
       const first = await captured!.handler({ rawInput: 'maintain' })
       expect(first.kind).toBe('success')
       expect(starts).toBe(1)
@@ -797,7 +809,7 @@ describe('evolution-commands', () => {
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
       ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
-      await ctx.plugin(Commands, { skillsRoot })
+      await ctx.plugin(Commands, { root: skillsRoot })
       const result = await handler!.handler({ rawInput: 'preset install' })
       expect(result.kind).toBe('error')
       expect(result.text).toContain('Preset install failed')
@@ -899,7 +911,7 @@ describe('evolution-commands', () => {
           }
         },
       })
-      await ctx.plugin(Commands, { skillsRoot: root, maintainCooldownMs: 0 })
+      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
       const result = await handler!.handler({ rawInput: 'maintain' })
       expect(result.kind).toBe('success')
       // The append is fire-and-forget; poll for the locked RMW to land.
@@ -992,7 +1004,7 @@ describe('evolution-commands', () => {
       })
       const io = nodeEvolutionIo()
       ctx.provide('evolutionIo', { provider: () => io })
-      await ctx.plugin(Commands, { skillsRoot: root, threatExemptLabels: ['ssh_backdoor'] })
+      await ctx.plugin(Commands, { root: root, threatExemptLabels: ['ssh_backdoor'] })
       const result = await handler!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
       expect(result.kind).toBe('success')
       const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
@@ -1098,14 +1110,20 @@ describe('evolution-commands', () => {
     expect(overflow.text).toContain('Invalid --timeout value')
   })
 
-  it('F-14/E-7 (v18): the Config schema defaults maintainTimeoutMs and carries both root keys', () => {
+  it('F-14/E-7 (v18) → V27 G2.4: both root keys stay declared, and the expired alias fails the load', () => {
     const value = (Commands.Config as unknown as {
       ['~standard']: { validate(input: unknown): { value: { maintainTimeoutMs: number; root: string; skillsRoot: string } } }
     })['~standard'].validate({}).value
     expect(value.maintainTimeoutMs).toBe(600_000)
-    // E-7: `root` is canonical, `skillsRoot` the deprecated alias — both must
-    // exist so a legacy deployment still loads and the warn can fire.
+    // `root` is canonical. `skillsRoot` stays DECLARED (so the loader hands the
+    // key to the plugin instead of dropping it) but carries no root semantics:
+    // its one-minor-version window closed at 0.3.65, and a deployment that still
+    // sets it now fails the load loudly rather than pointing at a root nobody
+    // reads (M-08 — the promise was two releases past expiry).
     expect(value.root).toBe('')
     expect(value.skillsRoot).toBe('')
+    const ctx = new Context()
+    expect(() => { Commands.apply(ctx, { skillsRoot: '/tmp/legacy-root' }) })
+      .toThrow(/skillsRoot" was removed after 0\.3\.65/)
   })
 })

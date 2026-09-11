@@ -71,6 +71,65 @@ export const PENDING_RESOLVED_CAP = 200
 export const REVIEW_STATE_SESSION_CAP = 500
 
 /**
+ * V27 G2.2: WHICH pending records the audit cap evicts, as one pure rule both
+ * providers apply (the two implementations had drifted into separate files and
+ * only one of them was ever updated by a later fix).
+ *
+ * Eligible = resolved (`approved`/`rejected`) and NOT a capability approval:
+ * v23 (AP-1) exempts those because the Creator-mode contract reads the LIVE
+ * approved list and a capability cannot be re-submitted for the same package,
+ * so eviction would make an approved capability permanently unactivatable.
+ * Ordering = oldest `resolvedAt` first; a missing or unparseable timestamp sorts
+ * LAST (json parity, v16) — an unknown time must never make a record the victim,
+ * and pending/executing rows are live work that is never trimmed.
+ *
+ * @param records - every pending record currently in the live table.
+ * @param cap - how many resolved records may be kept.
+ * @returns the records to evict, oldest first (empty when within the cap).
+ */
+export function selectPendingOverflow(
+  records: readonly PendingRecord[],
+  cap: number = PENDING_RESOLVED_CAP,
+): PendingRecord[] {
+  const resolved = records.filter(record =>
+    (record.status === 'approved' || record.status === 'rejected') && record.kind !== 'capability')
+  const overflow = resolved.length - cap
+  if (overflow <= 0) return []
+  const resolvedAtMs = (record: PendingRecord): number => {
+    if (!record.resolvedAt) return Number.MAX_SAFE_INTEGER
+    const parsed = Date.parse(record.resolvedAt)
+    return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed
+  }
+  return [...resolved].sort((a, b) => resolvedAtMs(a) - resolvedAtMs(b)).slice(0, overflow)
+}
+
+/**
+ * V27 G2.2: which review-state session rows a save evicts, as one pure rule
+ * both providers apply. The saving session is never a candidate (it is the most
+ * recent write by definition); the rest are ordered by their provider stamp
+ * ascending, with a missing stamp read as 0 = oldest, because an active session
+ * re-stamps its row on its next save and an unknown stamp is stale by
+ * construction. Exactly one row is dropped per over-cap save, which keeps the
+ * table at the cap in steady state.
+ *
+ * @param rows - the other sessions' rows, with their stamps.
+ * @param cap - how many session rows may exist.
+ * @returns the keys to delete, oldest first.
+ */
+export function selectSessionOverflow<T>(
+  rows: readonly T[],
+  options: { keyOf(row: T): string; stampOf(row: T): number },
+  cap: number = REVIEW_STATE_SESSION_CAP,
+): string[] {
+  const overflow = rows.length - cap + 1
+  if (overflow <= 0) return []
+  return [...rows]
+    .sort((a, b) => options.stampOf(a) - options.stampOf(b))
+    .slice(0, overflow)
+    .map(row => options.keyOf(row))
+}
+
+/**
  * Claim lifecycle (S3.3): pending →(claim)→ executing →(resolve)→ approved/rejected.
  * release() rolls executing back to pending (failure path). A crash between
  * the runner execution and the resolve leaves the record executing+claimed,
@@ -128,6 +187,13 @@ export interface EvolutionStateStorage {
    * whole read → transform → write runs inside one provider transact, so a
    * setPaused racing the run-core bookkeeping write can never interleave a
    * stale load with a newer save.
+   *
+   * V27 S4: the record handed to `task` belongs to the task — a provider must
+   * NEVER pass the object it stores (both current providers hand out a copy:
+   * json re-parses its medium, the domain clones its record). Mutating the
+   * argument is not a supported way to write: a task that does so and then lets
+   * validation refuse the result would otherwise leave a mutated object in the
+   * provider's in-memory store.
    */
   transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void>
   listPending(status?: PendingStatus): Promise<PendingRecord[]>

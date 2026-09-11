@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { DriftReport } from '@deepseek-ai/dsh-evolution-core'
-import { validateAndNormalizeMaintainPlan, type ValidationResult } from '../src/index.ts'
+import { computeLifecycleTransitions, type DriftReport, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { MAINTAIN_RULE_IDS, validateAndNormalizeMaintainPlan, type ValidationResult } from '../src/index.ts'
 
 const report: DriftReport = {
   library: [
@@ -171,7 +171,7 @@ describe('validateAndNormalizeMaintainPlan', () => {
     delete item.undo_path
     const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
     expect(result.ok).toBe(true)
-    expect(result.plan.plan[0].undo_path).toBe('n/a')
+    expect(result.plan.plan[0]!.undo_path).toBe('n/a')
   })
 
   it('does not mutate the caller\'s structured input (E-56)', () => {
@@ -181,7 +181,7 @@ describe('validateAndNormalizeMaintainPlan', () => {
     const result = validateAndNormalizeMaintainPlan(root, report, SIGNALS)
     expect(result.ok).toBe(true)
     // The normalized plan carries the truthful 'n/a' ...
-    expect(result.plan.plan[0].undo_path).toBe('n/a')
+    expect(result.plan.plan[0]!.undo_path).toBe('n/a')
     // ... WITHOUT writing it back onto the caller's input object (no in-place
     // `undo_path = 'n/a'` — the old code mutated the raw plan element).
     expect((root.plan as Record<string, unknown>[])[0]?.undo_path).toBeUndefined()
@@ -217,6 +217,71 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(imposed[2]?.needs_human).toBe(true)
   })
 
+  it('V27 M-07: a whitespace-padded facts-report name still receives the quality_low gate', () => {
+    // The gate used to compare the CANONICAL item name (trimmed, see
+    // canonicalByName) against the RAW facts-report name, so one padded
+    // directory name made the lookup miss and the recommendation stayed
+    // machine-actionable — the §7 imposition silently did not apply.
+    const padded: DriftReport = {
+      ...report,
+      skills: [
+        ...report.skills,
+        { name: ' padded-skill ', signals: [{ id: 'quality_low', verdict: 'unknown', value: 'not-assessed' }] },
+      ],
+    }
+    const item = validItem({ names: [' padded-skill '], confidence: 0.9 })
+    const result = validateAndNormalizeMaintainPlan(validPlan([item]), padded, new Set([...SIGNALS, 'quality_low']))
+    expect(result.ok).toBe(true)
+    expect(result.plan.plan[0]?.names).toEqual(['padded-skill'])
+    expect(result.plan.plan[0]?.needs_human).toBe(true)
+    expect(result.forcedHuman).toContain('padded-skill')
+  })
+
+  it('V27 D-3: rule must be a clause id the template defines, not any string', () => {
+    // The template's §5 catalogue is the authority (parsed from MAINTAIN_PROMPT
+    // at module load); a fabricated clause number used to pass the shape check.
+    expect([...MAINTAIN_RULE_IDS].sort()).toEqual(['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5', 'D1', 'D2'])
+    const fabricated = validItem({ rule: 'Z9' })
+    const rejected = validateAndNormalizeMaintainPlan(validPlan([fabricated]), report, SIGNALS)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.errors.some(error => error.includes('is not a clause id the maintain template defines'))).toBe(true)
+    // A real clause id (including the D-discipline ones that carry no signal)
+    // still passes.
+    const discipline = validItem({ rule: 'D2' })
+    expect(validateAndNormalizeMaintainPlan(validPlan([discipline]), report, SIGNALS).ok).toBe(true)
+  })
+
+  it('V27 CC-4: a contradictory config archives instead of reviving an over-age stale skill', () => {
+    // qualityWarnStaleAfterDays (60) > archiveAfterDays (45): the stale branch
+    // used to test `idle < staleAfterDays` FIRST, so a 50-day-idle skill was
+    // reactivated although it had already passed the archive bound — the two
+    // branches disagreed about the same idle value.
+    const usage = new Map<string, UsageRecord>()
+    const idle = new Date(Date.now() - 50 * 24 * 60 * 60 * 1000).toISOString()
+    usage.set('over-age', {
+      created_by: 'agent', created_at: idle, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: idle, last_viewed_at: null, last_patched_at: null,
+      state: 'stale', pinned: false, archived_at: null, quality_warn: true,
+    })
+    const contradictory = { staleAfterDays: 30, archiveAfterDays: 45, qualityWarnStaleAfterDays: 60 }
+    const result = computeLifecycleTransitions(usage, contradictory, new Date())
+    expect(result.reactivate).toEqual([])
+    expect(result.archive).toEqual(['over-age'])
+    expect(usage.get('over-age')?.state).toBe('archived')
+    // The normal configuration (warn window < archive bound) is unchanged: a
+    // stale skill inside the warn window is still reactivated.
+    const fresh = new Map<string, UsageRecord>()
+    const recent = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+    fresh.set('recent-idle', {
+      created_by: 'agent', created_at: recent, use_count: 1, view_count: 0, patch_count: 0,
+      last_used_at: recent, last_viewed_at: null, last_patched_at: null,
+      state: 'stale', pinned: false, archived_at: null,
+    })
+    const normalConfig = { staleAfterDays: 30, archiveAfterDays: 90, qualityWarnStaleAfterDays: 7 }
+    const normal = computeLifecycleTransitions(fresh, normalConfig, new Date())
+    expect(normal.reactivate).toEqual(['recent-idle'])
+  })
+
   it('rejects NaN confidence (was allowed before isFinite)', () => {
     const item = validItem({ confidence: Number.NaN })
     const result = validateAndNormalizeMaintainPlan(validPlan([item]), report, SIGNALS)
@@ -248,7 +313,7 @@ describe('validateAndNormalizeMaintainPlan', () => {
     expect(result.ok).toBe(true)
     // The output uses the canonical facts-report name so later consumers
     // (protected check, quality_low gate) stay consistent.
-    expect(result.plan.plan[0].names).toEqual(['healthy-skill'])
+    expect(result.plan.plan[0]!.names).toEqual(['healthy-skill'])
     // A mixed-case name on a protected skill is still rejected through the
     // normalized key (the §7 rule is name-anchored, not formatting-anchored).
     const protectedReport: DriftReport = {

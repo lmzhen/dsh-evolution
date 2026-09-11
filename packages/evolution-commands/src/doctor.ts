@@ -97,7 +97,12 @@ export async function diagnose(
   if (full && host) conflicts.push('evolution-all and evolution-host are installed together — the infra rows double-mount and startup fails loud. Keep ONE: remove the other bundle.')
   if (full && preset) conflicts.push('evolution-all and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
   if (host && preset) conflicts.push('evolution-host and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
-  if (full && layered) conflicts.push('evolution-all and the layered Evolution preset are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).')
+  // V27 G6.4: the conflict is the DELIVERED preset artifact, not the
+  // host+preset `layered` form — `all` mounts the same four model rows at
+  // profile root, so `all` + a preset directory double-mounts them even when
+  // the host bundle is absent (the old `full && layered` condition required
+  // host and stayed silent for exactly that combination).
+  if (full && presetDirInstalled) conflicts.push('evolution-all and the layered Evolution preset are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).')
   // V24-11 (v24): the preset BUNDLE mounts the same four model rows as `all`
   // (tool-memory / tool-skill-manage / tool-session-query / skill-catalog),
   // so bundle × layered preset dir is the same double-mount as all × layered

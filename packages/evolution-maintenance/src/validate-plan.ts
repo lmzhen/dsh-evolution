@@ -8,7 +8,20 @@
  * recommendation is right — only whether it is well-formed and traceable.
  */
 
-import { findDriftSignal, type DriftReport, type DriftSignal } from '@deepseek-ai/dsh-evolution-core'
+import { findDriftSignal, MAINTAIN_PROMPT, type DriftReport, type DriftSignal } from '@deepseek-ai/dsh-evolution-core'
+
+/**
+ * V27 D-3: the clause ids the maintain template ITSELF enumerates — the `- A1 …`
+ * bullets of its §5 rule catalogue. `rule` is checked against this set (parsed
+ * from the shipped template at module load, so a template edit that adds or
+ * renames a clause moves the set with it) instead of the former bare
+ * non-empty-string check, which let a plan cite a clause number that does not
+ * exist and still pass mechanical validation. `self-consistency.spec.ts` pins
+ * the parsed set so a template rewording cannot silently empty it.
+ */
+export const MAINTAIN_RULE_IDS: ReadonlySet<string> = new Set(
+  [...MAINTAIN_PROMPT.matchAll(/^-\s+([A-D]\d)\s/gm)].map(match => match[1] as string),
+)
 
 export type MaintainVerdict = 'issues' | 'no_issues'
 export type MaintainPlanItemKind = 'skill-level' | 'relationship-level' | 'library-level'
@@ -207,6 +220,11 @@ export function validateAndNormalizeMaintainPlan(
         }
       }
       if (!isNonEmptyString(item.rule)) errors.push(`${path}.rule: required`)
+      else if (!MAINTAIN_RULE_IDS.has(item.rule.trim())) {
+        // V27 D-3: the template enumerates its clauses; a cited id outside that
+        // set is a fabricated rule (or a stale one) and must not pass.
+        errors.push(`${path}.rule: "${item.rule}" is not a clause id the maintain template defines (${[...MAINTAIN_RULE_IDS].sort().join(', ')})`)
+      }
       if (typeof item.finding !== 'string' || item.finding.trim().length === 0) errors.push(`${path}.finding: required`)
       if (!isNonEmptyString(item.recommendation)) errors.push(`${path}.recommendation: required`)
       if (!isNonEmptyString(item.semantic_reasoning)) errors.push(`${path}.semantic_reasoning: required`)
@@ -309,10 +327,16 @@ export function validateAndNormalizeMaintainPlan(
 
   // Quality_low gate: skills whose quality_low=unknown have all structural
   // recommendations machine-forced to needs_human (011 §7).
+  // V27 M-07: the set uses the SAME canonical spelling as `namesOut` (trimmed,
+  // see canonicalByName above). Comparing the raw `skill.name` here let a
+  // directory name with surrounding whitespace bypass the gate entirely: the
+  // item's name was canonicalized to the trimmed form while this set held the
+  // padded one, so the lookup missed and the recommendation stayed
+  // machine-actionable.
   const unknownQualitySkills = new Set(
     report.skills
       .filter(skill => findDriftSignal(skill.signals, 'quality_low')?.verdict === 'unknown')
-      .map(skill => skill.name),
+      .map(skill => skill.name.trim()),
   )
   for (const item of plan) {
     if (item.names.some(name => unknownQualitySkills.has(name)) && !item.needs_human) {

@@ -232,7 +232,7 @@ describe('evolution-feedback', () => {
       // the migration transact must APPEND, never drop, the legacy sequence.
       await io.writeText(cachePath, JSON.stringify({ skills: { 'old-skill': { positive: 2, negative: 1 } }, sessions: {} }))
       await appendEvolutionEvent(io, eventsPath, { type: 'feedback', target: 'new-skill', kind: 'skill', rating: 'positive' })
-      const aggregate = JSON.parse(await io.readText(cachePath) ?? '{}') as { skills: Record<string, { positive: number; negative: number }> }
+      const aggregate = JSON.parse(await io.readText(cachePath) ?? '{}') as Feedback.FeedbackState
       await Feedback.migrateFeedbackEvents(io, eventsPath, aggregate)
       const events = (await readEvolutionEvents(io, eventsPath)).events
       expect(events).toHaveLength(4)
@@ -646,7 +646,12 @@ describe('evolution-feedback', () => {
       [-1.5, -0.25],
     ]
     for (const [value, expected] of cases) {
-      expect(Feedback.resolveQualityWarnThreshold({ qualityWarnThreshold: value }), `qualityWarnThreshold=${String(value)}`).toBe(expected)
+      // An undefined value falls back to the default; the Config field is
+      // optional without `| undefined`, so the key is OMITTED for that case
+      // (resolveQualityWarnThreshold reads it through `?? -0.25`, making the
+      // omitted key and an explicit undefined identical).
+      const config = value === undefined ? {} : { qualityWarnThreshold: value }
+      expect(Feedback.resolveQualityWarnThreshold(config), `qualityWarnThreshold=${String(value)}`).toBe(expected)
     }
   })
 

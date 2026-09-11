@@ -64,6 +64,24 @@ describe('redactSecrets (E-1, 0.3.16)', () => {
     expect(redactSecrets(redactSecrets('use sk-abcdefghij123456 tomorrow'))).toBe('use <redacted> tomorrow')
   })
 
+  it('V27 G0.5 (CB-1): masks QUOTED (JSON) credential assignments too', () => {
+    // JSON is how credentials actually travel through tool results and session
+    // text. The key's closing quote sat between the key and the separator, so
+    // the separator never matched and the value crossed the session boundary
+    // verbatim — an arbitrary passphrase has no value-shape pattern to fall
+    // back on (`hunter2`, `topsecretvalue`).
+    expect(redactSecrets('"password": "hunter2"')).toBe('"password": <redacted>')
+    expect(redactSecrets('{"api_key":"topsecretvalue"}')).toBe('{"api_key":<redacted>')
+    expect(redactSecrets('  "client_secret": "s3cr3t-value"  ')).toBe('  "client_secret": <redacted>')
+    expect(redactSecrets('{"PASSWORD": "hunter2"}')).toBe('{"PASSWORD": <redacted>')
+    // The plain (unquoted) forms keep working unchanged.
+    expect(redactSecrets('password: hunter2')).toBe('password: <redacted>')
+    expect(redactSecrets('api_key: sk-live-abcdefghijklmnop')).toBe('api_key: <redacted>')
+    // A quoted JSON key whose value is a non-secret word is still masked only
+    // on the credential keys (the key list is unchanged).
+    expect(redactSecrets('{"user": "alice"}')).toBe('{"user": "alice"}')
+  })
+
   it('V8-12: sk-only patterns carry a word boundary (task-/risk- words are not keys)', () => {
     // `sk-` alone used to match inside `task-…`/`risk-…` identifiers — an
     // identifier ending in `sk-` plus a ≥16-char suffix was masked wholesale.

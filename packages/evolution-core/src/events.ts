@@ -43,12 +43,22 @@ export interface EvolutionPlanAppliedEvent {
   policyFingerprint?: string | undefined
   memoryApplied: number
   skillApplied: number
+  /** Validation rejects ONLY (see the contract note below). V27 R-03: a plan op
+   * that was skipped because the session had not read the skill is NOT a
+   * validation reject and now travels in `skippedUnread`. */
   rejectedOps: number
   /** 0.3.31 (V5-19): execution-layer failures — ops that reached execution but
    * did not land (non-throw `ok:false` results). `rejectedOps` counts only
    * VALIDATION rejects; a consumer that treats rejectedOps as "work not done"
    * would otherwise miss a partial application. */
   executionFailures?: number | undefined
+  /** V27 R-03: "not done" has a third, independent cause — an op naming a skill
+   * this session never read (the review pipeline refuses to touch unread
+   * skills). It is neither a validation reject nor an execution failure, so it
+   * has its own field; folding it into `rejectedOps` broke that field's stated
+   * contract and made the replay leaderboard penalize one refusal twice
+   * (rejectedOps weight AND the executionFailures dimension). */
+  skippedUnread?: number | undefined
   /** First execution-layer failure message (abort reason or op failure). */
   executionError?: string | undefined
   evidenceQuotes?: number | undefined

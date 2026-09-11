@@ -70,11 +70,16 @@ export class EvolutionFeedback {
   private readonly durableNote = new Map<string, string | undefined>
   /** P2-32 (v11): process-level bound — every feedbacked session would
    * otherwise keep one entry for the whole process lifetime (a name + note
-   * string per session); cap both maps and drop the oldest on overflow. */
+   * string per session); cap this map and drop the earliest-INSERTED entry on
+   * overflow (Map iteration order is insertion order, and re-setting an
+   * existing key does not refresh its position, so the eviction is FIFO rather
+   * than least-recently-used). `warnedMessages` carries the same bound through
+   * `WARNED_CAP` below. */
   private static readonly NOTE_CAP = 512
   /** V5-32 (0.3.31): fire-and-forget append failures are warn-once per unique
    * message — a persistent refusal (e.g. a future-version log) must not spam
-   * the log on every user feedback entry (family posture: process-level once). */
+   * the log on every user feedback entry (family posture: process-level once).
+   * Bounded like `durableNote`, with the same FIFO eviction. */
   private readonly warnedMessages = new Set<string>()
   private readonly WARNED_CAP = 512
   /** V5-29 (0.3.31): invoked after a FAILED append rolled back, so a caller

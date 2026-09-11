@@ -171,7 +171,7 @@ describe('V10-11 (P2-7): review skillsRoot config channel', () => {
     // inject a prompt and never run a plan in this fixture.
     ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'subagent' as const }) })
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'subagent', skillsRoot })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'subagent', root: skillsRoot })
     emitEnd(1) // completed boundary: the flush executes the plan directly
     // Real fs writes + full-suite parallel load: give the create generous
     // room (the default 1s waitFor flaked under load).

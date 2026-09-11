@@ -7,6 +7,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
 // v21 (T-8): most tests below set DSH_HOME and restore it only on the SUCCESS
 // path — one failing assertion used to leak a temp-dir DSH_HOME into every
@@ -1770,7 +1771,7 @@ it('V9-02: a bundled-marker agent skill produces no failed archive step through 
 })
 
 it('V8-14: a marker-protected agent skill is protected, never also managed (0.3.47)', () => {
-  const record = {
+  const record: UsageRecord = {
     created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 1, view_count: 0, patch_count: 0,
     last_used_at: '2026-01-02T00:00:00.000Z', last_viewed_at: null, last_patched_at: null,
     state: 'active', pinned: false, archived_at: null, quality_warn: false,

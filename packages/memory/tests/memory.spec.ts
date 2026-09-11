@@ -32,6 +32,49 @@ describe('MemoryRegistry', () => {
     expect(seen).toEqual([{ target: 'memory', chars: 1, entries: 1 }])
   })
 
+  it('V27 G6.3: config.provider pins the provider for every delegation, not row order', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry, { provider: 'second' })
+    const first: MemoryProvider = { ...provider, name: 'first', async read() { return ['first'] } }
+    const second: MemoryProvider = { ...provider, name: 'second', async read() { return ['second'] } }
+    // Mount order does not decide the store: the pin resolves when its provider
+    // registers, wherever that happens in the row list.
+    ctx.memory.registerProvider(first)
+    ctx.memory.registerProvider(second)
+    expect(await ctx.memory.read('memory')).toEqual(['second'])
+    // Without a pin the FIRST registered provider serves the reads — the
+    // documented row-order default, never a silent switch of stores.
+    const plain = new Context()
+    await plain.plugin(MemoryRegistry)
+    plain.memory.registerProvider(first)
+    plain.memory.registerProvider(second)
+    expect(await plain.memory.read('memory')).toEqual(['first'])
+  })
+
+  it('V27 G6.3: an unsatisfied pin warns at registration and fails the first access', async () => {
+    const { vi } = await import('vitest')
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry, { provider: 'typo-name' })
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    ctx.memory.registerProvider(provider)
+    // Earliest visible signal: the pin cannot be satisfied by what mounted.
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('config.provider="typo-name" is not registered'))
+    warnSpy.mockRestore()
+    // Hard failure: the read names the pin instead of silently serving the
+    // provider that did mount.
+    expect(() => ctx.memory.read('memory')).toThrow(/memory provider "typo-name" is not registered/)
+    // A pin whose provider mounts LATER is satisfied — the warning is a signal,
+    // never a refusal of a mount order that may still be resolving.
+    const late = new Context()
+    await late.plugin(MemoryRegistry, { provider: 'second' })
+    late.memory.registerProvider({ ...provider, name: 'first' })
+    const lateSpy = vi.spyOn(late.logger, 'warn')
+    late.memory.registerProvider({ ...provider, name: 'second', async read() { return ['second'] } })
+    expect(lateSpy).not.toHaveBeenCalled()
+    lateSpy.mockRestore()
+    expect(await late.memory.read('memory')).toEqual(['second'])
+  })
+
   it('F-333: a named provider miss throws instead of silently falling back to the first', async () => {
     const ctx = new Context()
     await ctx.plugin(MemoryRegistry)

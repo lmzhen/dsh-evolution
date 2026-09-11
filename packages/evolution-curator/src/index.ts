@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE, resolveSkillsRoot, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { usageObserved } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
@@ -32,7 +32,8 @@ const DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS = 7
  * 120s matches the review subagent default; the 32-bit ceiling is Node's
  * timer-delay limit (`AbortSignal.timeout` throws above it). */
 const DEFAULT_CURATOR_REVIEW_TIMEOUT_MS = 120_000
-const MAX_TIMER_DELAY_MS = 2_147_483_647
+// V27 G2.4: the timer ceiling is the core protocol constant (was a local copy).
+
 
 
 declare module '@deepseek-ai/cordis' {
@@ -416,7 +417,7 @@ export class EvolutionCurator extends Service {
     const llm = this.ctx.get('llm')
     if (!llm) return empty
     const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } | undefined } | undefined
-    const model = policy?.get()?.curatorModel ?? 'deepseek-v4-pro'
+    const model = policy?.get()?.curatorModel ?? DEFAULT_CURATOR_MODEL
     const clusters = computePrefixClusters(candidates)
     const clusterLines = clusters.length === 0
       ? ['Prefix clusters observed in the candidate list: (none)']
@@ -827,6 +828,20 @@ export class EvolutionCurator extends Service {
           const error = errors.find(item => item.startsWith(`${name}:`))
           return { name, reason: error?.slice(name.length + 2) ?? 'unknown' }
         }),
+      // V27 CUR-2: the report used to keep only the skill-attributable failures,
+      // so a run that was cut short wrote `failed: 0` and the digest read as a
+      // clean run while `errors` (in memory) said otherwise. Run-level facts now
+      // have their own fields: the abort reason and every error that names no
+      // skill.
+      ...(() => {
+        const attributed = new Set([...archiveCandidates, ...gatedNominations.consolidations.map(item => item.from)])
+        const loose = errors.filter(error => ![...attributed].some(name => error.startsWith(`${name}:`)))
+        const abort = loose.find(error => error.startsWith('run aborted'))
+        return {
+          ...abort === undefined ? {} : { aborted: abort.slice('run aborted: '.length) },
+          ...loose.length === 0 ? {} : { unattributed: loose },
+        }
+      })(),
       consolidated,
       ...snapshotPath === undefined ? {} : { snapshotPath },
       llmReviewEnabled: this.llmReview,

@@ -2,8 +2,13 @@
  * Stage/pending write approval for self-evolution mutations.
  *
  * DSH's native approval seam is one-shot only. This service adds the
- * Hermes-style staged queue: background review/curator writes are stored in
- * `ctx.evolutionState`, and a human approves or rejects them later. A runner
+ * Hermes-style staged queue: a write whose ORIGIN is the background review —
+ * or a foreground write while `stageForeground` is on — is recorded in
+ * `ctx.evolutionState`, and a human approves or rejects it later. The CURATOR
+ * does NOT route through this queue: it owns its own gate set and writes
+ * directly (batch/consolidate), so "curator writes are staged" is not a
+ * property of this service (V27 G6.2; see evolution-curator's gate set for what
+ * actually constrains an autonomous curator write). A runner
  * registry replays the exact mutation without passing through the gate a
  * second time. Resolved records are kept as audit history up to
  * PENDING_RESOLVED_CAP (the most recent N; the state provider archives the
@@ -35,6 +40,13 @@ export interface ApprovalRequest {
    * so the write is allowed instead of staging an unanswerable pending record
    * (claw alignment: "skip approval for non-interactive contexts"). Absent
    * (no session / no approval service) keeps the previous behavior.
+   *
+   * V27 G6.2: this field is a FALLBACK, not the authority. With the platform
+   * `approval` service mounted, `request()` derives the policy from it
+   * (`overrideOf` → deployment `config.policy` → 'ask') and ignores this value
+   * entirely; it is read only in assemblies WITHOUT that service. A caller
+   * holding the session object must pass it as `session`: a bare `sessionId`
+   * cannot be probed (the platform reads `session.events` off the object).
    */
   sessionPolicy?: 'ask' | 'never'
   /** 0.3.17 (E-25): the requesting session id, kept on the record for

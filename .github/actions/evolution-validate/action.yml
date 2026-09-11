@@ -149,6 +149,30 @@ runs:
         node node_modules/vitest/vitest.mjs run packages/evolution
         node node_modules/oxlint/bin/oxlint packages/evolution
 
+    - name: Typecheck the test files (G7.1, D-9)
+      if: inputs.copy_host_tsconfig == 'true'
+      shell: bash
+      working-directory: upstream
+      run: |
+        # D-9: build-lib runs the per-package `include: ["src"]` projects, so the
+        # tests were only ever TRANSPILED by esbuild — 73 type errors lived in
+        # them unnoticed. The host aggregate (`packages/*/*/tests/**/*.ts`)
+        # typechecks them; this step is the gate that keeps them honest.
+        # Skipped for the released-upstream compat job: that tree's own host
+        # aggregate is commit-bound and is not ours to run.
+        node node_modules/typescript/bin/tsc -b tsconfig.host.json
+
+    - name: Run the load-sensitive lock group at a pinned concurrency (G7.2)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # G7.2: the lock-timing/liveness cases are run ONCE at a pinned worker
+        # count (default 4, DSH_EVOLUTION_LOAD_SENSITIVE_WORKERS overrides), with
+        # retries off — a green default-parallel run says less than a green run at
+        # a known concurrency, and the runner also fails when a renamed case
+        # drops out of the group (no vacuous pass).
+        node packages/evolution/scripts/run-load-sensitive.mjs .
+
     - name: Verify dependency closure (G0.1 guard)
       shell: bash
       working-directory: upstream
@@ -202,6 +226,22 @@ runs:
       working-directory: upstream
       run: |
         node packages/evolution/scripts/verify-event-pairing.mjs packages/evolution --strict
+
+    - name: Verify declared config reach (G3.1)      shell: bash
+      working-directory: upstream
+      run: |
+        # G3.1 (v27 T-1): a patch layer only overrides keys of a row that exists
+        # AND is enabled in the plane below it. The platform's web-app bundle
+        # disables the profile-root `tool-skill` row (presets own the per-agent
+        # skill rows), so the declared `catalogDescriptionMaxLength: 60` is
+        # reachable in that profile only through the preset composer — the guard
+        # prints each declaration's reach per profile and fails (strict) when a
+        # declared key has no plane that reads it, or when a claimed composer
+        # reach no longer exists in the code it names.
+        # WARN mode for one release (batch-3 rule: one warn round before strict).
+        # V27 batch-3 close-out: the warn round is over — the gate reports 0
+        # violations on this tree, so CI now runs it strict (the plan's §5 flip).
+        node packages/evolution/scripts/verify-declared-config.mjs packages/evolution --strict
 
     - name: Publish dry-run
       shell: bash

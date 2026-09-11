@@ -152,6 +152,31 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return { ok: false, message: `skill_manage: "${field}" must be a string (got ${typeof value}); refusing the write.`, skills: [] }
       }
     }
+    // V27 G5.1 (v27 T-2): the tool schema can only require `action` (every other
+    // argument is action-specific), so an omitted argument used to surface as a
+    // downstream empty-string message. Name the missing arguments here, per
+    // action, before anything is read or written. An EMPTY string still reaches
+    // the library: its messages carry the more specific remedy (e.g. an empty
+    // patch anchor points at `update`).
+    const REQUIRED_ARGS: Record<string, readonly string[]> = {
+      create: ['name', 'content'],
+      edit: ['name', 'content'],
+      update: ['name', 'content'],
+      patch: ['name', 'old_string', 'new_string'],
+      delete: ['name'],
+      write_file: ['name', 'file_path', 'file_content'],
+      remove_file: ['name', 'file_path'],
+      restructure: ['name'],
+      pin: ['name'],
+      unpin: ['name'],
+    }
+    // `action` is optional on the queued/staged args shape, so the index needs
+    // a narrowing first (an unknown action is refused by its own branch below).
+    const requiredArgs: readonly string[] = action === undefined ? [] : REQUIRED_ARGS[action] ?? []
+    const missing = requiredArgs.filter((field: string) => scalarArgs[field] === undefined || scalarArgs[field] === null)
+    if (missing.length > 0) {
+      return { ok: false, message: `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`, skills: [] }
+    }
     let feedbackLines: string[] = []
     // v23 (AP-3): replay staleness guard for full-content updates. A staged
     // update/edit carries the sha256 of the skill as it existed at STAGING
@@ -307,6 +332,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     name: 'skill_manage',
     description:
       'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit/update take full SKILL.md content (edit is an alias of update); patch applies old_string -> new_string; delete archives to .archive (absorbed_into names an umbrella skill); write_file/remove_file add or remove one support file under references/ or scripts/; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
+      // V27 G5.1 (v27 T-2): the two fields the model could not discover —
+      // `file_path` picks WHICH file a patch/write_file/remove_file targets
+      // (absent = SKILL.md), and `replace_all` decides first-occurrence-only
+      // versus every occurrence. Both are real behavior; a description that
+      // omits them left the model guessing.
+      + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change.'

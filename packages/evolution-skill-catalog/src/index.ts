@@ -20,7 +20,7 @@ import type {
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { evolutionIoAdapter, resolveSkillsRoot, SkillLibrary, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, parseFrontmatter, resolveSkillsRoot, SkillLibrary, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'
@@ -199,8 +199,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         warnUnpublishable(summary.name, summary.description)
         return undefined
       }
-      const content = await library.read(name)
-      if (content === null) return undefined
+      const raw = await library.read(name)
+      if (raw === null) return undefined
+      // V27 G5.3: the upstream filesystem provider publishes the BODY
+      // (`skill-filesystem`: `content: parsed.body.trim()`). This provider
+      // shadows it for the same skills, so publishing the whole file made the
+      // model see a different skill depending on which provider served it — the
+      // frontmatter block leaked into the content the model loads. A file whose
+      // frontmatter cannot be read keeps its raw text: this provider's job is to
+      // keep the skill visible, and the audit already flags such a file
+      // (`frontmatterCatalogInvalid`).
+      const content = parseFrontmatter(raw)?.body ?? raw
       return {
         name,
         description: summary.description,

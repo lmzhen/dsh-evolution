@@ -21,4 +21,4 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+- `providerName` (default `files`) is the name this provider registers under. Nothing selects it implicitly: `memory.provider` pins the registry to one name (V27 G6.3), and with the pin empty the FIRST registered provider serves every read/write — so with two providers mounted, set the pin or the choice is row order.

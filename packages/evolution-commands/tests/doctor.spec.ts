@@ -56,6 +56,26 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
+  it('V27 G6.4: all × a delivered preset dir is flagged without the host bundle; a bare dir is not', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-all-presetdir-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      // A bare leftover directory is not an install (same artifact rule as the
+      // preset-bundle case above).
+      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      expect((await diagnose(stub, { home })).conflicts).toEqual([])
+      // The delivered preset artifact + `all` double-mounts the four model rows
+      // even when evolution-host is absent — the old `full && layered` condition
+      // required host and stayed silent for exactly this combination.
+      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      const report = await diagnose(stub, { home })
+      expect(report.conflicts.some(conflict => conflict.includes('evolution-all and the layered Evolution preset'))).toBe(true)
+      expect(report.actions[0]).toContain('Resolve the conflict first')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('T-WB2: one-click preset reports preset', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-'))
     try {

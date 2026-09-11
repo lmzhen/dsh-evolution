@@ -103,3 +103,19 @@ export const EVOLUTION_WRITE_TOOLS = ['memory', 'skill_manage'] as const
  * 0.3.16 (T-4): moved here from skill-store.ts so drift-signals (pure, no IO)
  * can reference it without importing the skill-store module. */
 export const AUTHORING_DESCRIPTION_BAR = 60
+
+/** V27 G2.4: the largest millisecond delay a timer accepts. `AbortSignal.timeout`
+ * (and `setTimeout`) coerce anything larger to 1ms after a Node warning, so a
+ * timeout configured above this ceiling silently collapses to "immediately
+ * aborted". The curator's review timeout and the review timeout each carried
+ * their own copy of the literal; the bound is one protocol constant.
+ * (v19 P2-10 corrected the value from 2^32-1 to Node's real 2^31-1 ceiling.) */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647
+
+/** V27 G2.4: the model each review/curation leg defaults to. The policy schema,
+ * the policy resolver and the curator's LLM nomination pass each carried their
+ * own copy of these strings — a deployment that changed the policy default used
+ * to leave the curator passing a different model than the reviews. */
+export const DEFAULT_MEMORY_REVIEW_MODEL = 'deepseek-v4-flash'
+export const DEFAULT_SKILL_REVIEW_MODEL = 'deepseek-v4-pro'
+export const DEFAULT_CURATOR_MODEL = 'deepseek-v4-pro'

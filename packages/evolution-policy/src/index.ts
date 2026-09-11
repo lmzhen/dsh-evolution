@@ -22,6 +22,9 @@ import {
   DEFAULT_MEMORY_CHAR_LIMIT,
   DEFAULT_USER_CHAR_LIMIT,
   DEFAULT_SKILL_CONTENT_CHARS,
+  DEFAULT_MEMORY_REVIEW_MODEL,
+  DEFAULT_SKILL_REVIEW_MODEL,
+  DEFAULT_CURATOR_MODEL,
   clampedNumber,
 } from '@deepseek-ai/dsh-evolution-core'
 
@@ -86,9 +89,9 @@ export const Config: Schema<Config> = z.object({
   // unmatching value" wording was wrong and contradicted the V5-33 comment
   // inside the clamp.
   reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
-  memoryReviewModel: z.string().default('deepseek-v4-flash'),
-  skillReviewModel: z.string().default('deepseek-v4-pro'),
-  curatorModel: z.string().default('deepseek-v4-pro'),
+  memoryReviewModel: z.string().default(DEFAULT_MEMORY_REVIEW_MODEL),
+  skillReviewModel: z.string().default(DEFAULT_SKILL_REVIEW_MODEL),
+  curatorModel: z.string().default(DEFAULT_CURATOR_MODEL),
   memoryChars: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
   userChars: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
   skillContentChars: z.number().min(1).default(DEFAULT_SKILL_CONTENT_CHARS),
@@ -141,9 +144,9 @@ export class EvolutionPolicy extends Service {
         // fallback below is kept for direct construction / legacy reads.
         return config.reviewMode === 'inject' ? 'inject' : 'subagent'
       })(),
-      memoryReviewModel: config.memoryReviewModel ?? 'deepseek-v4-flash',
-      skillReviewModel: config.skillReviewModel ?? 'deepseek-v4-pro',
-      curatorModel: config.curatorModel ?? 'deepseek-v4-pro',
+      memoryReviewModel: config.memoryReviewModel ?? DEFAULT_MEMORY_REVIEW_MODEL,
+      skillReviewModel: config.skillReviewModel ?? DEFAULT_SKILL_REVIEW_MODEL,
+      curatorModel: config.curatorModel ?? DEFAULT_CURATOR_MODEL,
       memoryChars: field('memoryChars', config.memoryChars, DEFAULT_MEMORY_CHAR_LIMIT),
       userChars: field('userChars', config.userChars, DEFAULT_USER_CHAR_LIMIT),
       skillContentChars: field('skillContentChars', config.skillContentChars, DEFAULT_SKILL_CONTENT_CHARS),

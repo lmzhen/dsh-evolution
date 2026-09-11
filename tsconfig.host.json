@@ -12,6 +12,11 @@
   "include": [
     "packages/evolution/test-support/row-contract.ts",
     "packages/evolution/test-support/cordis-rows.ts",
+    // V27 G7.1: the state-provider consistency harness is imported by the
+    // evolution state tests (`packages/*/*/tests/**` matches those, this file
+    // does not) — without it `tsc -b tsconfig.host.json`, now wired into the CI
+    // validate job, fails with TS6307.
+    "packages/evolution/test-support/state-provider-consistency.ts",
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/default-model.e2e.ts",
     "apps/web/tests/declared-reasoning.e2e.ts",

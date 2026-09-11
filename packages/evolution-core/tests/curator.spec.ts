@@ -1,5 +1,44 @@
 import { expect, it } from 'vitest'
-import { computeLifecycleTransitions, computeScopeView, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeScopeView, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, renderCuratorReportMarkdown, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
+
+it('V27 CUR-2: a run that was cut short carries its abort reason into the report and digest', () => {
+  const report = buildCuratorRunReport({
+    runId: 'r-1',
+    startedAt: '2026-09-11T00:00:00.000Z',
+    finishedAt: '2026-09-11T00:00:01.000Z',
+    staleCandidates: [],
+    llmNominations: [],
+    archiveCandidates: ['stale-skill'],
+    archived: [{ name: 'stale-skill', path: '.archive/stale-skill', reason: 'Lifecycle: reached archive threshold' }],
+    // Only skill-attributable failures may live here.
+    failed: [],
+    aborted: 'evolution-curator was disposed mid-run — consolidation skipped; archives that landed above are still accounted',
+    unattributed: ['some run-level error with no skill name'],
+  })
+  const digest = renderCuratorReportMarkdown(report)
+  // The digest is what an operator reads: it must not present "Failed: 0" over a
+  // run that stopped early, and the archive that DID land stays visible.
+  expect(digest).toContain('- **Archived**: 1')
+  expect(digest).toContain('- **Failed**: 0')
+  expect(digest).toContain('- **Aborted**: evolution-curator was disposed mid-run')
+  expect(digest).toContain('- **Unattributed errors**: 1')
+  expect(digest).toContain('## Unattributed')
+  expect(digest).toContain('some run-level error with no skill name')
+  // A clean run keeps the previous shape: no aborted/unattributed keys at all.
+  const clean = buildCuratorRunReport({
+    runId: 'r-2',
+    startedAt: 'x',
+    finishedAt: 'y',
+    staleCandidates: [],
+    llmNominations: [],
+    archiveCandidates: [],
+    archived: [],
+    failed: [],
+  })
+  expect('aborted' in clean).toBe(false)
+  expect('unattributed' in clean).toBe(false)
+  expect(renderCuratorReportMarkdown(clean)).not.toContain('Aborted')
+})
 
 it('curator transitions active -> stale -> archived by idle time', () => {
   const now = new Date('2026-08-01T00:00:00.000Z')

@@ -108,6 +108,39 @@ it('memory detectDrift flags structural drift but not canonical content', async 
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('G2.3: the write path and detectDrift reach the same conclusion about the same bytes', async () => {
+  // Both entry points run one predicate, but they read the body at different
+  // moments: a write derives it from the locked view, detectDrift from a fresh
+  // read. Pinning the agreement here keeps a second predicate from creeping
+  // back in — an added copy that disagrees on any body fails this table.
+  // The oversized read guard is a deliberate exception, asserted separately:
+  // detectDrift reports drift while the write path refuses with the byte-exact
+  // message instead (see the read-guard test above).
+  const { writeFile } = await import('node:fs/promises')
+  const cases: { name: string; body: string; limit?: number }[] = [
+    { name: 'canonical single entry', body: 'alpha\n' },
+    { name: 'canonical multi entry', body: 'alpha\n§\nbeta\n' },
+    { name: 'stray empty entry', body: 'alpha\n§\n\n§\nbeta\n' },
+    { name: 'trailing blank line', body: 'alpha\n\n' },
+    { name: 'delimiter only', body: '§\n' },
+    { name: 'empty file', body: '' },
+    { name: 'whitespace only', body: '   \n' },
+    // Canonical bytes whose single entry still exceeds the whole-file limit:
+    // only the entry-size signal flags this, so it discriminates a predicate
+    // that kept just the canonical-form check.
+    { name: 'one entry over the whole-file limit', body: `${'x'.repeat(11)}\n`, limit: 10 },
+  ]
+  for (const testCase of cases) {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-onedrift-'))
+    const store = new MemoryStore({ root, ...(testCase.limit === undefined ? {} : { memoryCharLimit: testCase.limit }) })
+    await writeFile(join(root, 'MEMORY.md'), testCase.body, 'utf8')
+    const readSide = await store.detectDrift('memory')
+    const writeSide = (await store.add('memory', 'new fact')).message.includes('External drift detected')
+    expect({ case: testCase.name, drifted: readSide }).toEqual({ case: testCase.name, drifted: writeSide })
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
 it('memory blocks threats and refuses ambiguous matches', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-'))
   const store = new MemoryStore({ root })

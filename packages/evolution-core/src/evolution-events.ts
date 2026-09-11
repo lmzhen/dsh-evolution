@@ -8,12 +8,15 @@
  *
  * Usage events (C semantics, rc.73+): `type:'usage'` records are the
  * OBSERVATION WINDOW ANCHOR — written once, when the library's first observed
- * read (`view_count` 0 -> 1) happens. Before that anchor the usage sidecar
- * has no read evidence (reads were invisible pre-A2), so churn-based health
- * judgments are NOT trustworthy; the curator suppresses them (its
- * `usageObserved()` gate) until the anchor exists. `counts` on the event is a
- * cumulative library-wide snapshot (skills/views/use/patches) at that moment,
- * and `window.opened` pins the window start for the timeline.
+ * read (`view_count` 0 -> 1) happens. The anchor is the durable timeline record
+ * of that moment: the churn-suppression gate itself (`usageObserved()`) reads
+ * the usage SIDECAR's own first-view evidence, since reads were invisible to it
+ * pre-A2 and no sidecar record can reach `view_count > 0` without the same
+ * 0 -> 1 transition. `counts` on the event is a cumulative library-wide
+ * snapshot (skills/views/use/patches) at that moment, and `window.opened` pins
+ * the window start for the timeline. (V27 G3.3: `verify-event-pairing` requires
+ * every persisted type to have a production reader or a declared external
+ * contract — this one is the latter.)
  *
  * Rotation (rc.71, 007 design): when the active log reaches
  * `EVENT_LOG_ROTATE_AT` the older half is split into an archive

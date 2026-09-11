@@ -26,6 +26,8 @@ import {
   PROVIDER_DOMAIN,
   REVIEW_STATE_SESSION_CAP,
   REVIEW_STATE_TABLE,
+  selectPendingOverflow,
+  selectSessionOverflow,
   type CuratorStateRecord,
   type EvolutionStateStorage,
   type PendingRecord,
@@ -199,8 +201,13 @@ export function apply(ctx: Context): void {
       const entries = [...table.entries()]
         .map(([key, row]) => ({ key, updatedAt: (row as { updatedAt?: number }).updatedAt ?? 0 }))
         .filter(entry => entry.key !== sessionId)
-        .sort((a, b) => a.updatedAt - b.updatedAt)
-      for (const entry of entries.slice(0, Math.max(0, entries.length - REVIEW_STATE_SESSION_CAP + 1))) {
+      // V27 G2.2: which rows to evict is the SEAM's pure rule (shared with the
+      // json provider) — this provider supplies keys and stamps only.
+      const victims = new Set(selectSessionOverflow(entries, {
+        keyOf: entry => entry.key,
+        stampOf: entry => entry.updatedAt,
+      }, REVIEW_STATE_SESSION_CAP))
+      for (const entry of entries.filter(candidate => victims.has(candidate.key))) {
         const current = table.get(entry.key)
         // C-5 pattern: re-read between the snapshot and the delete — a
         // concurrent save may have refreshed (or removed) the row the
@@ -237,7 +244,14 @@ export function apply(ctx: Context): void {
       // check, so a consumer returning a malformed record persisted it and the
       // next `open()` failed the whole domain with `invalid-record`.
       const guarded = (current: CuratorStateRecord | null): CuratorStateRecord | null => {
-        const next = task(current)
+        // V27 S4: hand the task a COPY. The storage-domain update callback
+        // receives the live stored object (upstream requires it not be mutated
+        // in place), and a task that mutated it and then failed the validation
+        // below would leave the mutation in the provider's in-memory store
+        // while the write was refused. json already hands a freshly parsed
+        // object, so this also aligns the two providers (transactCuratorState
+        // contract in evolution-state-storage).
+        const next = task(current === null ? null : cloneRecord(current))
         if (next === null) return null
         const issue = recordIssue(CURATOR_STATE_TABLE, next) ?? assertCloneable(next)
         if (issue !== null) throw new Error(`evolution-state-domain: refusing to persist an invalid curator-state record: ${issue}`)
@@ -398,20 +412,16 @@ export function apply(ctx: Context): void {
         // the re-check narrows it and in-tree mounts use randomUUID ids, so it
         // requires a third-party/hand-written id reused across the window.
         if (resolved.record !== null) {
-          const resolvedEntries = [...table.entries()]
+          // V27 G2.2: eligibility + ordering come from the SEAM's pure rule
+          // (shared with the json provider); this provider keeps only its
+          // medium-specific part — the C-5 re-read guard before each delete.
+          const evictedRecords = new Set(selectPendingOverflow(
+            [...table.entries()].map(([, record]) => record),
+            SEAM_PENDING_RESOLVED_CAP,
+          ))
+          const evicted = [...table.entries()]
+            .filter(([, record]) => evictedRecords.has(record))
             .map(([key, record]) => ({ key, record }))
-            .filter(entry => (entry.record.status === 'approved' || entry.record.status === 'rejected')
-              // v23 (AP-1): capability approvals exempt from the audit cap —
-              // `approvedPackage` reads the LIVE approved list and a capability
-              // cannot be re-submitted, so eviction would make it permanently
-              // unactivatable (same rule as json's enforceResolvedCap).
-              && entry.record.kind !== 'capability')
-          const resolvedAtMs = (record: PendingRecord): number => {
-            const parsed = Date.parse(record.resolvedAt ?? '')
-            return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed
-          }
-          resolvedEntries.sort((a, b) => resolvedAtMs(a.record) - resolvedAtMs(b.record))
-          const evicted = resolvedEntries.slice(0, Math.max(0, resolvedEntries.length - SEAM_PENDING_RESOLVED_CAP))
           for (const entry of evicted) {
             // C-5 (v18): the entries() snapshot and this delete are separate
             // operations, and the domain seam has no conditional write — a

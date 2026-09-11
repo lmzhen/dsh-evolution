@@ -12,10 +12,12 @@ import {
   DRIFT_MAX_LINE_CHARS,
   DRIFT_SIGNAL_NOUNS,
   DRIFT_SIGNALS_VERSION,
+  DEFAULT_CURATOR_MODEL,
   DEFAULT_HEALTH_THRESHOLDS,
   LOW_QUALITY_THRESHOLD,
   MAINTAIN_OUTPUT_INSTRUCTION,
   MAINTAIN_PROMPT,
+  MAX_TIMER_DELAY_MS,
   MIN_STAMP_BODY_CHARS,
   PROMPT_BUNDLE,
   PROMPT_BUNDLE_ID,
@@ -51,6 +53,14 @@ export interface MaintainRuntime {
    * Optional — an absent accessor means the tools service is not mounted at
    * all, so no tool beyond `skill` can be assumed registered. */
   tools?: { get(name: string): unknown } | undefined
+  /** V27 M-02: does the configured skill root EXIST? The io seam maps a missing
+   * directory to an empty listing, so "the scan found no skills" could not be
+   * told apart from "the configured root is not there" (an unexpanded `~`, a
+   * typo — INSTALL.md routes users to absolute paths). Optional: without the
+   * probe the scan keeps the previous empty-library answer. */
+  rootExists?: (() => Promise<boolean>) | undefined
+  /** V27 M-02: the root the probe above refers to, for the error message. */
+  skillRoot?: string | undefined
 }
 
 export interface MaintainOptions {
@@ -174,8 +184,17 @@ function formatPlan(validated: ValidationResult, runId: string): string {
   const { plan, forcedHuman } = validated
   const lines: string[] = []
   lines.push(`Maintenance scan ${runId}: verdict=${plan.verdict} (${plan.plan.length} recommendations, ${plan.notes.length} notes)`)
+  // V27 M-01: the notes are rendered for EVERY verdict. The validator REQUIRES
+  // a note per over-signal when the verdict is `no_issues`
+  // (validate-plan completeness gate), so the early return below used to drop
+  // exactly the evidence the model had been forced to produce: the operator
+  // read "Nothing to do." and never saw why the signals needed no action.
+  const noteLines = plan.notes.length === 0
+    ? []
+    : ['Notes:', ...plan.notes.map(note => `- ${note}`)]
   if (plan.verdict === 'no_issues') {
     lines.push('No drift issues detected. Nothing to do.')
+    lines.push(...noteLines)
     return lines.join('\n')
   }
   for (const item of plan.plan) {
@@ -194,10 +213,7 @@ function formatPlan(validated: ValidationResult, runId: string): string {
   if (forcedHuman.length > 0) {
     lines.push(`(quality_low gate: forced needs_human for ${[...new Set(forcedHuman)].join(', ')})`)
   }
-  if (plan.notes.length > 0) {
-    lines.push('Notes:')
-    for (const note of plan.notes) lines.push(`- ${note}`)
-  }
+  lines.push(...noteLines)
   return lines.join('\n')
 }
 
@@ -216,6 +232,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // the probe (which reads it off the snapshot) and the facts block (which
     // injects it) can never disagree (E-36).
     const usageObserved = options.usageObserved ? options.usageObserved() : undefined
+    const readFailures: string[] = []
     const snapshots = await snapshotFromLibrary(runtime.library, {
       supportFiles: options.supportFiles ? options.supportFiles() : undefined,
       descriptions: options.descriptions ? options.descriptions() : undefined,
@@ -224,12 +241,39 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       catalogInvalid: options.catalogInvalid ? options.catalogInvalid() : undefined,
       usageObserved,
       // E-9 (v18): a single unreadable SKILL.md is skipped with a trace.
+      // V27 M-02: the trace is also the evidence that separates "empty library"
+      // from "unreadable library" below.
       onReadError: (name, error) => {
+        readFailures.push(name)
         runtime.logger?.warn(`evolution-maintenance: skipping unreadable skill "${name}": ${error instanceof Error ? error.message : String(error)}`)
       },
     })
     if (snapshots.length === 0) {
-      // Empty library: no facts to review — do not spend a model call.
+      // V27 M-02: "the scan assembled no snapshots" has three causes, and only
+      // one of them may be reported as a clean library:
+      //   1. the configured root does not exist (the seam lists a missing
+      //      directory as empty) — a configuration error, not a verdict;
+      //   2. the root exists and every listed entry was unreadable — the tree
+      //      was NOT audited, so "no issues" would be a false clean bill;
+      //   3. the root exists and lists nothing — genuinely empty, the only case
+      //      where "nothing to do" is the truth.
+      if (readFailures.length > 0) {
+        return {
+          ok: false,
+          recommendationCount: 0,
+          error: `maintenance scan could not read ${readFailures.length} listed skill(s) (${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}) and read no skill at all — `
+            + 'the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again',
+        }
+      }
+      if (runtime.rootExists && !(await runtime.rootExists())) {
+        return {
+          ok: false,
+          recommendationCount: 0,
+          error: `maintenance scan found an empty skill library, but the configured skill root does not exist${runtime.skillRoot ? ` (${runtime.skillRoot})` : ''} — `
+            + 'point the skillsRoot config at a real directory (a literal `~` is not expanded) and run the scan again',
+        }
+      }
+      // Genuinely empty: no facts to review — do not spend a model call.
       return { ok: true, recommendationCount: 0, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
     const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, usageObserved, options.redact)
@@ -263,9 +307,10 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // value throws a synchronous RangeError that only the outer catch would
     // translate (obscuring the cause). Validate the domain up front.
     // P2-10 (v19): the real ceiling is 2^31-1; [2^31, 2^32-1] does not throw,
-    // it warns and silently becomes 1ms — the message already said 2147483647.
-    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 0x7FFFFFFF) {
-      return { ok: false, recommendationCount: 0, error: `maintain: --timeout must be a positive integer in ms, at most 2147483647; got ${String(timeoutMs)}` }
+    // it warns and silently becomes 1ms. V27 G2.4: the message interpolates
+    // MAX_TIMER_DELAY_MS, so the number has ONE definition (constants.ts).
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMER_DELAY_MS) {
+      return { ok: false, recommendationCount: 0, error: `maintain: --timeout must be a positive integer in ms, at most ${MAX_TIMER_DELAY_MS}; got ${String(timeoutMs)}` }
     }
     // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
     // hoisted so the catch can consult `signal.aborted` (our own timeout)
@@ -283,7 +328,9 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // the service is mounted but returns nothing (commands wires a policy
     // accessor that soft-probes), and `?.get().curatorModel` would read a
     // property of undefined.
-    const model = options.model ?? runtime.evolutionPolicy?.get()?.curatorModel ?? 'deepseek-v4-pro'
+    // V27 G2.4: the curator model fallback is the same core constant the policy
+    // default uses (a bare literal here could contradict the policy).
+    const model = options.model ?? runtime.evolutionPolicy?.get()?.curatorModel ?? DEFAULT_CURATOR_MODEL
     const agentOptions: Record<string, string> = { model }
     if (options.provider) agentOptions.provider = options.provider
     const run = await runtime.subagents.start('spawn', {

@@ -97,6 +97,39 @@ describe('tool-skill-manage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('V27 G5.1: the description names replace_all/file_path, and a missing argument names itself', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const tool = ctx.tools.get('skill_manage') as unknown as { description?: string } | undefined
+    // The two fields the model could not discover from the tool contract.
+    expect(tool?.description ?? '').toContain('replace_all')
+    expect(tool?.description ?? '').toContain('file_path')
+    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+      callId: CallId(`g51-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: args,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    await execute({ action: 'create', name: 'g51-skill', content: SKILL.replace('boundary-skill', 'g51-skill') })
+    // An omitted argument is named with the action, not surfaced as an empty
+    // string downstream ("File not found: ").
+    const missing = await execute({ action: 'patch', name: 'g51-skill', new_string: 'x' })
+    const missingMessage = (missing.value as { message?: string } | undefined)?.message ?? ''
+    expect(missingMessage).toContain('patch requires')
+    expect(missingMessage).toContain('old_string')
+    // A first-occurrence-only patch reports how many anchors the file carried,
+    // so a multi-site edit is never half-applied in silence.
+    const content = '---\nname: g51-repeat\ndescription: repeat anchor test\n---\n\nSay hi. Say hi.\n'
+    await execute({ action: 'create', name: 'g51-repeat', content })
+    const patched = await execute({ action: 'patch', name: 'g51-repeat', old_string: 'Say hi.', new_string: 'Say bye.' })
+    const patchMessage = (patched.value as { message?: string } | undefined)?.message ?? ''
+    expect(patchMessage).toContain('FIRST of 2 occurrences')
+    expect(patchMessage).toContain('replace_all=true')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('v20 (D-1): a non-string scalar arg is refused structurally, not as a bare TypeError', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({

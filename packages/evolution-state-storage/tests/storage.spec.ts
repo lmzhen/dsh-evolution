@@ -38,14 +38,14 @@ describe('evolution-state-storage', () => {
         calls.push(`resolve:${id}:${status}:${String(claimId)}`)
         return { record: null, applied: false }
       },
-      claimPending: async (id: string) => { calls.push(`claim:${id}`); return null },
+      claimPending: async (id: string, _claimId: string) => { calls.push(`claim:${id}`); return null },
       releasePendingClaim: async (id: string, claimId: string) => { calls.push(`release:${id}:${claimId}`) },
       transactCuratorState: async () => { calls.push('transact') },
     }
     ctx.evolutionStateStorage.registerProvider(spy)
     const selected = ctx.evolutionStateStorage.provider()
     await selected.tryResolvePending('x', 'approved', 'claim-1')
-    await selected.claimPending('x')
+    await selected.claimPending('x', 'claim-1')
     await selected.releasePendingClaim('x', 'claim-1')
     await selected.transactCuratorState(() => null)
     expect(calls).toEqual(['resolve:x:approved:claim-1', 'claim:x', 'release:x:claim-1', 'transact'])

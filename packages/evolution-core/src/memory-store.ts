@@ -282,37 +282,54 @@ export class MemoryStore {
     }
   }
 
-  async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
-    return await this.serial(() => this.addChained(target, facts))
-  }
-
-  private async addChained(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
-    if (!facts.trim()) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
-    const path = fileFor(this.root, target)
+  /**
+   * The ONE memory write skeleton (V27 G2.5): oversized read-guard pre-transact,
+   * one transaction over the target path, and the C-01 structured refusal when a
+   * backend never invokes the task. `addChained` and `applyBatchChained` supply
+   * only their own in-transaction core, so the two write paths cannot drift in
+   * their guard order, their missing-file handling or their error text.
+   *
+   * @param target - memory target being written
+   * @param core - the in-transaction read-modify-write for the locked body
+   * @returns the core's result, or the oversized / contract-violation refusal
+   */
+  private async chainedWrite(
+    target: MemoryTarget,
+    core: (raw: string) => Promise<{ result: MemoryApplyResult; write: string | null }>,
+  ): Promise<MemoryApplyResult> {
     // M-7 (v3 audit): the oversized read-guard must run BEFORE the transact —
     // inside it, node transact has already loaded the whole file, so the
     // "skipped for reading (never loaded)" contract only holds pre-lock.
     const refusal = await this.oversizedRefusal(target)
     if (refusal) return refusal
     let outcome: MemoryApplyResult | undefined
-    await transactIo(this.io, path, async (current) => {
-      const core = await this.addCore(target, facts, current ?? '')
-      outcome = core.result
+    await transactIo(this.io, fileFor(this.root, target), async (current) => {
+      const step = await core(current ?? '')
+      outcome = step.result
       // M-4 (v3 audit): a failure on a MISSING file must keep it missing —
       // returning '' would fabricate an empty file. `null` (DELETE) is safe
       // here: the file does not exist, so the remove is a no-op.
-      return core.write ?? (current ?? null)
+      return step.write ?? (current ?? null)
     })
-    // C-01: a transact backend that violates the contract (never
-    // invokes the task) leaves `outcome` undefined — the old
-    // `undefined as MemoryApplyResult` cast handed callers an object whose
-    // `.ok` dereference raised a raw TypeError. Structured refusal instead,
-    // mirroring skill-store's V6-19 guard.
+    // C-01: a transact backend that violates the contract (never invokes the
+    // task) leaves `outcome` undefined — the old `undefined as
+    // MemoryApplyResult` cast handed callers an object whose `.ok` dereference
+    // raised a raw TypeError. Structured refusal instead, mirroring
+    // skill-store's V6-19 guard.
     return outcome ?? {
       ok: false,
       message: 'internal error: the memory transaction did not invoke the task; no write was performed',
       entries: [], chars: 0, limit: this.limitFor(target),
     }
+  }
+
+  async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
+    return await this.serial(() => this.addChained(target, facts))
+  }
+
+  private async addChained(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
+    if (!facts.trim()) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    return await this.chainedWrite(target, async raw => await this.addCore(target, facts, raw))
   }
 
   /**
@@ -330,12 +347,8 @@ export class MemoryStore {
     if (!content) return { result: { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     // The oversized guard runs pre-transact in add(); drift is derived from
     // the locked view below.
-    const drift = this.driftFromRaw(target, raw)
-    if (drift) {
-      const backup = await this.backupFile(target)
-      const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
-      return { result: { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
-    }
+    const refusal = await this.driftRefusal(target, raw)
+    if (refusal) return { result: refusal, write: null }
     const threat = this.memoryThreatBlock(content)
     if (threat) return { result: { ok: false, message: threat, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     // V8-02 (0.3.47): the delimiter guard must inspect the FINAL on-disk entry
@@ -374,13 +387,52 @@ export class MemoryStore {
     return { result: { ok: true, message: `Entry added.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }, write: render(next) }
   }
 
-  /** Canonical-form drift check derived from the locked view (same formula as `detectDrift`, no second read). */
-  private driftFromRaw(target: MemoryTarget, raw: string): boolean {
-    if (raw.trim() === '') return false
+  /**
+   * The single drift predicate. `raw` is in canonical form when it byte-matches
+   * `render(normalizeEntries(raw))`; anything else means it was edited outside
+   * MemoryStore (empty/`§`-only entries, stray blank lines, leading or trailing
+   * delimiters — structural anomalies the writer would quietly normalize away).
+   * Both write paths derive this from their locked view and `detectDrift` from
+   * a fresh read, so a write and a later read can never disagree about the same
+   * bytes.
+   *
+   * An absent, empty, or whitespace-only body is the "never written" state
+   * (rc.42 audit P1-6): it parses to zero entries, and the canonical form
+   * `'\n'` can never byte-match it, so flagging it would permanently refuse
+   * every write path — including the repairs the model would need to make.
+   * Such files are adopted instead of flagged.
+   *
+   * @param target - memory target whose char limit bounds one parsed entry
+   * @param raw - on-disk body, or `null` when the file does not exist
+   * @returns whether these bytes count as externally drifted
+   */
+  private drifted(target: MemoryTarget, raw: string | null): boolean {
+    if (raw === null || raw.trim() === '') return false
     const entries = normalizeEntries(raw)
     const limit = this.limitFor(target)
+    // Second drift signal (Hermes parity, `_detect_external_drift` signal #2):
+    // one parsed entry larger than the store's whole-file limit means an
+    // external writer appended free-form content — a tool-written entry can
+    // never exceed the whole-store budget. Refusing (with backup) instead of
+    // letting a flush truncate it. A zero/negative limit means "unbounded".
     if (limit > 0 && entries.some(entry => entry.length > limit)) return true
     return render(entries) !== raw
+  }
+
+  /**
+   * Drift refusal for a body already read under the write lock, or `null` when
+   * the body is canonical. Both write paths return this unchanged, so their
+   * refusals stay byte-identical and each carries the same backup.
+   *
+   * @param target - memory target that owns the drifted file
+   * @param raw - locked file body
+   * @returns the refusal to hand back, or `null` to continue writing
+   */
+  private async driftRefusal(target: MemoryTarget, raw: string): Promise<MemoryApplyResult | null> {
+    if (!this.drifted(target, raw)) return null
+    const backup = await this.backupFile(target)
+    const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
+    return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
   }
 
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
@@ -389,25 +441,7 @@ export class MemoryStore {
 
   private async applyBatchChained(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
     if (operations.length === 0) return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
-    const path = fileFor(this.root, target)
-    // M-7: oversized guard pre-lock (see add()).
-    const refusal = await this.oversizedRefusal(target)
-    if (refusal) return refusal
-    let outcome: MemoryApplyResult | undefined
-    await transactIo(this.io, path, async (current) => {
-      const core = await this.applyBatchCore(target, operations, current ?? '')
-      outcome = core.result
-      // M-4: a failure on a MISSING file must keep it missing (null = DELETE,
-      // and the remove is a no-op when nothing exists).
-      return core.write ?? (current ?? null)
-    })
-    // C-01: same contract-violation guard as addChained above —
-    // no `undefined as MemoryApplyResult` can reach the caller.
-    return outcome ?? {
-      ok: false,
-      message: 'internal error: the memory transaction did not invoke the task; no write was performed',
-      entries: [], chars: 0, limit: this.limitFor(target),
-    }
+    return await this.chainedWrite(target, async raw => await this.applyBatchCore(target, operations, raw))
   }
 
   /** Batch RMW inside the transaction. `write: null` = failure/no-op, disk untouched. */
@@ -418,12 +452,8 @@ export class MemoryStore {
   ): Promise<{ result: MemoryApplyResult; write: string | null }> {
     // The oversized guard runs pre-transact in applyBatch(); drift is derived
     // from the locked view below.
-    const drift = this.driftFromRaw(target, raw)
-    if (drift) {
-      const backup = await this.backupFile(target)
-      const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
-      return { result: { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
-    }
+    const refusal = await this.driftRefusal(target, raw)
+    if (refusal) return { result: refusal, write: null }
     const entries = [...new Set(normalizeEntries(raw))]
     const working = [...entries]
     // C-02: one date prefix per batch — the replace branch gains the
@@ -531,35 +561,18 @@ export class MemoryStore {
   }
 
   /**
-   * Detect on-disk drift: true when the file is not in the canonical
-   * `render(normalizeEntries(raw))` form. This catches structural anomalies
-   * the writer would quietly normalize away (empty/`§`-only entries, stray
-   * blank lines, leading/trailing delimiters) that indicate the file was
-   * edited outside MemoryStore. Purely single-canonical content reaches the
-   * same serialization and returns false, so a normal write is never flagged.
+   * Detect on-disk drift for a caller that holds no locked view: `true` when the
+   * file is not in canonical form, or when its size trips the read guard. The
+   * write paths apply the same predicate (`drifted`) to the body they read under
+   * the lock, so a write and a follow-up read agree about the same bytes.
    *
-   * An absent, empty, or whitespace-only file is the "never written" state
-   * (rc.42 audit P1-6): it parses to zero entries, so the canonical form
-   * `'\n'` can never byte-match it and every write path was permanently
-   * refused with "External drift detected" — including the repairs the model
-   * would need to make. Such files are adopted instead of flagged.
+   * @param target - memory target to inspect
+   * @returns whether the file on disk counts as externally drifted
    */
   async detectDrift(target: MemoryTarget): Promise<boolean> {
     // Oversized files are an external-modification signal by the read guard;
     // report drift so a write followed by a read never loads them.
     if (await this.oversizedFile(target)) return true
-    const raw = await this.io.readText(fileFor(this.root, target))
-    if (raw === null || raw.trim() === '') return false
-    const entries = normalizeEntries(raw)
-    const limit = this.limitFor(target)
-    // Second drift signal (Hermes parity, `_detect_external_drift` signal #2):
-    // one parsed entry larger than the store's whole-file limit means an
-    // external writer appended free-form content — a tool-written entry can
-    // never exceed the whole-store budget. Refusing (with backup) instead of
-    // letting a flush truncate it. A zero/negative limit means "unbounded".
-    if (limit > 0 && entries.some(entry => entry.length > limit)) return true
-    // Canonicalize by normalizing (split + trim + drop empties) then re-rendering.
-    // If the on-disk bytes differ from that canonical form, the file drifted.
-    return render(entries) !== raw
+    return this.drifted(target, await this.io.readText(fileFor(this.root, target)))
   }
 }

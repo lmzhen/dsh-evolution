@@ -29,6 +29,8 @@ import {
   REVIEW_STATE_FILE,
   REVIEW_STATE_SESSION_CAP,
   REVIEW_STATE_TABLE,
+  selectPendingOverflow,
+  selectSessionOverflow,
   type CuratorStateRecord,
   type EvolutionStateStorage,
   type PendingRecord,
@@ -607,28 +609,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * live work and are never trimmed. Returns the pruned map (rather than
    * mutating in place) plus the evicted records. */
   function enforceResolvedCap(map: Record<string, PendingRecord>): { map: Record<string, PendingRecord>; evicted: PendingRecord[] } {
-    // v23 (AP-1): capability approvals are EXEMPT from the audit cap — the
-    // Creator-mode contract reads the LIVE approved list (`approvedPackage`)
-    // and a capability is never re-submit-able for the same package, so an
-    // eviction would make an approved capability permanently unactivatable.
-    // They are rare (manual submits) and cannot grow without limit.
-    const resolved = Object.values(map).filter(record =>
-      (record.status === 'approved' || record.status === 'rejected')
-      && record.kind !== 'capability')
-    if (resolved.length <= PENDING_RESOLVED_CAP) return { map, evicted: [] }
-    const overflow = resolved.length - PENDING_RESOLVED_CAP
-    // V5-09 (0.3.29): an unparseable resolvedAt sorts as "oldest-unknown" (same
-    // as a missing one) instead of poisoning the sort with NaN; eviction is by
-    // record id — a hand-edited file whose key ≠ id must still leave the map
-    // (the old key-based filter archived the record but never evicted it).
-    const entryTime = (record: PendingRecord): number => {
-      if (!record.resolvedAt) return Number.MAX_SAFE_INTEGER
-      const parsed = Date.parse(record.resolvedAt)
-      return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed
-    }
-    const oldest = resolved
-      .sort((a, b) => entryTime(a) - entryTime(b))
-      .slice(0, overflow)
+    // V27 G2.2: eligibility (resolved only, capability exempt) and ordering
+    // (oldest resolvedAt first, unknown LAST) are the SEAM's pure rule, shared
+    // with the domain provider — this function keeps only the JSON-specific
+    // part: rebuilding the map and returning the evicted records for archiving.
+    const oldest = selectPendingOverflow(Object.values(map), PENDING_RESOLVED_CAP)
+    if (oldest.length === 0) return { map, evicted: [] }
     // V6-30 (0.3.37): eviction is by the map KEY of the oldest ENTRIES, not by
     // their id — a hand-edited file with two entries sharing one id would
     // evict BOTH keys while archiving only one (over-eviction + a missing
@@ -775,9 +761,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             stamped[sessionId] = { ...record, updatedAt: Date.now() } as ReviewStateRecord
             const others = Object.keys(stamped).filter(id => id !== sessionId)
             if (others.length < REVIEW_STATE_SESSION_CAP) return stamped
-            const stampOf = (id: string): number => (stamped[id] as { updatedAt?: number } | undefined)?.updatedAt ?? 0
-            others.sort((a, b) => stampOf(a) - stampOf(b))
-            const evict = new Set(others.slice(0, others.length - REVIEW_STATE_SESSION_CAP + 1))
+            // V27 G2.2: the eviction choice is the SEAM's pure rule (shared with
+            // the domain provider) — the provider only supplies keys and stamps.
+            const evict = new Set(selectSessionOverflow(
+              others,
+              {
+                keyOf: id => id,
+                stampOf: id => (stamped[id] as { updatedAt?: number } | undefined)?.updatedAt ?? 0,
+              },
+            ))
             const pruned: Record<string, ReviewStateRecord> = {}
             for (const [id, row] of Object.entries(stamped)) {
               if (!evict.has(id)) pruned[id] = row

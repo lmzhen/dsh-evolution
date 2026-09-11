@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authoringFeedback, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback, frontmatterCatalogInvalid, frontmatterYamlUnsafeValues, parseFrontmatter, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -206,7 +206,7 @@ it('consolidate rollback reports sources it could not restore instead of silentl
     // injection sits at the layer the commit actually uses.
     transact: async (path: string, task: (current: string | null) => string | null) => {
       if (failTargetWrite && path.includes('target-skill')) throw new Error('target write blocked')
-      return real.transact(path, task)
+      return real.transact!(path, task)
     },
   }
   const lib = new SkillLibrary(root, io)
@@ -436,7 +436,7 @@ it('V26-14: snapshotAll probes live write locks — a locked skill is skipped, r
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
-it('V25-05: a restore reports snapshot-time skipped skills instead of deleting them silently', async () => {
+it('V27 G0.1 (core-a-10): an INCOMPLETE snapshot is refused before the destructive clear', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-skipped-'))
   const lib = new SkillLibrary(root)
   await lib.create('kept-skill', USABLE('kept-skill'), 'foreground')
@@ -451,15 +451,93 @@ it('V25-05: a restore reports snapshot-time skipped skills instead of deleting t
   manifest.skipped = ['locked-skill']
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8')
   await rm(join(baseline, 'locked-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-  // The whole-tree restore clears the live tree and copies back ONLY the
-  // manifest skills — the skipped skill must be NAMED in the result message
-  // instead of disappearing silently.
-  await lib.patch('locked-skill', 'locked-skill', 'locked-skill EDITED')
+  const beforeNames = (await lib.list()).map(s => s.name).sort()
+  const beforeBytes = await readFile(join(root, 'locked-skill', 'SKILL.md'), 'utf8')
+  // v25 restored such a snapshot and only added a NOTE to the message, which
+  // cleared the live library of every skipped skill while reporting success.
+  // The snapshot is now refused by name, and the live tree is left as it was
+  // (the pre-rollback snapshot rolls the untouched tree back over itself).
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(false)
+  expect(restored.message).toContain('incomplete')
+  expect(restored.message).toContain('locked-skill')
+  expect(restored.message).toContain('rolled back')
+  expect((await lib.list()).map(s => s.name).sort()).toEqual(beforeNames)
+  expect(await readFile(join(root, 'locked-skill', 'SKILL.md'), 'utf8')).toBe(beforeBytes)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V27 G0.1 (core-a-10): a snapshot that skipped EVERY skill cannot empty the live library', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-allskip-'))
+  const io = nodeEvolutionIo()
+  const lib = new SkillLibrary(root, io)
+  await lib.create('alpha', USABLE('alpha'), 'foreground')
+  await lib.create('beta', USABLE('beta'), 'foreground')
+  // A live writer holds both skills → snapshotAll skips both (skills: [],
+  // skipped: [alpha, beta]). This was the exact shape that reached
+  // restoreLatestSnapshot and cleared the whole live library with ok:true.
+  for (const name of ['alpha', 'beta']) {
+    await writeFile(join(root, name, 'SKILL.md.lock'), `${process.pid}:abc123`, 'utf8')
+  }
+  const snap = await lib.snapshotAll('all-locked')
+  const manifest = JSON.parse(await readFile(join(snap, 'manifest.json'), 'utf8')) as { skills: string[]; skipped: string[] }
+  expect(manifest.skills).toEqual([])
+  expect(manifest.skipped.sort()).toEqual(['alpha', 'beta'])
+  // Locks released: the restore is now attempted against a snapshot that
+  // brought back nothing — it must refuse and leave both skills in place.
+  for (const name of ['alpha', 'beta']) await rm(join(root, name, 'SKILL.md.lock'), { force: true })
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(false)
+  expect(restored.message).toContain('incomplete')
+  expect((await lib.list()).map(s => s.name).sort()).toEqual(['alpha', 'beta'])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V27 G0.3 (core-a-07): a skill whose description is a YAML block scalar is writable and readable', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-blockscalar-'))
+  const lib = new SkillLibrary(root)
+  // The model writes folded descriptions routinely; the platform's strict YAML
+  // catalog loads them, but the family used to reject every create/update/patch
+  // of such a file ("frontmatter rewrite verification failed" + advice to wrap
+  // the value in quotes, which would corrupt it) and published ">" as the
+  // description, losing the routing information.
+  const folded = USABLE('block-scalar').replace('description: A usable skill for consolidation tests.', 'description: >\n  Block scalar description that\n  spans two source lines.')
+  const created = await lib.create('block-scalar', folded, 'foreground')
+  expect(created.ok, created.message).toBe(true)
+  // The description reads back folded, not as the indicator.
+  const listed = (await lib.list()).find(skill => skill.name === 'block-scalar')
+  expect(listed?.description).toBe('Block scalar description that spans two source lines.')
+  // The on-disk frontmatter keeps its block form (the write path must not
+  // rewrite it into a quoted scalar).
+  const written = await readFile(join(root, 'block-scalar', 'SKILL.md'), 'utf8')
+  expect(written).toContain('description: >')
+  expect(frontmatterYamlUnsafeValues(written)).toEqual([])
+  // update and patch of the same skill stay writable.
+  const updated = await lib.update('block-scalar', folded.replace('spans two source lines.', 'now updated.'))
+  expect(updated.ok, updated.message).toBe(true)
+  const patched = await lib.patch('block-scalar', 'now updated.', 'patched in place.')
+  expect(patched.ok, patched.message).toBe(true)
+  expect(await readFile(join(root, 'block-scalar', 'SKILL.md'), 'utf8')).toContain('patched in place.')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V27 G0.4 (core-a-01): a manifest with non-string extras is refused before the tree is touched', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-extras-gate-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('keeper-skill', USABLE('keeper-skill'), 'foreground')
+  const snap = await lib.snapshotAll('extras-gate', [{ name: 'curator-state.json', content: '{"lastRunAt":1}' }])
+  const manifestPath = join(snap, 'manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>
+  // `123` used to survive the array check and `SNAPSHOT_EXTRA_NAME_RE.test`
+  // (which coerces), then threw TypeError inside path.join — AFTER the restore
+  // had already replaced the tree, so the mutation event never fired.
+  await writeFile(manifestPath, JSON.stringify({ ...manifest, extras: [123, 'curator-state.json'] }), 'utf8')
+  const before = (await lib.list()).map(s => s.name).sort()
   const restored = await lib.restoreLatestSnapshot()
   expect(restored.ok).toBe(true)
-  expect(restored.message).toContain('NOT restored')
-  expect(restored.message).toContain('locked-skill')
-  expect((await lib.list()).map(s => s.name)).toEqual(['kept-skill'])
+  expect(restored.extras?.map(extra => extra.name)).toEqual(['curator-state.json'])
+  // The tree still holds the skill and the restore completed (no TypeError).
+  expect((await lib.list()).map(s => s.name).sort()).toEqual(before)
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
@@ -639,6 +717,10 @@ it('create normalizes unquoted YAML-unsafe frontmatter at the write point (0.3.1
   expect(created.normalizedFrontmatterFields).toEqual(['description'])
   const onDisk = await (await import('node:fs/promises')).readFile(join(root, 'norm-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('description: "Search: arXiv papers by keyword."')
+  // V27 G2.1: what the write path lands is exactly what the reader declares
+  // valid as written — the writer and the audit agree on the same bytes.
+  expect(frontmatterCatalogInvalid(onDisk)).toBe(false)
+  expect(parseFrontmatter(onDisk)?.frontmatter['description']).toBe('Search: arXiv papers by keyword.')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
@@ -676,7 +758,7 @@ it('update and patch normalize frontmatter the same way (0.3.11)', async () => {
 it('E-68: an old===new patch is a noop — no write, no audit, no mutation event (0.3.18)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-noop-'))
   const events: string[] = []
-  const lib = new SkillLibrary(root, nodeEvolutionIo(), undefined, e => events.push(`${e.action}:${e.skillName}`))
+  const lib = new SkillLibrary(root, nodeEvolutionIo(), undefined, e => events.push(`${e.action}:${e.name}`))
   const created = await lib.create('python-testing', SKILL, 'background_review')
   expect(created.ok).toBe(true)
   events.length = 0
@@ -846,6 +928,78 @@ it('E-11 (v18): list() publishes the frontmatter whenToUse routing hint', async 
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('V27 G2.1: list() publishes the strict catalog value, and the audit verdict agrees', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-strict-'))
+  const lib = new SkillLibrary(root)
+  // Authored outside the family (the write point would quote this value): an
+  // unquoted ` # ` is a YAML comment, so the platform catalog reads
+  // `routing word` and the family must publish exactly that.
+  const commented = '---\nname: commented-skill\ndescription: routing word # trailing note\n---\n\n# Commented\n'
+  const commentedDir = join(root, 'commented-skill')
+  await mkdir(commentedDir, { recursive: true })
+  await writeFile(join(commentedDir, 'SKILL.md'), commented, 'utf8')
+  const summary = (await lib.list()).find(item => item.name === 'commented-skill')
+  expect(summary?.description).toBe('routing word')
+  expect(summary?.description).toBe(parseFrontmatter(commented)?.frontmatter.description)
+  expect(validateFrontmatter(commented, 'commented-skill')).toBeNull()
+  // The raw value is still flagged (the comment would be dropped by the
+  // platform and the family publishes the quoted form only after the next
+  // write), so the audit keeps reporting this file rather than calling it clean.
+  expect(frontmatterCatalogInvalid(commented)).toBe(true)
+  expect(frontmatterYamlUnsafeValues(commented).map(entry => entry.key)).toEqual(['description'])
+  const clean = '---\nname: clean-skill\ndescription: Plain routing text.\n---\n\n# Clean\n'
+  const cleanDir = join(root, 'clean-skill')
+  await mkdir(cleanDir, { recursive: true })
+  await writeFile(join(cleanDir, 'SKILL.md'), clean, 'utf8')
+  expect(frontmatterCatalogInvalid(clean)).toBe(false)
+  expect((await lib.list()).find(item => item.name === 'clean-skill')?.description).toBe('Plain routing text.')
+  // A block the strict parser rejects stays routable INSIDE the family — the
+  // platform cannot load the file, and the audit reports that instead of a
+  // silent visibility split.
+  const unloadable = '---\nname: unloadable-skill\ndescription: Search: arXiv papers\n---\n\n# Unloadable\n'
+  const unloadableDir = join(root, 'unloadable-skill')
+  await mkdir(unloadableDir, { recursive: true })
+  await writeFile(join(unloadableDir, 'SKILL.md'), unloadable, 'utf8')
+  expect((await lib.list()).find(item => item.name === 'unloadable-skill')?.description).toBe('Search: arXiv papers')
+  expect(frontmatterCatalogInvalid(unloadable)).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V27 G8.4: an archived skill whose SKILL.md is empty is still restorable by name', async () => {
+  const { readdir, stat } = await import('node:fs/promises')
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-archname-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('arch-name-skill', SKILL.replace('python-testing', 'arch-name-skill'), 'foreground')
+  expect((await lib.archive('arch-name-skill')).ok).toBe(true)
+  const archiveRoot = join(root, '.archive')
+  // The archive records the owning name next to the tree: the restore match used
+  // to depend on the archived frontmatter alone.
+  expect(await readFile(join(archiveRoot, 'arch-name-skill', '.archive-name'), 'utf8')).toBe('arch-name-skill\n')
+  // A crashed writer leaves a 0-byte SKILL.md in the archive — the file no
+  // longer says which skill this was.
+  await writeFile(join(archiveRoot, 'arch-name-skill', 'SKILL.md'), '', 'utf8')
+  const restored = await lib.restoreFromArchive('arch-name-skill')
+  expect(restored.ok).toBe(true)
+  // Both archive metadata markers are dropped on restore, so the live tree is
+  // the tree that was archived.
+  const lives = await readdir(join(root, 'arch-name-skill'))
+  expect(lives).not.toContain('.archive-name')
+  expect(lives).not.toContain('.archive-reason')
+  // The same holds for a STAMPED archive entry (the second archive of one
+  // name): the bare directory name cannot match it, the marker can.
+  expect((await lib.archive('arch-name-skill')).ok).toBe(true)
+  expect((await lib.create('arch-name-skill', SKILL.replace('python-testing', 'arch-name-skill'), 'foreground')).ok).toBe(true)
+  expect((await lib.archive('arch-name-skill')).ok).toBe(true)
+  const stamped = (await readdir(archiveRoot)).filter(entry => entry.startsWith('arch-name-skill-'))
+  expect(stamped.length).toBe(1)
+  await writeFile(join(archiveRoot, stamped[0]!, 'SKILL.md'), '', 'utf8')
+  // Leave ONLY the stamped entry, so the match has to come from the marker.
+  await rm(join(archiveRoot, 'arch-name-skill'), { recursive: true, force: true })
+  expect((await lib.restoreFromArchive('arch-name-skill')).ok).toBe(true)
+  expect((await stat(join(root, 'arch-name-skill'))).isDirectory()).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a durability warning', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-durability-'))
   await new SkillLibrary(root).create('durable-skill', SKILL.replace('python-testing', 'durable-skill'), 'foreground')
@@ -853,12 +1007,13 @@ it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a dura
   // The rename landed; only the parent-directory fsync failed (the marker the
   // io layer attaches). A plain failure would make the caller roll back — or
   // retry — a write that is already visible on disk.
+  // Drop the transact seam so the store takes its single-write path and calls
+  // THIS writeText (the node backend's transact writes through module-level
+  // helpers and would bypass the injected failure).
+  const { transact: _droppedTransact, ...withoutTransact } = base
+  void _droppedTransact
   const io = {
-    ...base,
-    // Drop the transact seam so the store takes its single-write path and calls
-    // THIS writeText (the node backend's transact writes through module-level
-    // helpers and would bypass the injected failure).
-    transact: undefined,
+    ...withoutTransact,
     writeText: async (path: string, content: string) => {
       await base.writeText(path, content)
       throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
@@ -877,9 +1032,10 @@ it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a dura
 it('P2-2 (v19): create and setPinned tolerate a post-commit fsync failure too', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-durability2-'))
   const base = nodeEvolutionIo()
+  const { transact: _droppedTransact2, ...withoutTransact2 } = base
+  void _droppedTransact2
   const io = {
-    ...base,
-    transact: undefined,
+    ...withoutTransact2,
     writeText: async (path: string, content: string) => {
       await base.writeText(path, content)
       throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })

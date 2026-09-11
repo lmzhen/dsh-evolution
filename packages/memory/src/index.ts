@@ -5,8 +5,16 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import type Schema from '@deepseek-ai/schemastery'
 
 export type MemoryTarget = 'memory' | 'user'
+
+/** Service config (V27 G6.3): pin one provider by name. */
+export interface Config {
+  /** Provider to use; empty = first registered provider (row order). */
+  provider?: string
+}
 
 export interface MemoryOperation {
   action: 'add' | 'replace' | 'remove'
@@ -61,18 +69,48 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export class MemoryRegistry extends Service {
-  private readonly providers = new Map<string, MemoryProvider>()
+  /**
+   * V27 G6.3: the same provider-pin contract the io/state seams use. Before
+   * this, every delegation called `provider()` with no name, so with two
+   * providers mounted the session-visible store was decided by ROW ORDER while
+   * `memory-files.providerName` renamed a registration nothing selected — a
+   * config no consumer read. Empty keeps the old behavior (first registered).
+   */
+  static Config: Schema<Config> = z.object({
+    provider: z.string().default(''),
+  })
 
-  constructor(ctx: Context) {
+  private readonly providers = new Map<string, MemoryProvider>()
+  private readonly providerName: string
+  private pinWarned = false
+
+  constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'memory')
+    this.providerName = config.provider ?? ''
+    // A mount-time check like evolution-state's S-07 is not available here: the
+    // registry and the provider-registration API are the SAME service, so a
+    // provider can only register after this constructor and the registry is
+    // always empty at mount. The pin is therefore verified at the two points
+    // that exist — a warning when a differently-named provider registers (the
+    // earliest visible signal), and the hard `provider(name)` throw on the first
+    // read or write, which names the pin.
   }
 
   registerProvider(provider: MemoryProvider): () => void {
     if (this.providers.has(provider.name)) throw new Error(`memory provider "${provider.name}" already registered`)
     this.providers.set(provider.name, provider)
+    if (this.providerName && provider.name !== this.providerName && !this.providers.has(this.providerName) && !this.pinWarned) {
+      this.pinWarned = true
+      this.ctx.logger.warn(`memory: config.provider="${this.providerName}" is not registered (mounted: "${provider.name}"); memory reads and writes fail until that provider mounts`)
+    }
     return () => {
       if (this.providers.get(provider.name) === provider) this.providers.delete(provider.name)
     }
+  }
+
+  /** Configured provider: the pinned name, or the first registered one. */
+  private selected(): MemoryProvider {
+    return this.provider(this.providerName || undefined)
   }
 
   /** 0.3.17 (E-73): named lookup like the io/state-storage registries; no
@@ -91,11 +129,11 @@ export class MemoryRegistry extends Service {
   }
 
   read(target: MemoryTarget): Promise<string[]> {
-    return this.provider().read(target)
+    return this.selected().read(target)
   }
 
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
-    const result = await this.provider().applyBatch(target, operations)
+    const result = await this.selected().applyBatch(target, operations)
     // P2 fix: every successful write refreshes whatever listens — the snapshot
     // subscriber (tool-memory) re-renders the model-visible context. This is
     // the single write sink, so bypass paths are covered without per-path fixes.
@@ -112,11 +150,11 @@ export class MemoryRegistry extends Service {
    * consumer (tests inspect the raw snapshot, kept by declaration).
    * @internal Exported for this package's own tests only. */
   snapshot(): Promise<MemorySnapshot> {
-    return this.provider().snapshot()
+    return this.selected().snapshot()
   }
 
   renderContext(): Promise<string> {
-    return this.provider().renderContext()
+    return this.selected().renderContext()
   }
 }
 

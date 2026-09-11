@@ -94,7 +94,7 @@ describe('anchored-standard review smoke', () => {
     expect(request?.maxDepth).toBe(1)
     const outputSchema = request?.outputSchema as {
       type?: string
-      properties?: Record<string, { items?: { type?: string } }>
+      properties?: Record<string, { type?: string; items?: { type?: string } }>
     } | undefined
     expect(outputSchema?.type).toBe('object')
     expect(outputSchema?.properties?.memoryOps?.type).toBe('array')

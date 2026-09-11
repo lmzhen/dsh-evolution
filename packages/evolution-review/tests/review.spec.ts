@@ -109,13 +109,12 @@ describe('evolution-review', () => {
     const { ctx, session, emitEnd } = await mountReviewFixture({ failState: true })
     const errors: string[] = []
     ctx.on('evolution/review-error', event => errors.push(event.sessionId))
+    // substantive thresholds live on the policy service, not the plugin Config.
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
     await ctx.plugin(Review, {
       reviewEnabled: true,
       memoryInterval: 1,
       skillInterval: 1,
-      substantiveMinToolCalls: 1,
-      substantiveMinUserChars: 0,
-      substantiveMinAgentChars: 0,
     })
     emitEnd(1)
     await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
@@ -175,7 +174,7 @@ describe('evolution-review', () => {
   it('E-41: the review is deferred when the subagent cannot start; the eventual fallback inject emits review-scheduled (0.3.19 + 0.3.39 + V24-15)', async () => {
     const injected: unknown[] = []
     const { ctx, session, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
-    const scheduled: Array<{ sessionId: string; channel?: string }> = []
+    const scheduled: Array<{ sessionId: string; channel?: string | undefined }> = []
     ctx.on('evolution/review-scheduled', event => scheduled.push(event))
     ctx.provide('subagents', {
       start: async () => { throw new Error('subagent spawn failed') },
@@ -275,6 +274,48 @@ describe('evolution-review', () => {
     expect(onInjectCalls).toHaveLength(1)
     expect(errors).toEqual([])
   })
+
+  it('V27 G4.3: a write leg that TIMES OUT still records the ops that landed', async () => {
+    const applied: Array<{ memoryApplied: number; skillApplied: number; executionError?: string; executionFailures?: number }> = []
+    const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
+    ctx.on('evolution/plan-applied', event => applied.push(event as never))
+    ctx.provide('subagents', {
+      start: async () => ({
+        result: Promise.resolve({
+          structured: {
+            // TWO ops: the first lands, the second never returns — the deadline
+            // hits mid-write.
+            memoryOps: [
+              { target: 'memory', action: 'add', facts: 'landed-fact', evidence: [{ event_seq: 0 }] },
+              { target: 'memory', action: 'add', facts: 'never-lands', evidence: [{ event_seq: 0 }] },
+            ],
+            skillOps: [],
+            summary: 'one lands, one hangs',
+          },
+        }),
+        dispose: async () => {},
+      }),
+    })
+    let calls = 0
+    ctx.provide('memory', {
+      applyBatch: async () => {
+        calls += 1
+        if (calls === 1) return { ok: true, message: 'ok' }
+        return await new Promise<never>(() => {}) // hangs → the write leg times out
+      },
+    })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewTimeoutMs: 30 })
+    emitEnd(1, 'blocked')
+    emitEnd(2)
+    // The payload must arrive even though the execution promise never settled:
+    // before this fix the timeout skipped the emit entirely, so replay/activity
+    // saw a review that changed nothing while memory had already been written.
+    await vi.waitFor(() => { expect(applied).toHaveLength(1) }, { timeout: 3000 })
+    expect(applied[0]?.memoryApplied).toBe(1)
+    expect(applied[0]?.skillApplied).toBe(0)
+    expect(applied[0]?.executionError ?? '').toContain('timed out')
+  }, 15_000)
 
   it('F-363: the completion channel fires through runOnTurnEnd on a proven-long session', async () => {
     const toolCalls = Array.from({ length: 25 }, (_, i) => ({
@@ -519,13 +560,12 @@ it('V6-23: a throwing review-error listener does not replace the turn-end failur
     // rejection and the original failure is masked.
     throw new Error('listener boom')
   })
+  // substantive thresholds live on the policy service, not the plugin Config.
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
   await ctx.plugin(Review, {
     reviewEnabled: true,
     memoryInterval: 1,
     skillInterval: 1,
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   emitEnd(1)
   await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
@@ -585,9 +625,6 @@ it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires 
     memoryInterval: 2,
     skillInterval: 2,
     reviewMode: 'inject',
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
   // turn1 completed: count 1 < 2 → no fire, no inject.
@@ -653,9 +690,6 @@ it('0.3.41: interval=1 waking delivery cannot self-drive — the injected wake t
     memoryInterval: 1,
     skillInterval: 1,
     reviewMode: 'inject',
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
   // turn1 (real turn): threshold fires (first ever) → exactly one delivery,
@@ -690,9 +724,6 @@ it('0.3.48: a completing-turn cross of the second threshold delivers the combine
     memoryInterval: 5,
     skillInterval: 10,
     reviewMode: 'inject',
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
   // turns 1-9 non-completing: memory crosses alone at turn 5 (latch='memory');
@@ -776,9 +807,6 @@ it('0.3.42: a failed counter-reset persist warns once instead of repeating silen
     memoryInterval: 1,
     skillInterval: 1,
     reviewMode: 'inject',
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   emitEnd(1)
   await vi.waitFor(() => { expect(delivered).toHaveLength(1) }) // delivery itself succeeded
@@ -796,9 +824,6 @@ it('0.3.40: without a followup the waking delivery degrades to inject', async ()
     memoryInterval: 1,
     skillInterval: 1,
     reviewMode: 'inject',
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   emitEnd(1)
   await vi.waitFor(() => { expect(injected).toHaveLength(1) })
@@ -817,9 +842,6 @@ it('0.3.40: the default delivery wakes via agent.followup, not inject', async ()
     memoryInterval: 1,
     skillInterval: 1,
     reviewMode: 'inject',
-    substantiveMinToolCalls: 1,
-    substantiveMinUserChars: 0,
-    substantiveMinAgentChars: 0,
   })
   emitEnd(1)
   await vi.waitFor(() => { expect(followups).toHaveLength(1) })
@@ -881,7 +903,7 @@ async function mountTwoSessions() {
   // turn; session X's single substantive turn stays under the cadence
   // threshold and reaches the completion channel (cumulative 1 ≥ min 1).
   ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewSkillInterval: 2, reviewMemoryInterval: 999 }) })
-  const scheduled: Array<{ sessionId: string; channel?: string }> = []
+  const scheduled: Array<{ sessionId: string; channel?: string | undefined }> = []
   ctx.on('evolution/review-scheduled', e => scheduled.push(e))
 
   const mk = (id: string) => {

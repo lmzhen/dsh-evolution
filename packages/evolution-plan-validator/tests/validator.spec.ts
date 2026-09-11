@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MemoryOp } from '../src/index.ts'
+import type { MemoryOp, SkillOp } from '../src/index.ts'
 import { validateEvolutionPlan } from '../src/index.ts'
 
 describe('evolution-plan-validator', () => {
@@ -78,7 +78,7 @@ describe('evolution-plan-validator', () => {
   })
 
   it('validates restructure moves: shape, domain and move cap (008 batch B)', () => {
-    const base = { action: 'restructure', name: 'fat-skill', evidence: [{ event_seq: 4 }] } as const
+    const base: SkillOp = { action: 'restructure', name: 'fat-skill', evidence: [{ event_seq: 4 }] }
     const ok = validateEvolutionPlan({
       skillOps: [{ ...base, restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] }],
     }, { sessionSeq: 10 })
@@ -132,8 +132,8 @@ describe('evolution-plan-validator', () => {
       skillOps: [{ name: 'demo', old_string: 'x', new_string: 'y', evidence: [{ event_seq: 1 }] }],
     }, { sessionSeq: 10 } satisfies Parameters<typeof validateEvolutionPlan>[1])
     expect(result.ok).toBe(true)
-    expect(result.accepted.skillOps).toHaveLength(1)
-    expect(result.accepted.skillOps[0]?.action).toBe('patch')
+    expect(result.accepted.skillOps!).toHaveLength(1)
+    expect(result.accepted.skillOps![0]?.action).toBe('patch')
   })
 
   it('V8-23⑪: a missing MEMORY action is normalized to an explicit "add" on the accepted op (V9-12)', () => {
@@ -142,8 +142,8 @@ describe('evolution-plan-validator', () => {
       skillOps: [],
     }, { sessionSeq: 10 } satisfies Parameters<typeof validateEvolutionPlan>[1])
     expect(result.ok).toBe(true)
-    expect(result.accepted.memoryOps).toHaveLength(1)
-    expect(result.accepted.memoryOps[0]?.action).toBe('add')
+    expect(result.accepted.memoryOps!).toHaveLength(1)
+    expect(result.accepted.memoryOps![0]?.action).toBe('add')
   })
 
   it('P2-1 (v15): a non-string truthy field is a per-op REJECTION, not a TypeError', () => {

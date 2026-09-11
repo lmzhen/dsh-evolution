@@ -73,7 +73,7 @@ describe('EvolutionIoRegistry', () => {
     // The seam hands back the registered object itself (no wrapper), so every
     // consumer method reaches the backend unchanged.
     await provider.readText('/x')
-    await provider.writeText('/x')
+    await provider.writeText('/x', 'body')
     await provider.exists('/x')
     expect(calls).toEqual(['read:/x', 'write:/x', 'exists:/x'])
     // Disposing is idempotent: the idempotent re-registration returns the

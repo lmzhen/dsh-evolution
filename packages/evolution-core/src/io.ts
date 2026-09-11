@@ -5,7 +5,7 @@
  * consumers (and the core's own tests) can use `nodeEvolutionIo`.
  */
 
-import { type FileHandle, cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
@@ -76,9 +76,23 @@ export async function transactIo(
   path: string,
   task: (current: string | null) => string | null | Promise<string | null>,
 ): Promise<void> {
+  // V27 G1.3: a dir-fsync failure AFTER the rename (`committed: true`) means the
+  // bytes ARE on disk. Every durable consumer in this family reaches its write
+  // through this helper, so the tolerance lives here instead of in seven
+  // packages: propagating it made memory/usage/mutations/state/activity/
+  // feedback/events report "not written" for a write that happened, and a
+  // two-phase caller could then roll back a visible write. The durability loss
+  // is still observable — it is logged, not swallowed.
+  const committedOnly = (error: unknown): boolean => isCommittedWarning(error)
   if (io.transact) {
-    await io.transact(path, task)
-    return
+    try {
+      await io.transact(path, task)
+      return
+    } catch (error) {
+      if (!committedOnly(error)) throw error
+      console.warn(`evolution-io: ${path} was written but its directory fsync failed — the bytes are visible, durability is unconfirmed: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
   }
   const current = await io.readText(path)
   const next = await task(current)
@@ -87,7 +101,14 @@ export async function transactIo(
   // short-circuit the node backend's transact already has. Without it every
   // fallback RMW churned a tmp+rename and touched the mtime even when nothing
   // changed, so transact-less backends behaved asymmetrically.
-  else if (next !== current) await io.writeText(path, next)
+  else if (next !== current) {
+    try {
+      await io.writeText(path, next)
+    } catch (error) {
+      if (!committedOnly(error)) throw error
+      console.warn(`evolution-io: ${path} was written but its directory fsync failed — the bytes are visible, durability is unconfirmed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
 }
 
 /** Lazy adapter over an IO provider registry, shared by every evolution consumer. */
@@ -322,6 +343,106 @@ export function parseLockBody(body: string): number | null {
 }
 
 /**
+ * V27 G0.2 (EVO-IO-01): the write lock named by this claim is no longer ours
+ * at the commit point — a takeover reclaimed it while we were inside the
+ * critical section. The lock layer converts this into a retry of the whole
+ * read-modify-write; it must never reach a caller as a successful write.
+ */
+export class LostWriteLock extends Error {
+  constructor() {
+    super('evolution-io: the write lock was reclaimed before the commit')
+    this.name = 'LostWriteLock'
+  }
+}
+
+/** V27 G1.4: every quarantine-copy name this family has ever produced —
+ * `<file>.corrupt` (current fixed name), `<file>.corrupt.<epoch>`, and the
+ * v10-05 legacy `<file>.corrupt-<epoch>-<rand>` series. A user support file
+ * keeps a final extension (`.corrupt-backup.md`) and therefore stays. */
+const CORRUPT_COPY_RE = /\.corrupt(\.\d+|-\d+-[0-9a-z]+)?$/
+
+/** V27 G1.1: the three takeover windows, as protocol constants at ONE place
+ * (the inline copies that used to live in the acquisition loop, plus the dead
+ * branch's bare `1000`, are gone). */
+/** A named holder that is gone, past this age, is reclaimed. Fits inside the
+ * `lockAttempts * 50ms` retry budget so a dead holder's lock is reachable
+ * within one budget (v19 gate arithmetic: budget >= 2 x threshold). */
+export const DEAD_LOCK_TAKEOVER_MS = 1_000
+/** No body at all: nothing attributes the lock to a holder, so this is the one
+ * branch that cannot probe liveness — it must outlast any plausible stall
+ * between create and body write (V27 G0.2: 1s was below what a loaded machine
+ * actually took, which let a peer delete a live holder's lock). */
+export const EMPTY_LOCK_TAKEOVER_MS = 30_000
+/** A body with no parseable pid (crash mid-write): 1h, far above any legal hold
+ * and far below "forever". */
+export const LOCK_TEAR_TAKEOVER_MS = 3_600_000
+
+/**
+ * V27 G1.3: the error `commitTmp` throws when the rename landed but the parent
+ * directory fsync failed — the bytes ARE visible, only their durability is
+ * unconfirmed. A consumer that treats it as a plain failure reports "not
+ * written" for a write that happened (and a two-phase caller may try to roll
+ * back a visible write). Every transaction consumer must therefore treat this
+ * shape as SUCCESS-with-warning, never as a rejection.
+ */
+export function isCommittedWarning(error: unknown): boolean {
+  return (error as { committed?: unknown } | undefined)?.committed === true
+}
+
+/** V27 G1.1: the takeover branches, as a value. */
+export type TakeoverDecision = 'none' | 'dead' | 'empty' | 'corrupt'
+
+/** V27 G1.1: one lock observation, plus the liveness probe for its pid. */
+export interface TakeoverProbe {
+  /** Raw lock body. An empty string means the file exists with no content. */
+  body: string
+  /** Lock mtime in epoch ms. */
+  mtimeMs: number
+  /** Liveness probe for a pid (injected so the decision is a pure function). */
+  alive: (pid: number) => boolean
+  /** Evaluation instant (defaults to now). */
+  nowMs?: number
+  /** Threshold overrides — production callers use the protocol defaults. */
+  deadAfterMs?: number
+  emptyAfterMs?: number
+  corruptAfterMs?: number
+}
+
+/**
+ * V27 G1.1: the lock-takeover decision as ONE pure function, so the protocol is
+ * testable and exhaustive instead of being an inline expression inside the
+ * acquisition loop:
+ *   - `none`    the lock is fresh, or its holder is alive → wait, never steal;
+ *   - `dead`    a named holder that is gone, past the dead threshold;
+ *   - `empty`   no body at all: nothing attributes it to a holder, so only the
+ *               wide `emptyAfterMs` window may reclaim it;
+ *   - `corrupt` a body with no parseable pid (a crash mid-write), past the 1h
+ *               tear threshold.
+ * The age thresholds compare against `nowMs - mtimeMs` with `>` so a lock whose
+ * age EQUALS the threshold is not yet reclaimed (the boundary the v19 gate fix
+ * pinned).
+ */
+export function decideTakeover(probe: TakeoverProbe): TakeoverDecision {
+  const now = probe.nowMs ?? Date.now()
+  const age = now - probe.mtimeMs
+  // The pid prefix is read with the SAME rule the acquisition path always used
+  // (`split(':')[0]`), not with `parseLockBody`: the takeover must keep
+  // reclaiming a lock whose body is a bare pid (a hand-written or legacy lock),
+  // while `parseLockBody` is the stricter "is this a writer lock at all" gate
+  // the sweepers use.
+  const holder = Number(probe.body.split(':')[0] ?? '')
+  const namedHolder = Number.isInteger(holder) && holder > 0
+  if (probe.body === '') {
+    return age > (probe.emptyAfterMs ?? EMPTY_LOCK_TAKEOVER_MS) ? 'empty' : 'none'
+  }
+  if (!namedHolder) {
+    return age > (probe.corruptAfterMs ?? LOCK_TEAR_TAKEOVER_MS) ? 'corrupt' : 'none'
+  }
+  if (probe.alive(holder)) return 'none'
+  return age > (probe.deadAfterMs ?? DEAD_LOCK_TAKEOVER_MS) ? 'dead' : 'none'
+}
+
+/**
  * Build the Node IO backend. `lockAttempts` scales the write-lock retry budget
  * (attempts × 50ms); the default 40 (~2s, rc.69) covers production contention,
  * while contention TESTS on a loaded runner may raise it (e.g. 240 ≈ 12s) —
@@ -339,14 +460,6 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
   }
   /** True when the pid is alive (single source: `isProcessAlive`). */
   const isAlive = isProcessAlive
-  /**
-   * V10-07 (P2-1): age threshold for taking over a lock whose body is TORN
-   * (non-empty, but the pid prefix does not parse to a positive integer). 1h:
-   * a legal hold (the ~2s lock/rename retry budgets, a slow task) never
-   * approaches minutes, so 1h fires only in the "torn write + creator long
-   * dead" scenario — far above any legitimate hold, far below "forever".
-   */
-  const LOCK_TEAR_TAKEOVER_MS = 3_600_000
 
   /**
    * V10-06 (P1-1 integration fix): a takeover TICKET must never be reclaimed
@@ -394,8 +507,17 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
    * parseable pid) — is taken over after a wide 1h threshold with a
    * console.warn; before this branch such a lock blocked every future writer
    * forever.
+   * V27 G0.2 (EVO-IO-01): the CONTRACT for `task` is therefore: commit only
+   * after calling the `assertOwned` callback it receives, immediately before the
+   * rename (or delete) that publishes the result. A takeover may reclaim a lock
+   * whose holder is alive — an empty body cannot be attributed to a pid, and a
+   * peer can read a stale stat — and the holder cannot see it from the handle it
+   * opened (on POSIX its write lands on the UNLINKED inode). With the guard, a
+   * reclaimed claim aborts the RMW (`LostWriteLock`, converted into a retry
+   * here) instead of overwriting the current holder's result; without it, two
+   * writers commit and one update is silently lost.
    */
-  const withWriteLock = async <T>(path: string, task: () => Promise<T>): Promise<T> => {
+  const withWriteLock = async <T>(path: string, task: (assertOwned: () => Promise<void>) => Promise<T>): Promise<T> => {
     const lock = `${path}${LOCK_SUFFIX}`
     let myClaim = ''
     for (let attempt = 0; attempt < lockAttempts; attempt += 1) {
@@ -407,39 +529,56 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
       // REPLACE-on-Windows semantic (MOVEFILE_REPLACE_EXISTING), which
       // let every contender overwrite the winner's lock (9/9 double-held in
       // the 10-way repro — far worse than the gap it was meant to close).
-      let lockHandle: FileHandle | null = null
       try {
         myClaim = `${process.pid}:${randomBytes(4).toString('hex')}`
-        // V6-04 (0.3.35): the exclusive create is opened explicitly so a failure
-        // AFTER the create (write/close) still knows the on-disk file is OURS
-        // (`lockHandle` set). An unhandled 0-byte lock would block every future
-        // writer forever — its body fails the pid probe, so no takeover could
-        // ever clear it.
-        lockHandle = await open(lock, 'wx')
-        await lockHandle.writeFile(myClaim)
-        await lockHandle.close()
-        lockHandle = null
+        // V6-04 (0.3.35): the exclusive create must not leave an unhandled
+        // 0-byte lock behind — its body fails the pid probe, so no takeover
+        // could ever clear it (the catch below removes OUR artifact).
+        // V27 G1.2 (EVO-IO-01): create AND write in ONE call. The former
+        // `await open('wx')` followed by an awaited `handle.writeFile()` yielded
+        // to the event loop between the exclusive create and the body, which is
+        // exactly the empty-lock window a takeover can observe; `writeFile` with
+        // the `wx` flag issues the same two syscalls back to back inside one
+        // libuv request chain, so no JS turn separates them.
+        await writeFile(lock, myClaim, { flag: 'wx' })
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
-        // V6-04: our create opened the file, so the failure is post-create —
-        // remove OUR artifact before throwing (a leftover 0-byte/partial lock
-        // outlives this writer as a permanent deadlock). A wrong rm is
-        // impossible here: `open('wx')` is the exclusive create, and while the
-        // file exists no other process can have created that name.
-        if (lockHandle) {
-          await lockHandle.close().catch(() => {})
-          await rm(lock, { force: true }).catch(() => {})
-          throw error
-        }
         // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
         // when a peer's holder-lock delete races our create; treat it as the
         // same retryable contention as EEXIST (rc.67).
-        if (code !== 'EEXIST' && code !== 'EPERM') throw error
+        if (code === 'EEXIST' || code === 'EPERM') {
+          // …contended: fall through to the takeover probe below.
+        } else {
+          // V6-04: any other failure happened AFTER the exclusive create took
+          // the name (the open could not have raced anyone), so the file — empty
+          // or truncated — is OURS. Remove it before throwing: a leftover lock
+          // outlives this writer as a permanent deadlock. A wrong rm is
+          // impossible: while the name exists no other process can have created
+          // it (O_EXCL).
+          await rm(lock, { force: true }).catch(() => {})
+          throw error
+        }
         try {
           const st = await stat(lock)
-          const holderContent = await readFile(lock, 'utf8').catch(() => '')
+          // V27 G0.2 (EVO-IO-01): a FAILED read must not be coerced to ''.
+          // `.catch(() => '')` fabricated the empty-body shape out of a real
+          // read failure (the usual one: a peer removed the stale lock between
+          // our stat and this read), and `staleEmpty` then matched a lock that
+          // was NOT empty — including a peer's freshly created, still-being-
+          // written claim. The pseudo-empty body also skipped the pid probe, so
+          // the ticket holder removed a LIVE claim: two writers inside the
+          // critical section, one RMW lost, both reporting success (the 30/32
+          // and 5/6 contention failures). An unreadable lock is simply an
+          // observation we cannot act on — re-enter the loop.
+          const holderRead = await readFile(lock, 'utf8').then(
+            body => ({ ok: true as const, body }),
+            () => ({ ok: false as const, body: '' }),
+          )
+          if (!holderRead.ok) continue
+          const holderContent = holderRead.body
+          // Same pid-prefix rule as `decideTakeover` (a bare-pid body is a valid
+          // claim); `parseLockBody` is the stricter sweepers' gate, not this one.
           const holder = Number(holderContent.split(':')[0] ?? '')
-          const holderAlive = Number.isInteger(holder) && holder > 0 && isAlive(holder)
           // F-367 (①), V4-05: a self-pid lock is recycled ONLY when the failed
           // release was recorded in pendingSelfCleanup (a task that ended but
           // could not rm in finally). A same-process lock is NEVER recycled on
@@ -498,17 +637,25 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
           // so the lock blocked every future writer FOREVER (sweepStaleTmps
           // deliberately skips `.lock`); past LOCK_TEAR_TAKEOVER_MS it is
           // taken over too, with a console.warn marking the anomaly.
-          const staleDead = Number.isInteger(holder) && holder > 0 && Date.now() - st.mtimeMs > 1000 && !holderAlive
-          const staleEmpty = holderContent === '' && Date.now() - st.mtimeMs > 1000
-          const staleCorrupt = holderContent !== ''
-            && !(Number.isInteger(holder) && holder > 0)
-            && Date.now() - st.mtimeMs > LOCK_TEAR_TAKEOVER_MS
-          if (staleDead || staleEmpty || staleCorrupt) {
-            if (staleCorrupt) {
-              // Exactly one warn per actual takeover — an anomaly that should
-              // not exist in a healthy deployment.
-              console.warn(`evolution-io: took over a corrupt write lock "${lock}" (body ${JSON.stringify(holderContent)} has no parseable pid, lock older than 1h) — a previous writer likely crashed mid-write`)
-            }
+          // V27 G1.1: the decision itself is the pure `decideTakeover` — the
+          // three windows (dead / empty / corrupt) live in one testable place
+          // instead of three inline expressions here.
+          const decision = decideTakeover({
+            body: holderContent,
+            mtimeMs: st.mtimeMs,
+            alive: isAlive,
+          })
+          if (decision !== 'none') {
+            // V27 G0.2 (EVO-IO-01): every takeover is a structured, observable
+            // event — the branch that fired, the body it judged, how old the
+            // lock was and which pid (if any) it named. A takeover is the only
+            // best-effort surface in this protocol, so "who took what from
+            // whom" must be reconstructible from the log after the fact.
+            console.warn(
+              `evolution-io: taking over write lock ${lock} (branch=stale${decision[0]?.toUpperCase()}${decision.slice(1)}, `
+              + `body=${JSON.stringify(holderContent)}, ageMs=${Date.now() - st.mtimeMs}, `
+              + `holderPid=${Number.isInteger(holder) && holder > 0 ? holder : 'none'})`,
+            )
             const current = await readFile(lock, 'utf8').catch(() => '')
             if (current === holderContent) {
               const ticket = `${lock}.next`
@@ -589,8 +736,35 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
       }
       // Phase 2 — run the task under the held lock. Its own errors propagate
       // (the lock was released in finally); they are never lock contention.
+      // V27 G0.2 (EVO-IO-01): the commit-point ownership guard. A takeover can
+      // wrongly reclaim a lock whose holder is alive (an unattributable empty
+      // body, a descheduled creator, a peer that read a stale stat), and the
+      // holder cannot see that from the handle it opened — on POSIX it keeps
+      // writing to the UNLINKED inode while the name now belongs to a peer, so
+      // both writers commit and one RMW is silently lost. The invariant that
+      // makes this protocol load-independent is therefore: COMMIT ONLY WHILE
+      // THE NAME STILL CARRIES OUR CLAIM. `io.writeText`/`io.transact` call
+      // this immediately before their rename (after the payload is durable);
+      // losing the claim aborts the whole RMW, which the caller then re-runs
+      // under a fresh acquisition — a lost lock costs one retry, never data.
+      const assertOwned = async (): Promise<void> => {
+        const body = await readFile(lock, 'utf8').catch(() => null)
+        if (body !== myClaim) {
+          console.warn(
+            `evolution-io: write lock ${lock} was reclaimed by another writer before the commit `
+            + `(on disk now: ${JSON.stringify(body)}, ours: ${JSON.stringify(myClaim)}) — `
+            + 'aborting this read-modify-write and retrying under a fresh acquisition',
+          )
+          throw new LostWriteLock()
+        }
+      }
       try {
-        return await task()
+        return await task(assertOwned)
+      } catch (error) {
+        // A claim lost before its commit is ordinary contention: the whole RMW
+        // is redone (the fresh read sees whatever the new holder wrote).
+        if (error instanceof LostWriteLock) continue
+        throw error
       } finally {
         // F-367 (②): a failed release is no longer silently swallowed — record
         // the path so the NEXT write to the same file self-heals it.
@@ -712,8 +886,13 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
       // (`validateSupportPath` reserves names ending in `.corrupt`), so a user
       // support file such as `overview.md.corrupt-backup.md` — creatable
       // because it does not END in `.corrupt` — is not deleted after 7 days.
-      // The stamped quarantine copies (`<file>.corrupt.<epoch>`) are swept.
-      if (/\.corrupt(\.\d+)?$/.test(name)) {
+      // V27 G1.4: the predicate must also cover EVERY shape this family has
+      // minted, or an abandoned copy lives forever. The v10-05 series was
+      // `<file>.corrupt-<epoch>-<rand>` (a fresh copy per read, hence the
+      // switch to the fixed name), and those copies are still on disk in any
+      // deployment upgraded from that era — the old `\.corrupt(\.\d+)?$` never
+      // matched the hyphenated form.
+      if (CORRUPT_COPY_RE.test(name)) {
         const corruptPath = join(dir, name)
         try {
           const st = await stat(corruptPath)
@@ -736,19 +915,22 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
     },
     async writeText(path, content) {
       await mkdir(dirname(path), { recursive: true })
-      await withWriteLock(path, async () => {
+      await withWriteLock(path, async (assertOwned) => {
         await sweepStaleTmps(path)
         // V10-06 (P1-1): durable tmp (exclusive create + handle fsync) before
         // the rename — the upstream storage-json crash-durable protocol, not
         // a bare writeFile whose data blocks could trail the rename metadata
         // across a power loss.
         const tmp = await writeDurableTmp(path, content)
+        // V27 G0.2: the claim is verified immediately before the commit — the
+        // one instant where a stolen lock turns into a lost update.
+        await assertOwned()
         await commitTmp(tmp, path)
       })
     },
     async transact(path, task) {
       await mkdir(dirname(path), { recursive: true })
-      await withWriteLock(path, async () => {
+      await withWriteLock(path, async (assertOwned) => {
         await sweepStaleTmps(path)
         let current: string | null
         try {
@@ -761,6 +943,8 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         }
         const next = await task(current)
         if (next === null) {
+          // V27 G0.2: a delete is a commit too — the same ownership gate.
+          await assertOwned()
           await rm(path, { force: true })
           return
         }
@@ -773,6 +957,7 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         }
         // V10-06 (P1-1): same durable tmp protocol as writeText.
         const tmp = await writeDurableTmp(path, next)
+        await assertOwned()
         await commitTmp(tmp, path)
       })
     },

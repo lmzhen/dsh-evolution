@@ -60,9 +60,16 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 // acceptable for a redactor; leaking or eating an unrelated line is not.
 // Capture groups: 1 = leading boundary (kept), 2 = connected prefix (kept),
 // 3 = key (kept), 4 = separator (kept), 5 = value (masked).
+// V27 G0.5 (CB-1): group 4 tolerates a CLOSING QUOTE after the key. In JSON —
+// the most common carrier of credentials in tool results and session text —
+// the key is quoted (`"password": "hunter2"`), and the quote between the key
+// and the `:` made the separator miss entirely, so the whole pattern failed and
+// the value crossed the boundary verbatim. Value-shape patterns only masked
+// well-known token prefixes; an arbitrary passphrase like `hunter2` had no
+// layer left to catch it.
 const INLINE_ASSIGNMENT_PATTERN = new RegExp(
   '(^|[^\\w-])([\\w-]{0,64}[_\\-])?((?:token|api[_-]?key|secret|password|passwd)' +
-  '(?:[_\\-][\\w-]{0,64})?)\\b([\\t ]*[:=][\\t ]*)' +
+  '(?:[_\\-][\\w-]{0,64})?)\\b(["\\\']?[\\t ]*[:=][\\t ]*)' +
   '([^\\r\\n]+)',
   'gi',
 )

@@ -99,6 +99,7 @@ pins the equality).
 | EVOLUTION_SCOPE | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. Plugin runtime never reads it |
 | DSH_EVOLUTION_DELTA_PATH | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment path the layered installer composes from; default stays the packaged `evolution-agent/agent.cordis.yml`. Plugin runtime never reads it |
 | DSH_EVOLUTION_ARCH_STRICT | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
+| DSH_EVOLUTION_DECLARED_CONFIG_STRICT | guard scripts only (`verify-declared-config.mjs`) | `1` makes the declared-config-reach guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
 
 ## Composition
 
@@ -137,9 +138,17 @@ infra rows mount twice. The one-click preset carries its own
 `evolution-maintenance-tools` row, its own `session-query-sqlite` index
 override and the same root-level `tool-skill` 60-char catalog cap override as
 the host bundle. Sessions running under an agent preset read the PRESET-scope
-`tool-skill` row, which no profile patch can reach; the layered flow injects
-the cap onto that row at generation time (V10-14). The 60-char authoring bar
-enforced by tool-skill-manage applies regardless.
+`tool-skill` row, which no profile patch can reach — and under the web profile
+the platform DISABLES the profile-root row
+(`packages/bundle/web-app/cordis.patch.yml`), so a profile-root override takes
+effect in headless/base installs only. For presets the evolution composer
+generates (`/evolution preset install` and the layered flow — one rule since
+0.3.53) the composer injects the cap onto that preset row; a session running a
+preset the composer did not generate (a platform preset, or one anchored
+before the composer ran) keeps the platform default until the preset is
+recomposed or the upstream default changes. The `verify-declared-config.mjs`
+guard prints this reach per profile and per declared key. The 60-char authoring
+bar enforced by tool-skill-manage applies regardless.
 
 Or compose manually — order matters because provider rows declare `inject`.
 This mirrors the row set shipped by the two bundles (evolution-host infra +

@@ -10,9 +10,9 @@ import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, contentHash, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, contentHash, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_USER_CHAR_LIMIT, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
@@ -21,13 +21,14 @@ import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 export const name = 'evolution-review'
 export const inject = ['agents']
 
-/** Node's 32-bit timer-delay ceiling (`AbortSignal.timeout`/`setTimeout`):
- * a larger value throws RangeError. B-2 (v18): without a max, a misconfigured
- * `reviewTimeoutMs` made `AbortSignal.timeout` throw inside the subagent
- * start call; the outer catch logged it and silently degraded the review to
- * the inject path. The schema and the assembly clamp both reject it (same
- * bound as commands/maintenance). */
-const MAX_TIMER_DELAY_MS = 2_147_483_647
+// V27 G2.4: `MAX_TIMER_DELAY_MS` comes from evolution-core/constants.ts — the
+// ONE definition (this file used to carry a second copy of the literal). Node's
+// 32-bit timer-delay ceiling (`AbortSignal.timeout`/`setTimeout`) throws
+// RangeError above it: B-2 (v18) — without a max, a misconfigured
+// `reviewTimeoutMs` made `AbortSignal.timeout` throw inside the subagent start
+// call, and the outer catch logged it and silently degraded the review to the
+// inject path. The schema and the assembly clamp both reject it (same bound as
+// commands/maintenance).
 
 export interface Config {
   reviewEnabled?: boolean
@@ -70,8 +71,9 @@ export interface Config {
    * skills in the SAME tree the catalog/tools read instead of writing a
    * parallel tree the rest of the family cannot see. E-7 (v18): canonical key. */
   root?: string
-  /** Deprecated alias of `root` (E-7, v18); honoured only while `root` is
-   * empty, with a warning; removed after 0.3.65. */
+  /** V27 G2.4 (M-08): the retired `skillsRoot` alias, kept in the schema so a
+   * config that still sets it reaches {@link assertSkillsRootAliasRetired} and
+   * fails the load instead of being silently dropped. Never read. */
   skillsRoot?: string
 }
 
@@ -105,7 +107,9 @@ export const Config: z<Config> = z.object({
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
   // V10-11 (P2-7): empty string keeps the default root (resolveSkillsRoot
   // trims and falls back) — the schema default mirrors the Config contract.
-  // E-7 (v18): `root` is canonical; `skillsRoot` is the deprecated alias.
+  // E-7 (v18) → V27 G2.4: `root` is canonical. The retired `skillsRoot` alias
+  // stays declared so a stale config reaches assertSkillsRootAliasRetired()
+  // and fails the load; nothing reads the value.
   root: z.string().default(''),
   skillsRoot: z.string().default(''),
 })
@@ -247,11 +251,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
   }
   const config = clampReviewConfig(rawConfig, ctx)
-  // E-7 (v18): canonical `root`, deprecated `skillsRoot` alias.
+  // E-7 (v18) → V27 G2.4 (M-08): canonical `root` only; the expired
+  // `skillsRoot` alias fails the load instead of being silently ignored.
+  assertSkillsRootAliasRetired(rawConfig)
   const rootConfig = resolveRootConfig(rawConfig)
-  if (rootConfig.usedDeprecatedAlias) {
-    ctx.logger.warn('evolution-review: config "skillsRoot" is deprecated (E-7); use "root" — the alias is honoured until 0.3.65')
-  }
   const turnStarts = new Map<SessionId, number>()
   // P3 (v15): per-mount one-shot for the stateless warn (was module-level).
   let statelessReviewStateWarned = false
@@ -415,9 +418,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       advanced.kind = advanceReview(state, event.data.turn, signal, {
         memoryInterval: snapshot?.reviewMemoryInterval ?? config.memoryInterval,
         skillInterval: snapshot?.reviewSkillInterval ?? config.skillInterval,
-        substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? 3,
-        substantiveMinUserChars: snapshot?.substantiveMinUserChars ?? 200,
-        substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
+        // V27 G2.4: the fallbacks are the SAME core constants the policy schema
+        // defaults to — a bare 3/200/500 here silently diverged the moment the
+        // policy default changed (a snapshot-less deployment kept the old bar).
+        substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS,
+        substantiveMinUserChars: snapshot?.substantiveMinUserChars ?? DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
+        substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
         // 0.3.40 (user decision): the counting window restarts at the INJECTION —
         // the counters stay monotonic across threshold fires and are zeroed at
         // the flush below (one injection per task segment regardless of how many
@@ -498,6 +504,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             } catch (emitError) {
               ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
             }
+          } else if (reviewOutcome === 'dropped') {
+            // V27 R-01: nothing was queued and nothing was delivered (the queue
+            // was at cap). Keep the latch — the next completed boundary retries
+            // this segment's review — and skip the counter reset below (zeroing
+            // would declare a segment that never got its review). The cap warn
+            // in trySubagentReview already names the cause.
+            pendingCadenceReviews.set(session.id, pendingKind)
+            return
           } else if (reviewOutcome !== 'deferred') {
             // Subagent path failed at the END — fall back to the prompt delivery
             // (still at completion; there is no later boundary to defer to).
@@ -725,7 +739,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // the E-19/C-3 comment), not by this flag.
   ctx.effect(() => () => { deferredFallbackReviews.length = 0 }, 'dsh-evolution-review.deferred-drain')
 
-  async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred'> {
+  async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred' | 'dropped'> {
     if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentLike | undefined
     if (!subagents) return false
@@ -749,10 +763,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           channel: 'inject',
           counts: signal as { toolCalls: number; userChars: number; assistantChars: number },
         })
-      } else {
-        ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropping one fallback review prompt`)
+        return 'deferred'
       }
-      return 'deferred'
+      // V27 R-01: the queue is at cap, so the prompt was NOT queued. Reporting
+      // 'deferred' here told every caller "already handled": the cadence flush
+      // dropped its latch and zeroed the counters, and this segment's only
+      // review vanished — no prompt, no event, no retry, no count. The
+      // completion channel's cap branch already rolls back; this one reports the
+      // truth so the caller can keep its latch and retry next boundary.
+      ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropping one fallback review prompt`)
+      return 'dropped'
     }
     reviewInFlight = true
     try {
@@ -762,8 +782,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // for the life of the process, so a single read is valid after the run.
       const snapshot = policy()
       const model = kind === 'memory'
-        ? snapshot?.memoryReviewModel ?? 'deepseek-v4-flash'
-        : snapshot?.skillReviewModel ?? 'deepseek-v4-pro'
+        // V27 G2.4: same core constants as the policy schema — the review leg
+        // must not fall back to a model the policy would never have chosen.
+        ? snapshot?.memoryReviewModel ?? DEFAULT_MEMORY_REVIEW_MODEL
+        : snapshot?.skillReviewModel ?? DEFAULT_SKILL_REVIEW_MODEL
       const reviewText = redactReviewSecrets(buildReviewRequest(
         session,
         kind,
@@ -832,15 +854,66 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const acceptedSkillOps = validation.accepted.skillOps ?? []
         const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
+        const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
+          .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
+        // V27 G4.3: ONE exit for the plan-outcome event. The payload used to be
+        // built inline at the very end of the happy path, so a write leg that
+        // TIMED OUT emitted nothing at all: replay and activity saw a review that
+        // did nothing while memory/skill had already been changed — the
+        // false-negative direction of the audit's R-04. `executePlan` reports each
+        // op the moment it lands (`onLanded`), so the timeout path can record the
+        // ops that really landed before the deadline. A synchronous throwing
+        // listener stays contained (V5-19③: it must not flip `started` and
+        // re-trigger the review).
+        type AppliedReport = { actions: readonly string[]; failedOps?: readonly string[]; executionError?: string | undefined }
+        const emitApplied = (report: AppliedReport): void => {
+          try {
+            ctx.emit('evolution/plan-applied', {
+              sessionId: session.id,
+              planId: randomUUID(),
+              policyFingerprint,
+              memoryApplied: report.actions.filter(action => action.startsWith('Memory')).length,
+              skillApplied: report.actions.filter(action => action.startsWith('Skill ')).length,
+              rejectedOps: validation.rejected.length,
+              // V27 R-03: "the plan named a skill this session never read" is its
+              // own dimension. Reporting it inside `rejectedOps` broke that field's
+              // stated contract (validation rejects only) and made the replay
+              // leaderboard penalize one refusal twice (rejectedOps weight AND the
+              // executionFailures dimension).
+              ...skippedUnread > 0 ? { skippedUnread } : {},
+              executionFailures: report.failedOps?.length ?? 0,
+              ...report.executionError !== undefined ? { executionError: report.executionError } : {},
+              evidenceQuotes,
+              estimatedInputChars: reviewText.length,
+            })
+          } catch (emitError) {
+            ctx.logger.warn(`dsh-evolution-review: plan-applied emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+          }
+        }
         // v20 (C-2): the write leg gets the same deadline class as the
         // subagent leg (config value is schema-clamped ≤ 2^31-1). A timeout
         // rejects into the pipeline catch below — the single-flight flag is
         // reset in the finally either way, so the channel recovers instead of
         // silently degrading to inject for the process lifetime.
-        const executed = await withTimeout(executePlan(validation.accepted, session), config.reviewTimeoutMs, 'review plan execution')
+        const landed: string[] = []
+        let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
+        try {
+          executed = await withTimeout(
+            executePlan(validation.accepted, session, action => landed.push(action)),
+            config.reviewTimeoutMs,
+            'review plan execution',
+          )
+        } catch (error) {
+          // V27 G4.3: the deadline hit mid-write. Everything in `landed` is a
+          // durable write that already happened, so it is recorded before the
+          // failure propagates (the review itself still fails loud).
+          emitApplied({
+            actions: landed,
+            executionError: `execution timed out after ${config.reviewTimeoutMs}ms`,
+          })
+          throw error
+        }
         const actions = executed.actions
-        const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
-          .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
         if (actions.length > 0) {
           const applied = actions.join(' · ')
           // E-59d: on partial failure the model must know which ops already
@@ -880,29 +953,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // Process event, payload v2 (sessionId) — plan-outcome durability is the
         // evolution-activity store's job; the session log stays native-only.
         // Emitted AFTER the result-notice inject (E-41 ordering: record the
-        // outcome only once the model was told what landed).
-        // V5-19 (0.3.31): the emit is inside a protection domain — a synchronous
-        // throwing listener must not flip `started` to false via the outer catch
-        // and re-trigger the same kind of review (the V4-21① shape, relocated);
-        // and the payload now carries the execution-failure dimension so a
-        // consumer can tell "rejected by validation" from "failed at execution".
-        try {
-          ctx.emit('evolution/plan-applied', {
-            sessionId: session.id,
-            planId: randomUUID(),
-            policyFingerprint,
-            memoryApplied: actions.filter(action => action.startsWith('Memory')).length,
-            skillApplied: actions.filter(action => action.startsWith('Skill ')).length,
-            rejectedOps: validation.rejected.length + skippedUnread,
-            executionFailures: executed.failedOps.length,
-            ...(executed.aborted !== undefined ? { executionError: executed.aborted } : {}),
-            ...(executed.failedOps[0] !== undefined && executed.aborted === undefined ? { executionError: executed.failedOps[0] } : {}),
-            evidenceQuotes,
-            estimatedInputChars: reviewText.length,
-          })
-        } catch (emitError) {
-          ctx.logger.warn(`dsh-evolution-review: plan-applied emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-        }
+        // outcome only once the model was told what landed) through the single
+        // `emitApplied` exit defined above (V27 G4.3).
+        emitApplied({
+          actions,
+          failedOps: executed.failedOps,
+          ...executed.aborted !== undefined
+            ? { executionError: executed.aborted }
+            : executed.failedOps[0] !== undefined ? { executionError: executed.failedOps[0] } : {},
+        })
         return true
       } finally {
         // Dispose on EVERY exit (rc.42 audit P1-3): a timed-out / aborted run
@@ -976,6 +1035,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function executePlan(
     plan: EvolutionPlan,
     session?: Session,
+    /** V27 G4.3: called the moment an op lands, so a caller that abandons this
+     * run (the write leg's timeout) can still record what really happened. */
+    onLanded?: (action: string) => void,
   ): Promise<{ actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }> {
     const sessionId = session?.id
     const memory = ctx.get('memory') as MemoryLike | undefined
@@ -1017,7 +1079,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const result = approval
           ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized, session)
           : await memory?.applyBatch(normalized.target, [normalized])
-        if (result?.ok) actions.push('Memory updated')
+        if (result?.ok) { actions.push('Memory updated'); onLanded?.('Memory updated') }
         else {
           ok = false
           failedOps.push(`memory ${normalized.action} ${normalized.target}: ${result?.message ?? 'service unavailable'}`)
@@ -1047,7 +1109,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const result = approval
           ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs, session)
           : await executeSkillDirect(args)
-        if (result?.ok) actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
+        if (result?.ok) {
+          actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
+          onLanded?.(`Skill ${op.name} ${op.action ?? 'patch'}`)
+        }
         else {
           ok = false
           failedOps.push(`skill ${op.action ?? 'patch'} ${op.name}: ${result?.message ?? 'service unavailable'}`)
@@ -1123,7 +1188,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // V10-11 (P2-7): the review's background writes previously constructed
       // the library on the hardcoded default root, so a custom-root deployment
       // wrote skills into a tree the catalog/tools never read. Route through
-      // the single core resolver (empty config.skillsRoot = default root).
+      // the single core resolver (an empty `root` = default root; the retired
+      // `skillsRoot` alias never reaches here — the load refuses it).
       const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
       const op = skillArgs
       const name = op.name ?? ''

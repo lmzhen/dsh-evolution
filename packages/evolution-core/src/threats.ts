@@ -142,6 +142,9 @@ const SCOPE_ORDER: Record<ThreatScope, number> = { all: 1, context: 2, strict: 3
  * benign phrasing (e.g. a skill that legitimately opens with "You are now a ...")
  * can exclude that label by name here. This is opt-in and never widens strict
  * scope; it only permits callers to drop a known-innocent match.
+ * V27 G-1: an exclusion drops the FINDING for that label — it never removes the
+ * de-obfuscation the other patterns are matched against, so exempting the
+ * unicode rules cannot re-open a splitting bypass.
  */
 export interface ScanOptions {
   /** Pattern labels to skip during this scan. */
@@ -208,9 +211,19 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   //   - STRIPPED variant: an intra-word splitter (soft hyphen in "n\u00ADot")
   //     rejoins the word — a space there would leave "n ot" unmatched.
   const SPACE_SPLITTERS = /[\u00ad\u061c\u180e\u200c\ufe00-\ufe0f]/gu
+  // V27 G-1 (P1): the reconstruction must cover the ZERO-WIDTH class too, not
+  // just the typography set. `unicode_zero_width` is the only rule that reports
+  // ZWSP/WJ/BOM/TAG, so exempting that single label used to be a complete
+  // bypass: the characters produced no finding (the guard was excluded) AND the
+  // pattern variants never removed them, so `ig<ZWSP>nore all previous
+  // instructions` matched no injection pattern at all. Exempting a label may
+  // silence its FINDING; it may never blind the detector that the finding
+  // protects. ZWJ rides along (its own report is context-sensitive) because a
+  // ZWJ between words splits a pattern just as effectively.
+  const OBFUSCATION_SPLITTERS = new RegExp(`[${INVISIBLE_CHAR_CLASS}\\u200d]`, 'gu')
   const patternTexts = [
-    normalized.replace(SPACE_SPLITTERS, ' '),
-    normalized.replace(SPACE_SPLITTERS, ''),
+    normalized.replace(SPACE_SPLITTERS, ' ').replace(OBFUSCATION_SPLITTERS, ' '),
+    normalized.replace(SPACE_SPLITTERS, '').replace(OBFUSCATION_SPLITTERS, ''),
   ]
   const windows: string[] = []
   for (const patternText of patternTexts) {

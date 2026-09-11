@@ -5,9 +5,10 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
@@ -24,8 +25,9 @@ export interface Config {
    * resolved through resolveSkillsRoot() so an empty/whitespace value falls
    * back to the default instead of a CWD-relative root. */
   root?: string | undefined
-  /** Deprecated alias of `root` (E-7, v18): honoured only while `root` is
-   * empty, with a warning; removed after 0.3.65. */
+  /** V27 G2.4 (M-08): RETIRED alias of `root`. The field stays declared so the
+   * loader can hand it to the load-time gate (which rejects it loudly) instead
+   * of dropping it silently; the plugin never reads it as a root. */
   skillsRoot?: string | undefined
   /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
    * secondary calls inside the window return the previous runId instead of
@@ -66,13 +68,11 @@ import { buildEnrichment } from '@deepseek-ai/dsh-evolution-maintenance'
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
-  // E-7 (v18): one root key for the whole family — resolve `root` (canonical)
-  // with `skillsRoot` accepted as a deprecated alias for one minor version.
-  const rootConfig = resolveRootConfig(rawConfig)
-  if (rootConfig.usedDeprecatedAlias) {
-    ctx.logger.warn('evolution-commands: config "skillsRoot" is deprecated (E-7); use "root" — the alias is honoured until 0.3.65')
-  }
-  const skillsRootValue = rootConfig.root
+  // E-7 (v18) → V27 G2.4 (M-08): one root key for the whole family. The
+  // `skillsRoot` alias expired at 0.3.65; a config that still sets it fails the
+  // load here instead of pointing at a root nobody reads.
+  assertSkillsRootAliasRetired(rawConfig)
+  const skillsRootValue = resolveRootConfig(rawConfig).root
   let lastMaintainAt = 0
   let lastMaintainRunId = ''
   // 0.3.11 single-flight: 0.3.5 discovered the cooldown never covers in-flight
@@ -81,7 +81,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // "already running" instead of spawning a second scan.
   let maintainInFlightSince = 0
   ctx.inject(['commands'], (commandCtx) => {
-    const commands = (commandCtx as unknown as { commands: CommandRuntimeLike }).commands
+    // V27 G5.2: the platform's own `Context.commands` augmentation + its
+    // `CommandDefinition` type are the contract here (previously a local
+    // `CommandRuntimeLike { register(definition: unknown) }` and a hand-written
+    // `CommandInvocation`, which silenced every upstream shape change: adding a
+    // required member to the definition or the invocation failed to compile
+    // nowhere in this family). `@deepseek-ai/dsh-commands` is a declared peer,
+    // so the types resolve through the same package the platform mounts.
+    const commands = commandCtx.commands
     // M-11 (S6.2, E-29): bind the register disposer to the fiber — an unbound
     // registration survives reload/HMR and registers /evolution twice.
     // evolution-learning-graph is the aligned precedent
@@ -113,7 +120,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // free-text branches (`learn <request>`, the quoted restructure
         // heading) read their arguments from `rawInputTrimmed` so the user's
         // original spacing reaches the prompt/disk untouched.
-        const rawInputTrimmed = invocation.rawInput?.trim() ?? ''
+        // V27 G5.2: the platform's `CommandInvocation` declares `rawInput` as a
+        // non-optional string (as the dispatcher always provides), so the
+        // defensive `?? ''` went with the local structural view.
+        const rawInputTrimmed = invocation.rawInput.trim()
         const input = rawInputTrimmed.replace(/\s+/g, ' ')
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
@@ -321,15 +331,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // spacing (only trim) — the whitespace collapse is dispatch-only.
           const request = rawInputTrimmed === 'learn' ? '' : rawInputTrimmed.slice(6).trim()
           // rc.67: command results never enter model history, so an echo can
-          // never reach the agent. INJECT the learn prompt as a first-class
-          // user message (same pattern as the auto-review inject path).
+          // never reach the agent. The prompt is injected as a first-class user
+          // message (same pattern as the auto-review inject path).
           // rc.70 F-2: always via createUserMessage — UserMessage requires
           // role:'user' plus the minted id; a bare object only works because
           // the DeepSeek adapter routes undefined-role into the user branch.
-          invocation.agent.inject(createUserMessage({
+          // V27 G0.5 (U-1): delivered through the WAKING channel. `agent.inject`
+          // is `send(input, 'next-step', wakeup=false)` — it queues the prompt
+          // but never starts a turn, and a slash command does not open one, so
+          // `/evolution learn` reported "Follow it now" while nothing happened
+          // until the user happened to send another message. `agent.followup`
+          // (send 'next-turn', wakeup=true) is the waking primitive; a host that
+          // does not expose it degrades to inject — the same followup-first
+          // contract evolution-review already ships (V7-03).
+          const message = createUserMessage({
             content: [{ type: 'text', text: buildLearnPrompt(request) }],
             source: { kind: 'plugin', plugin: 'dsh-evolution-commands', form: 'notice', summary: 'learn request' },
-          }))
+          })
+          const followup = (invocation.agent as unknown as { followup?: (message: unknown) => void }).followup
+          const woke = typeof followup === 'function'
+          if (woke) followup(message)
+          else invocation.agent.inject(message)
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is
           // skipped and the inject is never blocked.
@@ -341,7 +363,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               ctx.logger.warn(`evolution-commands: failed to record learn event: ${String(error)}`)
             })
           }
-          return ok('Learning request sent to this session. Follow it now.')
+          return woke
+            ? ok('Learning request sent to this session. Follow it now.')
+            : ok('Learning request queued for this session — this host exposes no wake-up channel, so it is read on your next message.')
         }
         if (input === 'maintain --facts') {
           // 0-token deterministic preview (011 §12-1 v12): facts block only,
@@ -379,15 +403,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // error from a `--timeout` typo.
           // P2-10 (v19): the real ceiling is 2^31-1. Node accepts [2^31, 2^32-1]
           // without throwing, warns, and silently sets 1ms — a "legal" value
-          // that aborts the scan immediately. The message below already said
-          // 2147483647; the comparison now agrees with it.
-          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0 || runTimeoutMs > 0x7FFFFFFF) {
+          // that aborts the scan immediately. V27 G2.4: the messages interpolate
+          // MAX_TIMER_DELAY_MS, so the number has ONE definition (constants.ts).
+          if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0 || runTimeoutMs > MAX_TIMER_DELAY_MS) {
             // P2-20 (F3, v11): name the ACTUAL source — a bad config value used
             // to be reported as a `--timeout` CLI typo and permanently
             // deadlock maintain (the user had no CLI flag to fix).
             return err(maintainArgs[1]
-              ? 'Invalid --timeout value: expected a positive integer number of milliseconds up to 2147483647 (e.g. /evolution maintain --timeout 600000).'
-              : 'The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to 2147483647. Fix the evolution-commands row config (maintainTimeoutMs), then retry.')
+              ? `Invalid --timeout value: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS} (e.g. /evolution maintain --timeout 600000).`
+              : `The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS}. Fix the evolution-commands row config (maintainTimeoutMs), then retry.`)
           }
           if (maintainInFlightSince > 0) {
             const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
@@ -443,6 +467,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() },
                 tools: { get: (name: string) => (ctx.get('tools') as { get(name: string): unknown } | undefined)?.get(name) },
                 logger: { warn: (message: string) => { ctx.logger.warn(message) } },
+                // V27 M-02: the io seam lists a missing directory as empty, so
+                // the orchestrator needs this probe to tell a misconfigured root
+                // (an unexpanded `~`, a typo) from a genuinely empty library.
+                rootExists: () => ioRegistry.provider().exists(skillsRootValue),
+                skillRoot: skillsRootValue,
               },
               {
                 timeoutMs: runTimeoutMs,
@@ -576,8 +605,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
               args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
-              ...session?.id ? { sessionId: session.id } : {},
-              ...session ? { session } : {},
+              // V27 G5.2: `agent.session` is non-optional on the platform's
+              // Agent type, so the session always rides the staged record.
+              ...session.id ? { sessionId: session.id } : {},
+              session,
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},
             })
             if (decision.action === 'staged') {
@@ -616,10 +647,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       },
     }))
   })
-}
-
-interface CommandRuntimeLike {
-  register(definition: unknown): () => void
 }
 
 /**
@@ -798,23 +825,13 @@ export function atomicWriteFiles(
 // to that very parse) was a fragile cross-package text contract and is gone
 // without a dual track; formatPlan's rendering itself is unchanged.
 
-interface CommandInvocation {
-  rawInput?: string
-  // V24-10 (v24): `session` joined the structural view (learning-graph's
-  // GraphInvocation shape) so the restructure staging can attribute the
-  // staged record and honor the session approval policy.
-  agent: {
-    inject(message: unknown): void
-    session?: {
-      id?: string
-      header?: { origin?: string }
-    }
-  }
-  /** E-6 (v18): the platform's cancel signal; forwarded to the maintenance scan. */
-  signal?: AbortSignal
-}
+// V27 G5.2: the local `CommandInvocation` view and the
+// `CommandRuntimeLike { register(definition: unknown) }` shim are gone — the
+// platform's `@deepseek-ai/dsh-commands` types (imported above, declared as a
+// peer dependency) type the registration and the invocation, so an upstream
+// shape change fails this package's build instead of silently passing.
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
-// authoritative consumer shape) instead of this local view.
+// authoritative consumer shape) instead of a local view.
 
 /** F-328: render staged args for `pending --detail`, truncated to 500 chars.
  * args may be non-JSON (a tool produced garbage), so the render is fail-safe.

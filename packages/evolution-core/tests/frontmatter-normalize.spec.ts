@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { frontmatterYamlUnsafeValues, normalizeFrontmatter, parseFrontmatter, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
+import { load as loadStrictYaml } from 'js-yaml'
+import { frontmatterCatalogInvalid, frontmatterYamlUnsafeValues, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
 
 describe('yamlPlainScalarNeedsQuotes (0.3.11)', () => {
   it('flags the plain-scalar hazards the strict YAML catalog rejects', () => {
@@ -19,6 +20,39 @@ describe('yamlPlainScalarNeedsQuotes (0.3.11)', () => {
     expect(yamlPlainScalarNeedsQuotes('[Capitalized, Tags]')).toBe(false)
     expect(yamlPlainScalarNeedsQuotes('{a: b}')).toBe(false)
     expect(yamlPlainScalarNeedsQuotes('')).toBe(false)
+  })
+
+  it('V27 G0.3 (core-a-07): a block scalar header is not a plain scalar needing quotes', () => {
+    // The indicator belongs to the value position: quoting it re-reads as the
+    // literal ">" and leaves the indented continuation lines dangling, so the
+    // rewritten block no longer parses and the write path rejected the skill.
+    expect(yamlPlainScalarNeedsQuotes('>')).toBe(false)
+    expect(yamlPlainScalarNeedsQuotes('|')).toBe(false)
+    expect(yamlPlainScalarNeedsQuotes('>-')).toBe(false)
+    expect(yamlPlainScalarNeedsQuotes('|+')).toBe(false)
+    expect(yamlPlainScalarNeedsQuotes('>2')).toBe(false)
+    // A longer value that merely STARTS with an indicator is still unsafe.
+    expect(yamlPlainScalarNeedsQuotes('| literal')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('>x')).toBe(true)
+  })
+})
+
+describe('V27 G0.3 (core-a-07): block scalars survive the write path and read back as values', () => {
+  const folded = '---\nname: demo-skill\ndescription: >\n  Long description that the\n  model folded across lines.\n---\n\n# Demo\n\nbody\n'
+  const literal = '---\nname: demo-skill\ndescription: |\n  first line\n  second line\n---\n\n# Demo\n\nbody\n'
+
+  it('leaves a block scalar untouched and reports no issue', () => {
+    const result = normalizeFrontmatter(folded)
+    expect(result.issues).toEqual([])
+    expect(result.changed).toBe(false)
+    expect(result.content).toBe(folded)
+    expect(frontmatterYamlUnsafeValues(folded)).toEqual([])
+  })
+
+  it('reads the block content as the value rather than the indicator', () => {
+    expect(parseFrontmatter(folded)?.frontmatter['description'])
+      .toBe('Long description that the model folded across lines.')
+    expect(parseFrontmatter(literal)?.frontmatter['description']).toBe('first line\nsecond line')
   })
 })
 
@@ -149,5 +183,107 @@ describe('normalizeFrontmatter (0.3.11)', () => {
     expect(result.issues).toEqual([])
     expect(result.content).toContain('description: "a: b"')
     expect(result.content).toContain('related_skills: "keyword # tag"')
+  })
+})
+
+describe('V27 G2.1: one frontmatter read — values come from the strict parser', () => {
+  const blockOf = (content: string): string => {
+    const lines = content.split('\n')
+    const end = lines.indexOf('---', 1)
+    return lines.slice(1, end).join('\n')
+  }
+  // js-yaml is the parser the platform catalog and normalizeFrontmatter's
+  // rewrite verification use, so the assertion is against the platform's own
+  // reading of the same bytes — not against a second implementation of mine.
+  const strictValue = (content: string, key: string): unknown =>
+    (loadStrictYaml(blockOf(content)) as Record<string, unknown>)[key]
+
+  it('publishes what the strict catalog parses, not the lenient line text', () => {
+    // ` # ` starts a YAML comment: the catalog reads `routing word`, so the
+    // family must publish exactly that. The lenient line scan published
+    // `routing word # trailing note` — routing text only the family ever saw.
+    const commented = '---\nname: demo-skill\ndescription: routing word # trailing note\n---\n\n# Demo\n'
+    expect(parseFrontmatter(commented)?.frontmatter['description']).toBe(strictValue(commented, 'description'))
+    expect(parseFrontmatter(commented)?.frontmatter['description']).toBe('routing word')
+
+    const doubleQuoted = '---\nname: demo-skill\ndescription: "routing word # kept"\n---\n\n# Demo\n'
+    expect(parseFrontmatter(doubleQuoted)?.frontmatter['description']).toBe('routing word # kept')
+
+    const singleQuoted = "---\nname: demo-skill\ndescription: 'routing: kept'\n---\n\n# Demo\n"
+    expect(parseFrontmatter(singleQuoted)?.frontmatter['description']).toBe('routing: kept')
+  })
+
+  it('reads a sequence as the inline form relatedSkillNames scans', () => {
+    const flow = '---\nname: demo-skill\ndescription: Demo.\nrelated_skills: [alpha-skill, beta-skill]\n---\n\n# Demo\n'
+    expect(parseFrontmatter(flow)?.frontmatter['related_skills']).toBe('[alpha-skill, beta-skill]')
+    expect(relatedSkillNames(flow)).toEqual(['alpha-skill', 'beta-skill'])
+    // A block sequence was previously invisible — the lenient line scan read
+    // the empty header value — so the references factor and the learning-graph
+    // edges lost those links without a trace.
+    const sequence = '---\nname: demo-skill\ndescription: Demo.\nrelated_skills:\n  - alpha-skill\n  - beta-skill\n---\n\n# Demo\n'
+    expect(relatedSkillNames(sequence)).toEqual(['alpha-skill', 'beta-skill'])
+  })
+
+  it('falls back to the lenient scan only for a block the strict parser rejects, and says so', () => {
+    // `Search: arXiv papers` is not valid YAML as an unquoted value: the
+    // platform drops the file, and the family keeps routing from the lenient
+    // read — reported through catalogInvalid instead of a silent split.
+    const unsafe = '---\nname: demo-skill\ndescription: Search: arXiv papers\n---\n\n# Demo\n'
+    const read = parseFrontmatter(unsafe)
+    expect(read?.frontmatter['description']).toBe('Search: arXiv papers')
+    expect(read?.catalogInvalid).toBe(true)
+    expect(frontmatterCatalogInvalid(unsafe)).toBe(true)
+    expect(frontmatterYamlUnsafeValues(unsafe).map(entry => entry.key)).toEqual(['description'])
+
+    const safe = '---\nname: demo-skill\ndescription: Safe text.\n---\n\n# Demo\n'
+    expect(frontmatterCatalogInvalid(safe)).toBe(false)
+    expect(parseFrontmatter(safe)?.catalogInvalid).toBe(false)
+    // An empty or comment-only block has no entries, so it is not "invalid as
+    // written": the catalog's complaint is the missing name, which
+    // validateFrontmatter reports.
+    expect(frontmatterCatalogInvalid('---\n---\n\n# Demo\n')).toBe(false)
+    expect(frontmatterCatalogInvalid('# no frontmatter\n')).toBe(false)
+  })
+
+  it('the audit verdict and the published values always come from one read', () => {
+    const cases = [
+      '---\nname: demo-skill\ndescription: Safe text.\n---\n\n# Demo\n',
+      '---\nname: demo-skill\ndescription: routing word # note\n---\n\n# Demo\n',
+      '---\nname: demo-skill\ndescription: Search: arXiv papers\n---\n\n# Demo\n',
+      '---\nname: demo-skill\ndescription: >\n  Folded routing text\n  across two lines.\n---\n\n# Demo\n',
+      '---\nname: demo-skill\ndescription: "already: quoted"\n---\n\n# Demo\n',
+    ]
+    for (const content of cases) {
+      const read = parseFrontmatter(content)
+      // Loadable by the catalog → the family publishes the catalog's own value.
+      if (!frontmatterCatalogInvalid(content)) {
+        expect(read?.frontmatter['description']).toBe(String(strictValue(content, 'description')).trim())
+      }
+      // The verdict is body-independent, so a body-less file cannot slip past
+      // the audit merely because the reader refuses it.
+      const bodyless = `${content.slice(0, content.lastIndexOf('---') + 3)}\n`
+      expect(frontmatterCatalogInvalid(bodyless)).toBe(frontmatterCatalogInvalid(content))
+    }
+  })
+
+  it('requires the exact fence line upstream requires, tolerating only CR', () => {
+    const exact = '---\nname: demo-skill\ndescription: Demo.\n---\n\n# Demo\n'
+    expect(parseFrontmatter(exact)?.frontmatter['name']).toBe('demo-skill')
+    // upstream skill-filesystem.parseFrontmatter compares the first line, after
+    // stripping a trailing \r, to exactly `---`; the same rule now applies here,
+    // so an indented fence can no longer load in the family alone.
+    const indentedOpen = ' ---\nname: demo-skill\ndescription: Demo.\n---\n\n# Demo\n'
+    expect(parseFrontmatter(indentedOpen)).toBeNull()
+    expect(normalizeFrontmatter(indentedOpen).changed).toBe(false)
+    const indentedClose = '---\nname: demo-skill\ndescription: Demo.\n ---\n\n# Demo\n'
+    expect(parseFrontmatter(indentedClose)).toBeNull()
+    const crlf = '---\r\nname: demo-skill\r\ndescription: Demo.\r\n---\r\n\r\n# Demo\r\n'
+    expect(parseFrontmatter(crlf)?.frontmatter['name']).toBe('demo-skill')
+  })
+
+  it('a body-less file is refused by the reader but still judged by the audit', () => {
+    const bodyless = '---\nname: demo-skill\ndescription: Search: arXiv papers\n---\n'
+    expect(parseFrontmatter(bodyless)).toBeNull()
+    expect(frontmatterCatalogInvalid(bodyless)).toBe(true)
   })
 })

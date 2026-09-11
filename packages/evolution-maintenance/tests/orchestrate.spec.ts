@@ -479,6 +479,59 @@ describe('runMaintain', () => {
     expect(emptyLibrary.recommendationCount).toBe(0)
   })
 
+  it('V27 M-01: a no_issues verdict still renders the notes the validator demanded', async () => {
+    const outcome = await runMaintain(runtime({
+      verdict: 'no_issues',
+      plan: [],
+      notes: [
+        'dup_heading / overlong_line / narrow_name: the fixture library is intentionally malformed; nothing to do',
+      ],
+    }))
+    expect(outcome.ok).toBe(true)
+    // The completeness gate forces one note per over-signal for no_issues; the
+    // renderer used to return "Nothing to do." and drop every one of them.
+    expect(outcome.text ?? '').toContain('Nothing to do.')
+    expect(outcome.text ?? '').toContain('Notes:')
+    expect(outcome.text ?? '').toContain('dup_heading / overlong_line / narrow_name')
+  })
+
+  it('V27 M-02: an unreadable tree is NOT reported as an empty, clean library', async () => {
+    // `list()` yields entries but every body reads as null (missing SKILL.md, or
+    // a directory name the name rule refuses): the tree was never audited, so
+    // "nothing to do" would be a false clean bill.
+    const outcome = await runMaintain({
+      library: {
+        async list() { return [{ name: 'ghost-a' }, { name: 'ghost-b' }] },
+        async read() { return null },
+      },
+      subagents: { async start() { throw new Error('should not be called') } },
+    })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error ?? '').toContain('could not read 2 listed skill(s)')
+    expect(outcome.error ?? '').toContain('NOT audited')
+  })
+
+  it('V27 M-02: a missing skill root is reported as a configuration error, not an empty library', async () => {
+    const outcome = await runMaintain({
+      library: { async list() { return [] }, async read() { return undefined } },
+      subagents: { async start() { throw new Error('should not be called') } },
+      rootExists: async () => false,
+      skillRoot: '~/my-skills',
+    })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error ?? '').toContain('does not exist')
+    expect(outcome.error ?? '').toContain('~/my-skills')
+    expect(outcome.error ?? '').toContain('~')
+    // The probe answering "it exists" keeps the genuine empty-library path.
+    const empty = await runMaintain({
+      library: { async list() { return [] }, async read() { return undefined } },
+      subagents: { async start() { throw new Error('should not be called') } },
+      rootExists: async () => true,
+    })
+    expect(empty.ok).toBe(true)
+    expect(empty.text ?? '').toContain('empty skill library')
+  })
+
   // F-16: the subagent output instruction is the `maintainOutput`
   // PROMPT_BUNDLE entry — no second, undigested prompt text hardcoded in the
   // orchestrator.

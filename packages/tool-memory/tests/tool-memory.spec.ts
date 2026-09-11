@@ -9,6 +9,16 @@ import * as ToolMemory from '../src/index.ts'
 import { MEMORY_GUIDANCE, MEMORY_TOOL_DESCRIPTION } from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 
+/** The `memory` tool's declared output schema, as the tests read it back. */
+interface MemoryToolResult {
+  ok: boolean
+  message: string
+  entries: string[]
+  chars: number
+  limit: number
+  pending_id?: string
+}
+
 describe('tool-memory', () => {
   it('registers the memory tool', async () => {
     const ctx = new Context()
@@ -90,13 +100,13 @@ describe('tool-memory', () => {
     // A lone add to the default 'memory' target was previously staged as
     // "memory memory add" (normalizeSummary only rewrote batches >1). F-329
     // applies the single-word rule for a single op at the summary source.
-    const single = await tool.execute({ target: 'memory', action: 'add', facts: 'remember x' }, execArg)
+    const single = await tool.execute({ target: 'memory', action: 'add', facts: 'remember x' }, execArg) as MemoryToolResult
     expect(single.ok).toBe(true)
     expect(summaries).toHaveLength(1)
     expect(summaries[0]).toBe('memory add')
     expect(summaries[0]).not.toMatch(/memory memory/)
     // A single-element operations batch used to stage "memory memory 1 ops".
-    const batched = await tool.execute({ target: 'memory', operations: [{ action: 'add', facts: 'remember y' }] }, execArg)
+    const batched = await tool.execute({ target: 'memory', operations: [{ action: 'add', facts: 'remember y' }] }, execArg) as MemoryToolResult
     expect(batched.ok).toBe(true)
     expect(summaries).toHaveLength(2)
     expect(summaries[1]).toBe('memory 1 ops')
@@ -214,7 +224,7 @@ describe('tool-memory', () => {
     // A write through the tool cures the empty snapshot via the applied event.
     const tool = ctx.tools.get('memory')!
     const execArg = { agent: { session: { header: { version: 0, id: 's3', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
-    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'E67-late-provider-fact' }, execArg)
+    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'E67-late-provider-fact' }, execArg) as MemoryToolResult
     expect(result.ok).toBe(true)
     await new Promise(resolve => setTimeout(resolve, 80))
     const systemPrompt = ctx.get('systemPrompt') as { assemble(): Promise<{ contexts?: Array<{ name?: string; text?: string }> }> } | undefined
@@ -235,9 +245,9 @@ describe('tool-memory', () => {
     await ctx.plugin(ToolMemory, { entryPreviewChars: NaN })
     const tool = ctx.tools.get('memory')!
     const execArg = { agent: { session: { header: { version: 0, id: 's6', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
-    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'x'.repeat(300) }, execArg)
+    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'x'.repeat(300) }, execArg) as MemoryToolResult
     expect(result.ok).toBe(true)
-    const entries = result.entries as string[]
+    const entries = result.entries
     expect(entries).toHaveLength(1)
     expect(entries[0]).toHaveLength(200)
   })
@@ -257,7 +267,7 @@ describe('tool-memory', () => {
     await ctx.plugin(ToolMemory, {})
     const tool = ctx.tools.get('memory')!
     const execArg = { agent: { session: { header: { version: 0, id: 's8', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
-    const result = await tool.execute({ target: 'memory', operations: [] as never }, execArg)
+    const result = await tool.execute({ target: 'memory', operations: [] as never }, execArg) as MemoryToolResult
     expect(result.ok).toBe(false)
     expect(result.message).toContain('No operations provided')
     expect(approvals).toBe(0)

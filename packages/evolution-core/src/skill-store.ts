@@ -156,21 +156,31 @@ export function resolveSkillsRoot(config: { root?: string | undefined } = {}): s
   return (config.root ?? '').trim() || skillsRoot()
 }
 
-/** E-7 (v18): every family row reads ONE root key. `root` is canonical;
- * `skillsRoot` is a deprecated alias honoured only while `root` is empty (so a
- * deployment that sets both keeps the canonical one) and removed after 0.3.65.
- * Callers log their own deprecation warning.
- * @param config - the raw plugin config, carrying `root` and/or `skillsRoot`.
- * @returns the effective root (empty when neither key is set) and whether the
- * deprecated alias supplied it.
+/** E-7 (v18) → V27 G2.4 (M-08): every family row reads ONE root key. `root` is
+ * canonical; the `skillsRoot` alias was honoured for one minor version and its
+ * window closed at 0.3.65 — it is now two releases past expiry, so this
+ * resolver no longer reads it at all. A deployment that still sets the alias
+ * must fail LOUDLY at load (see {@link assertSkillsRootAliasRetired}): silently
+ * ignoring a config key leaves the deployment pointing at a root nobody reads,
+ * which is the worst form of compatibility.
+ * @param config - the raw plugin config.
+ * @returns the effective root (empty when the key is unset or blank).
  */
-export function resolveRootConfig(
-  config: { root?: string | undefined; skillsRoot?: string | undefined } = {},
-): { root: string; usedDeprecatedAlias: boolean } {
-  const root = (config.root ?? '').trim()
-  if (root !== '') return { root, usedDeprecatedAlias: false }
-  const alias = (config.skillsRoot ?? '').trim()
-  return alias === '' ? { root: '', usedDeprecatedAlias: false } : { root: alias, usedDeprecatedAlias: true }
+export function resolveRootConfig(config: { root?: string | undefined } = {}): { root: string } {
+  return { root: (config.root ?? '').trim() }
+}
+
+/** V27 G2.4 (M-08): the retirement gate for the expired `skillsRoot` alias.
+ * Called at each plugin's load boundary (before the root is resolved), it turns
+ * a stale key into an explicit load error naming the replacement — the
+ * fail-loud form the plan requires instead of a silent no-op.
+ * @param config - the raw plugin config (the alias field stays DECLARED in each
+ * schema so the loader can hand it here instead of dropping it).
+ */
+export function assertSkillsRootAliasRetired(config: { skillsRoot?: string | undefined } = {}): void {
+  if ((config.skillsRoot ?? '').trim() !== '') {
+    throw new Error('evolution: config "skillsRoot" was removed after 0.3.65 — rename the key to "root" (the alias is no longer honoured)')
+  }
 }
 
 /**
@@ -231,40 +241,229 @@ export interface Frontmatter {
 
 /**
  * Shared frontmatter block detection (P3-3 single owner): opening line `---`
- * and closing line exactly `---` (both trimmed). Used by `parseFrontmatter`,
+ * and closing line exactly `---`. Used by `parseFrontmatter`,
  * `frontmatterYamlUnsafeValues` and `normalizeFrontmatter` so the three can
  * never disagree about where the block ends (the loose `indexOf('\n---')`
  * form matched `\n----` and was replaced by this strict line rule).
+ *
+ * V27 G2.1: both fence lines are matched EXACTLY, tolerating only a trailing
+ * `\r` — the same rule the upstream filesystem catalog uses
+ * (`skill-filesystem.parseFrontmatter`). The former `.trim()` comparison
+ * accepted ` --- `, so an indented fence loaded in the family while the
+ * platform ignored the file: family visibility split from platform visibility,
+ * which is exactly what a strict-YAML frontmatter is supposed to prevent.
  */
 export function frontmatterBlock(content: string): { block: string; lines: string[]; end: number; nl: string } | null {
   if (!content.trimStart().startsWith('---')) return null
   const nl = content.includes('\r\n') ? '\r\n' : '\n'
   const lines = content.split(nl)
-  if ((lines[0] ?? '').trim() !== '---') return null
+  if ((lines[0] ?? '').replace(/\r$/, '') !== '---') return null
   let end = -1
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
     if (line === undefined) continue
-    if (line.trim() === '---') { end = i; break }
+    if (line.replace(/\r$/, '') === '---') { end = i; break }
   }
   if (end < 0) return null
   return { block: lines.slice(1, end).join(nl), lines, end, nl }
 }
 
-export function parseFrontmatter(content: string): { frontmatter: Frontmatter; body: string } | null {
+/**
+ * One frontmatter read (V27 G2.1): the values, the body, and every signal the
+ * strict-YAML platform catalog derives from the same block. Returned by
+ * {@link parseFrontmatter} so a caller never has to parse the block twice to
+ * reach a description and the catalog verdict.
+ */
+export interface FrontmatterRead {
+  frontmatter: Frontmatter
+  body: string
+  /** Raw entries whose UNQUOTED value the strict catalog cannot load as
+   * written. Quotes are included, so a value already normalized by the write
+   * path (`normalizeFrontmatter`) is never re-flagged. */
+  unsafeValues: Array<{ key: string; value: string }>
+  /** Whether the frontmatter is not valid AS WRITTEN for the strict platform
+   * catalog: the strict parser rejects the block, or an unquoted value would
+   * read as something other than its text (a dropped ` # ` comment, a
+   * number/bool shorthand the catalog refuses as a string field). The write
+   * path quotes such a value on its next edit. */
+  catalogInvalid: boolean
+}
+
+/**
+ * Raw-line scan of a frontmatter block: the single owner of "which entries the
+ * strict catalog cannot load". `frontmatterYamlUnsafeValues` publishes it and
+ * `normalizeFrontmatter` decides each rewrite with the same predicate
+ * (`yamlPlainScalarNeedsQuotes`), so the audit verdict and the write path can
+ * never disagree. Only single-line `key: value` entries are judged; a line with
+ * embedded breaks is skipped.
+ */
+function unsafeFrontmatterEntries(block: string, nl: string): Array<{ key: string; value: string }> {
+  const found: Array<{ key: string; value: string }> = []
+  for (const line of block.split(nl)) {
+    if (line.includes('\n') || line.includes('\r')) continue
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    if (!match) continue
+    const key = match[1]
+    if (key === undefined) continue
+    const value = (match[2] ?? '').trim()
+    if (yamlPlainScalarNeedsQuotes(value)) found.push({ key, value })
+  }
+  return found
+}
+
+/**
+ * Frontmatter values as the STRICT platform catalog reads them — js-yaml, the
+ * parser `normalizeFrontmatter` also verifies rewrites with — or `null` when
+ * the block is not loadable as a YAML mapping.
+ *
+ * Scalars publish their text (`name`, `description`, `whenToUse` are strings by
+ * contract; a number/boolean-shaped value keeps the text the family always
+ * published), a flow or block sequence publishes its inline `[a, b]` form
+ * (`relatedSkillNames` scans names out of it), and a nested mapping publishes
+ * nothing — no consumer in this family reads one, and a lossy string could be
+ * picked up by a routing field. A string value is trimmed: YAML's block-scalar
+ * chomping appends a newline that the family's single-line routing fields never
+ * carried.
+ */
+function strictFrontmatterValues(block: string): Map<string, string> | null {
+  // An empty or comment-only block has no entries and is NOT a parser failure:
+  // the catalog's complaint about it is the missing name, which
+  // `validateFrontmatter` reports.
+  if (block.trim() === '') return new Map()
+  let loaded: unknown
+  try {
+    loaded = loadYaml(block)
+  } catch {
+    return null
+  }
+  if (loaded === null || loaded === undefined) return new Map()
+  if (typeof loaded !== 'object' || Array.isArray(loaded)) return null
+  const values = new Map<string, string>()
+  for (const [key, value] of Object.entries(loaded as Record<string, unknown>)) {
+    if (typeof value === 'string') { values.set(key, value.trim()); continue }
+    if (typeof value === 'number' || typeof value === 'boolean') { values.set(key, String(value)); continue }
+    if (Array.isArray(value)) { values.set(key, `[${value.map(item => String(item)).join(', ')}]`); continue }
+  }
+  return values
+}
+
+/**
+ * Lenient line scan, used only for a block the strict parser rejects: the
+ * family keeps routing a legacy file the platform refuses, and
+ * `catalogInvalid` reports the split instead of hiding it. Values are trimmed
+ * and unquoted exactly as before.
+ */
+function lenientFrontmatterValues(block: string, nl: string): Map<string, string> {
+  const values = new Map<string, string>()
+  const blockLines = block.split(nl)
+  for (let i = 0; i < blockLines.length; i += 1) {
+    const line = blockLines[i] ?? ''
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    if (!match) continue
+    const [, key, value] = match
+    if (key === undefined || value === undefined) continue
+    // V27 G0.3 (core-a-07): a block scalar's VALUE is the more-indented lines
+    // that follow its indicator, not the indicator itself. Reading only the
+    // header line published the literal ">" as the description — the skill
+    // loaded, but its routing information was gone (and the maintenance audit
+    // then flagged a file the platform catalog loads happily). Folding (`>`)
+    // joins the lines with single spaces and keeps a blank line as a break;
+    // literal (`|`) keeps the line structure — the value a strict YAML reader
+    // produces for the same block.
+    const header = /^([>|])[+-]?\d*$/.exec(value.trim())
+    if (header !== null) {
+      const fold = header[1] === '>'
+      const parts: string[] = []
+      let scan = i + 1
+      for (; scan < blockLines.length; scan += 1) {
+        const raw = blockLines[scan] ?? ''
+        if (raw.trim() === '') { parts.push('') ; continue }
+        if (!/^\s/.test(raw)) break // dedented → the next frontmatter key
+        parts.push(raw.trim())
+      }
+      while (parts.length > 0 && parts[parts.length - 1] === '') parts.pop()
+      let folded = ''
+      for (const part of parts) {
+        if (part === '') {
+          // A blank line ends the paragraph: one break, never a run of them.
+          if (folded !== '' && !folded.endsWith('\n')) folded += '\n'
+          continue
+        }
+        if (folded === '' || folded.endsWith('\n')) folded += part
+        else folded += ` ${part}`
+      }
+      values.set(key, (fold ? folded : parts.join('\n')).trim())
+      i = scan - 1
+      continue
+    }
+    values.set(key, value.trim().replace(/^["']|["']$/g, ''))
+  }
+  return values
+}
+
+/** What one frontmatter block says, before any body requirement is applied. */
+interface FrontmatterBlockRead {
+  frontmatter: Frontmatter
+  body: string
+  unsafeValues: Array<{ key: string; value: string }>
+  /** The strict parser rejected the block outright. */
+  strictFailed: boolean
+}
+
+/**
+ * The single read of a SKILL.md frontmatter block: values, body and every
+ * strict-catalog signal, computed once. `null` only when the file has no
+ * frontmatter block; the body may be empty. {@link parseFrontmatter} and
+ * {@link frontmatterCatalogInvalid} are its two projections.
+ *
+ * @param content - the SKILL.md text.
+ * @returns the block read, or `null` when there is no block.
+ */
+function readFrontmatterBlock(content: string): FrontmatterBlockRead | null {
   const found = frontmatterBlock(content)
   if (!found) return null
   const body = found.lines.slice(found.end + 1).join(found.nl).trim()
-  if (!body) return null
+  const strict = strictFrontmatterValues(found.block)
+  const values = strict ?? lenientFrontmatterValues(found.block, found.nl)
   const frontmatter: Frontmatter = {}
-  for (const line of found.block.split(found.nl)) {
-    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
-    if (match) {
-      const [, key, value] = match
-      if (key && value !== undefined) frontmatter[key] = value.trim().replace(/^["']|["']$/g, '')
-    }
+  for (const [key, value] of values) frontmatter[key] = value
+  return { frontmatter, body, unsafeValues: unsafeFrontmatterEntries(found.block, found.nl), strictFailed: strict === null }
+}
+
+/**
+ * Parse a SKILL.md: its frontmatter values and body, or `null` when the file
+ * has no frontmatter block or no body. Every consumer of frontmatter values
+ * goes through here — the write path's validation, `list()`'s published
+ * description, `relatedSkillNames` and the audit — so all of them read the same
+ * bytes the same way.
+ *
+ * @param content - the SKILL.md text.
+ * @returns the read, or `null` when there is no block or no body.
+ */
+export function parseFrontmatter(content: string): FrontmatterRead | null {
+  const read = readFrontmatterBlock(content)
+  if (!read || !read.body) return null
+  return {
+    frontmatter: read.frontmatter,
+    body: read.body,
+    unsafeValues: read.unsafeValues,
+    catalogInvalid: read.strictFailed || read.unsafeValues.length > 0,
   }
-  return { frontmatter, body }
+}
+
+/**
+ * Whether this file's frontmatter is valid as written for the strict platform
+ * catalog (see `FrontmatterRead.catalogInvalid`). Body-independent (a body-less
+ * file is still judged), and derived from the same read as `parseFrontmatter` —
+ * so the audit's verdict and the values the family publishes for one file can
+ * never disagree (V27 G2.1).
+ *
+ * @param content - the SKILL.md text.
+ * @returns `true` when the strict parser rejects the block or an unquoted value would read as something else.
+ */
+export function frontmatterCatalogInvalid(content: string): boolean {
+  const read = readFrontmatterBlock(content)
+  return read === null ? false : read.strictFailed || read.unsafeValues.length > 0
 }
 
 /** YAML plain-scalar hazards that make an UNQUOTED frontmatter value
@@ -285,6 +484,17 @@ export function yamlPlainScalarNeedsQuotes(value: string): boolean {
   if (value.length === 0) return false
   if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) return false
   if (/^\[.*\]$/.test(value) || /^\{.*\}$/.test(value)) return false
+  // V27 G0.3 (core-a-07): a block scalar header (`>` / `|`, optionally with a
+  // chomping/indent modifier) is NOT a plain scalar that needs quotes — it is
+  // the legal YAML form for a multi-line value whose CONTINUATION LINES carry
+  // the content. Quoting it ("description: >") re-reads as the literal string
+  // ">" and, because the continuation lines stay indented underneath, makes the
+  // whole rewritten block unparsable: the real-parser verification then failed
+  // and every create/update/patch of such a skill was rejected with advice
+  // ("wrap the value in double quotes") that would corrupt the value. The
+  // indicator is only meaningful in the value position — a leading `>`/`|`
+  // inside a longer value (`>x`, `|foo`) still needs quoting below.
+  if (/^[>|][+-]?\d*$/.test(value)) return false
   if (value.includes(': ')) return true
   if (value.includes(' #')) return true
   if (value.endsWith(':')) return true
@@ -297,21 +507,13 @@ export function yamlPlainScalarNeedsQuotes(value: string): boolean {
  * YAML-unsafe for the strict platform catalog. Operates on the ORIGINAL line
  * value (quotes included), so a value already wrapped by
  * `normalizeFrontmatter` is never re-flagged — one source with the write
- * path. Single-line entries only; lines with embedded line breaks skip. */
+ * path. V27 G2.1: delegates to the shared scan, which
+ * `parseFrontmatter(...).catalogInvalid` also uses, so the audit view and the
+ * read view of one file can never disagree. Independent of the body: a
+ * body-less file is still reported here. */
 export function frontmatterYamlUnsafeValues(content: string): Array<{ key: string; value: string }> {
-  const found: Array<{ key: string; value: string }> = []
   const block = frontmatterBlock(content)
-  if (!block) return found
-  for (const line of block.block.split(block.nl)) {
-    if (line.includes('\n') || line.includes('\r')) continue
-    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
-    if (!match) continue
-    const key = match[1]
-    const value = (match[2] ?? '').trim()
-    if (key === undefined) continue
-    if (yamlPlainScalarNeedsQuotes(value)) found.push({ key, value })
-  }
-  return found
+  return block === null ? [] : unsafeFrontmatterEntries(block.block, block.nl)
 }
 
 export interface FrontmatterNormalizeResult {
@@ -445,7 +647,10 @@ export function relatedSkillNames(content: string, exclude?: string): string[] {
 
 export function validateFrontmatter(content: string, expectedName?: string, limits: SkillLimits = DEFAULT_SKILL_LIMITS): string | null {
   const parsed = parseFrontmatter(content)
-  if (!parsed) return 'SKILL.md must start and end with YAML frontmatter and include a body.'
+  // V27 G2.1: name the exact rule (the one the upstream catalog applies) —
+  // "start and end with YAML frontmatter" left a ` --- ` fence, or a block with
+  // no body, to be discovered by trial and error.
+  if (!parsed) return 'SKILL.md must start with a `---` line, close the frontmatter with another exact `---` line (only a trailing `\\r` is tolerated), and include a body below it.'
   if (!parsed.frontmatter.name) return 'Frontmatter must include a name field.'
   // C-12 (v10 audit): single-source the name shape — the inline copy of
   // SKILL_NAME_RE could silently drift from constants.ts.
@@ -1571,6 +1776,12 @@ export class SkillLibrary {
       // `null` means "no match" or (V7-11) the replaceAll loop exceeded the
       // cumulative fuzzy budget; an empty string is a legitimate replacement.
       if (patched === null) return { result: { ok: false, message: `Could not find old_string in "${name}/${patchLabel}" (or the replaceAll fuzzy budget was exceeded). Use update for a full rewrite.` }, write: null }
+      // V27 G5.1: a first-occurrence-only patch is the silent case the tool
+      // description used to omit — report how many anchors the file carries, so
+      // a multi-site edit is never half-applied without the model noticing.
+      const anchorCount = oldString === '' ? 0 : md.split(oldString).length - 1
+      const firstOnly = !replaceAll && anchorCount > 1
+      const patchNote = firstOnly ? ` Replaced the FIRST of ${anchorCount} occurrences; pass replace_all=true to change every one.` : ''
       let writeContent = patched
       let normalizedFields: string[] | undefined
       if (target === skillMd) {
@@ -1610,7 +1821,7 @@ export class SkillLibrary {
       // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
       const onDisk = writeContent.trimEnd() + '\n'
       return {
-        result: { ok: true, message: `Skill "${name}" patched (${patchLabel}).`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
+        result: { ok: true, message: `Skill "${name}" patched (${patchLabel}).${patchNote}`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
         write: onDisk,
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },
@@ -1878,6 +2089,16 @@ export class SkillLibrary {
       await this.io.writeText(join(dest, '.archive-reason'), `${new Date().toISOString()}: ${reason}\n`)
     } catch {
       // The archive itself succeeded; only the human-readable reason is missing.
+    }
+    // V27 G8.4: record the owning skill name next to the archived tree. The
+    // restore match used to depend on the archived SKILL.md's frontmatter, so an
+    // entry whose SKILL.md is 0 bytes (or whose frontmatter no longer parses)
+    // was unrecoverable by name even though its directory says which skill it
+    // was. Best-effort like the reason marker: the archive is already complete.
+    try {
+      await this.io.writeText(join(dest, '.archive-name'), `${name}\n`)
+    } catch {
+      // Same posture as .archive-reason: metadata only, never abort the archive.
     }
     await this.audit(name, 'archive', md, null, reason)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
@@ -2261,16 +2482,23 @@ export class SkillLibrary {
         written.push({ target: entry.target, previous: entry.previous })
       }
     } catch (error) {
+      // V27 G8.3: the rollback is best-effort (the .backups snapshot is the
+      // recovery path when the caller took one), so the result must not claim a
+      // rollback that did not happen. Track which targets failed to roll back
+      // and name them; a silent `.catch` made the message a promise the code
+      // never made.
+      const stuck: string[] = []
       for (const entry of written.reverse()) {
-        await (entry.previous === null
-          ? this.io.remove(entry.target)
-          : this.io.writeText(entry.target, entry.previous)
-        ).catch(() => {
-          // Rollback is best-effort; the .backups snapshot stays the recovery
-          // path when the curator took one (control-plane rule).
-        })
+        try {
+          if (entry.previous === null) await this.io.remove(entry.target)
+          else await this.io.writeText(entry.target, entry.previous)
+        } catch {
+          stuck.push(entry.target)
+        }
       }
-      return { ok: false, message: `Tree change failed and was rolled back: ${error instanceof Error ? error.message : String(error)}` }
+      const reason = error instanceof Error ? error.message : String(error)
+      if (stuck.length === 0) return { ok: false, message: `Tree change failed and was rolled back: ${reason}` }
+      return { ok: false, message: `Tree change failed: ${reason}. The rollback could not restore ${stuck.join(', ')} — recover those targets from the .backups snapshot (or re-apply the change).` }
     }
     await this.audit(name, plan.auditAction, md, landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')?.content ?? md, plan.auditSummary)
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
@@ -2317,14 +2545,33 @@ export class SkillLibrary {
     // foo-bar's content and foo-bar's archive vanished). The directory stamp
     // makes the name unique, not the owner — verify each candidate's own
     // SKILL.md frontmatter name before restoring.
+    //
+    // V27 G8.4: three signals can identify the owner, in decreasing authority:
+    // the `.archive-name` marker this store now writes, the archived
+    // SKILL.md frontmatter, and — only for a candidate whose directory name is
+    // EXACTLY the requested name — the directory itself. The last one is what
+    // makes an entry with a 0-byte SKILL.md recoverable; it stays safe because a
+    // sibling cannot own the exact name (a sibling would be `foo-bar<TAB>`).
     const candidates = entries.filter(entry => entry === name || entry.startsWith(`${name}-`)).sort().reverse()
     let chosen: string | undefined
+    const unreadable: string[] = []
     for (const candidate of candidates) {
+      const marked = (await this.io.readText(join(archiveRoot, candidate, '.archive-name')).catch(() => null))?.trim()
+      if (marked === name) { chosen = candidate; break }
       const md = await this.io.readText(join(archiveRoot, candidate, 'SKILL.md')).catch(() => null)
       const parsed = parseFrontmatter(md ?? '')
       if (parsed?.frontmatter.name === name) { chosen = candidate; break }
+      if (parsed === null && candidate === name) { chosen = candidate; break }
+      if (parsed === null) unreadable.push(candidate)
     }
-    if (!chosen) return { ok: false, message: `Skill "${name}" is not in .archive.` }
+    if (!chosen) {
+      if (unreadable.length === 0) return { ok: false, message: `Skill "${name}" is not in .archive.` }
+      return {
+        ok: false,
+        message: `No archived entry for "${name}" carries a matching frontmatter name, but .archive holds ${unreadable.length} entr(y/ies) named like it: ${unreadable.join(', ')}. `
+          + 'Those entries have no readable SKILL.md (or none matching the name), so restoring by name cannot tell them apart — rename the directory to the skill name and restore again, or restore from a snapshot.',
+      }
+    }
     const source = join(archiveRoot, chosen)
     // Symlink guard (G7): restoring a symlinked archive entry would recreate a
     // link in the active tree instead of the real content — refuse first.
@@ -2350,8 +2597,12 @@ export class SkillLibrary {
     // landing in the live root structurally closes the writers' self-heal and
     // would keep the restored skill unwritable until process restart.
     await this.deleteStrandedLocks(dest)
-    if (await this.io.exists(join(dest, '.archive-reason'))) {
-      await this.io.remove(join(dest, '.archive-reason'))
+    for (const marker of ['.archive-reason', '.archive-name']) {
+      // V27 G8.4: both markers are archive-directory metadata — dropping them is
+      // what keeps a restored tree identical to the tree that was archived.
+      if (await this.io.exists(join(dest, marker))) {
+        await this.io.remove(join(dest, marker))
+      }
     }
     // P3 (v15): `.mutations.json` documents "records every skill mutation" —
     // restore (including consolidate's rollback restores) was the one
@@ -2588,6 +2839,28 @@ export class SkillLibrary {
     return out
   }
 
+  /**
+   * V27 G0.4 (core-a-01): the per-entry gate `skipped` already has. A corrupted
+   * or hand-edited manifest could carry `extras: [123]`: the array check passed,
+   * `SNAPSHOT_EXTRA_NAME_RE.test(123)` coerced the number to the string "123"
+   * and matched, and the value then threw `TypeError` inside `path.join` — which
+   * `readSnapshotExtras` reached only AFTER a whole-tree restore had committed.
+   * Extras are path components under `extras/`, so they take the entry gate too;
+   * bounded like `skipped` so a hostile manifest cannot grow the read set.
+   */
+  private sanitizeExtraNames(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return []
+    const out: string[] = []
+    for (const entry of raw) {
+      if (typeof entry !== 'string') continue
+      if (!SNAPSHOT_EXTRA_NAME_RE.test(entry)) continue
+      if (!this.safeSnapshotEntryName(entry)) continue
+      out.push(entry)
+      if (out.length >= 50) break
+    }
+    return out
+  }
+
   async readSnapshotManifest(path: string): Promise<SnapshotManifest | null> {
     const raw = await this.io.readText(join(path, 'manifest.json'))
     if (raw === null) return null
@@ -2613,7 +2886,7 @@ export class SkillLibrary {
         skipped: this.sanitizeSkippedNames(manifest.skipped),
         sidecars: Array.isArray(manifest.sidecars) ? manifest.sidecars : [],
         ...typeof manifest.hasArchive === 'boolean' ? { hasArchive: manifest.hasArchive } : {},
-        extras: Array.isArray(manifest.extras) ? manifest.extras : [],
+        extras: this.sanitizeExtraNames(manifest.extras),
       }
     } catch {
       return null
@@ -2685,11 +2958,17 @@ export class SkillLibrary {
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
     const preRollbackPath = await this.snapshotAll('pre-rollback', extras)
-    let skipped: string[] = []
+    // V27 G0.4 (core-a-01): the extras read happens BEFORE the destructive
+    // replace. It used to run after the commit point and outside the rollback
+    // try, so a corrupt manifest (`extras: [123]`) or one real read failure
+    // (EACCES/EBUSY — the seam maps only "missing" to null) threw once the tree
+    // had already been replaced: the mutation event never fired (the catalog
+    // kept serving the pre-restore view) and the caller was told the restore
+    // failed even though it had succeeded — and retrying cleared the tree again.
+    // Reading here means a bad manifest aborts before anything is cleared.
+    const snapshotExtras = await this.readSnapshotExtras(latest.path)
     try {
-      // V26-04 (v25): the restore returns the validated manifest's skipped
-      // list — no second read that could race retainSnapshots.
-      skipped = await this.restoreSnapshotIntoRoot(latest.path)
+      await this.restoreSnapshotIntoRoot(latest.path)
     } catch (error) {
       // 0.3.16 (E-13): the old shape cleared the active root and then restored
       // with NO protection — a damaged/incomplete snapshot left the tree
@@ -2705,25 +2984,16 @@ export class SkillLibrary {
         return { ok: false, message: `Snapshot restore failed (${reason}) AND pre-rollback restore failed (${rb}). Rescue manually from: ${preRollbackPath} (pre-rollback), ${latest.path} (target).` }
       }
     }
-    const snapshotExtras = await this.readSnapshotExtras(latest.path)
     // Whole-tree replacement: a single synthetic event invalidates the catalog
     // regardless of how many skills the restore touched (decision C).
     this.notifyMutation({ action: 'restore', name: 'snapshot' })
-    // V25-05 (v25): a whole-tree restore brings back exactly `manifest.skills`
-    // — skills SKIPPED at snapshot time (live write locks, recorded in
-    // `manifest.skipped`) were present in the live tree, are cleared by the
-    // restore, and are NOT copied back. Surface them in the result message
-    // instead of deleting silently.
-    // V26-08 (v25): the recovery hint is HONEST about the mechanism — the
-    // pre-rollback snapshot is best-effort and (under a compound lock window)
-    // may itself have skipped the same skill, so the message only promises
-    // "a copy in .backups if one exists".
-    const skippedNote = skipped.length === 0
-      ? ''
-      : ` NOTE: ${skipped.length} skill(s) were skipped when this snapshot was taken (a live writer held their lock) and are NOT restored: ${skipped.join(', ')} — recover them from .backups if a copy exists.`
+    // V27 G0.1 (core-a-10): a successful restore is always COMPLETE — an
+    // incomplete snapshot is refused before the clear (see
+    // `restoreSnapshotIntoRoot`), so there is no "skipped but restored" message
+    // to render any more: the refusal names the skills instead.
     return {
       ok: true,
-      message: `Restored skill tree from ${latest.path}.${skippedNote}`,
+      message: `Restored skill tree from ${latest.path}`,
       path: latest.path,
       ...snapshotExtras.length === 0 ? {} : { extras: snapshotExtras },
     }
@@ -2735,10 +3005,7 @@ export class SkillLibrary {
    * drives the repopulation (skills, sidecars, `.archive`). Extracted from
    * restoreLatestSnapshot so a failed restore can roll itself back (E-13).
    */
-  private async restoreSnapshotIntoRoot(snapshotPath: string): Promise<string[]> {
-    // V26-04 (v25): returns the validated manifest's `skipped` list so the
-    // caller reuses ONE read (re-reading after the restore raced
-    // retainSnapshots and silently dropped the list).
+  private async restoreSnapshotIntoRoot(snapshotPath: string): Promise<void> {
     // A1-3 (v18): read and validate the manifest BEFORE clearing anything.
     // The old order cleared the active tree first, then treated an
     // unreadable/skills-less manifest as "restore nothing" and still reported
@@ -2761,6 +3028,26 @@ export class SkillLibrary {
         if (!this.safeSnapshotEntryName(name)) {
           throw new Error(`snapshot ${snapshotPath} declares an unsafe entry name ${JSON.stringify(name)}; refusing to restore`)
         }
+      }
+      // V27 G0.1 (core-a-10): a snapshot that skipped skills is INCOMPLETE and
+      // must never authorize the destructive clear. `snapshotAll` records every
+      // skill it could not copy (a live byte-writer held its write lock) in
+      // `manifest.skipped`, so such a snapshot holds everything EXCEPT those
+      // skills; restoring it clears the live root and copies back only
+      // `manifest.skills`, which DELETES the skipped skills from the live
+      // library while reporting ok:true (v25 only added a message note). With
+      // every skill locked the snapshot is empty and the whole library is wiped.
+      // v24-20b (skip instead of tear) and v19 P1-2 (allow a genuinely empty
+      // tree) are both right on their own; `skipped` was simply never consulted
+      // for completeness. Restoring is therefore limited to COMPLETE snapshots:
+      // the pre-rollback snapshot keeps the current tree, and the refusal names
+      // the skills so the operator can retry once the writer has finished.
+      if (manifest.skipped.length > 0) {
+        throw new Error(
+          `snapshot ${snapshotPath} is incomplete: ${manifest.skipped.length} skill(s) were skipped when it was taken `
+          + `(a live writer held their write lock: ${manifest.skipped.join(', ')}); restoring it would clear the active tree `
+          + 'without bringing them back — let the writer finish and take a fresh snapshot, then restore that one',
+        )
       }
       // A1-3 (v18): a manifest that declares no skills while the snapshot
       // directory contains UNDECLARED entries is inconsistent (a corrupted/
@@ -2856,6 +3143,5 @@ export class SkillLibrary {
       if (entry.startsWith('.')) continue
       await this.deleteStrandedLocks(join(this.root, entry))
     }
-    return manifest.skipped
   }
 }

@@ -49,7 +49,7 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     await provider.saveCuratorState({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
     await provider.transactCuratorState(() => null)
     expect((await provider.loadCuratorState())?.lastSummary).toBe('orig')
-    const raw = JSON.parse(await io.readText(join(root, 'curator-state.json'))) as { primary: { lastSummary: string } }
+    const raw = JSON.parse((await io.readText(join(root, 'curator-state.json')))!) as { primary: { lastSummary: string } }
     expect(raw.primary.lastSummary).toBe('orig')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })

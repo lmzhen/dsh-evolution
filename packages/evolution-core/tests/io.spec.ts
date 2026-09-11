@@ -2,11 +2,17 @@ import { afterAll, expect, it, vi } from 'vitest'
 // Contention tests spawn real fs races; full-suite parallel load can stretch
 // them far beyond the vitest default (audit v10 integration fix).
 vi.setConfig({ testTimeout: 30_000 })
+// V27 G7.2 LOAD-SENSITIVE GROUP: the cases that decide by a lock TIMING or
+// LIVENESS threshold are listed in `scripts/run-load-sensitive.mjs` (17 entries,
+// each with its reason) and are run there ONCE at a pinned worker count — so a
+// green result is a green at a known concurrency instead of an accident of the
+// default one. Renaming a case means updating its entry in that list: the runner
+// asserts the matched count, so a silent drop-out fails the gate.
 import { chmod, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
+import { decideTakeover, DEAD_LOCK_TAKEOVER_MS, EMPTY_LOCK_TAKEOVER_MS, LOCK_TEAR_TAKEOVER_MS, nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
 
 // A genuinely alive foreign pid: the tests below need a LIVE holder that is NOT
 // this process (F-367 recycles our own pid leftover, and F-366 sweeps our own
@@ -306,6 +312,96 @@ it('ticket takeover survives 32-way contention on one dead lock — no lost RMW 
   // crossed the default 5s cap (0.3.28 follow-up gate) — explicit budget.
 }, 15_000)
 
+it('V27 G0.2 (EVO-IO-01): an EMPTY stale lock is taken over without admitting a second holder', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-emptylock-takeover-'))
+  const io = nodeEvolutionIo(240)
+  const target = join(root, 'empty-takeover.json')
+  // The shape the audit flagged: a creator that died (or was stalled between
+  // `open('wx')` and the body write) leaves a 0-byte lock. It is the one body
+  // nothing can attribute to a live holder, so the takeover judges it by age —
+  // and the removal race it opens is what let two holders into the critical
+  // section (observed as 30/32 and 31/32 increments under load).
+  await writeFile(`${target}.lock`, '', 'utf8')
+  const old = new Date(Date.now() - 60_000)
+  await utimes(`${target}.lock`, old, old)
+  const warnings: string[] = []
+  const originalWarn = console.warn
+  console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')) }
+  try {
+    const transact = io.transact!
+    await Promise.all(Array.from({ length: 32 }, () => transact(target, async (current) => {
+      const value = JSON.parse(current ?? '0') as number
+      return JSON.stringify(value + 1)
+    })))
+  } finally {
+    console.warn = originalWarn
+  }
+  // No RMW lost: taking over an unattributable lock may not admit a second
+  // holder — a claim that lost its name is retried, never executed.
+  expect(await readFile(target, 'utf8')).toBe('32')
+  const entries = await readdir(root)
+  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
+  // Takeovers are observable, naming the branch that fired and the body judged.
+  expect(warnings.some(line => line.includes('taking over write lock') && line.includes('branch=staleEmpty'))).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+}, 15_000)
+
+it('V27 G1.4: the quarantine sweep covers every historical copy shape and spares user files', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-corrupt-sweep-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'state.json')
+  const stale = new Date(Date.now() - 8 * 86_400_000)
+  const shapes = [
+    'state.json.corrupt', // current fixed name
+    'state.json.corrupt.1700000000000', // stamped variant
+    'state.json.corrupt-1700000000000-ab12cd', // v10-05 legacy series
+  ]
+  for (const name of shapes) {
+    await writeFile(join(root, name), '{}', 'utf8')
+    await utimes(join(root, name), stale, stale)
+  }
+  // A user support file that merely CONTAINS `.corrupt` and ends in `.md` must
+  // survive: the namespace reserves names ENDING in `.corrupt`.
+  await writeFile(join(root, 'overview.md.corrupt-backup.md'), '# notes', 'utf8')
+  await utimes(join(root, 'overview.md.corrupt-backup.md'), stale, stale)
+  // Any write to the directory runs the sweep (it is lazy, inside the lock).
+  await io.writeText(target, '{}')
+  const left = (await readdir(root)).sort()
+  for (const name of shapes) expect(left).not.toContain(name)
+  expect(left).toContain('overview.md.corrupt-backup.md')
+  expect(left).toContain('state.json')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V27 G1.1: decideTakeover is the exhaustive decision table (branch x holder state x boundary)', () => {
+  const alive = (pid: number) => pid === 42
+  const probe = (body: string, ageMs: number, now = 100_000): Parameters<typeof decideTakeover>[0] =>
+    ({ body, mtimeMs: now - ageMs, nowMs: now, alive })
+  // Fresh locks of every shape are left alone.
+  expect(decideTakeover(probe('42:abc', 0))).toBe('none')
+  expect(decideTakeover(probe('999:abc', 0))).toBe('none')
+  expect(decideTakeover(probe('', 0))).toBe('none')
+  expect(decideTakeover(probe('torn', 0))).toBe('none')
+  // A LIVE holder is never stolen, at any age.
+  expect(decideTakeover(probe('42:abc', 10 * 3_600_000))).toBe('none')
+  // A dead named holder is reclaimed only past the dead window (boundary is
+  // strict: age == threshold still waits).
+  expect(decideTakeover(probe('999:abc', DEAD_LOCK_TAKEOVER_MS))).toBe('none')
+  expect(decideTakeover(probe('999:abc', DEAD_LOCK_TAKEOVER_MS + 1))).toBe('dead')
+  // Bare-pid bodies (legacy/hand-written) follow the same rule.
+  expect(decideTakeover(probe('999', DEAD_LOCK_TAKEOVER_MS + 1))).toBe('dead')
+  // An empty body needs the WIDE window (nothing can attribute it to a holder).
+  expect(decideTakeover(probe('', DEAD_LOCK_TAKEOVER_MS + 1))).toBe('none')
+  expect(decideTakeover(probe('', EMPTY_LOCK_TAKEOVER_MS))).toBe('none')
+  expect(decideTakeover(probe('', EMPTY_LOCK_TAKEOVER_MS + 1))).toBe('empty')
+  // A torn body needs the 1h tear window.
+  expect(decideTakeover(probe('torn', 60_000))).toBe('none')
+  expect(decideTakeover(probe('torn', LOCK_TEAR_TAKEOVER_MS + 1))).toBe('corrupt')
+  // Overrides are honoured (the thresholds are injectable for tests/other media).
+  expect(decideTakeover(probe('', 5_000, 100_000))).toBe('none')
+  expect(decideTakeover({ ...probe('', 5_000, 100_000), emptyAfterMs: 1_000 })).toBe('empty')
+})
+
 it('renameWithRetry recovers from a transient EPERM and still commits (F-366)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-renameretry-'))
   const src = join(root, 'src.txt')
@@ -508,7 +604,10 @@ it('V10-07 (P2-1): a torn lock body is refused while fresh, then taken over past
     expect(await readFile(target, 'utf8')).toBe('fresh')
     expect(await io.readText(`${target}.lock`)).toBeNull()
     expect(warns).toHaveLength(1)
-    expect(warns.join('\n')).toMatch(/corrupt write lock/)
+    // V27 G0.2: takeovers log one structured line naming the branch that fired
+    // (the corrupt-body branch is the torn-lock recovery path).
+    expect(warns.join('\n')).toMatch(/taking over write lock/)
+    expect(warns.join('\n')).toMatch(/branch=staleCorrupt/)
   } finally {
     console.warn = originalWarn
   }
@@ -563,16 +662,62 @@ it('C-07: the transact-less fallback skips the write on a byte-identical result'
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('V27 G1.3: a committed-but-unfsynced write is success-with-warning, not a rejection', async () => {
+  const committed = Object.assign(new Error('commitTmp: renamed but the directory fsync failed'), { committed: true })
+  // The transact backend reports a post-rename fsync failure: the bytes ARE on
+  // disk, so the RMW must resolve (every durable consumer funnels through this
+  // helper — propagating made them report "not written" for a landed write).
+  const warns: string[] = []
+  const originalWarn = console.warn
+  console.warn = (message?: unknown) => { warns.push(String(message)) }
+  try {
+    await transactIo(
+      {
+        async readText() { return null },
+        async writeText() {},
+        // Only `transact` participates in this test; the remaining seam members
+        // are unreachable here and fail loud if that assumption ever breaks.
+        async remove() { throw new Error('unreachable: remove') },
+        async list() { throw new Error('unreachable: list') },
+        async exists() { throw new Error('unreachable: exists') },
+        async rename() { throw new Error('unreachable: rename') },
+        async copy() { throw new Error('unreachable: copy') },
+        async transact() { throw committed },
+      },
+      '/tmp/whatever',
+      async () => 'next',
+    )
+    expect(warns.some(line => line.includes('durability is unconfirmed'))).toBe(true)
+    // A real failure still propagates.
+    await expect(transactIo(
+      {
+        async readText() { return null },
+        async writeText() {},
+        async remove() { throw new Error('unreachable: remove') },
+        async list() { throw new Error('unreachable: list') },
+        async exists() { throw new Error('unreachable: exists') },
+        async rename() { throw new Error('unreachable: rename') },
+        async copy() { throw new Error('unreachable: copy') },
+        async transact() { throw new Error('disk on fire') },
+      },
+      '/tmp/whatever',
+      async () => 'next',
+    )).rejects.toThrow('disk on fire')
+  } finally {
+    console.warn = originalWarn
+  }
+})
+
 it('P3-8 (v14): isSymlink returns null only for a missing path and propagates a real lstat failure', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-symlink-'))
   const io = nodeEvolutionIo()
   // Missing path = "guard not applicable".
-  expect(await io.isSymlink(join(root, 'nope'))).toBeNull()
+  expect(await io.isSymlink!(join(root, 'nope'))).toBeNull()
   await writeFile(join(root, 'plain.txt'), 'x')
-  expect(await io.isSymlink(join(root, 'plain.txt'))).toBe(false)
+  expect(await io.isSymlink!(join(root, 'plain.txt'))).toBe(false)
   // A genuine lstat failure must NOT read as "not a symlink": an invalid path
   // throws ERR_INVALID_ARG_VALUE, which the old blanket catch swallowed.
-  await expect(io.isSymlink('bad\0path')).rejects.toThrow()
+  await expect(io.isSymlink!('bad\0path')).rejects.toThrow()
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

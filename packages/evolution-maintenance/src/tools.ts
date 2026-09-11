@@ -12,7 +12,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { SkillLibrary, redactSecrets, resolveRootConfig, resolveSkillsRoot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { assertSkillsRootAliasRetired, SkillLibrary, redactSecrets, resolveRootConfig, resolveSkillsRoot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 import { buildEnrichment } from './enrichment.ts'
 import { snapshotFromLibrary } from './drift-scan.ts'
@@ -23,8 +23,8 @@ export interface Config {
   /** Skill-tree root for probe reads; empty uses the default tree. E-7 (v18):
    * canonical key — the same `root` every other family row reads. */
   root?: string | undefined
-  /** Deprecated alias of `root` (E-7, v18); honoured only while `root` is
-   * empty, with a warning; removed after 0.3.65. */
+  /** V27 G2.4 (M-08): RETIRED alias of `root`. Declared so the loader passes it
+   * to the load-time gate (which rejects it loudly) instead of dropping it. */
   skillsRoot?: string | undefined
 }
 
@@ -35,11 +35,10 @@ export const Config = z.object({
 })
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  // E-7 (v18): canonical `root`, deprecated `skillsRoot` alias.
+  // E-7 (v18) → V27 G2.4 (M-08): canonical `root` only; the expired
+  // `skillsRoot` alias fails the load instead of being silently ignored.
+  assertSkillsRootAliasRetired(rawConfig)
   const rootConfig = resolveRootConfig(rawConfig)
-  if (rootConfig.usedDeprecatedAlias) {
-    ctx.logger.warn('evolution-maintenance-tools: config "skillsRoot" is deprecated (E-7); use "root" — the alias is honoured until 0.3.65')
-  }
   ctx.inject(['tools'], (toolCtx) => {
     // Single budget-cast on the injected `tools` service (X-6): the previous
     // `toolCtx as unknown as {...}` double-cast was a gratuitous widening —

@@ -9,7 +9,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import {
-  frontmatterYamlUnsafeValues,
+  frontmatterCatalogInvalid,
   parseFrontmatter,
   usageObserved,
   type SkillLibrary,
@@ -52,12 +52,11 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
     // the reader contract is JSON-shaped in practice.
     if (body === undefined || body === null) continue
     const parsed = parseFrontmatter(body)
-    // 0.3.11: surface catalog-unloadable frontmatter — the platform parses
-    // strict YAML, so an unquoted `: ` (etc.) makes the skill invisible to
-    // it while the lenient evolution parser still sees it. Raw-line scan
-    // (quotes included): a value already normalized by the write path is
-    // never re-flagged (single source with normalizeFrontmatter).
-    if (frontmatterYamlUnsafeValues(body).length > 0) catalogInvalid.set(entry.name, true)
+    // V27 G2.1: one read carries both the values and the catalog verdict. The
+    // platform catalog parses strict YAML, so an unquoted `: ` or a block the
+    // strict parser rejects makes the skill invisible to it while the family
+    // still routes from the lenient fallback — reported here, never silent.
+    if (frontmatterCatalogInvalid(body)) catalogInvalid.set(entry.name, true)
     const description = parsed?.frontmatter.description
     if (typeof description === 'string' && description.trim().length > 0) {
       descriptions.set(entry.name, description)

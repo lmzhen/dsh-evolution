@@ -11,6 +11,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -45,22 +46,17 @@ export interface GraphDensity {
   isolatedPct: number
 }
 
-/**
- * The command invocation contract (N1, v12): the platform command handler
- * freezes the invoking agent onto the invocation object — evolution-commands
- * `/evolution learn` already reads `invocation.agent` — so the graph can pass
- * `agent.session` to the approval service (tool-skill-manage pattern) instead
- * of deriving every approval as foreground.
- */
-export interface GraphInvocation {
-  rawInput?: string
-  agent?: {
-    session?: {
-      id?: string
-      header?: { origin?: string }
-    }
-  }
-}
+// N1 (v12), V27 G5.2: the command invocation contract is the platform's own
+// `CommandInvocation` (imported above from `@deepseek-ai/dsh-commands`). It
+// freezes the invoking agent onto the invocation object — evolution-commands
+// `/evolution learn` reads `invocation.agent` the same way — so the graph can
+// pass `agent.session` to the approval service (tool-skill-manage pattern)
+// instead of deriving every approval as foreground. The local structural view
+// this replaces made an upstream shape change invisible to this package.
+
+/** V27 INS-04: how many skill files one `/graph` batch reads concurrently.
+ * Bounded so a large library cannot open every file at once (EMFILE). */
+const SKILL_READ_BATCH = 16
 
 export function graphDensity(graph: LearningGraph): GraphDensity {
   const linked = new Set<string>()
@@ -314,7 +310,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // empty config falls through to the shared default root inside the resolver.
   const graphSkillsRoot = resolveSkillsRoot(rawConfig)
   ctx.inject(['commands'], (commandCtx) => {
-    const commands = (commandCtx as unknown as { commands: { register(definition: unknown): () => void } }).commands
+    // V27 G5.2: the platform's `Context.commands` augmentation and its
+    // `CommandDefinition` type are the contract (previously a local cast to
+    // `{ register(definition: unknown) }`, which silenced every upstream shape
+    // change). `@deepseek-ai/dsh-commands` is a declared peer.
+    const commands = commandCtx.commands
     // M-11 (v3 audit): the register disposer must be bound to the fiber — an
     // unbound registration survives HMR/reload and duplicates the command.
     commandCtx.effect(() => commands.register({
@@ -327,7 +327,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       input: {
         hint: '[detail|edit|delete] <nodeId> [text]',
       },
-      handler: async (invocation: GraphInvocation) => {
+      handler: async (invocation: CommandInvocation) => {
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
         const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
@@ -337,8 +337,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const usage = usageService
         const memory = memoryService
         const io = ioService
-        const session = invocation.agent?.session
-        const input = (invocation.rawInput ?? '').trim()
+        // V27 G5.2: `CommandInvocation` (the platform's own type) declares both
+        // fields non-optional, so the defensive chains went with the local view.
+        const session = invocation.agent.session
+        const input = invocation.rawInput.trim()
         const detail = /^detail\s+(\S+)$/.exec(input)
         if (detail && detail[1]) return await nodeDetail(detail[1])
         const edit = /^edit\s+(\S+)\s+([\s\S]+)$/.exec(input)
@@ -362,7 +364,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // independent), and the map insertion order stays usage-key order.
           const skills = withSkills()
           const names = [...usageMap.keys()]
-          const contents = await Promise.all(names.map(name => skills.read(name)))
+          // V27 INS-04: the fan-out is BOUNDED and failure-tolerant. An
+          // unbounded `Promise.all` over every usage key opened one read per
+          // skill at once (EMFILE on a large library), and `SkillLibrary.read`
+          // re-throws everything but EISDIR — so ONE unreadable file or one
+          // EMFILE aborted the whole `/graph`. Skills are read in batches, a
+          // failed read contributes no references instead of killing the view,
+          // and the loss is reported once.
+          const contents: Array<string | null> = []
+          let unreadable = 0
+          for (let offset = 0; offset < names.length; offset += SKILL_READ_BATCH) {
+            const batch = names.slice(offset, offset + SKILL_READ_BATCH)
+            const batchContents = await Promise.all(batch.map(async (name) => {
+              try {
+                return await skills.read(name)
+              } catch {
+                unreadable += 1
+                return null
+              }
+            }))
+            contents.push(...batchContents)
+          }
+          if (unreadable > 0) {
+            ctx.logger.warn(`evolution-learning-graph: ${unreadable} skill file(s) could not be read; their related_skills edges are missing from this graph`)
+          }
           const related = new Map<string, string[]>()
           names.forEach((name, index) => {
             const content = contents[index]
@@ -415,7 +440,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // P3-38 (v14): the write origin is derived ONCE — the direct path
             // used to hardcode 'foreground' while the staged path sent
             // `origins.library` (which is 'subagent' for a subagent invocation).
-            const origins = resolveOrigins(session?.header?.origin)
+            // V27 G5.2: `agent.session` is non-optional on the platform's
+            // CommandInvocation, so the session always rides the request.
+            const origins = resolveOrigins(session.header.origin)
             if (approval) {
               // P2-7 (v15)/P3 (v16): staging pre-check — the skill runner lives
               // in tool-skill-manage, an AGENT-preset row, while this command is
@@ -460,8 +487,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   libraryOrigin: origins.library,
                 },
                 origin: origins.approval,
-                ...session?.id ? { sessionId: session.id } : {},
-                ...session ? { session } : {},
+                ...session.id ? { sessionId: session.id } : {},
+                session,
                 ...sessionPolicy !== undefined ? { sessionPolicy } : {},
               })
               if (decision.action === 'staged') return ok(decision.message)
@@ -497,7 +524,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // refinement as the skill branch) and carry the entry INDEX in the
             // summary — `graph edit memory:user` on index 0 and 3 used to
             // produce identical audit lines.
-            const originsM = resolveOrigins(session?.header?.origin)
+            const originsM = resolveOrigins(session.header.origin)
             const sessionPolicyM = effectiveSessionPolicy(ctx, session)
             const willStage = memoryApproval.isEnabled !== false
               && sessionPolicyM !== 'never'
@@ -515,8 +542,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `graph edit memory:${parsed.source}:${parsed.index}`,
               args: { target: parsed.source, operations: [{ action: 'replace', old_text: check.entry ?? '', facts: content }] },
               origin: originsM.approval,
-              ...session?.id ? { sessionId: session.id } : {},
-              ...session ? { session } : {},
+              ...session.id ? { sessionId: session.id } : {},
+              session,
               ...sessionPolicyM !== undefined ? { sessionPolicy: sessionPolicyM } : {},
             })
             if (decision.action === 'staged') return ok(decision.message)
@@ -540,7 +567,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // P3 (v16): the refusal fires only when staging will actually
               // happen (approval enabled, session policy not 'never',
               // foreground writes stage).
-              const origins = resolveOrigins(session?.header?.origin)
+              const origins = resolveOrigins(session.header.origin)
               const sessionPolicy = effectiveSessionPolicy(ctx, session)
               const willStage = approval.isEnabled !== false
                 && sessionPolicy !== 'never'
@@ -553,8 +580,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 summary: `graph delete ${parsed.name}`,
                 args: { operation: { action: 'delete', name: parsed.name }, origin: origins.approval, libraryOrigin: origins.library },
                 origin: origins.approval,
-                ...session?.id ? { sessionId: session.id } : {},
-                ...session ? { session } : {},
+                ...session.id ? { sessionId: session.id } : {},
+                session,
                 ...sessionPolicy !== undefined ? { sessionPolicy } : {},
               })
               if (decision.action === 'staged') return ok(decision.message)
@@ -575,7 +602,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (memoryApproval) {
             // P3 (v16): see the edit branch — stage-only refusal + index in
             // the summary.
-            const origins = resolveOrigins(session?.header?.origin)
+            const origins = resolveOrigins(session.header.origin)
             const sessionPolicy = effectiveSessionPolicy(ctx, session)
             const willStage = memoryApproval.isEnabled !== false
               && sessionPolicy !== 'never'
@@ -590,8 +617,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `graph delete memory:${parsed.source}:${parsed.index}`,
               args: { target: parsed.source, operations: [{ action: 'remove', old_text: check.entry ?? '' }] },
               origin: origins.approval,
-              ...session?.id ? { sessionId: session.id } : {},
-              ...session ? { session } : {},
+              ...session.id ? { sessionId: session.id } : {},
+              session,
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},
             })
             if (decision.action === 'staged') return ok(decision.message)
