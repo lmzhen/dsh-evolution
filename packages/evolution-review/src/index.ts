@@ -302,6 +302,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let reviewInFlight = false
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
+  // V24-04 (v24): per-session mutex over the persisted review-state RMW.
+  // Entries self-remove when the chain drains (no sweep needed); the dispose
+  // hook clears the map like the other per-session state.
+  const reviewStateLocks = new Map<SessionId, Promise<unknown>>()
+  async function withReviewStateLock<T>(id: SessionId, task: () => Promise<T>): Promise<T> {
+    const previous = reviewStateLocks.get(id) ?? Promise.resolve()
+    const next = previous.catch(() => {}).then(task)
+    reviewStateLocks.set(id, next)
+    try {
+      return await next
+    } finally {
+      if (reviewStateLocks.get(id) === next) reviewStateLocks.delete(id)
+    }
+  }
+
   ctx.on('session/event', (session, event) => {
     // v20 (C-5): subagent sessions never reach the fold — the turn/end handler
     // early-returns on `origin === 'subagent'` BEFORE the delete — so their
@@ -373,27 +388,45 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // first `advanceReview` always count (a PERSISTED record requires
     // lastTurn >= 0 in both providers). The save below always runs after
     // `advanceReview`, which overwrites it, so the sentinel never reaches disk.
-    const state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
+    // V24-04 (v24): the load → advance → save sequence (and the completed-
+    // flush counter reset further down) run under a per-session state lock.
+    // Two turn-end handlers of the SAME session can overlap — turn N's
+    // completed-flush pipeline awaits the subagent review (minutes) while turn
+    // N+1 ends — and the unlocked read-modify-write let the flush's STALE
+    // snapshot overwrite turn N+1's already-saved counters (lost cadence
+    // accumulation, lastTurn rolled back). The lock is the same per-key
+    // promise-chain primitive the io seam uses (core serial.ts); unlike a
+    // full pipeline serialization it only covers the state RMW, so fold
+    // windows and review timing are unchanged.
     const snapshot = policy()
     // V7-02: a turn woken by our own followup still accumulates (any real
     // user content arriving with it stays in the window) but cannot fire —
     // its review prompt alone must not re-trigger cadence with interval=1.
     const skipFire = skipNextCadenceFire.get(session.id) ?? false
     if (skipFire) skipNextCadenceFire.delete(session.id)
-    const rawKind = advanceReview(state, event.data.turn, signal, {
-      memoryInterval: snapshot?.reviewMemoryInterval ?? config.memoryInterval,
-      skillInterval: snapshot?.reviewSkillInterval ?? config.skillInterval,
-      substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? 3,
-      substantiveMinUserChars: snapshot?.substantiveMinUserChars ?? 200,
-      substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
-      // 0.3.40 (user decision): the counting window restarts at the INJECTION —
-      // the counters stay monotonic across threshold fires and are zeroed at
-      // the flush below (one injection per task segment regardless of how many
-      // thresholds fired before the task ended).
-      resetOnFire: false,
+    let state: ReviewState = { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
+    // V24-04 (v24): the advanceReview result lives in a holder so the
+    // control-flow analysis (which cannot see the lock-callback's assignment,
+    // the same reason the v22 drift flag is a holder) does not narrow it to
+    // the literal `null` initializer.
+    const advanced: { kind: ReviewKind | null } = { kind: null }
+    await withReviewStateLock(session.id, async () => {
+      state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
+      advanced.kind = advanceReview(state, event.data.turn, signal, {
+        memoryInterval: snapshot?.reviewMemoryInterval ?? config.memoryInterval,
+        skillInterval: snapshot?.reviewSkillInterval ?? config.skillInterval,
+        substantiveMinToolCalls: snapshot?.substantiveMinToolCalls ?? 3,
+        substantiveMinUserChars: snapshot?.substantiveMinUserChars ?? 200,
+        substantiveMinAgentChars: snapshot?.substantiveMinAgentChars ?? 500,
+        // 0.3.40 (user decision): the counting window restarts at the INJECTION —
+        // the counters stay monotonic across threshold fires and are zeroed at
+        // the flush below (one injection per task segment regardless of how many
+        // thresholds fired before the task ended).
+        resetOnFire: false,
+      })
+      await stateService?.saveReviewState(session.id, state)
     })
-    const kind = skipFire ? null : rawKind
-    await stateService?.saveReviewState(session.id, state)
+    const kind = skipFire ? null : advanced.kind
     // Cumulative tool-call counter updates on EVERY turn/end — including turns
     // that fired a cadence review — so the completion channel's long-session
     // gate reflects the whole conversation, not only cadence-free turns.
@@ -426,6 +459,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
           try {
             deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review')
+            // V24-15 (v24): the inject-mode cadence delivery previously did
+            // NOT emit `review-scheduled` — on the default inject-mode
+            // deployment a consumer would have missed every cadence review.
+            // Same protection domain as the emit below.
+            try {
+              ctx.emit('evolution/review-scheduled', {
+                sessionId: session.id,
+                kind: pendingKind,
+                toolCalls: signal.toolCalls,
+                userChars: signal.userChars,
+                assistantChars: signal.assistantChars,
+                channel: 'inject',
+              })
+            } catch (emitError) {
+              ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+            }
           } catch (injectError) {
             ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
           }
@@ -444,6 +493,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 toolCalls: signal.toolCalls,
                 userChars: signal.userChars,
                 assistantChars: signal.assistantChars,
+                channel: 'subagent',
               })
             } catch (emitError) {
               ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
@@ -458,6 +508,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // window E-19's single-flight exists to prevent.
             try {
               deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review')
+              // V24-15 (v24): the fallback inject previously did NOT emit —
+              // unified with every other delivery path.
+              try {
+                ctx.emit('evolution/review-scheduled', {
+                  sessionId: session.id,
+                  kind: pendingKind,
+                  toolCalls: signal.toolCalls,
+                  userChars: signal.userChars,
+                  assistantChars: signal.assistantChars,
+                  channel: 'inject',
+                })
+              } catch (emitError) {
+                ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+              }
             } catch (injectError) {
               ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
             }
@@ -467,15 +531,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // — zero the monotonic counters and re-persist so a continued
         // conversation starts a fresh segment from here (one injection per
         // segment; the post-flush save is authoritative over the earlier one).
-        state.turnsSinceMemory = 0
-        state.turnsSinceSkill = 0
-        // V7-04 (0.3.42): delivery already happened before this save; a persist
-        // failure means a stateful reload still sees the pre-reset counters and
-        // re-delivers next completed turn — warn once per session so the repeat
-        // source is identifiable (in-memory counters stay zeroed; the current
-        // process keeps the fresh segment).
+        // V24-04 (v24): the reset runs under the state lock and re-loads the
+        // persisted record before zeroing — the in-memory `state` is turn N's
+        // snapshot and the flush may have awaited the subagent review for
+        // minutes, during which turn N+1 advanced AND saved. Writing the stale
+        // object used to roll N+1's counters and lastTurn back entirely; only
+        // the two counters are zeroed on the FRESH record now.
         try {
-          await stateService?.saveReviewState(session.id, state)
+          await withReviewStateLock(session.id, async () => {
+            const fresh = await stateService?.loadReviewState(session.id) ?? state
+            fresh.turnsSinceMemory = 0
+            fresh.turnsSinceSkill = 0
+            await stateService?.saveReviewState(session.id, fresh)
+          })
         } catch (resetError) {
           if (!cadenceResetWarned.has(session.id)) {
             cadenceResetWarned.add(session.id)
@@ -523,6 +591,36 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
+    // V24-03 (v24): the completion channel is the one delivery path that
+    // bypassed E-19's single-flight — while a cadence subagent review was in
+    // flight (up to the full review + plan-execution window), a subsequent
+    // completed turn injected the completion review straight into the parent,
+    // and the parent's skill/memory writes could interleave with the in-flight
+    // subagent's executePlan — the exact concurrent-writer window v20 C-1
+    // closed for the cadence fallback. When a review is in flight, the prompt
+    // joins the SAME deferred queue the cadence path uses; the drain delivers
+    // it (and emits `review-scheduled` channel:'completion') right after the
+    // window closes. V26-06 (v25): the completionInjected flag means "queued
+    // or delivered" — a queue-cap DROP must roll it back (same V4-21 parity
+    // as the drain's delivery-failure rollback) or the session's one
+    // completion review is permanently lost in-process.
+    if (reviewInFlight) {
+      if (deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
+        deferredFallbackReviews.push({
+          agent,
+          sessionId: session.id,
+          kind: 'skill',
+          prompt: COMPLETION_SKILL_REVIEW_PROMPT,
+          label: 'completion review',
+          channel: 'completion',
+          counts: signal,
+        })
+      } else {
+        completionInjected.delete(session.id)
+        ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropped one deferred completion review prompt; the completion gate re-arms for the next completed turn`)
+      }
+      return
+    }
     try {
       deliverMessage(agent, COMPLETION_SKILL_REVIEW_PROMPT, 'completion review')
     } catch (injectError) {
@@ -547,6 +645,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         toolCalls: signal.toolCalls,
         userChars: signal.userChars,
         assistantChars: signal.assistantChars,
+        // V24-15 (v24): the emitting delivery path, per the unified contract.
+        channel: 'completion',
       })
     } catch (emitError) {
       ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
@@ -597,7 +697,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // v20 (C-1): fallback prompts queued while a review subagent was in flight.
   // Capped so a pathological pile-up cannot grow unboundedly (the drain point
   // is the `finally` in trySubagentReview, and C-2 bounds the window itself).
-  const deferredFallbackReviews: Array<{ agent: import('@deepseek-ai/dsh-agent').Agent; kind: ReviewKind }> = []
+  // V24-03/V24-15 (v24): the queue entries carry their full delivery spec
+  // (prompt text, source label, emit channel) instead of a bare ReviewKind —
+  // the COMPLETION channel now defers through this same queue when a subagent
+  // review is in flight, and it delivers a different prompt (and must emit a
+  // different channel) than the cadence fallbacks.
+  // V25-02 (v25): entries also carry their OWN sessionId and count window —
+  // the drain runs inside the IN-FLIGHT review's closure, so emitting its
+  // session/counts attributed another session's deferred review to the wrong
+  // session (and used an unrelated count window).
+  const deferredFallbackReviews: Array<{
+    agent: import('@deepseek-ai/dsh-agent').Agent
+    sessionId: SessionId
+    kind: ReviewKind
+    prompt: string
+    label: string
+    channel: 'inject' | 'completion'
+    counts: { toolCalls: number; userChars: number; assistantChars: number }
+  }> = []
   const DEFERRED_REVIEW_CAP = 16
   // v21 (L-5): drop queued fallback prompts on dispose — delivering them after
   // unload would inject through a dead plugin fiber. Scope note: the whole
@@ -623,7 +740,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // prevent. Queue the prompt; the `finally` below delivers it right after
       // the window closes (E-19's stated invariant now actually holds).
       if (deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
-        deferredFallbackReviews.push({ agent, kind })
+        deferredFallbackReviews.push({
+          agent,
+          sessionId: session.id,
+          kind,
+          prompt: reviewPrompt(kind),
+          label: 'auto-review',
+          channel: 'inject',
+          counts: signal as { toolCalls: number; userChars: number; assistantChars: number },
+        })
       } else {
         ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropping one fallback review prompt`)
       }
@@ -809,13 +934,40 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // v20 (C-1): flush prompts deferred while the window was open — AFTER
       // the reset, so the parent-model writer never overlaps the subagent
       // writer. Delivery failures stay warn-only (best-effort, same as the
-      // caller-side fallback).
+      // caller-side fallback). V24-15 (v24): every flushed delivery also
+      // emits `review-scheduled` with its channel — the drain previously
+      // delivered silently, a hole in the emission contract.
       const deferred = deferredFallbackReviews.splice(0)
-      for (const { agent: waitingAgent, kind: waitingKind } of deferred) {
+      for (const {
+        agent: waitingAgent, sessionId: entrySession, kind: waitingKind,
+        prompt, label, channel, counts: entryCounts,
+      } of deferred) {
         try {
-          deliverMessage(waitingAgent, reviewPrompt(waitingKind), 'auto-review')
+          deliverMessage(waitingAgent, prompt, label)
         } catch (injectError) {
+          // V25-03 (v25): a failed COMPLETION delivery rolls the session's
+          // completionInjected flag back (V4-21 parity with the direct inject
+          // path) — otherwise the flag blocks the only retry and the session's
+          // one completion review is permanently lost in-process.
+          if (channel === 'completion') completionInjected.delete(entrySession)
           ctx.logger.warn(`dsh-evolution-review: deferred review inject failed: ${injectError instanceof Error ? injectError.message : String(injectError)}`)
+          continue
+        }
+        try {
+          // V25-02 (v25): attribute the emit to the ENTRY's session and use
+          // the ENTRY's captured count window — this drain runs inside the
+          // in-flight review's closure, whose session/signal belong to a
+          // different review.
+          ctx.emit('evolution/review-scheduled', {
+            sessionId: entrySession,
+            kind: waitingKind,
+            toolCalls: entryCounts.toolCalls,
+            userChars: entryCounts.userChars,
+            assistantChars: entryCounts.assistantChars,
+            channel,
+          })
+        } catch (emitError) {
+          ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
         }
       }
     }
@@ -1034,6 +1186,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     pendingCadenceWarned.clear()
     skipNextCadenceFire.clear()
     cadenceResetWarned.clear()
+    // V24-04 (v24): chains self-remove when drained; the clear only covers
+    // locks still pending at unload (their tasks settle into the void).
+    reviewStateLocks.clear()
   }, 'dsh-evolution-review.cleanup')
 }
 

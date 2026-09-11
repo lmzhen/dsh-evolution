@@ -29,7 +29,7 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { usage: 'maintain [--timeout=<ms> | --facts]', summary: 'run a maintenance scan (--facts: 0-token preview)' },
   { usage: 'preset install', summary: 'generate the Evolution agent preset into the user root' },
   { usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', summary: 'move a body section into a references/ file' },
-  { usage: 'replay', summary: 'compare prompt-bundle replay for this session' },
+  { usage: 'replay', summary: 'compare plan outcomes across sessions and restarts (backfilled from the activity store)' },
 ]
 
 /** The input-declaration hint (single line, ` | `-separated). */

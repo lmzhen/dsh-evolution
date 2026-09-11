@@ -199,11 +199,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // v20 (D-1): the move fields get the same treatment — a non-string
       // `heading`/`to_file` used to flow past `?? ''` (only nullish defaults)
       // into the library's string ops.
+      // V24-20a (v24): ELEMENT-level guard — `restructure: [null]` used to
+      // throw reading `.heading` of null inside the map (the staged-args
+      // replay channel bypasses the tool schema, so the container guard alone
+      // did not close the family's "schema is not a guarantee" posture).
       const moves = Array.isArray(args.restructure) ? args.restructure : []
-      result = await library.restructure(name, moves.map(move => ({
-        heading: typeof move.heading === 'string' ? move.heading : '',
-        toFile: typeof move.to_file === 'string' ? move.to_file : '',
-      })), origin)
+      if (moves.some((move) => {
+        const raw: unknown = move
+        return raw === null || typeof raw !== 'object'
+      })) {
+        result = { ok: false, message: 'Every entry of restructure must be an object with heading and to_file.' }
+      } else {
+        result = await library.restructure(name, moves.map(move => ({
+          heading: typeof move.heading === 'string' ? move.heading : '',
+          toFile: typeof move.to_file === 'string' ? move.to_file : '',
+        })), origin)
+      }
     }
     else if (action === 'pin') result = await library.setPinned(name, true, origin)
     else if (action === 'unpin') result = await library.setPinned(name, false, origin)

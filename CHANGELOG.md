@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.67 (patch) — v24–v26 三轮审计闭环：3×P1 + 46×P2 全部处置 + 回归测试夹具修正
+
+> **范围**：v24 全量审计 → 全部修复 → v25 对修复的继续审计 → 修正 → v26 再审计 → 修正，三轮合计 3×P1 + 46×P2，全部闭环，零遗留 P0–P2。三个 P1 均为并发/生命周期类，且后两个 P1 都是在对前一轮修复的复审中发现的。
+>
+> **发布门禁（本版实测）**：vitest 109 文件 / 978 用例全绿；build-lib（29 包 tsc -b）exit 0；oxlint 0 warnings / 0 errors；dependency-closure / event-pairing / arch-guards 全 exit 0；mirror↔dev 树 339/339 逐字节一致。
+>
+> **回归测试夹具修正**：V25-02/V25-03 的双会话夹具原先使用恒 null 的 review-state 加载器，每轮计数被重置，Y 的 cadence 从未触发 subagent、X 也从未真正进入 deferred drain；两条用例因此在“撤销对应修复”后仍全绿（v26 报告的反事实推演未复现这一夹具缺陷）。本版改为按会话持久化的内存状态，并在 V25-03 重放轮前复位 X 计数以隔离 completion 通道；两条用例现均满足“撤销对应修复即红”，已用定向变异实测确认。
+
+### 核心修复
+
+- **V24-01 / V26-01（P1）**：`applyTreeChange` 的 CAS 基线改取计划期字节 `TreeChangeWrite.expected`（缺省回落预读），consolidate/restructure 全部写入携带基线；漂移即中止回滚。新增确定性 CAS 漂移回归测试（transact 内注入并发 patch，撤销 CAS 即红）。
+- **V25-01 / V26-05（P1）**：replay activity 回灌改为 once-per-driver latch；首挂载窄窗口内先 live 记录的 planId 在回灌时去重，io provider 重载不再翻倍。
+- **V25-02 / V25-03 / V26-06（P2）**：deferred completion 队列条目携带自身的 sessionId/count 窗口/channel；drain 投递失败按 entry session 回滚 `completionInjected`，队列 cap 丢弃路径同样回滚。
+- **其余 P2**：skill-catalog 摘要缓存 epoch 代次守卫；review-state 每会话状态锁 + 会话 cap（500，双介质惰性淘汰）；feedback 迁移复用 S6.4 逐记录消毒 + clamp；state-json 归档/备份吞错可观察（quarantine rethrow / warn）；`args: undefined` 写入门收紧 + 入口归一；suppressed sidecar 未来版本拒写；restructure 携带 session 维度；doctor preset×layered 产物检测与空目录误报修正；命令空白变体归一分发；no_issues 逐信号 notes 校验；JSON 模型工具元素 null 守卫；snapshotAll 写锁探针 + `manifest.skipped` 全链路（净化/读取/restore 明示）；uninstall journal.scope、staging familyVersion 基准、shipped yml 残留扫描；文档三方同步与审计标签撞号修正。
+
+
 ## 0.3.66 (patch) — v20–v23 四轮审计闭环：15×P1 + 62×P2 全部处置（4 个审计批合并发布 + capability 包退役）
 
 > **合并说明**：以下四个批次是 2026-09-09～09-10 的"审计 → 修复 → 回归审计"四轮闭环（合计 77 项：0×P0 / 15×P1 / 62×P2），全部改动集中在本版发布；每批的发现数与主题见其小标题。回归审计连续在后续批次中抓到前三批自身引入的缺陷（批 2 引入 2 项、批 3 引入 1×P1 + 2 项边角），共同形态是"用例全绿但语义有缺陷"。本版另含一项**非审计**改动：批 5（capability 包退役），理由与范围见其小节。

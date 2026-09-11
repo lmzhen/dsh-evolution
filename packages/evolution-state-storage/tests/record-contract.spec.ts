@@ -28,7 +28,11 @@ describe('seam record contract (P2-12/14/15/16/18, v19)', () => {
     expect(recordIssue(REVIEW_STATE_TABLE, { turnsSinceMemory: -1, turnsSinceSkill: 0, lastTurn: 0 })).toContain('turnsSinceMemory')
     expect(recordIssue(CURATOR_STATE_TABLE, { schemaVersion: 1.5, lastRunAt: 1, runCount: 0, lastSummary: 's', paused: false })).toContain('schemaVersion')
     expect(recordIssue(CURATOR_STATE_TABLE, { lastRunAt: Number.NaN, runCount: 0, lastSummary: 's', paused: false })).toContain('lastRunAt')
-    expect(recordIssue(PENDING_TABLE, { ...pending(), args: undefined })).toBeNull() // key present
+    // V24-06 (v24): key-present-but-undefined is REFUSED — the json medium
+    // persists through JSON.stringify, which drops an undefined-valued key,
+    // so the record would fail this gate on the next read, be quarantined,
+    // and the staged write would silently vanish from the approval view.
+    expect(recordIssue(PENDING_TABLE, { ...pending(), args: undefined })).toContain('args')
     const { args: _args, ...withoutArgs } = pending()
     expect(recordIssue(PENDING_TABLE, withoutArgs)).toContain('args')
     expect(recordIssue(PENDING_TABLE, pending({ kind: 'nope' }))).toContain('kind')

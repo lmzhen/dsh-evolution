@@ -24,6 +24,7 @@ import {
   PENDING_RESOLVED_CAP as SEAM_PENDING_RESOLVED_CAP,
   PENDING_TABLE,
   PROVIDER_DOMAIN,
+  REVIEW_STATE_SESSION_CAP,
   REVIEW_STATE_TABLE,
   type CuratorStateRecord,
   type EvolutionStateStorage,
@@ -159,7 +160,11 @@ export function apply(ctx: Context): void {
       // in-memory record ahead of the medium (the json provider serializes, so
       // it is deep by construction).
       const record = (await ensure()).table(REVIEW_STATE_TABLE).get(sessionId)
-      return record === undefined ? null : structuredClone(record)
+      if (record === undefined) return null
+      // V24-08 (v24): strip the provider-internal eviction stamp on read so
+      // the consumer-facing record shape is unchanged (json parity).
+      const { updatedAt: _stamp, ...rest } = record as ReviewStateRecord & { updatedAt?: number }
+      return structuredClone(rest)
     },
 
     async saveReviewState(sessionId, record) {
@@ -175,7 +180,36 @@ export function apply(ctx: Context): void {
       if (!parsed.success) {
         throw new Error(`evolution-state-domain: refusing to persist an invalid review-state record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
       }
-      await (await ensure()).table(REVIEW_STATE_TABLE).put(sessionId, cloneRecord(parsed.data))
+      const table = (await ensure()).table(REVIEW_STATE_TABLE)
+      // V24-08 (v24): store WITH the eviction stamp — the `.loose()` schema
+      // passes the extra field through, and loadReviewState strips it on read
+      // (json parity), so the consumer-facing record shape is unchanged. The
+      // gate above runs on the CONSUMER record, not the stamp.
+      const stamped = { ...cloneRecord(parsed.data), updatedAt: Date.now() } as ReviewStateRecord & { updatedAt: number }
+      await table.put(sessionId, stamped)
+      // V24-08 (v24): session cap — the review pipeline saves on every
+      // turn/end and nothing pruned rows, so the table grew with the deploy's
+      // whole session history. Same cap discipline as the pending table
+      // (SEAM constant, enforced by json too). Eviction is best-effort (the
+      // save has already committed; a delete failure warns and retries on the
+      // next save). A row without `updatedAt` (pre-0.3.67 writer) sorts as
+      // oldest and evicts first — unlike pending's resolvedAt convention —
+      // because an active session re-stamps its row on its very next save, so
+      // the "unknown" state is always stale by construction.
+      const entries = [...table.entries()]
+        .map(([key, row]) => ({ key, updatedAt: (row as { updatedAt?: number }).updatedAt ?? 0 }))
+        .filter(entry => entry.key !== sessionId)
+        .sort((a, b) => a.updatedAt - b.updatedAt)
+      for (const entry of entries.slice(0, Math.max(0, entries.length - REVIEW_STATE_SESSION_CAP + 1))) {
+        const current = table.get(entry.key)
+        // C-5 pattern: re-read between the snapshot and the delete — a
+        // concurrent save may have refreshed (or removed) the row the
+        // snapshot measured; only evict the exact staleness we saw.
+        if (current === undefined || ((current as { updatedAt?: number }).updatedAt ?? 0) !== entry.updatedAt) continue
+        await table.delete(entry.key).catch((error: unknown) => {
+          ctx.logger.warn(`evolution-state-domain: review-state session-cap eviction for "${entry.key}" failed (will retry on the next save): ${error instanceof Error ? error.message : String(error)}`)
+        })
+      }
     },
 
     async loadCuratorState() {

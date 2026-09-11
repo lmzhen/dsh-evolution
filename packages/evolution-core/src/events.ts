@@ -24,6 +24,15 @@ export interface EvolutionReviewScheduledEvent {
   toolCalls: number
   userChars: number
   assistantChars: number
+  /** V24-15 (v24): which delivery channel actually sent the review. The
+   * emission point was previously covered on only two of the four delivery
+   * paths (subagent success + completion inject), so a consumer on the
+   * default inject-mode deployment would have silently missed every cadence
+   * review. Every delivery path now emits with its channel:
+   * `'subagent'` (spawned review run), `'inject'` (prompt injected into the
+   * parent — direct, fallback, or deferred-drain), `'completion'`
+   * (completion-trigger prompt, direct or deferred-drain). */
+  channel?: 'subagent' | 'inject' | 'completion' | undefined
 }
 
 export interface EvolutionPlanAppliedEvent {

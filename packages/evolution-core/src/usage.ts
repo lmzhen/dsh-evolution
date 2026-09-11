@@ -405,6 +405,21 @@ export async function saveSuppressedNames(
   names: ReadonlySet<string>,
   io: EvolutionIoLike = nodeEvolutionIo(),
 ): Promise<void> {
+  // V24-09 (v24): same future-version discipline as the RMW path below and
+  // the mutations/usage/events writers (A2-11 / L-1 / F-338) — a newer
+  // on-disk schema is never downgraded by this writer.
+  const current = await io.readText(suppressedFile(root)).catch(() => null)
+  if (current !== null) {
+    try {
+      const parsed = JSON.parse(current) as { version?: unknown } | null
+      if (parsed !== null && typeof parsed.version === 'number' && parsed.version > SUPPRESSED_FILE_VERSION) {
+        console.warn(`suppression sidecar ${suppressedFile(root)} declares version ${String(parsed.version)} (newer than ${SUPPRESSED_FILE_VERSION}); not overwritten`)
+        return
+      }
+    } catch {
+      // Malformed — the plain write below matches the historical behavior.
+    }
+  }
   await io.writeText(suppressedFile(root), JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2))
 }
 
@@ -420,9 +435,24 @@ export async function updateSuppressedNames(
   task: (names: Set<string>) => void | Promise<void>,
 ): Promise<void> {
   await transactIo(io, suppressedFile(root), async (current) => {
-    // P3: never overwrite a malformed suppression sidecar.
+    // P3: never overwrite a malformed suppression sidecar; V24-09 (v24): a
+    // newer on-disk version is never downgraded by this writer — the family
+    // discipline the mutations (A2-11), usage (L-1) and evolution-events
+    // (F-338) writers already follow. parseSuppressed below deliberately
+    // ignores `version`; this guard reads it directly so an unknown future
+    // shape (carrying fields this runtime does not know) keeps its bytes
+    // instead of being rewritten back to the v1 shape.
     if (current !== null) {
-      try { JSON.parse(current) } catch { return current }
+      let parsed: { version?: unknown } | null = null
+      try {
+        parsed = JSON.parse(current) as { version?: unknown } | null
+      } catch {
+        return current
+      }
+      if (parsed !== null && typeof parsed.version === 'number' && parsed.version > SUPPRESSED_FILE_VERSION) {
+        console.warn(`suppression sidecar ${suppressedFile(root)} declares version ${String(parsed.version)} (newer than ${SUPPRESSED_FILE_VERSION}); not overwritten`)
+        return current
+      }
     }
     const names = parseSuppressed(current)
     await task(names)

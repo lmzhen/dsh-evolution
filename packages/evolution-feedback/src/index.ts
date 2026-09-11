@@ -125,7 +125,16 @@ export class EvolutionFeedback {
       const archiveNames = await listEventArchives(io, eventsPath)
       const noLog = rawEvents === null || rawEvents.trim() === ''
       if (noLog && archiveNames.length === 0) {
-        const aggregate = parseAggregate(await io.readText(path))
+        // V24-05 (v24): the migration path now consumes the SAME per-record
+        // sanitizer as the boot cache reader (S6.4) — parseAggregate used to
+        // cast `{skills,sessions}` unchecked, so a single corrupted
+        // `positive: 1e9` count in a hand-edited/damaged feedback.json was
+        // expanded by synthesizeFeedbackEvents into a billion-element event
+        // array at boot (OOM / wedged event loop), and a non-string lastNote
+        // flowed into the folded record as a type lie. Bad records are
+        // dropped with a warn; surviving counts are clamped to the migration
+        // budget below.
+        const aggregate = parseAggregate(await io.readText(path), this.warn)
         if (aggregate) {
           try {
             await migrateFeedbackEvents(io, eventsPath, aggregate)
@@ -378,13 +387,38 @@ export async function migrateFeedbackEvents(io: IoLike, eventsPath: string, aggr
   })
 }
 
-/** Parse a legacy aggregate (v1) or a v2 cache into a plain aggregate state. */
-function parseAggregate(raw: string | null): FeedbackState | null {
+/** Parse a legacy aggregate (v1) or a v2 cache into a plain aggregate state.
+ * V24-05 (v24): every record passes the shared per-record sanitizer (same
+ * validation as `parseCache` — S6.4), and migrated counts are clamped so one
+ * corrupted field cannot expand into an unbounded event array at boot. */
+const MAX_MIGRATED_EVENTS_PER_RECORD = 10_000
+function parseAggregate(raw: string | null, warn: (message: string) => void = () => {}): FeedbackState | null {
   if (raw === null) return null
   try {
     const parsed = JSON.parse(raw) as Partial<{ skills?: unknown; sessions?: unknown }>
-    const skills = isRecord(parsed.skills) ? parsed.skills as FeedbackState['skills'] : undefined
-    const sessions = isRecord(parsed.sessions) ? parsed.sessions as FeedbackState['sessions'] : undefined
+    const clamp = (count: number, target: string, field: string): number => {
+      if (count > MAX_MIGRATED_EVENTS_PER_RECORD) {
+        warn(`evolution-feedback: migration clamps ${field}=${count} for "${target}" to ${MAX_MIGRATED_EVENTS_PER_RECORD} — the on-disk aggregate is not trustworthy at that scale`)
+        return MAX_MIGRATED_EVENTS_PER_RECORD
+      }
+      return count
+    }
+    const sanitizeSection = (section: unknown, kind: 'skill' | 'session'): FeedbackState['skills'] | undefined => {
+      if (!isRecord(section)) return undefined
+      const cleaned = sanitizeCacheRecords(section, kind, warn)
+      for (const [target, record] of Object.entries(cleaned)) {
+        if (record.positive > MAX_MIGRATED_EVENTS_PER_RECORD || record.negative > MAX_MIGRATED_EVENTS_PER_RECORD) {
+          cleaned[target] = {
+            ...record,
+            positive: clamp(record.positive, target, 'positive'),
+            negative: clamp(record.negative, target, 'negative'),
+          }
+        }
+      }
+      return cleaned
+    }
+    const skills = sanitizeSection(parsed.skills, 'skill')
+    const sessions = sanitizeSection(parsed.sessions, 'session')
     if (!skills && !sessions) return null
     return { skills: skills ?? {}, sessions: sessions ?? {} }
   } catch {

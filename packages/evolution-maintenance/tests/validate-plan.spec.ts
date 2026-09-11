@@ -96,7 +96,30 @@ describe('validateAndNormalizeMaintainPlan', () => {
   })
 
   it('accepts no_issues with an empty plan and rejects a non-empty one', () => {
-    expect(validateAndNormalizeMaintainPlan(validPlan([]), report, SIGNALS).ok).toBe(true)
+    // V24-19 (v24): a no_issues verdict over over-signals now REQUIRES notes
+    // (the silent-skip moved from the issues side to the no_issues side is
+    // refused too). The fixture report carries dedup_group=over, so the
+    // clean-shape assertion explains it in a note; a notes-free no_issues
+    // over the same report fails completeness.
+    const explained = validateAndNormalizeMaintainPlan(
+      { verdict: 'no_issues', plan: [], notes: ['dedup_group: members are intentionally kept separate; no consolidation needed'] },
+      report,
+      SIGNALS,
+    )
+    expect(explained.ok).toBe(true)
+    const unexplained = validateAndNormalizeMaintainPlan(validPlan([]), report, SIGNALS)
+    expect(unexplained.ok).toBe(false)
+    expect(unexplained.errors.some(e => e.includes('completeness'))).toBe(true)
+    // V25-04 (v25): the notes check is PER-SIGNAL — an unrelated boilerplate
+    // note does not explain dedup_group away (the first cut only required
+    // notes to be non-empty).
+    const boilerplate = validateAndNormalizeMaintainPlan(
+      { verdict: 'no_issues', plan: [], notes: ['nothing to do here'] },
+      report,
+      SIGNALS,
+    )
+    expect(boilerplate.ok).toBe(false)
+    expect(boilerplate.errors.some(e => e.includes('dedup_group'))).toBe(true)
     const badRoot = { verdict: 'no_issues', plan: [validItem()], notes: [] }
     const bad = validateAndNormalizeMaintainPlan(badRoot, report, SIGNALS)
     expect(bad.ok).toBe(false)

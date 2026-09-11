@@ -274,6 +274,14 @@ export function validateAndNormalizeMaintainPlan(
   }
   const covered = new Set(plan.flatMap(item => item.evidence.map(ev => ev.signal)))
   const notesText = notes.join('\n')
+  // V24-19 (v24): the coverage check covers the `no_issues` verdict too.
+  // `no_issues` remains a legitimate no-action output (§7), but a no_issues
+  // verdict WITH over signals in the facts and no notes anywhere was the same
+  // silent skip E1 closed on the issues side — one lazy/hallucinated sweep
+  // verdict zeroed every over signal with nothing rendered but "No drift
+  // issues detected." A no_issues with over signals now requires notes that
+  // name (explain away) each signal; a no_issues on a clean facts block is
+  // untouched.
   if (verdict === 'issues') {
     if (plan.length === 0 && notes.length === 0 && overSignals.size > 0) {
       errors.push('completeness: verdict=issues with an empty plan AND no notes — every over signal must be covered by evidence or named in a note (§3)')
@@ -282,6 +290,16 @@ export function validateAndNormalizeMaintainPlan(
       if (uncovered.length > 0) {
         errors.push(`completeness: over signal(s) not covered by any plan evidence nor named in a note (${uncovered.join(', ')}) — §3 requires each over signal to be addressed or explicitly explained away`)
       }
+    }
+  } else if (verdict === 'no_issues' && overSignals.size > 0) {
+    // V25-04 (v25): the notes check is PER-SIGNAL (same notesText.includes
+    // discipline as the issues branch above) — the first cut only required
+    // notes to be NON-EMPTY, so one unrelated boilerplate note zero-explained
+    // every over signal while the error message claimed "explain each
+    // signal".
+    const uncovered = [...overSignals].filter(id => !notesText.includes(id))
+    if (uncovered.length > 0) {
+      errors.push(`completeness: verdict=no_issues while the facts block carries over signal(s) not named in any note (${uncovered.join(', ')}) — each signal must be explicitly explained away in notes (§3/§7)`)
     }
   }
 

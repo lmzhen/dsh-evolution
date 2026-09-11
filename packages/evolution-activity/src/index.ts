@@ -133,11 +133,12 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
 }
 
 /**
- * H-06: @internal — test-support API. The runtime listener path
- * persists through the `transactIo` fold inside `apply()` and never calls
- * this helper; it is kept only because the tests use it as a read barrier.
- * Do not extend it into a second production read path (the apply() listener
- * is the single sink).
+ * H-06: the read barrier over the sidecar. V24-13 (v24): `loadActivity` now
+ * HAS a production consumer — `evolution-replay` backfills its `/evolution
+ * replay` leaderboard from this store at mount (the two packages'
+ * "persistence is the activity store's job" contract is actually wired
+ * through this call). The single-writer rule is unchanged: `apply()`'s
+ * transact listener remains the only WRITE path.
  */
 export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
   return parseActivityContent(await io.readText(activityFile(root)))

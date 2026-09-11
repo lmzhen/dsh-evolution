@@ -5,16 +5,24 @@
  * driver records every `evolution/plan-applied` process event (payload v2,
  * with sessionId) into an in-memory leaderboard and exposes `/evolution
  * replay` (via the `/evolution` command family) for comparison, so a human can
- * A/B review policy/prompt changes against real plan outcomes. Durability
- * across restarts is the evolution-activity store's job; this leaderboard is
- * deliberately in-memory.
+ * A/B review policy/prompt changes against real plan outcomes.
+ *
+ * V24-13 (v24): the in-memory leaderboard is BACKFILLED at mount from the
+ * `evolution-activity` sidecar (`$DSH_HOME/evolution/activity.json`) — the
+ * header previously claimed "durability across restarts is the
+ * evolution-activity store's job" while nothing ever read the sidecar, so a
+ * restart emptied `/evolution replay` and the persisted history sat unread.
+ * Records are fed in sidecar order (oldest first); the driver's `maxPlans`
+ * window keeps the newest. Best-effort: a missing/unreadable sidecar starts
+ * the leaderboard empty, exactly as before.
  * @module @deepseek-ai/dsh-evolution-replay
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, evolutionHome, evolutionIoAdapter } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
+import { loadActivity } from '@deepseek-ai/dsh-evolution-activity'
 
 export interface ReplayPlan {
   policyId: string
@@ -116,6 +124,13 @@ declare module '@deepseek-ai/cordis' {
 export class EvolutionReplayDriver {
   private readonly plans: ReplayPlan[] = []
   private readonly maxPlans: number
+  /** V25-01 (v25): backfill-once latch — see {@link EvolutionReplayDriver.backfill}. */
+  private backfilled = false
+  /** V26-05 (v25): plan ids recorded live BEFORE the backfill settled. A
+   * plan-applied landing inside the one-shot `loadActivity` read window is
+   * recorded live AND persisted into the sidecar the backfill is reading —
+   * `backfill()` drops those ids so the event is not counted twice. */
+  private readonly preBackfillIds = new Set<string>()
   private readonly weights: ReplayWeights
 
   constructor(config: Config = {}, warn: (message: string) => void = () => {}) {
@@ -145,6 +160,10 @@ export class EvolutionReplayDriver {
   }
 
   record(plan: EvolutionPlanAppliedEvent): void {
+    // V26-05 (v25): while the one-shot backfill is in flight, live plan ids
+    // are tracked so `backfill()` can drop the same events arriving from the
+    // sidecar (the activity store persists them concurrently with the read).
+    if (!this.backfilled) this.preBackfillIds.add(plan.planId)
     // P3-23 (v14): the op counters arrive from a persisted session event, so a
     // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
     // with NaN and every score derived from it. Same finite-number discipline
@@ -189,6 +208,26 @@ export class EvolutionReplayDriver {
   }
 
   /**
+   * V25-01 (v25): backfill the leaderboard from the activity sidecar, ONCE
+   * per driver instance. The inject callback that loads the sidecar re-runs
+   * whenever the `evolutionIo` dependency is replaced (cordis derived-fiber
+   * reload — plugin restart / HMR) while THIS driver survives at the apply
+   * scope, so the dedupe guard must live here, not in the callback: without
+   * it, every io reload doubled the leaderboard entries.
+   * @param items - activity records in sidecar order (oldest first).
+   */
+  backfill(items: ReadonlyArray<import('@deepseek-ai/dsh-evolution-activity').EvolutionActivityRecord>): void {
+    if (this.backfilled) return
+    this.backfilled = true
+    // V26-05 (v25): drop the sidecar copies of plans that were already
+    // recorded live inside the read window (same planId — ids are unique per
+    // plan), then retire the tracking set.
+    const fresh = items.filter(item => !this.preBackfillIds.has(item.planId))
+    this.preBackfillIds.clear()
+    for (const item of fresh) this.record(item)
+  }
+
+  /**
    * F-11: test-support API — no production consumer reads the raw
    * plan list (the leaderboard path goes through `compare()`); tests use this
    * as a read/inspection window. Kept by declaration (same posture as the
@@ -221,6 +260,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.provide('evolutionReplay', driver)
   ctx.on('evolution/plan-applied', (event) => {
     driver.record(event)
+  })
+  // V24-13 (v24): backfill the leaderboard from the activity sidecar the
+  // evolution-activity package persists on every plan outcome. Deferred
+  // binding (same pattern as activity's own persistence listener): subscribe
+  // only once the evolution IO provider mounts. Records feed in file order
+  // (oldest first) through the same `record()` gate the live path uses, so
+  // the maxPlans window keeps the newest and every numeric guard applies.
+  // The activity record is payload v2 of `evolution/plan-applied` plus an
+  // `at` timestamp — structurally the event the leaderboard consumes.
+  ctx.inject(['evolutionIo'], (ioCtx) => {
+    const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(): import('@deepseek-ai/dsh-evolution-core').EvolutionIoLike } }).evolutionIo
+    const io = evolutionIoAdapter(() => ioRegistry.provider())
+    const root = evolutionHome()
+    void loadActivity(root, io)
+      .then((items) => {
+        // V25-01 (v25): backfill() is once-per-driver — this callback re-runs
+        // on every evolutionIo dependency replacement while the driver
+        // survives, so a plain record loop here would double the entries.
+        driver.backfill(items)
+      })
+      .catch((error: unknown) => {
+        ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${error instanceof Error ? error.message : String(error)})`)
+      })
   })
 }
 

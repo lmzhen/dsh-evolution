@@ -4,6 +4,7 @@ import MemoryRegistry from '@deepseek-ai/dsh-memory'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as MemoryFiles from '@deepseek-ai/dsh-memory-files'
+import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolMemory from '../src/index.ts'
 import { MEMORY_GUIDANCE, MEMORY_TOOL_DESCRIPTION } from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -100,6 +101,34 @@ describe('tool-memory', () => {
     expect(summaries).toHaveLength(2)
     expect(summaries[1]).toBe('memory 1 ops')
     expect(summaries[1]).not.toMatch(/memory memory/)
+  })
+
+  it('V24-20a: a null operations ELEMENT is refused structurally through the schema-bypassed replay runner', async () => {
+    // The tool schema rejects `operations: [null]` before execute, so the
+    // reachable route for this garbage is the approval replay runner, which
+    // calls executeCore DIRECTLY with the stored staged args (R-2 precedent).
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    ctx.provide('evolutionState', {
+      listPending: async () => [],
+      savePending: async () => {},
+      tryResolvePending: async () => ({ record: null, applied: false }),
+      claimPending: async () => null,
+      releasePendingClaim: async () => {},
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    await ctx.plugin(ToolMemory, {})
+    expect(ctx.evolutionApproval.hasRunner('memory')).toBe(true)
+    const nullElement = await ctx.evolutionApproval.run('memory', { target: 'memory', operations: [null] }, { interface: 'background_review' })
+    expect(nullElement.ok).toBe(false)
+    expect(nullElement.message).toContain('must be an object')
+    expect(nullElement.message).not.toContain('TypeError')
   })
 
   it('bypass writes refresh the model-visible snapshot through the applied event (P2 fix)', async () => {

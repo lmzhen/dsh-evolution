@@ -45,7 +45,11 @@ describe('doctor (WB2, 0.3.55)', () => {
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
       expect((await diagnose(stub, { home })).installForm).toBe('host')
+      // V26-02 (v25/v26): 'layered' keys on the DELIVERED artifact — a bare
+      // empty directory is not a layered install.
       await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      expect((await diagnose(stub, { home })).installForm).toBe('host')
+      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
       expect((await diagnose(stub, { home })).installForm).toBe('layered')
     } finally {
       await rm(home, { recursive: true, force: true })
@@ -57,6 +61,23 @@ describe('doctor (WB2, 0.3.55)', () => {
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-preset'])
       expect((await diagnose(stub, { home })).installForm).toBe('preset')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('V25-07/V24-11: preset bundle × a POPULATED layered preset dir is flagged; a bare empty preset dir is not', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-preset-layered-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-preset'])
+      // A bare/empty leftover directory is NOT a layered install — no conflict
+      // (V25-07: detection keys on the delivered agent.cordis.yml artifact).
+      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      expect((await diagnose(stub, { home })).conflicts).toEqual([])
+      // The delivered artifact flips it into a real double-mount.
+      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      const report = await diagnose(stub, { home })
+      expect(report.conflicts.some(c => c.includes('layered Evolution preset'))).toBe(true)
     } finally {
       await rm(home, { recursive: true, force: true })
     }

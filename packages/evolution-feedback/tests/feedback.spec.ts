@@ -755,4 +755,49 @@ describe('evolution-feedback', () => {
       await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   }, 60_000)
+
+  it('V24-05: a corrupted aggregate is sanitized before migration (no event explosion, no type lie)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-feedback-sanitize-'))
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = new Context()
+      await ctx.plugin(EvolutionIoRegistry)
+      await ctx.plugin(NodeIo)
+      const io = ctx.evolutionIo.provider('node')
+      const cachePath = join(home, 'evolution', 'feedback.json')
+      const eventsPath = join(home, 'evolution', 'events.json')
+      // Corrupted aggregate (hand-edited / damaged file) with NO event log —
+      // exactly the recovery scenario the migration path exists for.
+      // 'huge-skill' carries an impossible count (pre-fix: a billion-element
+      // event array at boot); 'note-skill' carries a non-string lastNote
+      // (pre-fix: flowed into the folded record as a type lie); 'good-skill'
+      // is a legitimate record that must survive.
+      await io.writeText(cachePath, JSON.stringify({
+        skills: {
+          'huge-skill': { positive: 1e9, negative: 0 },
+          'note-skill': { positive: 1, negative: 0, lastNote: 12345 },
+          'good-skill': { positive: 2, negative: 0 },
+        },
+        sessions: {},
+      }))
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      const events = (await readEvolutionEvents(io, eventsPath)).events
+      const countFor = (target: string): number => events.filter(event => event.type === 'feedback' && event.target === target).length
+      // The impossible count was clamped to the migration budget, not expanded.
+      expect(countFor('huge-skill')).toBe(10_000)
+      // The type-broken record was dropped by the shared sanitizer.
+      expect(countFor('note-skill')).toBe(0)
+      expect(feedback.snapshot().skills['note-skill']).toBeUndefined()
+      // The well-formed record migrated intact.
+      expect(countFor('good-skill')).toBe(2)
+      expect(feedback.snapshot().skills['good-skill']).toMatchObject({ positive: 2, negative: 0 })
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  }, 60_000)
 })

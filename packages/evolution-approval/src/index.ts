@@ -221,7 +221,15 @@ export class EvolutionApproval extends Service {
         id: randomUUID(),
         kind: input.kind,
         summary,
-        args: input.args,
+        // V24-06 (v24): `args: undefined` passes the seam's clone gate but is
+        // DROPPED by the json medium's JSON.stringify — the record would fail
+        // the field gate on the next read, be quarantined, and this staged
+        // write would silently vanish ("approve <id>" → "not in the pending
+        // window"). Normalize the no-args case to `{}` so the record
+        // round-trips through every medium. (The write gate now refuses
+        // undefined too; this keeps `request` usable for the honest caller
+        // that simply has no arguments.)
+        args: input.args === undefined ? {} : input.args,
         createdAt: new Date().toISOString(),
         status: 'pending',
         // 0.3.17 (E-25): attribution was previously dropped at staging — the

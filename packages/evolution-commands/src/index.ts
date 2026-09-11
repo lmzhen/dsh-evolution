@@ -102,7 +102,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         hint: renderHint(),
       },
       async handler(invocation: CommandInvocation) {
-        const input = invocation.rawInput?.trim() ?? ''
+        // V24-12 (v24): collapse internal whitespace for DISPATCH. The grammar
+        // matches are single-space exact forms (`pending --detail`, `skills
+        // health`, `preset install`, …), so a harmless double-space variant
+        // (`pending  --detail`) used to miss every branch, fall through to
+        // the help fallback, and return `kind:'success'` with the full help
+        // text — indistinguishable from a real result (the exact failure
+        // shape F-03 reported and P3-2 fixed for `maintain` only).
+        // V25-08 (v25): the collapse applies to MATCHING ONLY — the
+        // free-text branches (`learn <request>`, the quoted restructure
+        // heading) read their arguments from `rawInputTrimmed` so the user's
+        // original spacing reaches the prompt/disk untouched.
+        const rawInputTrimmed = invocation.rawInput?.trim() ?? ''
+        const input = rawInputTrimmed.replace(/\s+/g, ' ')
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
@@ -305,7 +317,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok('Skill catalog refresh requested: caches dropped, catalog re-read on next lookup.')
         }
         if (input === 'learn' || input.startsWith('learn ')) {
-          const request = input === 'learn' ? '' : input.slice(6).trim()
+          // V25-08 (v25): the free-text request keeps the user's original
+          // spacing (only trim) — the whitespace collapse is dispatch-only.
+          const request = rawInputTrimmed === 'learn' ? '' : rawInputTrimmed.slice(6).trim()
           // rc.67: command results never enter model history, so an echo can
           // never reach the agent. INJECT the learn prompt as a first-class
           // user message (same pattern as the auto-review inject path).
@@ -520,9 +534,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // rollback + origin gate); one move per invocation; heading may
           // contain spaces. `--plan` back-references a maintain scan runId
           // (011 §10 audit chain; shallow — annotated in the result text).
-          const planTail = /\s--plan\s+(\S+)\s*$/.exec(input) ?? null
+          // V25-08 (v25): parsed from the ORIGINAL trimmed input so a
+          // quoted heading keeps its inner spacing verbatim.
+          const planTail = /\s--plan\s+(\S+)\s*$/.exec(rawInputTrimmed) ?? null
           const planRunId = planTail?.[1] ?? undefined
-          const rest = planTail ? input.slice(0, planTail.index) : input
+          const rest = planTail ? rawInputTrimmed.slice(0, planTail.index) : rawInputTrimmed
           const match = /^restructure\s+(\S+)\s+"([^"]+)"\s+(\S+)$/.exec(rest)
           if (!match) return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
           const name = match[1] ?? ''
@@ -540,7 +556,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // runs unchanged. The pre-check refuses only the combination that
           // would stage a record nobody could ever replay (P1-9 trap).
           if (approval) {
-            const sessionPolicy = effectiveSessionPolicy(ctx, undefined)
+            // V24-10 (v24): the session now rides the request, exactly like
+            // the two same-family staging surfaces (tool-skill-manage and
+            // learning-graph). The previous `effectiveSessionPolicy(ctx,
+            // undefined)` was a constant-undefined dead call — the helper's
+            // own contract returns undefined when the session is missing — so
+            // a session/deployment `'never'` policy never reached this write
+            // face and the staged record carried no sessionId attribution.
+            const session = invocation.agent.session
+            const sessionPolicy = effectiveSessionPolicy(ctx, session)
             const willStage = approval.isEnabled !== false
               && sessionPolicy !== 'never'
               && approval.stageForeground !== false
@@ -552,6 +576,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
               args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
+              ...session?.id ? { sessionId: session.id } : {},
+              ...session ? { session } : {},
+              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
             })
             if (decision.action === 'staged') {
               return ok(`${decision.message}${planRunId ? `\n[audit] plan=${planRunId}` : ''}`)
@@ -773,7 +800,16 @@ export function atomicWriteFiles(
 
 interface CommandInvocation {
   rawInput?: string
-  agent: { inject(message: unknown): void }
+  // V24-10 (v24): `session` joined the structural view (learning-graph's
+  // GraphInvocation shape) so the restructure staging can attribute the
+  // staged record and honor the session approval policy.
+  agent: {
+    inject(message: unknown): void
+    session?: {
+      id?: string
+      header?: { origin?: string }
+    }
+  }
   /** E-6 (v18): the platform's cancel signal; forwarded to the maintenance scan. */
   signal?: AbortSignal
 }

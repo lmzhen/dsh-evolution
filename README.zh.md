@@ -58,7 +58,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 安装完成后运行一次内置自检确认形态：
 
 ```bash
-/evolution doctor [--json] # 人类可读自检（安装形态/冲突/env/服务清单 + 建议动作）；--json 供脚本消费
+/evolution doctor [--json] # 人类可读自检（安装形态/冲突〔all、host、preset、layered 两两双挂载〕/env/服务清单 + 建议动作）；--json 供脚本消费
 /evolution doctor --json   # 脚本友好
 ```
 
@@ -76,7 +76,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 | M1 全自动（默认） | 后台自己积累记忆与技能 | `add @lmzhen/dsh-evolution-all` |
 | M2 人审把关 | 进化可以，每步先给我看 | M1 + `approval.enabled: true`（`/evolution pending\|approve\|reject`） |
 | M3 只装底座 | 去掉模型工具；后台自动化照常运行（把关写盘用 M2） | `add @lmzhen/dsh-evolution-host` |
-| M4 按会话启用（进阶） | 只在指定会话生效 | host + `/evolution preset install`（与 M1 互斥） |
+| M4 按会话启用（进阶） | 只在指定会话生效 | host + `/evolution preset install`（与 M1、`preset` 兼容包互斥） |
 
 > [!WARNING]
 > 插件会在你的本地权限下运行第三方代码。安装前请阅读源码，建议先在
@@ -109,7 +109,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 | 分阶段审批 | 后台写入可 stage / approve / reject，保留审计历史 |
 | 威胁扫描 | 写入前检测 prompt injection、泄露、密钥和混淆 |
 | 使用遥测 | 每个技能的 use / view / patch sidecar |
-| 可观测性 | session projection、replay/A-B、feedback 质量分、learning graph |
+| 可观测性 | activity 审计、replay/A-B、feedback 质量分、learning graph |
 
 ## 安装方式
 
@@ -148,7 +148,7 @@ host 基础设施   review、curator、审批、审计、可观测性、威胁�
   `agent.cordis.yml`/`preset.yml` 写入 `$DSH_HOME/.agent-presets/evolution/`），
   再为需要自进化工具的会话选择 **Evolution** 预设。
   其他预设仍获得 review、curator、审批和观测能力，但不会暴露模型侧的自进化工具。
-  **注意：`all` 与 layered 形态互斥**（两者都挂模型行，双装启动即 fail-loud）。
+  **注意：`all`、`preset` 兼容包与 layered 形态互斥**（preset 兼容包与 all 同样全会话挂模型行，与 layered 双挂载冲突）。
 
 #### 选择安装方式（场景 → 操作 → 你得到什么）
 
@@ -156,8 +156,8 @@ host 基础设施   review、curator、审批、审计、可观测性、威胁�
 |---|---|---|---|
 | **全量（默认）** | `add @lmzhen/dsh-evolution-all`（推荐） | review/curator/审批/审计/威胁检查 + memory/`skill_manage`/`session_search`/技能目录 + 指引注入（**全会话 root 级**） | 无需预设、无需会话选择；升级后旧 all 用户即全量 |
 | **仅 host（精简）** | `add @lmzhen/dsh-evolution-host` | 后台自动化 + 审批 + 审计 + 威胁检查 | **模型无法自主写记忆/技能**——删减=从 all 换装 host |
-| **按会话分级（layered）** | `add @lmzhen/dsh-evolution-host` + 生成/选择 Evolution 预设 | 后台全会话 + 模型工具仅 Evolution 预设会话 | 与 `all` 互斥，二选一 |
-| **兼容旧包** | `add @lmzhen/dsh-evolution-preset` | 与旧单体 facade 等价的兼容包（会全会话暴露模型工具） | **仅 legacy 兼容**；新部署用第一行 |
+| **按会话分级（layered）** | `add @lmzhen/dsh-evolution-host` + 生成/选择 Evolution 预设 | 后台全会话 + 模型工具仅 Evolution 预设会话 | 与 `all`、`preset` 兼容包互斥，三选一 |
+| **兼容旧包** | `add @lmzhen/dsh-evolution-preset` | 与旧单体 facade 等价的兼容包（会全会话暴露模型工具） | **仅 legacy 兼容**；新部署用第一行；与 layered 预设目录互斥 |
 
 业务视角的另一面见 [使用场景](#使用场景)。
 
@@ -218,7 +218,7 @@ system-prompt section。
 
 `skill_manage` 支持 create / edit / update / patch / delete / write_file /
 remove_file / list。delete 只归档到 `.archive/`，不会硬删除。curator
-运行前会快照，支持恢复。`evolution-skill-catalog` 通过原生 `ctx.skills`
+运行前会快照（被写锁占用的技能会跳过并记录在快照清单中，恢复时不回填），支持恢复。`evolution-skill-catalog` 通过原生 `ctx.skills`
 发布技能并在写入后立即失效缓存。
 
 ### 后台 review
@@ -229,7 +229,7 @@ turn/end
   -> one-shot subagent 输出结构化计划
   -> validator 检查证据和禁止字段
   -> trusted executor 应用合法操作
-  -> session event + projection 记录结果
+  -> process 事件 + activity 审计记录结果
 ```
 
 ### Curator
@@ -325,7 +325,7 @@ evolution-approval  stage -> approve/reject -> 审计
 1. 模型只能修改 memory 和 skills。
 2. policy、prompt、routing、approval、state 不是模型可写数据。
 3. 动态插件（能力包）不在本家族的写入面内：创建、审批与激活归平台 Creator 模式；0.3.66 起本家族的 capability 适配器已移除。
-4. 技能删除是归档；curator 先快照；审批写入通过精确 runner 重放。
+4. 技能删除是归档；curator 先快照（被写锁占用的技能会跳过并记录在快照清单中，恢复时明示不回填）；审批写入通过精确 runner 重放。
 5. 依赖缺失时优雅降级，例如没有 storage-domain 时使用 JSON provider。
 
 ## 开发与测试

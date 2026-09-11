@@ -2,7 +2,8 @@
  * `/evolution doctor` — read-only self-check (0.3.55, WB2).
  *
  * Turns "what the README would explain" into "the tool tells you directly":
- * install form, three-way conflict detection (all/host/preset + layered), the
+ * install form, three-way conflict detection (all/host/preset + layered,
+ * including preset-bundle × layered via the preset's delivered agent.cordis.yml), the
  * environment surfaces that bit us before (v10 P2-12/13), and which evolution
  * services are actually mounted in this runtime. Always ends with suggested
  * actions so any finding carries its next step.
@@ -83,13 +84,28 @@ export async function diagnose(
   const host = bundles.some(name => tailOf(name) === 'dsh-evolution-host')
   const preset = bundles.some(name => tailOf(name) === 'dsh-evolution-preset')
   const presetDir = join(home, '.agent-presets', 'evolution')
-  const layered = host && existsSync(presetDir)
+  // V25-07/V26-02 (v25/v26): the layered side is detected by its DELIVERED
+  // ARTIFACT (`agent.cordis.yml`, the file `/evolution preset install` and the
+  // layered installer both write) rather than bare directory existence — an
+  // empty or stale leftover directory must not report a layered install or
+  // flag a healthy deployment. ONE detection feeds installForm AND every
+  // layered conflict row.
+  const presetDirInstalled = existsSync(join(presetDir, 'agent.cordis.yml'))
+  const layered = host && presetDirInstalled
 
   const conflicts: string[] = []
   if (full && host) conflicts.push('evolution-all and evolution-host are installed together — the infra rows double-mount and startup fails loud. Keep ONE: remove the other bundle.')
   if (full && preset) conflicts.push('evolution-all and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
   if (host && preset) conflicts.push('evolution-host and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
   if (full && layered) conflicts.push('evolution-all and the layered Evolution preset are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).')
+  // V24-11 (v24): the preset BUNDLE mounts the same four model rows as `all`
+  // (tool-memory / tool-skill-manage / tool-session-query / skill-catalog),
+  // so bundle × layered preset dir is the same double-mount as all × layered
+  // — but `layered` requires `host`, so this combination used to pass the
+  // matrix silently (installForm even reports the healthy 'preset') and a
+  // user following the M4 steps on top of the one-click bundle got no
+  // conflict at all.
+  if (preset && presetDirInstalled) conflicts.push('evolution-preset and the layered Evolution preset are both present — the model rows double-mount (the preset bundle carries the same model rows as all). Keep ONE (drop the preset bundle, or remove the layered preset).')
 
   // P0-1 fix (v11): `evolutionReview` is NOT a provided service — review only
   // registers session-event hooks. Infer its presence from the install form

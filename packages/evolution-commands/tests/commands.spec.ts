@@ -396,7 +396,10 @@ describe('evolution-commands', () => {
           const opts = options as { prompt?: Array<{ text: string }> }
           capturedPrompt = opts.prompt?.[0]?.text ?? ''
           return {
-            result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
+            // V24-19 (v24): the no-action output must name the over signal in
+            // a note — pointer_missing=over is in the facts block, so an
+            // unexplained no_issues is refused by the §3 completeness gate.
+            result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: ['pointer_missing: references/notes.md intentionally unlinked in this fixture; no action needed'] } }),
           }
         },
       })
@@ -942,6 +945,30 @@ describe('evolution-commands', () => {
     const detail = await captured!.handler({ rawInput: 'pending --detail' })
     expect(detail.text).toContain('c3  skill  pending  fn args')
     expect(detail.text).toContain('staged args: (unserializable)')
+  })
+
+  it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', {
+      register: (definition: unknown) => {
+        captured = definition as typeof captured
+        return () => {}
+      },
+    })
+    ctx.provide('evolutionApproval', {
+      list: async (status?: string) => status === 'pending'
+        ? [{ id: 'c4', kind: 'skill', status: 'pending', summary: 'whitespace probe', args: {}, createdAt: '', origin: 'foreground' }]
+        : [],
+    })
+    await ctx.plugin(Commands)
+    // `pending  --detail` (double space) used to miss every branch, fall into
+    // the help fallback, and return kind:'success' with the full help text —
+    // indistinguishable from a real result while NOTHING was listed.
+    const result = await captured!.handler({ rawInput: 'pending  --detail' })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('c4  skill  pending  whitespace probe')
+    expect(result.text).not.toContain('Evolution: memory, skills')
   })
 
   // V10-03 (P2-18): threatExemptLabels rides the Config into the write-side

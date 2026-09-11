@@ -123,15 +123,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // (decision C keeps no filesystem watcher); see README Known Limitations.
   let summariesCache: SkillSummary[] | null = null
   let summariesStamp: number | null = null
+  // V24-02 (v24): generation counter — `dropSummariesCache` bumps it, and a
+  // scan that started BEFORE a drop discards its result instead of caching
+  // it. Without this, an in-flight `library.list()` (a full tree scan that
+  // can interleave a concurrent skill_manage/curator write in multi-session
+  // hosts) repopulated the cache with the PRE-mutation list after the drop,
+  // and — because a content-only edit does not change the root's mtime —
+  // every later consult then hit `summariesStamp === stamp` and served the
+  // stale descriptions until the next structural change.
+  let summariesEpoch = 0
   async function summaries(): Promise<SkillSummary[]> {
     const stamp = await io.mtime?.(library.root) ?? null
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) return summariesCache
     if (summariesCache !== null && stamp !== null) control?.invalidate()
-    summariesCache = await library.list()
-    summariesStamp = stamp
-    return summariesCache
+    const epochAtScanStart = summariesEpoch
+    const scanned = await library.list()
+    if (epochAtScanStart === summariesEpoch) {
+      summariesCache = scanned
+      summariesStamp = stamp
+    }
+    // A drop during the scan returns the scanned list to THIS caller (it is
+    // a coherent snapshot) but leaves the cache empty — the next consult
+    // rescans and observes the mutation.
+    return scanned
   }
   const dropSummariesCache = (): void => {
+    summariesEpoch += 1
     summariesCache = null
     control?.invalidate()
   }

@@ -43,10 +43,14 @@ const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
  * reaches the HOST repo's root package.json in an overlay/dev checkout (0.1.x)
  * and pinned the bundle to a range that has nothing to do with the family; the
  * bundle package's own manifest is the authority. The ancestor walk stays as a
- * fallback for trees that ship no bundle source. */
-function familyVersion() {
+ * fallback for trees that ship no bundle source.
+ * V24-17 (v24): the source root is a parameter so the staging-freshness check
+ * inside `packageSourceRoot()` can call this WITHOUT re-entering
+ * `packageSourceRoot()` (the no-argument form resolves the root through the
+ * staging branch, which would recurse). */
+function familyVersion(sourceRoot = packageSourceRoot()) {
   try {
-    const version = JSON.parse(readFileSync(join(packageSourceRoot(), 'evolution-host', 'package.json'), 'utf8')).version
+    const version = JSON.parse(readFileSync(join(sourceRoot, 'evolution-host', 'package.json'), 'utf8')).version
     if (typeof version === 'string' && /^\d+\.\d+\.\d+/.test(version)) return version
   } catch {
     // fall through to the ancestor walk
@@ -87,7 +91,17 @@ function packageSourceRoot() {
       throw new Error(`scoped installer: ${STAGING_DIR} is not a fresh prepare-release staging — missing .staging-manifest.json; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
     }
     const stagingVersion = JSON.parse(readFileSync(manifestPath, 'utf8')).version
-    const expected = rootPackageVersion()
+    // V24-17 (v24): the freshness baseline is the FAMILY version read from
+    // the FAMILY SOURCE tree (PACKAGES_DIR), the same authority the
+    // dependency pin's `familyVersion()` uses. The old `rootPackageVersion()`
+    // walks ancestors and lands on the HOST root manifest in an overlay/dev
+    // tree (0.1.x) — so a freshly built 0.3.x staging was rejected as "stale"
+    // against a host version it has nothing to do with. P2-22 fixed the pin
+    // in v19 but left this姊妹 call site on the ancestor walk; the two
+    // version notions have diverged here ever since. PACKAGES_DIR is passed
+    // explicitly: the default-argument form re-enters `packageSourceRoot()`
+    // and would recurse.
+    const expected = familyVersion(PACKAGES_DIR)
     if (!expected || stagingVersion !== expected) {
       throw new Error(`scoped installer: ${STAGING_DIR} was built for ${stagingVersion || '(unknown)'} but this tree is ${expected || '(unknown)'} — the staging is stale; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
     }
@@ -554,7 +568,19 @@ export async function uninstall(options = {}) {
       // installer copied (tails of the recorded scoped names), not every
       // scope entry that happens to match the family prefixes (a manually
       // installed or platform-shipped same-prefix package must survive).
-      const scopeDir = join(profileDir, 'node_modules', EVOLUTION_SCOPE)
+      // V24-16 (v24): the scope comes from the JOURNAL, not the current
+      // environment — the journal records the scope the install actually
+      // used (`scope:` field, written since v1 of the format but never
+      // read). With `EVOLUTION_SCOPE=@lmzhen` at install time and an
+      // unscoped shell at uninstall time, the old code rm'd under
+      // `@deepseek-ai/` (nonexistent) with `force: true` — every removal
+      // no-op'd silently while the summary still reported
+      // `removedPackages = N`, leaving the real packages on disk.
+      const journalScope = typeof journal.scope === 'string' && journal.scope.length > 0 ? journal.scope : EVOLUTION_SCOPE
+      if (journalScope !== EVOLUTION_SCOPE) {
+        console.warn(`install-layered: journal was written under scope "${journalScope}" but EVOLUTION_SCOPE is "${EVOLUTION_SCOPE}" — removing from "${journalScope}" (set EVOLUTION_SCOPE=${journalScope} to silence this warning)`)
+      }
+      const scopeDir = join(profileDir, 'node_modules', journalScope)
       const recorded = journal.copied.filter(name => typeof name === 'string' && name.length > 0)
       if (!dryRun) {
         for (const fullName of recorded) {

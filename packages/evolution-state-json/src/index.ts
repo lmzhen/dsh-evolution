@@ -27,6 +27,7 @@ import {
   PENDING_TABLE,
   PROVIDER_JSON,
   REVIEW_STATE_FILE,
+  REVIEW_STATE_SESSION_CAP,
   REVIEW_STATE_TABLE,
   type CuratorStateRecord,
   type EvolutionStateStorage,
@@ -449,10 +450,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // inner merges — a mutation that runs before any list would otherwise
   // merge the RAW legacy (no archive exclusion) and fixate a ghost twin in
   // current where retirement can never remove it (id-in-current skip).
-  // The archive id set is read once and cached: it only strengthens the
-  // filter, and any stale-miss is covered by the current-wins half of the
-  // exclusion (the id was in current at the time it was archived before it
-  // could be rotated out).
+  // V11-B2 (P1-9): the archive id set is READ FRESH on every merge — the
+  // stale-miss hazard a cache would reintroduce is covered by the
+  // current-wins half of the exclusion (the id was in current at the time it
+  // was archived before it could be rotated out). (V26-12: this comment
+  // previously described a "read once and cached" model that rc.50+ removed.)
   let legacyMigrated = false
   async function readArchivedIds(): Promise<Set<string>> {
     // V11-B2 (P1-9): NO process-level cache — the archive set is only read on
@@ -470,17 +472,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // .bak — read it too, so an archived id evicted to the bak keeps
       // excluding its legacy twin (the retirement filter never loses its
       // evidence). Best-effort: an unreadable bak only weakens the filter.
+      // V25-06 (v25): the swallow is now OBSERVABLE — a quarantine (bak
+      // present but corrupt) rethrows like the active-archive branch below,
+      // and a transient read failure warns, per the same E-52 discipline the
+      // outer catch applies. Silently dropping the bak ids disabled the
+      // V5-02 ghost-twin filter for ids that live ONLY in the bak.
       try {
         const rawBak = await readJson<Array<{ id?: string } | null>>(PENDING_ARCHIVE_BAK_FILE)
         if (Array.isArray(rawBak)) {
           for (const entry of rawBak) if (entry && typeof entry.id === 'string') ids.add(entry.id)
         }
-      } catch {
-        // Unreadable bak — the active archive still carries the newer ids.
+      } catch (bakError) {
+        if ((bakError as { name?: unknown } | undefined)?.name === QUARANTINE_ERROR_NAME) throw bakError
+        ctx.logger.warn(`evolution-state-json: pending archive .bak unreadable (${bakError instanceof Error ? bakError.message : String(bakError)}) — archived ids that live only in the .bak do not exclude their legacy twins until the sidecar is readable again`)
       }
-    } catch {
-      // Corrupt/unreadable archive — best-effort: keep legacy copies (the
-      // previous merge behavior) rather than dropping possibly-real work.
+    } catch (error) {
+      // V24-07 (v24): this catch used to be bare, which silently DISABLED the
+      // V5-02 ghost-twin filter whenever the archive was unreadable — a
+      // corrupted archive file throws a quarantine error out of readJson, the
+      // empty set merged every not-yet-retired legacy `pending` record back
+      // into the current table, and a months-old staged write could be
+      // re-claimed and replayed with zero observable cause. The E-52 family
+      // discipline (every swallow is observable) applies: the quarantine
+      // (data present but unreadable) now fails loud so the operator clears
+      // the `.corrupt` copy; a transient READ failure stays best-effort but
+      // warns, matching `appendArchive` / `retireLegacyOnce` on the same file
+      // family.
+      const name = (error as { name?: unknown } | undefined)?.name
+      if (name === QUARANTINE_ERROR_NAME) throw error
+      ctx.logger.warn(`evolution-state-json: pending archive sidecars unreadable (${error instanceof Error ? error.message : String(error)}) — the V5-02 legacy ghost-twin filter runs WITHOUT the archived-id exclusion until the archive is readable again`)
     }
     return ids
   }
@@ -569,7 +589,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   /** V6-01 (0.3.34): single-sourced legacy merge for the four mutation paths —
    * the SAME exclusion as the retirement read path, so a mutation that runs
    * before any retirement cannot fixate a ghost pending twin in current
-   * (the archive id set is cached once; current-wins covers stale misses). */
+   * (the archive id set is read fresh on every merge — V11-B2; current-wins
+   * covers stale misses). */
   async function mergedWithFilteredLegacy(
     legacy: Record<string, PendingRecord> | null,
     current: Record<string, PendingRecord>,
@@ -723,7 +744,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async loadReviewState(sessionId) {
       return await mutate(async () => {
         const map = await readJson<Record<string, ReviewStateRecord>>(REVIEW_STATE_FILE)
-        return map?.[sessionId] ?? null
+        const row = map?.[sessionId] ?? null
+        if (row === null) return null
+        // V24-08 (v24): the `updatedAt` stamp is provider-internal eviction
+        // metadata (see saveReviewState) — it is stripped on read so the
+        // consumer-facing record shape is unchanged.
+        const { updatedAt: _stamp, ...record } = row as ReviewStateRecord & { updatedAt?: number }
+        return record
       })
     },
 
@@ -731,7 +758,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       await mutate(async () => {
         await jsonTransact<Record<string, ReviewStateRecord>>(
           ctx, io, root, REVIEW_STATE_FILE,
-          current => ({ ...(current ?? {}), [sessionId]: record }),
+          (current) => {
+            // V24-08 (v24): stamp the save wall-clock and enforce the session
+            // cap INSIDE the same transact. The review pipeline writes on
+            // every turn/end and nothing pruned rows, so the map (and this
+            // whole-file rewrite) grew with the deploy's entire session
+            // history. Same cap discipline as the pending table
+            // (PENDING_RESOLVED_CAP); eviction drops the least-recently-
+            // active sessions first (a missing stamp — a pre-0.3.67 row —
+            // sorts as oldest and evicts first: an active session re-stamps
+            // its row on its very next save). The current session's row is
+            // exempt from eviction — it is the most recent write by
+            // definition. The stamp lives on DISK only; loadReviewState
+            // strips it again, so the consumer contract is unchanged.
+            const stamped: Record<string, ReviewStateRecord> = { ...(current ?? {}) }
+            stamped[sessionId] = { ...record, updatedAt: Date.now() } as ReviewStateRecord
+            const others = Object.keys(stamped).filter(id => id !== sessionId)
+            if (others.length < REVIEW_STATE_SESSION_CAP) return stamped
+            const stampOf = (id: string): number => (stamped[id] as { updatedAt?: number } | undefined)?.updatedAt ?? 0
+            others.sort((a, b) => stampOf(a) - stampOf(b))
+            const evict = new Set(others.slice(0, others.length - REVIEW_STATE_SESSION_CAP + 1))
+            const pruned: Record<string, ReviewStateRecord> = {}
+            for (const [id, row] of Object.entries(stamped)) {
+              if (!evict.has(id)) pruned[id] = row
+            }
+            return pruned
+          },
         )
       })
     },

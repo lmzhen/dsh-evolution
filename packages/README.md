@@ -75,7 +75,7 @@ pins the equality).
 | `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
 | `/evolution preset install` | generate the Evolution agent preset into the user root |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
-| `/evolution replay` | compare prompt-bundle replay for this session |
+| `/evolution replay` | compare plan outcomes across sessions and restarts (backfilled from the activity store) |
 
 ## Composition details
 
@@ -229,7 +229,9 @@ joins only when mounted (D-30):
    enabled, the staged approval service. Approved writes replay through the
    exact runner they were registered with.
 3. Skill destruction is never a hard delete: archival moves to `.archive/`,
-   and every curator run snapshots the full skill tree first.
+   and every curator run snapshots the skill tree first (a skill held by a
+   live writer's lock is skipped, recorded in the snapshot manifest, and
+   reported as not-restored by a later restore).
 4. Review plans require event-sequence evidence bounded by the session seq;
    invalid ops are dropped while valid ops still apply.
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media

@@ -1209,19 +1209,14 @@ export class EvolutionCurator extends Service {
       // must not surface as a run error after the fact.
       this.ctx.logger.warn('evolution-curator: failed to persist usage sidecar')
     }
-    // The registry caches the sidecar in-process; the curator wrote it directly
-    // above, so the next tool telemetry flush must re-read instead of re-covering
-    // the quality/state/pinned changes with its stale cache.
-    const usageRegistry = this.ctx.get('skillUsage') as { invalidate?(): Promise<void> } | undefined
-    try {
-      await usageRegistry?.invalidate?.()
-    } catch (error) {
-      // P2-9 (v11): E-52 discipline — the one silent swallow left in this
-      // file; a failed invalidate would let the next telemetry flush re-cover
-      // the curator's written fields with its stale cache and nothing would
-      // point at it.
-      this.ctx.logger.warn(`evolution-curator: skillUsage cache invalidate failed after curation: ${error instanceof Error ? error.message : String(error)}`)
-    }
+    // V24-14 (v24): the former `skillUsage.invalidate()` call here was
+    // removed. It was the family's only production call into a test-support
+    // API, and its justification — "the registry caches the sidecar in-process,
+    // so its next telemetry flush would re-cover the curator's writes with a
+    // stale cache" — describes a mechanism that no longer exists: since rc.50
+    // (P2-2) every skill-usage mutate re-reads the sidecar fresh from disk
+    // inside its own transact, so there is no stale cache to invalidate. The
+    // `mutateUsage` fold above is authoritative the moment it commits.
     return { archivedSkills, errors, suppressedChanged, consolidated: executedConsolidations }
   }
 

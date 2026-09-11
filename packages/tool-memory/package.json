@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-memory",
   "description": "Model-facing memory tool and prompt context",
-  "version": "0.3.66",
+  "version": "0.3.67",
   "publishConfig": {
     "access": "public"
   },
@@ -30,6 +30,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
@@ -42,6 +43,7 @@
     "@deepseek-ai/dsh-system-prompt": "workspace:^"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
     "@deepseek-ai/dsh-memory-files": "workspace:^",

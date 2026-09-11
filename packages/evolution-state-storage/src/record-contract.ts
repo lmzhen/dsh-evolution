@@ -61,6 +61,14 @@ export function recordIssue(table: SeamRecordTable, record: unknown): string | n
   if (typeof value.kind !== 'string' || !PENDING_KINDS.has(value.kind)) return 'kind must be memory|skill|capability'
   if (typeof value.summary !== 'string') return 'summary must be a string'
   if (!Object.prototype.hasOwnProperty.call(value, 'args')) return 'args key is required (may be any cloneable value)'
+  // V24-06 (v24): the key-present-but-undefined shape passes this gate, but
+  // the json medium persists through JSON.stringify — which DROPS an
+  // undefined-valued key — so the record would fail this same gate on the
+  // next read, be quarantined, and the staged write would silently vanish
+  // from the approval view. `undefined` is the ONE uncloneable-ish value that
+  // slipped past `assertCloneable` (structuredClone accepts it); refuse it at
+  // the write gate so both media agree and the caller learns immediately.
+  if (value.args === undefined) return 'args must be a cloneable value — `undefined` is dropped by the json medium and the record would be unreadable after a restart (pass {} instead)'
   if (typeof value.createdAt !== 'string') return 'createdAt must be a string'
   if (typeof value.status !== 'string' || !PENDING_STATUSES.has(value.status)) return 'status must be pending|executing|approved|rejected'
   for (const field of ['resolvedAt', 'claimedBy', 'claimedAt', 'origin', 'sessionId']) {

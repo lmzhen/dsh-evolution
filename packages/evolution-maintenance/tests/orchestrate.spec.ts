@@ -449,7 +449,16 @@ describe('runMaintain', () => {
     const success = await runMaintain(runtime(validResult))
     expect(success.ok).toBe(true)
     expect(success.recommendationCount).toBe(1)
-    const none = await runMaintain(runtime({ verdict: 'no_issues', plan: [], notes: [] }))
+    // V24-19 (v24): a no_issues verdict over over-signals now requires notes
+    // naming each signal — the fixture library reports three over signals, so
+    // the no-action output must explain them instead of passing silently.
+    const none = await runMaintain(runtime({
+      verdict: 'no_issues',
+      plan: [],
+      notes: [
+        'dup_heading / overlong_line / narrow_name: the fixture library is intentionally malformed; nothing to do',
+      ],
+    }))
     expect(none.ok).toBe(true)
     expect(none.recommendationCount).toBe(0)
     // Every failure path carries the field too (0) — no `undefined` leaks.

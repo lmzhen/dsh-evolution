@@ -24,7 +24,10 @@ The full `all` bundle is the new-install default; `host` is the shrink path
 > infrastructure rows, so mounting two double-registers that infrastructure
 > and fails loud at startup (invariants: already registered). The layered
 > layout (host + Evolution agent preset) is ALSO exclusive with `all` — the
-> preset scope's model rows would double-mount the tools. Choose one:
+> preset scope's model rows would double-mount the tools. For the same
+> reason the one-click `preset` bundle is ALSO exclusive with the layered
+> layout (its model rows would double-mount the layered preset's rows).
+> Choose one:
 > full (`all`), layered (`host` + preset), or one-click (`preset`).
 
 ## Prerequisites

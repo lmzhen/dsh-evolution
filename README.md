@@ -59,11 +59,11 @@ tools — its automation keeps running.
 | **M1 Full-auto (DEFAULT)** | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` | Both loops run and write automatically; model tools in every session |
 | **M2 Human gated** | M1 + `approval.enabled: true` | Evolution may propose; every write shows as `/evolution pending` for you to approve/reject |
 | **M3 Infrastructure only** | `dsh plugin --profile web add @lmzhen/dsh-evolution-host` | Automation runs but the model has no memory/skill tools — nothing gets written by the model |
-| **M4 Per-session (advanced)** | host + `/evolution preset install` | Tools only in sessions selecting the Evolution preset (exclusive with M1) |
+| **M4 Per-session (advanced)** | host + `/evolution preset install` | Tools only in sessions selecting the Evolution preset (exclusive with M1 and the one-click `evolution-preset` bundle) |
 
 **Fastest check — `/evolution doctor`:** after any install, run it once: it
 tells you the install form, flags conflicts (all/host/preset double mounts,
-all vs layered), checks `DSH_EVOLUTION_*` variables and the mounted services,
+all vs layered, one-click preset vs layered), checks `DSH_EVOLUTION_*` variables and the mounted services,
 and ends with suggested next steps. Install docs point here instead of
 repeating the same prose.
 
@@ -117,7 +117,7 @@ single source with the input hint and the emitted help/README text):
 | `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
 | `/evolution preset install` | generate the Evolution agent preset into the user root |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
-| `/evolution replay` | compare prompt-bundle replay for this session |
+| `/evolution replay` | compare plan outcomes across sessions and restarts (backfilled from the activity store) |
 
 ### Configuration dials (5 knobs, underlying fields pinned by tests)
 
@@ -315,7 +315,9 @@ joins only when mounted (D-30):
    enabled, the staged approval service. Approved writes replay through the
    exact runner they were registered with.
 3. Skill destruction is never a hard delete: archival moves to `.archive/`,
-   and every curator run snapshots the full skill tree first.
+   and every curator run snapshots the skill tree first (a skill held by a
+   live writer's lock is skipped, recorded in the snapshot manifest, and
+   reported as not-restored by a later restore).
 4. Review plans require event-sequence evidence bounded by the session seq;
    invalid ops are dropped while valid ops still apply.
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media

@@ -33,7 +33,7 @@ Independent of request-prefix construction. This package does not alter the asse
 - `archive` never deletes: skills move to `.archive/` with a `.archive-reason` marker.
 - `restore(name)` (service) / `/evolution skill restore <name>` brings one archived skill back to the active root and resets its usage state.
 - `consolidate(target, sources)` (service) / `/evolution consolidate` merges source bodies into the target, archives the sources with an absorbed-into marker, and folds their usage records into `archived` state. Both operations snapshot the full state first (`pre-consolidate` / `pre-restore`).
-- `restoreSnapshot` (service) / `/evolution restore` rolls the FULL state back to the latest snapshot: active tree, usage/suppression sidecars, `.archive/` and the curator state carried in the snapshot (`curator-state.json`), so the interval gate does not immediately re-fire after a rollback. The restore itself is undoable — the pre-rollback safety snapshot preserves the current tree plus its state.
+- `restoreSnapshot` (service) / `/evolution restore` rolls the state back to the latest snapshot: active tree, usage/suppression sidecars, `.archive/` and the curator state carried in the snapshot (`curator-state.json`), so the interval gate does not immediately re-fire after a rollback. Skills that were skipped at snapshot time (a live writer held their lock; recorded in the manifest's `skipped` list) are NOT restored — the restore result names them, and `.backups` may hold a copy. The restore itself is undoable — the pre-rollback safety snapshot preserves the current tree plus its state.
 
 ## Automatic scheduling
 

@@ -167,6 +167,17 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     chars: number
     limit: number
   }> {
+    // V24-20a (v24): element-level shape guard on the DIRECT entry. The
+    // approval replay runner calls executeCore with the STORED staged args
+    // and no tool schema in front of it, so `operations: [null]` used to
+    // reach applyBatch and throw a bare TypeError. (The tool-execute path
+    // rejects the same shape earlier, in its conflict pre-check.)
+    if (normalized.operations?.some((op) => {
+      const raw: unknown = op
+      return raw === null || typeof raw !== 'object'
+    })) {
+      return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
+    }
     const result = normalized.operations
       ? await ctx.memory.applyBatch(normalized.target, normalized.operations)
       : await ctx.memory.applyBatch(normalized.target, [{ action: normalized.action ?? 'add', facts: normalized.facts, old_text: normalized.old_text }])
@@ -231,8 +242,17 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
         if (a.facts === undefined || a.content === undefined) return false
         return a.facts !== a.content
       }
+      // V24-20a (v24): element-level shape guard — `operations: [null]` used
+      // to reach `conflict` and throw a bare TypeError (`a.facts` on null).
+      // Same "schema is not a guarantee" posture as V8-09 (array container)
+      // and D-1 (scalar fields); the approval staged-args replay path does
+      // not pass the schema, so the guard is not redundant with it.
       if (Array.isArray(args.operations)) {
         for (const op of args.operations) {
+          const raw: unknown = op
+          if (raw === null || typeof raw !== 'object') {
+            return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
+          }
           if (conflict(op)) return { ok: false, message: 'Provide only one of facts or content per operation (same field); different values were given.', entries: [], chars: 0, limit: 0 }
         }
       } else if (conflict(args)) {

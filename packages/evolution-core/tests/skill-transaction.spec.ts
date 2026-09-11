@@ -153,3 +153,41 @@ it('V4-20: a backend without transact keeps the plain read→write path', async 
   expect(created.ok).toBe(true)
   expect(await io.readText('/skills/tx-no-transact/SKILL.md')).toContain('alpha.')
 })
+
+it('V26-01: a concurrent write landing inside the commit transact aborts the merge (CAS drift, rollback intact)', async () => {
+  // Deterministic drift harness: the competing writer patches INSIDE the
+  // injected transact, BEFORE the task reads `current` — so the disk no
+  // longer matches the plan-time baseline when the CAS compares. This locks
+  // the drift-detect → abort → rollback mechanism end-to-end (v22 LOCK-1 +
+  // v24 V24-01): with the CAS removed (blind writeText of the plan-time
+  // merge) the merge would report ok:true and the concurrent patch would be
+  // silently lost.
+  const io = fakeIo()
+  const lib = new SkillLibrary('/skills', io)
+  await lib.create('cas-target', SKILL_TX('cas-target', 'original body.'), 'foreground')
+  await lib.create('cas-source', SKILL_TX('cas-source', 'source body.'), 'foreground')
+  const targetPath = '/skills/cas-target/SKILL.md'
+  let driftInjected = false
+  const fakeTransact: typeof transactIo = async (ioLike, path, task) => {
+    if (!driftInjected && path.replaceAll('\\', '/') === targetPath) {
+      driftInjected = true
+      // The competing instance has its own serial chain — exactly like
+      // tool-skill-manage vs curator in one process.
+      const other = new SkillLibrary('/skills', io)
+      const patch = await other.patch('cas-target', 'original body.', 'CONCURRENT EDIT.')
+      if (!patch.ok) throw new Error(`concurrent patch failed: ${patch.message}`)
+    }
+    const current = await ioLike.readText(path)
+    const next = await task(current)
+    if (next === null) await ioLike.remove(path)
+    else await ioLike.writeText(path, next)
+  }
+  const lib2 = new SkillLibrary('/skills', io, undefined, undefined, fakeTransact)
+  const result = await lib2.consolidate('cas-target', ['cas-source'], 'foreground')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('concurrent modification detected')
+  // The concurrent writer's bytes survived the aborted merge; the plan-time
+  // merge content never landed.
+  expect(await io.readText(targetPath)).toContain('CONCURRENT EDIT.')
+  expect(await io.readText(targetPath)).not.toContain('source body.')
+})

@@ -110,6 +110,13 @@ export interface SnapshotManifest {
   createdAt: string
   /** Active skill names at snapshot time. */
   skills: string[]
+  /** V25-05 (v25): skills that were SKIPPED by the write-lock probe at
+   * snapshot time (a live byte-writer held them) — they are NOT in the
+   * snapshot directory and are NOT restored by a whole-tree restore, which
+   * clears the live tree and copies back only `skills`. Consumers must
+   * surface this list; restore reports it in its result message. Absent
+   * (empty) on pre-0.3.67 manifests. */
+  skipped: string[]
   /** Co-copied sidecar file names (usage/suppression). */
   sidecars: string[]
   /** Whether `.archive/` was co-copied; absent on legacy manifests (do not touch archive on restore). */
@@ -734,10 +741,20 @@ function supportRefs(content: string): string[] {
   return refs
 }
 
-/** One content write of a tree-change plan; `target` is an absolute path. */
+/**
+ * One content write of a tree-change plan; `target` is an absolute path.
+ * `expected` (v24 V24-01) is the PLAN-TIME bytes the caller built `content`
+ * from — the same read `content` was composed over. When present, the commit
+ * CAS compares the disk against `expected` instead of the kernel's own
+ * just-before-commit pre-read: a concurrent writer landing between planning
+ * and commit must abort the plan (drift), not silently win a silent-overwrite
+ * baseline. Omit it only for writes whose content does not derive from a
+ * plan-time read.
+ */
 interface TreeChangeWrite {
   target: string
   content: string
+  expected?: string | null
 }
 
 /**
@@ -1988,19 +2005,22 @@ export class SkillLibrary {
         for (const reference of referenceWrites) {
           const previous = await this.io.readText(reference.target).catch(() => null)
           const base = previous?.trimEnd() ?? ''
-          writes.push({ target: reference.target, content: base === '' ? reference.content : `${base}\n\n${reference.content}` })
+          // V24-01: carry the plan-time bytes as the CAS baseline — a read
+          // error here reads as null and stays fail-closed at commit (an
+          // existing file then counts as drift).
+          writes.push({ target: reference.target, content: base === '' ? reference.content : `${base}\n\n${reference.content}`, expected: previous })
         }
         if (mode === 'append') {
           const merged = freshTargetMd.trimEnd() + parts.join('\n') + '\n'
           const validation = validateFrontmatter(merged, targetName, this.limits)
           if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
-          writes.push({ target: join(targetDir, 'SKILL.md'), content: merged })
+          writes.push({ target: join(targetDir, 'SKILL.md'), content: merged, expected: freshTargetMd })
         } else {
           const pointerLines = normalizedSources.map(source => `\n${POINTER_LINE_PREFIX}${source}.md`).join('')
           const extended = freshTargetMd.trimEnd() + pointerLines + '\n'
           const validation = validateFrontmatter(extended, targetName, this.limits)
           if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
-          writes.push({ target: join(targetDir, 'SKILL.md'), content: extended })
+          writes.push({ target: join(targetDir, 'SKILL.md'), content: extended, expected: freshTargetMd })
         }
         return await this.applyTreeChange({
           name: targetName,
@@ -2063,6 +2083,15 @@ export class SkillLibrary {
     if (moves.length === 0) return { ok: false, message: 'Restructure requires at least one section move.' }
     if (moves.length > MAX_RESTRUCTURE_MOVES) return { ok: false, message: `Restructure exceeds ${MAX_RESTRUCTURE_MOVES} moves.` }
     for (const move of moves) {
+      // V24-20a (v24): element-shape guard BEFORE the field reads — a null
+      // element used to throw on `move.heading` instead of returning the
+      // structured refusal the library owes every entry point. The `unknown`
+      // view is deliberate: the declared element type promises an object, but
+      // model/plan payloads have historically crossed that promise (V8-09).
+      const raw: unknown = move
+      if (raw === null || typeof raw !== 'object') {
+        return { ok: false, message: 'Every restructure move must be an object with a heading.' }
+      }
       if (typeof move.heading !== 'string' || !move.heading.trim()) {
         return { ok: false, message: 'Every restructure move needs a non-empty heading.' }
       }
@@ -2119,9 +2148,12 @@ export class SkillLibrary {
       writes.push({
         target,
         content: base === '' ? entry.texts.join('\n\n') : `${base}\n\n${entry.texts.join('\n\n')}`,
+        // V24-01: plan-time bytes as the CAS baseline (fail-closed on a read
+        // error: `previous` is null then, so an existing file counts as drift).
+        expected: previous,
       })
     }
-    writes.push({ target: join(dir, 'SKILL.md'), content: finalMd })
+    writes.push({ target: join(dir, 'SKILL.md'), content: finalMd, expected: md })
     const result = await this.applyTreeChange({
       name,
       origin,
@@ -2159,7 +2191,7 @@ export class SkillLibrary {
     // caller cannot fabricate them. The same read feeds the append semantics of
     // restructure (the caller re-reads for its own construction — kernel reads
     // again because the bytes it restores must be the bytes on disk at commit).
-    const landing: Array<{ target: string; content: string; previous: string | null }> = []
+    const landing: Array<{ target: string; content: string; previous: string | null; expected: string | null | undefined }> = []
     for (const write of plan.writes) {
       // A1-11 (v18): a read failure (EACCES/EIO) is NOT "missing" —
       // treating it as null made the rollback delete a file it could not
@@ -2175,7 +2207,7 @@ export class SkillLibrary {
       }
       const threat = this.contentThreatBlock(write.content)
       if (threat) return { ok: false, message: threat }
-      landing.push({ target: write.target, content: write.content, previous })
+      landing.push({ target: write.target, content: write.content, previous, expected: write.expected })
     }
     const written: Array<{ target: string; previous: string | null }> = []
     let durabilityWarning = ''
@@ -2190,12 +2222,22 @@ export class SkillLibrary {
             // update; both writers reported success). The task only commits
             // when the disk still holds the pre-read baseline; any drift
             // aborts the plan into the rollback below.
+            // v24 (V24-01): the CAS baseline is the caller's PLAN-TIME bytes
+            // (`expected`) when the write carries them — the pre-read above
+            // only supplies the rollback bytes. Lock-1's own pre-read baseline
+            // still left a window for appends/merges built from an earlier
+            // read: a concurrent write landing between planning and the
+            // pre-read became the CAS baseline, so plan-time content
+            // (composed WITHOUT it) committed cleanly over it — lost update,
+            // both writers successful. Comparing against the plan-time bytes
+            // closes the whole planning→commit span.
             // P3 (v22; gate fix 0.3.66): the flag lives in a holder so the
             // control-flow analysis (which cannot see the transact callback's
             // assignment) does not narrow it to a literal `false`.
+            const baseline = entry.expected === undefined ? entry.previous : entry.expected
             const drift = { seen: false }
             await this.transact(this.io, entry.target, (current) => {
-              if (current !== entry.previous) {
+              if (current !== baseline) {
                 drift.seen = true
                 return current
               }
@@ -2452,7 +2494,27 @@ export class SkillLibrary {
       // per-path write locks never contend (P2-6). A1-18 (v18): allSettled
       // (not all) so the cleanup below cannot race a still-running copy and
       // leave a manifest-less orphan directory behind.
-      const copyResults = await Promise.allSettled(names.map(async (name) => {
+      // V24-20b (v24): the copy joins the destructive-movers' probe discipline
+      // (archive / restore / whole-tree restore all probe `hasWriteLock`
+      // before touching a skill directory). A byte-writer mid-flight used to
+      // surface either as an ENOENT copy failure (rename between the list and
+      // the copy) or — worse — as a TEARSORED snapshot: the copy passed
+      // SKILL.md before the rename and picked up support files after it, and
+      // that mixed generation was exactly what restoreLatestSnapshot would
+      // roll back to. A locked skill is now SKIPPED (recorded in the
+      // manifest as `skipped`, not silently absent) — a partial-but-honest
+      // snapshot beats a torn one.
+      const skipped: string[] = []
+      const copyable: string[] = []
+      for (const name of names) {
+        if (await this.hasWriteLock(this.dirOf(name))) {
+          console.warn(`skill-store: snapshot skipped "${name}" — a byte-writer holds its write lock; the skill is recorded as skipped in the manifest`)
+          skipped.push(name)
+        } else {
+          copyable.push(name)
+        }
+      }
+      const copyResults = await Promise.allSettled(copyable.map(async (name) => {
         await this.io.copy(this.dirOf(name), join(dest, name))
       }))
       const copyFailure = copyResults.find((result): result is PromiseRejectedResult => result.status === 'rejected')
@@ -2488,7 +2550,8 @@ export class SkillLibrary {
       await this.io.writeText(join(dest, 'manifest.json'), JSON.stringify({
         reason,
         createdAt: new Date().toISOString(),
-        skills: names,
+        skills: copyable,
+        skipped,
         sidecars,
         hasArchive,
         extras: extraNames,
@@ -2506,6 +2569,25 @@ export class SkillLibrary {
   }
 
   /** Read and normalize a snapshot manifest; null when the file is missing or unparsable. */
+  /**
+   * V26-03 (v25/v26): sanitize the manifest's `skipped` list before it can
+   * reach a user-visible restore message. Entries must pass the same name
+   * gate as snapshot entries (a corrupted or hand-edited manifest cannot
+   * inject arbitrary text into the result), bounded to 50 entries of at most
+   * 64 chars each (the name-rule maximum — real skill names always fit).
+   */
+  private sanitizeSkippedNames(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return []
+    const out: string[] = []
+    for (const entry of raw) {
+      if (typeof entry !== 'string') continue
+      if (!this.safeSnapshotEntryName(entry)) continue
+      out.push(entry.length > 64 ? entry.slice(0, 64) : entry)
+      if (out.length >= 50) break
+    }
+    return out
+  }
+
   async readSnapshotManifest(path: string): Promise<SnapshotManifest | null> {
     const raw = await this.io.readText(join(path, 'manifest.json'))
     if (raw === null) return null
@@ -2521,6 +2603,14 @@ export class SkillLibrary {
         reason: typeof manifest.reason === 'string' ? manifest.reason : '',
         createdAt: typeof manifest.createdAt === 'string' ? manifest.createdAt : '',
         skills: manifest.skills,
+        // V25-05 (v25): preserve the skipped list so the restore path can
+        // surface the skills a whole-tree restore will NOT bring back.
+        // V26-03 (v26): the list is SANITIZED before it can reach a
+        // user-visible message — entries must pass the same name gate as
+        // snapshot entries (a corrupted/hand-edited manifest cannot inject
+        // arbitrary text), bounded to 50 entries × 64 chars (the name-rule
+        // maximum).
+        skipped: this.sanitizeSkippedNames(manifest.skipped),
         sidecars: Array.isArray(manifest.sidecars) ? manifest.sidecars : [],
         ...typeof manifest.hasArchive === 'boolean' ? { hasArchive: manifest.hasArchive } : {},
         extras: Array.isArray(manifest.extras) ? manifest.extras : [],
@@ -2595,8 +2685,11 @@ export class SkillLibrary {
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
     const preRollbackPath = await this.snapshotAll('pre-rollback', extras)
+    let skipped: string[] = []
     try {
-      await this.restoreSnapshotIntoRoot(latest.path)
+      // V26-04 (v25): the restore returns the validated manifest's skipped
+      // list — no second read that could race retainSnapshots.
+      skipped = await this.restoreSnapshotIntoRoot(latest.path)
     } catch (error) {
       // 0.3.16 (E-13): the old shape cleared the active root and then restored
       // with NO protection — a damaged/incomplete snapshot left the tree
@@ -2616,9 +2709,21 @@ export class SkillLibrary {
     // Whole-tree replacement: a single synthetic event invalidates the catalog
     // regardless of how many skills the restore touched (decision C).
     this.notifyMutation({ action: 'restore', name: 'snapshot' })
+    // V25-05 (v25): a whole-tree restore brings back exactly `manifest.skills`
+    // — skills SKIPPED at snapshot time (live write locks, recorded in
+    // `manifest.skipped`) were present in the live tree, are cleared by the
+    // restore, and are NOT copied back. Surface them in the result message
+    // instead of deleting silently.
+    // V26-08 (v25): the recovery hint is HONEST about the mechanism — the
+    // pre-rollback snapshot is best-effort and (under a compound lock window)
+    // may itself have skipped the same skill, so the message only promises
+    // "a copy in .backups if one exists".
+    const skippedNote = skipped.length === 0
+      ? ''
+      : ` NOTE: ${skipped.length} skill(s) were skipped when this snapshot was taken (a live writer held their lock) and are NOT restored: ${skipped.join(', ')} — recover them from .backups if a copy exists.`
     return {
       ok: true,
-      message: `Restored skill tree from ${latest.path}`,
+      message: `Restored skill tree from ${latest.path}.${skippedNote}`,
       path: latest.path,
       ...snapshotExtras.length === 0 ? {} : { extras: snapshotExtras },
     }
@@ -2630,7 +2735,10 @@ export class SkillLibrary {
    * drives the repopulation (skills, sidecars, `.archive`). Extracted from
    * restoreLatestSnapshot so a failed restore can roll itself back (E-13).
    */
-  private async restoreSnapshotIntoRoot(snapshotPath: string): Promise<void> {
+  private async restoreSnapshotIntoRoot(snapshotPath: string): Promise<string[]> {
+    // V26-04 (v25): returns the validated manifest's `skipped` list so the
+    // caller reuses ONE read (re-reading after the restore raced
+    // retainSnapshots and silently dropped the list).
     // A1-3 (v18): read and validate the manifest BEFORE clearing anything.
     // The old order cleared the active tree first, then treated an
     // unreadable/skills-less manifest as "restore nothing" and still reported
@@ -2748,5 +2856,6 @@ export class SkillLibrary {
       if (entry.startsWith('.')) continue
       await this.deleteStrandedLocks(join(this.root, entry))
     }
+    return manifest.skipped
   }
 }

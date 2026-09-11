@@ -161,6 +161,28 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('V24-09: a future-version suppression sidecar is never downgraded by either writer', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-suppressed-v2-'))
+    const io = nodeEvolutionIo()
+    const sidecar = join(root, '.curator-suppressed.json')
+    const future = JSON.stringify({ version: 2, names: ['kept-skill'], unknownFutureField: { x: 1 } })
+    await writeFile(sidecar, future, 'utf8')
+    // The RMW writer (curator suppression updates) must refuse + preserve.
+    await updateSuppressedNames(root, io, (current) => { current.add('added-skill') })
+    expect(JSON.parse(await readFile(sidecar, 'utf8'))).toEqual({ version: 2, names: ['kept-skill'], unknownFutureField: { x: 1 } })
+    // The plain writer (saveSuppressedNames) carries the same discipline.
+    const { saveSuppressedNames } = await import('@deepseek-ai/dsh-evolution-core')
+    await saveSuppressedNames(root, new Set(['other']), io)
+    expect(JSON.parse(await readFile(sidecar, 'utf8'))).toEqual({ version: 2, names: ['kept-skill'], unknownFutureField: { x: 1 } })
+    // A v1 sidecar keeps updating normally.
+    await writeFile(sidecar, JSON.stringify({ version: 1, names: ['kept-skill'] }), 'utf8')
+    await updateSuppressedNames(root, io, (current) => { current.add('added-skill') })
+    const v1 = JSON.parse(await readFile(sidecar, 'utf8')) as { version: number; names: string[] }
+    expect(v1.version).toBe(1)
+    expect(v1.names.sort()).toEqual(['added-skill', 'kept-skill'])
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('mutateUsage runs an atomic read-modify-write where concurrent bumps are preserved', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mutate-'))
     const io = nodeEvolutionIo()

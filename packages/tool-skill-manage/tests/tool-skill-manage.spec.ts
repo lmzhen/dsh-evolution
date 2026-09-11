@@ -166,6 +166,34 @@ describe('tool-skill-manage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('V24-20a: a null restructure ELEMENT is refused structurally through the schema-bypassed replay runner', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const pending: Array<unknown> = []
+    ctx.provide('evolutionState', {
+      listPending: async () => pending,
+      savePending: async (record: unknown) => { pending.push(record) },
+      tryResolvePending: async () => ({ record: null, applied: false }),
+      claimPending: async () => null,
+      releasePendingClaim: async () => {},
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    // `restructure: [null]` used to throw reading `.heading` of null inside
+    // the map (the replay channel has no schema in front of it).
+    const nullElement = await ctx.evolutionApproval.run('skill', {
+      operation: { action: 'restructure', name: 'element-guard-skill', restructure: [null] },
+      origin: 'foreground',
+      libraryOrigin: 'foreground',
+    }, { interface: 'background_review' })
+    expect(nullElement.ok).toBe(false)
+    expect(nullElement.message).toContain('must be an object')
+    expect(nullElement.message).not.toContain('TypeError')
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   it('reports the write-point frontmatter auto-quote on create (0.3.11)', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({

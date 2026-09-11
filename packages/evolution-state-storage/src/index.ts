@@ -58,6 +58,19 @@ export const releasedStatus = (status: PendingStatus): PendingStatus => status =
 export const PENDING_RESOLVED_CAP = 200
 
 /**
+ * V24-08 (v24): session rows in the review-state table, per session id. The
+ * review pipeline saves on EVERY turn/end of EVERY session and nothing ever
+ * deleted rows, so the file grew (and was fully rewritten) with the deploy's
+ * whole session history — the same unbounded-growth class the pending cap
+ * above already fixed for approvals. A review row is advisory cadence state:
+ * evicting the least-recently-active session merely lets that session's next
+ * review fire from a fresh counter, so a generous cap is loss-less in
+ * practice. Enforced by BOTH providers inside their save path (no seam
+ * interface change, no background sweeper).
+ */
+export const REVIEW_STATE_SESSION_CAP = 500
+
+/**
  * Claim lifecycle (S3.3): pending →(claim)→ executing →(resolve)→ approved/rejected.
  * release() rolls executing back to pending (failure path). A crash between
  * the runner execution and the resolve leaves the record executing+claimed,

@@ -14,6 +14,19 @@ describe('evolution-replay', () => {
     expect(plans[0]).toMatchObject({ evidenceQuotes: 2, estimatedInputChars: 1500 })
   })
 
+  it('V25-01: backfill is once-per-driver — an io reload re-running the loader must not double the leaderboard', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    // First io mount backfills; a later io dependency replacement re-runs the
+    // loader against the SAME driver — the guard must swallow the replay.
+    driver.backfill([item])
+    driver.backfill([item, item])
+    expect(driver.plansSnapshot()).toHaveLength(1)
+    // Live events recorded after the backfill still land normally.
+    driver.record({ sessionId: 's2', planId: 'run-2', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    expect(driver.plansSnapshot()).toHaveLength(2)
+  })
+
   it('selects the plan with better accepted/evidence and lower cost', () => {
     const result = comparePlans([
       { policyId: 'A', acceptedOps: 3, rejectedOps: 1, memoryOps: 2, skillOps: 1, evidenceQuotes: 3, estimatedInputChars: 2000 },

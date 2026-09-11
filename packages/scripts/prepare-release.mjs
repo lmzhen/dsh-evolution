@@ -405,6 +405,22 @@ for (const item of tarballs) {
       if (!inShipped(rel)) failures.push(`${item.name}: preset container is missing ${rel}`)
     }
   }
+  // V24-18 (v24): every SHIPPED .yml gets the same unrewritten-scope scan the
+  // lib/ bundles get. The rewrite step above covers a hardcoded four-file
+  // whitelist (cordis.yml / cordis.patch.yml / agent.cordis.yml / preset.yml);
+  // a future fifth composition file added to files/exports would publish with
+  // raw `@deepseek-ai/dsh-*` row names — `dsh plugin add` then fails to
+  // resolve the mount while every other guard stays green. Scanning the
+  // shipped list (not staging disk) matches the F-356 posture.
+  for (const rel of item.shipped) {
+    if (!rel.endsWith('.yml') && !rel.endsWith('.yaml')) continue
+    const text = readFileSync(join(staged, ...rel.split('/')), 'utf8')
+    for (const originalName of names.keys()) {
+      if (text.includes(originalName)) {
+        failures.push(`${item.name}: ${rel} still references ${originalName} (unrewritten scope in a shipped composition file)`)
+      }
+    }
+  }
 }
 if (failures.length > 0) {
   console.error(failures.join('\n'))

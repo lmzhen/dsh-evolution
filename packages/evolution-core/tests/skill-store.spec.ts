@@ -417,6 +417,52 @@ it('snapshot co-copies .archive and restore replaces it with the snapshot state'
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('V26-14: snapshotAll probes live write locks — a locked skill is skipped, recorded, and not copied', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-probe-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('kept-skill', USABLE('kept-skill'), 'foreground')
+  await lib.create('locked-skill', USABLE('locked-skill'), 'foreground')
+  // A live writer lock on locked-skill (pid:token body — any well-formed
+  // body trips the conservative probe; liveness is not consulted here).
+  await writeFile(join(root, 'locked-skill', 'SKILL.md.lock'), `${process.pid}:deadbeef`, 'utf8')
+  const baseline = await lib.snapshotAll('probe-test')
+  const manifest = JSON.parse(await readFile(join(baseline, 'manifest.json'), 'utf8')) as { skills: string[]; skipped: string[] }
+  // The locked skill is recorded as skipped and its directory is NOT in the
+  // snapshot; the unlocked skill is copied as usual.
+  expect(manifest.skipped).toEqual(['locked-skill'])
+  expect(manifest.skills).toEqual(['kept-skill'])
+  expect(await nodeEvolutionIo().exists(join(baseline, 'kept-skill'))).toBe(true)
+  expect(await nodeEvolutionIo().exists(join(baseline, 'locked-skill'))).toBe(false)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V25-05: a restore reports snapshot-time skipped skills instead of deleting them silently', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-skipped-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('kept-skill', USABLE('kept-skill'), 'foreground')
+  await lib.create('locked-skill', USABLE('locked-skill'), 'foreground')
+  const baseline = await lib.snapshotAll('pre-test')
+  // Simulate a snapshot taken while `locked-skill` was write-locked: the
+  // manifest records it under `skipped` and its directory is absent from the
+  // snapshot (exactly what the V24-20b probe produces).
+  const manifestPath = join(baseline, 'manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { skills: string[]; skipped: string[] }
+  manifest.skills = manifest.skills.filter(name => name !== 'locked-skill')
+  manifest.skipped = ['locked-skill']
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8')
+  await rm(join(baseline, 'locked-skill'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  // The whole-tree restore clears the live tree and copies back ONLY the
+  // manifest skills — the skipped skill must be NAMED in the result message
+  // instead of disappearing silently.
+  await lib.patch('locked-skill', 'locked-skill', 'locked-skill EDITED')
+  const restored = await lib.restoreLatestSnapshot()
+  expect(restored.ok).toBe(true)
+  expect(restored.message).toContain('NOT restored')
+  expect(restored.message).toContain('locked-skill')
+  expect((await lib.list()).map(s => s.name)).toEqual(['kept-skill'])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('snapshot extras are manifest-declared and only declared names are read back', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-extras-'))
   const lib = new SkillLibrary(root)

@@ -144,9 +144,13 @@ describe('evolution-review', () => {
     emitEnd(2)
     // At the completed flush the subagent runs and fails to produce a plan —
     // review-error surfaces AND the fallback injects (at the end).
+    // V24-15 (v24): the fallback inject now also emits `review-scheduled`
+    // (channel 'inject') — the old contract left the fallback delivery
+    // invisible to the event bus, so a consumer on the subagent-mode
+    // deployment would have missed every fallback review.
     await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
     expect(injected).toHaveLength(1)
-    expect(scheduled).toEqual([])
+    expect(scheduled).toEqual([session.id])
   })
 
   it('F-203: a skill tool/call with JSON-null arguments does not crash read-name collection', async () => {
@@ -168,11 +172,11 @@ describe('evolution-review', () => {
     await vi.waitFor(() => { expect(applied).toHaveLength(1) })
   })
 
-  it('E-41: review-scheduled is not emitted and the subagent spawn is deferred when it cannot start (0.3.19 + 0.3.39)', async () => {
+  it('E-41: the review is deferred when the subagent cannot start; the eventual fallback inject emits review-scheduled (0.3.19 + 0.3.39 + V24-15)', async () => {
     const injected: unknown[] = []
-    const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
-    const scheduled: string[] = []
-    ctx.on('evolution/review-scheduled', event => scheduled.push(event.sessionId))
+    const { ctx, session, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
+    const scheduled: Array<{ sessionId: string; channel?: string }> = []
+    ctx.on('evolution/review-scheduled', event => scheduled.push(event))
     ctx.provide('subagents', {
       start: async () => { throw new Error('subagent spawn failed') },
     })
@@ -181,15 +185,17 @@ describe('evolution-review', () => {
     emitEnd(1, 'blocked')
     await new Promise(resolve => setTimeout(resolve, 50))
     // V6-53 (0.3.39): the spawn is DEFERRED too — no immediate run, no inject,
-    // no schedule signal (E-41 stands).
+    // no schedule signal (E-41's deferral half stands).
     expect(injected).toHaveLength(0)
     expect(scheduled).toEqual([])
     emitEnd(2)
     await new Promise(resolve => setTimeout(resolve, 50))
     // At the completed flush the spawn fails again → the fallback injects the
-    // prompt (at the end); still no schedule signal.
-    expect(scheduled).toEqual([])
+    // prompt (at the end). V24-15 (v24): that delivery is no longer invisible
+    // — it emits with channel 'inject', same as every other delivery path.
     expect(injected).toHaveLength(1)
+    expect(scheduled).toHaveLength(1)
+    expect(scheduled[0]).toMatchObject({ sessionId: session.id, channel: 'inject' })
   })
 
   it('V6-53: a deferred cadence review executes at conversation END — neither inject nor subagent runs mid-task (0.3.39)', async () => {
@@ -846,4 +852,118 @@ it('P2-12 (v12): the completion channel delivers through the waking followup cha
   emitEnd(1)
   await vi.waitFor(() => { expect(followups).toHaveLength(1) })
   expect(injects).toHaveLength(0)
+})
+
+// V26-07 (v25): two-session mounting for the deferred-completion queue — the
+// in-flight review (Y) and the deferred completion (X) must be DIFFERENT
+// sessions for the drain's attribution/rollback to be observable.
+async function mountTwoSessions() {
+  const ctx = new Context()
+  await mountAgentLoopTestDependencies(ctx)
+  // V26-07 fix-up: persist per-session review counters for the duration of the
+  // fixture — the always-null loader reset them every turn, so Y's skill
+  // counter never reached the interval-2 cadence threshold and the fixture
+  // silently exercised only the completion channel (no subagent, no deferral).
+  const reviewStates = new Map<string, { turnsSinceMemory: number; turnsSinceSkill: number; lastTurn: number }>()
+  ctx.provide('evolutionState', {
+    loadReviewState: async (id: string) => reviewStates.get(id) ?? null,
+    saveReviewState: async (
+      id: string,
+      record: { turnsSinceMemory: number; turnsSinceSkill: number; lastTurn: number },
+    ) => { reviewStates.set(id, { ...record }) },
+  })
+  // V25-03 uses a second completed turn to prove the completion flag re-arms.
+  // Clear that session's cadence counters first so the re-arm turn cannot trip
+  // the interval-2 cadence instead (which would deliver via the fallback path
+  // and make the rollback assertion pass for the wrong reason).
+  const resetReviewState = (id: string): void => { reviewStates.delete(id) }
+  // skillInterval=2: session Y fires its cadence flush on the 2nd substantive
+  // turn; session X's single substantive turn stays under the cadence
+  // threshold and reaches the completion channel (cumulative 1 ≥ min 1).
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewSkillInterval: 2, reviewMemoryInterval: 999 }) })
+  const scheduled: Array<{ sessionId: string; channel?: string }> = []
+  ctx.on('evolution/review-scheduled', e => scheduled.push(e))
+
+  const mk = (id: string) => {
+    const injected: string[] = []
+    let failFollowup = false
+    const session = {
+      id: SessionId(id),
+      seq: 1,
+      header: { origin: undefined },
+      events: [{ type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } }],
+      deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
+    } as unknown as Session
+    const agent = {
+      id: session.id,
+      session,
+      inject: (_message: unknown) => { if (failFollowup) throw new Error('followup boom'); injected.push(id) },
+      followup: (_message: unknown) => { if (failFollowup) throw new Error('followup boom'); injected.push(id) },
+    } as unknown as Agent
+    ctx.agents.register(agent)
+    const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
+      ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: reasonKind } } } as never)
+    }
+    return { id, injected, emitEnd, setFail: (value: boolean) => { failFollowup = value } }
+  }
+  const y = mk('y-cadence')
+  const x = mk('x-completion')
+
+  let releaseY!: (value: { text: string; structured: null }) => void
+  const yResult = new Promise<{ text: string; structured: null }>((resolve) => { releaseY = resolve })
+  ctx.provide('subagents', {
+    start: async () => ({ result: yResult, dispose: async () => {} }),
+  })
+
+  await ctx.plugin(Review, {
+    reviewEnabled: true,
+    memoryInterval: 999,
+    skillInterval: 2,
+    skillReviewTrigger: 'both',
+    skillReviewCompletionMinToolCalls: 1,
+  })
+  return { ctx, y, x, releaseY, scheduled, resetReviewState }
+}
+
+it('V25-02: a deferred completion review is emitted under its OWN session id, not the id of the in-flight review', async () => {
+  const { y, x, releaseY, scheduled } = await mountTwoSessions()
+  // Y: cadence fires at the 2nd substantive turn → the subagent start hangs
+  // (reviewInFlight). X: the completed turn reaches the completion channel,
+  // which defers under X's identity while Y is in flight.
+  y.emitEnd(1, 'blocked')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  y.emitEnd(2)
+  await new Promise(resolve => setTimeout(resolve, 20))
+  x.emitEnd(1)
+  await new Promise(resolve => setTimeout(resolve, 20))
+  // Release Y: the flush fails (structured null) → Y's finally drains the
+  // queue → X's completion prompt is delivered to X's agent and the event
+  // must carry X's session id (the pre-fix code emitted Y's id here).
+  releaseY({ text: 'x', structured: null })
+  await vi.waitFor(() => {
+    expect(scheduled.some(e => e.sessionId === 'x-completion' && e.channel === 'completion')).toBe(true)
+  })
+  expect(x.injected).toContain('x-completion')
+})
+
+it('V25-03: a FAILED deferred completion delivery rolls completionInjected back so the review re-arms', async () => {
+  const { y, x, releaseY, resetReviewState } = await mountTwoSessions()
+  y.emitEnd(1, 'blocked')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  y.emitEnd(2)
+  await new Promise(resolve => setTimeout(resolve, 20))
+  // X defers; the drain's delivery to X will THROW (V4-21 shape).
+  x.setFail(true)
+  x.emitEnd(1)
+  await new Promise(resolve => setTimeout(resolve, 20))
+  releaseY({ text: 'x', structured: null })
+  await new Promise(resolve => setTimeout(resolve, 30))
+  // The delivery failed — without the rollback the flag stays set and this
+  // session's one completion review is permanently lost in-process.
+  x.setFail(false)
+  resetReviewState('x-completion')
+  x.emitEnd(2)
+  await new Promise(resolve => setTimeout(resolve, 30))
+  // The re-armed completion review actually delivers on the next turn.
+  expect(x.injected).toContain('x-completion')
 })
