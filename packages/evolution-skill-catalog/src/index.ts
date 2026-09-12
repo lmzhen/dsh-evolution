@@ -132,12 +132,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // every later consult then hit `summariesStamp === stamp` and served the
   // stale descriptions until the next structural change.
   let summariesEpoch = 0
+  // v31 CAT-01: warn-once per DISTINCT scan failure (consults repeat per turn).
+  let lastScanWarn = ''
   async function summaries(): Promise<SkillSummary[]> {
     const stamp = await io.mtime?.(library.root) ?? null
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) return summariesCache
     if (summariesCache !== null && stamp !== null) control?.invalidate()
     const epochAtScanStart = summariesEpoch
-    const scanned = await library.list()
+    // v31 CAT-01: a loud read failure on ONE SKILL.md (EACCES — the REG-01
+    // posture) must not abort the whole platform collection: this provider is
+    // called OUTSIDE any try/catch, so the throw used to kill agent/pre-step
+    // and the skill tool for the entire session. Degrade to the last coherent
+    // cache (or empty) with a warn; the cache is not assigned, so the next
+    // successful scan repopulates normally.
+    let scanned: SkillSummary[]
+    try {
+      scanned = await library.list()
+    } catch (error) {
+      const message = `skill tree scan failed (${error instanceof Error ? error.message : String(error)}) — serving ${summariesCache?.length ?? 0} cached summaries`
+      if (lastScanWarn !== message) {
+        lastScanWarn = message
+        ctx.logger.warn(`evolution-skill-catalog: ${message}`)
+      }
+      return summariesCache ?? []
+    }
+    if (lastScanWarn !== '') {
+      // v31 CAT-02: recovery after a degraded consult — the registry cached
+      // the empty fallback, and the invalidate gate below requires a non-null
+      // cache, which a recovery scan does not have. Re-arm the registry here
+      // so it re-consults and picks up the repopulated list.
+      control?.invalidate()
+      lastScanWarn = ''
+    }
     if (epochAtScanStart === summariesEpoch) {
       summariesCache = scanned
       summariesStamp = stamp

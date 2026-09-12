@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
@@ -372,4 +372,164 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(active).toHaveLength(1)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
+})
+
+describe('v28 G0.2 (STATE-01): a failed archive append must not open the ghost-twin replay window', () => {
+  it('compensates an append failure by merging the evicted records back into the live map', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap3-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+
+    const seeded: Record<string, PendingRecord> = {}
+    for (let i = 0; i < 200; i += 1) {
+      seeded[`seed-${i}`] = {
+        id: `seed-${i}`, kind: 'memory', summary: `s${i}`, args: {}, createdAt: 'now',
+        status: 'approved', resolvedAt: new Date(Date.UTC(2020, 0, 1, 0, 0, i)).toISOString(),
+      }
+    }
+    seeded['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(seeded))
+    // The legacy twin that turns a lost archive line into a replayable ghost:
+    // seed-0 as still-pending in the pre-split pending.json.
+    await io.writeText(join(root, 'pending.json'), JSON.stringify({
+      'seed-0': { id: 'seed-0', kind: 'memory', summary: 'ghost', args: { evil: true }, createdAt: 'now', status: 'pending' },
+    } satisfies Record<string, PendingRecord>))
+    // Force the archive append to fail: the sidecar path is occupied by a
+    // DIRECTORY, so the locked read/write inside appendArchive throws (EISDIR)
+    // and the append lands nothing.
+    await mkdir(join(root, 'pending-state-archive.json'))
+
+    const resolved = await provider.tryResolvePending('to-resolve', 'approved')
+    expect(resolved.applied).toBe(true)
+
+    // Compensation: seed-0's RESOLVED record is back in the live map, so the
+    // legacy pending twin is filtered by the "id in live map" rule and cannot
+    // revive as claimable.
+    const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
+    expect(map['seed-0']?.status).toBe('approved')
+    expect(map['seed-0']?.args).not.toHaveProperty('evil')
+    // The resolve that triggered eviction is unaffected.
+    expect(map['to-resolve']?.status).toBe('approved')
+    // No replay: the compensated record cannot be claimed or re-resolved.
+    expect(await provider.claimPending('seed-0', 'operator-claim')).toBeNull()
+    const reResolve = await provider.tryResolvePending('seed-0', 'approved')
+    expect(reResolve.applied).toBe(false)
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('a healthy append still evicts (compensation never fires on success)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap4-'))
+    const ctx = await mount(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+
+    const seeded: Record<string, PendingRecord> = {}
+    for (let i = 0; i < 200; i += 1) {
+      seeded[`seed-${i}`] = {
+        id: `seed-${i}`, kind: 'memory', summary: `s${i}`, args: {}, createdAt: 'now',
+        status: 'approved', resolvedAt: new Date(Date.UTC(2020, 0, 1, 0, 0, i)).toISOString(),
+      }
+    }
+    seeded['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(seeded))
+
+    const resolved = await provider.tryResolvePending('to-resolve', 'approved')
+    expect(resolved.applied).toBe(true)
+    const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
+    expect(map['seed-0']).toBeUndefined()
+    const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
+    expect(archive.map(entry => entry.id)).toEqual(['seed-0'])
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+})
+
+it('v28 G1.2 (STATE-01b): a valid-JSON wrong-shape archive is quarantined, not silently overwritten', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap5-'))
+  const ctx = await mount(root)
+  const provider = ctx.evolutionStateStorage.provider('json')
+  const io = ctx.evolutionIo.provider('node')
+
+  const seeded: Record<string, PendingRecord> = {}
+  for (let i = 0; i < 200; i += 1) {
+    seeded[`seed-${i}`] = {
+      id: `seed-${i}`, kind: 'memory', summary: `s${i}`, args: {}, createdAt: 'now',
+      status: 'approved', resolvedAt: new Date(Date.UTC(2020, 0, 1, 0, 0, i)).toISOString(),
+    }
+  }
+  seeded['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+  await io.writeText(join(root, 'pending-state.json'), JSON.stringify(seeded))
+  // A hand-edited archive: valid JSON, wrong top-level shape. Previously the
+  // append silently overwrote it with a fresh array (no quarantine, no warn).
+  const poisoned = '{"someone":"hand-edited me"}'
+  await io.writeText(join(root, 'pending-state-archive.json'), poisoned)
+
+  const resolved = await provider.tryResolvePending('to-resolve', 'approved')
+  expect(resolved.applied).toBe(true)
+
+  // The wrong-shape bytes are preserved in the .corrupt rescue copy…
+  expect(await io.readText(join(root, 'pending-state-archive.json.corrupt'))).toBe(poisoned)
+  // …and the append landed on the fresh array (the designed post-quarantine
+  // behavior, same as a parse-failed archive).
+  const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
+  expect(archive.map(entry => entry.id)).toEqual(['seed-0'])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v29 STATE-05: repeated quarantines of the same corrupt file against a DIFFERENT stale copy mint exactly one stamped sibling', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap6-'))
+  const ctx = await mount(root)
+  const provider = ctx.evolutionStateStorage.provider('json')
+  const io = ctx.evolutionIo.provider('node')
+
+  // The base .corrupt already holds an OLDER, DIFFERENT payload (a previous
+  // corrupt generation the operator has not cleared).
+  await io.writeText(join(root, 'pending-state.json.corrupt'), '{"generation":1}')
+  // The live file is corrupt with a NEW payload; every read must quarantine.
+  await io.writeText(join(root, 'pending-state.json'), '{ this is not json')
+
+  const readdir = await import('node:fs/promises').then(m => m.readdir)
+  await provider.listPending().catch(() => null)
+  await provider.listPending().catch(() => null)
+  await provider.listPending().catch(() => null)
+
+  // Exactly ONE stamped sibling for the new payload (plus the pre-existing
+  // base) — the old code minted one `${base}.${Date.now()}` PER READ.
+  const names = (await readdir(root)).filter(name => name.startsWith('pending-state.json.corrupt'))
+  expect(names).toHaveLength(2)
+  expect(names).toContain('pending-state.json.corrupt')
+  const stamped = names.find(name => name !== 'pending-state-json.corrupt' && name !== 'pending-state.json.corrupt')
+  const stampedName = names.find(name => /^pending-state\.json\.corrupt\.\d+$/.test(name))
+  expect(stampedName).toBeDefined()
+  expect(await io.readText(join(root, stampedName!))).toBe('{ this is not json')
+  // The pre-existing base copy is untouched.
+  expect(await io.readText(join(root, 'pending-state.json.corrupt'))).toBe('{"generation":1}')
+  void stamped
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v30 STATE-07: a byte-equal user file named `<file>.corrupt.notes.md` is NOT reused as the quarantine dest', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap7-'))
+  const ctx = await mount(root)
+  const provider = ctx.evolutionStateStorage.provider('json')
+  const io = ctx.evolutionIo.provider('node')
+
+  const corruptPayload = '{ this is not json'
+  // base holds a DIFFERENT payload (forces the sibling scan)…
+  await io.writeText(join(root, 'pending-state.json.corrupt'), '{"generation":1}')
+  // …and a USER file whose bytes happen to equal the corrupt payload — the
+  // bare-prefix scan would have reused it as the "preserved" dest.
+  await io.writeText(join(root, 'pending-state.json.corrupt.notes.md'), corruptPayload)
+  await io.writeText(join(root, 'pending-state.json'), corruptPayload)
+
+  await provider.listPending().catch(() => null)
+
+  const { readdir } = await import('node:fs/promises')
+  const names = (await readdir(root)).filter(name => name.startsWith('pending-state.json.corrupt'))
+  // A numbered `.corrupt.<ts>` sibling was minted for the payload…
+  expect(names.some(name => /^pending-state\.json\.corrupt\.\d+$/.test(name))).toBe(true)
+  // …and the user file is untouched (still exactly its own bytes, never
+  // pointed at as the rescue copy).
+  expect(await io.readText(join(root, 'pending-state.json.corrupt.notes.md'))).toBe(corruptPayload)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { load as loadStrictYaml } from 'js-yaml'
-import { frontmatterCatalogInvalid, frontmatterYamlUnsafeValues, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
+import { frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
 
 describe('yamlPlainScalarNeedsQuotes (0.3.11)', () => {
   it('flags the plain-scalar hazards the strict YAML catalog rejects', () => {
@@ -46,7 +46,7 @@ describe('V27 G0.3 (core-a-07): block scalars survive the write path and read ba
     expect(result.issues).toEqual([])
     expect(result.changed).toBe(false)
     expect(result.content).toBe(folded)
-    expect(frontmatterYamlUnsafeValues(folded)).toEqual([])
+    expect(frontmatterCatalogInvalid(folded)).toBe(false)
   })
 
   it('reads the block content as the value rather than the indicator', () => {
@@ -56,14 +56,14 @@ describe('V27 G0.3 (core-a-07): block scalars survive the write path and read ba
   })
 })
 
-describe('frontmatterYamlUnsafeValues (0.3.11)', () => {
+describe('frontmatterCatalogInvalid (0.3.11; v28 G2.5 migrated from the removed frontmatterYamlUnsafeValues)', () => {
   const unquoted = '---\nname: demo-skill\ndescription: Search: arXiv papers by keyword.\n---\n\n# Demo\n'
 
   it('flags raw unquoted values and never re-flags values already quoted by the write path', () => {
-    expect(frontmatterYamlUnsafeValues(unquoted).map(e => e.key)).toEqual(['description'])
+    expect(frontmatterCatalogInvalid(unquoted)).toBe(true)
     const normalized = normalizeFrontmatter(unquoted).content
-    expect(frontmatterYamlUnsafeValues(normalized)).toEqual([])
-    expect(frontmatterYamlUnsafeValues('---\nname: a\ndescription: Safe text.\n---\n\n# A\n')).toEqual([])
+    expect(frontmatterCatalogInvalid(normalized)).toBe(false)
+    expect(frontmatterCatalogInvalid('---\nname: a\ndescription: Safe text.\n---\n\n# A\n')).toBe(false)
   })
 })
 
@@ -149,7 +149,7 @@ describe('normalizeFrontmatter (0.3.11)', () => {
     // parser's indexOf matched \n---- slurping the remainder).
     expect(parseFrontmatter(looseClose)).toBeNull()
     expect(normalizeFrontmatter(looseClose).changed).toBe(false)
-    expect(frontmatterYamlUnsafeValues(looseClose)).toEqual([])
+    expect(frontmatterCatalogInvalid(looseClose)).toBe(false)
   })
 
   it('preserves the file line-ending style', () => {
@@ -233,7 +233,6 @@ describe('V27 G2.1: one frontmatter read — values come from the strict parser'
     expect(read?.frontmatter['description']).toBe('Search: arXiv papers')
     expect(read?.catalogInvalid).toBe(true)
     expect(frontmatterCatalogInvalid(unsafe)).toBe(true)
-    expect(frontmatterYamlUnsafeValues(unsafe).map(entry => entry.key)).toEqual(['description'])
 
     const safe = '---\nname: demo-skill\ndescription: Safe text.\n---\n\n# Demo\n'
     expect(frontmatterCatalogInvalid(safe)).toBe(false)
@@ -285,5 +284,50 @@ describe('V27 G2.1: one frontmatter read — values come from the strict parser'
     const bodyless = '---\nname: demo-skill\ndescription: Search: arXiv papers\n---\n'
     expect(parseFrontmatter(bodyless)).toBeNull()
     expect(frontmatterCatalogInvalid(bodyless)).toBe(true)
+  })
+})
+
+describe('v28 G2.2 (CORE-SK-01): YAML 1.2 core number forms are quoted, not split-brained', () => {
+  it('flags hex/octal/exponent/inf/nan scalars the strict parser coerces', () => {
+    expect(yamlPlainScalarNeedsQuotes('0x1F')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('0o17')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('1e5')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('1.5E-3')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('.inf')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('.NaN')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('1.')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('.5')).toBe(true)
+  })
+
+  it('a file whose description is a hex scalar is catalogInvalid and self-heals on rewrite', () => {
+    const raw = '---\nname: hex-skill\ndescription: 0x1F\n---\n\n# Hex\n'
+    expect(frontmatterCatalogInvalid(raw)).toBe(true)
+    const result = normalizeFrontmatter(raw)
+    expect(result.changed).toBe(true)
+    expect(frontmatterCatalogInvalid(result.content)).toBe(false)
+  })
+
+  it('plain decimals and prose stay unflagged', () => {
+    expect(yamlPlainScalarNeedsQuotes('31')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('-2.5')).toBe(true)
+    expect(yamlPlainScalarNeedsQuotes('Version 0x1F compatible')).toBe(false)
+    expect(yamlPlainScalarNeedsQuotes('info@0x10')).toBe(false)
+  })
+})
+
+describe('v28 G2.3 (CORE-SK-02): undetectable frontmatter blocks fail closed', () => {
+  it('a BOM-prefixed fence is catalogInvalid (the platform may still parse it)', () => {
+    const bom = '\uFEFF---\nname: bom-skill\ndescription: Demo.\n---\n\n# Demo\n'
+    expect(frontmatterCatalogInvalid(bom)).toBe(true)
+  })
+
+  it('mixed line endings are catalogInvalid', () => {
+    const mixed = '---\r\nname: mixed-skill\ndescription: Demo.\n---\n\n# Demo\n'
+    expect(frontmatterCatalogInvalid(mixed)).toBe(true)
+  })
+
+  it('a body-only file and an unterminated block stay "not applicable" (structure health owns them)', () => {
+    expect(frontmatterCatalogInvalid('---\n\n# Just a rule and body\n')).toBe(false)
+    expect(frontmatterCatalogInvalid('# Plain body\n')).toBe(false)
   })
 })

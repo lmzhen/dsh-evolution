@@ -29,15 +29,27 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const root = resolve(process.argv[2] ?? process.cwd())
-const spec = 'packages/evolution/evolution-core/tests/io.spec.ts'
 const workers = process.env.DSH_EVOLUTION_LOAD_SENSITIVE_WORKERS ?? '4'
+// v28 G7.1 (G-01): the header promises BOTH layouts, but only the dev overlay
+// path was resolved — the flat mirror (`packages/evolution-core/tests/…`) hit
+// the exit-2 branch with or without the root argument, so the documented local
+// pre-push check was dead in the mirror. Probe both layouts.
+const SPEC_CANDIDATES = [
+  'packages/evolution/evolution-core/tests/io.spec.ts', // dev overlay layout
+  'packages/evolution-core/tests/io.spec.ts',           // flat mirror layout
+]
+const spec = SPEC_CANDIDATES.find(candidate => existsSync(join(root, candidate)))
+if (spec === undefined) {
+  console.error(`run-load-sensitive: none of the known spec paths exist under ${root} (tried: ${SPEC_CANDIDATES.join(', ')}) — pass the repository root`)
+  process.exit(2)
+}
 
 /**
  * The load-sensitive group. Each entry names the case and WHY it is in the
  * group; the `-t` pattern below is the union of these names.
  */
 const LOAD_SENSITIVE = [
-  { name: 'serializes concurrent writers', why: 'two writers contend for one lock' },
+  { name: 'commits one complete payload per concurrent writer', why: 'two writers contend for one lock (v32 TEST-04 rename)' },
   { name: 'takes over a stale lock', why: 'takeover deadline vs. wall clock' },
   { name: 'never steals a lock from a LIVE holder', why: 'liveness deadline (the case that regressed in rc.66)' },
   { name: 'takes over a stale lock from a GONE pid', why: 'pid-liveness probe under load' },
@@ -61,10 +73,6 @@ const pattern = LOAD_SENSITIVE.map(entry => entry.name).join('|')
 const vitest = join(root, 'node_modules', 'vitest', 'vitest.mjs')
 if (!existsSync(vitest)) {
   console.error(`run-load-sensitive: no vitest at ${vitest} — pass the repository root (vacant guard: a missing runner is not a pass)`)
-  process.exit(2)
-}
-if (!existsSync(join(root, spec))) {
-  console.error(`run-load-sensitive: no ${spec} under ${root} — pass the repository root`)
   process.exit(2)
 }
 

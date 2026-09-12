@@ -85,6 +85,13 @@ interface SkillWriteArgs {
   staged_from_sha256?: string
 }
 
+/** v30 REV-02: read the protected-skill list off the (optional) policy
+ * snapshot through an `unknown` boundary — the Context augmentation types the
+ * getter non-optionally, but at runtime the row can be absent. */
+function policySnapshotOf(source: unknown): { protectedSkillNames?: readonly string[] } | undefined {
+  return (source as { get?(): { protectedSkillNames?: readonly string[] } } | undefined)?.get?.()
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   // Hermes SKILLS_GUIDANCE parity: when the system-prompt service is mounted,
   // register the skills guidance section exactly when THIS tool mounts (i.e.
@@ -134,10 +141,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[] }> {
     const action = args.action
     const name = args.name ?? ''
-    if (action === 'review') return { ok: true, message: await buildSkillReviewText(), skills: [] }
+    if (action === 'review') {
+      // v31 TSM-05: the tree scan fails loud on a transient read error
+      // (REG-01 posture) — the tool surface owes the model a structured
+      // refusal, not a raw errno throw.
+      try {
+        return { ok: true, message: await buildSkillReviewText(), skills: [] }
+      } catch (error) {
+        return { ok: false, message: `skill_manage review: skill tree scan failed (${error instanceof Error ? error.message : String(error)}).`, skills: [] }
+      }
+    }
     if (action === 'list') {
-      const list = await library.list()
-      return { ok: true, message: `Listed ${list.length} skills.`, skills: list.map(s => s.name) }
+      try {
+        const list = await library.list()
+        return { ok: true, message: `Listed ${list.length} skills.`, skills: list.map(s => s.name) }
+      } catch (error) {
+        return { ok: false, message: `skill_manage list: skill tree scan failed (${error instanceof Error ? error.message : String(error)}).`, skills: [] }
+      }
     }
     // v20 (D-1, V8-09 sibling): the schema does not strictly guarantee scalar
     // shapes (the F-07 class of garbage that slipped past the schema), and a
@@ -150,6 +170,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const value = scalarArgs[field]
       if (value !== undefined && value !== null && typeof value !== 'string') {
         return { ok: false, message: `skill_manage: "${field}" must be a string (got ${typeof value}); refusing the write.`, skills: [] }
+      }
+    }
+    // v30 REV-02: the immutable policy's protected list is enforced at plan
+    // validation, but the replay channel executes STORED plans — one accepted
+    // under an older policy must not land on a skill the CURRENT policy
+    // protects. Foreground (operator) writes are deliberately not gated by
+    // this list. Soft probe: deployments without the policy row keep the
+    // previous behavior.
+    if (origin !== 'foreground') {
+      // v30 REV-02: the runtime value CAN be undefined (policy row not
+      // mounted) even though the Context augmentation types the getter
+      // non-optionally — the unknown-boundary helper keeps that guard honest
+      // for both the compiler and the linter.
+      const protectedNames = policySnapshotOf(ctx.get('evolutionPolicy'))?.protectedSkillNames
+      if (protectedNames?.includes(name)) {
+        return { ok: false, message: `skill_manage: "${name}" is protected by the current policy (protectedSkillNames); replayed/autonomous writes are refused.`, skills: [] }
       }
     }
     // V27 G5.1 (v27 T-2): the tool schema can only require `action` (every other
@@ -172,7 +208,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     // `action` is optional on the queued/staged args shape, so the index needs
     // a narrowing first (an unknown action is refused by its own branch below).
-    const requiredArgs: readonly string[] = action === undefined ? [] : REQUIRED_ARGS[action] ?? []
+    // v29 TSM-01: the guard must be an OWN-property check — a plain-object
+    // index resolves inherited members (`constructor`, `toString`, …) to
+    // truthy functions, `?? []` never fired, and `.filter` threw a bare
+    // TypeError. Reachable through the approval replay runner, which executes
+    // STORED args with no schema in front of it.
+    const requiredArgs: readonly string[] =
+      action === undefined || typeof action !== 'string' || !Object.hasOwn(REQUIRED_ARGS, action)
+        ? []
+        : REQUIRED_ARGS[action] ?? []
     const missing = requiredArgs.filter((field: string) => scalarArgs[field] === undefined || scalarArgs[field] === null)
     if (missing.length > 0) {
       return { ok: false, message: `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`, skills: [] }
@@ -193,6 +237,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return {
           ok: false,
           message: `Skill "${name}" changed after this write was staged (content ${currentContent === null ? 'no longer exists' : 'hash mismatch'}); refusing to replay the stale snapshot. Re-apply the edit to stage a fresh copy.`,
+          skills: [],
+        }
+      }
+    }
+    // v30 REV-03: the same anchor for support-file writes/removes — the
+    // staged sha covers the file's CURRENT bytes (or their absence) at
+    // staging; a mismatch refuses the replay instead of last-writer-wins
+    // overwriting whatever changed since. An unreadable target cannot be
+    // verified and refuses the same way (the write itself would fail too).
+    if ((action === 'write_file' || action === 'remove_file') && typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== '') {
+      const currentBytes = await library.readSupportFile(name, args.file_path ?? '').catch(() => undefined)
+      const actual = currentBytes === undefined || currentBytes === null ? 'absent' : contentHash(currentBytes)
+      if (currentBytes === undefined || actual !== args.staged_from_sha256) {
+        return {
+          ok: false,
+          message: `Support file "${args.file_path ?? ''}" of "${name}" changed after this write was staged (or its state could not be verified); refusing to replay the stale snapshot. Re-stage the file operation.`,
           skills: [],
         }
       }
@@ -311,7 +371,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const protection = summary.protectionUnknown ? ' [protection:unknown]' : summary.protectedBy ? ` [${summary.protectedBy}]` : ''
       return `- ${summary.name} | ${record?.state ?? 'active'} | use:${record?.use_count ?? 0} view:${record?.view_count ?? 0} patch:${record?.patch_count ?? 0}${quality}${protection}`
     })
-    const groups = computeDedupGroups({ contents: new Map(await Promise.all(list.map(async summary => [summary.name, (await library.read(summary.name)) ?? ''] as const))) })
+    // v29 TSM-02: the read fan-out is bounded and per-read caught — the exact
+    // INS-04 hardening `/graph` already has. Unbounded `Promise.all` over the
+    // whole library hit EMFILE on large trees, and ONE unreadable SKILL.md
+    // (read() re-throws everything but EISDIR) killed the whole `review`
+    // action; an unreadable skill now contributes no content (no dedup edges).
+    const contents = new Map<string, string>()
+    for (let offset = 0; offset < list.length; offset += 16) {
+      await Promise.all(list.slice(offset, offset + 16).map(async (summary) => {
+        const body = await library.read(summary.name).catch(() => null)
+        contents.set(summary.name, body ?? '')
+      }))
+    }
+    const groups = computeDedupGroups({ contents })
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
     const warned = list
       .filter(summary => warnedFlag(summary.name))
@@ -395,6 +467,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if ((args.action === 'update' || args.action === 'edit') && typeof args.name === 'string' && args.name !== '') {
           const stageCurrent = await library.read(args.name).catch(() => null)
           if (stageCurrent !== null) (args as { staged_from_sha256?: string }).staged_from_sha256 = contentHash(stageCurrent)
+        }
+        // v30 REV-03: the anchor extends to support-file writes/removes —
+        // the staged sha covers the file's current bytes, or the sentinel
+        // 'absent' when the file does not exist yet (create-on-write). An
+        // unreadable target stays unanchored (documented residual).
+        if ((args.action === 'write_file' || args.action === 'remove_file') && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
+          const stageFile = await library.readSupportFile(args.name, args.file_path).catch(() => undefined)
+          if (stageFile !== undefined) (args as { staged_from_sha256?: string }).staged_from_sha256 = stageFile === null ? 'absent' : contentHash(stageFile)
         }
         const decision = await approval.request({
           kind: 'skill',

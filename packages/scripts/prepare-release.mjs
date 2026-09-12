@@ -28,7 +28,7 @@
  * reconciliation is skipped, the staging is unpublishable, and the release path
  * (tags) never passes it.
  */
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,7 +40,12 @@ const argv = process.argv.slice(2)
 
 function arg(name, fallback = '') {
   const index = argv.indexOf(name)
-  return index >= 0 ? argv[index + 1] : fallback
+  // v31 INST-05: a following FLAG is not this flag's value (`--scope
+  // --version` used to bind '--version' as the scope and fail later, far
+  // from the cause).
+  const value = index >= 0 ? argv[index + 1] : undefined
+  if (value === undefined || value.startsWith('--')) return fallback
+  return value
 }
 
 function requireArg(name) {
@@ -317,6 +322,33 @@ for (const dir of sourceDirs) {
   // in the validation loop, after every package had already packed. (The
   // validation loop below unconditionally walks lib/, so lib/ is a hard
   // prerequisite for every family package.)
+  // v31 GUARD-02: freshness warning — build-lib never cleans orphaned lib/
+  // outputs and `tsc -b` does not remove deleted modules' declarations, so a
+  // rename/delete followed by pack-without-rebuild used to ship stale files
+  // under lib/types. Warn (not fail): a rebuild is the operator's call.
+  {
+    let newestSrc = 0
+    const walkSrc = (dirPath) => {
+      for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+        const full = join(dirPath, entry.name)
+        if (entry.isDirectory()) walkSrc(full)
+        else newestSrc = Math.max(newestSrc, statSync(full).mtimeMs)
+      }
+    }
+    try { walkSrc(join(staged, 'src')) } catch { /* no src — skip the check */ }
+    let oldestLib = Number.POSITIVE_INFINITY
+    const walkLib = (dirPath) => {
+      for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+        const full = join(dirPath, entry.name)
+        if (entry.isDirectory()) walkLib(full)
+        else oldestLib = Math.min(oldestLib, statSync(full).mtimeMs)
+      }
+    }
+    try { walkLib(join(staged, 'lib')) } catch { /* lib absence handled above */ }
+    if (newestSrc > oldestLib) {
+      console.warn(`prepare-release: warning — ${dir}: src/ has file(s) newer than every lib/ output; if sources were renamed or deleted, stale lib/ files may be packed. Re-run build-lib.mjs to be safe.`)
+    }
+  }
   if (!existsSync(join(staged, 'lib'))) {
     console.error(`prepare-release: ${dir} has no lib/ build output — run build-lib.mjs first, then prepare-release`)
     process.exit(1)

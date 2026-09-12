@@ -126,8 +126,10 @@ it('G2.3: the write path and detectDrift reach the same conclusion about the sam
     { name: 'empty file', body: '' },
     { name: 'whitespace only', body: '   \n' },
     // Canonical bytes whose single entry still exceeds the whole-file limit:
-    // only the entry-size signal flags this, so it discriminates a predicate
-    // that kept just the canonical-form check.
+    // v28 MEM-01 — the entry-size signal is scoped to NON-canonical bodies,
+    // so this state is 'over-limit' on both sides (detectDrift false, add
+    // refuses with the config-naming text, not "External drift detected").
+    // It still discriminates a predicate that dropped the entry-size scan.
     { name: 'one entry over the whole-file limit', body: `${'x'.repeat(11)}\n`, limit: 10 },
   ]
   for (const testCase of cases) {
@@ -188,33 +190,37 @@ it('memory read guard is off when the IO backend has no size probe', async () =>
   const { writeFile } = await import('node:fs/promises')
   await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(5000) + '\n', 'utf8')
   // Backward-compatible: a backend without `size` gets no 10x read guard, so
-  // the file is read whole... but the single-entry-over-limit drift signal is
-  // independent of the size probe and still flags it (Hermes signal #2).
+  // the file is read whole. The canonical oversized body is v28 MEM-01's
+  // 'over-limit' state (not external drift): growth still refuses — through
+  // the config-naming gate instead of the drift gate — so the content is
+  // never silently truncated or overwritten.
   expect(await store.read('memory')).toEqual(['x'.repeat(5000)])
-  expect(await store.detectDrift('memory')).toBe(true)
-  // The write path now refuses through the drift guard (add() is symmetric
-  // with mutate/applyBatch), backing up instead of silently truncating.
+  expect(await store.detectDrift('memory')).toBe(false)
   const result = await store.add('memory', 'gamma')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('drift')
-  expect(result.message).toMatch(/backup was saved/)
+  expect(result.message).toContain('memoryCharLimit (400)')
+  expect(result.message).not.toContain('External drift')
+  expect(result.message).not.toMatch(/backup was saved/)
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
-it('memory drift flags a single entry above the store limit', async () => {
+it('v28 MEM-01: a canonical single entry above the store limit is a config conflict — shrink stays available', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-entryoverflow-'))
   const store = new MemoryStore({ root, memoryCharLimit: 100 })
   const { writeFile, readdir } = await import('node:fs/promises')
   // Structurally canonical single entry, larger than the whole-store limit:
-  // Hermes parity signal #2 — an external writer appended free-form content.
+  // NOT reported as external drift (the store may have written it under a
+  // higher limit) — growth refuses with the config text, no backup sidecar.
   await writeFile(join(root, 'MEMORY.md'), 'x'.repeat(150) + '\n', 'utf8')
-  expect(await store.detectDrift('memory')).toBe(true)
+  expect(await store.detectDrift('memory')).toBe(false)
   const denied = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
   expect(denied.ok).toBe(false)
-  expect(denied.message).toContain('drift')
-  expect(denied.message).toMatch(/backup was saved/)
-  const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
-  expect(backups.length).toBe(1)
+  expect(denied.message).toContain('memoryCharLimit (100)')
+  expect(denied.message).not.toContain('drift')
+  expect((await readdir(root)).filter(name => name === 'MEMORY.md.bak').length).toBe(0)
+  // Shrink-only batches remain the recovery path.
+  expect((await store.applyBatch('memory', [{ action: 'remove', old_text: 'xxx' }])).ok).toBe(true)
+  expect((await store.add('memory', 'gamma')).ok).toBe(true)
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
@@ -532,5 +538,94 @@ it('P3-14 (v14): renderContext announces a block whose entries were ALL threat-f
   expect(context).toContain('withheld by the security scan')
   // The block header for a rendered (non-empty) block must not appear.
   expect(context).not.toContain('## Memory (')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v28 MEM-01: lowering the limit flags a config conflict, not external drift — remove stays available', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-mem01-'))
+  // The store writes a long entry under the ORIGINAL (high) limit.
+  const original = new MemoryStore({ root, memoryCharLimit: 400 })
+  expect((await original.add('memory', 'legacy '.repeat(44))).ok).toBe(true) // 352 chars
+  // An operator lowers the limit; a NEW store instance models the reload.
+  const store = new MemoryStore({ root, memoryCharLimit: 100 })
+  // Canonical body written by the store itself is NOT external drift.
+  expect(await store.detectDrift('memory')).toBe(false)
+  // Growth refuses with the config-naming text (not "External drift").
+  const grow = await store.add('memory', 'new fact')
+  expect(grow.ok).toBe(false)
+  expect(grow.message).toContain('memoryCharLimit (100)')
+  expect(grow.message).not.toContain('External drift')
+  // A grow via batch replace refuses the same way.
+  const replace = await store.applyBatch('memory', [{ action: 'replace', old_text: 'legacy', facts: 'short' }])
+  expect(replace.ok).toBe(false)
+  expect(replace.message).toContain('memoryCharLimit (100)')
+  expect(replace.message).not.toContain('External drift')
+  // The recovery path stays open: remove-only batches pass the drift gate
+  // (the batch's own final limit check still applies), and afterwards the
+  // store is writable again.
+  const shrink = await store.applyBatch('memory', [{ action: 'remove', old_text: 'legacy' }])
+  expect(shrink.ok).toBe(true)
+  const after = await store.add('memory', 'new fact')
+  expect(after.ok).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v28 MEM-01: the user target names userCharLimit in the config-conflict refusal', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-mem01u-'))
+  const original = new MemoryStore({ root, userCharLimit: 400 })
+  expect((await original.add('user', 'profile '.repeat(45))).ok).toBe(true)
+  const store = new MemoryStore({ root, userCharLimit: 100 })
+  const grow = await store.add('user', 'new fact')
+  expect(grow.ok).toBe(false)
+  expect(grow.message).toContain('userCharLimit (100)')
+  expect(grow.message).not.toContain('External drift')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v28 MEM-01: a non-canonical oversized body is still external drift (Hermes parity signal #2)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-mem01x-'))
+  const store = new MemoryStore({ root, memoryCharLimit: 100 })
+  const { writeFile } = await import('node:fs/promises')
+  // Free-form external append: stray blank entry (non-canonical) AND an
+  // oversized blob — signal #2 keeps firing on non-canonical bodies.
+  await writeFile(join(root, 'MEMORY.md'), `${'x'.repeat(150)}\n§\n\n`, 'utf8')
+  expect(await store.detectDrift('memory')).toBe(true)
+  const result = await store.add('memory', 'new fact')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('External drift detected')
+  expect(result.message).toMatch(/backup was saved/)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v29 MEM-02: a remove-only batch passes the oversized read guard for a ≥10× lowered limit', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-mem02-'))
+  // Write a large canonical store under the ORIGINAL limit (2000): the total
+  // must land above 10× the NEW limit (100 → guard bound 1000 bytes).
+  const original = new MemoryStore({ root, memoryCharLimit: 2000 })
+  for (let i = 0; i < 5; i += 1) {
+    expect((await original.add('memory', `fact-${i} ${'x'.repeat(200)}`)).ok).toBe(true)
+  }
+  const store = new MemoryStore({ root, memoryCharLimit: 100 })
+  // Before v29 MEM-02 the pre-transact read guard refused the batch with
+  // "fix the file manually" — the MEM-01 recovery path was unreachable for
+  // large limit drops. A remove-only batch now LOADS (past the read guard):
+  // removing one of five entries still exceeds the batch limit, and the
+  // refusal must be the BATCH-LIMIT text, not the read-guard text.
+  const partial = await store.applyBatch('memory', [{ action: 'remove', old_text: 'fact-0' }])
+  expect(partial.ok).toBe(false)
+  expect(partial.message).toContain('exceeds the 100 limit')
+  expect(partial.message).not.toContain('Fix the file manually')
+  // Removing everything in ONE remove-only batch succeeds (the advertised
+  // recovery), and the store is writable again afterwards. The needles are
+  // constructed from the known seeds — `read()` itself runs the same read
+  // guard and returns [] for the oversized file, which is exactly the surface
+  // this recovery path is meant to unblock.
+  const shrink = await store.applyBatch(
+    'memory',
+    [0, 1, 2, 3, 4].map(i => ({ action: 'remove' as const, old_text: `fact-${i} xxxxx` })),
+  )
+  expect(shrink.ok).toBe(true)
+  const grow = await store.add('memory', 'tiny')
+  expect(grow.ok).toBe(true)
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

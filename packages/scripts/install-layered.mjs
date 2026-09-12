@@ -140,6 +140,23 @@ async function readPackageName(packageDir) {
   return JSON.parse(raw).name
 }
 
+/** v31 INST-01: the profile manifest and the install journal are the two
+ * files whose loss or truncation misleads every later install/uninstall
+ * decision (the manifest carries every bundle row; the journal carries the
+ * preset-ownership record) — write them through the same tmp+rename
+ * discipline the yml assets already get (F-354), so a crash mid-write cannot
+ * leave a truncated file for the next boot to choke on. */
+async function writeManifestAtomic(manifestPath, contents) {
+  // v32 REG-02: the parent directory may not exist yet (agent-mode installs
+  // journal into profiles/<p>/ without ever running ensureProfile) — create
+  // it before the tmp write, or the ENOENT aborts the install AFTER the
+  // preset is already on disk.
+  await mkdir(dirname(manifestPath), { recursive: true })
+  const tmp = `${manifestPath}.${process.pid}.tmp`
+  await writeFile(tmp, contents)
+  await rename(tmp, manifestPath)
+}
+
 async function copyPackage(source, destination) {
   await mkdir(dirname(destination), { recursive: true })
   await cp(source, destination, {
@@ -152,9 +169,13 @@ async function copyPackage(source, destination) {
       // merely STARTS WITH `tests` (e.g. `tests-support/`) would be excluded
       // too. No package in the family carries such a segment today; tighten
       // to an exact `tests` segment match only if one ever appears.
+      // v31 INST-02: release STAGING also carries each package's own `npm
+      // pack` tarball — copying it into the user profile doubled the family's
+      // on-disk size per package.
       return base !== 'node_modules'
         && !base.startsWith('tests')
         && !base.endsWith('.tsbuildinfo')
+        && !base.endsWith('.tgz')
     },
   })
 }
@@ -175,7 +196,8 @@ async function ensureProfile(home, profile) {
   await mkdir(dir, { recursive: true })
   const manifestPath = join(dir, 'package.json')
   if (!existsSync(manifestPath)) {
-    await writeFile(manifestPath, JSON.stringify({
+    // v31 INST-01: the seed write is atomic like every other manifest write.
+    await writeManifestAtomic(manifestPath, JSON.stringify({
       name: `dsh-profile-${profile}`,
       private: true,
       dependencies: {},
@@ -214,7 +236,7 @@ async function installBundlePackage(profileDir, bundleName) {
   manifest.dependencies ??= {}
   const addedDependency = !Object.prototype.hasOwnProperty.call(manifest.dependencies, bundleName)
   manifest.dependencies[bundleName] = /^\d+\.\d+\.\d+/.test(version) ? `^${version}` : '*'
-  await writeFile(join(profileDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n')
+  await writeManifestAtomic(join(profileDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n')
   return { addedDependency, dependencyRange: manifest.dependencies[bundleName] }
 }
 
@@ -226,7 +248,10 @@ async function installBundlePackage(profileDir, bundleName) {
 const INSTALL_JOURNAL = '.evolution-install.json'
 
 async function writeInstallJournal(profileDir, journal) {
-  await writeFile(join(profileDir, INSTALL_JOURNAL), JSON.stringify(journal, null, 2) + '\n')
+  // v31 INST-01: the journal drives INST-03/04 uninstall decisions — atomic
+  // like the manifest, so a crash cannot leave a truncated journal that
+  // misreports what the installer owns.
+  await writeManifestAtomic(join(profileDir, INSTALL_JOURNAL), JSON.stringify(journal, null, 2) + '\n')
 }
 
 async function readInstallJournal(profileDir) {
@@ -304,7 +329,7 @@ async function removeBundleFromProfile(profileDir, bundleName, options = {}) {
       }
     }
   }
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+  await writeManifestAtomic(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   return true
 }
 
@@ -607,9 +632,34 @@ export async function uninstall(options = {}) {
     // uninstall of a preset-less host install.
     const presetSkippedByInstall = journal !== null && journal.agentPreset === false
     const presetDir = agentPresetDirectory(home)
-    if (!dryRun && existsSync(presetDir) && !presetSkippedByInstall) {
+    // v31 INST-04: the preset is HOME-GLOBAL — before deleting it, sweep the
+    // other profiles the same way the install side (PRE-1) does. Another
+    // profile carrying bundle rows or a preset-owning journal means its
+    // sessions still mount the preset's model rows.
+    let otherProfileStillUsesPreset = false
+    if (!presetSkippedByInstall && existsSync(presetDir)) {
+      const profilesDir = join(home, 'profiles')
+      if (existsSync(profilesDir)) {
+        for (const entry of await readdir(profilesDir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue
+          // v32 INST-08: case-insensitive (Windows) — a `Web` vs `web`
+          // spelling must not make the sweep probe the profile being
+          // uninstalled as if it were "another profile".
+          if (profileDirectory(home, entry.name).toLowerCase() === profileDir.toLowerCase()) continue
+          const others = detectInstalledBundles(join(profilesDir, entry.name), (warnError) => {
+            console.warn(`install-layered: ${warnError instanceof Error ? warnError.message : String(warnError)}`)
+          })
+          if (others.length > 0) { otherProfileStillUsesPreset = true; break }
+          const otherJournal = readInstallJournal(join(profilesDir, entry.name))
+          if (otherJournal?.agentPreset === true) { otherProfileStillUsesPreset = true; break }
+        }
+      }
+    }
+    if (!dryRun && existsSync(presetDir) && !presetSkippedByInstall && !otherProfileStillUsesPreset) {
       await rm(presetDir, { recursive: true, force: true })
       result.removedAgentPreset = true
+    } else if (otherProfileStillUsesPreset) {
+      console.warn('install-layered: the home-global Evolution preset was KEPT — another profile still carries evolution bundles or a preset-owning journal')
     }
   }
   // v22 (R-2): the journal is consumed and deleted INSIDE the replaying mode
@@ -632,7 +682,7 @@ const EVOLUTION_BUNDLE_TAILS = ['dsh-evolution-all', 'dsh-evolution-host', 'dsh-
 /** D-1 (v18): every evolution bundle row in the profile, scope-agnostic
  * (exact-segment tail). Used by the three-way mutual-exclusion checks and by
  * uninstall to decide whether any bundle row would be left behind. */
-export function detectInstalledBundles(profileDir) {
+export function detectInstalledBundles(profileDir, warn = () => {}) {
   try {
     const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
     const bundles = Array.isArray(manifest?.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
@@ -641,7 +691,15 @@ export function detectInstalledBundles(profileDir) {
       const trimmed = entry.trim()
       return EVOLUTION_BUNDLE_TAILS.some(tail => trimmed === tail || trimmed.endsWith(`/${tail}`))
     })
-  } catch {
+  } catch (error) {
+    // v31 INST-01 + INST-07: a MISSING manifest is the legitimate fresh-home
+    // shape (reads as "no bundles", silently). A PRESENT but unparsable
+    // manifest is the corruption warn — a later reinstall would proceed on
+    // top of it.
+    const code = error instanceof Error && 'code' in error ? error.code : undefined
+    if (code !== undefined && code !== 'ENOENT') {
+      warn(`profile manifest at ${join(profileDir, 'package.json')} could not be parsed (${error instanceof Error ? error.message : String(error)}) — treating as no bundles installed; the profile may be corrupted`)
+    }
     return []
   }
 }
@@ -690,9 +748,12 @@ export async function install(options = {}) {
   // used to run unconditionally, seeding a fresh DSH_HOME with a web profile
   // carrying a dependency-less bundle row that violates this script's own
   // D-3 rule. Read-only probes (conflict checks) tolerate a missing profile.
-  const profileDir = dryRun || mode === 'agent'
-    ? profileDirectory(home, profile)
-    : await ensureProfile(home, profile)
+  // v31 INST-07: pure path resolution here — ensureProfile moved BELOW the
+  // refusal sweep, so a refused install no longer leaves a freshly seeded
+  // empty profile behind (v21 S-5 closed agent mode; this closes
+  // host/layered/oneclick).
+  const profileDir = profileDirectory(home, profile)
+  const profileReady = !dryRun && mode !== 'agent'
   const result = { mode, home, profile, profileDir, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
   // v21 (S-1): the bundle-dependency outcome, recorded onto the journal at the
   // end of the run (null in dry-run — no journal is written then anyway).
@@ -832,6 +893,15 @@ export async function install(options = {}) {
       }
     }
     result.bundle = bundleName
+    // v31 INST-07: the FIRST profile mutation happens here — every refusal
+    // check has passed, so a refused install can no longer leave a seeded
+    // empty profile behind.
+    // v33 F-1: ensureProfile is IDEMPOTENT (mkdir idempotent, manifest/patch/
+    // workspace seeded only while missing) - run it whenever the profile is
+    // in scope. The old `!existsSync(profileDir)` gate let an agent-journal
+    // -only directory (REG-02's mkdir, no manifest) skip the manifest seed,
+    // bricking the next host/layered install with a mid-copy ENOENT.
+    if (profileReady) await ensureProfile(home, profile)
     result.copied = await copyAllEvolutionPackages(profileDir, dryRun)
     if (!dryRun) {
       dependencyInfo = await installBundlePackage(profileDir, bundleName)
@@ -856,6 +926,13 @@ export async function install(options = {}) {
   // deliverable must not be lost to a host/oneclick reinstall).
   if (!dryRun && result.bundle !== null) {
     await writeInstallJournal(profileDir, journalPayload(result.agentPreset?.installed === true || priorJournal?.agentPreset === true))
+  }
+  // v31 INST-03: `--mode agent` installs the home-global preset with NO
+  // bundle row — the old `result.bundle !== null` gate never journaled it, so
+  // a later layered uninstall read `agentPreset:false` and left the preset
+  // stranded while reporting a clean removal. Journal the ownership.
+  if (!dryRun && result.bundle === null && result.agentPreset?.installed === true) {
+    await writeInstallJournal(profileDir, journalPayload(true))
   }
 
   return result

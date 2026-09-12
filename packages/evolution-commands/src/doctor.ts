@@ -9,6 +9,7 @@
  * actions so any finding carries its next step.
  */
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
+import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
 
@@ -35,13 +36,43 @@ export interface DoctorReport {
   actions: string[]
 }
 
-/** Profile bundle rows for evolution-family packages across all profiles. */
-export function collectEvolutionBundles(home: string): string[] {
+/** Profile bundle rows for evolution-family packages across all profiles.
+ *
+ * `onReadError` reports a profile whose manifest could not be READ or PARSED.
+ * Like the directory-enumeration failure, it is fail-closed at every caller:
+ * a truncated manifest is indistinguishable from "no bundles" by the returned
+ * list alone, and treating it as "no bundles" is exactly the fail-open state
+ * the double-mount exclusion exists to prevent. */
+export function collectEvolutionBundles(home: string, onReadError?: (error: unknown, scope: 'profiles-dir' | 'profile-manifest') => void): string[] {
   const profilesDir = join(home, 'profiles')
   if (!existsSync(profilesDir)) return []
   const bundles: string[] = []
-  for (const profile of readdirSync(profilesDir, { withFileTypes: true })) {
+  // v29 CMD-04: the directory enumeration itself is guarded — a `profiles`
+  // entry that is a FILE (ENOTDIR on readdir) or an unreadable home (EACCES)
+  // used to throw out of every caller (doctor, the preset-install refusal
+  // gate) instead of degrading to "no bundles seen". Per-profile manifest
+  // failures used to be swallowed entirely; they are now reported through the
+  // SAME channel (see `onReadError` and the per-profile catch below).
+  let profileEntries: Dirent[]
+  try {
+    profileEntries = readdirSync(profilesDir, { withFileTypes: true })
+  } catch (error) {
+    // v30 CMD-06: the enumeration failure is now REPORTABLE. The silent `[]`
+    // made the preset-install mutual-exclusion gate fail OPEN (an unreadable
+    // profiles dir looked like "no bundles" and the double-mounted install
+    // proceeded) and doctor rendered a confident `bundles: (none)`.
+    onReadError?.(error, 'profiles-dir')
+    return bundles
+  }
+  for (const profile of profileEntries) {
     if (!profile.isDirectory()) continue
+    // v34 INST-01: the per-profile manifest failure is fail-closed on the same
+    // channel as the enumeration failure. A torn/truncated `package.json`
+    // (INST-01's exact corruption) parsed as "no bundles in this profile", so
+    // a home whose ONE profile declared `dsh-evolution-all` reported
+    // `bundles: (none)` and the preset-install mutual-exclusion gate let the
+    // double-mounted install through. A manifest that cannot be read is not
+    // evidence of absence — report it and let each caller decide.
     try {
       const manifest = JSON.parse(readFileSync(join(profilesDir, profile.name, 'package.json'), 'utf8')) as {
         dsh?: { profile?: { bundles?: string[] } }
@@ -49,8 +80,8 @@ export function collectEvolutionBundles(home: string): string[] {
       for (const name of manifest.dsh?.profile?.bundles ?? []) {
         if (EVOLUTION_BUNDLE_TAILS.has(tailOf(name))) bundles.push(name)
       }
-    } catch {
-      // A torn/partial profile manifest never blocks doctor.
+    } catch (error) {
+      onReadError?.(error, 'profile-manifest')
     }
   }
   return bundles
@@ -77,7 +108,19 @@ export async function diagnose(
   options: { home?: string } = {},
 ): Promise<DoctorReport> {
   const home = options.home ?? evolutionRoot()
-  const bundles = collectEvolutionBundles(home)
+  const conflicts: string[] = []
+  const bundles = collectEvolutionBundles(home, (error, scope) => {
+    // v30 CMD-06: the degraded enumeration must be visible — a silent `[]`
+    // rendered as `bundles: (none)` hid exactly the double-mount conflicts
+    // this report exists to surface.
+    // v34 INST-01: the same rule now covers a per-profile manifest that could
+    // not be read or parsed — a truncated manifest read as "this profile has no
+    // bundles", the identical fail-open direction.
+    const detail = error instanceof Error ? error.message : String(error)
+    conflicts.push(scope === 'profiles-dir'
+      ? `the home profiles directory could not be enumerated (${detail}) — bundle-based install-form and conflict checks are DEGRADED and may miss installed bundles`
+      : `a profile manifest could not be read or parsed (${detail}) — this profile's bundle rows are UNKNOWN, so the install-form and conflict checks are DEGRADED and may miss installed bundles`)
+  })
   const has = (name: string) => ctx.get(name) !== undefined
 
   const full = bundles.some(name => tailOf(name) === 'dsh-evolution-all')
@@ -93,7 +136,6 @@ export async function diagnose(
   const presetDirInstalled = existsSync(join(presetDir, 'agent.cordis.yml'))
   const layered = host && presetDirInstalled
 
-  const conflicts: string[] = []
   if (full && host) conflicts.push('evolution-all and evolution-host are installed together — the infra rows double-mount and startup fails loud. Keep ONE: remove the other bundle.')
   if (full && preset) conflicts.push('evolution-all and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
   if (host && preset) conflicts.push('evolution-host and evolution-preset are installed together — the infra rows double-mount. Keep ONE.')
@@ -155,7 +197,11 @@ export async function diagnose(
   if (pendingCount === null && services.approval) actions.push('Approval service is mounted but pending listing failed — check the evolution state service.')
   // v23 (AP-2): a stuck EXECUTING record can only be cleared by an operator
   // reject (approve refuses to re-execute it) — surface it as a next step.
-  if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are stuck EXECUTING (the approving run crashed) — inspect with /evolution pending and reject them after verifying the write effect.`)
+  // v29 DOC-02: EXECUTING is also the LIVE claim state of an approve still in
+  // flight — the flat "the approving run crashed" story steered operators into
+  // rejecting a live run (the F-204 divergence). Dual attribution, matching
+  // the pending-view hint and the approve surface.
+  if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended.`)
 
   return { installForm, bundles, conflicts, envIssues: env, services, pendingCount, executingCount, actions }
 }
@@ -164,7 +210,11 @@ export function renderDoctorText(report: DoctorReport): string {
   const lines = [
     `Evolution doctor — install form: ${report.installForm}`,
     `bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
-    `services: review=${report.services.review} curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
+    // v29 DOC-01: `review` is INFERRED from installed bundles across all
+    // profiles (no runtime probe exists) — the render now says so, per the
+    // docblock's promise, so a multi-profile machine cannot pass disk evidence
+    // off as a mounted service.
+    `services: review=${report.services.review} (inferred from bundles, all profiles) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
     `executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`,
   ]

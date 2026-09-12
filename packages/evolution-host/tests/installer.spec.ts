@@ -402,6 +402,82 @@ describe('layered installer', () => {
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
+  // v33 REG-02 / v31 INST-01/02/05 / v18 D-11: the five `packages/scripts/*.mjs`
+  // fixes that live in the release tooling. The installer exports no test seam
+  // for its internal write/copy helpers, so (a) runs through the CLI (the real
+  // code path); (b) and (c) spawn the real scripts and read their refusal —
+  // the guards run at module scope, BEFORE any staging read or pack, which is
+  // exactly why they can be pinned without a release tree; (d) is the
+  // source-level pin described at its assertion.
+  it('REG-02: the install journal is written into a not-yet-existing profile directory', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-reg02-'))
+    // `--mode agent` never runs ensureProfile (v21 S-5) and the profile
+    // directory does not exist. Before REG-02 the journal's tmp write hit
+    // ENOENT on the missing parent and aborted the install AFTER the agent
+    // preset was already on disk — a half-installed home.
+    const { stdout } = await runInstaller(home, 'agent', 'evo-reg02', ['--dry-run'])
+    expect(stdout).toContain('dry-run:  no files were written')
+    // The real (non-dry-run) shape: build the profile dir by hand exactly as
+    // an agent-mode install finds it, then run the layered mode whose journal
+    // write is the one REG-02 covers.
+    const seeded = await mkdtemp(join(tmpdir(), 'dsh-installer-reg02b-'))
+    await runInstaller(seeded, 'host', 'evo-reg02')
+    const journalPath = join(seeded, 'profiles', 'evo-reg02', '.evolution-install.json')
+    expect(existsSync(journalPath)).toBe(true)
+    expect(JSON.parse(await readFile(journalPath, 'utf8'))).toMatchObject({ scope: '@deepseek-ai' })
+    // INST-01: the write is tmp+rename, so the staging name is never left
+    // behind next to the committed file.
+    const leftovers = (await (await import('node:fs/promises')).readdir(join(seeded, 'profiles', 'evo-reg02')))
+      .filter(name => name.startsWith('.evolution-install.json') && name !== '.evolution-install.json')
+    expect(leftovers).toEqual([])
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(seeded, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 60_000)
+
+  it('INST-05: --scope --version 0.1.0 does not bind --version as the scope value', async () => {
+    // The guard runs at module scope, BEFORE any pack/staging work, so this
+    // spawns the real script and reads its refusal instead of producing a
+    // release tree. Before INST-05 the fallback bound the string '--version'
+    // as the scope and the run failed much later, far from the cause.
+    const script = fileURLToPath(new URL('../../scripts/prepare-release.mjs', import.meta.url))
+    const error = await run(process.execPath, [script, '--scope', '--version', '0.1.0'])
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(error?.stderr).toContain('missing required --scope')
+    expect(error?.stderr).not.toContain('--version')
+  }, 20_000)
+
+  it('INST-05: a bare --otp hands npm no OTP value (the next flag is not one)', async () => {
+    // Same shape as above: the guard throws before dist/manifest.json is read,
+    // so no release tree is needed. Before INST-05 `--otp --dry-run` handed
+    // '--dry-run' to npm as the one-time password.
+    const script = fileURLToPath(new URL('../../scripts/publish-scoped.mjs', import.meta.url))
+    const error = await run(process.execPath, [script, '--tag', 'next', '--otp', '--dry-run'])
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(error?.stderr).toContain('--otp requires a value')
+  }, 20_000)
+
+  it('INST-02 + D-11: copyPackage skips release tarballs; a bare --groups is refused', async () => {
+    // `copyPackage` is module-private and the installer exports no seam for it
+    // (its only caller is the staged-copy sweep, which needs a full
+    // .release-staging tree). Pin the filter's invariant on the source instead
+    // of asserting nothing: the `.tgz` exclusion must sit in the SAME filter
+    // expression as the node_modules/tests exclusions, or a release staging
+    // copies each package's own `npm pack` tarball into the user profile
+    // (v31 INST-02: doubled on-disk size per package).
+    const installerSource = await readFile(fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url)), 'utf8')
+    const filter = /filter\(sourcePath\) \{[\s\S]*?\n {6}\}/.exec(installerSource)?.[0]
+    expect(filter).toBeDefined()
+    expect(filter).toContain("base !== 'node_modules'")
+    expect(filter).toContain('base.endsWith(\'.tgz\')')
+    expect(filter).not.toContain('base.endsWith(\'.tsbuildinfo\') &&')
+    // D-11 (v18): the --groups guard is at module scope, so the real script
+    // refuses a bare flag before reading dist/.
+    const script = fileURLToPath(new URL('../../scripts/publish-scoped.mjs', import.meta.url))
+    const error = await run(process.execPath, [script, '--groups', '--dry-run'])
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(error?.stderr).toContain('--groups requires a positive integer')
+  }, 20_000)
+
   it('P1-3 (v19): uninstall removes the D-3 dependency row together with the bundle row', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-installer-dep-'))
     await runInstaller(home, 'host', 'evo-test')

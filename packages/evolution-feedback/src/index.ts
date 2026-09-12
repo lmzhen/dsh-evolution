@@ -214,6 +214,19 @@ export class EvolutionFeedback {
    * @param note - optional free-text note carried into the durable event.
    * @param kind - `skill` (default `session`) selects the score table.
    */
+  /**
+   * v30 FB-01: refold the shared event log into the in-process aggregate.
+   * The aggregate only folds at mount, so a long-lived process computed the
+   * ABSOLUTE feedback pair from a stale aggregate and overwrote the decision
+   * relevant `feedback_warn` another process had recorded. The log is the
+   * truth — re-reading it before each quality push shrinks the staleness
+   * window to the refold-vs-append race (near-zero, serialized by mutate).
+   */
+  async refold(): Promise<void> {
+    if (!this.io) return
+    await this.restore(this.io)
+  }
+
   record(target: string, rating: 'positive' | 'negative', note?: string, kind: 'skill' | 'session' = 'session'): void {
     const mode = kind === 'skill' ? 'skills' : 'sessions'
     // Optimistic in-memory update: score()/quality read it synchronously.
@@ -652,11 +665,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const skillUsage = (skillCtx as unknown as { skillUsage: SkillUsageLike }).skillUsage
     const pushQuality = (target: string, kind: 'skill' | 'session'): void => {
       if (kind !== 'skill') return
-      const score = feedback.score(target, 'skill')
-      const warn = score < qualityWarnThreshold
-      void skillUsage.setFeedbackQuality(target, score, warn).catch((error: unknown) => {
-        skillCtx.logger.warn(error)
-      })
+      // v30 FB-01: refold the shared log first so the absolute pair is
+      // computed from the CURRENT truth, not this process's mount-time
+      // aggregate (multi-process DSH_HOME overwrote a live warn with a stale
+      // value). Failures degrade to the previous behavior with a warn.
+      void feedback.refold()
+        .then(() => {
+          const score = feedback.score(target, 'skill')
+          const warn = score < qualityWarnThreshold
+          return skillUsage.setFeedbackQuality(target, score, warn)
+        })
+        .catch((error: unknown) => {
+          skillCtx.logger.warn(error)
+        })
     }
     // V5-29: a failed append rolls the memory count/note back — re-push the
     // derived quality so the usage side never keeps an unpersisted score.

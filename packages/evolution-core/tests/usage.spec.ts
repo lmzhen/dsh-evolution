@@ -315,3 +315,23 @@ describe('v17: mutateUsage preserves wrong-shape sidecars', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
+
+it('v28 G5.2 (USAGE-01): unknown per-record fields survive normalize + a write-side RMW roundtrip', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-usage-unknown-'))
+  const io = nodeEvolutionIo()
+  // A NEWER host recorded a field this runtime does not know.
+  await writeFile(join(root, '.usage.json'), JSON.stringify({
+    'hub-skill': { created_by: 'model', use_count: 2, view_count: 1, patch_count: 0, hub_url: 'skills://hub' },
+  }), 'utf8')
+  // This runtime bumps a counter through the write-side RMW (mutateUsage
+  // persists the rebuilt map, normalizeUsageRecord sanitizes known fields).
+  await mutateUsage(root, io, (map) => {
+    const record = map.get('hub-skill')
+    if (record) record.view_count += 1
+  })
+  const raw = JSON.parse(await readFile(join(root, '.usage.json'), 'utf8')) as Record<string, Record<string, unknown>>
+  expect(raw['hub-skill']?.hub_url).toBe('skills://hub')
+  expect(raw['hub-skill']?.view_count).toBe(2)
+  expect(raw['hub-skill']?.use_count).toBe(2)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})

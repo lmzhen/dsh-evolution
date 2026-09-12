@@ -10,7 +10,7 @@ import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, assertSkillsRootAliasRetired, contentHash, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, contentHash, DEFAULT_SKILL_LIMITS, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -246,6 +246,13 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
   return config
 }
 
+/** v30 REV-04/REV-02: read the policy snapshot off the (optional) policy
+ * service through an `unknown` boundary — the Context augmentation types the
+ * getter non-optionally, but at runtime the row can be absent. */
+function policySnapshotOf(source: unknown): { skillContentChars?: number; protectedSkillNames?: readonly string[] } | undefined {
+  return (source as { get?(): { skillContentChars?: number; protectedSkillNames?: readonly string[] } } | undefined)?.get?.()
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
@@ -297,7 +304,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // curator is skill-store's per-file write lock + the F-17 marker probe (a
   // destructive mover refuses a directory whose writer lock is alive) —
   // curator's acquireMutex serializes its OWN package only. Automatic curator
-  // passes stay out of the session-active window via the min-idle gate; a
+  // passes stay out of the session-active window via the min-idle gate,
+  // checked pre-run AND re-checked at the commit boundary (v28 G4.2: a
+  // session activating mid-run no longer slips past it); a
   // manual `/evolution curator run` (ignoreGates) is the one realistic
   // interleave window: the loser records a failed op and the snapshot stays
   // the rollback path. Accepted + documented (plan v20 C-3①); the same
@@ -739,6 +748,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // the E-19/C-3 comment), not by this flag.
   ctx.effect(() => () => { deferredFallbackReviews.length = 0 }, 'dsh-evolution-review.deferred-drain')
 
+  /** v32 REV-06(b): content hash of every tree skill at REVIEW SCHEDULE time.
+   * The subagent's read-time hash is not plumbed through the plan, so this
+   * pre-run snapshot is what the execute-time staleness check can honestly
+   * compare against: a skill whose hash changed while the review ran was
+   * touched concurrently, and the plan (authored against the old state) is
+   * refused as stale. */
+  async function treeSkillHashes(): Promise<Map<string, string>> {
+    const hashes = new Map<string, string>()
+    const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+    if (!io) return hashes
+    const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()))
+    for (const summary of await library.list().catch((error: unknown) => {
+      // v33 R2-3: the fail-open here silently disarms the v32 REV-06(b)
+      // staleness gate for EVERY skill - say so instead of an empty map with
+      // no trace.
+      ctx.logger.warn(`dsh-evolution-review: skill tree scan failed (${error instanceof Error ? error.message : String(error)}) — pre-run staleness hashes are unavailable; full-content updates will not be drift-checked this review`)
+      return []
+    })) {
+      const text = await library.read(summary.name).catch(() => null)
+      if (text !== null) hashes.set(summary.name, contentHash(text))
+    }
+    return hashes
+  }
+
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred' | 'dropped'> {
     if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentLike | undefined
@@ -795,6 +828,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       ))
       const agentOptions: Record<string, string> = { model }
       if (config.reviewProvider) agentOptions.provider = config.reviewProvider
+      // v32 REV-06(b): snapshot the tree hashes BEFORE the subagent runs —
+      // the plan is authored against this state; executePlan refuses a
+      // full-content update whose target drifted while the review ran.
+      const preRunHashes = await treeSkillHashes()
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: reviewText }],
@@ -808,6 +845,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // operative wording that contradicts the tool filter.
         persona: reviewPrompt(kind, 'plan'),
         toolFilter: { allow: [...(config.reviewToolAllow ?? [])] },
+        // (v33 R3-F2: the plan prompt's CHANNEL note hardcodes 'read-only skill
+        // tool, no skill_manage/memory' — keep reviewToolAllow aligned with
+        // that claim or the persona contradicts the actual mount.)
         // V8-01 (0.3.45): the single-sourced constant — `'json'` DSL values
         // in items would be rejected by the upstream raw-schema boundary.
         outputSchema: REVIEW_OUTPUT_SCHEMA,
@@ -899,7 +939,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
         try {
           executed = await withTimeout(
-            executePlan(validation.accepted, session, action => landed.push(action)),
+            executePlan(validation.accepted, session, action => landed.push(action), preRunHashes),
             config.reviewTimeoutMs,
             'review plan execution',
           )
@@ -918,7 +958,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const applied = actions.join(' · ')
           // E-59d: on partial failure the model must know which ops already
           // landed so it does not repeat them; the applied list stays explicit.
-          const note = executed.ok ? '' : '\n部分操作失败。以下操作已应用，请勿重复执行。'
+          const failedNote = executed.failedOps.length > 0 ? ` 失败 ${executed.failedOps.length} 个：${executed.failedOps.join('；')}。` : ''
+          const note = executed.ok ? '' : `\n部分操作失败。${failedNote}以上操作已应用，请勿重复执行。`
           // G4.4 (F-334): the result-notice inject is NOT a review-failure — the
           // plan already landed in memory/skill, so a notification error must not
           // fall through to the outer "review failed" catch and flip started to
@@ -1038,6 +1079,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     /** V27 G4.3: called the moment an op lands, so a caller that abandons this
      * run (the write leg's timeout) can still record what really happened. */
     onLanded?: (action: string) => void,
+    /** v32 REV-06(b): content hash of every tree skill at REVIEW START. A
+     * skill whose live hash differs at execute time changed while the review
+     * ran — the plan was authored against the pre-run snapshot, so its
+     * full-content writes are refused as stale (read->execute generation gap:
+     * the subagent's read-time hash is not plumbed through the plan). */
+    preRunHashes?: Map<string, string>,
   ): Promise<{ actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }> {
     const sessionId = session?.id
     const memory = ctx.get('memory') as MemoryLike | undefined
@@ -1102,6 +1149,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const stageCurrent = await hashLibrary.read(args.name).catch(() => null)
           if (stageCurrent !== null) (args as { staged_from_sha256?: string }).staged_from_sha256 = contentHash(stageCurrent)
         }
+        // v30 REV-03: support-file ops carry the same anchor — the staged sha
+        // covers the file's current bytes (or the 'absent' sentinel), which
+        // the tool-side replay guard verifies before overwriting.
+        if ((args.action === 'write_file' || args.action === 'remove_file') && hashLibrary && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
+          const stageFile = await hashLibrary.readSupportFile(args.name, args.file_path).catch(() => undefined)
+          if (stageFile !== undefined) (args as { staged_from_sha256?: string }).staged_from_sha256 = stageFile === null ? 'absent' : contentHash(stageFile)
+        }
+        // v32 REV-06(b): pre-run hash comparison — the plan was authored
+        // against the run-start snapshot; a skill whose live hash differs now
+        // was changed WHILE the review ran (foreground session or another
+        // process). Refuse the full-content write so the concurrent writer's
+        // work is not clobbered (both-writers-success eliminated on this
+        // channel). Runs for BOTH the direct and the staged path.
+        const opName = typeof args.name === 'string' ? args.name : ''
+        const hashChecked = (args.action === 'update' || args.action === 'edit') && opName !== '' && preRunHashes?.has(opName) === true
+        if (hashChecked) {
+          const live = await hashLibrary?.read(opName).catch(() => null) ?? null
+          const preRun = preRunHashes.get(opName)
+          if (live === null || (preRun !== undefined && contentHash(live) !== preRun)) {
+            ok = false
+            failedOps.push(`skill ${args.action} ${args.name}: the skill changed while this review ran — update refused as stale; produce a fresh plan`)
+            continue
+          }
+        }
         // The registered skill runner expects the { operation, origin } wrapper;
         // passing it on both the pending record and the replay keeps the
         // background_review origin in the approval-disabled (default) path too.
@@ -1112,6 +1183,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (result?.ok) {
           actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
           onLanded?.(`Skill ${op.name} ${op.action ?? 'patch'}`)
+          // v33 F-4, corrected: the pre-run baseline is refreshed ONLY here —
+          // after a write THIS PLAN actually landed, from the bytes now on disk.
+          // The first cut refreshed it before the comparison and even when the op
+          // was refused as stale, so a plan with TWO ops on one skill (the very
+          // case this exists for) re-based op 2 onto a concurrent writer's bytes
+          // and let it overwrite them. A concurrent write landing between ops
+          // still mismatches the landed baseline and is refused.
+          if (hashChecked) {
+            const landed = await hashLibrary?.read(opName).catch(() => null) ?? null
+            if (landed !== null) preRunHashes.set(opName, contentHash(landed))
+          }
         }
         else {
           ok = false
@@ -1190,10 +1272,45 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // wrote skills into a tree the catalog/tools never read. Route through
       // the single core resolver (an empty `root` = default root; the retired
       // `skillsRoot` alias never reaches here — the load refuses it).
-      const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
+      // v30 REV-04: the library limits come from the policy snapshot's
+      // `skillContentChars` — the v28-era construction passed `undefined` and
+      // ran on DEFAULT_SKILL_LIMITS, so the approval-disabled autonomous
+      // channel wrote up to 10x the configured tool limit.
+      const policySnapshot = policySnapshotOf(ctx.get('evolutionPolicy'))
+      const library = new SkillLibrary(
+        resolveSkillsRoot({ root: rootConfig.root }),
+        evolutionIoAdapter(() => io.provider()),
+        { ...DEFAULT_SKILL_LIMITS, maxSkillContentChars: policySnapshot?.skillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars },
+        (event) => { ctx.emit('evolution/skill-mutated', event) },
+      )
       const op = skillArgs
       const name = op.name ?? ''
       const origin: WriteOrigin = origins.library
+      // v30 REV-02: the immutable policy's protected list is enforced at plan
+      // validation, but the approval replay and this direct path execute
+      // STORED plans — a plan accepted under an older policy must not land on
+      // a skill the CURRENT policy protects. Foreground (operator) writes are
+      // deliberately not gated by this list.
+      const protectedNames = policySnapshot?.protectedSkillNames
+      if (origin !== 'foreground' && protectedNames?.includes(name) && op.action !== 'create') {
+        return { ok: false, message: `Skill "${name}" is protected by the current policy (protectedSkillNames); autonomous writes are refused.` }
+      }
+      // v31 REV-05: the support-file staleness anchor (attached at staging)
+      // is enforced here too — the direct path (approval-disabled DEFAULT)
+      // otherwise commits the staged bytes over whatever changed since
+      // staging, with both writers reporting success (REV-01's defect shape
+      // on the support-file ops). 'absent' anchors a file that did not exist
+      // at staging; an unreadable target refuses as unverifiable.
+      if (op.action === 'write_file' || op.action === 'remove_file') {
+        const expected = (op as { staged_from_sha256?: string }).staged_from_sha256
+        if (typeof expected === 'string' && expected !== '') {
+          const current = await library.readSupportFile(name, op.file_path ?? '').catch(() => undefined)
+          const actual = current === undefined || current === null ? 'absent' : contentHash(current)
+          if (current === undefined || actual !== expected) {
+            return { ok: false, message: `Support file "${op.file_path ?? ''}" of "${name}" changed since this plan was produced — the staged file operation was refused as stale. Re-read the skill tree and produce a fresh plan.` }
+          }
+        }
+      }
       if (op.action === 'create') {
         // The direct path (approval-disabled deployments) must keep the same
         // lifecycle entry as the runner: an agent-created record so the
@@ -1205,8 +1322,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         return created
       }
-      if (op.action === 'edit' || op.action === 'update') return await library.update(name, op.content ?? '', origin)
-      if (op.action === 'patch') return await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', false, origin)
+      if (op.action === 'edit' || op.action === 'update') {
+        // v30 REV-01: enforce the staleness anchor this file attaches at
+        // staging time. The tool/replay channel verifies it (tool-skill-manage);
+        // this direct path (approval-disabled DEFAULT) used to commit the
+        // G-generation full content over whatever is current — a concurrent
+        // foreground patch was silently lost with BOTH writers reporting
+        // success. Re-read under our own call and refuse on drift.
+        const expected = (op as { staged_from_sha256?: string }).staged_from_sha256
+        if (typeof expected === 'string' && expected !== '') {
+          const current = await library.read(name).catch(() => null)
+          if (current !== null && contentHash(current) !== expected) {
+            return { ok: false, message: `Skill "${name}" changed since this plan was produced — the full-content update was refused as stale. Re-read the skill and produce a fresh plan.` }
+          }
+        }
+        const updated = await library.update(name, op.content ?? '', origin)
+        // v30 TSM-04: keep the mutation-maturity accounting aligned with the
+        // runner path, which bumps patch_count for every content write.
+        if (updated.ok) {
+          const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
+          await usageRegistry?.record?.(name, 'patch').catch(() => {})
+        }
+        return updated
+      }
+      if (op.action === 'patch') {
+        const patched = await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', false, origin)
+        // v30 TSM-04: same accounting parity as the runner path.
+        if (patched.ok) {
+          const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
+          await usageRegistry?.record?.(name, 'patch').catch(() => {})
+        }
+        return patched
+      }
       if (op.action === 'delete') {
         const into = (op.absorbed_into ?? '').trim()
         if (!into || !(await library.read(into))) {
@@ -1227,8 +1374,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // P3 (v16): no `?? op.content` fallback — the validator (plan-validator
       // write_file gate) and the approval runner (tool-skill-manage) are both
       // file_content-only; the fallback here was a dead-but-divergent branch.
-      if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? '', origin)
-      if (op.action === 'remove_file') return await library.removeSupportFile(name, op.file_path ?? '', origin)
+      // v31 REV-05: enforce the support-file staleness anchor on this direct
+      // path too — the staging attach (write_file/remove_file) records the
+      // file's current bytes (or the 'absent' sentinel), and the approval-
+      // disabled DEFAULT channel used to commit the staged bytes over
+      // whatever changed since, with both writers reporting success.
+      if (op.action === 'write_file' || op.action === 'remove_file') {
+        const expected = (op as { staged_from_sha256?: string }).staged_from_sha256
+        if (typeof expected === 'string' && expected !== '') {
+          const current = await library.readSupportFile(name, op.file_path ?? '').catch(() => undefined)
+          const actual = current === undefined || current === null ? 'absent' : contentHash(current)
+          if (current === undefined || actual !== expected) {
+            return { ok: false, message: `Support file "${op.file_path ?? ''}" of "${name}" changed since this plan was produced — the staged file operation was refused as stale. Re-read the skill tree and produce a fresh plan.` }
+          }
+        }
+        if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? '', origin)
+        const removedSupport = await library.removeSupportFile(name, op.file_path ?? '', origin)
+        // v30 TSM-04 parity: support-file removals mutate the skill package.
+        if (removedSupport.ok) {
+          const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
+          await usageRegistry?.record?.(name, 'patch').catch(() => {})
+        }
+        return removedSupport
+      }
       if (op.action === 'restructure') {
         const moves = (op.restructure ?? [])
           .filter((move): move is { heading?: string; to_file?: string } => move !== null)
@@ -1269,25 +1437,48 @@ export function shouldCompletionReview(reason: { kind?: string } | undefined, se
  * per-skill read action (its `list`/`review` are whole-library), so a specific
  * skill read through it cannot be tracked — see README Known Limitations. */
 function collectReadSkillNames(session: Session): Set<string> {
-  const names = new Set<string>()
+  // v32 REV-06(a): a skill counts as READ only when its `tool/call` has a
+  // MATCHING `tool/result` that is not an error — the call alone used to be
+  // credited, so a failed/timeout read passed the read-before-write gate and
+  // the review could blind-overwrite content the model never saw.
+  const callNames = new Map<string, string>()
+  const okCallIds = new Set<string>()
   for (const event of session.events) {
-    if (event.type !== 'tool/call') continue
-    if (event.data.name !== 'skill') continue
-    const raw = (event.data as unknown as { arguments?: string | Record<string, unknown> }).arguments
-    let parsed: unknown = {}
-    if (typeof raw === 'string') {
-      try {
-        // F-203 (0.3.23): `JSON.parse('null')` yields null; guard before `.name`.
-        parsed = JSON.parse(raw) as unknown
-      } catch {
-        continue
+    if (event.type === 'tool/call') {
+      if (event.data.name !== 'skill') continue
+      const raw = event.data.arguments
+      let parsed: unknown = {}
+      if (typeof raw === 'string') {
+        try {
+          // F-203 (0.3.23): `JSON.parse('null')` yields null; guard before `.name`.
+          parsed = JSON.parse(raw) as unknown
+        } catch {
+          continue
+        }
+      } else {
+        parsed = raw
       }
-    } else {
-      parsed = raw ?? {}
+      const parsedObj = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+      const name = typeof parsedObj.name === 'string' ? parsedObj.name : typeof parsedObj.skill === 'string' ? parsedObj.skill : ''
+      if (name) callNames.set(event.data.callId, name)
+    } else if (event.type === 'tool/result') {
+      // v33 F-3: tolerate the legacy pre-rc.2 shape (no `message`) the same
+      // way renderToolResultLine does - a persisted pre-upgrade event must
+      // not throw here and permanently degrade the session's reviews to
+      // inject fallbacks.
+      const blocks = (event.data as unknown as { message?: { content?: unknown } } | undefined)?.message?.content
+      if (!Array.isArray(blocks)) continue
+      for (const block of blocks) {
+        const typed = block as { type?: unknown; isError?: unknown; toolCallId?: unknown }
+        if (typed.type === 'tool-result' && typed.isError !== true && typeof typed.toolCallId === 'string') {
+          okCallIds.add(typed.toolCallId)
+        }
+      }
     }
-    const parsedObj = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
-    const name = typeof parsedObj.name === 'string' ? parsedObj.name : typeof parsedObj.skill === 'string' ? parsedObj.skill : ''
-    if (name) names.add(name)
+  }
+  const names = new Set<string>()
+  for (const [callId, name] of callNames) {
+    if (okCallIds.has(callId)) names.add(name)
   }
   return names
 }

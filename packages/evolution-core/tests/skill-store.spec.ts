@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authoringFeedback, frontmatterCatalogInvalid, frontmatterYamlUnsafeValues, parseFrontmatter, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback, frontmatterCatalogInvalid, parseFrontmatter, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 
 const SKILL = `---
 name: python-testing
@@ -511,7 +511,7 @@ it('V27 G0.3 (core-a-07): a skill whose description is a YAML block scalar is wr
   // rewrite it into a quoted scalar).
   const written = await readFile(join(root, 'block-scalar', 'SKILL.md'), 'utf8')
   expect(written).toContain('description: >')
-  expect(frontmatterYamlUnsafeValues(written)).toEqual([])
+  expect(frontmatterCatalogInvalid(written)).toBe(false)
   // update and patch of the same skill stay writable.
   const updated = await lib.update('block-scalar', folded.replace('spans two source lines.', 'now updated.'))
   expect(updated.ok, updated.message).toBe(true)
@@ -946,7 +946,6 @@ it('V27 G2.1: list() publishes the strict catalog value, and the audit verdict a
   // platform and the family publishes the quoted form only after the next
   // write), so the audit keeps reporting this file rather than calling it clean.
   expect(frontmatterCatalogInvalid(commented)).toBe(true)
-  expect(frontmatterYamlUnsafeValues(commented).map(entry => entry.key)).toEqual(['description'])
   const clean = '---\nname: clean-skill\ndescription: Plain routing text.\n---\n\n# Clean\n'
   const cleanDir = join(root, 'clean-skill')
   await mkdir(cleanDir, { recursive: true })
@@ -1102,5 +1101,107 @@ it('P2-4 (v19): a non-string manifest entry is refused structurally, not with a 
   expect(result.ok).toBe(false)
   expect(result.message).toContain('unsafe entry name')
   expect(result.message).not.toContain('is not a function')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v28 G1.1 (EVO-IO-02): update on a ghost directory removes it instead of blocking restore forever', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-ghost-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('ghost-skill', SKILL.replace('python-testing', 'ghost-skill'), 'foreground')
+  const { rm: rmDir } = await import('node:fs/promises')
+  // Simulate the archive-probe race outcome: the directory moved away and the
+  // io seam's mkdir-before-lock resurrected it EMPTY (no SKILL.md).
+  await rmDir(join(root, 'ghost-skill', 'SKILL.md'))
+  const result = await lib.update('ghost-skill', SKILL.replace('python-testing', 'ghost-skill'), 'foreground')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('not found')
+  // The ghost is gone: a later restoreFromArchive is not blocked by the
+  // "already exists … carries no SKILL.md" refusal.
+  const { stat } = await import('node:fs/promises')
+  await expect(stat(join(root, 'ghost-skill'))).rejects.toMatchObject({ code: 'ENOENT' })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v28 G1.1 (EVO-IO-02): the ghost cleanup never takes a directory with real content', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-ghost2-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('partial-skill', SKILL.replace('python-testing', 'partial-skill'), 'foreground')
+  const { rm: rmDir, writeFile, mkdir } = await import('node:fs/promises')
+  // No SKILL.md but real support content: the cleanup must leave it alone.
+  await rmDir(join(root, 'partial-skill', 'SKILL.md'))
+  await mkdir(join(root, 'partial-skill', 'references'), { recursive: true })
+  await writeFile(join(root, 'partial-skill', 'references', 'keep.md'), 'keep me\n', 'utf8')
+  const result = await lib.update('partial-skill', SKILL.replace('python-testing', 'partial-skill'), 'foreground')
+  expect(result.ok).toBe(false)
+  const { stat } = await import('node:fs/promises')
+  expect((await stat(join(root, 'partial-skill'))).isDirectory()).toBe(true)
+  expect(await readFile(join(root, 'partial-skill', 'references', 'keep.md'), 'utf8')).toContain('keep me')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v28 G2.5 (CORE-SK-03): both refusals pre-clear report an UNCHANGED tree, not "Rescue manually"', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-restore3-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('locked-skill', SKILL.replace('python-testing', 'locked-skill'), 'foreground')
+  // Latest complete snapshot (pre-lock).
+  await lib.snapshotAll('test')
+  // Now create a second skill and hold a LIVE write lock on it.
+  await lib.create('second-skill', SKILL.replace('python-testing', 'second-skill'), 'foreground')
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(join(root, 'second-skill', 'SKILL.md.lock'), `${process.pid}:deadbeef`, 'utf8')
+  const result = await lib.restoreLatestSnapshot()
+  expect(result.ok).toBe(false)
+  // The target restore refuses on the live lock; the pre-rollback snapshot is
+  // incomplete (second-skill was skipped) and refuses on completeness — both
+  // pre-clear, so nothing was ever touched.
+  expect(result.message).toContain('UNCHANGED')
+  expect(result.message).not.toContain('Rescue manually')
+  // The library is intact.
+  const { stat } = await import('node:fs/promises')
+  expect((await stat(join(root, 'locked-skill', 'SKILL.md'))).isFile()).toBe(true)
+  expect((await stat(join(root, 'second-skill', 'SKILL.md'))).isFile()).toBe(true)
+  await rm(join(root, 'second-skill', 'SKILL.md.lock'), { force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v29 LIST-01: a directory squatting on SKILL.md skips the entry instead of killing the whole listing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-listeisdir-'))
+  const lib = new SkillLibrary(root)
+  await lib.create('healthy-skill', SKILL.replace('python-testing', 'healthy-skill'), 'foreground')
+  await lib.create('broken-skill', SKILL.replace('python-testing', 'broken-skill'), 'foreground')
+  const { rm: rmPath, mkdir, writeFile } = await import('node:fs/promises')
+  // The E-43 shape: a DIRECTORY on the SKILL.md path (half-extracted artifact).
+  await rmPath(join(root, 'broken-skill', 'SKILL.md'))
+  await mkdir(join(root, 'broken-skill', 'SKILL.md'))
+  await writeFile(join(root, 'broken-skill', 'SKILL.md', 'junk'), 'x', 'utf8')
+  // Previously: list() rejected wholesale with EISDIR while read() said
+  // "not found" — now both surfaces agree the entry is effectively absent.
+  const summaries = await lib.list()
+  expect(summaries.map(s => s.name)).toEqual(['healthy-skill'])
+  expect(await lib.read('broken-skill')).toBeNull()
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v30 REG-01: a non-EISDIR read failure (EACCES) still fails list() loud — no silent partial tree', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-skills-acces-'))
+  const { mkdir, writeFile } = await import('node:fs/promises')
+  const stubIo = {
+    ...nodeEvolutionIo(),
+    readText: async (path: string) => {
+      if (path.includes('locked-skill')) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      }
+      return '---\nname: open-skill\ndescription: Visible.\n---\n\nbody\n'
+    },
+  }
+  await mkdir(join(root, 'locked-skill'), { recursive: true })
+  await writeFile(join(root, 'locked-skill', 'SKILL.md'), 'x', 'utf8')
+  await mkdir(join(root, 'open-skill'), { recursive: true })
+  await writeFile(join(root, 'open-skill', 'SKILL.md'), '---\nname: open-skill\ndescription: Visible.\n---\n\nbody\n', 'utf8')
+  // A transient EACCES on ONE entry must NOT silently produce a partial tree
+  // (the curator's E-15 fold would archive the "missing" live skill forever);
+  // it fails loud instead. Only the EISDIR shape is absorbed (v29 LIST-01).
+  const lib = new SkillLibrary(root, stubIo)
+  await expect(lib.list()).rejects.toMatchObject({ code: 'EACCES' })
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

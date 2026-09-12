@@ -534,12 +534,19 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         // V6-04 (0.3.35): the exclusive create must not leave an unhandled
         // 0-byte lock behind — its body fails the pid probe, so no takeover
         // could ever clear it (the catch below removes OUR artifact).
-        // V27 G1.2 (EVO-IO-01): create AND write in ONE call. The former
-        // `await open('wx')` followed by an awaited `handle.writeFile()` yielded
-        // to the event loop between the exclusive create and the body, which is
-        // exactly the empty-lock window a takeover can observe; `writeFile` with
-        // the `wx` flag issues the same two syscalls back to back inside one
-        // libuv request chain, so no JS turn separates them.
+        // v28 G1.5 (EVO-IO-03): this single call does NOT eliminate the
+        // empty-lock window. `fsPromises.writeFile` on a path is still
+        // open → write → close, three awaited threadpool steps, and the
+        // observer that matters is another PROCESS, which sees the OS-level
+        // window between the exclusive create and the body regardless of JS
+        // turns. What actually makes the protocol safe is the takeover
+        // budget: an empty-body lock is only stealable after
+        // EMPTY_LOCK_TAKEOVER_MS (30s), the C-27 fresh-body re-check prevents
+        // a just-created lock from being removed mid-flight, and `assertOwned`
+        // re-verifies ownership at the commit point. Do NOT shrink
+        // EMPTY_LOCK_TAKEOVER_MS on the theory that this call closed the
+        // window — it did not (v27 G1.2 claimed as much; that claim was
+        // wrong).
         await writeFile(lock, myClaim, { flag: 'wx' })
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
@@ -867,11 +874,15 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
           const body = await readFile(ticketPath, 'utf8').catch(() => '')
           const holder = Number(body.split(':')[0] ?? '')
           const st = await stat(ticketPath)
-          // Same semantics as the per-attempt reclaim: dead-pid or >1s-old
-          // tickets are reclaimable (an empty body has no pid to probe, so
+          // v28 G1.4 (EVO-IO-04): the SAME semantics as the per-attempt
+          // reclaim — TICKET_STALE_MS governs age (the sweep's old "1s"
+          // value contradicted the takeover path and could delete a
+          // mid-flight ticket whose creator was stalled under 5s, burning
+          // the contention budget on recycled tickets). Dead-pid tickets are
+          // reclaimable immediately (an empty body has no pid to probe, so
           // only its age proves a crashed creator — V6-04).
           const dead = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
-          const old = Date.now() - st.mtimeMs > 1000
+          const old = Date.now() - st.mtimeMs > TICKET_STALE_MS
           if (dead || old) await rm(ticketPath, { force: true })
         } catch {
           // The ticket vanished (or a race with its reaper); nothing to clean.

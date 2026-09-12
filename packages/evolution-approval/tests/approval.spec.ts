@@ -501,3 +501,38 @@ describe('evolution-approval', () => {
   })
 
 })
+
+it('v28 G1.3 (APPR-01): a failed resolve after a successful runner reports the landed write instead of throwing', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-approval-g13-'))
+  const ctx = new Context()
+  await ctx.plugin(EvolutionStateStorageRegistry)
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  await ctx.plugin(JsonState, { root: home })
+  await ctx.plugin(EvolutionState)
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: true, message: 'memory written' }))
+  const decision = await ctx.evolutionApproval.request({
+    kind: 'memory', summary: 'x', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
+  })
+  expect(decision.action).toBe('staged')
+  const pendingId = decision.pendingId!
+  // Fault: the state resolve throws (quarantine / lock-budget class) AFTER the
+  // runner has landed its effect.
+  const state = ctx.evolutionState as unknown as { tryResolvePending: () => Promise<never> }
+  const original = state.tryResolvePending
+  state.tryResolvePending = async () => { throw new Error('corrupt pending-state.json (quarantined)') }
+  try {
+    const result = await ctx.evolutionApproval.approve(pendingId)
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('LANDED')
+    expect(result.message).toContain('corrupt pending-state.json')
+  } finally {
+    state.tryResolvePending = original
+  }
+  // The claim stays 'executing' — approve refuses to re-run it (no double write).
+  const again = await ctx.evolutionApproval.approve(pendingId)
+  expect(again.ok).toBe(false)
+  expect(again.message).toMatch(/executing|already/i)
+  await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})

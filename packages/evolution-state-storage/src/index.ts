@@ -80,8 +80,15 @@ export const REVIEW_STATE_SESSION_CAP = 500
  * approved list and a capability cannot be re-submitted for the same package,
  * so eviction would make an approved capability permanently unactivatable.
  * Ordering = oldest `resolvedAt` first; a missing or unparseable timestamp sorts
- * LAST (json parity, v16) — an unknown time must never make a record the victim,
- * and pending/executing rows are live work that is never trimmed.
+ * LAST (json parity, v16), and pending/executing rows are live work that is
+ * never trimmed. v28 G2.4 (STATE-03) — the previous wording promised "an
+ * unknown time must never make a record the victim"; that is only true while
+ * the overflow fits within the KNOWN-timestamp records. When the overflow
+ * exceeds them (corruption-level data: most resolved rows with broken
+ * timestamps), `slice` necessarily reaches into the unknown-timestamp tail —
+ * the cap must be enforced, so there is no alternative. The guarantee is
+ * therefore: unknown-timestamp records are evicted LAST, after every known
+ * timestamp, in insertion order among themselves (Array#sort stability).
  *
  * @param records - every pending record currently in the live table.
  * @param cap - how many resolved records may be kept.
@@ -222,6 +229,9 @@ export class EvolutionStateStorageRegistry extends Service {
   private readonly providers = new Map<string, EvolutionStateStorage>()
   /** C-7 (v18): per-name dispose, mirroring the evolution-io registry. */
   private readonly disposals = new Map<string, () => void>()
+  /** v28 G3.1 (STATE-04): the multi-provider warn fires once per ambiguous
+   * period, not once per state op (provider() runs on every read/write). */
+  private ambiguousWarned = false
 
   constructor(ctx: Context) {
     super(ctx, 'evolutionStateStorage')
@@ -258,12 +268,29 @@ export class EvolutionStateStorageRegistry extends Service {
 
   provider(name?: string): EvolutionStateStorage {
     if (name) {
+      this.ambiguousWarned = false
       const provider = this.providers.get(name)
       if (provider) return provider
       throw new Error(`evolution state storage provider "${name}" is not registered`)
     }
     const first = this.providers.values().next().value
     if (!first) throw new Error('no evolution state storage provider registered; mount @deepseek-ai/dsh-evolution-state-json or @deepseek-ai/dsh-evolution-state-domain')
+    // v28 G3.1 (STATE-04): the io registry refuses multi-default ambiguity;
+    // here two providers can silently coexist and the effective one is
+    // REGISTRATION ORDER — enabling the domain row in an overlay rebinds every
+    // evolutionState op to an empty medium while all json state stays on disk,
+    // invisible (/evolution pending shows nothing, approve misses). Warn ONCE
+    // per ambiguous period at the un-pinned selection point, naming both the
+    // effective provider and the escape hatch (a pinned selection takes the
+    // `name` branch above and never warns).
+    if (this.providers.size > 1) {
+      if (!this.ambiguousWarned) {
+        this.ambiguousWarned = true
+        this.ctx.logger.warn(`evolution state storage: ${this.providers.size} providers registered (${[...this.providers.keys()].join(', ')}), none pinned — the effective provider is "${first.name}" (registration order). Existing state under the other provider is now invisible. Pin config: { provider: json|domain } on the evolution-state row to make the choice explicit.`)
+      }
+    } else {
+      this.ambiguousWarned = false
+    }
     return first
   }
 }

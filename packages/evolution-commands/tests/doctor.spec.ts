@@ -154,4 +154,26 @@ describe('doctor (WB2, 0.3.55)', () => {
       await rm(home, { recursive: true, force: true })
     }
   })
+
+  it('v34 INST-01: a corrupt profile manifest is REPORTED, never read as "no bundles"', async () => {
+    // The corruption INST-01 exists to prevent: a truncated manifest makes the
+    // profile's bundle rows UNKNOWN. Swallowing the parse error reported
+    // `bundles: (none)` and let the preset-install mutual-exclusion gate
+    // proceed with a double-mounting install.
+    const home = await mkdtemp(join(tmpdir(), 'doctor-corrupt-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      await writeFile(join(home, 'profiles', 'web', 'package.json'), '{"dsh":{"profile":{"bundles":["@lmzhen/dsh-evol', 'utf8')
+      const seen: unknown[] = []
+      const bundles = collectEvolutionBundles(home, (error) => { seen.push(error) })
+      // The unreadable profile contributes no rows, but the failure is loud.
+      expect(bundles).toEqual([])
+      expect(seen).toHaveLength(1)
+      const report = await diagnose(stub, { home })
+      expect(report.conflicts.some(conflict => conflict.includes('a profile manifest could not be read or parsed'))).toBe(true)
+      expect(report.actions[0]).toContain('Resolve the conflict first')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
 })

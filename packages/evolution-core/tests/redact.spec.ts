@@ -113,3 +113,44 @@ describe('v22 (SEC-4): provider token shapes the original set missed', () => {
     expect(redactSecrets(benign)).toBe(benign)
   })
 })
+
+it('v28 G5.1 (REDACT-01): a block-style credential key masks the following indented value', () => {
+  const block = ['api_key:', '  wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', 'region: us-east-1'].join('\n')
+  const out = redactSecrets(block)
+  expect(out).toContain('api_key:')
+  expect(out).toContain('<redacted>')
+  expect(out).not.toContain('wJalrXUtnFEMI')
+  // Unrelated following lines are untouched.
+  expect(out).toContain('region: us-east-1')
+  // A bare key with nothing after it and NO indented value line stays as-is.
+  expect(redactSecrets('notes:\n  plain prose line')).toBe('notes:\n  plain prose line')
+})
+
+it('v28 G5.1 (REDACT-02): PEM private key blocks are masked whole', () => {
+  const pem = [
+    '-----BEGIN RSA PRIVATE KEY-----',
+    'MIIEpAIBAAKCAQEA7dKgXz0plusmorestuffthatgoesonandonandonforever',
+    '-----END RSA PRIVATE KEY-----',
+    'after the key',
+  ].join('\n')
+  const out = redactSecrets(pem)
+  expect(out).toContain('<redacted-private-key>')
+  expect(out).not.toContain('MIIEpAIBAAKCAQEA')
+  expect(out).toContain('after the key')
+  // OpenSSH variant too.
+  const openssh = '-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----'
+  expect(redactSecrets(openssh)).toContain('<redacted-private-key>')
+})
+
+it('v31 REDACT-03: block-style keys with connected prefixes (AWS_CLIENT_DB forms) are masked', () => {
+  for (const key of ['AWS_SECRET_ACCESS_KEY:', 'aws_secret_access_key:', 'CLIENT_SECRET:', 'DB_PASSWORD:', 'MY_API_KEY:', 'SECRET:']) {
+    const doc = `${key}\n    wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY`
+    const out = redactSecrets(doc)
+    expect(out, key).not.toContain('wJalrXUtnFEMI')
+    expect(out, key).toContain('<redacted>')
+  }
+  // The inline prefixed form keeps working (A2-6 parity).
+  expect(redactSecrets('x AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY')).not.toContain('wJalrXUtnFEMI')
+  // A non-credential block key stays untouched.
+  expect(redactSecrets('configuration:\n    plain value line')).toBe('configuration:\n    plain value line')
+})

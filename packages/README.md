@@ -42,7 +42,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
 | `evolution-host` | Host-plane infrastructure bundle (no memory/skill model tools; ships the read-only `maintenance_probe` diagnostic) |
-| `evolution-agent` | Agent preset: standard tools + `memory`/`skill_manage` model entry |
+| `evolution-agent` | Agent preset: standard tools + the four model rows (`memory` / `skill_manage` / session search / skill catalog) |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
 

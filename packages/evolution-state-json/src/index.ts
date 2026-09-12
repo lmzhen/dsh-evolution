@@ -39,7 +39,7 @@ import {
   type ReviewStateRecord,
   type SeamRecordTable,
 } from '@deepseek-ai/dsh-evolution-state-storage'
-import { isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 
 export const name = 'evolution-state-json'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
@@ -110,27 +110,61 @@ const QUARANTINE_ERROR_NAME = 'EvolutionStateCorruptFile'
  * file must still yield exactly one copy — V10-05's bounded-growth rule); a
  * DIFFERENT payload gets a stamped sibling so the earlier rescue copy is never
  * overwritten. The node backend's 7-day `.corrupt` sweep bounds the set. */
-async function quarantineTarget(io: () => EvolutionIoLike, base: string, content: string): Promise<string> {
-  if (!(await io().exists(base).catch(() => false))) return base
+async function quarantineTarget(io: () => EvolutionIoLike, base: string, content: string): Promise<{ dest: string; needsWrite: boolean }> {
+  if (!(await io().exists(base).catch(() => false))) return { dest: base, needsWrite: true }
   const existing = await io().readText(base).catch(() => null)
-  return existing === content ? base : `${base}.${Date.now()}`
+  if (existing === content) return { dest: base, needsWrite: false }
+  // v29 STATE-05: probe the stamped siblings earlier reads minted BEFORE
+  // minting another. A still-corrupt file on a hot path (review-state is read
+  // every turn) used to create one `${base}.${Date.now()}` copy PER READ when
+  // the base held a different payload — an unbounded set the 7-day sweep
+  // (per-copy mtime) can never catch up with, contradicting the V10-05 /
+  // P2-19 bounds documented below. A matching sibling is reused as-is.
+  const dir = dirname(base)
+  const stem = `${basename(base)}.`
+  try {
+    for (const name of await io().list(dir)) {
+      if (!name.startsWith(stem)) continue
+      // v30 STATE-07: only THIS function's minted stamps (`.<digits>`) count.
+      // The bare prefix also matched user files such as
+      // `pending-state.json.corrupt.notes.md`, which a byte-equal read would
+      // then name as the "preserved" copy while no quarantine copy exists.
+      if (!/^\d+$/.test(name.slice(stem.length))) continue
+      const sibling = join(dir, name)
+      const siblingBytes = await io().readText(sibling).catch(() => null)
+      if (siblingBytes === content) return { dest: sibling, needsWrite: false }
+    }
+  } catch {
+    // Listing failure falls through to minting — the quarantine itself still fires.
+  }
+  return { dest: `${base}.${Date.now()}`, needsWrite: true }
 }
 
 async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string): Promise<never> {
   const base = `${join(root, file)}.corrupt`
-  const dest = await quarantineTarget(io, base, raw)
+  const { dest, needsWrite } = await quarantineTarget(io, base, raw)
   // P2-27 (v11): a failed rescue copy must not claim "original preserved" —
   // the operator follows the message to a file that does not exist. The main
   // failure stays fail-loud either way; only the diagnosis gets honest.
+  // v29 STATE-05: `needsWrite` is false when an existing copy (base or a
+  // stamped sibling) already holds EXACTLY these bytes — the durable write
+  // (and its mtime refresh) is skipped, so a repeated read neither churns the
+  // write protocol nor keeps the copy forever-young for the sweep.
   let preservedNote = `; original preserved at ${dest} — inspect and fix it, then retry.`
-  try {
-    await io().writeText(dest, raw)
-    // P2-1 (v13): the quarantine write replaces the caveat copy's CONTENT —
-    // its key must go stale or the gate path's "key match + copy on disk"
-    // skip would trust the old key and never rewrite the record-scoped copy.
+  if (needsWrite) {
+    try {
+      await io().writeText(dest, raw)
+      // P2-1 (v13): the quarantine write replaces the caveat copy's CONTENT —
+      // its key must go stale or the gate path's "key match + copy on disk"
+      // skip would trust the old key and never rewrite the record-scoped copy.
+      corruptWritten.delete(file)
+    } catch (writeError) {
+      preservedNote = `; the quarantine copy at ${dest} FAILED to write (${writeError instanceof Error ? writeError.message : String(writeError)}) — the original file is left in place.`
+    }
+  } else {
+    // Same key-staleness discipline on the no-write path: the gate must
+    // re-verify rather than trust a key minted for a previous payload.
     corruptWritten.delete(file)
-  } catch (writeError) {
-    preservedNote = `; the quarantine copy at ${dest} FAILED to write (${writeError instanceof Error ? writeError.message : String(writeError)}) — the original file is left in place.`
   }
   throw Object.assign(
     new Error(`evolution state file "${file}" is not valid JSON (${reason})${preservedNote}`),
@@ -264,8 +298,14 @@ async function ensureCorruptCopy(
   })).sort((a, b) => a.id.localeCompare(b.id)))
   if (corruptWritten.get(file) === corruptKey && await io().exists(base)) return true
   const payload = JSON.stringify(bad, null, 2)
-  const dest = await quarantineTarget(io, base, payload)
-  const wrote = await io().writeText(dest, payload).then(() => true).catch(() => false)
+  // v29 STATE-05: quarantineTarget now returns `{dest, needsWrite}` — a copy
+  // (base or a stamped sibling) that already holds EXACTLY these bytes is
+  // reused without a rewrite, so repeated reads neither churn the durable
+  // write protocol nor refresh the copy's mtime past the 7-day sweep.
+  const { dest, needsWrite } = await quarantineTarget(io, base, payload)
+  const wrote = needsWrite
+    ? await io().writeText(dest, payload).then(() => true).catch(() => false)
+    : true
   if (wrote) {
     corruptWritten.set(file, corruptKey)
     corruptWriteWarned.delete(file)
@@ -603,8 +643,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   /** 0.3.22 (F-336): when the live pending map holds more than
-   * `PENDING_RESOLVED_CAP` resolved records, drop the oldest (by resolvedAt,
-   * then insertion order on ties) from the map and return them for archiving.
+   * `PENDING_RESOLVED_CAP` resolved records, drop the oldest (by resolvedAt;
+   * a missing/unparseable timestamp sorts LAST and leaves first only when the
+   * overflow exceeds every known timestamp — v28 G2.4 wording, shared seam
+   * rule) from the map and return them for archiving.
    * Only approved/rejected records are candidates — pending/executing are
    * live work and are never trimmed. Returns the pruned map (rather than
    * mutating in place) plus the evicted records. */
@@ -639,19 +681,36 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * read-only legacy `pending.json` re-introduces an evicted record on the
    * next resolve) and rotate the sidecar to `.bak` past ARCHIVE_RESOLVED_CAP
    * so neither the file nor the per-append full-array rewrite grows without
-   * bound. */
-  async function appendArchive(records: PendingRecord[]): Promise<void> {
+   * bound.
+   * v28 G0.2 (STATE-01): returns whether the records' resolved evidence
+   * LANDED. `false` (rescue-skip or write failure) hands the caller the
+   * replay-window responsibility: the evicted records are no longer in the
+   * live map and their only durable "resolved" copy failed to land, so the
+   * caller must compensate (merge them back) before the legacy merge can
+   * revive a ghost twin. A dedupe no-op counts as success — the records are
+   * already in the archive. */
+  async function appendArchive(records: PendingRecord[]): Promise<boolean> {
+    let landed = true
     try {
       await transactIo(io(), pathOf(PENDING_ARCHIVE_FILE), async (current) => {
         // P2-25 (v11): the archive arrives from disk — keep the type honest as
         // (PendingRecord | null)[] so the non-object guard below is meaningful
         // (a null entry used to TypeError inside pendingArchiveKey).
+        // v28 G1.2 (STATE-01b): valid JSON with the WRONG top-level shape is a
+        // corrupt record map per F-215/E-9, not "empty" — it takes the same
+        // C-9 quarantine as a parse failure instead of being silently
+        // overwritten by the fresh array below (nothing else gated this file
+        // after RECORD_MAP_FILES deliberately excluded it).
         let archive: Array<PendingRecord | null> = []
         if (current !== null) {
+          let parsed: unknown
+          let unparseable = false
           try {
-            const parsed = JSON.parse(current) as unknown
-            if (Array.isArray(parsed)) archive = parsed as Array<PendingRecord | null>
+            parsed = JSON.parse(current)
           } catch {
+            unparseable = true
+          }
+          if (unparseable || !Array.isArray(parsed)) {
             // C-9 (v18): preserve the corrupt archive bytes before starting
             // fresh — the audit copy is the only recovery path. v21 (L-3):
             // when the rescue copy ITSELF fails to write, return `current` so
@@ -660,11 +719,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // (P2-17 discipline) and the next append retries the rescue. The
             // outer catch still guards the resolve, and its warn covers the
             // skip only if this refusal THROWS, so surface it explicitly.
+            // v28 G0.2: a skipped append is evidence LOST — reported to the
+            // caller via `landed` so it can compensate (see tryResolvePending).
             const rescued = await io().writeText(`${pathOf(PENDING_ARCHIVE_FILE)}.corrupt`, current).then(() => true, () => false)
             if (!rescued) {
               ctx.logger.warn(`evolution-state-json: corrupt ${PENDING_ARCHIVE_FILE} could not be quarantined to .corrupt — skipping this audit append to preserve the recoverable bytes`)
+              landed = false
               return current
             }
+          } else {
+            archive = parsed as Array<PendingRecord | null>
           }
         }
         // V5-07 (0.3.33): archives written before the dedupe key existed may
@@ -706,21 +770,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // must keep the newest CAP of the COLLAPSED history — writing
           // fresh.slice() (an empty batch) would blank the audit sidecar.
           if (archive.length > 0) {
-            await io().writeText(pathOf(PENDING_ARCHIVE_BAK_FILE), JSON.stringify(archive, null, 2)).catch(() => {})
+            // v31 STATE-08: the archive is machine-read only — compact
+            // serialization halves the in-lock rewrite bytes (the RMW holds
+            // the state-file lock since v30 STATE-06).
+            await io().writeText(pathOf(PENDING_ARCHIVE_BAK_FILE), JSON.stringify(archive)).catch(() => {})
           }
           // V7-08 (0.3.44) + V11-B2 (P1-9): the rotation moved ids into/out of
           // the active archive — readArchivedIds now reads fresh on every call
           // (no cache to invalidate), so the exclusion can never be stale.
-          return JSON.stringify((fresh.length > 0 ? fresh : next).slice(-ARCHIVE_RESOLVED_CAP), null, 2)
+          return JSON.stringify((fresh.length > 0 ? fresh : next).slice(-ARCHIVE_RESOLVED_CAP))
         }
         // V7-08 (0.3.44) + V11-B2: plain appends add ids—re-read covers them.
-        return JSON.stringify(next, null, 2)
+        return JSON.stringify(next)
       })
+      return landed
     } catch (error) {
       // Audit aid only: never let an archive write failure surface as a
       // resolve failure. P2-25 (v11): E-52 discipline — the swallow must be
       // observable, or a poisoned archive sidecar dies silently.
+      // v28 G0.2: the failure is ALSO reported to the caller so it can
+      // compensate for the lost resolved evidence (see tryResolvePending).
       ctx.logger.warn(`evolution-state-json: archive append deferred: ${error instanceof Error ? error.message : String(error)}`)
+      return false
     }
   }
 
@@ -878,7 +949,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async tryResolvePending(id, status, expectedClaimId): Promise<PendingResolution> {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
-        let evicted: PendingRecord[] = []
         await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
@@ -904,10 +974,31 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // 0.3.22 (F-336): after the write-back, keep the LIVE map bounded by
           // archiving the oldest resolved records above the cap.
           const pruned = enforceResolvedCap(map)
-          evicted = pruned.evicted
+          if (pruned.evicted.length === 0) return pruned.map
+          // v30 STATE-06: the archive append now runs INSIDE the state-file
+          // transaction. transactIo nesting is per-path lockfiles (state →
+          // archive; no reverse order exists anywhere), so a concurrent
+          // process's first-read retirement — the v29 audit's residual race —
+          // blocks on the state lock until AFTER the append commits and can
+          // no longer observe the "in neither file" hole that let a legacy
+          // pending twin of an executed op revive as claimable.
+          // Failure handling is the v28 G0.2 compensation, now INSIDE the
+          // task: an append that lands nothing merges the evicted records
+          // back (absent-key, current-wins — a concurrent re-stage of the
+          // same id keeps its newer row) so nothing leaves the live map
+          // without durable resolved evidence.
+          const archived = await appendArchive(pruned.evicted)
+          if (!archived) {
+            const restored: Record<string, PendingRecord> = { ...pruned.map }
+            for (const record of pruned.evicted) {
+              if (record.id in restored) continue
+              restored[record.id] = record
+            }
+            ctx.logger.warn(`evolution-state-json: archive append deferred — ${pruned.evicted.length} evicted resolved record(s) were merged back into the live map (retried on the next resolve)`)
+            return restored
+          }
           return pruned.map
         })
-        if (evicted.length > 0) await appendArchive(evicted)
         return result
       })
     },

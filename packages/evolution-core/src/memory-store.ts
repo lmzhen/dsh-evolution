@@ -291,17 +291,40 @@ export class MemoryStore {
    *
    * @param target - memory target being written
    * @param core - the in-transaction read-modify-write for the locked body
+   * @param shrinkOnly - v29 MEM-02: every queued operation REMOVES an entry
+   *   (the recovery path for a limit lowered under existing content). The
+   *   oversized read-guard is skipped for these batches: a canonical file
+   *   written under a ≥10× higher limit trips the `limit × 10` byte bound, and
+   *   the guard's "fix the file manually" refusal would pre-empt exactly the
+   *   shrink recovery MEM-01 advertises. The load is bounded by what the store
+   *   itself wrote under the old limit.
    * @returns the core's result, or the oversized / contract-violation refusal
    */
   private async chainedWrite(
     target: MemoryTarget,
     core: (raw: string) => Promise<{ result: MemoryApplyResult; write: string | null }>,
+    shrinkOnly = false,
   ): Promise<MemoryApplyResult> {
     // M-7 (v3 audit): the oversized read-guard must run BEFORE the transact —
     // inside it, node transact has already loaded the whole file, so the
     // "skipped for reading (never loaded)" contract only holds pre-lock.
-    const refusal = await this.oversizedRefusal(target)
-    if (refusal) return refusal
+    // v33 R2-1: the shrinkOnly bypass keeps a hard ceiling - a pathological
+    // (externally corrupted) file must not be loaded whole just because the
+    // batch is remove-only.
+    const SHRINK_LOAD_CEILING = 64 * 1024 * 1024
+    if (!shrinkOnly) {
+      const refusal = await this.oversizedRefusal(target)
+      if (refusal) return refusal
+    } else {
+      const size = await this.io.size?.(fileFor(this.root, target))
+      if (typeof size === 'number' && size > SHRINK_LOAD_CEILING) {
+        return {
+          ok: false,
+          message: `Memory file is ${size} bytes - too large to load even for a remove-only batch. Fix the file manually, then retry.`,
+          entries: [], chars: 0, limit: this.limitFor(target),
+        }
+      }
+    }
     let outcome: MemoryApplyResult | undefined
     await transactIo(this.io, fileFor(this.root, target), async (current) => {
       const step = await core(current ?? '')
@@ -388,7 +411,7 @@ export class MemoryStore {
   }
 
   /**
-   * The single drift predicate. `raw` is in canonical form when it byte-matches
+   * The single drift evaluation. `raw` is in canonical form when it byte-matches
    * `render(normalizeEntries(raw))`; anything else means it was edited outside
    * MemoryStore (empty/`§`-only entries, stray blank lines, leading or trailing
    * delimiters — structural anomalies the writer would quietly normalize away).
@@ -402,34 +425,72 @@ export class MemoryStore {
    * every write path — including the repairs the model would need to make.
    * Such files are adopted instead of flagged.
    *
+   * Returns one of:
+   * - `'external'` — non-canonical body, i.e. real external modification. This
+   *   includes the Hermes-parity signal #2 (an entry larger than the whole-file
+   *   limit): that shape is only meaningful as external evidence on a
+   *   NON-canonical body, because free-form external appends never render
+   *   canonically.
+   * - `'over-limit'` — v28 MEM-01: a CANONICAL body whose entries exceed the
+   *   CURRENT configured limit. Those bytes were written by this store under a
+   *   previous (higher) limit, so they are not external drift; treating them as
+   *   such misattributed a config change to an "external editor" and bricked
+   *   every write path (the advertised recovery — remove/consolidate — is
+   *   exactly what the drift gate refused). Callers route this state to a
+   *   config-naming refusal and let shrink-only batches through.
+   * - `null` — no drift: writable as-is.
+   *
    * @param target - memory target whose char limit bounds one parsed entry
    * @param raw - on-disk body, or `null` when the file does not exist
-   * @returns whether these bytes count as externally drifted
    */
-  private drifted(target: MemoryTarget, raw: string | null): boolean {
-    if (raw === null || raw.trim() === '') return false
+  private driftKind(target: MemoryTarget, raw: string | null): 'external' | 'over-limit' | null {
+    if (raw === null || raw.trim() === '') return null
     const entries = normalizeEntries(raw)
+    if (render(entries) !== raw) return 'external'
     const limit = this.limitFor(target)
-    // Second drift signal (Hermes parity, `_detect_external_drift` signal #2):
-    // one parsed entry larger than the store's whole-file limit means an
-    // external writer appended free-form content — a tool-written entry can
-    // never exceed the whole-store budget. Refusing (with backup) instead of
-    // letting a flush truncate it. A zero/negative limit means "unbounded".
-    if (limit > 0 && entries.some(entry => entry.length > limit)) return true
-    return render(entries) !== raw
+    // A zero/negative limit means "unbounded".
+    if (limit > 0 && entries.some(entry => entry.length > limit)) return 'over-limit'
+    return null
+  }
+
+  /** External-drift predicate: canonical-form violations only (see
+   * {@link driftKind}). `detectDrift` and the write paths share it, so a write
+   * and a later read never disagree about the same bytes. */
+  private drifted(target: MemoryTarget, raw: string | null): boolean {
+    return this.driftKind(target, raw) === 'external'
   }
 
   /**
    * Drift refusal for a body already read under the write lock, or `null` when
-   * the body is canonical. Both write paths return this unchanged, so their
+   * writing may proceed. Both write paths return this unchanged, so their
    * refusals stay byte-identical and each carries the same backup.
+   *
+   * The `'over-limit'` state never refuses shrink-only batches (`shrinkOnly`):
+   * removing entries is the advertised recovery for a limit lowered under
+   * existing content, and the batch's own final limit check still gates the
+   * result.
    *
    * @param target - memory target that owns the drifted file
    * @param raw - locked file body
+   * @param shrinkOnly - every queued operation removes an entry (no growth)
    * @returns the refusal to hand back, or `null` to continue writing
    */
-  private async driftRefusal(target: MemoryTarget, raw: string): Promise<MemoryApplyResult | null> {
-    if (!this.drifted(target, raw)) return null
+  private async driftRefusal(target: MemoryTarget, raw: string, shrinkOnly = false): Promise<MemoryApplyResult | null> {
+    const kind = this.driftKind(target, raw)
+    if (kind === null) return null
+    if (kind === 'over-limit') {
+      if (shrinkOnly) return null
+      const limit = this.limitFor(target)
+      const entries = normalizeEntries(raw)
+      const over = entries.filter(entry => entry.length > limit).length
+      return {
+        ok: false,
+        message: `${over} memory ${over === 1 ? 'entry exceeds' : 'entries exceed'} the configured ${target}CharLimit (${limit}); they were written under a higher limit. Raise the limit or remove entries — remove operations stay available.`,
+        entries,
+        chars: entries.join(ENTRY_DELIMITER).length,
+        limit,
+      }
+    }
     const backup = await this.backupFile(target)
     const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
     return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
@@ -441,7 +502,12 @@ export class MemoryStore {
 
   private async applyBatchChained(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
     if (operations.length === 0) return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
-    return await this.chainedWrite(target, async raw => await this.applyBatchCore(target, operations, raw))
+    // v28 MEM-01: remove-only batches are the recovery path for the
+    // 'over-limit' state (canonical body under a lowered limit) — the drift
+    // gate lets them through; grows still refuse with the config-naming text.
+    // v29 MEM-02: they also bypass the oversized read-guard (see chainedWrite).
+    const shrinkOnly = operations.every(op => op.action === 'remove')
+    return await this.chainedWrite(target, async raw => await this.applyBatchCore(target, operations, raw, shrinkOnly), shrinkOnly)
   }
 
   /** Batch RMW inside the transaction. `write: null` = failure/no-op, disk untouched. */
@@ -449,10 +515,11 @@ export class MemoryStore {
     target: MemoryTarget,
     operations: MemoryOperation[],
     raw: string,
+    shrinkOnly = false,
   ): Promise<{ result: MemoryApplyResult; write: string | null }> {
     // The oversized guard runs pre-transact in applyBatch(); drift is derived
     // from the locked view below.
-    const refusal = await this.driftRefusal(target, raw)
+    const refusal = await this.driftRefusal(target, raw, shrinkOnly)
     if (refusal) return { result: refusal, write: null }
     const entries = [...new Set(normalizeEntries(raw))]
     const working = [...entries]

@@ -40,7 +40,10 @@ export interface ReplayPlan {
 
 export interface ReplayResult {
   winner: string | null
-  margin: number
+  /** v28 G4.4 (RPL-01): `null` when fewer than two plans were recorded — a
+   * single plan has no runner-up, and reporting its FULL score as a "margin"
+   * read as "won by N points" over nothing. Consumers must null-check. */
+  margin: number | null
   plans: ReplayPlan[]
   report: string
 }
@@ -101,17 +104,21 @@ function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): 
 }
 
 export function comparePlans(plans: ReplayPlan[], weights: ReplayWeights = DEFAULT_WEIGHTS): ReplayResult {
-  if (plans.length === 0) return { winner: null, margin: 0, plans, report: 'No plans to compare.' }
+  if (plans.length === 0) return { winner: null, margin: null, plans, report: 'No plans to compare.' }
   const scored = plans.map(plan => ({ plan, score: scorePlan(plan, weights) })).sort((a, b) => b.score - a.score)
   const winner = scored[0]
-  if (!winner) return { winner: null, margin: 0, plans, report: 'No plans to compare.' }
+  if (!winner) return { winner: null, margin: null, plans, report: 'No plans to compare.' }
   const runnerUp = scored[1]
-  const margin = runnerUp ? winner.score - runnerUp.score : winner.score
+  // v28 G4.4 (RPL-01): one plan recorded → no comparison happened; the old
+  // `margin = winner.score` published the absolute score in a field whose
+  // only other meaning is a DIFFERENCE. Null it and say so in the report.
+  const margin = runnerUp ? winner.score - runnerUp.score : null
+  const singleNote = runnerUp ? '' : '\n(single plan recorded — margin is not a comparison)'
   return {
     winner: winner.plan.policyId,
     margin,
     plans,
-    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected${(plan.executionFailures ?? 0) > 0 ? `, ${plan.executionFailures} failed${plan.executionError !== undefined ? `: ${plan.executionError}` : ''}` : ''})`).join('\n'),
+    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected${(plan.executionFailures ?? 0) > 0 ? `, ${plan.executionFailures} failed${plan.executionError !== undefined ? `: ${plan.executionError}` : ''}` : ''})`).join('\n') + singleNote,
   }
 }
 
@@ -193,11 +200,32 @@ export class EvolutionReplayDriver {
     // `scorePlan` (evidence is a scored dimension) — the exact poisoning the
     // fix claimed to close. `count` also refuses negatives: a counter cannot
     // be negative and a negative value distorts the ranking.
+    this.plans.push(this.toPlan(plan))
+    if (this.plans.length > this.maxPlans) this.plans.shift()
+  }
+
+  /**
+   * v29 RPL-02: the activity/event record → scored-plan mapping, extracted
+   * from `record` so `backfill` can place sidecar plans at the CHRONOLOGICAL
+   * head of the window instead of appending them after this boot's live plans
+   * (the old order made the FIFO evict the freshest live plan first).
+   */
+  private toPlan(plan: EvolutionPlanAppliedEvent): ReplayPlan {
+    // P3-23 (v14): the op counters arrive from a persisted session event, so a
+    // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
+    // with NaN and every score derived from it. Same finite-number discipline
+    // as the other guarded fields below.
+    // P2-2 (v15): the guard now covers ALL SIX numeric fields — the first cut
+    // left `evidenceQuotes`/`estimatedInputChars`/`executionFailures` on bare
+    // `typeof` checks, and `typeof NaN === 'number'` let them straight into
+    // `scorePlan` (evidence is a scored dimension) — the exact poisoning the
+    // fix claimed to close. `count` also refuses negatives: a counter cannot
+    // be negative and a negative value distorts the ranking.
     const count = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
     const countOr = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback)
     const memoryApplied = count(plan.memoryApplied)
     const skillApplied = count(plan.skillApplied)
-    this.plans.push({
+    return ({
       // 0.3.17 (E-76): an EMPTY policyFingerprint counts as missing — the
       // leaderboard used to show a nameless "" entry (empty-string checks pass
       // through typeof).
@@ -223,7 +251,6 @@ export class EvolutionReplayDriver {
       executionFailures: count(plan.executionFailures),
       ...typeof plan.executionError === 'string' ? { executionError: plan.executionError } : {},
     })
-    if (this.plans.length > this.maxPlans) this.plans.shift()
   }
 
   /**
@@ -243,7 +270,16 @@ export class EvolutionReplayDriver {
     // plan), then retire the tracking set.
     const fresh = items.filter(item => !this.preBackfillIds.has(item.planId))
     this.preBackfillIds.clear()
-    for (const item of fresh) this.record(item)
+    // v29 RPL-02: sidecar records are OLDER than this boot's live plans
+    // (live events recorded between listener registration and this async load
+    // landed at the tail first). Inserting them at the CHRONOLOGICAL head —
+    // oldest first — keeps the array time-ordered, so the maxPlans FIFO
+    // evicts the oldest record instead of the freshest live plan (the old
+    // append-after-live order shifted out exactly the plans a human A/B
+    // review most wants).
+    const freshPlans = fresh.map(item => this.toPlan(item))
+    this.plans.unshift(...freshPlans)
+    if (this.plans.length > this.maxPlans) this.plans.splice(0, this.plans.length - this.maxPlans)
   }
 
   /**

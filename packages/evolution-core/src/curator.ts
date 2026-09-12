@@ -48,7 +48,13 @@ export interface CuratorResult {
 
 export interface CuratorArchivedSkill {
   name: string
-  path: string
+  /** v28 G4.3 (CUR-03): the on-disk archive destination. OMITTED when the run
+   * only knows the nominal `.archive/<name>` location — consolidation sources
+   * archive through SkillLibrary.archive(), which stamps a
+   * `<name>-<stamp>[-<rand>]` suffix on collision. A synthesized path sent
+   * operators to a directory that may not exist; the real destination is on
+   * the `evolution/skill-mutated` event (`archivedPath`). */
+  path?: string
   reason: string
 }
 

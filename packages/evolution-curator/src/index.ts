@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE, resolveSkillsRoot, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
+import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SkillLibrary, SKILL_NAME_RE, resolveSkillsRoot, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -612,7 +612,9 @@ export class EvolutionCurator extends Service {
    * mover refuses a directory whose writer lock is alive), so a collision
    * degrades to a recorded failed op + snapshot rollback, never a torn
    * write. Automatic passes are kept out of the session-active window by the
-   * min-idle gate; a manual run (`ignoreGates`) bypasses that gate and is
+   * min-idle gate — checked pre-run AND re-checked at the commit boundary
+   * (v28 G4.2: a session activating mid-run no longer slips past it); a
+   * manual run (`ignoreGates`) bypasses both checks and is
    * the one realistic interleave window — documented, accepted (plan v20
    * C-3①). The same statement lives on evolution-review's `reviewInFlight`.
    */
@@ -728,7 +730,11 @@ export class EvolutionCurator extends Service {
         skipped: 'disposed',
       }
     }
-    const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
+    // v29 CUR-05: the snapshot moved BELOW the min-idle re-check — it is the
+    // rollback insurance for the mutation phase and a report field, nothing
+    // between here and there needs it, and a session-blocked run no longer
+    // mints an orphan `pre-curator-run` snapshot that churns the 5-slot
+    // retention window.
     const suppressedNames = new Set(await loadSuppressedNames(root, this.io))
     // One GateSet instance per run (decision B) shared by the lifecycle
     // engine and the merge-nomination gate below.
@@ -737,7 +743,7 @@ export class EvolutionCurator extends Service {
       referenced: this.referencedSkillNames,
       suppressed: suppressedNames,
     })
-    const { bundledNames, treeNames } = await this.seedBaseline(usage)
+    const { bundledNames, treeNames, resetToActive } = await this.seedBaseline(usage)
     // P2-5: near-duplicate groups join the recommendation candidate pool —
     // the deterministic scanner sees idle names, only the LLM sees overlap.
     const contents = new Map<string, string>()
@@ -793,6 +799,41 @@ export class EvolutionCurator extends Service {
     }
     const llmNominations = gatedNominations.prunings
     const archiveCandidates = [...new Set([...result.archive, ...llmNominations])]
+    // v28 G4.2 (CUR-02): the min-idle gate was evaluated once, before a run
+    // window that can span the LLM recommend() timeout (~120s). A session that
+    // became active AFTER that check was invisible, so the automatic pass
+    // could archive a skill the in-flight review was still writing against —
+    // contradicting the cross-layer invariant both files document. Re-check at
+    // the commit boundary; a hit skips the pass with the same structured shape
+    // as the pre-run gate (one agents.list of cost, nothing applied).
+    if (!ignoreGates && this.minIdleHours > 0 && this.recentSessionActive()) {
+      // v29 CUR-04: persist the seeded usage baseline even though the pass is
+      // skipped. `seedBaseline` stamped fresh `created_at` anchors for skills
+      // absent from the sidecar; discarding them made a busy host (every tick
+      // inside minIdleHours) re-seed a NEWER created_at on every attempt, so
+      // those skills could never reach staleAfterDays. Set-if-absent only —
+      // existing on-disk records are untouched. Best-effort: a persist failure
+      // downgrades to a warn (the next run re-seeds identically).
+      if (!dryRun) {
+        try {
+          await mutateUsage(root, this.io, (map) => {
+            for (const [name, record] of usage) {
+              if (!map.has(name)) map.set(name, { ...record })
+            }
+          })
+        } catch (error) {
+          this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
+        }
+      }
+      // No `pre-curator-run` snapshot on the blocked path (v29 CUR-05): the
+      // report simply carries none, matching the other pre-run gate skips.
+      return {
+        stale: [], archived: [], errors: [],
+        report: this.skippedReport(runId, startedAt),
+        skipped: 'active-session',
+      }
+    }
+    const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
     const { archivedSkills, errors, consolidated } = await this.applyMutations({
       dryRun,
       archiveCandidates,
@@ -807,12 +848,22 @@ export class EvolutionCurator extends Service {
       // the transitions engine mutates the snapshot (state='stale'/'archived'/
       // 'active'), and a concurrent curator run's archive/restore must never be
       // reverted by a stale snapshot.
-      stateOwned: new Set([...result.transitions.map(t => t.name), ...archiveCandidates]),
+      // v31 SNAP-02: the seedBaseline archived→active resets are THIS run's
+      // durable changes — folding them (CAS expected 'archived' == disk
+      // 'archived') makes the stranding self-heal reach the sidecar instead
+      // of dying with the run's memory.
+      stateOwned: new Set([...result.transitions.map(t => t.name), ...archiveCandidates, ...resetToActive]),
       // A2-4 (v18): the CAS basis for the lifecycle fold (see runStartStates).
       runStartStates,
       failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
     })
-    if (!dryRun) this.lastRun = Date.now()
+    // v28 G4.1 (CUR-01): a disposed mid-run must not anchor the durable
+    // schedule as if the pass had completed — the aborted-run bookkeeping used
+    // to push lastRunAt a full intervalHours (default 168h) into the future,
+    // so the skipped work was never re-run. The rerun is idempotent (E-15);
+    // an aborted pass leaves lastRun/lastRunAt/runCount untouched.
+    const runAborted = errors.some(error => error.startsWith('run aborted'))
+    if (!dryRun && !runAborted) this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
     const report = buildCuratorRunReport({
       runId,
@@ -888,8 +939,11 @@ export class EvolutionCurator extends Service {
           // baseline at the run's OWN time, not the process-construction clock
           // (`this.lastRun`); take Date.now() at the save point. A dry-run is a
           // preview: it must not push the next scheduled pass out.
-          lastRunAt: dryRun ? (persisted?.lastRunAt ?? this.lastRun) : Date.now(),
-          runCount: dryRun ? (persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
+          // v28 G4.1 (CUR-01): an aborted run anchors at the PREVIOUS pass
+          // (or construction time) and does not tick runCount — the skipped
+          // work must be re-runnable at the next check, not a full interval later.
+          lastRunAt: dryRun || runAborted ? (persisted?.lastRunAt ?? this.lastRun) : Date.now(),
+          runCount: dryRun || runAborted ? (persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
           lastSummary: summary,
           paused: pausedNow,
         }
@@ -912,9 +966,13 @@ export class EvolutionCurator extends Service {
    * become known candidates only when prune-builtins opts them in. Also
    * returns the full active tree names for nomination validation.
    */
-  private async seedBaseline(usage: UsageMap): Promise<{ bundledNames: Set<string>; treeNames: Set<string> }> {
+  private async seedBaseline(usage: UsageMap): Promise<{ bundledNames: Set<string>; treeNames: Set<string>; resetToActive: Set<string> }> {
     const bundledNames = new Set<string>()
     const treeNames = new Set<string>()
+    // v31 SNAP-02: names whose record said `archived` while their directory is
+    // LIVE in the tree — the reset must reach the sidecar (see the fold below)
+    // or the stranding it heals persists forever.
+    const resetToActive = new Set<string>()
     for (const summary of await this.skills.list()) {
       treeNames.add(summary.name)
       if (!usage.has(summary.name)) usage.set(summary.name, emptyRecord())
@@ -923,9 +981,22 @@ export class EvolutionCurator extends Service {
       // the usage record before the lifecycle gate reads it (a marker or a
       // stale mirrored `pinned: true` used to diverge from the gate).
       const record = usage.get(summary.name)
+      // v30 SNAP-01: a record must never stay `archived` while its directory
+      // is LIVE in the tree. That shape arises from the snapshot/mover races
+      // (a mixed-generation rollback restores the tree while the sidecar
+      // record reads archived) and from any missed archive-move; the lifecycle
+      // engine excludes archived records from every candidate pool, so the
+      // skill was stranded forever — never staled, scored, or nominated — and
+      // E-15 heals only the inverse (record-active/dir-missing). Reset the
+      // pair and let the lifecycle re-evaluate the skill normally.
+      if (record?.state === 'archived') {
+        record.state = 'active'
+        record.archived_at = null
+        resetToActive.add(summary.name)
+      }
       if (record) record.pinned = await this.skills.isPinned(summary.name)
     }
-    return { bundledNames, treeNames }
+    return { bundledNames, treeNames, resetToActive }
   }
 
   /**
@@ -993,7 +1064,7 @@ export class EvolutionCurator extends Service {
     /** A2-4 (v18): run-start lifecycle state per name, the CAS basis for the fold. */
     runStartStates?: ReadonlyMap<string, string>
   }): Promise<{
-    archivedSkills: Array<{ name: string; path: string; reason: string }>
+    archivedSkills: CuratorArchivedSkill[]
     errors: string[]
     suppressedChanged: boolean
     consolidated: CuratorConsolidation[]
@@ -1002,7 +1073,9 @@ export class EvolutionCurator extends Service {
     const { archiveCandidates, nominations, treeNames, usage, bundledNames, suppressedNames, root, failedFrom } = input
     const runStartStates = input.runStartStates
     const errors: string[] = []
-    const archivedSkills: Array<{ name: string; path: string; reason: string }> = []
+    // v28 G4.3 (CUR-03): the shared type keeps `path` optional — a
+    // consolidation source has no trustworthy local path.
+    const archivedSkills: CuratorArchivedSkill[] = []
     const executedConsolidations: CuratorConsolidation[] = []
     let suppressedChanged = false
     // Delta set (rc.52 regression review): the save below must merge only the
@@ -1047,6 +1120,12 @@ export class EvolutionCurator extends Service {
           record.state = 'archived'
           record.archived_at = record.archived_at ?? new Date().toISOString()
           stateOwned.add(name)
+          // v33 R2-2: OBSERVABILITY - this branch assumed the archive rename
+          // had already landed (E-15's crash-window premise). Since REG-01 the
+          // list() skips a dir-on-SKILL.md skill without the dir being gone,
+          // so a hit here can also mean a STRANDED live directory that will
+          // never re-enter the lifecycle. Say so instead of folding silently.
+          this.ctx.logger.warn(`evolution-curator: skill "${name}" left the tree without an archive move - its usage record was folded to archived; if the directory is still on disk, repair or remove it manually (it will not re-enter the lifecycle while the record is archived)`)
         }
         // F-330 (0.3.26, v4 V4-02): the old guard checked `bundledNames.has(name)`,
         // but `bundledNames ⊆ treeNames` is a construction invariant (both are
@@ -1183,10 +1262,12 @@ export class EvolutionCurator extends Service {
       }
       alreadyArchived.add(nomination.from)
       executedConsolidations.push({ from: nomination.from, into: nomination.into })
-      // Approximate recovered location: the exact archive dir may carry a
-      // stamp suffix, but consolidated.path points at the TARGET, not the
-      // archived source, so it must not be reported as the source's path.
-      archivedSkills.push({ name: nomination.from, path: join(this.skills.root, '.archive', nomination.from), reason: `Consolidated into ${nomination.into}` })
+      // v28 G4.3 (CUR-03): no fabricated path. The consolidation flow points
+      // `path` at the TARGET; the source's real archive dir is chosen by
+      // SkillLibrary.archive() with a stamp suffix on collision, so the
+      // nominal `.archive/<name>` used to name a directory that may not
+      // exist. Omit the field and point at the event that carries the truth.
+      archivedSkills.push({ name: nomination.from, reason: `Consolidated into ${nomination.into} (exact archive path: the evolution/skill-mutated event, archivedPath)` })
     }
     if (suppressedChanged) {
       try {

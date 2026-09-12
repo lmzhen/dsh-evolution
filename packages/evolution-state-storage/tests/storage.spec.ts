@@ -69,3 +69,27 @@ describe('evolution-state-storage', () => {
     expect(ctx.evolutionStateStorage.hasProviders()).toBe(false)
   })
 })
+
+it('v28 G3.1 (STATE-04): an un-pinned selection over 2+ providers warns once; a pinned one never warns', async () => {
+  const ctx = new Context()
+  await ctx.plugin(EvolutionStateStorageRegistry)
+  const warns: string[] = []
+  const registry = ctx.evolutionStateStorage as unknown as {
+    registerProvider(p: ReturnType<typeof provider>): () => void
+    provider(n?: string): { name: string }
+    ctx: { logger?: { warn(m: string): void } }
+  }
+  registry.ctx.logger = { warn: (m: string) => warns.push(m) }
+  registry.registerProvider(provider('json'))
+  registry.registerProvider(provider('domain'))
+  // Un-pinned selection: warns ONCE, names the effective provider and the pin escape hatch.
+  expect(registry.provider().name).toBe('json')
+  expect(registry.provider().name).toBe('json')
+  expect(warns).toHaveLength(1)
+  expect(warns[0]).toContain('2 providers registered')
+  expect(warns[0]).toContain('"json"')
+  expect(warns[0]).toContain('Pin config')
+  // A pinned selection takes the named branch and never warns.
+  registry.provider('domain')
+  expect(warns).toHaveLength(1)
+})

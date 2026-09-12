@@ -253,3 +253,28 @@ describe('evolution event log (rc.68)', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
+
+it('v31 EVENTS-01: a rotation whose archive name collides MERGES both seq bands instead of overwriting', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-collide-'))
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  // Simulate the post-rollback state: archives events-2.json (seq 1..2) and
+  // events-4.json (seq 3..4) exist, while the ACTIVE log rolled back to
+  // seqs 1..2 (4 records, rotateAt 4). The next rotation's computed name —
+  // events-4.json (anchor = tail[0].seq 5 - 1 = 4) — collides with the
+  // existing 3..4 band.
+  const mk = (seq: number, type: string) => ({ seq, type })
+  await io.writeText(join(root, 'events-2.json'), JSON.stringify({ version: 1, events: [mk(1, 'feedback'), mk(2, 'feedback')] }))
+  await io.writeText(join(root, 'events-4.json'), JSON.stringify({ version: 1, events: [mk(3, 'feedback'), mk(4, 'feedback')] }))
+  await io.writeText(path, JSON.stringify({ version: 1, events: [mk(1, 'feedback'), mk(2, 'feedback'), mk(3, 'feedback'), mk(4, 'feedback')] }))
+  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })
+  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'y', kind: 'skill', rating: 'positive' })
+  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'z', kind: 'skill', rating: 'positive' })
+  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'w', kind: 'skill', rating: 'positive' })
+
+  const timeline = await readEvolutionEvents(io, path)
+  const seqs = timeline.events.map(event => event.seq).sort((a, b) => a - b)
+  // The 3..4 band must survive the collision (merged, not overwritten).
+  expect(seqs).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})

@@ -160,3 +160,30 @@ describe('evolution-replay', () => {
     expect(driver.plansSnapshot().filter(entry => entry.policyId === 'pre-1')).toHaveLength(1)
   })
 })
+
+it('v28 G4.4 (RPL-01): a single plan yields margin null and an explicit no-comparison note', () => {
+  const result = comparePlans([
+    { policyId: 'only', acceptedOps: 3, rejectedOps: 0, memoryOps: 1, skillOps: 1, evidenceQuotes: 2, estimatedInputChars: 1000 },
+  ])
+  expect(result.winner).toBe('only')
+  expect(result.margin).toBeNull()
+  expect(result.report).toContain('single plan recorded')
+  // No plans at all: same null margin discipline.
+  expect(comparePlans([]).margin).toBeNull()
+})
+
+it('v29 RPL-02: backfilled (older) sidecar plans land at the chronological head, so maxPlans evicts the oldest', () => {
+  const driver = new EvolutionReplayDriver({ maxPlans: 3 })
+  // A live plan lands between listener registration and the async backfill.
+  driver.record({ sessionId: 's', planId: 'live-1', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+  // The sidecar backfill brings OLDER plans (sidecar order: oldest first).
+  driver.backfill([
+    { sessionId: 's', planId: 'old-1', at: 1, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 },
+    { sessionId: 's', planId: 'old-2', at: 2, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 },
+  ])
+  // One more live plan: the FIFO must now evict the OLDEST record (old-1),
+  // not the freshest live plan (the pre-fix order shifted out live-1).
+  driver.record({ sessionId: 's', planId: 'live-2', memoryApplied: 2, skillApplied: 0, rejectedOps: 0 })
+  const ids = driver.plansSnapshot().map(plan => plan.policyId)
+  expect(ids).toEqual(['old-2', 'live-1', 'live-2'])
+})

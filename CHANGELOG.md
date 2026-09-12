@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.3.69 (patch) — v28–v32 五轮审计闭环（12×P1 + ~70×P2）+ 发布链加固 + REV-06(b) 基线刷新修正
+
+> **范围**：v28→v32 五轮"审计-修复"循环（26 路次分片 + 主代理逐项复核），依据 `dsh-evolution-mirror-audit-report-v28..v32.md`；另含本版提交前的独立复核修正。
+> **发布门禁（本版实测）**：`vitest` 110 文件 / 1059 用例全绿；`tsc -b tsconfig.host.json` 0 错；`oxlint` 0/0；四守卫全 exit 0；负载敏感锁组 17/17 @ pinned 4 worker。
+> **如实标注**：P1 表中的 REG-02 与 F-1 两行，其缺陷**由本批自身引入后又在同批修回**（v31 INST-03 给 agent 模式新增 journal 写入才产生 REG-02 的 ENOENT；v31 INST-07 给 `ensureProfile` 加 `existsSync` 门才产生 F-1），不是 0.3.68 基线里的既有缺陷；STATE-03 为纯文档修正。
+
+### 提交前独立复核修正
+
+- **REV-06(b) 基线刷新点错位（真实缺陷）**：原实现把 pre-run 哈希基线刷在"自己的比较"之前、且**即使该 op 被判 stale 也刷**。后果 A：同计划第二步（rewrite→adjust）仍被误判 stale；后果 B（更严重）：被拒的那一步把基线**改成并发写入者的字节**，后续 op 比较相等而被放行 → 覆盖并发写，正是 REV-06(b) 要消灭的"双写都成功"。现改为**只在本计划真正落地的写之后**、按盘上字节刷新；并发写落在两步之间仍被拒。
+- **注释损坏修复**：`evolution-review/tests/anchored-smoke.spec.ts` 的 11 处 em-dash 曾被写成 GBK 误读形态（`鈥?`）并把注释行并成一行，已修回；两侧树扫描无残留。
+- **诊断一致性**：`doctor` 的 profile 清单解析失败不再静默吞掉（原为"枚举失败 fail-closed、单文件解析 fail-open"的不一致：截断的清单会让双挂载门禁 fail-open）；`install-layered.mjs` 的块缩进与其所属 `if (needsAgent)` 对齐（**纯排版**——括号嵌套本就正确，不是行为修复）。
+- **覆盖补充**：`packages/scripts/*.mjs` 的 5 处发布链修复与 REV-06(b) 判别用例在本版补齐（原 `TEST-01` 对 REV-06(b) 是空转的：它实际由 REV-01 的锚检查拦下）。
+
+### v28 批次（P1=3 / P2=22）
+
+### 行为变化需知
+- **memory 降限不再冻结**（v28 MEM-01）：调低 `memoryCharLimit`/`userCharLimit` 后，store 自己写入的历史长条目不再被误报为"外部漂移"；增长类操作得到点名配置的拒绝文案，remove/纯收缩 batch 保持可用（自愈通道恢复）。非规范形的外部改动仍照旧拒绝并备份（Hermes 信号 #2 仅作用于非规范形）。
+- **`/evolution preset install` 前置互斥**（v28 CMD-03）：home 内任一 profile 已挂 `evolution-all` 或 `evolution-preset` bundle 时拒绝安装分层预设（此前与 install-layered 的排他口径不一致，写完预设才在下次启动 fail-loud）。
+- **state provider 多注册告警**（v28 STATE-04）：未 pin 且注册了 2+ 个 state provider 时，未定选择点发出一次性命名警告（有效 provider=注册序；另一 provider 的现存状态不可见）。
+- **curator 中止不推进调度**（v28 CUR-01）：dispose 中止的运行不再把 `lastRunAt`/`runCount` 当完成推进——被跳过的工作在下一个检查点即可重跑（E-15 幂等），而不是等满 `intervalHours`（默认 168h）。
+- **curator 提交前复核 min-idle**（v28 CUR-02）：自动 pass 在 `applyMutations` 前复核会话活跃，命中即以 `skipped:'active-session'` 收尾；跨层"自动 pass 不进活跃窗"的注释此后为真。
+- **curator 报告不再编造归档路径**（v28 CUR-03）：consolidation 来源的 `archived[].path` 在无法确定（碰撞带 stamp）时**省略**，reason 指向 `evolution/skill-mutated` 事件的 `archivedPath`。
+- **replay 单计划 margin=null**（v28 RPL-01）：只有一条计划时不再把绝对分当"领先分"，报告附"single plan recorded"说明。
+- **命令面异常翻译**（v28 CMD-01）：`/evolution` 与 `/graph` 的 handler 顶层各有一道 try/catch，任何服务层异常（状态文件隔离、暂态 IO）转为结构化 `kind:'error'` + 下一步指引，不再裸抛给平台 dispatcher。
+- **脱敏扩展**（v28 REDACT-01/02）：PEM 私钥块整段遮蔽；`api_key:` 换行缩进取值的块式形态被遮蔽（此前多行凭据原样出站）。
+
+### 修复（择要）
+- state-json：cap 驱逐的归档凭据与活表驱逐**同生共死**——追加失败时补偿合流回活表，堵死"legacy 孪生复活→已解决写被重放"的窗口（v28 STATE-01）；合法 JSON 但形状错误的归档文件改走 C-9 隔离，不再被静默覆盖（STATE-01b）。
+- approval：`doApprove` 的 resolve 纳入保护——resolve 抛错时报告"效果已落地、审计行留在 executing"，不再抛裸异常（APPR-01）。
+- skill-store：update/patch 的归档竞态共享补偿清理——不再留下永久阻塞 `restoreFromArchive` 的幽灵目录（EVO-IO-02）；`restoreLatestSnapshot` 双 pre-clear 拒绝改为"树未动、无需手动抢救"的口径（CORE-SK-03）；`committed` 谓词收敛到 `isCommittedWarning` 单源（EVO-IO-05）；删除零调用导出 `frontmatterYamlUnsafeValues`（CORE-DEAD-01）。
+- frontmatter：快速路径补 YAML 1.2 core 数字形态（hex/octal/指数/`.inf`/`.nan`），catalogInvalid 不再假阴性（CORE-SK-01）；BOM/混合换行的不可检出块 fail-closed（CORE-SK-02）。
+- io：ticket sweep 阈值统一到 `TICKET_STALE_MS`（EVO-IO-04）；G1.2 假不变量注释改写为真实保护链描述（EVO-IO-03）。
+- usage：未知 per-record 字段在 RMW 往返中穿透保留（USAGE-01）；`selectPendingOverflow` 文档按可实现语义修正（STATE-03）。
+- policy：`tools.guard` 改用上游 `ToolGuard` 真型（UP-01）；29 个 `invariant.ts` 模板写明生产语义约定（UP-02）。
+- 守卫：`run-load-sensitive.mjs` 支持 dev/flat 双布局（G-01）。
+
+### v29-v32 批次（P1=9 / P2≈48）
+
+- **v29**：LIST-01（`SkillLibrary.list()` 被单个 EISDIR/暂态读取失败整体击穿）→ 只吸收 EISDIR、其余响亮失败；STATE-05（归档追加失败后 legacy 孪生复活为可领取 pending）→ 驱逐与追加在事务内同生共死；MEM-02 shrinkOnly 载荷 64MB 上限。
+- **v30**：REV-01（审查直写通道整内容更新不校验 staleness 锚，并发前台 patch 被静默覆盖）→ 执行前重读字节比对锚、失配拒绝；REV-02/04（policy 快照经 optional 边界读取、protected 直写拒绝）；CUR-04 blocked-run 基线持久化。
+- **v31**：REDACT-03（块式脱敏漏掉全部带连接前缀的凭据键，如 AWS_SECRET_ACCESS_KEY，实测泄漏）→ 补连接前缀组；INST-01（install-layered 就地非原子写 profile 清单，崩溃即砖 profile）→ 五处调用点 tmp+rename 原子写 + 解析失败告警；INST-05（`--scope --version` 把下一个 flag 当值、裸 `--otp` 把下一个 flag 当 OTP）→ 显式守卫；INST-02（staging 的 `.tgz` 被拷进用户 profile）→ 过滤。
+- **v32**：REV-06(a)（失败的技能读取也计入\u201c已读\u201d）→ call/result 配对且 `isError !== true` 才计入；REV-06(b)（锚绑定在 staging 而非读取时刻）→ executePlan 循环内 pre-run 哈希对比（其基线刷新点错位在本版修正）；REG-02/F-1（本批自造并自填，见如实标注）；UP-01/UP-02（policy 改用上游 `ToolGuard` 真型；29 个 invariant.ts 写明生产语义约定）；PROMPT-01（纠正 `verifyPromptBundle` 作用域措辞，PROMPT_BUNDLE_VERSION 16→17）。
+
 ## 0.3.68 (patch) — v27 三轮批次闭环：12×P1 + 52×P2 处置 + 四条新门禁 + 测试类型检查接通
 
 > **范围**：v27 全量审计（P0=0 / P1=12 / P2=52）按 `dsh-evolution-mirror-optimization-plan-v27.md` 的批次 1（G0 止血，5 步）、批次 2（G1+G2+G4，13 步）、批次 3（G3+G5+G6+G7+G8，19 步）全部落地；另处置审计列为 P2/suspect 的 CC-4 / M-07 / S4 / INS-04 / INS-05 五项。

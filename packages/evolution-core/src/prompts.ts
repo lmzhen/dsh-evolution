@@ -12,8 +12,13 @@
  * platform's index cap), and DSH-only additions are marked as such.
  *
  * Every prompt is pinned in a versioned bundle. Review workers verify the
- * bundle digest before spending a model call, so a partially-patched
- * deployment fails closed instead of silently running a truncated prompt.
+ * bundle digest before spending a model call — v31 PROMPT-01, stated
+ * precisely: THAT check proves internal coherence (id/version/digest agree)
+ * for a bundle assembled OUT of process and handed to `verifyPromptBundle`
+ * explicitly. It CANNOT detect in-process tampering (the digest is recomputed
+ * from the same module state it verifies) — catching a stale or partially
+ * patched default bundle is CI's version pin (tests/prompts.spec.ts), not
+ * this runtime gate.
  */
 import { createHash } from 'node:crypto'
 
@@ -22,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 16
+export const PROMPT_BUNDLE_VERSION = 17
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -48,7 +53,7 @@ Signals to look for (any one of these warrants action):
   • Non-trivial technique, fix, workaround, debugging path, or tool-usage pattern emerged that a future session would benefit from. Capture it.
   • A skill that got loaded or consulted this session turned out to be wrong, missing a step, or outdated. Patch it NOW.
 
-Read-before-write (enforced by this channel): update, patch, delete, or write support files ONLY into skills you loaded or read in THIS session — ops on unread skills are dropped; CREATE of a brand-new umbrella is the only exception.
+Read-before-write: update, patch, delete, or write support files ONLY into skills you loaded or read in THIS session. On the plan channel ops on unread skills are rejected; direct writes have no such guard, so treat the rule as binding. CREATE of a brand-new umbrella is the only exception.
 
 Preference order — prefer the earliest action that fits, but do pick one when a signal above fired:
   1. UPDATE A CURRENTLY-LOADED SKILL. Look back through the conversation for skills the user loaded or you read. If any of them covers the territory of the new learning, PATCH that one first. It is the skill that was in play, so it's the right one to extend.
@@ -99,7 +104,7 @@ Signals that warrant a skill update (any one is enough):
   • Non-trivial technique, fix, workaround, or debugging path emerged.
   • A skill that was loaded or consulted turned out wrong, missing, or outdated — patch it now.
 
-Read-before-write (enforced by this channel): update, patch, delete, or write support files ONLY into skills you loaded or read in THIS session — ops on unread skills are dropped; CREATE of a brand-new umbrella is the only exception.
+Read-before-write: update, patch, delete, or write support files ONLY into skills you loaded or read in THIS session. On the plan channel ops on unread skills are rejected; direct writes have no such guard, so treat the rule as binding. CREATE of a brand-new umbrella is the only exception.
 
 Preference order for skills — pick the earliest that fits:
   1. UPDATE A CURRENTLY-LOADED SKILL. Check what skills were loaded or read in the conversation. If one of them covers the learning, PATCH it first. It was in play; it's the right place.

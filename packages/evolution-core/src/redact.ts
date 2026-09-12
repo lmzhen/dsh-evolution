@@ -79,6 +79,32 @@ const INLINE_ASSIGNMENT_PATTERN = new RegExp(
 // connection string stays diagnosable.
 const URL_CREDENTIALS_PATTERN = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s/@]+)@/gi
 
+// v28 G5.1 (REDACT-02): a PEM private key block is masked WHOLE (header to
+// footer). threats.ts blocks the same shape on the WRITE path
+// (`private_key_block`, SEC-3) — but the review/maintenance OUTBOUND channels
+// pass through redact only, never the threat scan, so a session that pasted a
+// key used to ship it verbatim to the second model context. The header
+// alternation mirrors threats.ts's pattern (keep the two in sync).
+// The `\\s` doubles are required: these are STRING literals feeding
+// `new RegExp`, so each backslash must survive JS string-escape processing.
+const PEM_HEAD = '-----BEGIN\\s+(?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED|PGP)\\s+)?PRIVATE\\s+KEY(?:\\s+BLOCK)?-----'
+const PEM_TAIL = '-----END\\s+(?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED|PGP)\\s+)?PRIVATE\\s+KEY(?:\\s+BLOCK)?-----'
+const PEM_PRIVATE_KEY_PATTERN = new RegExp(`${PEM_HEAD}[\\s\\S]*?${PEM_TAIL}`, 'g')
+
+// v28 G5.1 (REDACT-01): the block-style form the inline pattern cannot reach —
+// its separator `[\t ]*[:=]` and value class are same-line-only, so YAML /
+// docker-compose / kubectl-secret style
+//   api_key:
+//     wJalrXUtnFEMI…
+// crossed verbatim. This predicate matches a line that is ONLY a credential
+// key plus its mapping separator; the following INDENTED line is its value.
+// v31 REDACT-03: the key carries the same connected-prefix group as the
+// inline pattern (`AWS_SECRET_ACCESS_KEY`, `CLIENT_SECRET`, `DB_PASSWORD` —
+// A2-6's `[\w-]{0,64}[_\-]` form). Without it, every prefixed block key
+// missed the pass AND the AWS residual sweep (the underscore blocks every
+// `\b`), so the secret shipped verbatim (executed-verified leak).
+const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]{0,64}[_\-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_\-][\w-]{0,64})?)\s*:\s*$/i
+
 /**
  * Mask credential-shaped text before it crosses a session boundary.
  * @param text - the text about to be sent to a model outside this session.
@@ -93,12 +119,33 @@ export function redactSecrets(text: string): string {
   // group (the inline-assignment label prefix, the URL scheme/user) keep
   // their parts.
   let out = text
+  // v28 G5.1: PEM blocks first — the value-shape passes below only mask the
+  // well-known token prefixes, and a key body carries no marker to anchor on.
+  out = out.replace(PEM_PRIVATE_KEY_PATTERN, '<redacted-private-key>')
   for (const [, pattern] of SECRET_PATTERNS) {
     out = out.replace(pattern, '<redacted>')
   }
   out = out.replace(URL_CREDENTIALS_PATTERN, (_match, lead?: string) => `${lead ?? ''}<redacted>@`)
   out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, lead?: string, prefix?: string, key?: string, separator?: string) =>
     `${lead ?? ''}${prefix ?? ''}${key ?? ''}${separator ?? ''}<redacted>`)
+  // Line-paired passes on the split lines. Order matters: the block-style pass
+  // runs first so the `<redacted>` it plants still enables the AWS residual
+  // pass below (a 40-char secret on the block value line is already gone, but
+  // a same-line AWS pair id+secret benefits from both).
+  const lines = out.split('\n')
+  for (let i = 0; i < lines.length - 1; i++) {
+    const line = lines[i]
+    if (line === undefined || !BLOCK_KEY_ONLY_LINE.test(line)) continue
+    const next = lines[i + 1] ?? ''
+    // The value is the first non-empty indented line after the bare key.
+    // Over-masking an indented line under a credential key is acceptable for a
+    // redactor (same policy as P2-7); an unindented line is NOT the value.
+    const [, indent, value, tail] = /^([ \t]+)(\S.*?)([ \t]*)$/.exec(next) ?? []
+    if (indent === undefined || value === undefined) continue
+    if (value.includes('<redacted>')) continue
+    lines[i + 1] = `${indent}<redacted>${tail ?? ''}`
+  }
+  out = lines.join('\n')
   // v22 (SEC-4): an AWS SECRET access key is a bare 40-char base64ish run —
   // far too common in legitimate text to mask unconditionally. It is masked
   // only on a line that already shows a redaction or an aws/secret keyword

@@ -53,7 +53,12 @@ if (argv.includes('--only') && (onlyArg === undefined || onlyArg === '')) {
   throw new Error('--only requires a comma-separated package list')
 }
 const onlyNames = onlyArg ? onlyArg.split(',').map(name => name.trim()).filter(Boolean) : []
+// v31 INST-05: the other flags guard their value shape — a bare `--otp`
+// (or `--otp --dry-run`) used to hand npm the NEXT FLAG as the OTP.
 const otp = argv.includes('--otp') ? argv[argv.indexOf('--otp') + 1] : ''
+if (argv.includes('--otp') && (otp === undefined || otp === '' || otp.startsWith('--'))) {
+  throw new Error('--otp requires a value (the npm one-time password)')
+}
 
 /** V7-01 (0.3.41): `npm.cmd` with shell:false is EINVAL on Windows (Node
  * ≥18.20/20.12/22 CVE-2024-27980 hardening — install-layered.mjs already knew:
@@ -152,6 +157,8 @@ for (const name of onlyNames) {
 }
 
 const publishOrder = groupLimit === undefined ? order : order.slice(0, groupLimit)
+// v31 INST-05: a sliced rollout must not read as a full publish in the logs.
+if (groupLimit !== undefined) console.log(`publish-scoped: PARTIAL rollout — publishing the first ${publishOrder.length} of ${order.length} staged package(s) (--groups ${groupLimit})`)
 // V8-19 (0.3.48): --only × --groups — a named package beyond the sliced
 // publishOrder was silently skipped while the run still reported complete
 // (the operator believed it was published). Fail loud instead.

@@ -28,7 +28,11 @@ afterAll(() => {
   liveChildren.clear()
 })
 
-it('nodeEvolutionIo.writeText serializes concurrent writers and cleans its lock', async () => {
+it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer and cleans its lock', async () => {
+  // v32 TEST-04: a blind `writeText` cannot prove SERIALIZATION (atomic rename
+  // alone yields one complete payload even without any lock). This case pins
+  // atomicity + lock cleanup; the serialization invariant is pinned by the
+  // `transact` RMW counter cases below (which would fail on a lost update).
   const root = await mkdtemp(join(tmpdir(), 'dsh-io-lock-'))
   const io = nodeEvolutionIo()
   const target = join(root, 'shared.txt')
@@ -37,6 +41,38 @@ it('nodeEvolutionIo.writeText serializes concurrent writers and cleans its lock'
   const content = await readFile(target, 'utf8')
   expect(content).toMatch(/^writer-\d$/m)
   expect((await io.readText(`${target}.lock`))).toBeNull()
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+// v32 TEST-03: the commit-point ownership guard. A foreign claim landing on
+// the lock file BETWEEN acquisition and commit must be detected by
+// `assertOwned` (LostWriteLock) and the whole RMW must be REDONE — this is
+// the load-independent invariant that keeps cross-process writes
+// loss-free (the class that broke as EVO-IO-01). Single-process simulation:
+// the task itself corrupts the lock body once, simulating a foreign steal.
+it('a foreign lock overwrite mid-RMW is detected at the commit point and the RMW is redone', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-io-owned-'))
+  const io = nodeEvolutionIo()
+  const target = join(root, 'owned.txt')
+  let attempts = 0
+  let sawLost = false
+  const transact = io.transact
+  expect(transact).toBeTypeOf('function')
+  await transact!(target, async (current) => {
+    attempts += 1
+    if (attempts === 1) {
+      // Simulate the steal: another process took the lock and wrote its own
+      // claim (dead pid -> stealable on the retry, live enough to break the
+      // commit gate on this attempt).
+      await writeFile(`${target}.lock`, '999999:deadbeef').catch(() => {})
+      sawLost = true
+    }
+    return `${current ?? ''}x`
+  })
+  // Attempt 1 was invalidated (LostWriteLock) and the RMW ran a second time.
+  expect(attempts).toBe(2)
+  expect(sawLost).toBe(true)
+  expect(await readFile(target, 'utf8')).toBe('x')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

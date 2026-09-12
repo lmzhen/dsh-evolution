@@ -59,7 +59,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  expect(PROMPT_BUNDLE_VERSION).toBe(16)
+  expect(PROMPT_BUNDLE_VERSION).toBe(17)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {
@@ -113,12 +113,13 @@ it('channel variants carry the subagent deliverable limit (M-2)', () => {
   expect(PROMPT_BUNDLE.prompts['combinedPlan']).toBe(COMBINED_REVIEW_PLAN_PROMPT)
 })
 
-it('skill review avoids unread-skill ops with an explicit create exemption (rc.67 K-3)', () => {
-  expect(SKILL_REVIEW_PROMPT).toContain('Read-before-write (enforced by this channel)')
+it('skill review avoids unread-skill ops with an explicit create exemption (rc.67 K-3; v33 R3-F1 wording)', () => {
+  // v33 R3-F1: the enforcement claim is now channel-accurate - the plan
+  // channel rejects unread ops, direct writes carry no such guard.
+  expect(SKILL_REVIEW_PROMPT).toContain('On the plan channel ops on unread skills are rejected')
   expect(SKILL_REVIEW_PROMPT).toContain('CREATE of a brand-new umbrella is the only exception')
-  expect(COMBINED_REVIEW_PROMPT).toContain('Read-before-write (enforced by this channel)')
-  // The subagent plan variant inherits the rule verbatim (template concat).
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('Read-before-write (enforced by this channel)')
+  expect(COMBINED_REVIEW_PROMPT).toContain('On the plan channel ops on unread skills are rejected')
+  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('On the plan channel ops on unread skills are rejected')
 })
 
 it('authoring standards carry the colon-quote and privacy motive guarantees', () => {

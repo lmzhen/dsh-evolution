@@ -5,6 +5,7 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { ToolGuard } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import {
@@ -110,10 +111,12 @@ export class EvolutionPolicy extends Service {
     super(ctx, 'evolutionPolicy')
     // DSH-native monotonic guard: policy denials run after the extensible
     // pre-execute waterfall and cannot be overridden by later listeners.
+    // v28 G6.1 (UP-01): the guard function uses the upstream `ToolGuard` type
+    // (the same anchor evolution-threat adopted for P2-13) instead of a
+    // hand-written structural cast — an upstream contract change now fails
+    // this package's compile instead of silently detyping the denial.
     ctx.inject(['tools'], (toolCtx) => {
-      const tools = toolCtx.get('tools') as {
-        guard(guard: (exec: { name: string; arguments: unknown }) => string | undefined): () => void
-      }
+      const tools = toolCtx.get('tools') as { guard(guard: ToolGuard): () => void }
       toolCtx.effect(() => tools.guard(exec => this.guardReason(exec.name, exec.arguments)), 'evolution-policy.tools-guard')
     })
     // G3.1 (0.3.23): every numeric snapshot field is clamped to at least 1.

@@ -5,12 +5,12 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
+import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
-import { diagnose, renderDoctorText } from './doctor.ts'
+import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -93,7 +93,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // registration survives reload/HMR and registers /evolution twice.
     // evolution-learning-graph is the aligned precedent
     // (commandCtx.effect(() => commands.register(...))).
-    commandCtx.effect(() => commands.register({
+    // v28 G0.3 (CMD-01): the definition is hoisted to a const so `handler` can
+    // delegate to `run` — the wrapper is the ONE net for unexpected throws
+    // (a corrupt state file's quarantine, a transient IO error) which used to
+    // escape the async handler on every branch except maintain/preset. The
+    // upstream dispatcher records such a throw as a bare command/done error
+    // and rethrows; this surface's contract is a structured `{kind:'error'}`
+    // with next-step guidance instead (doctor.ts already wraps the identical
+    // `approval.list()` calls for the same reason).
+    const evolutionCommand = {
       name: 'evolution',
       description: 'Self-evolution status and approval controls',
       recordInput: false,
@@ -108,7 +116,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // T-WD2 pins the equality).
         hint: renderHint(),
       },
-      async handler(invocation: CommandInvocation) {
+      run: async (invocation: CommandInvocation): Promise<CommandResult> => {
         // V24-12 (v24): collapse internal whitespace for DISPATCH. The grammar
         // matches are single-space exact forms (`pending --detail`, `skills
         // health`, `preset install`, …), so a harmless double-space variant
@@ -132,7 +140,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (pendingMatch) {
           // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
           // mid-run) stay visible — approve will refuse to re-run them.
-          const pending = approval ? [...await approval.list('pending'), ...await approval.list('executing')] : []
+          // v29 CMD-05: the two lists come from independent provider
+          // snapshots (jointly non-atomic) — a record pending at snapshot 1
+          // and claimed executing before snapshot 2 appeared TWICE. Dedupe by
+          // id with the later snapshot (executing) winning; pending-first
+          // ordering preserved.
+          const listed = approval ? [...await approval.list('pending'), ...await approval.list('executing')] : []
+          const pending = [...new Map(listed.map(row => [row.id, row])).values()]
           if (pending.length === 0) return ok('No pending evolution writes.')
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
@@ -470,7 +484,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 // V27 M-02: the io seam lists a missing directory as empty, so
                 // the orchestrator needs this probe to tell a misconfigured root
                 // (an unexpanded `~`, a typo) from a genuinely empty library.
-                rootExists: () => ioRegistry.provider().exists(skillsRootValue),
+                // v30 LIST-02: the probe runs ONLY when the operator CONFIGURED
+                // a root — the previous wiring probed the RAW value, which is
+                // `''` under the default config, and `exists('')` is ENOENT →
+                // permanently false, so every default-deployment empty library
+                // was hard-reported as "the configured skill root does not
+                // exist" instead of the intended "nothing to do". A default
+                // (resolved) root that does not exist yet IS the genuinely
+                // empty state, so there is nothing to probe for it.
+                rootExists: skillsRootValue === '' ? undefined : () => ioRegistry.provider().exists(skillsRootValue),
                 skillRoot: skillsRootValue,
               },
               {
@@ -521,6 +543,34 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return err('Unknown maintain arguments: expected bare `maintain`, `maintain --timeout <ms>` or `maintain --timeout=<ms>` (a positive integer). Got: ' + input)
         }
         if (input === 'preset install') {
+          // v28 G3.2 (CMD-03): the same three-way mutual exclusion
+          // install-layered.mjs enforces up front, applied at the command's
+          // write boundary. Writing the preset product while the `all` bundle
+          // (or the one-click preset bundle) is mounted in ANY profile of this
+          // home double-mounts the four model rows and the next session that
+          // selects the preset fails loud at startup. Doctor reports this
+          // post-hoc; here it is refused pre-hoc. A clean host(-less) layered
+          // home is unaffected (re-installs stay idempotent).
+          {
+            // v30 CMD-06: the enumeration must not degrade silently HERE —
+            // an unreadable profiles dir would look like "no bundles" and the
+            // double-mounting install would proceed (fail-open). The gate
+            // refuses with guidance instead.
+            // v34 INST-01: a per-profile manifest that cannot be read or
+            // parsed is the same fail-open (its bundle rows become "unknown",
+            // not "absent") — both scopes refuse.
+            let installedBundles: string[]
+            try {
+              installedBundles = collectEvolutionBundles(evolutionRoot(), (error) => { throw error })
+            } catch (enumerationError) {
+              return err(`Refusing to install the layered Evolution preset: the home profile directory or one of its profile manifests could not be read (${enumerationError instanceof Error ? enumerationError.message : String(enumerationError)}) — the all/preset double-mount check could not run. Resolve access to the profiles directory and retry, or install via the layered installer, which enforces the same exclusion up front.`)
+            }
+            const allBundle = installedBundles.find(name => name === 'dsh-evolution-all' || name.endsWith('/dsh-evolution-all'))
+            const presetBundle = installedBundles.find(name => name === 'dsh-evolution-preset' || name.endsWith('/dsh-evolution-preset'))
+            if (allBundle || presetBundle) {
+              return err(`Refusing to install the layered Evolution preset: "${allBundle ?? presetBundle}" is installed in this home — its model rows (tool-memory / tool-skill-manage / tool-session-query / skill-catalog) would double-mount with the preset's and the profile fails loud at startup. Keep ONE: remove the ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'} before installing the layered preset (see /evolution doctor).`)
+            }
+          }
           // 0.3.14 (P1-1): the published install delivers the Evolution agent
           // preset package (ships agent.cordis.yml/preset.yml) as part of the
           // dependency closure, but nothing auto-copies it into
@@ -645,7 +695,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         return ok(`Evolution: memory, skills, review, curator — self-evolution status, approval and maintenance.\n${renderHelpText()}`)
       },
-    }))
+      handler: (invocation: CommandInvocation): Promise<CommandResult> =>
+        evolutionCommand.run(invocation).catch((error: unknown): CommandResult => ({
+          kind: 'error',
+          text: `evolution: command failed: ${error instanceof Error ? error.message : String(error)}\nRun /evolution doctor to inspect services and state files; a corrupted state file is quarantined as <file>.corrupt for inspection.`,
+        })),
+    }
+    commandCtx.effect(() => commands.register(evolutionCommand))
   })
 }
 

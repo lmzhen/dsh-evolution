@@ -271,7 +271,39 @@ async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionE
   if (tail.length === 0) return events
   const anchor = tail[0]?.seq ?? 0
   const archivePath = join(dirname(path), `${EVENT_ARCHIVE_PREFIX}${anchor - 1}.json`)
-  await io.writeText(archivePath, JSON.stringify({ version: EVENT_LOG_VERSION, events: head }, null, 2))
+  // v31 EVENTS-01: after a manual active-file rollback the recomputed archive
+  // name can COLLIDE with an existing archive holding a DIFFERENT seq band —
+  // the old in-place write destroyed that band silently (feedback/learn/usage
+  // history gone while every reader reported a coherent timeline). Merge the
+  // two generations instead: both bands survive, overlapping seqs dedupe.
+  let archived = head
+  const existing = await io.readText(archivePath).catch(() => null)
+  if (existing !== null) {
+    try {
+      const parsed = JSON.parse(existing) as { events?: Array<{ seq?: number }> }
+      const prior = (Array.isArray(parsed.events) ? parsed.events : []) as EvolutionEvent[]
+      // v33 F-3: the merge validates like every reader does - a collision
+      // archive with damaged entries must not re-persist junk into the
+      // canonical band (isEventRecord is the same filter the timeline uses).
+      const usablePrior = prior.filter(isEventRecord)
+      const bySeq = new Map(usablePrior.map(event => [event.seq, event]))
+      for (const event of head) bySeq.set(event.seq, event)
+      archived = [...bySeq.values()].sort((a, b) => a.seq - b.seq)
+    } catch {
+      // An unparsable collision file must not be destroyed: shift this
+      // rotation's head aside under a distinct name instead. v31 EVENTS-02:
+      // the shift-aside is OBSERVABLE (the band leaves the logical timeline —
+      // the collide name matches no archive reader) and PRUNABLE (the old
+      // silent form accumulated without bound).
+      const shiftPath = `${archivePath}.${Date.now()}.collide`
+      await io.writeText(shiftPath, JSON.stringify({ version: EVENT_LOG_VERSION, events: head }, null, 2))
+      console.warn(`evolution-events: rotation hit an unparsable archive collision — the rotated head band was preserved at ${shiftPath} but is OUTSIDE the logical timeline; inspect and merge it manually`)
+      await retainEventArchives(io, path)
+      await pruneCollideArchives(io, path)
+      return tail
+    }
+  }
+  await io.writeText(archivePath, JSON.stringify({ version: EVENT_LOG_VERSION, events: archived }, null, 2))
   await retainEventArchives(io, path)
   return tail
 }
@@ -289,6 +321,42 @@ export async function retainEventArchives(io: EvolutionIoLike, path: string): Pr
   const excess = names.slice(0, Math.max(0, names.length - EVENT_LOG_RETAIN_ARCHIVES))
   for (const name of excess) {
     await io.remove(join(dir, name)).catch(() => {})
+  }
+}
+
+/** v31 EVENTS-02: prune shift-aside collision files (`events-*.json.<ts>.collide`)
+ * after the same 7-day window the `.corrupt` sweep uses. They are write-once
+ * recovery artifacts no reader accepts; without a sweep they accumulated
+ * without bound across rollback episodes. No mtime probe → keep (fail-safe). */
+const COLLIDE_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+async function pruneCollideArchives(io: EvolutionIoLike, path: string): Promise<void> {
+  const dir = dirname(path)
+  let names: string[]
+  try {
+    names = await io.list(dir)
+  } catch {
+    return
+  }
+  const now = Date.now()
+  for (const name of names) {
+    if (!name.endsWith('.collide') || !name.startsWith('events-')) continue
+    const full = join(dir, name)
+    const stamp = name.match(/\.(\d{13})\.collide$/)
+    if (stamp && now - Number(stamp[1]) < COLLIDE_AGE_MS) continue
+    if (!stamp) {
+      // v33 F-2: the no-stamp branch is FAIL-SAFE BY CONTRACT - an unknown
+      // collision artifact (no readable mtime, absent mtime probe) is KEPT,
+      // never destroyed. A rejecting mtime is contained here so housekeeping
+      // cannot abort the event append.
+      try {
+        const mtime = await io.mtime?.(full)
+        if (typeof mtime === 'number' && now - mtime < COLLIDE_AGE_MS) continue
+      } catch {
+        continue
+      }
+    }
+    await io.remove(full).catch(() => {})
   }
 }
 

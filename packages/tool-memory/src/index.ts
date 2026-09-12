@@ -178,6 +178,25 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     })) {
       return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
     }
+    // v30 TSM-03: field-level guards mirroring tool-skill-manage's scalar
+    // guard. The approval replay runner executes STORED args with no schema:
+    // a garbage STRING `target` (e.g. "memori") used to retarget the write
+    // to USER.md silently (fileFor maps anything ≠ 'memory' to the user
+    // profile), and non-string facts/old_text escaped as bare TypeErrors
+    // from inside the store.
+    // `unknown`-typed alias: the runtime value may violate the declared
+    // union (the replay channel executes stored args without a schema), so
+    // the comparison below must stay a REAL guard.
+    const target: unknown = normalized.target
+    if (target !== 'memory' && target !== 'user') {
+      return { ok: false, message: `memory: "target" must be "memory" or "user" (got ${String(target)}); refusing the write.`, entries: [], chars: 0, limit: 0 }
+    }
+    for (const field of ['facts', 'old_text'] as const) {
+      const value = (normalized as unknown as Record<string, unknown>)[field]
+      if (value !== undefined && value !== null && typeof value !== 'string') {
+        return { ok: false, message: `memory: "${field}" must be a string (got ${typeof value}); refusing the write.`, entries: [], chars: 0, limit: 0 }
+      }
+    }
     const result = normalized.operations
       ? await ctx.memory.applyBatch(normalized.target, normalized.operations)
       : await ctx.memory.applyBatch(normalized.target, [{ action: normalized.action ?? 'add', facts: normalized.facts, old_text: normalized.old_text }])

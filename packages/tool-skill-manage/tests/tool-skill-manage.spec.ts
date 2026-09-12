@@ -8,12 +8,23 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 function fakeAgent(origin: string | undefined): Agent {
   return { session: { header: { origin }, append: () => {} } } as unknown as Agent
+}
+
+/** v30: shared approval-replay harness — `executeCore` through the runner, no
+ * schema in front (the forged-pending-record route). */
+function replayRun(ctx: Context, operation: Record<string, unknown>, libraryOrigin: 'foreground' | 'background_review' = 'foreground') {
+  return ctx.evolutionApproval.run('skill', {
+    operation,
+    origin: 'background_review',
+    libraryOrigin,
+  }, { interface: 'background_review' })
 }
 
 const SKILL = '---\nname: boundary-skill\ndescription: lifecycle boundary test\n---\nBody.\n'
@@ -178,20 +189,15 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     expect(ctx.evolutionApproval.hasRunner('skill')).toBe(true)
 
-    const run = (operation: Record<string, unknown>) => ctx.evolutionApproval.run('skill', {
-      operation,
-      origin: 'foreground',
-      libraryOrigin: 'foreground',
-    }, { interface: 'background_review' })
-    const badName = await run({ action: 'create', name: 42, content: SKILL })
+    const badName = await replayRun(ctx, { action: 'create', name: 42, content: SKILL })
     expect(badName.ok).toBe(false)
     expect(badName.message).toContain('"name" must be a string')
-    const badPatch = await run({ action: 'patch', name: 'scalar-guard-skill', old_string: 7 })
+    const badPatch = await replayRun(ctx, { action: 'patch', name: 'scalar-guard-skill', old_string: 7 })
     expect(badPatch.ok).toBe(false)
     expect(badPatch.message).toContain('"old_string" must be a string')
     // A restructure move with non-string fields is coerced to '' and refused
     // by the library's own structured heading check — also never a TypeError.
-    const badMove = await run({ action: 'restructure', name: 'scalar-guard-skill', restructure: [{ heading: 9, to_file: 'references/x.md' }] })
+    const badMove = await replayRun(ctx, { action: 'restructure', name: 'scalar-guard-skill', restructure: [{ heading: 9, to_file: 'references/x.md' }] })
     expect(badMove.ok).toBe(false)
     expect(badMove.message).not.toContain('TypeError')
     if (previousHome === undefined) delete process.env.DSH_HOME
@@ -614,3 +620,148 @@ Use it.
 })
 
 
+
+it('v29 TSM-01: an inherited-name action (`constructor`) yields the structured refusal, not a TypeError', async () => {
+  const { ctx, root, previousHome } = await setup()
+  // EvolutionApproval's static inject is ['evolutionState'] — without a
+  // provider the service never starts and the replay runner is unreachable.
+  ctx.provide('evolutionState', {
+    listPending: async () => [],
+    savePending: async () => {},
+    tryResolvePending: async () => ({ record: null, applied: false }),
+    claimPending: async () => null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  // The approval replay runner invokes executeCore with STORED args and no
+  // schema in front of it — the exact channel where the un-guarded
+  // REQUIRED_ARGS index resolved `constructor`/`toString` to inherited
+  // functions, `?? []` never fired, and `.filter` threw a bare TypeError.
+
+  for (const hostile of ['constructor', 'toString', 'hasOwnProperty']) {
+    const result = await replayRun(ctx, { action: hostile })
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain(`Unknown action "${hostile}"`)
+    expect(result.message).not.toContain('TypeError')
+  }
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v30 REV-02: a replayed write onto a policy-protected skill is refused (background origin only)', async () => {
+  const { ctx, root, previousHome } = await setup()
+  ctx.provide('evolutionState', {
+    listPending: async () => [],
+    savePending: async () => {},
+    tryResolvePending: async () => ({ record: null, applied: false }),
+    claimPending: async () => null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  // The plan gate enforces protectedSkillNames at VALIDATION time; the replay
+  // channel executes STORED plans — one accepted under an older policy must
+  // not land on a skill the CURRENT policy protects.
+  ctx.provide('evolutionPolicy', {
+    get: () => ({ protectedSkillNames: ['guarded-skill'] }),
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  // Foreground create of the (now-protected) name is operator freedom.
+  const created = await replayRun(ctx, { action: 'create', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill') }, 'foreground')
+  expect(created.ok).toBe(true)
+  // The replay (autonomous origin) onto the protected name is refused by the
+  // CURRENT policy, even though the tool channel itself would allow it.
+  const replayed = await replayRun(ctx, { action: 'update', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill').replace('lifecycle boundary test', 'updated body') }, 'background_review')
+  expect(replayed.ok).toBe(false)
+  expect(replayed.message).toContain('protectedSkillNames')
+  // The foreground channel stays open.
+  const foreground = await replayRun(ctx, { action: 'update', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill').replace('lifecycle boundary test', 'operator body') }, 'foreground')
+  expect(foreground.ok, foreground.message).toBe(true)
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('v30 REV-03: a staged support-file write refuses to replay when the file changed after staging', async () => {
+  const { ctx, root, previousHome } = await setup()
+  ctx.provide('evolutionState', {
+    listPending: async () => [],
+    savePending: async () => {},
+    tryResolvePending: async () => ({ record: null, applied: false }),
+    claimPending: async () => null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+
+  const created = await replayRun(ctx, { action: 'create', name: 'anchor-skill', content: SKILL.replace('boundary-skill', 'anchor-skill') })
+  expect(created.ok).toBe(true)
+  // The file does NOT exist yet: the honest anchor is the 'absent' sentinel,
+  // and the replay proceeds (create-on-write).
+  const fresh = await replayRun(ctx, {
+    action: 'write_file', name: 'anchor-skill', file_path: 'references/api.md',
+    file_content: 'v1\n', staged_from_sha256: 'absent',
+  })
+  expect(fresh.ok).toBe(true)
+  // The file NOW exists (v1 bytes): an anchor claiming 'absent' no longer
+  // matches → the stale replay is refused instead of last-writer-wins
+  // overwriting the current bytes.
+  const staleAbsent = await replayRun(ctx, {
+    action: 'write_file', name: 'anchor-skill', file_path: 'references/api.md',
+    file_content: 'v2\n', staged_from_sha256: 'absent',
+  })
+  expect(staleAbsent.ok).toBe(false)
+  expect(staleAbsent.message).toContain('changed after this write was staged')
+  // An anchor matching the CURRENT bytes (v1) still authorizes the overwrite.
+  const freshV2 = await replayRun(ctx, {
+    action: 'write_file', name: 'anchor-skill', file_path: 'references/api.md',
+    file_content: 'v2\n', staged_from_sha256: contentHash('v1\n'),
+  })
+  expect(freshV2.ok).toBe(true)
+  // remove_file is anchored too: removing with the anchor matching the
+  // CURRENT bytes (v2) proceeds.
+  const removed = await replayRun(ctx, { action: 'remove_file', name: 'anchor-skill', file_path: 'references/api.md', staged_from_sha256: contentHash('v2\n') })
+  expect(removed.ok).toBe(true)
+  // A content anchor for a file that is now ABSENT refuses (stale).
+  const absentStale = await replayRun(ctx, {
+    action: 'write_file', name: 'anchor-skill', file_path: 'references/api.md',
+    file_content: 'v4\n', staged_from_sha256: contentHash('some-old-bytes\n'),
+  })
+  expect(absentStale.ok).toBe(false)
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+
+it('v32 TEST-05: the tool channel refuses autonomous (subagent-origin) writes onto policy-protected skills', async () => {
+  const { ctx, root, previousHome } = await setup()
+  // The policy gates AUTONOMOUS (subagent/review-origin) writes onto
+  // protected skills; the operator's foreground channel stays open.
+  ctx.provide('evolutionPolicy', {
+    get: () => ({ protectedSkillNames: ['guarded-skill'] }),
+  })
+  const subagent = fakeAgent('subagent')
+  const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    callId: CallId(`tsm05-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: args,
+    agent: subagent,
+    signal: new AbortController().signal,
+  })
+  const created = await execute({ action: 'create', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill') })
+  expect(created.isError).toBe(false)
+  const updated = await execute({ action: 'update', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill').replace('lifecycle boundary test', 'updated') })
+  // The refusal rides the structured payload (isError stays false by the
+  // family's tool contract; the model reads the refusal from the message).
+  const updatedMessage = (updated.value as { message?: string } | undefined)?.message ?? JSON.stringify(updated.value)
+  expect(updatedMessage).toContain('protectedSkillNames')
+  expect(updatedMessage).toContain('guarded-skill')
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-policy",
   "description": "Immutable evolution policy service",
-  "version": "0.3.68",
+  "version": "0.3.69",
   "publishConfig": {
     "access": "public"
   },
@@ -34,10 +34,12 @@
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/dsh-tools": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^"
   }
 }

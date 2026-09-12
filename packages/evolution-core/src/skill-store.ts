@@ -7,10 +7,10 @@
  * move to `.archive/` — never a hard delete.
  */
 
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
-import { LOCK_BODY_RE, LOCK_SUFFIX, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
+import { LOCK_BODY_RE, LOCK_SUFFIX, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -242,7 +242,7 @@ export interface Frontmatter {
 /**
  * Shared frontmatter block detection (P3-3 single owner): opening line `---`
  * and closing line exactly `---`. Used by `parseFrontmatter`,
- * `frontmatterYamlUnsafeValues` and `normalizeFrontmatter` so the three can
+ * `frontmatterCatalogInvalid` and `normalizeFrontmatter` so the three can
  * never disagree about where the block ends (the loose `indexOf('\n---')`
  * form matched `\n----` and was replaced by this strict line rule).
  *
@@ -291,7 +291,7 @@ export interface FrontmatterRead {
 
 /**
  * Raw-line scan of a frontmatter block: the single owner of "which entries the
- * strict catalog cannot load". `frontmatterYamlUnsafeValues` publishes it and
+ * strict catalog cannot load". `frontmatterCatalogInvalid` publishes it and
  * `normalizeFrontmatter` decides each rewrite with the same predicate
  * (`yamlPlainScalarNeedsQuotes`), so the audit verdict and the write path can
  * never disagree. Only single-line `key: value` entries are judged; a line with
@@ -463,7 +463,18 @@ export function parseFrontmatter(content: string): FrontmatterRead | null {
  */
 export function frontmatterCatalogInvalid(content: string): boolean {
   const read = readFrontmatterBlock(content)
-  return read === null ? false : read.strictFailed || read.unsafeValues.length > 0
+  if (read !== null) return read.strictFailed || read.unsafeValues.length > 0
+  // v28 G2.3 (CORE-SK-02): fail closed for the DETECTION failures this guard
+  // exists for — a BOM-prefixed fence or mixed line endings make the block
+  // undetectable to the byte-exact extractor while a real YAML parser (the
+  // platform's) may still read it, so "catalog-valid" here was the one
+  // fail-open verdict in this file. Probe: strip the BOM and normalize CRLF,
+  // then re-extract; if the block appears, report the split risk. A file with
+  // no fence at all, or a genuinely unterminated block, stays "not
+  // applicable" — structure health owns that verdict and body-only files
+  // must not flood the catalogInvalid channel.
+  const probed = frontmatterBlock(content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'))
+  return probed !== null
 }
 
 /** YAML plain-scalar hazards that make an UNQUOTED frontmatter value
@@ -498,22 +509,19 @@ export function yamlPlainScalarNeedsQuotes(value: string): boolean {
   if (value.includes(': ')) return true
   if (value.includes(' #')) return true
   if (value.endsWith(':')) return true
-  if (/^(?:null|true|false|~|[-+]?\d+(?:\.\d+)?)$/i.test(value)) return true
+  // v28 G2.2 (CORE-SK-01): the full YAML 1.2 core scalar set the strict
+  // parser coerces to null/bool/number — ints (dec/hex/octal), exponent
+  // floats, .inf/.nan — not just plain decimals. A value like `0x1F` used to
+  // pass the fast path unquoted, so the platform catalog read a NUMBER while
+  // the family published the string `31` (the E-47 split-brain this guard
+  // exists for) and no self-heal ever fired.
+  if (/^(?:null|true|false|~)$/i.test(value)) return true
+  if (/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(value)) return true
+  if (/^0x[0-9a-f]+$/i.test(value)) return true
+  if (/^0o[0-7]+$/.test(value)) return true
+  if (/^\.(?:inf|nan)$/i.test(value)) return true
   if (/^[-?:,[\]{}#&*!|>'\"%@`\s]/.test(value)) return true
   return false
-}
-
-/** Raw-line scan of the frontmatter block: entries whose UNQUOTED value is
- * YAML-unsafe for the strict platform catalog. Operates on the ORIGINAL line
- * value (quotes included), so a value already wrapped by
- * `normalizeFrontmatter` is never re-flagged — one source with the write
- * path. V27 G2.1: delegates to the shared scan, which
- * `parseFrontmatter(...).catalogInvalid` also uses, so the audit view and the
- * read view of one file can never disagree. Independent of the body: a
- * body-less file is still reported here. */
-export function frontmatterYamlUnsafeValues(content: string): Array<{ key: string; value: string }> {
-  const block = frontmatterBlock(content)
-  return block === null ? [] : unsafeFrontmatterEntries(block.block, block.nl)
 }
 
 export interface FrontmatterNormalizeResult {
@@ -554,7 +562,7 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
   const fields: string[] = []
   const issues: string[] = []
   // Detection shares the predicate with the audit side
-  // (frontmatterYamlUnsafeValues): normalize and catalog-invalid detection
+  // (frontmatterCatalogInvalid): normalize and catalog-invalid detection
   // can never disagree.
   const seen = new Set<string>()
   const originalValues = new Map<string, string>()
@@ -704,9 +712,19 @@ export function authoringFeedback(frontmatter: Frontmatter): AuthoringFeedback {
 /** A1-15 (v18) / P2-2 (v19): the io layer marks an error `committed: true` when
  * the rename landed and only the directory fsync failed. Every single-file
  * writer must treat that as "written, durability unconfirmed" — never as a
- * plain failure (which a caller would retry, or a two-phase caller roll back). */
+ * plain failure (which a caller would retry, or a two-phase caller roll back).
+ * v28 G2.1 (EVO-IO-05): this is a delegation to the seam's own
+ * `isCommittedWarning` — the marker predicate has exactly one definition. */
 function isCommittedOnly(error: unknown): boolean {
-  return (error as { committed?: unknown } | undefined)?.committed === true
+  return isCommittedWarning(error)
+}
+
+/** v28 G2.5 (CORE-SK-03): every pre-clear refusal in restoreSnapshotIntoRoot
+ * says "refus…" (manifest / traversal / live-writer gates) or "is incomplete"
+ * (completeness gate). Anything else thrown from that method means the
+ * destructive clear already happened and a rollback is load-bearing. */
+function isPreClearRefusal(message: string): boolean {
+  return message.includes('refus') || message.includes('is incomplete')
 }
 
 async function listNames(root: string, io: EvolutionIoLike): Promise<string[]> {
@@ -1099,16 +1117,23 @@ export class SkillLibrary {
     path: string,
     task: (current: string | null) => SingleWriteOutcome | Promise<SingleWriteOutcome>,
   ): Promise<SkillActionResult> {
-    let outcome: SingleWriteOutcome | undefined
+    // v28 G1.1 (EVO-IO-02): `ghostDir` rides the outcome instead of a closure
+    // flag — it is set when the task saw a missing body and chose not to
+    // write, the ghost-directory precondition decided on the clean
+    // `SingleWriteOutcome` type inside `run`.
+    let outcome: (SingleWriteOutcome & { ghostDir?: boolean }) | undefined
     const run = async (current: string | null) => {
       const o = await task(current ?? null)
-      outcome = o
+      outcome = { ...o, ghostDir: current === null && o.write === null }
       // write: null = "leave the file untouched" — return the current bytes so
       // an existing file is preserved and a missing one stays missing (M-4).
       return o.write ?? (current ?? null)
     }
     let durabilityWarning = ''
-    const committedOnly = (error: unknown): boolean => (error as { committed?: unknown } | undefined)?.committed === true
+    // v28 G2.1 (EVO-IO-05): the module-level `isCommittedOnly` is the single
+    // source of this predicate (V27 G1.3's own consolidation); the local
+    // re-binding here was a fifth copy waiting to drift.
+    const committedOnly = isCommittedOnly
     if (this.transact) {
       try {
         await this.transact(this.io, path, run)
@@ -1140,6 +1165,13 @@ export class SkillLibrary {
     if (o === undefined || typeof o !== 'object' || !Object.prototype.hasOwnProperty.call(o, 'write')) {
       return { ok: false, message: 'internal error: the write transaction did not invoke the task; no write was performed' }
     }
+    // v28 G1.1 (EVO-IO-02): nothing was written and the body was missing —
+    // the io seam's mkdir-before-lock may have resurrected the directory a
+    // concurrent archive just moved away (the update/patch shape of the v22
+    // LOCK-4 race; setPinnedCore/createCore carry their own compensating
+    // cleanups). Without this, a SKILL.md-less ghost dir blocks
+    // restoreFromArchive forever ("carries no SKILL.md; remove or repair it").
+    if (o.ghostDir === true) await this.cleanupGhostDir(path)
     if (o.write !== null && o.audit) {
       await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary)
     }
@@ -1149,6 +1181,28 @@ export class SkillLibrary {
     return durabilityWarning === '' || !o.result.ok
       ? o.result
       : { ...o.result, message: `${o.result.message} (warning: the write landed but the directory fsync failed — durability unconfirmed: ${durabilityWarning})` }
+  }
+
+  /**
+   * v28 G1.1 (EVO-IO-02): shared compensating cleanup for a locked write that
+   * found no SKILL.md — remove the possibly-resurrected directory ONLY when it
+   * holds nothing but this path's own write-lock file. The BR-5 rule from
+   * setPinnedCore/createCore applies unchanged: a concurrent mover can land a
+   * full directory between the list probe and the remove, so anything beyond
+   * the lock file (support files, a fresh restore) must never be recursed
+   * away. Best-effort: a failed cleanup leaves the "not found" result
+   * unchanged (the operator-facing ghost-dir refusal is fail-loud already).
+   */
+  private async cleanupGhostDir(skillFilePath: string): Promise<void> {
+    const dir = dirname(skillFilePath)
+    const lockName = `${basename(skillFilePath)}${LOCK_SUFFIX}`
+    try {
+      const leftovers = await this.io.list(dir)
+      if (leftovers.some(entry => entry !== lockName)) return
+      await this.io.remove(dir)
+    } catch {
+      // Leave the ghost; restore/archive report it with repair instructions.
+    }
   }
 
   /** Notify the mutation observer after a successful write; observers must never fail the mutation. */
@@ -1177,11 +1231,54 @@ export class SkillLibrary {
     return scanContentThreats(content, undefined, this.threatScanOptions())
   }
 
+  /**
+   * v30 REV-03: read a support file's bytes for staleness anchoring (the
+   * write/remove replay guard). Same validation as writeSupportFile; a
+   * missing file (or a directory squatting on the path) reads as `null`, any
+   * other failure RETHROWS — the callers are the staging/replay anchors, and
+   * a swallowed error would silently downgrade the anchor to
+   * last-writer-wins.
+   */
+  async readSupportFile(name: string, filePath: string): Promise<string | null> {
+    const bad = this.badName(name, { allowReserved: true })
+    if (bad) throw new Error(bad)
+    const validation = validateSupportPath(filePath)
+    if (validation) throw new Error(validation)
+    const dir = this.dirOf(name)
+    const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
+    try {
+      return await this.io.readText(target)
+    } catch (error) {
+      // v30 REV-03: 'absent' is a first-class anchored state — a MISSING file
+      // reads as null so the staging/replay anchor can pin "did not exist
+      // yet". EISDIR (a directory on the path) reads as null too (no bytes).
+      // Any other failure (EACCES…) rethrows: the anchor must not silently
+      // degrade to last-writer-wins.
+      const code = (error as NodeJS.ErrnoException | undefined)?.code
+      if (code === 'ENOENT' || code === 'EISDIR') return null
+      throw error
+    }
+  }
+
   async list(): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
     for (const name of await listNames(this.root, this.io)) {
       const dir = this.dirOf(name)
-      const md = await this.io.readText(join(dir, 'SKILL.md'))
+      // v29 LIST-01 + v30 REG-01: ONLY the EISDIR shape is absorbed (a
+      // directory squatting on the SKILL.md path — the E-43 form `read()`
+      // also absorbs). The v29 cut swallowed every error here: one TRANSIENT
+      // EACCES (win32 AV/indexer hold) silently dropped a LIVE skill from
+      // `treeNames`, and the curator's E-15 fold — which assumes a missing
+      // tree name means "the archive rename already landed" — permanently
+      // marked it archived in the usage sidecar with no self-heal. Any other
+      // read failure now fails loud exactly like the pre-v29 behavior.
+      let md: string | null
+      try {
+        md = await this.io.readText(join(dir, 'SKILL.md'))
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException | undefined)?.code === 'EISDIR') continue
+        throw error
+      }
       // C-14: a 0-byte SKILL.md is "present but corrupt" — listNames
       // already proved the file exists, so the entry stays visible (parseFrontmatter
       // of '' yields no description) instead of being ghost-skipped: scope and
@@ -1536,8 +1633,10 @@ export class SkillLibrary {
         // its LAST remaining entry — a concurrent restore's single rename can
         // land a full directory between the exists probe and this point, and
         // the recursive remove must never take it.
-        const leftovers = await this.io.list(dir).catch(() => [] as string[])
-        if (leftovers.length === 0) await this.io.remove(dir).catch(() => {})
+        // v29 SK-06: routed through the shared `cleanupGhostDir` (probing the
+        // SKILL.md path) so a stale `.lock` left by a failed lock release no
+        // longer defeats the removal and the rule has exactly one owner.
+        await this.cleanupGhostDir(join(dir, 'SKILL.md'))
         return { ok: false, message: `Skill "${normalized}" was archived concurrently while pinning; the partial marker was removed — retry after the mover settles.` }
       }
     } else {
@@ -1647,14 +1746,32 @@ export class SkillLibrary {
     // would otherwise let writeText's mkdir resurrect the old path as a
     // SKILL.md-less ghost (same compensating cleanup as setPinnedCore).
     if (origin !== 'foreground') {
-      await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
+      // v29 SK-05: the marker write gets the same committed-only tolerance as
+      // every other write in this file (A1-15) — a post-rename dir-fsync
+      // failure means the MARKER landed; rejecting the create as a plain
+      // failure made the model retry into "already exists" for a skill that
+      // IS on disk and managed.
+      let markerDurabilityWarning = ''
+      try {
+        await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
+      } catch (error) {
+        if (!isCommittedOnly(error)) throw error
+        markerDurabilityWarning = error instanceof Error ? error.message : String(error)
+      }
       if (!(await this.io.exists(createPath))) {
         await this.io.remove(markerPath(dir, 'hermes-managed')).catch(() => {})
-        // v23 (BR-5): same content re-check as setPinnedCore — never recurse
-        // away a directory a concurrent restore just landed.
-        const leftovers = await this.io.list(dir).catch(() => [] as string[])
-        if (leftovers.length === 0) await this.io.remove(dir).catch(() => {})
+        // v23 (BR-5) + v29 SK-06: same compensating cleanup as setPinnedCore —
+        // routed through the shared `cleanupGhostDir` so a stale lock file (a
+        // failed lock release) no longer defeats the empty-dir removal.
+        await this.cleanupGhostDir(createPath)
         return { ok: false, message: `Skill "${normalized}" was archived concurrently while being created; the partial marker was removed — retry once the mover settles.` }
+      }
+      // Both warnings ride the normal success path (audit/event included) —
+      // a durability warning must never skip the accounting.
+      if (markerDurabilityWarning !== '') {
+        createDurabilityWarning = createDurabilityWarning === ''
+          ? markerDurabilityWarning
+          : `${createDurabilityWarning}; marker: ${markerDurabilityWarning}`
       }
     }
     await this.audit(normalized, 'create', null, onDisk, 'created')
@@ -2476,7 +2593,7 @@ export class SkillLibrary {
           // A1-15 (v18): a post-rename dir-fsync failure means the bytes DID
           // land — rolling back would delete a visible write, and the audit/
           // event below must still run. Record it and keep going.
-          if ((error as { committed?: unknown } | undefined)?.committed !== true) throw error
+          if (!isCommittedOnly(error)) throw error
           durabilityWarning = error instanceof Error ? error.message : String(error)
         }
         written.push({ target: entry.target, previous: entry.previous })
@@ -2791,7 +2908,23 @@ export class SkillLibrary {
         await this.io.copy(archiveRoot, join(dest, '.archive'))
         hasArchive = true
       }
-      const validExtras = extras.filter(extra => SNAPSHOT_EXTRA_NAME_RE.test(extra.name))
+      // v29 SK-08: invalid extras fail LOUD instead of two silent wrongs — an
+      // out-of-grammar name used to be dropped with no result surface (the
+      // data silently skipped every rollback), and a non-string name coerced
+      // through RegExp.test then threw a bare TypeError inside path.join.
+      // The manifest READER already sanitizes this shape (V27 G0.4); the
+      // writer now refuses it at the same boundary.
+      // The scan runs through the `unknown` element boundary on purpose: the
+      // runtime payload may violate the declared SnapshotExtra shape (the
+      // exact defect this guard refuses).
+      const extrasAsUnknown = extras as unknown as Array<{ name?: unknown } | undefined>
+      const rejectedExtras = extrasAsUnknown
+        .filter(extra => typeof extra?.name !== 'string' || !SNAPSHOT_EXTRA_NAME_RE.test(extra.name))
+        .map(extra => JSON.stringify(extra?.name ?? extra))
+      if (rejectedExtras.length > 0) {
+        throw new Error(`snapshotAll: refusing invalid snapshot extras (name must match ${SNAPSHOT_EXTRA_NAME_RE.source}): ${rejectedExtras.join(', ')}`)
+      }
+      const validExtras = extras
       const extraNames = validExtras.map(extra => extra.name)
       const extraResults = await Promise.allSettled(validExtras.map(async (extra) => {
         await this.io.writeText(join(dest, 'extras', extra.name), extra.content)
@@ -2957,7 +3090,18 @@ export class SkillLibrary {
     const snapshots = await this.listSnapshots()
     const latest = snapshots[0]
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
-    const preRollbackPath = await this.snapshotAll('pre-rollback', extras)
+    // v29 SK-07: the pre-rollback snapshot is the rollback INSURANCE, not part
+    // of the restore — a failure taking it (win32 AV/indexer hold on the copy,
+    // ENOSPC) used to reject raw out of this method before the E-13 rollback
+    // machinery could speak. Nothing has been cleared at this point, so the
+    // refusal is structured and says the tree is untouched.
+    let preRollbackPath: string
+    try {
+      preRollbackPath = await this.snapshotAll('pre-rollback', extras)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      return { ok: false, message: `Snapshot restore was refused before anything was cleared: taking the pre-rollback snapshot failed (${reason}) — the active tree is UNCHANGED. Resolve the snapshot write failure and retry.` }
+    }
     // V27 G0.4 (core-a-01): the extras read happens BEFORE the destructive
     // replace. It used to run after the commit point and outside the rollback
     // try, so a corrupt manifest (`extras: [123]`) or one real read failure
@@ -2981,6 +3125,17 @@ export class SkillLibrary {
         return { ok: false, message: `Snapshot restore failed (${reason}); the active tree was rolled back to the pre-rollback snapshot.` }
       } catch (rollbackError) {
         const rb = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+        // v28 G2.5 (CORE-SK-03): both failures were PRE-CLEAR refusals
+        // (manifest / completeness / live-writer gates) — the active tree is
+        // byte-identical to before the attempt, so the old "Rescue manually"
+        // sent operators hand-rescuing an intact library (and repeated on
+        // every retry while the writer held the lock).
+        if (isPreClearRefusal(reason) && isPreClearRefusal(rb)) {
+          return {
+            ok: false,
+            message: `Snapshot restore was refused before anything was cleared; the active tree is UNCHANGED.\n- target: ${reason}\n- pre-rollback: ${rb}\nResolve the cause (a live skill write, or an incomplete snapshot) and retry — no manual rescue is needed.`,
+          }
+        }
         return { ok: false, message: `Snapshot restore failed (${reason}) AND pre-rollback restore failed (${rb}). Rescue manually from: ${preRollbackPath} (pre-rollback), ${latest.path} (target).` }
       }
     }

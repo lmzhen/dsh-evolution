@@ -11,7 +11,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
+import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -317,7 +317,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const commands = commandCtx.commands
     // M-11 (v3 audit): the register disposer must be bound to the fiber — an
     // unbound registration survives HMR/reload and duplicates the command.
-    commandCtx.effect(() => commands.register({
+    // v28 G0.3 (CMD-01): the definition is a const so `handler` can delegate
+    // to `run` — the wrapper is the ONE net for unexpected throws (an
+    // unreadable skill/memory/state file re-thrown out of SkillLibrary.read),
+    // the same contract the /evolution wrapper enforces. v27's INS-04 guarded
+    // the skill fan-out only; nodeDetail/memory reads/usage.report stayed bare.
+    const graphCommand = {
       name: 'graph',
       description: 'Show the learning graph, or act on a node: graph [detail|edit|delete] <nodeId>',
       recordInput: false,
@@ -327,7 +332,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       input: {
         hint: '[detail|edit|delete] <nodeId> [text]',
       },
-      handler: async (invocation: CommandInvocation) => {
+      run: async (invocation: CommandInvocation): Promise<CommandResult> => {
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
         const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
@@ -344,15 +349,43 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const detail = /^detail\s+(\S+)$/.exec(input)
         if (detail && detail[1]) return await nodeDetail(detail[1])
         const edit = /^edit\s+(\S+)\s+([\s\S]+)$/.exec(input)
-        if (edit && edit[1] && edit[2] !== undefined) return await nodeEdit(edit[1], edit[2])
+        if (edit && edit[1] && edit[2] !== undefined) {
+          // v30 GRAPH-03: refuse BEFORE staging — a nonexistent (or archived/
+          // delisted) SKILL produced an approval record whose replay could
+          // never succeed ("Skill not found"), wasting an operator approval.
+          // The memory branches already pre-check their index the same way.
+          // `memory:*` ids are MEMORY nodes (their own pre-check covers them)
+          // and are exempt here.
+          if (!edit[1].startsWith('memory:')) {
+            const stageProbe = await withSkills().read(edit[1]).catch(() => null)
+            if (stageProbe === null) return err(`Skill "${edit[1]}" not found in the live skill library — nothing to edit. (The graph may be showing a stale node.)`)
+          }
+          return await nodeEdit(edit[1], edit[2])
+        }
         const remove = /^delete\s+(\S+)$/.exec(input)
-        if (remove && remove[1]) return await nodeDelete(remove[1])
+        if (remove && remove[1]) {
+          if (!remove[1].startsWith('memory:')) {
+            const stageProbe = await withSkills().read(remove[1]).catch(() => null)
+            if (stageProbe === null) return err(`Skill "${remove[1]}" not found in the live skill library — nothing to delete.`)
+          }
+          return await nodeDelete(remove[1])
+        }
         const directory = await renderGraph()
         if (input !== '') return err(`Unknown graph subcommand "${input.split(' ')[0]}". ${directory}`)
         return ok(directory)
 
         async function renderGraph(): Promise<string> {
-          const usageMap = await usage.report()
+          const usageReport = await usage.report()
+          // v29 GRAPH-02: archived skills must not render as live nodes.
+          // `graph delete` archives the skill and marks the record
+          // (`state:'archived'`), but usage records are never pruned — the
+          // graph used to keep listing the dead node identically to live
+          // skills while `graph detail` reported "Skill not found". The
+          // memory-node side has had the E-21 staleness guard; the skill side
+          // now filters on the same signal the curator lifecycle writes.
+          const usageMap = new Map(
+            [...usageReport].filter(([, record]) => (record as { state?: string }).state !== 'archived'),
+          )
           const memoryEntries = await memory.read('memory')
           const userEntries = await memory.read('user')
           // Semantic skill-skill edges (B-line G3): read each usage-known
@@ -627,6 +660,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return result.ok ? ok(result.message) : err(result.message)
         }
       },
-    }), 'evolution-learning-graph.command')
+      handler: (invocation: CommandInvocation): Promise<CommandResult> =>
+        graphCommand.run(invocation).catch((error: unknown): CommandResult => ({
+          kind: 'error',
+          text: `graph: command failed: ${error instanceof Error ? error.message : String(error)}\nCheck the node id and the skills/memory files under the evolution root, then retry.`,
+        })),
+    }
+    commandCtx.effect(() => commands.register(graphCommand), 'evolution-learning-graph.command')
   })
 }

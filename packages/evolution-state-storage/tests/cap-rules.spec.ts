@@ -85,3 +85,22 @@ it('V27 G2.2: selectSessionOverflow drops one row per over-cap save, unknown sta
   const mixed = [{ key: 'unstamped', stamp: 0 }, { key: 'fresh', stamp: 9_999 }, { key: 'older', stamp: 5 }]
   expect(selectSessionOverflow(mixed, options, 2)).toEqual(['unstamped', 'older'])
 })
+
+it('v28 G2.4 (STATE-03): when the overflow exceeds every known timestamp, unknown-time rows are evicted last (forced phase)', () => {
+  // Corruption-level shape where the overflow necessarily reaches the unknown
+  // tail: 3 known-timestamp rows + 201 unknown = 204 resolved, cap 200 →
+  // overflow 4. The cap must be enforced, so after the 3 known rows the FIRST
+  // unknown (insertion order, stable sort on equal MAX keys) becomes a victim
+  // — the old doc promise ("never the victim") was unenforceable at this phase.
+  const rows = [
+    record('dated-0', { resolvedAt: new Date(Date.UTC(2026, 8, 2, 0, 0, 0)).toISOString() }),
+    record('dated-1', { resolvedAt: new Date(Date.UTC(2026, 8, 2, 0, 0, 1)).toISOString() }),
+    record('dated-2', { resolvedAt: new Date(Date.UTC(2026, 8, 2, 0, 0, 2)).toISOString() }),
+    ...Array.from({ length: 201 }, (_, index) => record(`unknown-${index}`, { resolvedAt: undefined })),
+  ]
+  const evicted = selectPendingOverflow(rows).map(item => item.id)
+  expect(evicted).toEqual(['dated-0', 'dated-1', 'dated-2', 'unknown-0'])
+  // Unknown rows sort strictly after every known timestamp (never before).
+  expect(evicted).not.toContain('dated-3')
+  expect(evicted[3]).toBe('unknown-0')
+})

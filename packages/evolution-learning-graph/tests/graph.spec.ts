@@ -417,6 +417,11 @@ describe('learning graph', () => {
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = root
     try {
+      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+      // stage the skill the tests edit/delete.
+      const skillsDir = join(root, 'skills', 'demo-skill')
+      await mkdir(skillsDir, { recursive: true })
+      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
       const ctx = new Context()
       let handler: GraphHandler | undefined
       ctx.provide('commands', {
@@ -471,6 +476,10 @@ describe('learning graph', () => {
       ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
       ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+      // v30 GRAPH-03: the staging pre-check requires the target to exist.
+      const skillsDir = join(root, 'skills', 'demo-skill')
+      await mkdir(skillsDir, { recursive: true })
+      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
       // The PLATFORM approval service is the single source of the session
       // policy (effectiveSessionPolicy); a `never` policy must reach the
       // evolution approval request so the seam can refuse to stage.
@@ -496,6 +505,11 @@ describe('learning graph', () => {
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = root
     try {
+      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+      // stage the skill the tests edit/delete.
+      const skillsDir = join(root, 'skills', 'demo-skill')
+      await mkdir(skillsDir, { recursive: true })
+      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
       const ctx = new Context()
       let handler: GraphHandler | undefined
       ctx.provide('commands', {
@@ -538,6 +552,11 @@ describe('learning graph', () => {
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = root
     try {
+      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+      // stage the skill the tests edit/delete.
+      const skillsDir = join(root, 'skills', 'demo-skill')
+      await mkdir(skillsDir, { recursive: true })
+      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
       const ctx = new Context()
       let handler: GraphHandler | undefined
       ctx.provide('commands', {
@@ -590,6 +609,11 @@ describe('learning graph', () => {
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = root
     try {
+      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+      // stage the skill the tests edit/delete.
+      const skillsDir = join(root, 'skills', 'demo-skill')
+      await mkdir(skillsDir, { recursive: true })
+      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
       const ctx = new Context()
       let handler: GraphHandler | undefined
       ctx.provide('commands', {

@@ -86,6 +86,15 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
   const bool = (value: unknown, fallback: boolean): boolean =>
     typeof value === 'boolean' ? value : fallback
   return {
+    // v28 G5.2 (USAGE-01): unknown fields pass through UNTOUCHED and land
+    // before the known keys, so a newer writer's per-record fields survive
+    // this runtime's write-side RMW (mutateUsage persists the rebuilt map).
+    // The family's forward-compat discipline (A2-11/L-1/F-338) gates on the
+    // top-level file version, but the usage writer emits none — without this
+    // spread the first counter bump stripped every unknown field. Known keys
+    // are overridden below and stay strictly sanitized; a malformed value
+    // falls back exactly as before.
+    ...raw,
     created_by: typeof raw.created_by === 'string' ? raw.created_by : null,
     use_count: num(raw.use_count, base.use_count),
     view_count: num(raw.view_count, base.view_count),

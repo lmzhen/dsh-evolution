@@ -1127,3 +1127,48 @@ describe('evolution-commands', () => {
       .toThrow(/skillsRoot" was removed after 0\.3\.65/)
   })
 })
+
+it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every state-touching subcommand, never a throw', async () => {
+  const ctx = new Context()
+  let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+  ctx.provide('commands', {
+    register: (definition: unknown) => {
+      captured = definition as typeof captured
+      return () => {}
+    },
+  })
+  // Any property access on these services throws — the corrupted-state /
+  // transient-IO shape (quarantine, lock budget, EIO) that the wrapper exists
+  // for. The guard iterates the REGISTRY's state-touching subcommands, so a
+  // future subcommand that reads a service without the wrapper fails here.
+  const faulting = () => new Proxy({}, {
+    get(target, prop) {
+      if (prop === 'then' || typeof prop === 'symbol') return (target as Record<symbol, unknown>)[prop as symbol]
+      throw new Error(`service fault injected at "${prop}" (quarantine-class)`)
+    },
+  })
+  ctx.provide('evolutionApproval', faulting())
+  ctx.provide('evolutionCurator', faulting())
+  ctx.provide('evolutionReplay', faulting())
+  await ctx.plugin(Commands)
+  expect(captured).toBeDefined()
+  // Every subcommand that reads a mounted service (drawn from COMMAND_ENTRIES;
+  // the state-touching set). Also pins the G0.3 contract for the previously
+  // bare branches: pending/approve/reject/curator/mutations/restore/replay.
+  const stateTouching = [
+    'pending', 'pending --detail',
+    'approve some-id', 'reject some-id',
+    'curator run', 'curator pause', 'curator resume', 'curator status', 'curator report', 'curator scope',
+    'mutations', 'skills health',
+    'restore', 'replay',
+  ]
+  for (const rawInput of stateTouching) {
+    const result = await captured!.handler({ rawInput })
+    expect({ rawInput, kind: result.kind }).toEqual({ rawInput, kind: 'error' })
+    expect(result.text).toContain('command failed')
+  }
+  // `maintain` keeps its own structured error path (pre-v28) and the help
+  // fallback never touches a service — both stay kind:error/success as before.
+  const help = await captured!.handler({ rawInput: 'definitely-not-a-subcommand' })
+  expect(help.kind).toBe('success')
+})

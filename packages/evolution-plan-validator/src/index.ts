@@ -63,6 +63,11 @@ const SKILL_ACTIONS = new Set(['create', 'edit', 'update', 'patch', 'delete', 'w
 // 0.3.17 (S3.10, T-1): single source lives in core constants.
 const FORBIDDEN_KEYS: readonly string[] = FORBIDDEN_CONTROL_KEYS
 
+/** v31 REV-08 (stated honestly): this gate is SEQUENCE-RANGE ONLY — every
+ * evidence item must carry an integer seq within [0, sessionSeq]. There is NO
+ * quoted-text/content verification: a model can satisfy it by citing any
+ * in-range event (even an unrelated one). Anti-fabrication strength lives in
+ * read-before-write, budgets, and the threat scan — not here. */
 function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
   if (!Array.isArray(evidence) || evidence.length === 0) return false
   return evidence.every((item) => {

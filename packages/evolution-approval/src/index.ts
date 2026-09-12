@@ -395,14 +395,41 @@ export class EvolutionApproval extends Service {
       const result = await runner(record.args)
       if (!result.ok) {
         await this.state().releasePendingClaim(id, claimId)
-        return { ok: false, message: result.message }
+        // v32 REV-07: a replay that fails on staleness/not-found was usually
+        // defeated by a SIBLING record from the same plan (an earlier approve
+        // changed the target) — the record would deterministically fail every
+        // retry. Name that, and point at reject as the way out, instead of
+        // leaving a permanently un-approvable pending row.
+        const deterministic = /changed since this plan|no entry matching|not found|no longer exists/i.test(result.message)
+        return {
+          ok: false,
+          message: deterministic
+            ? `${result.message} — a sibling write from the same plan may have already changed this target, so repeated approves will keep failing. Reject this record unless the target changed again.`
+            : result.message,
+        }
       }
     } catch (error) {
       await this.state().releasePendingClaim(id, claimId)
       this.ctx.logger.warn(error)
       return { ok: false, message: 'Replay runner failed; the pending write remains pending.' }
     }
-    const resolution = await this.state().tryResolvePending(id, 'approved', claimId)
+    // v28 G1.3 (APPR-01): the resolve sits inside the same protection the
+    // runner has — a thrown resolve (state-file quarantine, lock budget,
+    // domain closed) used to escape as a raw exception AFTER the effect had
+    // landed, hiding the landed write behind an exception and skipping the
+    // divergence report the concurrent-reject branch below always provides.
+    // The claim deliberately stays 'executing': that row is the operator's
+    // verify-before-retry gate (approve refuses to re-run it).
+    const resolution = await this.state().tryResolvePending(id, 'approved', claimId).catch((error: unknown) => {
+      this.ctx.logger.warn(error)
+      return `failed: ${error instanceof Error ? error.message : String(error)}`
+    })
+    if (typeof resolution === 'string') {
+      return {
+        ok: false,
+        message: `Approved write "${id}" was replayed, but resolving the record failed (${resolution.slice('failed: '.length)}) — the effect has LANDED while the audit row stays "executing". Verify the write manually; approve will not re-run it.`,
+      }
+    }
     if (!resolution.applied) {
       // P2-2 (v14): the claim-scoped resolve refused, which means the record
       // left 'executing' under us — typically a concurrent operator reject

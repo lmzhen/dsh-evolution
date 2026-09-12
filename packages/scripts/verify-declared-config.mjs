@@ -211,7 +211,12 @@ for (const { bundle, item, key, profile, verdict } of violations) {
 
 if (unknownRows.length > 0) {
   const listed = [...new Set(unknownRows.map(entry => `${entry.bundle}:${entry.item.id}`))]
-  console.log(`verify-declared-config: notice — overrides of row(s) this platform table does not know: ${listed.join(', ')} — re-check the upstream plane and add them to UPSTREAM_PLANES`)
+  // v31 GUARD-01: a patch row the platform table does not know means the row
+  // was RENAMED or REMOVED upstream — the declared override reaches nothing,
+  // and the old 'profile-root' verdict was a vacuous pass (even under
+  // --strict). Fail loud; updating UPSTREAM_PLANES re-arms the guard.
+  console.error(`verify-declared-config: ${strict ? 'FAIL' : 'WARN'} — overrides of row(s) this platform table does not know: ${listed.join(', ')} — the row was likely renamed/removed upstream, so the declared override reaches nothing. Re-check the upstream plane and add the row to UPSTREAM_PLANES.`)
+  if (strict) process.exit(1)
 }
 
 const declared = declarations.length
