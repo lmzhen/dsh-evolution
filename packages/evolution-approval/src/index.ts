@@ -22,7 +22,7 @@ import { randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
-import type {} from '@deepseek-ai/dsh-evolution-state'
+import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
 
 export type { PendingKind, PendingRecord, PendingStatus }
 
@@ -117,14 +117,6 @@ export function effectiveSessionPolicy(ctx: Context, session: unknown): 'ask' | 
   return approval.overrideOf(session) ?? (approval as Partial<ApprovalPolicyLike>).config?.policy ?? 'ask'
 }
 
-interface EvolutionStateLike {
-  listPending(status?: PendingStatus): Promise<PendingRecord[]>
-  savePending(record: PendingRecord): Promise<void>
-  tryResolvePending(id: string, status: 'approved' | 'rejected', expectedClaimId?: string): Promise<{ record: PendingRecord | null; applied: boolean }>
-  claimPending(id: string, claimId: string): Promise<PendingRecord | null>
-  releasePendingClaim(id: string, claimId: string): Promise<void>
-}
-
 declare module '@deepseek-ai/cordis' {
   interface Context {
     evolutionApproval: EvolutionApproval
@@ -162,7 +154,7 @@ export class EvolutionApproval extends Service {
     this.stageForegroundConfig = config.stageForeground ?? true
   }
 
-  private state(): EvolutionStateLike {
+  private state(): EvolutionState {
     return this.ctx.evolutionState
   }
 

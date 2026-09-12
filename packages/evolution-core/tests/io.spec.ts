@@ -8,11 +8,11 @@ vi.setConfig({ testTimeout: 30_000 })
 // green result is a green at a known concurrency instead of an accident of the
 // default one. Renaming a case means updating its entry in that list: the runner
 // asserts the matched count, so a silent drop-out fails the gate.
-import { chmod, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
+import { chmod, mkdir, readdir, rename, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { decideTakeover, DEAD_LOCK_TAKEOVER_MS, EMPTY_LOCK_TAKEOVER_MS, LOCK_TEAR_TAKEOVER_MS, nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 // A genuinely alive foreign pid: the tests below need a LIVE holder that is NOT
 // this process (F-367 recycles our own pid leftover, and F-366 sweeps our own
@@ -33,7 +33,7 @@ it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer
   // alone yields one complete payload even without any lock). This case pins
   // atomicity + lock cleanup; the serialization invariant is pinned by the
   // `transact` RMW counter cases below (which would fail on a lost update).
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-lock-'))
+  const root = await tempRoot('dsh-io-lock-')
   const io = nodeEvolutionIo()
   const target = join(root, 'shared.txt')
   await Promise.all(Array.from({ length: 8 }, (_, i) => io.writeText(target, `writer-${i}`)))
@@ -41,7 +41,6 @@ it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer
   const content = await readFile(target, 'utf8')
   expect(content).toMatch(/^writer-\d$/m)
   expect((await io.readText(`${target}.lock`))).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 // v32 TEST-03: the commit-point ownership guard. A foreign claim landing on
@@ -51,7 +50,7 @@ it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer
 // loss-free (the class that broke as EVO-IO-01). Single-process simulation:
 // the task itself corrupts the lock body once, simulating a foreign steal.
 it('a foreign lock overwrite mid-RMW is detected at the commit point and the RMW is redone', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-owned-'))
+  const root = await tempRoot('dsh-io-owned-')
   const io = nodeEvolutionIo()
   const target = join(root, 'owned.txt')
   let attempts = 0
@@ -73,11 +72,10 @@ it('a foreign lock overwrite mid-RMW is detected at the commit point and the RMW
   expect(attempts).toBe(2)
   expect(sawLost).toBe(true)
   expect(await readFile(target, 'utf8')).toBe('x')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('nodeEvolutionIo.writeText takes over a stale lock (1s, E-8a) and still writes', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-stale-'))
+  const root = await tempRoot('dsh-io-stale-')
   const io = nodeEvolutionIo()
   const target = join(root, 'stale.txt')
   // A pid that cannot exist: the lock is stale AND holderless (rc.66 probe).
@@ -87,11 +85,10 @@ it('nodeEvolutionIo.writeText takes over a stale lock (1s, E-8a) and still write
   await io.writeText(target, 'fresh')
   expect(await readFile(target, 'utf8')).toBe('fresh')
   expect((await io.readText(`${target}.lock`))).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('nodeEvolutionIo never steals a lock from a LIVE holder older than 1s (rc.66)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-live-lock-'))
+  const root = await tempRoot('dsh-io-live-lock-')
   const io = nodeEvolutionIo()
   const target = join(root, 'live.txt')
   // A real live FOREIGN pid (a spawned child): the probe must refuse the
@@ -101,14 +98,13 @@ it('nodeEvolutionIo never steals a lock from a LIVE holder older than 1s (rc.66)
   const old = new Date(Date.now() - 60_000)
   await utimes(`${target}.lock`, old, old)
   await expect(io.writeText(target, 'fresh')).rejects.toThrow(/could not acquire write lock/)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   // The probe loop spends ~2s nominal (40 x 50ms retry budget); a loaded
   // machine crossed the default 5s cap in the full parallel run (0.3.28
   // release gate) — explicit budget so the retry loop owns the unbounded part.
 }, 15_000)
 
 it('nodeEvolutionIo takes over a stale lock from a GONE pid (rc.66)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-gone-lock-'))
+  const root = await tempRoot('dsh-io-gone-lock-')
   const io = nodeEvolutionIo()
   const target = join(root, 'gone.txt')
   await writeFile(`${target}.lock`, '999999', 'utf8')
@@ -116,11 +112,10 @@ it('nodeEvolutionIo takes over a stale lock from a GONE pid (rc.66)', async () =
   await utimes(`${target}.lock`, old, old)
   await io.writeText(target, 'fresh')
   expect(await readFile(target, 'utf8')).toBe('fresh')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('nodeEvolutionIo.transact runs read-modify-write atomically under one lock', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-transact-'))
+  const root = await tempRoot('dsh-io-transact-')
   const io = nodeEvolutionIo()
   const target = join(root, 'counter.json')
   const transact = io.transact
@@ -132,22 +127,20 @@ it('nodeEvolutionIo.transact runs read-modify-write atomically under one lock', 
   })))
   expect(await readFile(target, 'utf8')).toBe('8')
   expect((await io.readText(`${target}.lock`))).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('nodeEvolutionIo.transact deletes the file when task returns null', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-transact-del-'))
+  const root = await tempRoot('dsh-io-transact-del-')
   const io = nodeEvolutionIo()
   const target = join(root, 'remove-me.json')
   await io.writeText(target, 'keep')
   const transact = io.transact!
   await transact(target, async () => null)
   expect(await io.readText(target)).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('a task failure propagates immediately — it is never lock contention (E-8, 0.3.17)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-taskfail-'))
+  const root = await tempRoot('dsh-io-taskfail-')
   const io = nodeEvolutionIo()
   const target = join(root, 'ephemeral.json')
   let calls = 0
@@ -161,11 +154,10 @@ it('a task failure propagates immediately — it is never lock contention (E-8, 
   expect(calls).toBe(1)
   // The lock was released on the failure path.
   expect(await io.readText(`${target}.lock`)).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('sweeps stale tmp files of dead writers on the next write (E-8b, 0.3.17)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-tmpsweep-'))
+  const root = await tempRoot('dsh-io-tmpsweep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'sweep.json')
   const stale = `${target}.999999.abcd1234.tmp` // dead pid
@@ -175,11 +167,10 @@ it('sweeps stale tmp files of dead writers on the next write (E-8b, 0.3.17)', as
   await io.writeText(target, 'fresh')
   expect(await io.readText(stale)).toBeNull() // swept
   expect(await readFile(target, 'utf8')).toBe('fresh')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('does not sweep a fresh tmp from a live pid (E-8b, 0.3.17)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-tmpkeep-'))
+  const root = await tempRoot('dsh-io-tmpkeep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'keep.json')
   // A FOREIGN live pid — a genuinely in-flight writer's tmp is kept. Our own
@@ -189,22 +180,20 @@ it('does not sweep a fresh tmp from a live pid (E-8b, 0.3.17)', async () => {
   await writeFile(fresh, 'in-flight', 'utf8')
   await io.writeText(target, 'fresh')
   expect(await io.readText(fresh)).toBe('in-flight') // kept (recent, live pid)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('nodeEvolutionIo.list reports ENOENT as empty (P2-4) and isSymlink probes the entry (G7)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-list-'))
+  const root = await tempRoot('dsh-io-list-')
   const io = nodeEvolutionIo()
   expect(await io.list(join(root, 'missing-dir'))).toEqual([])
   const target = join(root, 'real-file.txt')
   await io.writeText(target, 'x')
   expect(await io.isSymlink?.(target)).toBe(false)
   expect(await io.isSymlink?.(join(root, 'missing'))).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('two peers take over one stale dead lock without double-holding (F-101)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-dual-takeover-'))
+  const root = await tempRoot('dsh-io-dual-takeover-')
   const io = nodeEvolutionIo()
   const target = join(root, 'dual.json')
   // A stale lock from a dead pid is the takeover target for TWO peers at once.
@@ -221,11 +210,10 @@ it('two peers take over one stale dead lock without double-holding (F-101)', asy
   })))
   expect(await readFile(target, 'utf8')).toBe('2')
   expect((await io.readText(`${target}.lock`))).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('self-heals a leftover lock carrying this process pid (F-367)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-selfheal-'))
+  const root = await tempRoot('dsh-io-selfheal-')
   const io = nodeEvolutionIo()
   const target = join(root, 'self.json')
   const lock = `${target}.lock`
@@ -245,11 +233,10 @@ it('self-heals a leftover lock carrying this process pid (F-367)', async () => {
   } finally {
     pendingSelfCleanup.delete(lock)
   }
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V8-05: a stale pendingSelfCleanup entry never removes a NEW same-pid lock (0.3.46)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-v805-'))
+  const root = await tempRoot('dsh-io-v805-')
   const io = nodeEvolutionIo()
   const target = join(root, 'v805.json')
   const lock = `${target}.lock`
@@ -268,11 +255,10 @@ it('V8-05: a stale pendingSelfCleanup entry never removes a NEW same-pid lock (0
   } finally {
     pendingSelfCleanup.delete(lock)
   }
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 }, 60_000)
 
 it('does not steal a same-pid lock held by a long-running task (V4-05)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-live-samepid-'))
+  const root = await tempRoot('dsh-io-live-samepid-')
   const io = nodeEvolutionIo()
   const target = join(root, 'live.json')
   const transact = io.transact!
@@ -292,11 +278,10 @@ it('does not steal a same-pid lock held by a long-running task (V4-05)', async (
   await Promise.all([first, second])
   expect(await readFile(target, 'utf8')).toBe('v1|v2')
   expect((await io.readText(`${target}.lock`))).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('takeover claims a stale dead lock atomically and leaves no residue (V4-04)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-atomic-takeover-'))
+  const root = await tempRoot('dsh-io-atomic-takeover-')
   const io = nodeEvolutionIo()
   const target = join(root, 'atomic.json')
   await writeFile(`${target}.lock`, '999999', 'utf8')
@@ -315,11 +300,10 @@ it('takeover claims a stale dead lock atomically and leaves no residue (V4-04)',
   expect(entries.filter(e => e.startsWith('atomic.json.takeover-'))).toEqual([])
   expect(entries.filter(e => e.endsWith('.lock'))).toEqual([])
   expect(entries).toEqual(['atomic.json'])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('ticket takeover survives 32-way contention on one dead lock — no lost RMW (V4-04 follow-up)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-ticket-takeover-'))
+  const root = await tempRoot('dsh-io-ticket-takeover-')
   // 240 attempts (~12s): under full-suite load the 32-way burst legitimately
   // exceeds the default ~2s budget; fail-loud only past a real stall.
   const io = nodeEvolutionIo(240)
@@ -343,13 +327,12 @@ it('ticket takeover survives 32-way contention on one dead lock — no lost RMW 
   expect(entries.filter(e => e.startsWith('ticket.json.takeover-'))).toEqual([])
   expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
   expect(entries).toEqual(['ticket.json'])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   // 32 serialized acquisitions take ~3-5s nominal; a loaded full-suite run
   // crossed the default 5s cap (0.3.28 follow-up gate) — explicit budget.
 }, 15_000)
 
 it('V27 G0.2 (EVO-IO-01): an EMPTY stale lock is taken over without admitting a second holder', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-emptylock-takeover-'))
+  const root = await tempRoot('dsh-io-emptylock-takeover-')
   const io = nodeEvolutionIo(240)
   const target = join(root, 'empty-takeover.json')
   // The shape the audit flagged: a creator that died (or was stalled between
@@ -379,11 +362,10 @@ it('V27 G0.2 (EVO-IO-01): an EMPTY stale lock is taken over without admitting a 
   expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
   // Takeovers are observable, naming the branch that fired and the body judged.
   expect(warnings.some(line => line.includes('taking over write lock') && line.includes('branch=staleEmpty'))).toBe(true)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 }, 15_000)
 
 it('V27 G1.4: the quarantine sweep covers every historical copy shape and spares user files', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-corrupt-sweep-'))
+  const root = await tempRoot('dsh-io-corrupt-sweep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'state.json')
   const stale = new Date(Date.now() - 8 * 86_400_000)
@@ -406,7 +388,6 @@ it('V27 G1.4: the quarantine sweep covers every historical copy shape and spares
   for (const name of shapes) expect(left).not.toContain(name)
   expect(left).toContain('overview.md.corrupt-backup.md')
   expect(left).toContain('state.json')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V27 G1.1: decideTakeover is the exhaustive decision table (branch x holder state x boundary)', () => {
@@ -439,7 +420,7 @@ it('V27 G1.1: decideTakeover is the exhaustive decision table (branch x holder s
 })
 
 it('renameWithRetry recovers from a transient EPERM and still commits (F-366)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-renameretry-'))
+  const root = await tempRoot('dsh-io-renameretry-')
   const src = join(root, 'src.txt')
   const dst = join(root, 'dst.txt')
   await writeFile(src, 'payload', 'utf8')
@@ -454,7 +435,6 @@ it('renameWithRetry recovers from a transient EPERM and still commits (F-366)', 
   await renameWithRetry(src, dst, flaky)
   expect(await readFile(dst, 'utf8')).toBe('payload')
   expect(calls).toBe(2) // initial + exactly one retry
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('renameWithRetry surfaces a non-retryable error immediately and gives up on persistent EPERM (C-28, C-28)', async () => {
@@ -474,7 +454,7 @@ it('renameWithRetry surfaces a non-retryable error immediately and gives up on p
 }, 15_000)
 
 it('writeText deletes its tmp when the commit rename still fails (F-366)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-tmpclean-'))
+  const root = await tempRoot('dsh-io-tmpclean-')
   const io = nodeEvolutionIo()
   const dirTarget = join(root, 'a-directory')
   await mkdir(dirTarget, { recursive: true })
@@ -486,11 +466,10 @@ it('writeText deletes its tmp when the commit rename still fails (F-366)', async
   await expect(io.writeText(dirTarget, 'x')).rejects.toThrow()
   const entries = await readdir(root)
   expect(entries.some(e => e.endsWith('.tmp'))).toBe(false)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 }, 15_000)
 
 it('sweeps this process own tmp immediately regardless of age (F-366)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-selfsweep-'))
+  const root = await tempRoot('dsh-io-selfsweep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'sweep.json')
   // Our own leftover tmp is recycled immediately (F-366) — a live writer's tmp
@@ -500,11 +479,10 @@ it('sweeps this process own tmp immediately regardless of age (F-366)', async ()
   await io.writeText(target, 'fresh')
   expect(await io.readText(fresh)).toBeNull() // swept (self pid)
   expect(await readFile(target, 'utf8')).toBe('fresh')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('self-heals a 0-byte lock left by a crashed creator (V6-04, 0.3.35)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-emptylock-'))
+  const root = await tempRoot('dsh-io-emptylock-')
   const io = nodeEvolutionIo()
   const target = join(root, 'empty-lock.json')
   // A creator that died between open and write leaves a 0-byte lock whose body
@@ -517,11 +495,10 @@ it('self-heals a 0-byte lock left by a crashed creator (V6-04, 0.3.35)', async (
   expect(await readFile(target, 'utf8')).toBe('fresh')
   const entries = await readdir(root)
   expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('reclaims a 0-byte takeover ticket older than the takeover threshold (V6-04, 0.3.35)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-emptyticket-'))
+  const root = await tempRoot('dsh-io-emptyticket-')
   const io = nodeEvolutionIo()
   const target = join(root, 'empty-ticket.json')
   await writeFile(`${target}.lock`, '999999', 'utf8')
@@ -533,11 +510,10 @@ it('reclaims a 0-byte takeover ticket older than the takeover threshold (V6-04, 
   expect(await readFile(target, 'utf8')).toBe('fresh')
   const entries = await readdir(root)
   expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('sweeps a stale `.lock.next` ticket left by a crashed takeover (V6-18, 0.3.35)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-ticketsweep-'))
+  const root = await tempRoot('dsh-io-ticketsweep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'ticket-sweep.json')
   // No lock present: the write acquires on the first attempt, so nothing in
@@ -548,11 +524,10 @@ it('sweeps a stale `.lock.next` ticket left by a crashed takeover (V6-18, 0.3.35
   await io.writeText(target, 'fresh')
   expect(await readFile(target, 'utf8')).toBe('fresh')
   expect(await io.readText(`${target}.lock.next`)).toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('keeps a fresh live-pid ticket in the sweep (V6-18, 0.3.35)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-ticketkeep-'))
+  const root = await tempRoot('dsh-io-ticketkeep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'ticket-keep.json')
   // A peer's in-flight takeover: a fresh ticket naming a LIVE pid is not a
@@ -560,11 +535,10 @@ it('keeps a fresh live-pid ticket in the sweep (V6-18, 0.3.35)', async () => {
   await writeFile(`${target}.lock.next`, String(spawnLivePid()), 'utf8')
   await io.writeText(target, 'fresh')
   expect(await io.readText(`${target}.lock.next`)).not.toBeNull()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V5-03: a byte-identical transact does not touch the file mtime (direct regression, 0.3.29)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-noop-mtime-'))
+  const root = await tempRoot('dsh-io-noop-mtime-')
   const io = nodeEvolutionIo()
   const target = join(root, 'noop.json')
   await io.writeText(target, 'fixed')
@@ -573,11 +547,10 @@ it('V5-03: a byte-identical transact does not touch the file mtime (direct regre
   await io.transact!(target, async () => 'fixed')
   const after = (await stat(target)).mtimeMs
   expect(after).toBe(before)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V10-06 (P1-1): a failing tmp fsync fails loud, leaves no tmp, and never touches the target', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-fsync-'))
+  const root = await tempRoot('dsh-io-fsync-')
   const target = join(root, 'durable.txt')
   await writeFile(target, 'precious', 'utf8')
   // Inject an open() whose handle syncs nothing: the real file is created and
@@ -597,11 +570,10 @@ it('V10-06 (P1-1): a failing tmp fsync fails loud, leaves no tmp, and never touc
   const entries = await readdir(root)
   expect(entries.some(name => name.endsWith('.tmp'))).toBe(false)
   expect(await readFile(target, 'utf8')).toBe('precious')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V10-06 (P1-1): a durable writeText still sweeps stale tmps and leaves no residue behind', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-durable-'))
+  const root = await tempRoot('dsh-io-durable-')
   const io = nodeEvolutionIo()
   const target = join(root, 'durable.txt')
   // A crashed writer's tmp (dead pid, old) is still swept on the next write;
@@ -614,11 +586,10 @@ it('V10-06 (P1-1): a durable writeText still sweeps stale tmps and leaves no res
   expect(await readFile(target, 'utf8')).toBe('fresh')
   expect(await io.readText(stale)).toBeNull()
   expect(await readdir(root)).toEqual(['durable.txt'])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V10-07 (P2-1): a torn lock body is refused while fresh, then taken over past the 1h threshold (warned once)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-tornlock-'))
+  const root = await tempRoot('dsh-io-tornlock-')
   const io = nodeEvolutionIo()
   const target = join(root, 'torn.json')
   // A torn body: non-empty, pid prefix unparseable (NaN) — it matched neither
@@ -647,12 +618,11 @@ it('V10-07 (P2-1): a torn lock body is refused while fresh, then taken over past
   } finally {
     console.warn = originalWarn
   }
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   // Two ~2s refused-acquisition budgets dominate the runtime.
 }, 20_000)
 
 it('S-10: a `.corrupt` quarantine copy older than 7 days is swept by the next write', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-corruptsweep-'))
+  const root = await tempRoot('dsh-io-corruptsweep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'state.json')
   await writeFile(`${target}.corrupt`, '{"broken"', 'utf8')
@@ -661,11 +631,10 @@ it('S-10: a `.corrupt` quarantine copy older than 7 days is swept by the next wr
   await io.writeText(target, 'fresh')
   expect(await io.readText(`${target}.corrupt`)).toBeNull() // swept
   expect(await readFile(target, 'utf8')).toBe('fresh')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('S-10: a `.corrupt` copy inside the 7-day rescue window is kept', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-corruptkeep-'))
+  const root = await tempRoot('dsh-io-corruptkeep-')
   const io = nodeEvolutionIo()
   const target = join(root, 'state.json')
   const content = '{"broken": true}'
@@ -675,11 +644,10 @@ it('S-10: a `.corrupt` copy inside the 7-day rescue window is kept', async () =>
   await io.writeText(target, 'fresh')
   // Still inside the operator rescue window — untouched.
   expect(await io.readText(`${target}.corrupt`)).toBe(content)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('C-07: the transact-less fallback skips the write on a byte-identical result', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-fallback-'))
+  const root = await tempRoot('dsh-io-fallback-')
   const io = nodeEvolutionIo()
   const target = join(root, 'fallback.json')
   await io.writeText(target, 'fixed')
@@ -695,7 +663,6 @@ it('C-07: the transact-less fallback skips the write on a byte-identical result'
   // A changed result still writes through the fallback.
   await transactIo(fallback, target, async () => 'changed')
   expect(await readFile(target, 'utf8')).toBe('changed')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V27 G1.3: a committed-but-unfsynced write is success-with-warning, not a rejection', async () => {
@@ -745,7 +712,7 @@ it('V27 G1.3: a committed-but-unfsynced write is success-with-warning, not a rej
 })
 
 it('P3-8 (v14): isSymlink returns null only for a missing path and propagates a real lstat failure', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-symlink-'))
+  const root = await tempRoot('dsh-io-symlink-')
   const io = nodeEvolutionIo()
   // Missing path = "guard not applicable".
   expect(await io.isSymlink!(join(root, 'nope'))).toBeNull()
@@ -754,12 +721,11 @@ it('P3-8 (v14): isSymlink returns null only for a missing path and propagates a 
   // A genuine lstat failure must NOT read as "not a symlink": an invalid path
   // throws ERR_INVALID_ARG_VALUE, which the old blanket catch swallowed.
   await expect(io.isSymlink!('bad\0path')).rejects.toThrow()
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('P3-9 (v14): an atomic rewrite preserves a tightened file mode (POSIX)', async () => {
   if (process.platform === 'win32') return
-  const root = await mkdtemp(join(tmpdir(), 'dsh-io-mode-'))
+  const root = await tempRoot('dsh-io-mode-')
   const io = nodeEvolutionIo()
   const target = join(root, 'secret.txt')
   await io.writeText(target, 'first')
@@ -767,5 +733,4 @@ it('P3-9 (v14): an atomic rewrite preserves a tightened file mode (POSIX)', asyn
   await io.writeText(target, 'second')
   expect((await stat(target)).mode & 0o777).toBe(0o600)
   expect(await readFile(target, 'utf8')).toBe('second')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

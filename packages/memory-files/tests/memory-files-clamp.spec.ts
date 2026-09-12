@@ -4,6 +4,7 @@ import MemoryRegistry from '@deepseek-ai/dsh-memory'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as MemoryFiles from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 // MemoryCharLimit/userCharLimit 0 is never an "unbounded" meaning (a 0 limit
 // would truncate every entry to nothing; MemoryStore keeps its own internal
@@ -15,16 +16,10 @@ async function mount(config: Record<string, unknown> = {}) {
   await ctx.plugin(MemoryRegistry)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
-  await ctx.plugin(MemoryFiles, { root: await makeTmp(), ...config })
+  await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-'), ...config })
   return ctx
 }
 
-async function makeTmp(): Promise<string> {
-  const fs = await import('node:fs/promises')
-  const os = await import('node:os')
-  const path = await import('node:path')
-  return fs.mkdtemp(path.join(os.tmpdir(), 'dsh-evolution-tmp-'))
-}
 
 describe('memory-files G3.1 numeric clamping', () => {
   const parse = (input: unknown): unknown => (MemoryFiles.Config as unknown as (i: unknown) => unknown)(input)

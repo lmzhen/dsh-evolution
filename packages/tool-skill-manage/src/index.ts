@@ -22,7 +22,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
-import type {} from '@deepseek-ai/dsh-evolution-core'
+import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
 export const name = 'tool-skill-manage'
@@ -222,41 +222,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       return { ok: false, message: `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`, skills: [] }
     }
     let feedbackLines: string[] = []
-    // v23 (AP-3): replay staleness guard for full-content updates. A staged
-    // update/edit carries the sha256 of the skill as it existed at STAGING
-    // time; if the live content has changed since, the full-content overwrite
-    // would silently roll back the intermediate edit (memory replays carry
-    // old_text for exactly this scenario). Refusing lets approve release the
-    // record back to pending — fail-safe, like the memory path. Records
-    // without the hash (legacy, or staggers that do not attach it) keep the
-    // previous last-writer-wins behavior.
-    if ((action === 'edit' || action === 'update') && typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== '') {
-      const currentContent = await library.read(name).catch(() => null)
-      const actual = contentHash(currentContent ?? '')
-      if (currentContent === null || actual !== args.staged_from_sha256) {
-        return {
-          ok: false,
-          message: `Skill "${name}" changed after this write was staged (content ${currentContent === null ? 'no longer exists' : 'hash mismatch'}); refusing to replay the stale snapshot. Re-apply the edit to stage a fresh copy.`,
-          skills: [],
-        }
-      }
-    }
-    // v30 REV-03: the same anchor for support-file writes/removes — the
-    // staged sha covers the file's CURRENT bytes (or their absence) at
-    // staging; a mismatch refuses the replay instead of last-writer-wins
-    // overwriting whatever changed since. An unreadable target cannot be
-    // verified and refuses the same way (the write itself would fail too).
-    if ((action === 'write_file' || action === 'remove_file') && typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== '') {
-      const currentBytes = await library.readSupportFile(name, args.file_path ?? '').catch(() => undefined)
-      const actual = currentBytes === undefined || currentBytes === null ? 'absent' : contentHash(currentBytes)
-      if (currentBytes === undefined || actual !== args.staged_from_sha256) {
-        return {
-          ok: false,
-          message: `Support file "${args.file_path ?? ''}" of "${name}" changed after this write was staged (or its state could not be verified); refusing to replay the stale snapshot. Re-stage the file operation.`,
-          skills: [],
-        }
-      }
-    }
+    // v23 (AP-3) / v30 REV-03 → v35 C9: the stage-time anchor is no longer
+    // compared here on a lock-free read — SkillLibrary verifies it against the
+    // bytes it reads INSIDE the write's own lock, so a concurrent writer landing
+    // between staging and commit is refused instead of overwritten and the replay
+    // saves the extra read. The refusal wording stays THIS function's: the library
+    // reports { stale, anchor } and leaves the phrasing to the caller.
+    const stagedAnchor: WriteAnchor | undefined =
+      typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== ''
+        ? args.staged_from_sha256 === 'absent' ? { absent: true } : { sha256: args.staged_from_sha256 }
+        : undefined
     // P0 authoring feedback: every create/update reports the description
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
@@ -272,11 +247,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     let result
     if (action === 'create') result = await library.create(name, args.content ?? '', origin)
-    else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin)
+    else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin, stagedAnchor)
     else if (action === 'patch') result = await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
     else if (action === 'delete') result = await library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
-    else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin)
-    else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin)
+    else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
+    else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor)
     else if (action === 'restructure') {
       // V8-09 (0.3.47): `args.restructure` is an ARRAY — a non-array payload
       // (garbage that slipped past the schema) used to throw a bare `.map`
@@ -305,6 +280,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     else if (action === 'unpin') result = await library.setPinned(name, false, origin)
     else result = { ok: false, message: `Unknown action "${action}".` }
 
+    // v35 C9: the library refused because the anchor did not hold — report it in
+    // this channel's staged wording (which kinds of drift exist is the tool's
+    // vocabulary, not the library's).
+    if (result.stale === true) {
+      const supportAction = action === 'write_file' || action === 'remove_file'
+      return {
+        ok: false,
+        message: supportAction
+          ? `Support file "${args.file_path ?? ''}" of "${name}" changed after this write was staged (or its state could not be verified).`
+          : `Skill "${name}" changed after this write was staged (content ${result.anchor === 'missing' ? 'no longer exists' : 'hash mismatch'}).`,
+        skills: [],
+      }
+    }
     if (result.ok) {
       // 0.3.11: the write point auto-quoted unquoted YAML-unsafe frontmatter
       // values (catalog-loadability) — surface it so the model can learn.

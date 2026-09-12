@@ -4,24 +4,21 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '../src/index.ts'
 import { eventsFile, loadUsage, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('skill-usage', () => {
   it('records use and persists to disk', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-'))
+    const root = await tempRoot('dsh-usage-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
     await ctx.skillUsage.record('demo', 'use')
     expect((await ctx.skillUsage.report()).get('demo')?.use_count).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P1-4: the sidecar key is trimmed at the service boundary (ghost-key divergence, 0.3.58)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-trim-'))
+    const root = await tempRoot('dsh-usage-trim-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -32,11 +29,10 @@ describe('skill-usage', () => {
     expect(map.has('spaced-name')).toBe(true)
     expect(map.has('  spaced-name  ')).toBe(false)
     expect(map.has('spaced-create')).toBe(true)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-dispose-'))
+    const root = await tempRoot('dsh-usage-dispose-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -58,11 +54,10 @@ describe('skill-usage', () => {
     }
     expect(settled).toBeGreaterThan(0)
     await fiber.dispose()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('markArchived sets state without bumping the patch counter', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-archive-'))
+    const root = await tempRoot('dsh-usage-archive-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -73,11 +68,10 @@ describe('skill-usage', () => {
     expect(record?.state).toBe('archived')
     expect(record?.archived_at).toBeTruthy()
     expect(record?.patch_count).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('invalidate() re-reads external writes instead of re-covering them', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-invalidate-'))
+    const root = await tempRoot('dsh-usage-invalidate-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -95,7 +89,6 @@ describe('skill-usage', () => {
     const seen = (await ctx.skillUsage.report()).get('demo')
     expect(seen?.quality_score).toBe(0.9)
     expect(seen?.view_count).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('falls back to skillsRoot() when root is unset or empty (P0-3)', async () => {
@@ -108,7 +101,7 @@ describe('skill-usage', () => {
   })
 
   it('observes the skill tool read through session/event and records a view (A2)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-observe-'))
+    const root = await tempRoot('dsh-usage-observe-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -126,11 +119,10 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('demo-read')
     expect(seen?.view_count).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('appends the observation-window anchor once, on the first observed read (C)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-anchor-'))
+    const root = await tempRoot('dsh-usage-anchor-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -153,11 +145,10 @@ describe('skill-usage', () => {
     expect(anchors[0]?.window?.opened).toBeTruthy()
     // Counts are the snapshot at the moment the window opened (first read).
     expect(anchors[0]?.counts?.views).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('does not mint a usage record for a read of an unknown skill (A2 guard)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-no-mint-'))
+    const root = await tempRoot('dsh-usage-no-mint-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -168,11 +159,10 @@ describe('skill-usage', () => {
     } as never)
     await ctx.skillUsage.invalidate()
     expect((await ctx.skillUsage.report()).has('never-created')).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('skips malformed tool/call events without throwing and without counting (E-65)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-malformed-'))
+    const root = await tempRoot('dsh-usage-malformed-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -193,11 +183,10 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('malformed-demo')
     expect(seen?.view_count).toBe(0)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('F-203: JSON-null arguments do not throw and do not count as a read', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-null-'))
+    const root = await tempRoot('dsh-usage-null-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -212,11 +201,10 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('null-args-demo')
     expect(seen?.view_count).toBe(0)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-70: ensureRecordCreated creates and marks authorship in one atomic write (0.3.18)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-e70-'))
+    const root = await tempRoot('dsh-usage-e70-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -228,11 +216,10 @@ describe('skill-usage', () => {
     expect(report.get('agent-skill')?.patch_count).toBe(0)
     expect(report.get('user-skill')).toBeDefined()
     expect(report.get('user-skill')?.created_by).toBeNull()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P1-1 (v15): setFeedbackQuality trims and writes the FEEDBACK-owned fields (no silent drop)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-n5q-'))
+    const root = await tempRoot('dsh-usage-n5q-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -242,11 +229,10 @@ describe('skill-usage', () => {
     const record = (await ctx.skillUsage.report()).get('demo')
     expect(record?.feedback_score).toBe(0.42)
     expect(record?.feedback_warn).toBe(true)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('N5 (v12): observeRead counts a whitespace-y tool name against the trimmed key', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-n5v-'))
+    const root = await tempRoot('dsh-usage-n5v-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -263,6 +249,5 @@ describe('skill-usage', () => {
       await new Promise(resolve => setTimeout(resolve, 25))
     }
     expect(views).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

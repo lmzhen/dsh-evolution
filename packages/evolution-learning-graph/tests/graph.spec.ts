@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as Graph from '../src/index.ts'
 import { buildLearningGraph, graphDensity, memorySnapshotOf, parseGraphNodeId, readMemoryIndex, renderNodeLine, resolveGraphNode } from '../src/index.ts'
+import { tempHome } from '../../test-support/temp-home.ts'
+import { captureCommands } from '../../test-support/commands-stub.ts'
 
 /** The registered /graph handler, captured through a stub `commands` service. */
 type GraphHandler = { handler(invocation: CommandInvocation): Promise<{ kind: 'success' | 'error'; text: string }> }
@@ -41,59 +43,46 @@ describe('learning graph', () => {
   })
 
   it('V27 INS-04: one unreadable skill file drops its edges instead of the whole graph', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-graph-ins04-'))
+    const root = await tempHome('dsh-graph-ins04-')
     const skillsRoot = join(root, 'skills')
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const healthy = '---\nname: healthy-skill\ndescription: healthy\n---\n\nBody.\n'
-      const broken = '---\nname: broken-skill\ndescription: broken\n---\n\nBody.\n'
-      await mkdir(join(skillsRoot, 'healthy-skill'), { recursive: true })
-      await mkdir(join(skillsRoot, 'broken-skill'), { recursive: true })
-      await writeFile(join(skillsRoot, 'healthy-skill', 'SKILL.md'), healthy, 'utf8')
-      await writeFile(join(skillsRoot, 'broken-skill', 'SKILL.md'), broken, 'utf8')
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
+    const healthy = '---\nname: healthy-skill\ndescription: healthy\n---\n\nBody.\n'
+    const broken = '---\nname: broken-skill\ndescription: broken\n---\n\nBody.\n'
+    await mkdir(join(skillsRoot, 'healthy-skill'), { recursive: true })
+    await mkdir(join(skillsRoot, 'broken-skill'), { recursive: true })
+    await writeFile(join(skillsRoot, 'healthy-skill', 'SKILL.md'), healthy, 'utf8')
+    await writeFile(join(skillsRoot, 'broken-skill', 'SKILL.md'), broken, 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', {
+      report: async () => new Map([['healthy-skill', {}], ['broken-skill', {}]]),
+    })
+    ctx.provide('memory', {
+      read: async () => [],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    // One skill's read fails the way a real EACCES/EMFILE does: `SkillLibrary`
+    // re-throws everything but EISDIR, and the unbounded `Promise.all` used to
+    // let that abort the whole `/graph`.
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', {
+      provider: () => ({
+        ...io,
+        readText: async (path: string) => {
+          if (path.includes('broken-skill')) throw new Error('EACCES: simulated unreadable skill')
+          return await io.readText(path)
         },
-      })
-      ctx.provide('skillUsage', {
-        report: async () => new Map([['healthy-skill', {}], ['broken-skill', {}]]),
-      })
-      ctx.provide('memory', {
-        read: async () => [],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      // One skill's read fails the way a real EACCES/EMFILE does: `SkillLibrary`
-      // re-throws everything but EISDIR, and the unbounded `Promise.all` used to
-      // let that abort the whole `/graph`.
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', {
-        provider: () => ({
-          ...io,
-          readText: async (path: string) => {
-            if (path.includes('broken-skill')) throw new Error('EACCES: simulated unreadable skill')
-            return await io.readText(path)
-          },
-        }),
-      })
-      const warnings: string[] = []
-      const originalWarn = ctx.logger.warn.bind(ctx.logger)
-      ctx.logger.warn = ((message: string) => { warnings.push(message); originalWarn(message) }) as typeof ctx.logger.warn
-      await ctx.plugin(Graph, { root: skillsRoot })
-      const result = await handler!.handler(invocationOf(''))
-      expect(result.kind).toBe('success')
-      expect(result.text).toContain('healthy-skill')
-      expect(result.text).toContain('broken-skill')
-      expect(warnings.some(message => message.includes('could not be read'))).toBe(true)
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+      }),
+    })
+    const warnings: string[] = []
+    const originalWarn = ctx.logger.warn.bind(ctx.logger)
+    ctx.logger.warn = ((message: string) => { warnings.push(message); originalWarn(message) }) as typeof ctx.logger.warn
+    await ctx.plugin(Graph, { root: skillsRoot })
+    const result = await handler!.handler(invocationOf(''))
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('healthy-skill')
+    expect(result.text).toContain('broken-skill')
+    expect(warnings.some(message => message.includes('could not be read'))).toBe(true)
   })
 
   it('memory nodes embed a snapshot token so edit/delete detect index drift (F15 parity + E-21)', () => {
@@ -270,40 +259,27 @@ describe('learning graph', () => {
   })
 
   it('F-10: the /graph directory caps its node block on a large usage set', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-cap-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      const names = Array.from({ length: 250 }, (_, i) => `cap-skill-${String(i).padStart(3, '0')}`)
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('skillUsage', {
-        report: async () => new Map(names.map(name => [name, {}])),
-      })
-      ctx.provide('memory', {
-        read: async () => [],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      await ctx.plugin(Graph)
-      const result = await handler!.handler(invocationOf(''))
-      expect(result.kind).toBe('success')
-      expect(result.text).toContain('● cap-skill-000')
-      expect(result.text).toContain('…50 more')
-      expect(result.text).not.toContain('● cap-skill-249')
-      // The density footer still reports the TRUE totals beyond the cap.
-      expect(result.text).toContain('Skills: 250')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('evo-graph-cap-')
+    const ctx = new Context()
+    const names = Array.from({ length: 250 }, (_, i) => `cap-skill-${String(i).padStart(3, '0')}`)
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', {
+      report: async () => new Map(names.map(name => [name, {}])),
+    })
+    ctx.provide('memory', {
+      read: async () => [],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf(''))
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('● cap-skill-000')
+    expect(result.text).toContain('…50 more')
+    expect(result.text).not.toContain('● cap-skill-249')
+    // The density footer still reports the TRUE totals beyond the cap.
+    expect(result.text).toContain('Skills: 250')
   })
 
   it('V10-11 (P2-7): Config.root routes graph reads to the configured skills tree, not the default root', async () => {
@@ -320,12 +296,7 @@ describe('learning graph', () => {
 
       const ctx = new Context()
       let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
+      ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
       ctx.provide('skillUsage', {
         report: async () => new Map<string, unknown>(),
       })
@@ -343,12 +314,7 @@ describe('learning graph', () => {
 
       const ctxDefault = new Context()
       let defaultHandler: typeof handler
-      ctxDefault.provide('commands', {
-        register: (definition: unknown) => {
-          defaultHandler = definition as typeof handler
-          return () => {}
-        },
-      })
+      ctxDefault.provide('commands', captureCommands((definition) => { defaultHandler = definition as typeof handler }))
       ctxDefault.provide('skillUsage', {
         report: async () => new Map<string, unknown>(),
       })
@@ -370,285 +336,212 @@ describe('learning graph', () => {
   })
 
   it('V4-13: a no-op graph edit (byte-equivalent content) does not bump the patch counter, a real edit does', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-noop-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const skillDir = join(root, 'skills', 'demo-skill')
-      await mkdir(skillDir, { recursive: true })
-      const content = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n'
-      await writeFile(join(skillDir, 'SKILL.md'), content, 'utf8')
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      let recordCalls = 0
-      ctx.provide('skillUsage', {
-        record: async () => { recordCalls += 1 },
-        report: async () => new Map<string, unknown>(),
-      })
-      ctx.provide('memory', {
-        read: async () => [],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      await ctx.plugin(Graph)
-      // Re-save the exact on-disk content: core update returns noop:true, so the
-      // graph branch must NOT count it (V4-13 — previously it counted on result.ok).
-      const noop = await handler!.handler(invocationOf(`edit demo-skill ${content}`))
-      expect(noop.kind).toBe('success')
-      expect(noop.text).toContain('unchanged')
-      expect(recordCalls).toBe(0)
-      // A real content edit still counts exactly once.
-      const changed = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody changed\n'
-      const real = await handler!.handler(invocationOf(`edit demo-skill ${changed}`))
-      expect(real.kind).toBe('success')
-      expect(real.text).toContain('updated')
-      expect(recordCalls).toBe(1)
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('evo-graph-noop-')
+    const skillDir = join(root, 'skills', 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    const content = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n'
+    await writeFile(join(skillDir, 'SKILL.md'), content, 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    let recordCalls = 0
+    ctx.provide('skillUsage', {
+      record: async () => { recordCalls += 1 },
+      report: async () => new Map<string, unknown>(),
+    })
+    ctx.provide('memory', {
+      read: async () => [],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await ctx.plugin(Graph)
+    // Re-save the exact on-disk content: core update returns noop:true, so the
+    // graph branch must NOT count it (V4-13 — previously it counted on result.ok).
+    const noop = await handler!.handler(invocationOf(`edit demo-skill ${content}`))
+    expect(noop.kind).toBe('success')
+    expect(noop.text).toContain('unchanged')
+    expect(recordCalls).toBe(0)
+    // A real content edit still counts exactly once.
+    const changed = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody changed\n'
+    const real = await handler!.handler(invocationOf(`edit demo-skill ${changed}`))
+    expect(real.kind).toBe('success')
+    expect(real.text).toContain('updated')
+    expect(recordCalls).toBe(1)
   })
 
   it('N1 (v12): /graph edit passes the command invocation session to the approval request', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
-      // stage the skill the tests edit/delete.
-      const skillsDir = join(root, 'skills', 'demo-skill')
-      await mkdir(skillsDir, { recursive: true })
-      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('skillUsage', {
-        report: async () => new Map<string, unknown>(),
-      })
-      ctx.provide('memory', {
-        read: async () => [],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      let captured: { sessionId?: unknown; session?: unknown; args?: { origin?: unknown } } | undefined
-      ctx.provide('evolutionApproval', {
-        // P2-7 (v15): hasRunner is part of the staging contract (the graph
-        // pre-checks it before staging).
-        hasRunner: () => true,
-        request: async (input: unknown) => {
-          captured = input as typeof captured
-          return { action: 'staged', message: 'staged for approval' }
-        },
-      })
-      await ctx.plugin(Graph)
-      const result = await handler!.handler(invocationOf('edit demo-skill new body', { id: 'sess-n1', header: { origin: 'subagent' } }))
-      expect(result.kind).toBe('success')
-      // The approval service derives the platform session policy from these —
-      // before N1 the graph sent neither and documented the absence as a
-      // platform limitation (a `never`-policy session staged anyway). A
-      // subagent-origin session derives to the review channel (resolveOrigins).
-      expect(captured?.sessionId).toBe('sess-n1')
-      expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1')
-      expect(captured?.args?.origin).toBe('background_review')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('evo-graph-n1-')
+    // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+    // stage the skill the tests edit/delete.
+    const skillsDir = join(root, 'skills', 'demo-skill')
+    await mkdir(skillsDir, { recursive: true })
+    await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', {
+      report: async () => new Map<string, unknown>(),
+    })
+    ctx.provide('memory', {
+      read: async () => [],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let captured: { sessionId?: unknown; session?: unknown; args?: { origin?: unknown } } | undefined
+    ctx.provide('evolutionApproval', {
+      // P2-7 (v15): hasRunner is part of the staging contract (the graph
+      // pre-checks it before staging).
+      hasRunner: () => true,
+      request: async (input: unknown) => {
+        captured = input as typeof captured
+        return { action: 'staged', message: 'staged for approval' }
+      },
+    })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf('edit demo-skill new body', { id: 'sess-n1', header: { origin: 'subagent' } }))
+    expect(result.kind).toBe('success')
+    // The approval service derives the platform session policy from these —
+    // before N1 the graph sent neither and documented the absence as a
+    // platform limitation (a `never`-policy session staged anyway). A
+    // subagent-origin session derives to the review channel (resolveOrigins).
+    expect(captured?.sessionId).toBe('sess-n1')
+    expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1')
+    expect(captured?.args?.origin).toBe('background_review')
   })
 
   it('E-3 (v18): /graph edit forwards the platform session policy to the approval request', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-e3-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', { register: (definition: unknown) => { handler = definition as typeof handler; return () => {} } })
-      ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
-      ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      // v30 GRAPH-03: the staging pre-check requires the target to exist.
-      const skillsDir = join(root, 'skills', 'demo-skill')
-      await mkdir(skillsDir, { recursive: true })
-      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
-      // The PLATFORM approval service is the single source of the session
-      // policy (effectiveSessionPolicy); a `never` policy must reach the
-      // evolution approval request so the seam can refuse to stage.
-      ctx.provide('approval', { overrideOf: () => undefined, config: { policy: 'never' } })
-      let captured: { sessionPolicy?: unknown } | undefined
-      ctx.provide('evolutionApproval', {
-        hasRunner: () => true,
-        request: async (input: unknown) => { captured = input as typeof captured; return { action: 'staged', message: 'staged for approval' } },
-      })
-      await ctx.plugin(Graph)
-      const result = await handler!.handler(invocationOf('edit demo-skill new body', { id: 'sess-e3', header: { origin: 'subagent' } }))
-      expect(result.kind).toBe('success')
-      expect(captured?.sessionPolicy).toBe('never')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('evo-graph-e3-')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
+    ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // v30 GRAPH-03: the staging pre-check requires the target to exist.
+    const skillsDir = join(root, 'skills', 'demo-skill')
+    await mkdir(skillsDir, { recursive: true })
+    await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
+    // The PLATFORM approval service is the single source of the session
+    // policy (effectiveSessionPolicy); a `never` policy must reach the
+    // evolution approval request so the seam can refuse to stage.
+    ctx.provide('approval', { overrideOf: () => undefined, config: { policy: 'never' } })
+    let captured: { sessionPolicy?: unknown } | undefined
+    ctx.provide('evolutionApproval', {
+      hasRunner: () => true,
+      request: async (input: unknown) => { captured = input as typeof captured; return { action: 'staged', message: 'staged for approval' } },
+    })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf('edit demo-skill new body', { id: 'sess-e3', header: { origin: 'subagent' } }))
+    expect(result.kind).toBe('success')
+    expect(captured?.sessionPolicy).toBe('never')
   })
 
   it('N1 (v12): /graph delete passes the session too and a never-policy session is not staged', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1d-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
-      // stage the skill the tests edit/delete.
-      const skillsDir = join(root, 'skills', 'demo-skill')
-      await mkdir(skillsDir, { recursive: true })
-      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('skillUsage', {
-        report: async () => new Map<string, unknown>(),
-      })
-      ctx.provide('memory', {
-        read: async () => [],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      let captured: { sessionId?: unknown; session?: unknown } | undefined
-      ctx.provide('evolutionApproval', {
-        // P2-7 (v15): hasRunner is part of the staging contract (the graph
-        // pre-checks it before staging).
-        hasRunner: () => true,
-        request: async (input: unknown) => {
-          captured = input as typeof captured
-          return { action: 'allow', message: 'allowed' }
-        },
-      })
-      await ctx.plugin(Graph)
-      await handler!.handler(invocationOf('delete demo-skill', { id: 'sess-n1d', header: { origin: 'foreground' } }))
-      expect(captured?.sessionId).toBe('sess-n1d')
-      expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1d')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('evo-graph-n1d-')
+    // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+    // stage the skill the tests edit/delete.
+    const skillsDir = join(root, 'skills', 'demo-skill')
+    await mkdir(skillsDir, { recursive: true })
+    await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', {
+      report: async () => new Map<string, unknown>(),
+    })
+    ctx.provide('memory', {
+      read: async () => [],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let captured: { sessionId?: unknown; session?: unknown } | undefined
+    ctx.provide('evolutionApproval', {
+      // P2-7 (v15): hasRunner is part of the staging contract (the graph
+      // pre-checks it before staging).
+      hasRunner: () => true,
+      request: async (input: unknown) => {
+        captured = input as typeof captured
+        return { action: 'allow', message: 'allowed' }
+      },
+    })
+    await ctx.plugin(Graph)
+    await handler!.handler(invocationOf('delete demo-skill', { id: 'sess-n1d', header: { origin: 'foreground' } }))
+    expect(captured?.sessionId).toBe('sess-n1d')
+    expect((captured?.session as { id?: string } | undefined)?.id).toBe('sess-n1d')
   })
 
   it('P2-6 (v15)/v16: /graph edit memory:* stages through the approval seam with a runner-replayable payload', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1m-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
-      // stage the skill the tests edit/delete.
-      const skillsDir = join(root, 'skills', 'demo-skill')
-      await mkdir(skillsDir, { recursive: true })
-      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('skillUsage', {
-        report: async () => new Map<string, unknown>(),
-      })
-      // The memory stub mirrors the file-backed store: readMemoryIndex
-      // resolves index 0 against this list, and applyBatch is what the direct
-      // path would have called.
-      ctx.provide('memory', {
-        read: async () => ['existing entry body'],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      let captured: { kind?: unknown; summary?: unknown; args?: unknown } | undefined
-      ctx.provide('evolutionApproval', {
-        hasRunner: () => true,
-        request: async (input: unknown) => {
-          captured = input as typeof captured
-          return { action: 'staged', message: 'staged for approval' }
-        },
-      })
-      await ctx.plugin(Graph)
-      const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem', header: { origin: 'foreground' } }))
-      expect(result.kind).toBe('success')
-      // P2-6: the memory branch goes through the approval seam (v15 batch),
-      // staged in the tool-memory runner's replay shape.
-      expect(captured?.kind).toBe('memory')
-      expect(captured?.summary).toBe('graph edit memory:user:0')
-      const args = captured?.args as { target?: string; operations?: Array<{ action?: string; old_text?: string; facts?: string }> }
-      expect(args.target).toBe('user')
-      expect(args.operations?.[0]).toMatchObject({ action: 'replace', old_text: 'existing entry body', facts: 'replacement body' })
-      // The direct path never ran: applyBatch is not stubbed to record, and a
-      // stub returning ok would still be fine — assert via the stage message.
-      expect(result.text).toContain('staged for approval')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('evo-graph-n1m-')
+    // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+    // stage the skill the tests edit/delete.
+    const skillsDir = join(root, 'skills', 'demo-skill')
+    await mkdir(skillsDir, { recursive: true })
+    await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', {
+      report: async () => new Map<string, unknown>(),
+    })
+    // The memory stub mirrors the file-backed store: readMemoryIndex
+    // resolves index 0 against this list, and applyBatch is what the direct
+    // path would have called.
+    ctx.provide('memory', {
+      read: async () => ['existing entry body'],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let captured: { kind?: unknown; summary?: unknown; args?: unknown } | undefined
+    ctx.provide('evolutionApproval', {
+      hasRunner: () => true,
+      request: async (input: unknown) => {
+        captured = input as typeof captured
+        return { action: 'staged', message: 'staged for approval' }
+      },
+    })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem', header: { origin: 'foreground' } }))
+    expect(result.kind).toBe('success')
+    // P2-6: the memory branch goes through the approval seam (v15 batch),
+    // staged in the tool-memory runner's replay shape.
+    expect(captured?.kind).toBe('memory')
+    expect(captured?.summary).toBe('graph edit memory:user:0')
+    const args = captured?.args as { target?: string; operations?: Array<{ action?: string; old_text?: string; facts?: string }> }
+    expect(args.target).toBe('user')
+    expect(args.operations?.[0]).toMatchObject({ action: 'replace', old_text: 'existing entry body', facts: 'replacement body' })
+    // The direct path never ran: applyBatch is not stubbed to record, and a
+    // stub returning ok would still be fine — assert via the stage message.
+    expect(result.text).toContain('staged for approval')
   })
 
   it('P2-7 (v15)/v16: /graph edit memory:* refuses when staging will happen but no memory runner is mounted', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'evo-graph-n1mr-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
-      // stage the skill the tests edit/delete.
-      const skillsDir = join(root, 'skills', 'demo-skill')
-      await mkdir(skillsDir, { recursive: true })
-      await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
-      const ctx = new Context()
-      let handler: GraphHandler | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('skillUsage', {
-        report: async () => new Map<string, unknown>(),
-      })
-      ctx.provide('memory', {
-        read: async () => ['existing entry body'],
-        applyBatch: async () => ({ ok: true, message: 'ok' }),
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      ctx.provide('evolutionApproval', {
-        // Host-only assembly: approval enabled, the tool-memory runner row absent.
-        isEnabled: true,
-        hasRunner: (kind: string) => kind !== 'memory',
-        request: async () => { throw new Error('request must not be called when the pre-check refuses') },
-      })
-      await ctx.plugin(Graph)
-      const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem2', header: { origin: 'foreground' } }))
-      expect(result.kind).toBe('error')
-      expect(result.text).toContain('cannot be staged')
-      expect(result.text).toContain('tool-memory')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('evo-graph-n1mr-')
+    // v30 GRAPH-03: the staging pre-check requires the target to EXIST —
+    // stage the skill the tests edit/delete.
+    const skillsDir = join(root, 'skills', 'demo-skill')
+    await mkdir(skillsDir, { recursive: true })
+    await writeFile(join(skillsDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\nbody\n', 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', {
+      report: async () => new Map<string, unknown>(),
+    })
+    ctx.provide('memory', {
+      read: async () => ['existing entry body'],
+      applyBatch: async () => ({ ok: true, message: 'ok' }),
+    })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    ctx.provide('evolutionApproval', {
+      // Host-only assembly: approval enabled, the tool-memory runner row absent.
+      isEnabled: true,
+      hasRunner: (kind: string) => kind !== 'memory',
+      request: async () => { throw new Error('request must not be called when the pre-check refuses') },
+    })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem2', header: { origin: 'foreground' } }))
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('cannot be staged')
+    expect(result.text).toContain('tool-memory')
   })
 })

@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, assertSkillsRootAliasRetired, contentHash, DEFAULT_SKILL_LIMITS, evolutionIoAdapter, foldTurn, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
-import type {} from '@deepseek-ai/dsh-evolution-core'
+import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
@@ -388,10 +388,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (!agent) return
     const signal = foldTurn(session, turnStarts.get(session.id) ?? Math.max(0, session.seq - 1))
     turnStarts.delete(session.id)
-    const stateService = ctx.get('evolutionState') as {
-      loadReviewState(id: string): Promise<ReviewState | null>
-      saveReviewState(id: string, record: ReviewState): Promise<void>
-    } | undefined
+    // R7 (v35): no cast — the evolution-state module augmentation types this
+    // service, so the hand-written shape (and its drift risk) is gone.
+    const stateService = ctx.get('evolutionState')
     if (!stateService && !statelessReviewStateWarned) {
       statelessReviewStateWarned = true
       ctx.logger.warn('dsh-evolution-review: evolution-state service not mounted — memory/skill review cadence is not persisted and resets every turn (see README Known Limitations).')
@@ -759,15 +758,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
     if (!io) return hashes
     const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()))
-    for (const summary of await library.list().catch((error: unknown) => {
+    // v35 C3(a)/C11: the listing already reads every SKILL.md, so ask it for the
+    // bodies instead of re-reading each skill just to hash it (the pre-run
+    // snapshot ran once per review, for both kinds).
+    for (const summary of await library.list({ withContent: true }).catch((error: unknown) => {
       // v33 R2-3: the fail-open here silently disarms the v32 REV-06(b)
       // staleness gate for EVERY skill - say so instead of an empty map with
       // no trace.
       ctx.logger.warn(`dsh-evolution-review: skill tree scan failed (${error instanceof Error ? error.message : String(error)}) — pre-run staleness hashes are unavailable; full-content updates will not be drift-checked this review`)
       return []
     })) {
-      const text = await library.read(summary.name).catch(() => null)
-      if (text !== null) hashes.set(summary.name, contentHash(text))
+      // A skill the listing could not read carries no body: it stays out of the
+      // snapshot exactly as the former per-skill read's null did.
+      if (summary.content !== undefined) hashes.set(summary.name, contentHash(summary.content))
     }
     return hashes
   }
@@ -1145,8 +1148,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // whose live content no longer matches). Review ops re-read through a
         // lightweight read-only library; patch ops carry old_string anchors
         // and need no hash.
+        let stageCurrent: string | null = null
         if ((args.action === 'update' || args.action === 'edit') && hashLibrary && typeof args.name === 'string' && args.name !== '') {
-          const stageCurrent = await hashLibrary.read(args.name).catch(() => null)
+          stageCurrent = await hashLibrary.read(args.name).catch(() => null)
           if (stageCurrent !== null) (args as { staged_from_sha256?: string }).staged_from_sha256 = contentHash(stageCurrent)
         }
         // v30 REV-03: support-file ops carry the same anchor — the staged sha
@@ -1165,7 +1169,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const opName = typeof args.name === 'string' ? args.name : ''
         const hashChecked = (args.action === 'update' || args.action === 'edit') && opName !== '' && preRunHashes?.has(opName) === true
         if (hashChecked) {
-          const live = await hashLibrary?.read(opName).catch(() => null) ?? null
+          // C10 (v35): the staging read above already holds this skill's bytes —
+          // for update/edit ops nothing awaited in between — so the pre-run
+          // comparison reuses them instead of issuing a second read of the same
+          // file (a null here also covers the no-library case, as before).
+          const live = stageCurrent
           const preRun = preRunHashes.get(opName)
           if (live === null || (preRun !== undefined && contentHash(live) !== preRun)) {
             ok = false
@@ -1295,22 +1303,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (origin !== 'foreground' && protectedNames?.includes(name) && op.action !== 'create') {
         return { ok: false, message: `Skill "${name}" is protected by the current policy (protectedSkillNames); autonomous writes are refused.` }
       }
-      // v31 REV-05: the support-file staleness anchor (attached at staging)
-      // is enforced here too — the direct path (approval-disabled DEFAULT)
-      // otherwise commits the staged bytes over whatever changed since
-      // staging, with both writers reporting success (REV-01's defect shape
-      // on the support-file ops). 'absent' anchors a file that did not exist
-      // at staging; an unreadable target refuses as unverifiable.
-      if (op.action === 'write_file' || op.action === 'remove_file') {
-        const expected = (op as { staged_from_sha256?: string }).staged_from_sha256
-        if (typeof expected === 'string' && expected !== '') {
-          const current = await library.readSupportFile(name, op.file_path ?? '').catch(() => undefined)
-          const actual = current === undefined || current === null ? 'absent' : contentHash(current)
-          if (current === undefined || actual !== expected) {
-            return { ok: false, message: `Support file "${op.file_path ?? ''}" of "${name}" changed since this plan was produced — the staged file operation was refused as stale. Re-read the skill tree and produce a fresh plan.` }
-          }
-        }
-      }
       if (op.action === 'create') {
         // The direct path (approval-disabled deployments) must keep the same
         // lifecycle entry as the runner: an agent-created record so the
@@ -1323,20 +1315,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return created
       }
       if (op.action === 'edit' || op.action === 'update') {
-        // v30 REV-01: enforce the staleness anchor this file attaches at
-        // staging time. The tool/replay channel verifies it (tool-skill-manage);
-        // this direct path (approval-disabled DEFAULT) used to commit the
-        // G-generation full content over whatever is current — a concurrent
-        // foreground patch was silently lost with BOTH writers reporting
-        // success. Re-read under our own call and refuse on drift.
-        const expected = (op as { staged_from_sha256?: string }).staged_from_sha256
-        if (typeof expected === 'string' && expected !== '') {
-          const current = await library.read(name).catch(() => null)
-          if (current !== null && contentHash(current) !== expected) {
-            return { ok: false, message: `Skill "${name}" changed since this plan was produced — the full-content update was refused as stale. Re-read the skill and produce a fresh plan.` }
-          }
-        }
-        const updated = await library.update(name, op.content ?? '', origin)
+        // v30 REV-01 → v35 C9: this direct path (approval-disabled DEFAULT) used
+        // to compare the staging anchor against its own lock-free read, then call
+        // the library — a concurrent foreground patch landing in between was
+        // silently lost with BOTH writers reporting success. The anchor now rides
+        // the library call and is verified against the bytes read under the
+        // write's own lock.
+        const updated = await library.update(name, op.content ?? '', origin, anchorOf(op))
+        if (updated.stale === true) return staleRefusal(updated, name, op.file_path)
         // v30 TSM-04: keep the mutation-maturity accounting aligned with the
         // runner path, which bumps patch_count for every content write.
         if (updated.ok) {
@@ -1374,22 +1360,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // P3 (v16): no `?? op.content` fallback — the validator (plan-validator
       // write_file gate) and the approval runner (tool-skill-manage) are both
       // file_content-only; the fallback here was a dead-but-divergent branch.
-      // v31 REV-05: enforce the support-file staleness anchor on this direct
-      // path too — the staging attach (write_file/remove_file) records the
-      // file's current bytes (or the 'absent' sentinel), and the approval-
-      // disabled DEFAULT channel used to commit the staged bytes over
-      // whatever changed since, with both writers reporting success.
+      // v31 REV-05 → v35 C9: the support-file anchor rides the library call for
+      // the same reason as the body anchor above; the second lock-free copy of
+      // this check (it used to run twice on this path) is gone with it.
       if (op.action === 'write_file' || op.action === 'remove_file') {
-        const expected = (op as { staged_from_sha256?: string }).staged_from_sha256
-        if (typeof expected === 'string' && expected !== '') {
-          const current = await library.readSupportFile(name, op.file_path ?? '').catch(() => undefined)
-          const actual = current === undefined || current === null ? 'absent' : contentHash(current)
-          if (current === undefined || actual !== expected) {
-            return { ok: false, message: `Support file "${op.file_path ?? ''}" of "${name}" changed since this plan was produced — the staged file operation was refused as stale. Re-read the skill tree and produce a fresh plan.` }
-          }
+        const anchor = anchorOf(op)
+        if (op.action === 'write_file') {
+          const written = await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? '', origin, anchor)
+          if (written.stale === true) return staleRefusal(written, name, op.file_path)
+          return written
         }
-        if (op.action === 'write_file') return await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? '', origin)
-        const removedSupport = await library.removeSupportFile(name, op.file_path ?? '', origin)
+        const removedSupport = await library.removeSupportFile(name, op.file_path ?? '', origin, anchor)
+        if (removedSupport.stale === true) return staleRefusal(removedSupport, name, op.file_path)
         // v30 TSM-04 parity: support-file removals mutate the skill package.
         if (removedSupport.ok) {
           const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
@@ -1436,6 +1418,46 @@ export function shouldCompletionReview(reason: { kind?: string } | undefined, se
  * `skill_search` discovery pair, so that branch was dead. `skill_manage` has no
  * per-skill read action (its `list`/`review` are whole-library), so a specific
  * skill read through it cannot be tracked — see README Known Limitations. */
+/**
+ * v35 C9: the staging anchor of one accepted plan op, in the shape the library
+ * verifies against the bytes it reads under the write's own lock. The `absent`
+ * sentinel is the same one the tool's staging attaches for a support file that
+ * did not exist when the plan was produced.
+ * The staged field rides OUTSIDE the plan schema (the staging channel attaches
+ * it to the op payload), so it is read defensively rather than typed on SkillOp.
+ * @param op - one accepted plan op.
+ * @returns the anchor, or `undefined` when the op carries none.
+ */
+function anchorOf(op: unknown): WriteAnchor | undefined {
+  const expected = (op as { staged_from_sha256?: unknown }).staged_from_sha256
+  if (typeof expected !== 'string' || expected === '') return undefined
+  return expected === 'absent' ? { absent: true } : { sha256: expected }
+}
+
+/**
+ * Translate the library's anchor refusal into this channel's staging wording.
+ * The library reports WHICH drift it saw (drift / missing / unverifiable); the
+ * vocabulary ("this plan was produced", "produce a fresh plan") is the review
+ * channel's. A body op whose skill vanished keeps the historical not-found
+ * report: the former lock-free check only refused on a DRIFTED body, so a
+ * deleted target fell through to the write's own not-found result.
+ * @param result - the library's stale result.
+ * @param name - the skill the op targets.
+ * @param filePath - the support-file path for file ops; omitted for body ops.
+ * @returns the refusal to return from the direct path.
+ */
+function staleRefusal(result: SkillActionResult, name: string, filePath?: string): SkillActionResult {
+  if (filePath === undefined && result.anchor === 'missing') {
+    return { ok: false, message: `Skill "${name}" not found.` }
+  }
+  return {
+    ok: false,
+    message: filePath === undefined
+      ? `Skill "${name}" changed since this plan was produced — the full-content update was refused as stale. Re-read the skill and produce a fresh plan.`
+      : `Support file "${filePath}" of "${name}" changed since this plan was produced — the staged file operation was refused as stale. Re-read the skill tree and produce a fresh plan.`,
+  }
+}
+
 function collectReadSkillNames(session: Session): Set<string> {
   // v32 REV-06(a): a skill counts as READ only when its `tool/call` has a
   // MATCHING `tool/result` that is not an error — the call alone used to be

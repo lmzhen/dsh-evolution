@@ -409,11 +409,17 @@ export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Pr
  * malformed (or unreadable) ARCHIVE is skipped — it never bricks the boot and
  * it is still flagged.
  */
-export async function readEvolutionTimeline(io: EvolutionIoLike, path: string): Promise<EventLogRead> {
+export async function readEvolutionTimeline(
+  io: EvolutionIoLike,
+  path: string,
+  archives?: readonly string[],
+): Promise<EventLogRead> {
   const dir = dirname(path)
   let malformed = false
   const bySeq = new Map<number, EvolutionEvent>()
-  for (const name of await listEventArchives(io, path)) {
+  // C2 (v35): a caller that already listed the archives (the boot restore does)
+  // passes them in instead of paying a second directory scan.
+  for (const name of archives ?? await listEventArchives(io, path)) {
     const read = await readEvolutionEvents(io, join(dir, name))
     if (read.malformed) malformed = true
     for (const event of read.events) bySeq.set(event.seq, event)

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // ${configDir} rebases the inherited paths onto each extending package: a
+  // plain "src"/"lib/types" here would resolve against THIS directory instead.
+  "compilerOptions": {
+    "rootDir": "${configDir}/src",
+    "outDir": "${configDir}/lib/types"
+  },
+  "include": ["${configDir}/src"]
+}

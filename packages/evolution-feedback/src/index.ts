@@ -24,7 +24,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, eventsFile, evolutionIoAdapter, evolutionRoot, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionIoAdapter, evolutionRoot, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
@@ -128,6 +128,10 @@ export class EvolutionFeedback {
       // created the log in the race window is handled by the merge in
       // migrateFeedbackEvents (append, never drop).
       const archiveNames = await listEventArchives(io, eventsPath)
+      // C2 (v35): the cache file is read ONCE for both consumers below — the
+      // migration branch's parseAggregate and the boot cache's parseCache (both
+      // are pure; the migration writes only the event log, never this file).
+      const rawCache = await io.readText(path)
       const noLog = rawEvents === null || rawEvents.trim() === ''
       if (noLog && archiveNames.length === 0) {
         // V24-05 (v24): the migration path now consumes the SAME per-record
@@ -139,18 +143,20 @@ export class EvolutionFeedback {
         // flowed into the folded record as a type lie. Bad records are
         // dropped with a warn; surviving counts are clamped to the migration
         // budget below.
-        const aggregate = parseAggregate(await io.readText(path), this.warn)
+        const aggregate = parseAggregate(rawCache, this.warn)
         if (aggregate) {
           try {
-            await migrateFeedbackEvents(io, eventsPath, aggregate)
+            await migrateFeedbackEvents(io, eventsPath, aggregate, this.warn)
           } catch {
             // Best-effort: a failed migration means the log stays absent and
             // history starts empty — the old aggregate is not re-booted.
           }
         }
       }
-      const { events } = await readEvolutionTimeline(io, eventsPath)
-      const cache = parseCache(await io.readText(path), this.warn)
+      // The archives listed above ride along: the timeline reader would
+      // otherwise scan the same directory again.
+      const { events } = await readEvolutionTimeline(io, eventsPath, archiveNames)
+      const cache = parseCache(rawCache, this.warn)
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       const floor = events[0]?.seq ?? 0
       // rc.72 G-3: a cache whose lastSeq fell below the timeline floor is out
@@ -391,8 +397,24 @@ function containsLegacySequence(existing: EvolutionEvent[], expected: EvolutionE
  * and race-safe (the search runs inside the same transact). Exported for the
  * migration-race regression test.
  */
-export async function migrateFeedbackEvents(io: IoLike, eventsPath: string, aggregate: FeedbackState): Promise<void> {
+export async function migrateFeedbackEvents(
+  io: IoLike,
+  eventsPath: string,
+  aggregate: FeedbackState,
+  warn: (message: string) => void = () => {},
+): Promise<void> {
   const expected = synthesizeFeedbackEvents(aggregate)
+  // v35 R5: this is the event log's SECOND writer, and it used to serialize the
+  // synthesized batch straight to disk — bypassing the durable-boundary payload
+  // gate every live append runs (evolution-events: appendEvolutionEvent). The
+  // synthesizer feeds off a sanitized aggregate, so a violation means the two
+  // halves drifted apart; refuse the WHOLE batch (never a half-written log) and
+  // say so, so the drift is visible instead of silently durable.
+  const refused = expected.filter(event => evolutionEventPayloadIssue(event) !== null)
+  if (refused.length > 0) {
+    warn(`evolution-feedback: migration refused ${refused.length} synthesized event(s) that the event log's payload gate rejects (types: ${[...new Set(refused.map(event => event.type))].join(', ')}) — history starts empty instead of writing an unreadable log`)
+    return
+  }
   await transactIo(io, eventsPath, (current) => {
     const existing = parseEvolutionEvents(current)
     // Skip = hand back `current` untouched: null means "no file" in the

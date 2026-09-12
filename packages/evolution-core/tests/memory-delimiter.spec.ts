@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ENTRY_DELIMITER, MemoryStore } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 /**
  * F-201: a fact carrying the on-disk entry delimiter (or ending in `\n§`) would
@@ -13,7 +13,7 @@ import { ENTRY_DELIMITER, MemoryStore } from '@deepseek-ai/dsh-evolution-core'
  */
 describe('memory entry-delimiter defense (F-201)', () => {
   it('add refuses a fact ending in a delimiter fragment and leaves the file unchanged', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-delim-end-'))
+    const root = await tempRoot('dsh-evo-memory-delim-end-')
     const store = new MemoryStore({ root })
     expect((await store.add('memory', 'alpha')).ok).toBe(true)
     const before = await readFile(join(root, 'MEMORY.md'), 'utf8')
@@ -24,21 +24,19 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.message).toContain('entry delimiter (§)')
     expect(result.message).toContain('rewrite it as separate facts')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('add refuses a fact containing the delimiter mid-body', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-delim-mid-'))
+    const root = await tempRoot('dsh-evo-memory-delim-mid-')
     const store = new MemoryStore({ root })
     const result = await store.add('memory', `first${ENTRY_DELIMITER}second`)
     expect(result.ok).toBe(false)
     expect(result.message).not.toContain('Operation')
     expect(result.message).toContain('entry delimiter (§)')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('applyBatch add refuses a delimiter fact, names its position, and keeps the file unchanged', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-delim-batch-'))
+    const root = await tempRoot('dsh-evo-memory-delim-batch-')
     const store = new MemoryStore({ root })
     await store.add('memory', 'alpha')
     const before = await readFile(join(root, 'MEMORY.md'), 'utf8')
@@ -54,11 +52,10 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.message).toContain('Current entries (preview):')
     expect(result.message).toContain('- alpha')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('applyBatch replace refuses a delimiter fact and names its position', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-delim-replace-'))
+    const root = await tempRoot('dsh-evo-memory-delim-replace-')
     const store = new MemoryStore({ root })
     await store.add('memory', 'alpha fact')
     const before = await readFile(join(root, 'MEMORY.md'), 'utf8')
@@ -71,14 +68,12 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.message).toContain('Current entries (preview):')
     expect(result.message).toContain('- alpha fact')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a delimiting fact never reaches the store, so no entry is created', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-memory-delim-nostate-'))
+    const root = await tempRoot('dsh-evo-memory-delim-nostate-')
     const store = new MemoryStore({ root })
     await store.add('memory', `a${ENTRY_DELIMITER}b`)
     expect(await store.read('memory')).toEqual([])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

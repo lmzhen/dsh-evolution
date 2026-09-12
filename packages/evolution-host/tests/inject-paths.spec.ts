@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 const run = promisify(execFile)
 const injector = fileURLToPath(new URL('../../scripts/inject-evolution-paths.mjs', import.meta.url))
@@ -30,7 +30,7 @@ const MIRROR = `{
 
 describe('inject-evolution-paths (N-7 purity)', () => {
   it('injects only evolution alias lines and preserves upstream rows', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-inject-'))
+    const root = await tempRoot('dsh-inject-')
     const target = join(root, 'target.json')
     const mirror = join(root, 'mirror.json')
     await writeFile(target, TARGET)
@@ -46,11 +46,10 @@ describe('inject-evolution-paths (N-7 purity)', () => {
     // machine-specific, and a target that already declares it must not fail
     // the "already declares an evolution alias" check.
     expect(next).not.toContain('"zod"')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('fails loudly when the target already declares an evolution alias line', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-inject-clash-'))
+    const root = await tempRoot('dsh-inject-clash-')
     const target = join(root, 'target.json')
     const mirror = join(root, 'mirror.json')
     await writeFile(target, TARGET.replace('"@deepseek-ai/dsh-session"', '"@deepseek-ai/dsh-session",\n      "@deepseek-ai/dsh-evolution-core": ["./packages/evolution/evolution-core/src/index.ts"]'))
@@ -60,6 +59,5 @@ describe('inject-evolution-paths (N-7 purity)', () => {
     expect(error).not.toBeNull()
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('absorbed this row')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

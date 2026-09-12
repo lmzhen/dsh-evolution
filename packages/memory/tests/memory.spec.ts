@@ -89,4 +89,21 @@ describe('MemoryRegistry', () => {
     // No name keeps the backward-compatible first-registered behavior.
     expect(ctx.memory.provider()).toBe(first)
   })
+
+  it('v35 R1: a stale dispose handle cannot remove a newer registration of the same object', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    const stale = ctx.memory.registerProvider(provider)
+    stale()
+    // Re-registering the SAME singleton is legitimate once the name is free —
+    // object identity alone would let the first handle delete this registration.
+    ctx.memory.registerProvider(provider)
+    stale()
+    expect(await ctx.memory.read('memory')).toEqual(['a'])
+    // The current handle still disposes, and double-dispose stays a no-op.
+    const current = ctx.memory.registerProvider({ ...provider, name: 'other' })
+    current()
+    current()
+    expect(() => ctx.memory.provider('other')).toThrow(/not registered/)
+  })
 })

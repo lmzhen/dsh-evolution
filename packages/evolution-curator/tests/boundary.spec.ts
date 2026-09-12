@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '../src/index.ts'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
+import { tempHome } from '../../test-support/temp-home.ts'
 
 // v21 (T-8): some tests restore DSH_HOME only on the success path — one
 // failing assertion used to leak a temp-dir DSH_HOME into later tests in the
@@ -27,27 +26,17 @@ async function mount(_home: string, config: ConstructorParameters<typeof Evoluti
 
 describe('evolution-curator boundaries', () => {
   it('D2: a custom config.root points the SkillLibrary at the custom tree (0.3.58)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-root-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const customRoot = join(home, 'custom-skills')
-      const ctx = await mount(home, { root: customRoot })
-      expect(ctx.evolutionCurator.skills.root).toBe(customRoot)
-      // Default (root omitted): resolveSkillsRoot falls back to $DSH_HOME/skills.
-      const defaultCtx = await mount(home)
-      expect(defaultCtx.evolutionCurator.skills.root).toBe(join(home, 'skills'))
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const home = await tempHome('dsh-curator-root-')
+    const customRoot = join(home, 'custom-skills')
+    const ctx = await mount(home, { root: customRoot })
+    expect(ctx.evolutionCurator.skills.root).toBe(customRoot)
+    // Default (root omitted): resolveSkillsRoot falls back to $DSH_HOME/skills.
+    const defaultCtx = await mount(home)
+    expect(defaultCtx.evolutionCurator.skills.root).toBe(join(home, 'skills'))
   })
 
   it('skips an automatic run while a session is recently active', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-idle-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    const home = await tempHome('dsh-curator-idle-')
     const ctx = await mount(home, { minIdleHours: 1 })
     // v32 TEST-02 (CUR-04): a stateful agents stub - the FIRST
     // recentSessionActive call (pre-run gate) sees an idle session so the run
@@ -96,28 +85,18 @@ describe('evolution-curator boundaries', () => {
     const record = usage.get('seeded-skill')
     expect(record?.state).toBe('active')
     expect(typeof record?.created_at).toBe('string')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('ignores a malformed report file instead of crashing the report reader', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-report-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    const home = await tempHome('dsh-curator-report-')
     const ctx = await mount(home)
     const io = ctx.evolutionIo.provider('node')
     await io.writeText(join(evolutionHome(), 'reports', 'curator-bad.json'), '{broken')
     expect(await ctx.evolutionCurator.latestReport()).toBeNull()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('H-07: setPaused warns when the curator state service is absent (pause not persisted)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-pause-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    const home = await tempHome('dsh-curator-pause-')
     // No evolutionState service mounted: the optional-chain form used to make
     // setPaused a silent no-op — the command surface reported success while
     // nothing was persisted. The warn must declare the loss.
@@ -126,8 +105,5 @@ describe('evolution-curator boundaries', () => {
     await expect(ctx.evolutionCurator.setPaused(true)).resolves.toBeUndefined()
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('curator state service absent; pause not persisted'))
     warnSpy.mockRestore()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

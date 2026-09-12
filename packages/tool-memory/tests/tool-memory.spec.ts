@@ -8,6 +8,7 @@ import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolMemory from '../src/index.ts'
 import { MEMORY_GUIDANCE, MEMORY_TOOL_DESCRIPTION } from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 /** The `memory` tool's declared output schema, as the tests read it back. */
 interface MemoryToolResult {
@@ -26,7 +27,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     await ctx.plugin(ToolMemory, {})
     expect(ctx.tools.get('memory')).toBeDefined()
   })
@@ -56,7 +57,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     let captured: { sessionPolicy?: string } | undefined
     ctx.provide('approval', {
       overrideOf: () => 'never',
@@ -85,7 +86,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     const summaries: string[] = []
     ctx.provide('evolutionApproval', {
       request: async (input: { summary?: string }) => {
@@ -122,7 +123,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     ctx.provide('evolutionState', {
       listPending: async () => [],
       savePending: async () => {},
@@ -147,7 +148,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     await ctx.plugin(ToolMemory, {})
     // Bypass write — the `/graph memory:` / background-review direct path.
     await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'P2-bypass-fact' }])
@@ -165,7 +166,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     await ctx.plugin(ToolMemory, {})
     const spy = vi.spyOn(ctx.memory, 'renderContext')
     const tool = ctx.tools.get('memory')!
@@ -194,7 +195,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     // systemPrompt is absent: guidance/snapshot skipped, boot and tool still work.
     await ctx.plugin(ToolMemory, {})
     expect(ctx.get('systemPrompt')).toBeUndefined()
@@ -220,7 +221,7 @@ describe('tool-memory', () => {
     await ctx.plugin(NodeIo)
     // Boot order trap: tool-memory mounts BEFORE the memory provider registers.
     await ctx.plugin(ToolMemory, {})
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     // A write through the tool cures the empty snapshot via the applied event.
     const tool = ctx.tools.get('memory')!
     const execArg = { agent: { session: { header: { version: 0, id: 's3', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
@@ -239,7 +240,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     // NaN passes the schema; without the assembly clamp `slice(0, NaN)`
     // echoed an EMPTY preview for every entry instead of the default cap.
     await ctx.plugin(ToolMemory, { entryPreviewChars: NaN })
@@ -258,7 +259,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     let approvals = 0
     ctx.provide('evolutionApproval', {
       request: async () => { approvals += 1; return { action: 'staged', message: 'staged' } },
@@ -279,15 +280,9 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     await ctx.plugin(ToolMemory, { memoryEnabled: false })
     expect(ctx.tools.get('memory')).toBeUndefined()
   })
 })
 
-async function makeTmp(): Promise<string> {
-  const fs = await import('node:fs/promises')
-  const os = await import('node:os')
-  const path = await import('node:path')
-  return fs.mkdtemp(path.join(os.tmpdir(), 'dsh-evolution-tmp-'))
-}

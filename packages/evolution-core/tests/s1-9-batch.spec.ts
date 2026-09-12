@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   latestActivityAt,
@@ -12,6 +11,7 @@ import {
   yamlPlainScalarNeedsQuotes,
   type TurnSignals,
 } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('0.3.16 S1.9 batch (E-42..E-50)', () => {
   it('E-45: hermes_env matches the win32 %USERPROFILE% form', () => {
@@ -57,7 +57,7 @@ describe('0.3.16 S1.9 batch (E-42..E-50)', () => {
   })
 
   it('E-43: a SKILL.md directory reads as absent through the library surface while readText keeps flagging EISDIR', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-e43-'))
+    const root = await tempRoot('dsh-evo-e43-')
     const lib = new SkillLibrary(root)
     await lib.create('normal-skill', '---\nname: normal-skill\ndescription: fine.\n---\n\n# N\n', 'foreground')
     await rm(join(root, 'normal-skill', 'SKILL.md'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -66,6 +66,5 @@ describe('0.3.16 S1.9 batch (E-42..E-50)', () => {
     expect(await lib.read('normal-skill')).toBeNull()
     // Raw IO keeps throwing so rotation can still flag the malformed slot (G-2).
     await expect(nodeEvolutionIo().readText(join(root, 'normal-skill', 'SKILL.md'))).rejects.toThrow()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.3.71 (patch) — v34 文本面降长（净 −1.5k 行）＋ v35 结构面 I/O 与正确性收口
+
+> **范围**：① `dsh-evolution-mirror-loc-audit-v34.md` §8 的杠杆 D/B/C 逐项实测、E 面六方向榨取；② `dsh-evolution-mirror-codepath-audit-v35.md` 的「能做，但要带条件」清单逐项裁决后，只做**不损可维护性与鲁棒性**的那一类；③ 两项零语义风险的收口（C11 窄版、A6 防漂移守卫）。
+> **发布门禁（本版实测，0.1.5-rc.2 验证树最终态）**：全链 **10/10** —— `native-system`、`build-lib`（29 包）、`vitest` **112 文件 / 1078 用例全绿**（`--maxWorkers=2 --testTimeout=30000`）、`tsc -b tsconfig.host.json` **0 错**、`oxlint` **0 warnings / 0 errors**（211 文件）、`verify-dependency-closure`、`verify-arch-guards`、`verify-event-pairing`、`verify-declared-config`、`run-load-sensitive` 全 exit 0；三树 `authority↔mirror↔overlay` **354 文件 0 差异**。
+> **账目**：镜像相对 `v0.3.70` 的**代码面**（不含本 CHANGELOG 与 30 份 manifest 的版本对齐）= **98 文件、+3,290 / −4,840 = 净 −1,550 行**（含 6 个新文件 286 行：`evolution-core/tests/library-limits-guard.spec.ts`、`test-support/{fake-io,temp-home,commands-stub,state-stack}.ts`、`tsconfig.pkg.json`）。**本版不以行数为唯一目标**：v35 结构面主动把其中 **+234 行**换成「I/O 更少 + 一处正确性修复」（见第二节），C11/A6 两笔同属等价交换。
+> **未动的三项（需用户决策）**：**A 注释治理**（2,000–5,000 行；注释占 src 字节 48%，是文本面最大杠杆，但属「搬家到台账」且 R-04 等审计锚的证据载体就在注释里）、**`invariant.ts` 退役**（≈665 行；v28 UP-02 刻意契约 vs 平台 0.1.5 的新规范）、**C 的守卫改造版**（≈50 行 + 改 `verify-declared-config.mjs` 的注释要求，属发布链改动）。
+
+### 一、v34 文本面：逐杠杆实测交付
+
+| 批次 | 内容 | 实测净行/树 |
+|---|---|---|
+| D | 29 份包 tsconfig 收敛（`packages/tsconfig.pkg.json` + `${configDir}` 相对化） | −469 |
+| E/F6 | `fakeIo()` 三份合一（core / host / preset） | −85 |
+| E/F1① | 临时根目录 + `DSH_HOME` 存取 + rm 重试仪式 → `test-support/temp-home.ts` | −471 |
+| E/F1② | 测试体末尾清理（Pattern B；由三条新守卫倒逼出规则） | −553 |
+| E/F2① | commands 捕获桩去重 → `test-support/commands-stub.ts` | −177 |
+| E/F9 | 挂载栈提取 → `test-support/state-stack.ts` | −81 |
+| E/F5 | 本地 mount 夹具 + `makeTmp` 合并 | −100 |
+| E/F11 | 其余小簇（`makeTmp` 收口） | −15 |
+
+> 上表各批为**该批实测**（口径＝镜像工作树 diff，逐批单独跑过全量门禁）；四份新 `test-support` 文件与 `tsconfig.pkg.json` 的行数只在上一节总账里计入 —— 两处口径不同，故不逐项相加。
+
+### 二、v35 结构面：把行数换成 I/O 与正确性（净 +234 行）
+
+| 项 | 改动 | 效果 | 验证 |
+|---|---|---|---|
+| **R1**（正确性） | `memory` 的 `registerProvider` 加 dispose **代次 guard**（句柄只在仍是当前代时生效） | 关闭「dispose → 重注册同一对象 → 旧句柄删掉活注册」——原判据只有对象身份，分辨不了代次 | 新增回归用例；**红/绿实证**（未修复源码下该用例红，修复后绿） |
+| **C7** | `skill-usage` 窗口开启判据 `usageTotals(map).views === 0` → `!usageObserved(map)`（core 已有早退） | 每次「读技能」判定 O(N) → O(1)；事件 payload 仍用全量求和不改 | 43 用例 + 全链 |
+| **C4** | `evolution-curator` 的 `scoreTree(usage, treeNames, contents)` → `referenceCounts(contents)`，复用本轮已读正文 | 每次 curator 运行少 **N 次读 + 1 次 list** | 173 用例 + 全链 |
+| **C2** | `evolution-core` 新增 `readEvolutionTimeline(io, path, archives?)`；`evolution-feedback` 把缓存文件读一次、归档列一次 | 每次 boot restore 少 **1 次目录列 + 1 次文件读** | 同上 |
+| **C10** | `evolution-review` pre-run 陈旧比对复用 staging 那次读（两者之间无 await） | 每个 update/edit op 少 **1 次读** | 同上（含 anchored-smoke） |
+| **R7** | `evolution-approval` 删自建 `EvolutionStateLike`、改用导出服务类型；`evolution-review` 去手写形状后**连 cast 都不需要**（模块增强已给出类型） | 服务改名/漂移由 `tsc` 捕获；契约单一所有者 | tsc + oxlint（两处冗余都是 oxlint 抓的） |
+| **R6（队列）** | `skill-usage` 手写串行链 → core `makeSerialQueue()`；`invalidate()` 用「入队空任务」表达 drain | 进程内队列单一实现（第 5 处使用） | tsc + oxlint + 全链 |
+| **C9** | 陈旧锚折进库内 RMW：`SkillLibrary.update/writeSupportFile/removeSupportFile(+ *Core)` 接受 `WriteAnchor`（`{sha256}` 或 `{absent:true}`），在**锁内**读后判定 `match/drift/missing`；`runSingleWrite` 把锁内读失败转成结构化拒绝 | 每个 staged 写**少 1 次锁外读**，且 **guard→commit 的丢失更新窗关闭**（并发写落在两者之间时，由「可能覆盖、双方都报成功」变为「必然拒绝」） | 5 条新用例（`skill-store.spec.ts` 的 `v35 C9:` 组）；`tool-skill-manage` / `evolution-review` 的锁外预检查改为把锚交给库；家族原文案逐字保留（含 `(content no longer exists)` / `(content hash mismatch)` / `(or its state could not be verified)` 三态映射） |
+| **R5** | `migrateFeedbackEvents` 用 core 的 `evolutionEventPayloadIssue` 过滤合成批次：命中即**整批拒绝** + `warn`（不写半截日志） | 关掉第二个事件日志写入者对 payload 门的绕过 | feedback 29 用例 + 全链 |
+
+**两项收口（零语义风险）**：
+
+- **C11 窄版**：`SkillLibrary.list(options)` 新增**默认关闭**的 `withContent`；`evolution-review` 的 `treeSkillHashes` 由「list + 逐技能读」改为单遍读 —— 每次 review 计划执行少 **N 次读**。（maintenance 的两条消费者**未切**：它们需要先统一错误策略，属行为变更，留待独立批次。）
+- **A6 防漂移守卫**：`evolution-core/tests/library-limits-guard.spec.ts` **不**改组合面，而是把「11 处 `new SkillLibrary` 中 9 处取默认 limits」这一**已复核集合**钉住（其中 3 处是写入者，即 v35 审计 REV-04 记录的漂移面；其余 6 处只读），新增构造点或新增写调用即**变红并强制决策**。守卫自带**空转保护**（register 里出现「已消失的站点」同样红），并已做**红/绿实证**（临时给 `evolution-skill-catalog/src/index.ts` 加一个未登记的构造点 → 恰报 1 条未登记项，撤销后绿）。
+
+### 三、实测否决与刻意跳过（附数字，避免重复立案）
+
+- **F8**（三份 `dependency-contract.spec.ts` 去重）**不是杠杆**：只有 host/preset 两份 97% 相同、共可省 36 行，而共享 helper（含 JSDoc 与两个断言助手）需 59–61 行 → 净 **+25 行**，已按实数回退。
+- **B2**（clamp 模板 5 处）：实测净 **+8 行** → 回退。
+- **C**（YAML 单源）：实测 **≈45–55 行**，且被 `verify-declared-config.mjs` 的「平台键必须出现在 yml 注释里」要求挡住（搬注释必须同时改守卫，属发布链改动）→ 不做。
+- **F2**（`retainReports` 两个默认参内联）：实测 **0 行**净变化。
+- **C8 / C12**（review 直连路径的重复锚校验、inject 分支的第二次 RMW）：看似可删，实为「两次读之间被外部改写」的唯一拦截点 → 与 **C9** 合并处置（本版已做），**不单删**。
+- **F5 尾项**（`record/markArchived` 的 `at`、`assessHealth` 默认阈值）：是刻意保留的**测试时间注入缝**，删除只省 1–2 行却砍掉注入点。
+- **R6 其余子项**（sha256 ×6、`isRecord` ×8、marker 探测 ×5、sanitizer ×2 等 ≈70 行、触及约 25 个文件）：值得单独一批单独验证，不与本轮混做。
+
+### 四、验证
+
+- 每批：定向 vitest 套件（43 / 98 / 115 / 173 用例等）+ `tsc-host` + `oxlint` 全跑；**改动含 tests 时 oxlint 覆盖 tests 目录** —— 本轮即由 `tsc-host`/`oxlint` 抓出守卫文件的 2 类类型错与 3 处风格错（`member-delimiter-style`、`restrict-plus-operands`、`noUncheckedIndexedAccess`），修完复跑两步骤各自 1/1 绿。
+- 末次全量：见开头门禁行（10/10）。
+
 ## 0.3.70 (patch) — 平台跨代适配：目标线 DSH 0.1.5-rc.2（v33 兼容审计 18 步）
 
 > **支持窗口（本版声明）**：本版本**已在平台 `0.1.5-rc.2` 上验证**。**`0.1.1-rc.2` 及更早不在支持窗口内**，两条硬依据：① node-semver 预发布准入规则使 `^0.1.1-rc.2` 不匹配 `0.1.5-rc.2`（对稳定 `0.1.5` 却匹配），失败发生在**依赖解析**阶段；② `@deepseek-ai/dsh` 自 0.1.5 起不再发布 `config/`，agent 预设迁到 `packages/preset/agent-presets/presets/`（`code` 预设改名 `ptc`——**家族不受此改名影响**：只解析 `standard`，自装预设固定在 `$DSH_HOME/.agent-presets/evolution`）。家族定位为**跟随当前已验证线**，不做双代兼容、不引入适配层。

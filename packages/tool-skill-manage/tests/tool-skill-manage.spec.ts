@@ -12,6 +12,7 @@ import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tempHome } from '../../test-support/temp-home.ts'
 
 function fakeAgent(origin: string | undefined): Agent {
   return { session: { header: { origin }, append: () => {} } } as unknown as Agent
@@ -252,33 +253,25 @@ describe('tool-skill-manage', () => {
   })
 
   it('refuses an over-bar description when descriptionStrict is enabled (P0)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-strict-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      await mountAgentLoopTestDependencies(ctx)
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(SkillUsageRegistry, { root })
-      await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
-      const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
-      const result = await ctx.tools.execute({
-        callId: ToolCallId(`strict-${Math.random()}`),
-        name: 'skill_manage',
-        arguments: { action: 'create', name: 'strict-skill', content: SKILL.replace('boundary-skill', 'strict-skill').replace('lifecycle boundary test', over) },
-        agent: fakeAgent(undefined),
-        signal: new AbortController().signal,
-      })
-      expect(result.isError).toBe(false)
-      expect((result.value as { ok?: boolean; message?: string } | undefined)?.ok).toBe(false)
-      expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
-      await ctx.fiber.dispose()
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('dsh-skill-strict-')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
+    const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
+    const result = await ctx.tools.execute({
+      callId: ToolCallId(`strict-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'create', name: 'strict-skill', content: SKILL.replace('boundary-skill', 'strict-skill').replace('lifecycle boundary test', over) },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect(result.isError).toBe(false)
+    expect((result.value as { ok?: boolean; message?: string } | undefined)?.ok).toBe(false)
+    expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+    await ctx.fiber.dispose()
   })
 
   it('marks review-created skills for curator lifecycle management, but not foreground writes', async () => {
@@ -382,47 +375,36 @@ describe('tool-skill-manage', () => {
   })
 
   it('action=edit gets the same authoring strict gate as create/update (M-1)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-strict-edit-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      await mountAgentLoopTestDependencies(ctx)
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(SkillUsageRegistry, { root })
-      await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
-      const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
-      // edit routes to the same full-content update as update — the gate must not be bypassable.
-      const result = await ctx.tools.execute({
-        callId: ToolCallId(`edit-strict-${Math.random()}`),
-        name: 'skill_manage',
-        arguments: { action: 'edit', name: 'edit-strict', content: SKILL.replace('boundary-skill', 'edit-strict').replace('lifecycle boundary test', over) },
-        agent: fakeAgent(undefined),
-        signal: new AbortController().signal,
-      })
-      expect((result.value as { ok?: boolean } | undefined)?.ok).toBe(false)
-      expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
-      await ctx.fiber.dispose()
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('dsh-skill-strict-edit-')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
+    const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
+    // edit routes to the same full-content update as update — the gate must not be bypassable.
+    const result = await ctx.tools.execute({
+      callId: ToolCallId(`edit-strict-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'edit', name: 'edit-strict', content: SKILL.replace('boundary-skill', 'edit-strict').replace('lifecycle boundary test', over) },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect((result.value as { ok?: boolean } | undefined)?.ok).toBe(false)
+    expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+    await ctx.fiber.dispose()
   })
 
   it('action=restructure moves a body section to references/ (B)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-restructure-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      await mountAgentLoopTestDependencies(ctx)
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(SkillUsageRegistry, { root })
-      await ctx.plugin(ToolSkillManage)
-      const body = `---
+    const root = await tempHome('dsh-skill-restructure-')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.plugin(ToolSkillManage)
+    const body = `---
 name: fat-body
 description: restructure fixture.
 ---
@@ -437,33 +419,28 @@ description: restructure fixture.
 
 Use it.
 `
-      const created = await ctx.tools.execute({
-        callId: ToolCallId(`restructure-create-${Math.random()}`),
-        name: 'skill_manage',
-        arguments: { action: 'create', name: 'fat-body', content: body },
-        agent: fakeAgent(undefined),
-        signal: new AbortController().signal,
-      })
-      expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
-      const moved = await ctx.tools.execute({
-        callId: ToolCallId(`restructure-move-${Math.random()}`),
-        name: 'skill_manage',
-        arguments: { action: 'restructure', name: 'fat-body', restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] },
-        agent: fakeAgent(undefined),
-        signal: new AbortController().signal,
-      })
-      expect((moved.value as { ok?: boolean } | undefined)?.ok).toBe(true)
-      const md = await readFile(join(root, 'skills', 'fat-body', 'SKILL.md'), 'utf8')
-      expect(md).toContain('> 详见 references/log.md')
-      expect(md).not.toContain('rc.99')
-      const sidecar = await ctx.skillUsage.report()
-      expect(sidecar.get('fat-body')?.patch_count).toBe(1)
-      await ctx.fiber.dispose()
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const created = await ctx.tools.execute({
+      callId: ToolCallId(`restructure-create-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'create', name: 'fat-body', content: body },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    const moved = await ctx.tools.execute({
+      callId: ToolCallId(`restructure-move-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'restructure', name: 'fat-body', restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect((moved.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    const md = await readFile(join(root, 'skills', 'fat-body', 'SKILL.md'), 'utf8')
+    expect(md).toContain('> 详见 references/log.md')
+    expect(md).not.toContain('rc.99')
+    const sidecar = await ctx.skillUsage.report()
+    expect(sidecar.get('fat-body')?.patch_count).toBe(1)
+    await ctx.fiber.dispose()
   })
 
   it('T-13: limit schemas reject zero/negative values at configuration time (0.3.18)', () => {
@@ -514,39 +491,31 @@ Use it.
   })
 
   it('V6-06: NaN numeric limits fall back to the defaults and stay enforced (0.3.35)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-manage-nan-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      await mountAgentLoopTestDependencies(ctx)
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(SkillUsageRegistry, { root })
-      // NaN passes the number schema (`z.number().min(1)`), so the assembly
-      // clamp is the net that must keep the DEFAULT limits enforced — a NaN
-      // limit would make every comparison false and silently unlimit writes.
-      await ctx.plugin(ToolSkillManage, {
-        maxSkillNameLength: NaN,
-        maxDescriptionLength: NaN,
-        maxSkillContentChars: NaN,
-        maxSkillFileBytes: NaN,
-      })
-      const longName = 'n'.repeat(65)
-      const created = await ctx.tools.execute({
-        callId: ToolCallId(`nan-${Math.random()}`),
-        name: 'skill_manage',
-        arguments: { action: 'create', name: longName, content: SKILL.replace('boundary-skill', longName) },
-        agent: fakeAgent(undefined),
-        signal: new AbortController().signal,
-      })
-      expect(created.isError).toBe(false)
-      expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(false)
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('dsh-skill-manage-nan-')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    // NaN passes the number schema (`z.number().min(1)`), so the assembly
+    // clamp is the net that must keep the DEFAULT limits enforced — a NaN
+    // limit would make every comparison false and silently unlimit writes.
+    await ctx.plugin(ToolSkillManage, {
+      maxSkillNameLength: NaN,
+      maxDescriptionLength: NaN,
+      maxSkillContentChars: NaN,
+      maxSkillFileBytes: NaN,
+    })
+    const longName = 'n'.repeat(65)
+    const created = await ctx.tools.execute({
+      callId: ToolCallId(`nan-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'create', name: longName, content: SKILL.replace('boundary-skill', longName) },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect(created.isError).toBe(false)
+    expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(false)
   })
 
   it('V6-15: a byte-equivalent write_file is a no-op — no patch_count bump (0.3.36)', async () => {

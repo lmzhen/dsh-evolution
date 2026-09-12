@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-io-node', () => {
   it('registers the node provider and writes atomically through the seam', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-io-node-'))
+    const root = await tempRoot('dsh-io-node-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -30,7 +29,6 @@ describe('evolution-io-node', () => {
     expect(await io.list(root)).toContain('renamed.txt')
     await io.remove(join(root, 'nested'))
     expect(await io.exists(join(root, 'nested', 'a.txt'))).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P3-11 (v14): a second apply is idempotent instead of throwing "already registered"', async () => {

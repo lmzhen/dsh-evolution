@@ -1,51 +1,19 @@
 {
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib/types"
-  },
-  "include": [
-    "src"
-  ],
+  "extends": "../tsconfig.pkg.json",
   "references": [
-        {"path": "../evolution-approval"},{
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../evolution-core"
-    },
-    {
-      "path": "../../test-support/agent-loop-testkit"
-    },
-    {
-      "path": "../evolution-plan-validator"
-    },
-    {
-      "path": "../evolution-state"
-    },
-    {
-      "path": "../evolution-policy"
-    },
-    {
-      "path": "../evolution-curator"
-    }
+    { "path": "../evolution-approval" },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../runtime-diagnostics/invariants" },
+    { "path": "../../core/tools" },
+    { "path": "../../core/agent" },
+    { "path": "../../llm/llm" },
+    { "path": "../../core/session" },
+    { "path": "../evolution-core" },
+    { "path": "../../test-support/agent-loop-testkit" },
+    { "path": "../evolution-plan-validator" },
+    { "path": "../evolution-state" },
+    { "path": "../evolution-policy" },
+    { "path": "../evolution-curator" }
   ]
 }

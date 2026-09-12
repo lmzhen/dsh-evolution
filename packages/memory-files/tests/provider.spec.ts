@@ -7,6 +7,7 @@ import * as MemoryFiles from '../src/index.ts'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('memory-files', () => {
   it('registers a provider on ctx.memory', async () => {
@@ -14,7 +15,7 @@ describe('memory-files', () => {
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(MemoryFiles, { root: await makeTmp() })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     expect((await ctx.memory.read('memory')).length).toBeGreaterThanOrEqual(0)
     const result = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'user prefers terse' }])
     expect(result.ok).toBe(true)
@@ -22,7 +23,7 @@ describe('memory-files', () => {
   })
 
   it('snapshot reads memory and user in one serialized step — no mixed generation (V4-12)', async () => {
-    const root = await makeTmp()
+    const root = await tempRoot('dsh-evolution-tmp-')
     // Seed a single user fact directly so the snapshot's first USER.md read is
     // the one we gate below.
     await writeFile(join(root, 'USER.md'), 'original fact\n', 'utf8')
@@ -69,7 +70,7 @@ describe('memory-files', () => {
   })
 
   it('renderContext reads memory and user in one serialized step — no mixed generation (P2-3, v14)', async () => {
-    const root = await makeTmp()
+    const root = await tempRoot('dsh-evolution-tmp-')
     await writeFile(join(root, 'USER.md'), 'original fact\n', 'utf8')
     const ctx = new Context()
     await ctx.plugin(MemoryRegistry)
@@ -111,7 +112,7 @@ describe('memory-files', () => {
   })
 
   it('F-14 (v18): providerName renames the registered provider and addDatePrefix writes the date header', async () => {
-    const root = await makeTmp()
+    const root = await tempRoot('dsh-evolution-tmp-')
     const ctx = new Context()
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -127,9 +128,3 @@ describe('memory-files', () => {
   })
 })
 
-async function makeTmp(): Promise<string> {
-  const fs = await import('node:fs/promises')
-  const os = await import('node:os')
-  const path = await import('node:path')
-  return fs.mkdtemp(path.join(os.tmpdir(), 'dsh-evolution-tmp-'))
-}

@@ -1,23 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import type { EvolutionStateStorage } from '@deepseek-ai/dsh-evolution-state-storage'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
-import * as JsonState from '../src/index.ts'
 import { runStateProviderConsistency } from '../../test-support/state-provider-consistency.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
+import { mountStateStack } from '../../test-support/state-stack.ts'
 
-async function mount(root: string) {
-  const ctx = new Context()
-  await ctx.plugin(EvolutionStateStorageRegistry)
-  await ctx.plugin(EvolutionIoRegistry)
-  await ctx.plugin(NodeIo)
-  await ctx.plugin(JsonState, { root })
-  return ctx
-}
 
 /**
  * V4-07: the consistency base must actually catch a single forged field
@@ -27,8 +13,8 @@ async function mount(root: string) {
  */
 describe('state-provider-consistency catches forged field drift (V4-07)', () => {
   it('rejects a provider that drops summary on claim', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-forge-sum-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-forge-sum-')
+    const ctx = await mountStateStack(root)
     const base = ctx.evolutionStateStorage.provider('json')
     const broken: EvolutionStateStorage = {
       ...base,
@@ -39,12 +25,11 @@ describe('state-provider-consistency catches forged field drift (V4-07)', () => 
       },
     }
     await expect(runStateProviderConsistency(broken)).rejects.toThrow()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rejects a provider that drops resolvedAt on resolve', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-forge-rat-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-forge-rat-')
+    const ctx = await mountStateStack(root)
     const base = ctx.evolutionStateStorage.provider('json')
     const broken: EvolutionStateStorage = {
       ...base,
@@ -55,6 +40,5 @@ describe('state-provider-consistency catches forged field drift (V4-07)', () => 
       },
     }
     await expect(runStateProviderConsistency(broken)).rejects.toThrow()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

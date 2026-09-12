@@ -8,6 +8,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 const run = promisify(execFile)
 const guard = fileURLToPath(new URL('../../scripts/verify-layout-sync.mjs', import.meta.url))
@@ -71,7 +72,7 @@ describe('verify-layout-sync (P1-② layout drift guard)', () => {
   })
 
   it('fails when a file exists on only one side', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-layout-sync-2-'))
+    const root = await tempRoot('dsh-layout-sync-2-')
     const dev = join(root, 'dev')
     const mirror = join(root, 'mirror')
     await mkdir(dev)
@@ -80,7 +81,6 @@ describe('verify-layout-sync (P1-② layout drift guard)', () => {
     const error = await run(process.execPath, [guard, dev, mirror], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(error?.stderr).toContain('only-dev.mjs')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   // P2-15 / V9-01 (0.3.50): the version half of the guard — mirror CHANGELOG

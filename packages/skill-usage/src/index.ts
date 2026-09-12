@@ -8,8 +8,8 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
-import { evolutionIoAdapter, evolutionRoot, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
-import { appendEvolutionEvent, eventsFile } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
@@ -83,7 +83,8 @@ export class SkillUsageRegistry extends Service {
   readonly root: string
   private readonly eventsHome: string
   private readonly io: EvolutionIoLike
-  private chain: Promise<unknown> = Promise.resolve()
+  /** Process-local RMW queue (v34 B14 / v35 R6: the same factory the other sidecars use). */
+  private readonly serial = makeSerialQueue()
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'skillUsage')
@@ -149,9 +150,14 @@ export class SkillUsageRegistry extends Service {
     const normalized = name.trim()
     return this.mutate(async (map) => {
       if (!map.has(normalized)) return
-      const viewsBefore = usageTotals(map).views
+      // C7 (v35): the anchor fires on the FIRST observed read anywhere in the
+      // sidecar — usageObserved() answers that with an early exit instead of
+      // summing every record (the totals are still needed for the event payload
+      // below). Cardinality counters are normalized to >= 0, so
+      // "sum(views) === 0" and "no record viewed" are the same predicate.
+      const windowOpening = !usageObserved(map)
       bumpView(map, normalized, new Date())
-      if (viewsBefore === 0) {
+      if (windowOpening) {
         await this.appendUsageWindowEvent(map)
       }
     })
@@ -202,7 +208,7 @@ export class SkillUsageRegistry extends Service {
    * order would deadlock, so the one-way order is a binding invariant.
    */
   private mutate<T>(task: (map: UsageMap) => T | Promise<T>): Promise<T> {
-    const run = this.chain.then(async () => {
+    return this.serial(async () => {
       let outcome = undefined as T | undefined
       await mutateUsage(this.root, this.io, async (map) => {
         outcome = await task(map)
@@ -212,8 +218,6 @@ export class SkillUsageRegistry extends Service {
       })
       return outcome as T
     })
-    this.chain = run.then(() => undefined, () => undefined)
-    return run
   }
 
   async record(name: string, kind: 'use' | 'view' | 'patch', at = new Date()): Promise<void> {
@@ -242,9 +246,7 @@ export class SkillUsageRegistry extends Service {
    * reader observes a complete generation (old or new), never a torn file, and
    * the lock exists for the read-modify-write cycle this method does not do. */
   async report(): Promise<UsageMap> {
-    const run = this.chain.then(async () => new Map(await loadUsage(this.root, this.io)))
-    this.chain = run.then(() => undefined, () => undefined)
-    return run
+    return this.serial(async () => new Map(await loadUsage(this.root, this.io)))
   }
 
   async markAgentCreated(name: string): Promise<void> {
@@ -292,7 +294,9 @@ export class SkillUsageRegistry extends Service {
    * @internal Exported for this package's own tests only.
    */
   async invalidate(): Promise<void> {
-    await this.chain
+    // A no-op task is the barrier: it settles only after everything queued
+    // before it has settled, which is what the drain means here.
+    await this.serial(async () => {})
   }
 
   /** P1-1 (v15): write the FEEDBACK-owned quality signal onto the usage

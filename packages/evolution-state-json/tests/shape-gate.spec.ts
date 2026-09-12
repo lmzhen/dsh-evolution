@@ -1,21 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
-import * as JsonState from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
+import { mountStateStack } from '../../test-support/state-stack.ts'
 
-async function mount(root: string) {
-  const ctx = new Context()
-  await ctx.plugin(EvolutionStateStorageRegistry)
-  await ctx.plugin(EvolutionIoRegistry)
-  await ctx.plugin(NodeIo)
-  await ctx.plugin(JsonState, { root })
-  return ctx
-}
 
 describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
   it.each([
@@ -26,8 +13,8 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
   ] as [string, unknown, string | null][])(
     'quarantines a valid-JSON but non-object %s as %s',
     async (file, value, sessionId) => {
-      const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-'))
-      const ctx = await mount(root)
+      const root = await tempRoot('dsh-json-shape-')
+      const ctx = await mountStateStack(root)
       const provider = ctx.evolutionStateStorage.provider('json')
       const io = ctx.evolutionIo.provider('node')
       const content = JSON.stringify(value)
@@ -48,25 +35,23 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
       expect(corrupt).toBeDefined()
       expect(await io.readText(join(root, corrupt!))).toBe(content)
       expect(await io.readText(join(root, file))).toBe(content)
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     },
   )
 
   it('a save into a wrong-shape record map rejects and leaves the file untouched', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-save-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-shape-save-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     await io.writeText(join(root, 'review-state.json'), '[]')
     await expect(provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 }))
       .rejects.toThrow(/not valid JSON/)
     expect(await io.readText(join(root, 'review-state.json'))).toBe('[]')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V8-16: a value-level malformation quarantines (no bare .status TypeError) and preserves the bytes (0.3.46)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-value-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-shape-value-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     const content = JSON.stringify({ broken: null })
@@ -76,21 +61,19 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
     expect(corrupt).toBeDefined()
     expect(await io.readText(join(root, corrupt!))).toBe(content)
     expect(await io.readText(join(root, 'pending-state.json'))).toBe(content)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('loads a well-shaped record map normally', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-ok-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-shape-ok-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('produces exactly one .corrupt copy and a non-nested message on a wrong shape (V4-06)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-single-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-shape-single-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     await io.writeText(join(root, 'review-state.json'), '[]')
@@ -110,12 +93,11 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
     const entries = await io.list(root)
     const corrupt = entries.filter(name => name.startsWith('review-state.json.corrupt'))
     expect(corrupt).toHaveLength(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V10-05 (P2-5): reading a corrupt file twice yields exactly ONE fixed `.corrupt` copy', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-shape-bounded-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-shape-bounded-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     await io.writeText(join(root, 'review-state.json'), '[]')
@@ -127,6 +109,5 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
     const entries = await io.list(root)
     expect(entries.filter(name => name.startsWith('review-state.json.corrupt'))).toEqual(['review-state.json.corrupt'])
     expect(await io.readText(join(root, 'review-state.json.corrupt'))).toBe('[]')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

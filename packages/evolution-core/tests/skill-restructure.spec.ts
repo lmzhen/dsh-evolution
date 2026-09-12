@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseFrontmatter, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = `---
 name: demo-skill
@@ -160,7 +161,7 @@ it('refuses pinned skills from the background review (origin gate)', async () =>
 })
 
 it('a `----` line inside frontmatter does not truncate the header (E-38, 0.3.16)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-restructure-'))
+  const root = await tempRoot('dsh-evo-restructure-')
   const lib = new SkillLibrary(root)
   const dodge = `---
 name: demo-skill
@@ -185,11 +186,10 @@ Intro.
   // the real `---` closer (the old indexOf cut the header on the 4-dash line).
   expect(md.slice(0, md.indexOf('# Demo'))).toContain('----')
   expect(md).toContain('> 详见 references')
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('keeps CRLF line endings on every untouched line (E-38a, 0.3.16)', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-restructure-'))
+  const root = await tempRoot('dsh-evo-restructure-')
   const lib = new SkillLibrary(root)
   // Write the CRLF file directly: create() assembles content with LF.
   await mkdir(join(root, 'crlf-skill'), { recursive: true })
@@ -200,7 +200,6 @@ it('keeps CRLF line endings on every untouched line (E-38a, 0.3.16)', async () =
   expect(raw.includes('\r\n')).toBe(true)
   // No lone LF remains: untouched lines kept their original ending.
   expect(raw.replace(/\r\n/g, '').includes('\n')).toBe(false)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('never duplicates frontmatter on success or on repeated restructures (v7 audit P1-1)', async () => {

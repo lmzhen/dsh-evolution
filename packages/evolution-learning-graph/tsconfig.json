@@ -1,24 +1,10 @@
 {
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib/types"
-  },
-  "include": [
-    "src"
-  ],
+  "extends": "../tsconfig.pkg.json",
   "references": [
-        {"path": "../evolution-approval"},{
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../interaction/commands"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../evolution-core"
-    }
+    { "path": "../evolution-approval" },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../interaction/commands" },
+    { "path": "../../runtime-diagnostics/invariants" },
+    { "path": "../evolution-core" }
   ]
 }

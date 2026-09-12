@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { appendEvolutionEvent, eventsFile, nodeEvolutionIo, parseEvolutionEvents, readEvolutionEvents } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 /**
  * F-338: the event-log reader is v1-ONLY. A future-format body (`version !==
@@ -35,17 +33,16 @@ describe('event log version guard (F-338)', () => {
   })
 
   it('readEvolutionEvents treats a future-version body as empty, not malformed (F-338)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-ver-'))
+    const root = await tempRoot('dsh-evo-events-ver-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await io.writeText(path, JSON.stringify({ version: 999, events: v1Events }, null, 2))
     const read = await readEvolutionEvents(io, path)
     expect(read).toEqual({ events: [], malformed: false })
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('appendEvolutionEvent rejects a future-version body and preserves the bytes (F-338)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-ver-append-'))
+    const root = await tempRoot('dsh-evo-events-ver-append-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     const future = JSON.stringify({ version: 999, events: v1Events }, null, 2)
@@ -55,11 +52,10 @@ describe('event log version guard (F-338)', () => {
     })).rejects.toThrow(/version mismatch/)
     // The v2 bytes are untouched — never rewritten down to v1.
     expect(await io.readText(path)).toBe(future)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reports the version TYPE so a string body does not read as a numeric match (V4-48)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-ver-str-'))
+    const root = await tempRoot('dsh-evo-events-ver-str-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     // The SAME digit as a string is refused (v1-only guard compares the number);
@@ -71,11 +67,10 @@ describe('event log version guard (F-338)', () => {
     })).rejects.toThrow(/got "1" \(string\)/)
     // The bytes are untouched — never rewritten down to v1.
     expect(await io.readText(path)).toBe(body)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a v1 body still appends normally (F-338 does not break the happy path)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-ver-happy-'))
+    const root = await tempRoot('dsh-evo-events-ver-happy-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     const seq = await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })
@@ -84,6 +79,5 @@ describe('event log version guard (F-338)', () => {
     expect(malformed).toBe(false)
     expect(events).toHaveLength(1)
     expect(events[0]?.seq).toBe(seq)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

@@ -8,6 +8,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { tempHome } from '../../test-support/temp-home.ts'
 
 // v21 (T-8): most tests below set DSH_HOME and restore it only on the SUCCESS
 // path — one failing assertion used to leak a temp-dir DSH_HOME into every
@@ -49,9 +50,7 @@ type StateTransactTask = (current: StateRecord | null) => StateRecord | null
 
 describe('evolution-curator', () => {
   it('starts stopped by default, runs manually, and persists a run report', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -73,15 +72,10 @@ describe('evolution-curator', () => {
     expect(result.report.llmReviewEnabled).toBe(false)
     expect(await ctx.evolutionCurator.latestReport()).toMatchObject({ runId: result.report.runId })
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
   }, 15_000)
 
   it('records llmReview: true on the run report when the LLM channel is enabled', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-llm-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-llm-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -91,15 +85,10 @@ describe('evolution-curator', () => {
     // but the report still states the channel was enabled.
     expect(result.report.llmReviewEnabled).toBe(true)
     expect(result.nominations).toBeDefined()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('references factor: related_skills frontmatter raises the hub skill score', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-references-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-references-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -112,15 +101,10 @@ describe('evolution-curator', () => {
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     // The referenced skill (leaf) takes the in-degree boost, not its referrer.
     expect(usage.get('leaf-skill')?.quality_score).toBeGreaterThan(usage.get('hub-skill')?.quality_score ?? 0)
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('pins through the marker keep an old skill out of the lifecycle run', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-pin-gate-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-pin-gate-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -144,15 +128,10 @@ describe('evolution-curator', () => {
     await skills.setPinned('precious-skill', false, 'foreground')
     const again = await ctx.evolutionCurator.run({ ignoreGates: true })
     expect(again.archived).toEqual(['precious-skill'])
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reentrant run() is skipped with an explicit already-running outcome', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-reentrancy-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-reentrancy-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -164,15 +143,10 @@ describe('evolution-curator', () => {
     const skipped = [first, second].filter(result => result.skipped === 'already-running')
     expect(skipped.length).toBe(1)
     expect([first, second].some(result => result.skipped === undefined)).toBe(true)
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-27 (F-331): pinned/bundled skills are excluded from the LLM nomination prompt', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-f331-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-f331-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -202,15 +176,10 @@ describe('evolution-curator', () => {
     expect(shown).toContain('beta-skill')
     // The bundled marker is not part of the nomination pool (V5-21).
     expect(shown).not.toContain('gamma-skill')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('snapshotFull captures curator state and restoreSnapshot rewinds tree + state', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-full-restore-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-full-restore-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -235,15 +204,10 @@ describe('evolution-curator', () => {
     expect(restored.ok).toBe(true)
     expect((await skills.list()).map(item => item.name)).toContain('pre-skill')
     expect(saved).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('auto-start boot check catches up a due persisted state after a restart', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-boot-catchup-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-boot-catchup-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -263,15 +227,10 @@ describe('evolution-curator', () => {
     expect(saved.runCount).toBe(1)
     expect(saved.lastSummary).toMatch(/^auto:/)
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('auto-start boot check stays quiet when the persisted state is not due', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-boot-quiet-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-boot-quiet-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -287,9 +246,6 @@ describe('evolution-curator', () => {
     expect(saved.runCount).toBe(3)
     expect(saved.lastSummary).toBe('seed')
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('gateConsolidations blocks automated merges that touch gated names', () => {
@@ -308,9 +264,7 @@ describe('evolution-curator', () => {
   })
 
   it('consolidates sources into a target, then restores one from the archive', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-consolidate-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-consolidate-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -332,15 +286,10 @@ describe('evolution-curator', () => {
     expect(restore.ok).toBe(true)
     names = (await skills.list()).map(item => item.name)
     expect(names).toContain('source-a')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('healthView reports degraded structure only, derived on demand (rc.73 A1)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-health-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-health-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -354,15 +303,10 @@ describe('evolution-curator', () => {
     expect(names).not.toContain('lean-skill')
     const fat = rows.find(row => row.name === 'fat-skill')
     expect(fat?.verdict).toBe('needs-restructure')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('healthView folds usage churn into the assessment (A2 write-ghost)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-churn-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-churn-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -386,15 +330,10 @@ describe('evolution-curator', () => {
     expect(ghost?.verdict).toBe('warn')
     expect(ghost?.reasons.some(reason => reason.includes('never read'))).toBe(true)
     expect(rows.some(row => row.name === 'read-skill')).toBe(false)
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('suppresses churn rows before any observed read exists (C observation window)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-window-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-window-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -410,15 +349,10 @@ describe('evolution-curator', () => {
     expect(await ctx.evolutionCurator.usageObserved()).toBe(false)
     const rows = await ctx.evolutionCurator.healthView()
     expect(rows.find(row => row.name === 'ghost-skill')).toBeUndefined()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('control-plane folds keep counters and never flatten a malformed usage sidecar (rc.67 K-1)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-k1-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-k1-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -453,15 +387,10 @@ describe('evolution-curator', () => {
     expect(restored.ok).toBe(true)
     expect(await io.readText(`${usagePath}.corrupt`)).toBe('{corrupt telemetry')
     expect(await io.readText(usagePath)).not.toBe('{corrupt telemetry')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('refuses consolidation with a missing target', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-consolidate-bad-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-consolidate-bad-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -469,15 +398,10 @@ describe('evolution-curator', () => {
     const result = await ctx.evolutionCurator.consolidate('ghost-target', ['ghost-source'])
     expect(result.ok).toBe(false)
     expect(result.message).toContain('not found')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('archives a skill that reached the archive threshold (F1 regression)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-archive-threshold-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-archive-threshold-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -504,15 +428,10 @@ describe('evolution-curator', () => {
     const record = usage.get('ancient-skill')
     expect(record?.state).toBe('archived')
     expect(record?.archived_at).toBeTruthy()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-15: a crashed archive (dir gone, usage not folded) heals to archived with no failed entry (S5.4)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e15-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-e15-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -542,15 +461,10 @@ describe('evolution-curator', () => {
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     expect(usage.get('ancient-skill')?.state).toBe('archived')
     expect(usage.get('ancient-skill')?.archived_at).toBeTruthy()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('F-330 (V4-02): a bundled crashed archive self-heals AND persists suppression from the archive copy marker (0.3.26)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-f330-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-f330-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -580,15 +494,10 @@ describe('evolution-curator', () => {
     expect(usage.get('bundled-skill')?.state).toBe('archived')
     const suppressed = await loadSuppressedNames(skills.root, nodeEvolutionIo())
     expect(suppressed.has('bundled-skill')).toBe(true)
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-08: a bundled SIBLING archive no longer suppresses a crashed non-bundled skill (0.3.36)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v608-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-v608-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -623,15 +532,10 @@ describe('evolution-curator', () => {
     expect(suppressed.has('foo')).toBe(false)
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     expect(usage.get('foo')?.state).toBe('archived')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-09: a FAILED .archive listing warns instead of silently reading as "not bundled" (0.3.36)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v609-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-v609-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -662,15 +566,10 @@ describe('evolution-curator', () => {
     expect(suppressed.has('ghost-skill')).toBe(false)
     warnSpy.mockRestore()
     vi.restoreAllMocks()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-15 regression: a dry-run heal must NOT persist the archived fold (0.3.19 review)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e15-dry-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-e15-dry-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -692,15 +591,10 @@ describe('evolution-curator', () => {
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     expect(usage.get('ancient-skill')?.state).toBe('active')
     expect(usage.get('ancient-skill')?.archived_at).toBeNull()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('seeds baseline records for tree skills the sidecar has not seen (F8)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-seed-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-seed-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -714,15 +608,10 @@ describe('evolution-curator', () => {
     expect(result.archived).toEqual([])
     const usage = await import('@deepseek-ai/dsh-evolution-core').then(m => m.loadUsage(skills.root, nodeEvolutionIo()))
     expect(usage.has('fresh-skill')).toBe(true)
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('dry-run reports what WOULD happen without mutating or pushing out the next run', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-dryrun-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-dryrun-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -749,14 +638,9 @@ describe('evolution-curator', () => {
     if (before && after) {
       expect(after.lastRunAt).toBe(before.lastRunAt)
     }
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('defers on first sight even without a state service (P1-7)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-nostate-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-nostate-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -770,15 +654,10 @@ describe('evolution-curator', () => {
     // the second due run proceeds (see the E-18 test) instead of deferring forever.
     expect(result.skipped).toBe('first-run-deferred(stateless)')
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('quality-warn scoring drives the SAME run stale window (P1-2)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-score-order-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-score-order-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -807,15 +686,10 @@ Aging body.
     const usage = await loadUsage(skills.root, nodeEvolutionIo())
     expect(usage.get('aging-skill')?.quality_warn).toBe(true)
     expect(usage.get('aging-skill')?.state).toBe('stale')
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('paused gate skips automatic passes; manual run and resume still work (G2)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-paused-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-paused-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -850,18 +724,13 @@ Ancient body.
     expect(saved.paused).toBe(false)
     expect(await ctx.evolutionCurator.status()).toMatchObject({ paused: false })
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     // 0.3.28 (release gate): the body itself is fast (~0.2s) but the full
     // parallel suite starved this worker past the default 5s cap — give the
     // test an explicit budget so a loaded CI run cannot flip it.
   }, 15_000)
 
   it('setPaused seeds state when none exists; status() exposes it (G2)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-setpaused-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-setpaused-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -880,18 +749,13 @@ Ancient body.
     expect(Date.now() - saved!.lastRunAt).toBeLessThan(60_000)
     expect(await ctx.evolutionCurator.status()).toMatchObject({ paused: true })
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a manual run while paused does not clear the operator pause (rc.43 regression)', async () => {
 
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-pause-keep-'))
+    await tempHome('dsh-curator-pause-keep-')
 
-    const previous = process.env.DSH_HOME
 
-    process.env.DSH_HOME = home
 
     const ctx = new Context()
 
@@ -959,18 +823,12 @@ Ancient body.
 
     ctx.evolutionCurator.stop()
 
-    if (previous === undefined) delete process.env.DSH_HOME
 
-    else process.env.DSH_HOME = previous
-
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 
   })
 
   it('E-16: a manual run finishing and a setPaused both persist atomically (S5.5)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e16-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-e16-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1008,15 +866,10 @@ Ancient body.
     // The run anchored the baseline at its own time (not the process clock).
     expect(Date.now() - saved.lastRunAt).toBeLessThan(60_000)
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-51: a fresh-install manual run anchors the baseline at run time (S5.6)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e51-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-e51-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1037,18 +890,13 @@ Ancient body.
     expect(persisted!.lastRunAt).toBeGreaterThanOrEqual(startedAt)
     expect(persisted!.lastSummary).toMatch(/^auto:/)
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('control-plane consolidate enforces the full gate set (P1-8)', async () => {
 
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-consolidate-gate-'))
+    await tempHome('dsh-curator-consolidate-gate-')
 
-    const previous = process.env.DSH_HOME
 
-    process.env.DSH_HOME = home
 
     const ctx = new Context()
 
@@ -1124,18 +972,12 @@ Body of ${name}.
 
     ])
 
-    if (previous === undefined) delete process.env.DSH_HOME
 
-    else process.env.DSH_HOME = previous
-
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 
   })
 
   it('retains only the newest 20 reports by startedAt and prunes their digests (G6)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-g6-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    const home = await tempHome('dsh-curator-g6-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1182,42 +1024,31 @@ Body of ${name}.
     expect(digests).toHaveLength(1)
 
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('scopeView reports pinned skills as protected through the library view (N-1)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-scopeview-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(EvolutionCurator, { enabled: true })
-      const skills = ctx.evolutionCurator.skills
-      const body = (name: string) => `---
+    await tempHome('dsh-curator-scopeview-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = (name: string) => `---
 name: ${name}
 description: ${name}
 ---
 
 Body of ${name}.
 `
-      await skills.create('view-pinned', body('view-pinned'), 'foreground')
-      // The marker is dot-prefixed; scopeView() derives its protected set from
-      // SkillLibrary.list()'s protectedBy, so a list-side miss hides the pin.
-      await writeFile(join(skills.root, 'view-pinned', '.pinned'), '', 'utf8')
-      await skills.create('view-plain', body('view-plain'), 'foreground')
-      const view = await ctx.evolutionCurator.scopeView()
-      expect(view.protected).toContain('view-pinned')
-      expect(view.protected).not.toContain('view-plain')
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await skills.create('view-pinned', body('view-pinned'), 'foreground')
+    // The marker is dot-prefixed; scopeView() derives its protected set from
+    // SkillLibrary.list()'s protectedBy, so a list-side miss hides the pin.
+    await writeFile(join(skills.root, 'view-pinned', '.pinned'), '', 'utf8')
+    await skills.create('view-plain', body('view-plain'), 'foreground')
+    const view = await ctx.evolutionCurator.scopeView()
+    expect(view.protected).toContain('view-pinned')
+    expect(view.protected).not.toContain('view-plain')
+    ctx.evolutionCurator.stop()
   })
 
   it('garbage activity timestamps fall back to created_at and still transition (N-3)', () => {
@@ -1243,321 +1074,263 @@ Body of ${name}.
   })
 
   it('runs the reference-mode demote chain: nomination → reference file + pointer → archive (009-II)', { timeout: 20_000 }, async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-demote-chain-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const yaml = '## Structured summary (required)\n```yaml\n'
-        + 'consolidations:\n'
-        + '  - from: stale-src\n'
-        + '    mode: reference\n'
-        + '    into: umbrella-skill\n'
-        + '    reason: session detail demotes to the umbrella references\n'
-        + 'prunings: []\n'
-        + '```\n'
-      const ctx = new Context()
-      ctx.provide('llm', {
-        stream: async function* () {
-          yield { type: 'block-start', index: 0, blockType: 'text' }
-          yield { type: 'text-delta', index: 0, text: yaml }
-          yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-          yield { type: 'finish', reason: 'stop' }
-        },
-      })
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      ctx.provide('evolutionState', {
-        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
-        saveCuratorState: async () => {},
-        transactCuratorState: async () => {},
-      })
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
-      const skills = ctx.evolutionCurator.skills
-      await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
-      await skills.create('stale-src', basicBody('stale-src'), 'foreground')
-      await saveUsage(skills.root, new Map([
-        ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
-        ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
-      ]), nodeEvolutionIo())
-      await ctx.evolutionCurator.run({ ignoreGates: true })
-      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'stale-src'))).toBe(true)
-      expect(await nodeEvolutionIo().exists(join(skills.root, 'umbrella-skill', 'references', 'stale-src.md'))).toBe(true)
-      expect((await skills.read('umbrella-skill')) ?? '').toContain('> 详见 references/stale-src.md')
-      expect((await skills.read('umbrella-skill')) ?? '').not.toContain('Body of stale-src.')
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-demote-chain-')
+    const yaml = '## Structured summary (required)\n```yaml\n'
+      + 'consolidations:\n'
+      + '  - from: stale-src\n'
+      + '    mode: reference\n'
+      + '    into: umbrella-skill\n'
+      + '    reason: session detail demotes to the umbrella references\n'
+      + 'prunings: []\n'
+      + '```\n'
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* () {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: yaml }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+        yield { type: 'finish', reason: 'stop' }
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
+    await skills.create('stale-src', basicBody('stale-src'), 'foreground')
+    await saveUsage(skills.root, new Map([
+      ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
+      ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
+    ]), nodeEvolutionIo())
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'stale-src'))).toBe(true)
+    expect(await nodeEvolutionIo().exists(join(skills.root, 'umbrella-skill', 'references', 'stale-src.md'))).toBe(true)
+    expect((await skills.read('umbrella-skill')) ?? '').toContain('> 详见 references/stale-src.md')
+    expect((await skills.read('umbrella-skill')) ?? '').not.toContain('Body of stale-src.')
   })
 
   it('runs the full LLM-提名→门→吸收→归档→报告 merge chain (P1b)', { timeout: 20_000 }, async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-merge-chain-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      // One block: a consolidation nomination from the "LLM" for the stale skill.
-      const yaml = '## Structured summary (required)\n```yaml\n'
-        + 'consolidations:\n'
-        + '  - from: stale-src\n'
-        + '    into: umbrella-skill\n'
-        + '    reason: absorbs the sibling\n'
-        + 'prunings: []\n'
-        + '```\n'
-      const ctx = new Context()
-      ctx.provide('llm', {
-        stream: async function* () {
-          yield { type: 'block-start', index: 0, blockType: 'text' }
-          yield { type: 'text-delta', index: 0, text: yaml }
-          yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-          yield { type: 'finish', reason: 'stop' }
-        },
-      })
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      ctx.provide('evolutionState', {
-        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
-        saveCuratorState: async () => {},
-        transactCuratorState: async () => {},
-      })
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
-      const skills = ctx.evolutionCurator.skills
-      const body = basicBody
-      await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
-      await skills.create('stale-src', body('stale-src'), 'foreground')
-      // stale-src is 45d idle: inside the stale window (30) but below archive
-      // (90), so the deterministic scanner puts it in markStale — the
-      // candidate list the LLM recommendation pass sees.
-      await saveUsage(skills.root, new Map([
-        ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
-        ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
-      ]), nodeEvolutionIo())
+    await tempHome('dsh-curator-merge-chain-')
+    // One block: a consolidation nomination from the "LLM" for the stale skill.
+    const yaml = '## Structured summary (required)\n```yaml\n'
+      + 'consolidations:\n'
+      + '  - from: stale-src\n'
+      + '    into: umbrella-skill\n'
+      + '    reason: absorbs the sibling\n'
+      + 'prunings: []\n'
+      + '```\n'
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* () {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: yaml }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+        yield { type: 'finish', reason: 'stop' }
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = basicBody
+    await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
+    await skills.create('stale-src', body('stale-src'), 'foreground')
+    // stale-src is 45d idle: inside the stale window (30) but below archive
+    // (90), so the deterministic scanner puts it in markStale — the
+    // candidate list the LLM recommendation pass sees.
+    await saveUsage(skills.root, new Map([
+      ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
+      ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
+    ]), nodeEvolutionIo())
 
-      await ctx.evolutionCurator.run({ ignoreGates: true })
+    await ctx.evolutionCurator.run({ ignoreGates: true })
 
-      // The full chain landed: source archived, umbrella absorbed the body,
-      // usage state folded, and the report records the consolidation.
-      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'stale-src'))).toBe(true)
-      expect(await skills.read('umbrella-skill') ?? '').toContain('consolidated from stale-src')
-      const usage = await loadUsage(skills.root, nodeEvolutionIo())
-      expect(usage.get('stale-src')?.state).toBe('archived')
-      const report = await ctx.evolutionCurator.latestReport()
-      expect(report?.consolidated?.some(item => item.from === 'stale-src' && item.into === 'umbrella-skill')).toBe(true)
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    // The full chain landed: source archived, umbrella absorbed the body,
+    // usage state folded, and the report records the consolidation.
+    expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'stale-src'))).toBe(true)
+    expect(await skills.read('umbrella-skill') ?? '').toContain('consolidated from stale-src')
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    expect(usage.get('stale-src')?.state).toBe('archived')
+    const report = await ctx.evolutionCurator.latestReport()
+    expect(report?.consolidated?.some(item => item.from === 'stale-src' && item.into === 'umbrella-skill')).toBe(true)
+    ctx.evolutionCurator.stop()
   })
 
   it('near-duplicate members join the LLM recommendation candidate pool (P2-5)', { timeout: 20_000 }, async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-dedup-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const seen: string[] = []
-      const emptyYaml = '## Structured summary (required)\n```yaml\nconsolidations: []\nprunings: []\n```\n'
-      const ctx = new Context()
-      ctx.provide('llm', {
-        stream: async function* (options: { messages: Array<{ content: Array<{ text: string }> }> }) {
-          seen.push(options.messages[0]?.content[0]?.text ?? '')
-          yield { type: 'block-start', index: 0, blockType: 'text' }
-          yield { type: 'text-delta', index: 0, text: emptyYaml }
-          yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
-          yield { type: 'finish', reason: 'stop' }
-        },
-      })
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      ctx.provide('evolutionState', {
-        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
-        saveCuratorState: async () => {},
-        transactCuratorState: async () => {},
-      })
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
-      const skills = ctx.evolutionCurator.skills
-      // Two nearly-identical skills: the deterministic scanner sees nothing
-      // (both fresh), only the dedup pool can surface them as candidates.
-      // The shared body is a long DISTINCT-word block (dedup compares token
-      // SETS, so repetition adds no weight): ~58 shared tokens vs 2 name
-      // tokens difference keeps the Jaccard above the 0.95 gate.
-      const near = nearBody
-      await skills.create('dup-a', near('dup-a'), 'foreground')
-      await skills.create('dup-b', near('dup-b'), 'foreground')
-      expect(computeDedupGroups({ contents: new Map([['dup-a', near('dup-a')], ['dup-b', near('dup-b')]]) })).toEqual([['dup-a', 'dup-b']])
-      await ctx.evolutionCurator.run({ ignoreGates: true })
-      expect(seen[0]).toContain('- dup-a')
-      expect(seen[0]).toContain('- dup-b')
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-dedup-')
+    const seen: string[] = []
+    const emptyYaml = '## Structured summary (required)\n```yaml\nconsolidations: []\nprunings: []\n```\n'
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* (options: { messages: Array<{ content: Array<{ text: string }> }> }) {
+        seen.push(options.messages[0]?.content[0]?.text ?? '')
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: emptyYaml }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
+        yield { type: 'finish', reason: 'stop' }
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const skills = ctx.evolutionCurator.skills
+    // Two nearly-identical skills: the deterministic scanner sees nothing
+    // (both fresh), only the dedup pool can surface them as candidates.
+    // The shared body is a long DISTINCT-word block (dedup compares token
+    // SETS, so repetition adds no weight): ~58 shared tokens vs 2 name
+    // tokens difference keeps the Jaccard above the 0.95 gate.
+    const near = nearBody
+    await skills.create('dup-a', near('dup-a'), 'foreground')
+    await skills.create('dup-b', near('dup-b'), 'foreground')
+    expect(computeDedupGroups({ contents: new Map([['dup-a', near('dup-a')], ['dup-b', near('dup-b')]]) })).toEqual([['dup-a', 'dup-b']])
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(seen[0]).toContain('- dup-a')
+    expect(seen[0]).toContain('- dup-b')
+    ctx.evolutionCurator.stop()
   })
 
   it('prunings nominations never touch non-stale skills even from the dedup pool (M-3)', { timeout: 20_000 }, async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-m3-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const pruneYaml = '```yaml\nconsolidations: []\nprunings:\n  - name: dup-a\n    reason: duplicate\n```\n'
-      const ctx = new Context()
-      ctx.provide('llm', {
-        stream: async function* () {
-          yield { type: 'block-start', index: 0, blockType: 'text' }
-          yield { type: 'text-delta', index: 0, text: pruneYaml }
-          yield { type: 'block-end', index: 0, block: { type: 'text', text: pruneYaml } }
-          yield { type: 'finish', reason: 'stop' }
-        },
-      })
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      ctx.provide('evolutionState', {
-        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
-        saveCuratorState: async () => {},
-        transactCuratorState: async () => {},
-      })
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
-      const skills = ctx.evolutionCurator.skills
-      const near = nearBody
-      // Both fresh: in the dedup pool but in NO stale pool.
-      await skills.create('dup-a', near('dup-a'), 'foreground')
-      await skills.create('dup-b', near('dup-b'), 'foreground')
-      await ctx.evolutionCurator.run({ ignoreGates: true })
-      expect(await skills.read('dup-a')).not.toBeNull()
-      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'dup-a'))).toBe(false)
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-m3-')
+    const pruneYaml = '```yaml\nconsolidations: []\nprunings:\n  - name: dup-a\n    reason: duplicate\n```\n'
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* () {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: pruneYaml }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: pruneYaml } }
+        yield { type: 'finish', reason: 'stop' }
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const skills = ctx.evolutionCurator.skills
+    const near = nearBody
+    // Both fresh: in the dedup pool but in NO stale pool.
+    await skills.create('dup-a', near('dup-a'), 'foreground')
+    await skills.create('dup-b', near('dup-b'), 'foreground')
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(await skills.read('dup-a')).not.toBeNull()
+    expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'dup-a'))).toBe(false)
+    ctx.evolutionCurator.stop()
   })
 
   it('hands the model deterministic prefix clusters as orientation (rc.67 merge heuristic)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-prefix-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      let captured = ''
-      const emptyYaml = '```yaml\nconsolidations: []\nprunings: []\n```\n'
-      const ctx = new Context()
-      ctx.provide('llm', {
-        stream: async function* (options: { messages: unknown[] }) {
-          const message = options.messages[0] as { content: Array<{ text?: string }> } | undefined
-          captured = message?.content[0]?.text ?? ''
-          yield { type: 'block-start', index: 0, blockType: 'text' }
-          yield { type: 'text-delta', index: 0, text: emptyYaml }
-          yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
-          yield { type: 'finish', reason: 'stop' }
-        },
-      })
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(EvolutionCurator, { llmReview: true })
-      const nominations = await ctx.evolutionCurator.recommend(['sql-backup', 'SQL-restore', 'unrelated'])
-      expect(nominations).toEqual({ prunings: [], consolidations: [], warnings: [] })
-      expect(captured).toContain('Prefix clusters observed')
-      expect(captured).toContain("'sql'")
-      expect(captured).toContain('SQL-restore')
-      expect(captured).not.toContain("'unrelated'")
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-prefix-')
+    let captured = ''
+    const emptyYaml = '```yaml\nconsolidations: []\nprunings: []\n```\n'
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* (options: { messages: unknown[] }) {
+        const message = options.messages[0] as { content: Array<{ text?: string }> } | undefined
+        captured = message?.content[0]?.text ?? ''
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: emptyYaml }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
+        yield { type: 'finish', reason: 'stop' }
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { llmReview: true })
+    const nominations = await ctx.evolutionCurator.recommend(['sql-backup', 'SQL-restore', 'unrelated'])
+    expect(nominations).toEqual({ prunings: [], consolidations: [], warnings: [] })
+    expect(captured).toContain('Prefix clusters observed')
+    expect(captured).toContain("'sql'")
+    expect(captured).toContain('SQL-restore')
+    expect(captured).not.toContain("'unrelated'")
+    ctx.evolutionCurator.stop()
   })
 
   it('a consolidation nomination outside the candidate pool is refused visibly (M-1 backstop)', { timeout: 20_000 }, async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-m1-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const yaml = '```yaml\nconsolidations:\n  - from: plain-skill\n    into: umbrella-skill\n    reason: absorb\nprunings: []\n```\n'
-      const ctx = new Context()
-      ctx.provide('llm', {
-        stream: async function* () {
-          yield { type: 'block-start', index: 0, blockType: 'text' }
-          yield { type: 'text-delta', index: 0, text: yaml }
-          yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-          yield { type: 'finish', reason: 'stop' }
-        },
-      })
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      ctx.provide('evolutionState', {
-        loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
-        saveCuratorState: async () => {},
-        transactCuratorState: async () => {},
-      })
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
-      const skills = ctx.evolutionCurator.skills
-      const body = basicBody
-      await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
-      // plain-skill exists in the tree but is neither stale nor duplicated:
-      // in NO recommendation pool, so the LLM narrating "merged plain-skill"
-      // must be refused before any file move.
-      await skills.create('plain-skill', body('plain-skill'), 'foreground')
-      await ctx.evolutionCurator.run({ ignoreGates: true })
-      expect(await skills.read('plain-skill')).not.toBeNull()
-      expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'plain-skill'))).toBe(false)
-      const report = await ctx.evolutionCurator.latestReport()
-      expect(report?.consolidated?.some(item => item.from === 'plain-skill')).toBe(false)
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-m1-')
+    const yaml = '```yaml\nconsolidations:\n  - from: plain-skill\n    into: umbrella-skill\n    reason: absorb\nprunings: []\n```\n'
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* () {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: yaml }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+        yield { type: 'finish', reason: 'stop' }
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const skills = ctx.evolutionCurator.skills
+    const body = basicBody
+    await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
+    // plain-skill exists in the tree but is neither stale nor duplicated:
+    // in NO recommendation pool, so the LLM narrating "merged plain-skill"
+    // must be refused before any file move.
+    await skills.create('plain-skill', body('plain-skill'), 'foreground')
+    await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect(await skills.read('plain-skill')).not.toBeNull()
+    expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'plain-skill'))).toBe(false)
+    const report = await ctx.evolutionCurator.latestReport()
+    expect(report?.consolidated?.some(item => item.from === 'plain-skill')).toBe(false)
+    ctx.evolutionCurator.stop()
   })
 
   it('latestReport orders by file mtime, not by filename or startedAt (E-54)', { timeout: 20_000 }, async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-latest-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      const reportsRoot = join(home, 'evolution', 'reports')
-      await mkdir(reportsRoot, { recursive: true })
-      const base = {
-        schemaVersion: 1,
-        staleCandidates: [],
-        llmNominations: [],
-        archiveCandidates: [],
-        archived: [],
-        failed: [],
-      }
-      // Filename order ('aaaa' first) AND startedAt order ('aaaa' newer) both
-      // point at 'aaaa', but the mtime probe is the ordering authority (E-54):
-      // 'zzzz' carries the NEWER mtime, so latestReport must return it despite
-      // the lexicographic and startedAt disagreement (filenames are
-      // randomUUIDs — never chronological).
-      const aPath = join(reportsRoot, 'curator-aaaa.json')
-      const zPath = join(reportsRoot, 'curator-zzzz.json')
-      await nodeEvolutionIo().writeText(aPath, JSON.stringify({ ...base, runId: 'startedat-new-but-mtime-old', startedAt: '2026-08-30T01:00:00.000Z', finishedAt: '2026-08-30T01:00:00.000Z' }))
-      await nodeEvolutionIo().writeText(zPath, JSON.stringify({ ...base, runId: 'mtime-new', startedAt: '2026-08-29T01:00:00.000Z', finishedAt: '2026-08-29T01:00:00.000Z' }))
-      await utimes(aPath, new Date('2026-08-29T00:00:00.000Z'), new Date('2026-08-29T00:00:00.000Z'))
-      await utimes(zPath, new Date('2026-08-30T00:00:00.000Z'), new Date('2026-08-30T00:00:00.000Z'))
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
-      const report = await ctx.evolutionCurator.latestReport()
-      expect(report?.runId).toBe('mtime-new')
-      ctx.evolutionCurator.stop()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    const home = await tempHome('dsh-curator-latest-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const reportsRoot = join(home, 'evolution', 'reports')
+    await mkdir(reportsRoot, { recursive: true })
+    const base = {
+      schemaVersion: 1,
+      staleCandidates: [],
+      llmNominations: [],
+      archiveCandidates: [],
+      archived: [],
+      failed: [],
     }
+    // Filename order ('aaaa' first) AND startedAt order ('aaaa' newer) both
+    // point at 'aaaa', but the mtime probe is the ordering authority (E-54):
+    // 'zzzz' carries the NEWER mtime, so latestReport must return it despite
+    // the lexicographic and startedAt disagreement (filenames are
+    // randomUUIDs — never chronological).
+    const aPath = join(reportsRoot, 'curator-aaaa.json')
+    const zPath = join(reportsRoot, 'curator-zzzz.json')
+    await nodeEvolutionIo().writeText(aPath, JSON.stringify({ ...base, runId: 'startedat-new-but-mtime-old', startedAt: '2026-08-30T01:00:00.000Z', finishedAt: '2026-08-30T01:00:00.000Z' }))
+    await nodeEvolutionIo().writeText(zPath, JSON.stringify({ ...base, runId: 'mtime-new', startedAt: '2026-08-29T01:00:00.000Z', finishedAt: '2026-08-29T01:00:00.000Z' }))
+    await utimes(aPath, new Date('2026-08-29T00:00:00.000Z'), new Date('2026-08-29T00:00:00.000Z'))
+    await utimes(zPath, new Date('2026-08-30T00:00:00.000Z'), new Date('2026-08-30T00:00:00.000Z'))
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+    const report = await ctx.evolutionCurator.latestReport()
+    expect(report?.runId).toBe('mtime-new')
+    ctx.evolutionCurator.stop()
   })
 
   it('minIdleFailOpen (default true) lets the run through when the agents service is missing (E-54)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-idle-open-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-idle-open-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1573,15 +1346,10 @@ Body of ${name}.
     expect(open.skipped).toBeUndefined()
     expect(open.report.runId).toBeTruthy()
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('minIdleFailOpen=false fails closed: a missing agents service defers the run (E-54)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-idle-closed-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-idle-closed-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1594,15 +1362,10 @@ Body of ${name}.
     const closed = await ctx.evolutionCurator.run()
     expect(closed.skipped).toBe('active-session')
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-18: stateless composition defers FIRST sight only; the next due run actually curates (0.3.18)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-stateless-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    await tempHome('dsh-curator-stateless-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1614,15 +1377,10 @@ Body of ${name}.
     expect(second.skipped).toBeUndefined()
     expect(second.report.runId).toBeTruthy()
     ctx.evolutionCurator.stop()
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
   })
 
   it('E-7: a throwing automatic check is contained and leaves an error report (0.3.18)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-e7-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
+    const home = await tempHome('dsh-curator-e7-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1636,9 +1394,6 @@ Body of ${name}.
     await expect(curator.autoCheck()).resolves.toBeUndefined()
     const files = await readdir(join(home, 'evolution', 'reports'))
     expect(files.some(name => name.startsWith('curator-error-'))).toBe(true)
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-22: error reports are recycled on a failing auto-check and budgeted independently (F-327)', async () => {
@@ -1737,9 +1492,7 @@ Body of ${name}.
 })
 
 it('V9-02: a bundled-marker agent skill produces no failed archive step through run() (0.3.50)', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-curator-v902-'))
-  const previous = process.env.DSH_HOME
-  process.env.DSH_HOME = home
+  await tempHome('dsh-curator-v902-')
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
@@ -1765,9 +1518,6 @@ it('V9-02: a bundled-marker agent skill produces no failed archive step through 
   // archived.
   expect(result.errors).toEqual([])
   expect(result.archived).not.toContain('marker-skill')
-  if (previous === undefined) delete process.env.DSH_HOME
-  else process.env.DSH_HOME = previous
-  await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('V8-14: a marker-protected agent skill is protected, never also managed (0.3.47)', () => {
@@ -1800,156 +1550,124 @@ describe('P2-5 (v15)/v16: control-plane mutators serialize on the mutex chain', 
     // (while running: await an already-resolved promise) this exact sequence
     // starves micro-tasks, the 100ms timer never fires and the test hangs —
     // so this test is also the spin-regression detector.
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-queue-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-      const curator = ctx.evolutionCurator
-      // Hold the mutex exactly the way run()/consolidate() hold it.
-      const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
-      const release = await internals.acquireMutex()
-      let done = false
-      const pending = curator.restore('ghost-skill').then((result) => { done = true; return result })
-      await new Promise(resolve => setTimeout(resolve, 100))
-      expect(done).toBe(false)
-      release()
-      const result = await pending
-      expect(done).toBe(true)
-      // No .archive entry exists — the structured refusal (not the outcome)
-      // is what proves restoreMutate ran after the mutex was released.
-      expect(result.ok).toBe(false)
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-queue-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    const curator = ctx.evolutionCurator
+    // Hold the mutex exactly the way run()/consolidate() hold it.
+    const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
+    const release = await internals.acquireMutex()
+    let done = false
+    const pending = curator.restore('ghost-skill').then((result) => { done = true; return result })
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(done).toBe(false)
+    release()
+    const result = await pending
+    expect(done).toBe(true)
+    // No .archive entry exists — the structured refusal (not the outcome)
+    // is what proves restoreMutate ran after the mutex was released.
+    expect(result.ok).toBe(false)
   })
 
   it('a manual run() arriving behind queued control-plane work skips (already-running)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-curator-queue2-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-      const curator = ctx.evolutionCurator
-      const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
-      const release = await internals.acquireMutex()
-      let restoreDone = false
-      const pendingRestore = curator.restore('ghost-skill').then((result) => { restoreDone = true; return result })
-      // run() must SKIP while control-plane work is queued/active.
-      const outcome = await curator.run()
-      expect(outcome.skipped).toBe('already-running')
-      expect(restoreDone).toBe(false)
-      release()
-      await pendingRestore
-      expect(restoreDone).toBe(true)
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-curator-queue2-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    const curator = ctx.evolutionCurator
+    const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
+    const release = await internals.acquireMutex()
+    let restoreDone = false
+    const pendingRestore = curator.restore('ghost-skill').then((result) => { restoreDone = true; return result })
+    // run() must SKIP while control-plane work is queued/active.
+    const outcome = await curator.run()
+    expect(outcome.skipped).toBe('already-running')
+    expect(restoreDone).toBe(false)
+    release()
+    await pendingRestore
+    expect(restoreDone).toBe(true)
   })
 })
 
 it('P3 (v17): two queued control-plane mutators run SERIALLY (no overlap, FIFO)', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-curator-fifo-'))
-  const previous = process.env.DSH_HOME
-  process.env.DSH_HOME = home
-  try {
-    const ctx = new Context()
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-    const curator = ctx.evolutionCurator
-    // Instrument the two mutator bodies to detect overlap.
-    const events: string[] = []
-    let inFlight = 0
-    let maxInFlight = 0
-    const internals = curator as unknown as {
-      restoreMutate(name: string): Promise<{ ok: boolean; message: string }>
-      consolidateMutate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
-      acquireMutex(): Promise<() => void>
-      restore(name: string): Promise<{ ok: boolean; message: string }>
-      consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
-    }
-    internals.restoreMutate = async (name: string) => {
-      events.push('restore:start')
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      await new Promise(resolve => setTimeout(resolve, 30))
-      inFlight -= 1
-      events.push('restore:end')
-      return { ok: false, message: `not in .archive (${name})` }
-    }
-    internals.consolidateMutate = async (target: string) => {
-      events.push('consolidate:start')
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      await new Promise(resolve => setTimeout(resolve, 30))
-      inFlight -= 1
-      events.push('consolidate:end')
-      return { ok: false, message: `not in tree (${target})` }
-    }
-    const release = await internals.acquireMutex()
-    const restoreDone = internals.restore('a').then(() => { events.push('restore:done') })
-    const consolidateDone = internals.consolidate('t', ['a']).then(() => { events.push('consolidate:done') })
-    await new Promise(resolve => setTimeout(resolve, 60))
-    // While the mutex is held, NEITHER mutator may have started.
-    expect(events.filter(e => e.endsWith(':start'))).toEqual([])
-    release()
-    await Promise.all([restoreDone, consolidateDone])
-    // Serial: no overlap, FIFO order (restore queued first, runs first;
-    // its .then continuation completes before consolidate starts — the
-    // mutex hands over only at release()).
-    expect(maxInFlight).toBe(1)
-    expect(events).toEqual(['restore:start', 'restore:end', 'restore:done', 'consolidate:start', 'consolidate:end', 'consolidate:done'])
-  } finally {
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  await tempHome('dsh-curator-fifo-')
+  const ctx = new Context()
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+  const curator = ctx.evolutionCurator
+  // Instrument the two mutator bodies to detect overlap.
+  const events: string[] = []
+  let inFlight = 0
+  let maxInFlight = 0
+  const internals = curator as unknown as {
+    restoreMutate(name: string): Promise<{ ok: boolean; message: string }>
+    consolidateMutate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
+    acquireMutex(): Promise<() => void>
+    restore(name: string): Promise<{ ok: boolean; message: string }>
+    consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }>
   }
+  internals.restoreMutate = async (name: string) => {
+    events.push('restore:start')
+    inFlight += 1
+    maxInFlight = Math.max(maxInFlight, inFlight)
+    await new Promise(resolve => setTimeout(resolve, 30))
+    inFlight -= 1
+    events.push('restore:end')
+    return { ok: false, message: `not in .archive (${name})` }
+  }
+  internals.consolidateMutate = async (target: string) => {
+    events.push('consolidate:start')
+    inFlight += 1
+    maxInFlight = Math.max(maxInFlight, inFlight)
+    await new Promise(resolve => setTimeout(resolve, 30))
+    inFlight -= 1
+    events.push('consolidate:end')
+    return { ok: false, message: `not in tree (${target})` }
+  }
+  const release = await internals.acquireMutex()
+  const restoreDone = internals.restore('a').then(() => { events.push('restore:done') })
+  const consolidateDone = internals.consolidate('t', ['a']).then(() => { events.push('consolidate:done') })
+  await new Promise(resolve => setTimeout(resolve, 60))
+  // While the mutex is held, NEITHER mutator may have started.
+  expect(events.filter(e => e.endsWith(':start'))).toEqual([])
+  release()
+  await Promise.all([restoreDone, consolidateDone])
+  // Serial: no overlap, FIFO order (restore queued first, runs first;
+  // its .then continuation completes before consolidate starts — the
+  // mutex hands over only at release()).
+  expect(maxInFlight).toBe(1)
+  expect(events).toEqual(['restore:start', 'restore:end', 'restore:done', 'consolidate:start', 'consolidate:end', 'consolidate:done'])
 })
 
 it('v17: a REAL in-flight run holds the mutex — a second run skips (already-running)', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-curator-runvs-'))
-  const previous = process.env.DSH_HOME
-  process.env.DSH_HOME = home
-  try {
-    const ctx = new Context()
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-    const curator = ctx.evolutionCurator
-    let started = 0
-    let releaseFirst!: () => void
-    const gate = new Promise<void>((resolve) => { releaseFirst = resolve })
-    const internals = curator as unknown as { runCore(options?: { ignoreGates?: boolean; dryRun?: boolean }): Promise<unknown> }
-    internals.runCore = async () => {
-      started += 1
-      await gate
-      return { stale: [], archived: [], errors: [], report: { runId: 'held', startedAt: '', finishedAt: '', durationMs: 0 }, skipped: undefined }
-    }
-    const first = curator.run()
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(started).toBe(1)
-    const second = await curator.run()
-    expect(second.skipped).toBe('already-running')
-    releaseFirst()
-    const firstOutcome = await first
-    expect(started).toBe(1)
-    expect(firstOutcome.report.runId).toBe('held')
-  } finally {
-    if (previous === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  await tempHome('dsh-curator-runvs-')
+  const ctx = new Context()
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+  const curator = ctx.evolutionCurator
+  let started = 0
+  let releaseFirst!: () => void
+  const gate = new Promise<void>((resolve) => { releaseFirst = resolve })
+  const internals = curator as unknown as { runCore(options?: { ignoreGates?: boolean; dryRun?: boolean }): Promise<unknown> }
+  internals.runCore = async () => {
+    started += 1
+    await gate
+    return { stale: [], archived: [], errors: [], report: { runId: 'held', startedAt: '', finishedAt: '', durationMs: 0 }, skipped: undefined }
   }
+  const first = curator.run()
+  await new Promise(resolve => setTimeout(resolve, 50))
+  expect(started).toBe(1)
+  const second = await curator.run()
+  expect(second.skipped).toBe('already-running')
+  releaseFirst()
+  const firstOutcome = await first
+  expect(started).toBe(1)
+  expect(firstOutcome.report.runId).toBe('held')
 })
 
 it('F-14 (v18): curatorProvider defaults to deepseek-official and is configurable', () => {

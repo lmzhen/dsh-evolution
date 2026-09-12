@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
 import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
+import { tempHome } from '../../test-support/temp-home.ts'
 
 function payload(overrides: Partial<EvolutionPlanAppliedEvent> = {}): EvolutionPlanAppliedEvent {
   return {
@@ -86,81 +86,65 @@ function serialize(items: EvolutionActivityRecord[]): string {
   })
 
   it('persists every emitted plan-applied payload across driver restarts (A1 replacement read path)', { timeout: 20_000 }, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-activity-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const first = new Context()
-      await first.plugin(EvolutionIoRegistry)
-      await first.plugin(NodeIo)
-      await first.plugin(apply, { maxItems: 10 })
-      first.emit('evolution/plan-applied', payload())
-      first.emit('evolution/plan-applied', payload({ planId: 'plan-2', sessionId: 'session-b', policyFingerprint: undefined }))
-      await pollUntil(root, 'plan-2')
-      await first.fiber.dispose()
+    const root = await tempHome('dsh-activity-')
+    const first = new Context()
+    await first.plugin(EvolutionIoRegistry)
+    await first.plugin(NodeIo)
+    await first.plugin(apply, { maxItems: 10 })
+    first.emit('evolution/plan-applied', payload())
+    first.emit('evolution/plan-applied', payload({ planId: 'plan-2', sessionId: 'session-b', policyFingerprint: undefined }))
+    await pollUntil(root, 'plan-2')
+    await first.fiber.dispose()
 
-      // Driver restart (new context over the same DSH_HOME) must MERGE with
-      // the existing sidecar, never overwrite it — the store is the durable
-      // replacement for the retired session projection.
-      const second = new Context()
-      await second.plugin(EvolutionIoRegistry)
-      await second.plugin(NodeIo)
-      await second.plugin(apply, { maxItems: 10 })
-      second.emit('evolution/plan-applied', payload({ planId: 'plan-3', sessionId: 'session-c' }))
-      await pollUntil(root, 'plan-3')
-      await second.fiber.dispose()
+    // Driver restart (new context over the same DSH_HOME) must MERGE with
+    // the existing sidecar, never overwrite it — the store is the durable
+    // replacement for the retired session projection.
+    const second = new Context()
+    await second.plugin(EvolutionIoRegistry)
+    await second.plugin(NodeIo)
+    await second.plugin(apply, { maxItems: 10 })
+    second.emit('evolution/plan-applied', payload({ planId: 'plan-3', sessionId: 'session-c' }))
+    await pollUntil(root, 'plan-3')
+    await second.fiber.dispose()
 
-      // The driver persists under $DSH_HOME/evolution (evolutionHome()).
-      const items = await loadActivity(join(root, 'evolution'), nodeEvolutionIo())
-      expect(items.map(item => item.planId)).toEqual(['plan-1', 'plan-2', 'plan-3'])
-      expect(items[0]).toMatchObject({
-        sessionId: 'session-a',
-        policyFingerprint: 'fp-1',
-        memoryApplied: 1,
-        skillApplied: 2,
-        rejectedOps: 3,
-      })
-      expect(typeof items[0]?.at).toBe('number')
-      // Versioned on-disk shape.
-      const raw = JSON.parse(await readFile(join(root, 'evolution', 'activity.json'), 'utf8')) as { version?: number }
-      expect(raw.version).toBe(ACTIVITY_FILE_VERSION)
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    // The driver persists under $DSH_HOME/evolution (evolutionHome()).
+    const items = await loadActivity(join(root, 'evolution'), nodeEvolutionIo())
+    expect(items.map(item => item.planId)).toEqual(['plan-1', 'plan-2', 'plan-3'])
+    expect(items[0]).toMatchObject({
+      sessionId: 'session-a',
+      policyFingerprint: 'fp-1',
+      memoryApplied: 1,
+      skillApplied: 2,
+      rejectedOps: 3,
+    })
+    expect(typeof items[0]?.at).toBe('number')
+    // Versioned on-disk shape.
+    const raw = JSON.parse(await readFile(join(root, 'evolution', 'activity.json'), 'utf8')) as { version?: number }
+    expect(raw.version).toBe(ACTIVITY_FILE_VERSION)
   })
 
   it('caps the sidecar at maxItems and tolerates a malformed file', { timeout: 20_000 }, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-activity-cap-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      // Malformed sidecar reads as empty instead of crashing the driver.
-      await nodeEvolutionIo().writeText(activityFile(join(root, 'evolution')), '{not json')
-      expect(await loadActivity(join(root, 'evolution'), nodeEvolutionIo())).toEqual([])
+    const root = await tempHome('dsh-activity-cap-')
+    // Malformed sidecar reads as empty instead of crashing the driver.
+    await nodeEvolutionIo().writeText(activityFile(join(root, 'evolution')), '{not json')
+    expect(await loadActivity(join(root, 'evolution'), nodeEvolutionIo())).toEqual([])
 
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      await ctx.plugin(apply, { maxItems: 2 })
-      ctx.emit('evolution/plan-applied', payload({ planId: 'p1' }))
-      ctx.emit('evolution/plan-applied', payload({ planId: 'p2' }))
-      ctx.emit('evolution/plan-applied', payload({ planId: 'p3' }))
-      // maxItems=2: the fold keeps the most recent two; the sidecar never
-      // grows past the cap, so poll for the steady-state 2 records. V5-30:
-      // poll the LAST emitted plan (p3) — 'plan-2' was a leftover name that
-      // never matched (p2 is quickly superseded) and burned the full 8s
-      // deadline before asserting.
-      const items = await pollUntil(root, 'plan-3')
-      expect(items.map(item => item.planId)).toEqual(['p2', 'p3'])
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(apply, { maxItems: 2 })
+    ctx.emit('evolution/plan-applied', payload({ planId: 'p1' }))
+    ctx.emit('evolution/plan-applied', payload({ planId: 'p2' }))
+    ctx.emit('evolution/plan-applied', payload({ planId: 'p3' }))
+    // maxItems=2: the fold keeps the most recent two; the sidecar never
+    // grows past the cap, so poll for the steady-state 2 records. V5-30:
+    // poll the LAST emitted plan (p3) — 'plan-2' was a leftover name that
+    // never matched (p2 is quickly superseded) and burned the full 8s
+    // deadline before asserting.
+    const items = await pollUntil(root, 'plan-3')
+    expect(items.map(item => item.planId)).toEqual(['p2', 'p3'])
 
 
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
   })
 
   it('does nothing (no throw) without an evolution IO provider', async () => {
@@ -225,54 +209,38 @@ function serialize(items: EvolutionActivityRecord[]): string {
   })
 
   it('a NaN maxItems config keeps the driver bounded instead of disabling the window (S6.4)', { timeout: 20_000 }, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-activity-nan-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      // `typeof NaN === 'number'` so schemastery accepts it; apply must warn and
-      // fall back to the default bound rather than disable the window.
-      await ctx.plugin(apply, { maxItems: Number.NaN })
-      ctx.emit('evolution/plan-applied', payload({ planId: 'n1' }))
-      ctx.emit('evolution/plan-applied', payload({ planId: 'n2' }))
-      ctx.emit('evolution/plan-applied', payload({ planId: 'n3' }))
-      const items = await pollUntil(root, 'n3')
-      expect(items.map(item => item.planId)).toEqual(['n1', 'n2', 'n3'])
-      await ctx.fiber.dispose()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const root = await tempHome('dsh-activity-nan-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // `typeof NaN === 'number'` so schemastery accepts it; apply must warn and
+    // fall back to the default bound rather than disable the window.
+    await ctx.plugin(apply, { maxItems: Number.NaN })
+    ctx.emit('evolution/plan-applied', payload({ planId: 'n1' }))
+    ctx.emit('evolution/plan-applied', payload({ planId: 'n2' }))
+    ctx.emit('evolution/plan-applied', payload({ planId: 'n3' }))
+    const items = await pollUntil(root, 'n3')
+    expect(items.map(item => item.planId)).toEqual(['n1', 'n2', 'n3'])
+    await ctx.fiber.dispose()
   })
 
   it('V4-42: a zero maxItems warns and clamps to 1 in the programmatic assembly path', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-activity-zero-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = root
-    try {
-      const ctx = new Context()
-      await ctx.plugin(EvolutionIoRegistry)
-      await ctx.plugin(NodeIo)
-      const warnSpy = vi.spyOn(ctx.logger, 'warn')
-      // Direct assembly bypasses the schema `.min(1)`; the apply() clamp must
-      // warn loudly (a zero cap would disable the retention window).
-      await ctx.plugin(apply, { maxItems: 0 })
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('maxItems'))
-      warnSpy.mockRestore()
-      // The fold still caps at one record.
-      let items: EvolutionActivityRecord[] = []
-      items = applyActivityEvent(items, payload({ planId: 'p1' }), 0, 100)
-      items = applyActivityEvent(items, payload({ planId: 'p2' }), 0, 200)
-      expect(items.map(item => item.planId)).toEqual(['p2'])
-      await ctx.fiber.dispose()
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('dsh-activity-zero-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    // Direct assembly bypasses the schema `.min(1)`; the apply() clamp must
+    // warn loudly (a zero cap would disable the retention window).
+    await ctx.plugin(apply, { maxItems: 0 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('maxItems'))
+    warnSpy.mockRestore()
+    // The fold still caps at one record.
+    let items: EvolutionActivityRecord[] = []
+    items = applyActivityEvent(items, payload({ planId: 'p1' }), 0, 100)
+    items = applyActivityEvent(items, payload({ planId: 'p2' }), 0, 200)
+    expect(items.map(item => item.planId)).toEqual(['p2'])
+    await ctx.fiber.dispose()
   })
 
   it('F-304: serializeActivity is the single-source envelope writers share (round-trips with the reader)', () => {

@@ -1,26 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
 import * as JsonState from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
+import { mountStateStack } from '../../test-support/state-stack.ts'
 
-async function mount(root: string) {
-  const ctx = new Context()
-  await ctx.plugin(EvolutionStateStorageRegistry)
-  await ctx.plugin(EvolutionIoRegistry)
-  await ctx.plugin(NodeIo)
-  await ctx.plugin(JsonState, { root })
-  return ctx
-}
 
 describe('V10-04 (P2-19): json provider per-record field gates', () => {
   it('isolates a record with a wrong field shape and keeps the valid siblings', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-review-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-review-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // The audit's exact case: `{"s1":{"foo":1}}` used to load as a
@@ -38,12 +29,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     expect(corrupt).not.toBeNull()
     expect(JSON.parse(corrupt!)).toEqual({ s1: { foo: 1 } })
     expect(await io.readText(join(root, 'review-state.json'))).toBe(content)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('isolates a non-enum `status:"Pending"` record instead of leaving a permanent zombie', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-status-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-status-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // The audit's zombie case: `status:"Pending"` matched no query and was
@@ -56,12 +46,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     const corrupt = await io.readText(join(root, 'pending-state.json.corrupt'))
     expect(corrupt).not.toBeNull()
     expect(JSON.parse(corrupt!)).toEqual({ z1: zombie })
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('isolates a malformed curator record and keeps the singleton readable afterwards', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-curator-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-curator-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     await io.writeText(join(root, 'curator-state.json'), JSON.stringify({
@@ -73,12 +62,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     // record dropped and the record becomes readable again).
     await provider.saveCuratorState({ lastRunAt: 1, runCount: 1, lastSummary: 'ok', paused: false })
     expect((await provider.loadCuratorState())?.lastSummary).toBe('ok')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('gates the legacy pending.json merge too', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-legacy-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-legacy-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     await io.writeText(join(root, 'pending.json'), JSON.stringify({
@@ -88,12 +76,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     const pending = await provider.listPending('pending')
     expect(pending.map(record => record.id)).toEqual(['good'])
     expect(await io.readText(join(root, 'pending.json.corrupt'))).not.toBeNull()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('keeps well-formed records fully unaffected (no false isolation)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-clean-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-clean-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     await provider.saveReviewState('s1', { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: 0 })
     await provider.saveCuratorState({ lastRunAt: 0, runCount: 0, lastSummary: '', paused: false })
@@ -104,12 +91,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     // No quarantine copies anywhere — a clean store stays clean.
     const io = ctx.evolutionIo.provider('node')
     expect((await io.list(root)).filter(name => name.includes('.corrupt'))).toEqual([])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('N12 (v12): rebuilds a .corrupt copy swept by the 7-day cleanup in the same process', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-n12-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-n12-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' }
@@ -124,11 +110,10 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     expect(await provider.listPending()).toEqual([])
     expect(await io.readText(corruptPath)).not.toBeNull()
     expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('N2 (v13): a failed .corrupt write is RETRIED on the next read — the rewrite key is not set', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-n2-'))
+    const root = await tempRoot('dsh-json-gate-n2-')
     const ctx = new Context()
     await ctx.plugin(EvolutionStateStorageRegistry)
     const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' }
@@ -154,12 +139,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     // The rewrite key stays unset, so the next access retries the copy.
     await expect(provider.listPending()).rejects.toThrow(/write-back carries/)
     expect(writes).toBeGreaterThan(writesAfterFirst)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P2-1 (v13): a whole-file quarantine overwrite must let the record gate rewrite its scoped copy', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-gate-p21-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-gate-p21-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     const zombie = { id: 'z1', kind: 'memory', summary: 'zombie', args: {}, createdAt: 'now', status: 'Pending' }
@@ -186,12 +170,11 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     const stampedAfter = (await readdir(root)).filter(name => name.startsWith('pending-state.json.corrupt.'))
     expect(stampedAfter).toHaveLength(stamped.length)
     expect(JSON.parse((await io.readText(corruptPath))!)).toEqual({ z1: zombie })
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P2-1 (v14): the write-back clears the same field gate — a malformed record never lands', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-write-gate-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-write-gate-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // The same zombie record the READ gate quarantines: before v14 the write
@@ -205,6 +188,5 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     // A well-formed record still lands, and a legacy write-back keeps working.
     await provider.savePending({ id: 'p2', kind: 'memory', summary: 'ok', args: {}, createdAt: 'now', status: 'pending' })
     expect((await provider.listPending()).map(record => record.id)).toEqual(['p2'])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

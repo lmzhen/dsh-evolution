@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import MemoryRegistry from '@deepseek-ai/dsh-memory'
@@ -19,10 +17,11 @@ import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
 import * as ToolSkillManage from '@deepseek-ai/dsh-tool-skill-manage'
 import * as EvolutionSkillCatalog from '@deepseek-ai/dsh-evolution-skill-catalog'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('layered installation matrix', () => {
   it('host-only: services exist, model tools do not', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-host-only-'))
+    const root = await tempRoot('dsh-host-only-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
@@ -50,11 +49,10 @@ describe('layered installation matrix', () => {
     await ctx.evolutionState.saveReviewState('host-session', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     expect(await ctx.evolutionState.loadReviewState('host-session')).toMatchObject({ turnsSinceMemory: 1 })
 
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('host + agent: adding the agent preset exposes model tools', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-host-agent-'))
+    const root = await tempRoot('dsh-host-agent-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
@@ -79,6 +77,5 @@ describe('layered installation matrix', () => {
     expect(ctx.tools.get('memory')).toBeDefined()
     expect(ctx.tools.get('skill_manage')).toBeDefined()
 
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })

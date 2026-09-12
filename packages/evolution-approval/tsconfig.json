@@ -1,36 +1,13 @@
 {
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib/types"
-  },
-  "include": [
-    "src"
-  ],
+  "extends": "../tsconfig.pkg.json",
   "references": [
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../evolution-state-storage"
-    },
-    {
-      "path": "../evolution-state"
-    },
-    {
-      "path": "../evolution-io"
-    },
-    {
-      "path": "../evolution-io-node"
-    },
-    {
-      "path": "../evolution-state-json"
-    }
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../runtime-diagnostics/invariants" },
+    { "path": "../evolution-state-storage" },
+    { "path": "../evolution-state" },
+    { "path": "../evolution-io" },
+    { "path": "../evolution-io-node" },
+    { "path": "../evolution-state-json" }
   ]
 }

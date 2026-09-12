@@ -52,6 +52,98 @@ export interface SkillSummary {
    * platform catalog keeps it while this provider shadows the upstream
    * filesystem provider. Absent when the frontmatter has none. */
   whenToUse?: string
+  /** v35 C11: the whole SKILL.md body, present only for
+   * {@link SkillLibrary.list} calls that pass `{ withContent: true }`. A consumer
+   * that needs both the summary fields and the body (tree hashing, enrichment,
+   * drift scans) saves the second per-skill read; the default stays body-free so
+   * the common listing does not hold a whole tree in memory. */
+  content?: string
+}
+
+/**
+ * Stage-time anchor for a full-content write (v35 C9): the sha256 the caller read
+ * when it staged the plan, or `absent` when the target did not exist then. The
+ * library compares it against the bytes it reads INSIDE the write's own lock — the
+ * same read the write commits — so a concurrent writer landing between staging and
+ * commit is refused instead of silently overwritten.
+ */
+export type WriteAnchor = { readonly sha256: string } | { readonly absent: true }
+
+/**
+ * What the write lock observed about an anchor target.
+ * - `match`: the anchor holds; the write proceeds.
+ * - `drift`: the target exists with different bytes.
+ * - `missing`: the target does not exist (an `absent` anchor `match`es this).
+ */
+export type AnchorVerdict = 'match' | 'drift' | 'missing'
+
+/**
+ * Evaluate a stage-time anchor against the bytes a locked read observed.
+ * @param anchor - the caller's anchor, or `undefined` for an unanchored write.
+ * @param current - the bytes the write lock read (`null` = the target is absent).
+ * @returns `match` when the write may proceed, otherwise the refusal verdict.
+ */
+function anchorVerdict(anchor: WriteAnchor | undefined, current: string | null): AnchorVerdict {
+  if (anchor === undefined) return 'match'
+  if ('absent' in anchor) return current === null ? 'match' : 'drift'
+  if (current === null) return 'missing'
+  return contentHash(current) === anchor.sha256 ? 'match' : 'drift'
+}
+
+/**
+ * Build the refusal for a skill write whose anchor did not hold. The wording is
+ * the library's own; a caller with staged-replay wording (the skill tool, the
+ * review plan) re-words it from {@link SkillActionResult.anchor}.
+ * @param name - the skill name the refusal names.
+ * @param verdict - the non-matching verdict.
+ * @returns the refusal result (nothing was written).
+ */
+function anchorRefusal(name: string, verdict: Exclude<AnchorVerdict, 'match'>): SkillActionResult {
+  return {
+    ok: false,
+    stale: true,
+    anchor: verdict,
+    message: verdict === 'missing'
+      ? `Skill "${name}" not found.`
+      : `Skill "${name}" changed since it was read; the write was refused to avoid overwriting newer content.`,
+  }
+}
+
+/**
+ * Build the refusal for a support-file write/remove whose anchor did not hold.
+ * @param name - the owning skill name.
+ * @param filePath - the support-file path inside the skill.
+ * @param verdict - the non-matching verdict.
+ * @returns the refusal result (nothing was written or removed).
+ */
+/**
+ * Refusal for a target the locked read could not verify at all (EISDIR, an
+ * unreadable file). A staged replay reports "could not be verified" instead of
+ * propagating an exception: nothing was read, so nothing can have been written.
+ * @param name - the owning skill name.
+ * @param filePath - the support-file path, or `null` for the skill body.
+ * @returns the refusal result.
+ */
+function anchorUnverifiable(name: string, filePath: string | null): SkillActionResult {
+  return {
+    ok: false,
+    stale: true,
+    anchor: 'drift',
+    message: filePath === null
+      ? `Skill "${name}" could not be read to verify the staged content.`
+      : `Support file "${filePath}" of "${name}" could not be read to verify the staged content.`,
+  }
+}
+
+function anchorRefusalFile(name: string, filePath: string, verdict: Exclude<AnchorVerdict, 'match'>): SkillActionResult {
+  return {
+    ok: false,
+    stale: true,
+    anchor: verdict,
+    message: verdict === 'missing'
+      ? `File "${filePath}" not found in skill "${name}".`
+      : `Support file "${filePath}" of "${name}" changed since it was read; the write was refused to avoid overwriting newer content.`,
+  }
 }
 
 export interface SkillActionResult {
@@ -64,6 +156,12 @@ export interface SkillActionResult {
   /** 0.3.18 (E-68): patch produced byte-identical content (old===new) — no
    * write, no audit, no mutation event; callers must not count a patch. */
   noop?: boolean
+  /** Set when the caller passed a {@link WriteAnchor} that the locked read did
+   * not satisfy: nothing was written. Carries {@link SkillActionResult.anchor}
+   * so a caller with staged-replay wording can translate it (v35 C9). */
+  stale?: true
+  /** The locked read's verdict for the caller's anchor. */
+  anchor?: AnchorVerdict
 }
 
 /**
@@ -1116,13 +1214,21 @@ export class SkillLibrary {
   private async runSingleWrite(
     path: string,
     task: (current: string | null) => SingleWriteOutcome | Promise<SingleWriteOutcome>,
+    readFailure?: SkillActionResult,
   ): Promise<SkillActionResult> {
     // v28 G1.1 (EVO-IO-02): `ghostDir` rides the outcome instead of a closure
     // flag — it is set when the task saw a missing body and chose not to
     // write, the ghost-directory precondition decided on the clean
     // `SingleWriteOutcome` type inside `run`.
     let outcome: (SingleWriteOutcome & { ghostDir?: boolean }) | undefined
+    // v35 C9: a staged write must report an unverifiable target as a refusal, not
+    // as an exception. `progress.entered` distinguishes a failure of the LOCKED
+    // READ (the task never ran, so nothing was verified and nothing was written)
+    // from a failure of the write itself. It is a holder object rather than a
+    // boolean because the assignment happens inside the transact callback.
+    const progress = { entered: false }
     const run = async (current: string | null) => {
+      progress.entered = true
       const o = await task(current ?? null)
       outcome = { ...o, ghostDir: current === null && o.write === null }
       // write: null = "leave the file untouched" — return the current bytes so
@@ -1142,11 +1248,18 @@ export class SkillLibrary {
         // failed. The bytes are visible, so this is NOT a failed write: keep the
         // audit/event below and report the durability warning instead of
         // letting a caller roll back (or retry) a write that already happened.
+        if (!progress.entered && readFailure !== undefined) return readFailure
         if (!committedOnly(error)) throw error
         durabilityWarning = error instanceof Error ? error.message : String(error)
       }
     } else {
-      const current = await this.io.readText(path)
+      let current: string | null
+      try {
+        current = await this.io.readText(path)
+      } catch (error) {
+        if (readFailure !== undefined) return readFailure
+        throw error
+      }
       const next = await run(current)
       if (next !== null && next !== current) {
         try {
@@ -1260,7 +1373,14 @@ export class SkillLibrary {
     }
   }
 
-  async list(): Promise<SkillSummary[]> {
+  /**
+   * Summarize the skill tree.
+   * @param options - `withContent` attaches each skill's whole SKILL.md body to
+   * its summary (v35 C11): the read this listing already performs is the one the
+   * body would cost again, so a content-consuming caller pays no second pass.
+   * @returns one summary per readable skill directory.
+   */
+  async list(options: { withContent?: boolean } = {}): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
     for (const name of await listNames(this.root, this.io)) {
       const dir = this.dirOf(name)
@@ -1329,6 +1449,7 @@ export class SkillLibrary {
         protectionUnknown: [bundled, hubInstalled, pinned, hermesManaged].some(value => value === null),
         managed: hermesManaged === true,
         ...typeof parsedWhenToUse === 'string' && parsedWhenToUse.trim() !== '' ? { whenToUse: parsedWhenToUse } : {},
+        ...options.withContent === true ? { content: md } : {},
       })
     }
     return summaries
@@ -1784,15 +1905,15 @@ export class SkillLibrary {
     }
   }
 
-  async update(rawName: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async update(rawName: string, content: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→validate→write runs under the in-process serialize
     // queue so two concurrent updates on one skill never interleave.
-    return await this.serial(() => this.updateCore(name, content, origin))
+    return await this.serial(() => this.updateCore(name, content, origin, anchor))
   }
 
-  private async updateCore(name: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
+  private async updateCore(name: string, content: string, origin: WriteOrigin, anchor?: WriteAnchor): Promise<SkillActionResult> {
     // P3 (v15): guard BEFORE dirOf — same order as patchCore, so no path
     // string is ever built from an unvalidated name (dirOf does not touch IO,
     // so this is consistency hygiene, not a reachable gap).
@@ -1815,6 +1936,11 @@ export class SkillLibrary {
     const threat = this.contentThreatBlock(finalContent)
     if (threat) return { ok: false, message: threat }
     return await this.runSingleWrite(path, (current) => {
+      // v35 C9: the stage-time anchor is checked against THIS locked read, so the
+      // compare and the commit share one lock (the caller's former pre-read left
+      // a window where both writers could report success).
+      const verdict = anchorVerdict(anchor, current)
+      if (verdict !== 'match') return { result: anchorRefusal(name, verdict), write: null }
       if (current === null) return { result: { ok: false, message: `Skill "${name}" not found.` }, write: null }
       // F-318 (②): a byte-equivalent rewrite (same content modulo trailing
       // newlines) is a no-op — no write, no audit, no mutation event, so the
@@ -1831,7 +1957,7 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'update', before: current, after: onDisk, summary: 'updated' },
         event: { action: 'update', name, skillDir: dir },
       }
-    })
+    }, anchor !== undefined ? anchorRefusal(name, 'missing') : undefined)
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
@@ -2730,15 +2856,21 @@ export class SkillLibrary {
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
 
-  async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→validate→write runs under the in-process serialize
     // queue so two concurrent writers to one support file never interleave.
-    return await this.serial(() => this.writeSupportFileCore(name, filePath, content, origin))
+    return await this.serial(() => this.writeSupportFileCore(name, filePath, content, origin, anchor))
   }
 
-  private async writeSupportFileCore(name: string, filePath: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
+  private async writeSupportFileCore(
+    name: string,
+    filePath: string,
+    content: string,
+    origin: WriteOrigin,
+    anchor?: WriteAnchor,
+  ): Promise<SkillActionResult> {
     // P3 (v17): guard BEFORE dirOf — the last holdout of the old order
     // (updateCore/patchCore/removeSupportFileCore all check first).
     const badName = this.badName(name)
@@ -2754,6 +2886,11 @@ export class SkillLibrary {
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     return await this.runSingleWrite(target, (current) => {
+      // v35 C9: the stage-time anchor is verified against this locked read; a
+      // mismatch refuses before the no-op check (a stale anchor is a refusal even
+      // when the supplied bytes happen to equal the current ones).
+      const verdict = anchorVerdict(anchor, current)
+      if (verdict !== 'match') return { result: anchorRefusalFile(name, filePath, verdict), write: null }
       // V6-15 (0.3.36): a byte-equivalent (modulo trailing whitespace) rewrite
       // is a no-op — no write, no audit, no mutation event — so a repeated
       // write_file cannot inflate the mutation-maturity counter or churn the
@@ -2767,19 +2904,24 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}` },
         event: { action: 'write_file', name, skillDir: dir, file: target },
       }
-    })
+    }, anchor !== undefined ? anchorUnverifiable(name, filePath) : undefined)
   }
 
-  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // P2-4 (v11): the exists/read/remove window runs under the serialize queue
     // — writeSupportFile wraps itself (F-208), so an unwrapped remove could
     // interleave with a concurrent write and silently drop its write.
-    return await this.serial(() => this.removeSupportFileCore(name, filePath, origin))
+    return await this.serial(() => this.removeSupportFileCore(name, filePath, origin, anchor))
   }
 
-  private async removeSupportFileCore(name: string, filePath: string, origin: WriteOrigin): Promise<SkillActionResult> {
+  private async removeSupportFileCore(
+    name: string,
+    filePath: string,
+    origin: WriteOrigin,
+    anchor?: WriteAnchor,
+  ): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
@@ -2789,7 +2931,12 @@ export class SkillLibrary {
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
-    if (!await this.io.exists(target)) return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
+    if (!await this.io.exists(target)) {
+      // v35 C9: a staged replay reports its own anchor verdict for a vanished
+      // target; the generic not-found report is for unanchored callers.
+      if (anchor !== undefined) return anchorRefusalFile(name, filePath, 'missing')
+      return { ok: false, message: `File "${filePath}" not found in skill "${name}".` }
+    }
     // P2-10 (v15): `io.remove` is a recursive rm, so a DIRECTORY path passed
     // as file_path (nested support dirs are a feature) would wipe the whole
     // subtree with only a null audit `before` — bytes gone without a hash.
@@ -2802,8 +2949,19 @@ export class SkillLibrary {
     // protocol, so a cross-instance/process writer could land its rename after
     // our read and have the bytes deleted while it reports success. Route the
     // delete through the same per-path transact lock (returning null = remove).
-    if (this.transact) await this.transact(this.io, target, () => null)
-    else await this.io.remove(target)
+    // v35 C9: verify the anchor inside the same lock the delete runs under. A
+    // mismatch returns `current` unchanged — "no change" in the transact
+    // contract — so nothing is deleted and nothing is audited.
+    let verdict = anchorVerdict(anchor, before)
+    if (verdict === 'match' && this.transact) {
+      await this.transact(this.io, target, (current) => {
+        verdict = anchorVerdict(anchor, current)
+        return verdict === 'match' ? null : current
+      })
+    } else if (verdict === 'match') {
+      await this.io.remove(target)
+    }
+    if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
     await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }

@@ -7,9 +7,8 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { existsSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 /**
  * V10-10 (P2-11) + V10-13 (P2-9) regression pins:
@@ -146,7 +145,7 @@ describe('V10-13 (P2-9): skillReviewTrigger both — one review per completed tu
 
 describe('V10-11 (P2-7): review skillsRoot config channel', () => {
   it('a review skill create lands in the configured skillsRoot, not the default tree', async () => {
-    const skillsRoot = await mkdtemp(join(tmpdir(), 'v10-review-root-'))
+    const skillsRoot = await tempRoot('v10-review-root-')
     const { ctx, emitEnd } = await mountReviewFixture()
     ctx.provide('subagents', {
       start: async () => ({
@@ -178,7 +177,6 @@ describe('V10-11 (P2-7): review skillsRoot config channel', () => {
     await vi.waitFor(() => {
       expect(existsSync(join(skillsRoot, 'rooted-skill', 'SKILL.md'))).toBe(true)
     }, { timeout: 15_000 })
-    await rm(skillsRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 

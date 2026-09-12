@@ -1,27 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
-import * as JsonState from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
+import { mountStateStack } from '../../test-support/state-stack.ts'
 
-async function mount(root: string) {
-  const ctx = new Context()
-  await ctx.plugin(EvolutionStateStorageRegistry)
-  await ctx.plugin(EvolutionIoRegistry)
-  await ctx.plugin(NodeIo)
-  await ctx.plugin(JsonState, { root })
-  return ctx
-}
 
 describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
   it('archives the oldest resolved record once the live map exceeds the cap', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-cap-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -53,12 +41,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(Array.isArray(archive)).toBe(true)
     expect(archive).toHaveLength(1)
     expect(archive[0]!.id).toBe('seed-0')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('produces no archive below the cap', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap2-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-cap2-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -77,12 +64,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect(Object.values(map).filter(r => r.status === 'approved' || r.status === 'rejected')).toHaveLength(51)
     expect(await io.exists(join(root, 'pending-state-archive.json'))).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('dedupes archive entries when the read-only legacy pending.json re-introduces evicted records (V4-01)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap-dedup-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-cap-dedup-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -114,12 +100,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(archive.map(record => record.id)).toEqual(Array.from({ length: 10 }, (_, i) => `seed-${i}`))
     const ids = archive.map(record => record.id)
     expect(new Set(ids).size).toBe(ids.length)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rotates the audit sidecar to .bak once it exceeds the archive cap (V4-01)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap-rotate-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-cap-rotate-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -156,12 +141,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(bak).toHaveLength(5000)
     expect(bak[0]!.id).toBe('arch-0')
     expect(bak[4999]!.id).toBe('arch-4999')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('retires a legacy pending.json on first list and never resurrects an archived twin (V5-02)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-retire-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-retire-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -194,12 +178,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.tryResolvePending('current', 'approved')
     expect((await provider.listPending('pending')).some(record => record.id === 'ghost')).toBe(false)
     expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('evicts by record id even when the map key differs from the id (V5-09)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-evict-key-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-evict-key-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -218,12 +201,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(Object.values(after).some(record => record.id === 'real-oldest')).toBe(false)
     const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(archive.some(record => record.id === 'real-oldest')).toBe(true)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('collapses historical duplicates inside the archive on load (V5-07)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-dup-collapse-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-dup-collapse-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // A pre-dedupe-key archive may hold the same id+status+resolvedAt twice —
@@ -241,12 +223,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.tryResolvePending('to-resolve', 'approved')
     const collapsed = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(collapsed.filter(record => record.id === 'dup')).toHaveLength(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-22: a collapse ALSO lands when the evicted record is already archived (fresh empty, 0.3.37)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v622-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-v622-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // The archive carries a collapsible duplicate pair AND the record this
@@ -269,12 +250,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     // residue forever.
     const once = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(once.filter(record => record.id === 'dup')).toHaveLength(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-30: eviction is by the oldest entry KEYS —a same-id twin keeps its own slot (0.3.37)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v630-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-v630-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     const map: Record<string, PendingRecord> = {}
@@ -296,12 +276,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const archivedShared = archive.filter(record => record.id === 'shared-id')
     expect(archivedShared).toHaveLength(1)
     expect(archivedShared[0]?.summary).toBe('old')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-01: a mutation BEFORE retirement cannot fixate an archived ghost twin', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v601-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-v601-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // Upgrade shape: legacy holds the pending twin of an id the archive saw
@@ -319,12 +298,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     const current = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect(Object.values(current).some(record => record.id === 'ghost')).toBe(false)
     expect(await provider.claimPending('ghost', 'claimer')).toBeNull()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V7-08: rotation REFRESHES the once-read archive id cache (0.3.44)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-v708-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-v708-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     // 1) First mutation establishes the once-per-instance archivedIdsCache
@@ -350,12 +328,11 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     await provider.savePending({ id: 'after-rotate', kind: 'memory', summary: 'n2', args: {}, createdAt: 'now', status: 'pending' })
     const current = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
     expect(Object.values(current).some(record => record.id === 'live-0')).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('does not write an empty .bak when the archive was empty at rotation (V5-10)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-empty-bak-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-empty-bak-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -370,14 +347,13 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(await io.exists(join(root, 'pending-state-archive.json.bak'))).toBe(false)
     const active = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(active).toHaveLength(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 describe('v28 G0.2 (STATE-01): a failed archive append must not open the ghost-twin replay window', () => {
   it('compensates an append failure by merging the evicted records back into the live map', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap3-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-cap3-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -415,12 +391,11 @@ describe('v28 G0.2 (STATE-01): a failed archive append must not open the ghost-t
     expect(await provider.claimPending('seed-0', 'operator-claim')).toBeNull()
     const reResolve = await provider.tryResolvePending('seed-0', 'approved')
     expect(reResolve.applied).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a healthy append still evicts (compensation never fires on success)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap4-'))
-    const ctx = await mount(root)
+    const root = await tempRoot('dsh-json-cap4-')
+    const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
 
@@ -440,13 +415,12 @@ describe('v28 G0.2 (STATE-01): a failed archive append must not open the ghost-t
     expect(map['seed-0']).toBeUndefined()
     const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     expect(archive.map(entry => entry.id)).toEqual(['seed-0'])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 it('v28 G1.2 (STATE-01b): a valid-JSON wrong-shape archive is quarantined, not silently overwritten', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap5-'))
-  const ctx = await mount(root)
+  const root = await tempRoot('dsh-json-cap5-')
+  const ctx = await mountStateStack(root)
   const provider = ctx.evolutionStateStorage.provider('json')
   const io = ctx.evolutionIo.provider('node')
 
@@ -473,12 +447,11 @@ it('v28 G1.2 (STATE-01b): a valid-JSON wrong-shape archive is quarantined, not s
   // behavior, same as a parse-failed archive).
   const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
   expect(archive.map(entry => entry.id)).toEqual(['seed-0'])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('v29 STATE-05: repeated quarantines of the same corrupt file against a DIFFERENT stale copy mint exactly one stamped sibling', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap6-'))
-  const ctx = await mount(root)
+  const root = await tempRoot('dsh-json-cap6-')
+  const ctx = await mountStateStack(root)
   const provider = ctx.evolutionStateStorage.provider('json')
   const io = ctx.evolutionIo.provider('node')
 
@@ -505,12 +478,11 @@ it('v29 STATE-05: repeated quarantines of the same corrupt file against a DIFFER
   // The pre-existing base copy is untouched.
   expect(await io.readText(join(root, 'pending-state.json.corrupt'))).toBe('{"generation":1}')
   void stamped
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 it('v30 STATE-07: a byte-equal user file named `<file>.corrupt.notes.md` is NOT reused as the quarantine dest', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-json-cap7-'))
-  const ctx = await mount(root)
+  const root = await tempRoot('dsh-json-cap7-')
+  const ctx = await mountStateStack(root)
   const provider = ctx.evolutionStateStorage.provider('json')
   const io = ctx.evolutionIo.provider('node')
 
@@ -531,5 +503,4 @@ it('v30 STATE-07: a byte-equal user file named `<file>.corrupt.notes.md` is NOT 
   // …and the user file is untouched (still exactly its own bytes, never
   // pointed at as the rescue copy).
   expect(await io.readText(join(root, 'pending-state.json.corrupt.notes.md'))).toBe(corruptPayload)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

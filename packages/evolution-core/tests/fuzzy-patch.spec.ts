@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { fakeIo } from '../../test-support/fake-io.ts'
 
 /**
  * P0-5 regression suite for the 3-level fuzzy patch match chain:
@@ -10,53 +10,6 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
  *  - property fuzz: patched output keeps every non-matched byte, and the
  *    only different span is the replacement itself.
  */
-
-function fakeIo(): EvolutionIoLike & { files: Map<string, string> } {
-  const files = new Map<string, string>()
-  const normalize = (path: string) => path.replaceAll('\\', '/')
-  const children = (path: string) => {
-    const prefix = normalize(path).replace(/[\\/]+$/, '') + '/'
-    const names = new Set<string>()
-    for (const key of files.keys()) {
-      if (!key.startsWith(prefix)) continue
-      const rest = key.slice(prefix.length)
-      const name = rest.split('/')[0]
-      if (name) names.add(name)
-    }
-    return [...names]
-  }
-  const removePrefix = (path: string) => {
-    const prefix = normalize(path).replace(/[\\/]+$/, '') + '/'
-    for (const key of [...files.keys()]) {
-      if (key === normalize(path) || key.startsWith(prefix)) files.delete(key)
-    }
-  }
-  return {
-    files,
-    async readText(path) { return files.get(normalize(path)) ?? null },
-    async writeText(path, content) { files.set(normalize(path), content) },
-    async remove(path) { removePrefix(path) },
-    async list(path) { return children(path) },
-    async exists(path) {
-      const key = normalize(path)
-      if (files.has(key)) return true
-      const prefix = key.replace(/\/$/, '') + '/'
-      return [...files.keys()].some(file => file.startsWith(prefix))
-    },
-    async rename(_path, _destination) { throw new Error('rename unsupported') },
-    async copy(path, destination) {
-      const prefix = normalize(path).replace(/[\\/]+$/, '') + '/'
-      const destPrefix = normalize(destination).replace(/\/$/, '') + '/'
-      for (const [key, value] of files) {
-        if (key === normalize(path) || key.startsWith(prefix)) {
-          const suffix = key === normalize(path) ? key.slice(key.lastIndexOf('/') + 1) : key.slice(prefix.length)
-          files.set(destPrefix + suffix, value)
-        }
-      }
-    },
-  }
-}
-
 async function setupSkill(lib: SkillLibrary, content: string): Promise<string> {
   const created = await lib.create('fuzz-skill', '---\nname: fuzz-skill\ndescription: Fuzz target.\n---\n\n# Fuzz\n', 'background_review')
   expect(created.ok).toBe(true)

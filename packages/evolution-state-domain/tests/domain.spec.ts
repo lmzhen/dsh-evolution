@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-state-domain', () => {
   it('persists state through the storage-domain KV domain', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-state-domain-'))
+    const home = await tempRoot('dsh-state-domain-')
     const ctx = new Context()
     await ctx.plugin(Storage)
     ctx.storage.backend.register('test-json', new JsonStorageBackend(home))
@@ -22,10 +20,9 @@ describe('evolution-state-domain', () => {
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('returns the existing record with applied:false when already resolved to another status (E-10, 0.3.17)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-state-domain-e10-'))
+    const home = await tempRoot('dsh-state-domain-e10-')
     const ctx = new Context()
     await ctx.plugin(Storage)
     ctx.storage.backend.register('test-json', new JsonStorageBackend(home))
@@ -41,10 +38,9 @@ describe('evolution-state-domain', () => {
     const second = await provider.tryResolvePending('p1', 'rejected')
     expect(second.applied).toBe(false)
     expect(second.record).not.toBeNull()
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('claim moves the record to executing and never double-claims (S3.3, E-24 — domain parity)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-state-domain-s3-'))
+    const home = await tempRoot('dsh-state-domain-s3-')
     const ctx = new Context()
     await ctx.plugin(Storage)
     ctx.storage.backend.register('test-json', new JsonStorageBackend(home))
@@ -63,7 +59,6 @@ describe('evolution-state-domain', () => {
     expect(await provider.claimPending('p1', 'c2')).toBeNull()
     const resolved = await provider.tryResolvePending('p1', 'rejected')
     expect(resolved.applied).toBe(true)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('dispose waits for an in-flight open and closes the domain (E-17, 0.3.17)', async () => {
     const ctx = new Context()

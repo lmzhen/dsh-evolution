@@ -6,13 +6,12 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as Catalog from '../src/index.ts'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-skill-catalog', () => {
   it('publishes evolution skills into ctx.skills and invalidates after mutations', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-'))
+    const root = await tempRoot('dsh-skill-catalog-')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -36,11 +35,10 @@ describe('evolution-skill-catalog', () => {
     expect(candidate).toBeDefined()
     expect(candidate?.provider).toBe('dsh-evolution')
 
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V27 G5.3: the published content is the BODY, matching the upstream filesystem provider', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-content-'))
+    const root = await tempRoot('dsh-skill-catalog-content-')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -58,11 +56,10 @@ describe('evolution-skill-catalog', () => {
     expect(definition?.content).toBe('# Body\n\nDo body work.')
     expect(definition?.content ?? '').not.toContain('---')
     expect(definition?.description).toBe('Body contract test.')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('X-7: repeated get() reuses the summaries cache; refresh drops it (0.3.18)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-cache-'))
+    const root = await tempRoot('dsh-skill-catalog-cache-')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -94,11 +91,10 @@ describe('evolution-skill-catalog', () => {
     const afterRefresh = await ctx.skills.get('demo-skill')
     expect(afterRefresh?.name).toBe('demo-skill')
     expect(listCalls).toBeGreaterThan(scansAfterFirst)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E-71: an out-of-band tree edit becomes visible via /evolution skills refresh (0.3.18)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-oob-'))
+    const root = await tempRoot('dsh-skill-catalog-oob-')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -121,11 +117,10 @@ describe('evolution-skill-catalog', () => {
     // After the refresh the mtime stamp rebuilds the cache AND the registry
     // re-collects: the out-of-band skill is visible without a restart.
     expect((await ctx.skills.get('other-skill'))?.name).toBe('other-skill')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P1-1 (v18): an upstream-invalid name or empty description is not published (and does not break snapshot)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-publishable-'))
+    const root = await tempRoot('dsh-skill-catalog-publishable-')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -154,11 +149,10 @@ describe('evolution-skill-catalog', () => {
     // the upstream registry before the provider is consulted).
     expect(await ctx.skills.get('trailing-')).toBeUndefined()
     expect(await ctx.skills.get('no-description')).toBeUndefined()
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('F-14 (v18): includeSkillNames/excludeSkillNames gate publication', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-skill-catalog-filter-'))
+    const root = await tempRoot('dsh-skill-catalog-filter-')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(EvolutionIoRegistry)
@@ -175,7 +169,6 @@ describe('evolution-skill-catalog', () => {
     expect(names).toContain('keep-me')
     expect(names).not.toContain('skip-me')
     expect(names).not.toContain('other')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
 })

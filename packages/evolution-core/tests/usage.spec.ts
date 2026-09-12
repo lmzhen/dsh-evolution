@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { applyCuratorFields, emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 describe('usage sidecar field normalization (P2-3)', () => {
   it('A2-4 (v18): the lifecycle fold is compare-and-set on the run-start state', () => {
     const make = (state: 'active' | 'stale' | 'archived') => ({ ...emptyRecord(), state, archived_at: state === 'archived' ? '2026-01-01T00:00:00.000Z' : null })
@@ -23,7 +23,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
   })
 
   it('P2-9 (v19): malformed entries are quarantined and the good entries keep serving', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-quarantine-'))
+    const root = await tempRoot('dsh-usage-quarantine-')
     const io = nodeEvolutionIo()
     const good = { created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 0, view_count: 0, patch_count: 0, last_used_at: null, last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false, archived_at: null }
     await writeFile(join(root, '.usage.json'), JSON.stringify({ 'skill-a': null, 'skill-b': good }), 'utf8')
@@ -36,18 +36,16 @@ describe('usage sidecar field normalization (P2-3)', () => {
     const map = await loadUsage(root, io)
     expect(map.get('skill-b')?.view_count).toBe(3)
     expect(map.has('skill-a')).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-20: a top-level ARRAY sidecar reads as empty — no phantom "0"/"1" records (0.3.37)', async () => {
     // `Object.entries([...])` produced "0"/"1" phantom skill records and the
     // RMW would persist them as an object map — the one guard the entry
     // shapes all had but the top level lacked.
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-array-'))
+    const root = await tempRoot('dsh-usage-array-')
     await writeFile(join(root, 'usage.json'), JSON.stringify([{ created_by: 'agent' }, { created_by: 'agent' }]), 'utf8')
     const map = await loadUsage(root, nodeEvolutionIo())
     expect(map.size).toBe(0)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('falls back to the emptyRecord baseline for mistyped fields', () => {
     const record = normalizeUsageRecord({
@@ -126,7 +124,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
   })
 
   it('loadUsage repairs a corrupted sidecar without throwing', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-usage-'))
+    const root = await tempRoot('dsh-evo-usage-')
     await writeFile(usageFile(root), JSON.stringify({
       'broken-skill': { use_count: 'many' },
       'good-skill': { created_by: 'agent', created_at: '2026-01-01T00:00:00.000Z', use_count: 4 },
@@ -134,11 +132,10 @@ describe('usage sidecar field normalization (P2-3)', () => {
     const usage = await loadUsage(root, nodeEvolutionIo())
     expect(usage.get('broken-skill')?.use_count).toBe(0)
     expect(usage.get('good-skill')?.use_count).toBe(4)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('suppression merge must never resurrect a concurrently deleted name (rc.52 regression)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-suppressed-'))
+    const root = await tempRoot('dsh-evo-suppressed-')
     const io = nodeEvolutionIo()
     // Disk starts with {deleted-skill, keep-skill}.
     await updateSuppressedNames(root, io, (current) => {
@@ -158,11 +155,10 @@ describe('usage sidecar field normalization (P2-3)', () => {
     expect(names.has('deleted-skill')).toBe(false)
     expect(names.has('keep-skill')).toBe(true)
     expect(names.has('new-skill')).toBe(true)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V24-09: a future-version suppression sidecar is never downgraded by either writer', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-suppressed-v2-'))
+    const root = await tempRoot('dsh-evo-suppressed-v2-')
     const io = nodeEvolutionIo()
     const sidecar = join(root, '.curator-suppressed.json')
     const future = JSON.stringify({ version: 2, names: ['kept-skill'], unknownFutureField: { x: 1 } })
@@ -180,11 +176,10 @@ describe('usage sidecar field normalization (P2-3)', () => {
     const v1 = JSON.parse(await readFile(sidecar, 'utf8')) as { version: number; names: string[] }
     expect(v1.version).toBe(1)
     expect(v1.names.sort()).toEqual(['added-skill', 'kept-skill'])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('mutateUsage runs an atomic read-modify-write where concurrent bumps are preserved', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-mutate-'))
+    const root = await tempRoot('dsh-evo-mutate-')
     const io = nodeEvolutionIo()
     await Promise.all(Array.from({ length: 8 }, () => mutateUsage(root, io, (map) => {
       const record = getRecord(map, 'atomic-skill')
@@ -192,7 +187,6 @@ describe('usage sidecar field normalization (P2-3)', () => {
     })))
     const usage = await loadUsage(root, io)
     expect(usage.get('atomic-skill')?.use_count).toBe(8)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('applyCuratorFields copies exactly the curator-owned field set (rc.67 K-2)', () => {
@@ -221,7 +215,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
   })
 
   it('foldCuratorFields keeps tool-side counters while applying curated lifecycle fields (rc.67 K-2)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-fold-'))
+    const root = await tempRoot('dsh-evo-fold-')
     const io = nodeEvolutionIo()
     // The disk record carries a tool-side bump that landed AFTER the curator's
     // run-start snapshot; the fold must keep it under the curated state.
@@ -233,7 +227,6 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await mutateUsage(root, io, (map) => { foldCuratorFields(map, curated) })
     const usage = await loadUsage(root, io)
     expect(usage.get('lifecycle-skill')).toMatchObject({ use_count: 5, state: 'stale', quality_score: 0.3, quality_warn: true })
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a state-ownership set never reverts a concurrent lifecycle write (rc.72 H-1)', () => {
@@ -252,7 +245,7 @@ describe('usage sidecar field normalization (P2-3)', () => {
   })
 
   it('v21 (L-1): a malformed sidecar is QUARANTINED, warned, and the sidecar heals — never a silent freeze', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-malformed-'))
+    const root = await tempRoot('dsh-evo-malformed-')
     const io = nodeEvolutionIo()
     const original = '{corrupted telemetry'
     await io.writeText(usageFile(root), original)
@@ -275,11 +268,10 @@ describe('usage sidecar field normalization (P2-3)', () => {
     await io.writeText(join(root, '.curator-suppressed.json'), 'not-json either')
     await updateSuppressedNames(root, io, (names) => { names.add('x') })
     expect(await io.readText(join(root, '.curator-suppressed.json'))).toBe('not-json either')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('v21 (L-1): a newer on-disk schema version freezes writes WITH a warn (never downgraded silently)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-futurever-'))
+    const root = await tempRoot('dsh-evo-futurever-')
     const io = nodeEvolutionIo()
     const original = JSON.stringify({ version: 99, demo: { use_count: 3 } })
     await io.writeText(usageFile(root), original)
@@ -289,13 +281,12 @@ describe('usage sidecar field normalization (P2-3)', () => {
     expect(warnings[0]).toContain('schema version 99')
     // Bytes preserved verbatim — the freeze is deliberate for future versions.
     expect(await io.readText(usageFile(root))).toBe(original)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 describe('v17: mutateUsage preserves wrong-shape sidecars', () => {
   it('v21 (L-1): a top-level ARRAY sidecar is quarantined and the sidecar heals (warn surfaced)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-usage-shape-'))
+    const root = await tempRoot('dsh-usage-shape-')
     const io = nodeEvolutionIo()
     const file = usageFile(root)
     const original = '[ "legacy array shape" ]'
@@ -312,12 +303,11 @@ describe('v17: mutateUsage preserves wrong-shape sidecars', () => {
     expect(warnings[0]).toContain('.corrupt')
     expect(await import('node:fs/promises').then(m => m.readFile(file, 'utf8'))).toContain('demo')
     expect((await loadUsage(root, io)).has('demo')).toBe(true)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 it('v28 G5.2 (USAGE-01): unknown per-record fields survive normalize + a write-side RMW roundtrip', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-usage-unknown-'))
+  const root = await tempRoot('dsh-usage-unknown-')
   const io = nodeEvolutionIo()
   // A NEWER host recorded a field this runtime does not know.
   await writeFile(join(root, '.usage.json'), JSON.stringify({
@@ -333,5 +323,4 @@ it('v28 G5.2 (USAGE-01): unknown per-record fields survive normalize + a write-s
   expect(raw['hub-skill']?.hub_url).toBe('skills://hub')
   expect(raw['hub-skill']?.view_count).toBe(2)
   expect(raw['hub-skill']?.use_count).toBe(2)
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

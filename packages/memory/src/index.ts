@@ -81,6 +81,8 @@ export class MemoryRegistry extends Service {
   })
 
   private readonly providers = new Map<string, MemoryProvider>()
+  /** Dispose handles by provider name, so a stale handle cannot remove a newer registration. */
+  private readonly disposals = new Map<string, () => void>()
   private readonly providerName: string
   private pinWarned = false
 
@@ -103,9 +105,17 @@ export class MemoryRegistry extends Service {
       this.pinWarned = true
       this.ctx.logger.warn(`memory: config.provider="${this.providerName}" is not registered (mounted: "${provider.name}"); memory reads and writes fail until that provider mounts`)
     }
-    return () => {
-      if (this.providers.get(provider.name) === provider) this.providers.delete(provider.name)
+    const dispose = (): void => {
+      // P3 (v16) parity with the io registry: a handle acts only while it is
+      // still the CURRENT one for this name. An object-identity check cannot
+      // tell generations apart, so after dispose → re-register(same object) a
+      // stale handle used to delete the LIVE registration.
+      if (this.disposals.get(provider.name) !== dispose) return
+      this.providers.delete(provider.name)
+      this.disposals.delete(provider.name)
     }
+    this.disposals.set(provider.name, dispose)
+    return dispose
   }
 
   /** Configured provider: the pinned name, or the first registered one. */

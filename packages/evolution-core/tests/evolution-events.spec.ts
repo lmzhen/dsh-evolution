@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { appendEvolutionEvent, eventsFile, EVENT_LOG_RETAIN_ARCHIVES, nodeEvolutionIo, readEvolutionEvents, readEvolutionTimeline, retainEventArchives } from '@deepseek-ai/dsh-evolution-core'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution event log (rc.68)', () => {
   it('appends with monotonic unique seq under concurrent writers', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-'))
+    const root = await tempRoot('dsh-evo-events-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await Promise.all(Array.from({ length: 8 }, (_, index) => appendEvolutionEvent(io, path, {
@@ -17,11 +17,10 @@ describe('evolution event log (rc.68)', () => {
     expect(events).toHaveLength(8)
     expect(new Set(events.map(event => event.seq))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8]))
     expect(events.filter(event => event.type === 'feedback')).toHaveLength(8)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a malformed log is never overwritten by an append (rc.65 posture)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-bad-'))
+    const root = await tempRoot('dsh-evo-events-bad-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await io.writeText(path, '{corrupt log')
@@ -29,11 +28,10 @@ describe('evolution event log (rc.68)', () => {
       type: 'feedback', target: 'x', kind: 'skill', rating: 'positive',
     })).rejects.toThrow(/malformed/)
     expect(await io.readText(path)).toBe('{corrupt log')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reads a missing log as empty and flags a malformed one', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-read-'))
+    const root = await tempRoot('dsh-evo-events-read-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     expect(await readEvolutionEvents(io, path)).toEqual({ events: [], malformed: false })
@@ -41,11 +39,10 @@ describe('evolution event log (rc.68)', () => {
     const read = await readEvolutionEvents(io, path)
     expect(read.malformed).toBe(true)
     expect(read.events).toEqual([])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a whitespace-only log reads as empty and is rebuilt on append (rc.69)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-empty-'))
+    const root = await tempRoot('dsh-evo-events-empty-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await io.writeText(path, '')
@@ -55,11 +52,10 @@ describe('evolution event log (rc.68)', () => {
     expect(malformed).toBe(false)
     expect(events).toHaveLength(1)
     expect(events[0]?.seq).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('shape-damaged content reads as empty (replaceable) and is rebuilt on append (rc.70 F-1)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-shape-'))
+    const root = await tempRoot('dsh-evo-events-shape-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await io.writeText(path, JSON.stringify({ version: 1, events: 42 }))
@@ -69,11 +65,10 @@ describe('evolution event log (rc.68)', () => {
     const { events, malformed } = await readEvolutionEvents(io, path)
     expect(malformed).toBe(false)
     expect(events).toHaveLength(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a single damaged entry is dropped at append while valid entries survive (rc.70 F-1 self-heal)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-entry-'))
+    const root = await tempRoot('dsh-evo-events-entry-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await io.writeText(path, JSON.stringify({
@@ -89,11 +84,10 @@ describe('evolution event log (rc.68)', () => {
     expect(events).toHaveLength(2)
     expect(events[0]?.target).toBe('good')
     expect(events[1]?.target).toBe('x')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rotates the older half into an archive at the threshold and continues seqs (rc.71)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-rotate-'))
+    const root = await tempRoot('dsh-evo-events-rotate-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     for (let index = 0; index < 5; index += 1) {
@@ -109,11 +103,10 @@ describe('evolution event log (rc.68)', () => {
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.events.map(event => event.seq)).toEqual([1, 2, 3, 4, 5])
     expect(timeline.malformed).toBe(false)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('the timeline merge dedupes by seq (rotation crash window, rc.71)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-dedupe-'))
+    const root = await tempRoot('dsh-evo-events-dedupe-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     // Crash window: the archive copy landed but the active rewrite did not —
@@ -130,11 +123,10 @@ describe('evolution event log (rc.68)', () => {
     ] }, null, 2))
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.events.map(event => event.seq)).toEqual([1, 2, 3, 4])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('retention keeps the newest archives by NUMERIC seq (rc.71)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-retain-'))
+    const root = await tempRoot('dsh-evo-events-retain-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     const dir = join(root, 'evolution')
@@ -147,11 +139,10 @@ describe('evolution event log (rc.68)', () => {
     expect(stays).toContain(`events-${EVENT_LOG_RETAIN_ARCHIVES + 2}.json`)
     expect(stays).not.toContain('events-1.json')
     expect(stays).not.toContain('events-2.json')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a deleted active continues seqs FROM THE ARCHIVE ANCHOR, never shadowing history (rc.72 G-1)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-g1-'))
+    const root = await tempRoot('dsh-evo-events-g1-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     const dir = join(root, 'evolution')
@@ -166,11 +157,10 @@ describe('evolution event log (rc.68)', () => {
     expect(timeline.events.map(event => event.seq)).toEqual([1, 2])
     expect(timeline.events[0]?.target).toBe('old')
     expect(timeline.events[1]?.target).toBe('fresh')
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('rotateAt below 2 is a guarded no-op (rc.72 G-1)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-g1b-'))
+    const root = await tempRoot('dsh-evo-events-g1b-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     for (let index = 0; index < 2; index += 1) {
@@ -180,11 +170,10 @@ describe('evolution event log (rc.68)', () => {
     expect((await io.list(join(root, 'evolution'))).filter(name => name.startsWith('events-'))).toEqual([])
     const active = await readEvolutionEvents(io, path)
     expect(active.events.map(event => event.seq)).toEqual([1, 2])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('non-numeric user files are neither read into the timeline nor pruned (rc.72 G-2)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-g2-'))
+    const root = await tempRoot('dsh-evo-events-g2-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     const dir = join(root, 'evolution')
@@ -202,11 +191,10 @@ describe('evolution event log (rc.68)', () => {
     expect(stays).toContain('events-backup.json')
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.events.map(event => event.seq)).not.toContain(999)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('an unreadable archive (directory at a numeric name) flags but never bricks the boot (rc.72 G-2)', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-eisdir-'))
+    const root = await tempRoot('dsh-evo-events-eisdir-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     const dir = join(root, 'evolution')
@@ -216,11 +204,10 @@ describe('evolution event log (rc.68)', () => {
     const timeline = await readEvolutionTimeline(io, path)
     expect(timeline.malformed).toBe(true)
     expect(timeline.events).toHaveLength(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('C-05: a non-finite seq (1e400 parses to Infinity) is dropped as a damaged record', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-inf-'))
+    const root = await tempRoot('dsh-evo-events-inf-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     // 1e400 is valid JSON but parses to Infinity — the old bare typeof check
@@ -237,11 +224,10 @@ describe('evolution event log (rc.68)', () => {
     expect(assigned).toBe(2)
     const after = await readEvolutionEvents(io, path)
     expect(after.events.map(event => event.seq)).toEqual([1, 2])
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('I-5 (v18): refuses an unfoldable payload at the durable write boundary', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-guard-'))
+    const root = await tempRoot('dsh-evo-events-guard-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await expect(appendEvolutionEvent(io, path, { type: 'feedback', target: 'x' } as never)).rejects.toThrow(/requires kind/)
@@ -250,12 +236,11 @@ describe('evolution event log (rc.68)', () => {
     await expect(appendEvolutionEvent(io, path, { type: 'nope' } as never)).rejects.toThrow(/unknown event type/)
     // A well-formed record still appends; the refusals wrote nothing.
     expect(await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })).toBe(1)
-    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 it('v31 EVENTS-01: a rotation whose archive name collides MERGES both seq bands instead of overwriting', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-events-collide-'))
+  const root = await tempRoot('dsh-evo-events-collide-')
   const io = nodeEvolutionIo()
   const path = eventsFile(root)
   // Simulate the post-rollback state: archives events-2.json (seq 1..2) and
@@ -276,5 +261,4 @@ it('v31 EVENTS-01: a rotation whose archive name collides MERGES both seq bands 
   const seqs = timeline.events.map(event => event.seq).sort((a, b) => a - b)
   // The 3..4 band must survive the collision (merged, not overwritten).
   expect(seqs).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

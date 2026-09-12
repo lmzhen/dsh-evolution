@@ -1,13 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
 import EvolutionStateStorageRegistry, { REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
 
 // Every case mounts the upstream storage domain (Storage + DomainFacility), which
 // is slow enough that the 5s default times out under a full-suite pool — the same
@@ -27,7 +25,7 @@ async function mount(home: string) {
 
 describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-202)', () => {
   it('V27 S4: the task receives a COPY, so mutating it in place cannot reach the store', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-s4-'))
+    const home = await tempRoot('dsh-domain-s4-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false }))
@@ -45,53 +43,48 @@ describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-20
       return null // refuse the write (null = keep the current record)
     })
     expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('seeds a missing key when the task returns a record', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc-'))
+    const home = await tempRoot('dsh-domain-tc-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     expect(await provider.loadCuratorState()).toBeNull()
     await provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'a', paused: false }))
     expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'a', paused: false })
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a null return on a missing key keeps the record absent', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc2-'))
+    const home = await tempRoot('dsh-domain-tc2-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.transactCuratorState(() => null)
     expect(await provider.loadCuratorState()).toBeNull()
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a null return keeps an existing record unchanged', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc3-'))
+    const home = await tempRoot('dsh-domain-tc3-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.saveCuratorState({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
     await provider.transactCuratorState(() => null)
     expect((await provider.loadCuratorState())?.lastSummary).toBe('orig')
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a returning task overwrites the existing record', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc4-'))
+    const home = await tempRoot('dsh-domain-tc4-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.saveCuratorState({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
     await provider.transactCuratorState(current => ({ ...current!, lastSummary: 'new', runCount: 6 }))
     expect((await provider.loadCuratorState())?.lastSummary).toBe('new')
     expect((await provider.loadCuratorState())?.runCount).toBe(6)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 describe('evolution-state-domain pendingSchema origin/sessionId (G2.3, F-214)', () => {
   it('round-trips origin and sessionId through the medium (not stripped on read)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-o-'))
+    const home = await tempRoot('dsh-domain-o-')
     // Session A writes the record, then closes.
     let ctx = await mount(home)
     let provider = ctx.evolutionStateStorage.provider('domain')
@@ -106,29 +99,26 @@ describe('evolution-state-domain pendingSchema origin/sessionId (G2.3, F-214)', 
     const record = (await provider.listPending('pending')).find(r => r.id === 'p-o')
     expect(record?.origin).toBe('background_review')
     expect(record?.sessionId).toBe('sess-1')
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reads undefined origin/sessionId for a record that never set them', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-o2-'))
+    const home = await tempRoot('dsh-domain-o2-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.savePending({ id: 'p-x', kind: 'skill', summary: 'y', args: {}, createdAt: 'now', status: 'pending' })
     const record = (await provider.listPending('pending')).find(r => r.id === 'p-x')
     expect(record?.origin).toBeUndefined()
     expect(record?.sessionId).toBeUndefined()
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
 describe('evolution-state-domain releasePendingClaim missing-key (G2.7, F-332)', () => {
   it('is a no-op that does not throw on a missing id', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-rel-'))
+    const home = await tempRoot('dsh-domain-rel-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await expect(provider.releasePendingClaim('nope', 'claim-x')).resolves.toBeUndefined()
     expect(await provider.listPending('pending')).toHaveLength(0)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 })
 
@@ -212,7 +202,7 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
   })
 
   it('V27 G2.2: the review-state session cap bounds the domain table (json parity)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-reviewcap-'))
+    const home = await tempRoot('dsh-domain-reviewcap-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     // One save past the cap. Every save stamps its own row and runs the eviction
@@ -232,11 +222,10 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
       if (await provider.loadReviewState(`s-${index}`) !== null) alive += 1
     }
     expect(alive).toBe(REVIEW_STATE_SESSION_CAP)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('E1 (v15): claim-scoped resolve refuses a foreign claim (same rule as json)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc4-'))
+    const home = await tempRoot('dsh-domain-tc4-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     await provider.savePending(record('p1', 'pending'))
@@ -248,11 +237,10 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
     expect((await provider.listPending('executing')).some(r => r.id === 'p1')).toBe(true)
     const owner = await provider.tryResolvePending('p1', 'approved', 'claim-a')
     expect(owner.applied).toBe(true)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P2-4 (v15)/v16: the cap counts RESOLVED records only — pending rows never shrink the audit budget', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc5-'))
+    const home = await tempRoot('dsh-domain-tc5-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     // 199 resolved records (resolvedAt ascending) — one below the cap.
@@ -275,11 +263,10 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
     expect(resolved.some(r => r.id === 'p0')).toBe(false)
     expect(resolved.some(r => r.id === 'p1')).toBe(true)
     expect((await provider.listPending('pending')).some(r => r.id === 'live')).toBe(true)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('P2 (v16): a resolved record without resolvedAt sorts LAST (json parity, never the eviction victim)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-domain-tc6-'))
+    const home = await tempRoot('dsh-domain-tc6-')
     const ctx = await mount(home)
     const provider = ctx.evolutionStateStorage.provider('domain')
     // 199 stamped resolved records + ONE decided record with NO resolvedAt
@@ -299,7 +286,6 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
     expect(resolved.some(r => r.id === 'no-time')).toBe(true)
     expect(resolved.some(r => r.id === 'p0')).toBe(false)
     expect(resolved.some(r => r.id === 'p1')).toBe(true)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('C-5 (v18): the cap eviction re-reads and never deletes a key re-mounted as a live record', async () => {

@@ -6,6 +6,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tempHome, tempRoot } from '../../test-support/temp-home.ts'
+import { captureCommands } from '../../test-support/commands-stub.ts'
 
 describe('evolution-commands', () => {
   it('loads without the commands service mounted', async () => {
@@ -17,12 +19,7 @@ describe('evolution-commands', () => {
   it('dispatches consolidate and skill restore to the curator service', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const calls: string[] = []
     ctx.provide('evolutionCurator', {
       consolidate: async (target: string, sources: string[]) => {
@@ -52,12 +49,7 @@ describe('evolution-commands', () => {
   it('V27 G0.5 (U-1): learn delivers through the WAKING channel (followup-first, inject fallback)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void; followup?(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const injected: unknown[] = []
     const followed: unknown[] = []
     await ctx.plugin(Commands)
@@ -92,12 +84,7 @@ describe('evolution-commands', () => {
   it('skills health renders degraded structure rows or a clean verdict (rc.73 A1)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     let first = true
     let observed = true
     ctx.provide('evolutionCurator', {
@@ -128,51 +115,33 @@ describe('evolution-commands', () => {
   })
 
   it('records a learn event into the event log when the io registry is mounted (rc.68)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-cmd-learn-event-'))
-    const previous = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          captured = definition as typeof captured
-          return () => {}
-        },
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      const injected: unknown[] = []
-      await ctx.plugin(Commands)
-      await captured!.handler({ rawInput: 'learn node packaging', agent: { inject: (message: unknown) => injected.push(message) } })
-      // The append is fire-and-forget; poll for the locked RMW to land — a
-      // fixed sleep is load-sensitive (the full parallel suite crossed 50ms).
-      const eventPath = join(home, 'evolution', 'events.json')
-      const deadline = Date.now() + 5000
-      let raw: string | null = null
-      while (raw === null && Date.now() < deadline) {
-        raw = await nodeEvolutionIo().readText(eventPath)
-        if (raw === null) await new Promise(resolve => setTimeout(resolve, 50))
-      }
-      expect(raw).not.toBeNull()
-      const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; source?: string; request?: string }> }
-      expect(parsed.events).toHaveLength(1)
-      expect(parsed.events[0]).toMatchObject({ type: 'learn', source: 'manual', request: 'node packaging' })
-      expect(injected).toHaveLength(1)
-    } finally {
-      if (previous === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previous
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    const home = await tempHome('dsh-cmd-learn-event-')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    const injected: unknown[] = []
+    await ctx.plugin(Commands)
+    await captured!.handler({ rawInput: 'learn node packaging', agent: { inject: (message: unknown) => injected.push(message) } })
+    // The append is fire-and-forget; poll for the locked RMW to land — a
+    // fixed sleep is load-sensitive (the full parallel suite crossed 50ms).
+    const eventPath = join(home, 'evolution', 'events.json')
+    const deadline = Date.now() + 5000
+    let raw: string | null = null
+    while (raw === null && Date.now() < deadline) {
+      raw = await nodeEvolutionIo().readText(eventPath)
+      if (raw === null) await new Promise(resolve => setTimeout(resolve, 50))
     }
+    expect(raw).not.toBeNull()
+    const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; source?: string; request?: string }> }
+    expect(parsed.events).toHaveLength(1)
+    expect(parsed.events[0]).toMatchObject({ type: 'learn', source: 'manual', request: 'node packaging' })
+    expect(injected).toHaveLength(1)
   })
 
   it('curator scope renders the lifecycle lists including quality-warned', async () => {    const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionCurator', {
       scopeView: async () => ({ managed: ['hub-skill'], watched: ['stale-skill', 'warn-skill'], qualityWarned: ['warn-skill'], exempted: ['scheduled'], protected: ['pinned-skill'] }),
     })
@@ -191,12 +160,7 @@ describe('evolution-commands', () => {
   it('restore dispatches the full-state snapshot restore to the curator', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const calls: string[] = []
     ctx.provide('evolutionCurator', {
       restoreSnapshot: async () => {
@@ -224,12 +188,7 @@ describe('evolution-commands', () => {
   it('dispatches curator pause/resume/status to the curator service (G2)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const calls: Array<{ paused: boolean }> = []
     let state: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null = {
       lastRunAt: Date.now() - 3_600_000, runCount: 2, lastSummary: 'auto: stale:0 archived:0', paused: false,
@@ -265,17 +224,7 @@ describe('evolution-commands', () => {
 
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
 
-    ctx.provide('commands', {
-
-      register: (definition: unknown) => {
-
-        captured = definition as typeof captured
-
-        return () => {}
-
-      },
-
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
 
     ctx.provide('evolutionCurator', {
 
@@ -298,12 +247,7 @@ describe('evolution-commands', () => {
   it('maintain fails closed without io or subagents, and reports usage on syntax errors', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     const noIo = await captured!.handler({ rawInput: 'maintain' })
     expect(noIo.kind).toBe('error')
@@ -319,12 +263,7 @@ describe('evolution-commands', () => {
   it('restructure rejects missing skills via the real SkillLibrary path (no side effects)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const io = nodeEvolutionIo()
     ctx.provide('evolutionIo', {
       provider: () => io,
@@ -338,137 +277,110 @@ describe('evolution-commands', () => {
   })
 
   it('restructure succeeds end-to-end on a temp library via Config.root', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-restructure-'))
+    const dir = await tempRoot('evo-commands-restructure-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(skillDir, { recursive: true })
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
-    try {
-      const ctx = new Context()
-      // V8-08 (0.3.47): the command's restructure now wires the single
-      // write-sink so the skill-catalog cache invalidation event fires.
-      let mutatedEvent: unknown
-      ctx.on('evolution/skill-mutated', (event) => { mutatedEvent = event })
-      // V9-12 (0.3.51): the OTHER half of the V8-08 discipline — the
-      // skillUsage.record(...) observation — must be asserted too (an
-      // event-only assertion let a removed record() line pass silently).
-      const usageRecords: Array<[string, string]> = []
-      ctx.provide('skillUsage', {
-        record: async (name: string, kind: string) => { usageRecords.push([name, kind]) },
-      })
-      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          captured = definition as typeof captured
-          return () => {}
-        },
-      })
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', {
-        provider: () => io,
-      })
-      // Config.root is the command-facing root (A7 alignment) — the
-      // temp root keeps the mutation off the real library.
-      await ctx.plugin(Commands, { root: root })
-      const result = await captured!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
-      expect(result.kind).toBe('success')
-      expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
-      expect(usageRecords).toEqual([['demo-skill', 'patch']])
-      const body = await io.readText(join(skillDir, 'SKILL.md'))
-      expect(body).not.toContain('old detail')
-      expect(body).toContain('references/log.md')
-      const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
-      expect(support).toContain('old detail')
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    // V8-08 (0.3.47): the command's restructure now wires the single
+    // write-sink so the skill-catalog cache invalidation event fires.
+    let mutatedEvent: unknown
+    ctx.on('evolution/skill-mutated', (event) => { mutatedEvent = event })
+    // V9-12 (0.3.51): the OTHER half of the V8-08 discipline — the
+    // skillUsage.record(...) observation — must be asserted too (an
+    // event-only assertion let a removed record() line pass silently).
+    const usageRecords: Array<[string, string]> = []
+    ctx.provide('skillUsage', {
+      record: async (name: string, kind: string) => { usageRecords.push([name, kind]) },
+    })
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', {
+      provider: () => io,
+    })
+    // Config.root is the command-facing root (A7 alignment) — the
+    // temp root keeps the mutation off the real library.
+    await ctx.plugin(Commands, { root: root })
+    const result = await captured!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
+    expect(result.kind).toBe('success')
+    expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
+    expect(usageRecords).toEqual([['demo-skill', 'patch']])
+    const body = await io.readText(join(skillDir, 'SKILL.md'))
+    expect(body).not.toContain('old detail')
+    expect(body).toContain('references/log.md')
+    const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
+    expect(support).toContain('old detail')
   })
 
   it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-enrich-'))
+    const dir = await tempRoot('evo-commands-enrich-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(join(skillDir, 'references'), { recursive: true })
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
     await writeFile(join(skillDir, 'references', 'notes.md'), '# notes\n', 'utf8')
-    try {
-      const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          captured = definition as typeof captured
-          return () => {}
-        },
-      })
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', { provider: () => io })
-      let capturedPrompt = ''
-      ctx.provide('subagents', {
-        async start(_kind: string, options: unknown) {
-          const opts = options as { prompt?: Array<{ text: string }> }
-          capturedPrompt = opts.prompt?.[0]?.text ?? ''
-          return {
-            // V24-19 (v24): the no-action output must name the over signal in
-            // a note — pointer_missing=over is in the facts block, so an
-            // unexplained no_issues is refused by the §3 completeness gate.
-            result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: ['pointer_missing: references/notes.md intentionally unlinked in this fixture; no action needed'] } }),
-          }
-        },
-      })
-      await ctx.plugin(Commands, { root: root })
-      const result = await captured!.handler({ rawInput: 'maintain' })
-      expect(result.kind).toBe('success')
-      // Enriched facts: the unlinked support file is reported as a real over,
-      // never a fabricated pass/unknown.
-      expect(capturedPrompt).toContain('signal=pointer_missing')
-      expect(capturedPrompt).toMatch(/signal=pointer_missing value=references\/notes\.md verdict=over/)
-      expect(capturedPrompt).toContain('signal=description_chars')
-      expect(capturedPrompt).toContain('signal=usage_observed')
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    let capturedPrompt = ''
+    ctx.provide('subagents', {
+      async start(_kind: string, options: unknown) {
+        const opts = options as { prompt?: Array<{ text: string }> }
+        capturedPrompt = opts.prompt?.[0]?.text ?? ''
+        return {
+          // V24-19 (v24): the no-action output must name the over signal in
+          // a note — pointer_missing=over is in the facts block, so an
+          // unexplained no_issues is refused by the §3 completeness gate.
+          result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: ['pointer_missing: references/notes.md intentionally unlinked in this fixture; no action needed'] } }),
+        }
+      },
+    })
+    await ctx.plugin(Commands, { root: root })
+    const result = await captured!.handler({ rawInput: 'maintain' })
+    expect(result.kind).toBe('success')
+    // Enriched facts: the unlinked support file is reported as a real over,
+    // never a fabricated pass/unknown.
+    expect(capturedPrompt).toContain('signal=pointer_missing')
+    expect(capturedPrompt).toMatch(/signal=pointer_missing value=references\/notes\.md verdict=over/)
+    expect(capturedPrompt).toContain('signal=description_chars')
+    expect(capturedPrompt).toContain('signal=usage_observed')
   })
 
   it('maintain --timeout overrides the subagent deadline for this run (0.3.4)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-timeout-'))
+    const dir = await tempRoot('evo-commands-timeout-')
     const root = join(dir, 'skills')
     // A non-empty library: runMaintain short-circuits an EMPTY library before
     // the subagent start (so the signal capture below would stay undefined).
     await mkdir(join(root, 'demo-skill'), { recursive: true })
     await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
-    try {
-      const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          captured = definition as typeof captured
-          return () => {}
-        },
-      })
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', { provider: () => io })
-      let capturedSignal: AbortSignal | undefined
-      ctx.provide('subagents', {
-        async start(_kind: string, options: unknown) {
-          capturedSignal = (options as { signal?: AbortSignal }).signal
-          return {
-            result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
-          }
-        },
-      })
-      // maintainCooldownMs: 0 — the cooldown is module-level transient state,
-      // and an earlier test already ran `maintain` (would block this run and
-      // skip the subagent call, leaving the signal capture undefined).
-      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-      const bad = await captured!.handler({ rawInput: 'maintain --timeout 0' })
-      expect(bad.kind).toBe('error')
-      expect(bad.text).toContain('Invalid --timeout')
-      const good = await captured!.handler({ rawInput: 'maintain --timeout 600000' })
-      expect(good.kind).toBe('success')
-      expect(capturedSignal).toBeTruthy()
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    let capturedSignal: AbortSignal | undefined
+    ctx.provide('subagents', {
+      async start(_kind: string, options: unknown) {
+        capturedSignal = (options as { signal?: AbortSignal }).signal
+        return {
+          result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
+        }
+      },
+    })
+    // maintainCooldownMs: 0 — the cooldown is module-level transient state,
+    // and an earlier test already ran `maintain` (would block this run and
+    // skip the subagent call, leaving the signal capture undefined).
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
+    const bad = await captured!.handler({ rawInput: 'maintain --timeout 0' })
+    expect(bad.kind).toBe('error')
+    expect(bad.text).toContain('Invalid --timeout')
+    const good = await captured!.handler({ rawInput: 'maintain --timeout 600000' })
+    expect(good.kind).toBe('success')
+    expect(capturedSignal).toBeTruthy()
   })
 
   it('single-flight: a re-trigger during a running scan returns already-running and does not spawn (0.3.11)', async () => {
@@ -483,12 +395,7 @@ describe('evolution-commands', () => {
     const spawned = new Promise<void>((resolve) => { markSpawned = resolve })
     try {
       const ctx = new Context()
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
+      ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       ctx.provide('subagents', {
         async start(_kind: string, _options: unknown) {
@@ -538,228 +445,166 @@ describe('evolution-commands', () => {
   })
 
   it('maintain survives a throwing enrichment: flag resets, cooldown updates, no naked reject (0.3.16 S6.1, E-5/E-39)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-enrichfail-'))
+    const dir = await tempRoot('evo-commands-enrichfail-')
     const root = join(dir, 'skills')
     await mkdir(root, { recursive: true })
-    try {
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      // A library whose first list() throws models an unreadable skills root —
-      // the 0.3.14 shape left the single-flight flag set forever here; every
-      // later re-trigger got "already running" with no log.
-      ctx.provide('evolutionIo', {
-        provider: () => ({
-          list: async () => { throw new Error('unreadable library root') },
-        }) as unknown as ReturnType<typeof nodeEvolutionIo>,
-      })
-      ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
-      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 60_000 })
-      const first = await handler!.handler({ rawInput: 'maintain' })
-      expect(first.kind).toBe('error')
-      expect(first.text).toContain('Maintenance scan failed')
-      // The flag was reset (no "already running") AND the failure updated the
-      // cooldown (E-39) — the second trigger is cooldown-blocked, not
-      // in-flight-blocked. V10-08 (F-04): cooldown-blocked is kind:'error'.
-      const second = await handler!.handler({ rawInput: 'maintain' })
-      expect(second.kind).toBe('error')
-      expect(second.text).toContain('cooldown active')
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    // A library whose first list() throws models an unreadable skills root —
+    // the 0.3.14 shape left the single-flight flag set forever here; every
+    // later re-trigger got "already running" with no log.
+    ctx.provide('evolutionIo', {
+      provider: () => ({
+        list: async () => { throw new Error('unreadable library root') },
+      }) as unknown as ReturnType<typeof nodeEvolutionIo>,
+    })
+    ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 60_000 })
+    const first = await handler!.handler({ rawInput: 'maintain' })
+    expect(first.kind).toBe('error')
+    expect(first.text).toContain('Maintenance scan failed')
+    // The flag was reset (no "already running") AND the failure updated the
+    // cooldown (E-39) — the second trigger is cooldown-blocked, not
+    // in-flight-blocked. V10-08 (F-04): cooldown-blocked is kind:'error'.
+    const second = await handler!.handler({ rawInput: 'maintain' })
+    expect(second.kind).toBe('error')
+    expect(second.text).toContain('cooldown active')
   })
 
   it('maintain grammar: unknown args rejected explicitly; = and multi-space timeout forms accepted (P3-2, F-03)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-reject-'))
+    const dir = await tempRoot('evo-commands-reject-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
     await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
-    try {
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      ctx.provide('subagents', {
-        async start(_kind: string, _options: unknown) {
-          return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) }
-        },
-      })
-      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-      const unknown = await handler!.handler({ rawInput: 'maintain --foo' })
-      expect(unknown.kind).toBe('error')
-      expect(unknown.text).toContain('Unknown maintain arguments')
-      // F-03: the `=` spelling and multi-space separators pass the
-      // grammar now (previously "Unknown maintain arguments" rejections).
-      const equals = await handler!.handler({ rawInput: 'maintain --timeout=600000' })
-      expect(equals.kind).toBe('success')
-      const spaced = await handler!.handler({ rawInput: 'maintain   --timeout 600000' })
-      expect(spaced.kind).toBe('success')
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    ctx.provide('subagents', {
+      async start(_kind: string, _options: unknown) {
+        return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) }
+      },
+    })
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
+    const unknown = await handler!.handler({ rawInput: 'maintain --foo' })
+    expect(unknown.kind).toBe('error')
+    expect(unknown.text).toContain('Unknown maintain arguments')
+    // F-03: the `=` spelling and multi-space separators pass the
+    // grammar now (previously "Unknown maintain arguments" rejections).
+    const equals = await handler!.handler({ rawInput: 'maintain --timeout=600000' })
+    expect(equals.kind).toBe('success')
+    const spaced = await handler!.handler({ rawInput: 'maintain   --timeout 600000' })
+    expect(spaced.kind).toBe('success')
   })
 
   it('preset install composes the runtime standard + delta into the user preset dir (0.3.15)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      // 0.3.53: the standard fixture carries a tool-skill row so the
-      // /evolution preset install path is proven to inject the V10-14 cap —
-      // the npm user's ONLY preset generation path (install-layered is the
-      // source-tree tool), and P1-2's symptom lived here before this batch.
-      const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
-      ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
-      await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-      const result = await handler!.handler({ rawInput: 'preset install' })
-      expect(result.kind).toBe('success')
-      const target = join(home, '.agent-presets', 'evolution')
-      const composed = readFileSync(join(target, 'agent.cordis.yml'), 'utf8')
-      // The registry mounts the composition verbatim: the written file is the
-      // standard rows + the delta, NEVER the delta alone (0.3.14 defect shape).
-      const delta = readFileSync(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url), 'utf8')
-      expect(composed).toContain(standardFixture.replace(/\s+$/, ''))
-      expect(composed).toContain(delta.trim())
-      // V10-14 cap injection rides the composer (0.3.53) — the generated
-      // preset-scope tool-skill row carries the 60-char cap.
-      expect(composed).toContain('- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  # V10-14')
-      expect(composed).toContain('catalogDescriptionMaxLength: 60')
-      expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.yml', import.meta.url), 'utf8'))
-      expect(existsSync(join(target, 'preset.yml'))).toBe(true)
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const home = await tempHome('evo-commands-preset-')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // 0.3.53: the standard fixture carries a tool-skill row so the
+    // /evolution preset install path is proven to inject the V10-14 cap —
+    // the npm user's ONLY preset generation path (install-layered is the
+    // source-tree tool), and P1-2's symptom lived here before this batch.
+    const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
+    ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('success')
+    const target = join(home, '.agent-presets', 'evolution')
+    const composed = readFileSync(join(target, 'agent.cordis.yml'), 'utf8')
+    // The registry mounts the composition verbatim: the written file is the
+    // standard rows + the delta, NEVER the delta alone (0.3.14 defect shape).
+    const delta = readFileSync(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url), 'utf8')
+    expect(composed).toContain(standardFixture.replace(/\s+$/, ''))
+    expect(composed).toContain(delta.trim())
+    // V10-14 cap injection rides the composer (0.3.53) — the generated
+    // preset-scope tool-skill row carries the 60-char cap.
+    expect(composed).toContain('- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  # V10-14')
+    expect(composed).toContain('catalogDescriptionMaxLength: 60')
+    expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.yml', import.meta.url), 'utf8'))
+    expect(existsSync(join(target, 'preset.yml'))).toBe(true)
   })
 
   it('preset install fails loud when delta rows collide with the runtime standard (0.3.15)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      // A standard that already carries tool-memory would mount the row twice
-      // if merged — the composition must refuse instead of shadowing it.
-      ctx.provide('agentPresets', { read: async () => '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n' })
-      await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-      const result = await handler!.handler({ rawInput: 'preset install' })
-      expect(result.kind).toBe('error')
-      expect(result.text).toContain('collide')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    await tempHome('evo-commands-preset-')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // A standard that already carries tool-memory would mount the row twice
+    // if merged — the composition must refuse instead of shadowing it.
+    ctx.provide('agentPresets', { read: async () => '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n' })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('collide')
   })
 
   it('maintain --facts renders the facts block with zero subagent calls and no cooldown', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-facts-'))
+    const dir = await tempRoot('evo-commands-facts-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(skillDir, { recursive: true })
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
-    try {
-      const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          captured = definition as typeof captured
-          return () => {}
-        },
-      })
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', { provider: () => io })
-      let subagentStarts = 0
-      ctx.provide('subagents', {
-        async start(_kind: string, _options: unknown) {
-          subagentStarts += 1
-          throw new Error('--facts must never spawn a subagent')
-        },
-      })
-      await ctx.plugin(Commands, { root: root })
-      const result = await captured!.handler({ rawInput: 'maintain --facts' })
-      expect(result.kind).toBe('success')
-      expect(result.text).toContain('MECHANICAL_FACTS')
-      expect(result.text).toContain('signal=description_chars')
-      expect(result.text).toContain('END FACTS')
-      expect(subagentStarts).toBe(0)
-      // Cooldown is a scan-command guard; a second facts preview must not hit it.
-      const second = await captured!.handler({ rawInput: 'maintain --facts' })
-      expect(second.kind).toBe('success')
-      expect(second.text).toContain('MECHANICAL_FACTS')
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    let subagentStarts = 0
+    ctx.provide('subagents', {
+      async start(_kind: string, _options: unknown) {
+        subagentStarts += 1
+        throw new Error('--facts must never spawn a subagent')
+      },
+    })
+    await ctx.plugin(Commands, { root: root })
+    const result = await captured!.handler({ rawInput: 'maintain --facts' })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('MECHANICAL_FACTS')
+    expect(result.text).toContain('signal=description_chars')
+    expect(result.text).toContain('END FACTS')
+    expect(subagentStarts).toBe(0)
+    // Cooldown is a scan-command guard; a second facts preview must not hit it.
+    const second = await captured!.handler({ rawInput: 'maintain --facts' })
+    expect(second.kind).toBe('success')
+    expect(second.text).toContain('MECHANICAL_FACTS')
   })
 
   it('maintain cooldown blocks rapid repeat triggers (single model call)', async () => {
     // Self-contained library (temp root) — a clean CI HOME has no skills and
     // the empty-library short-circuit would skip the subagent, breaking the
     // model-call count assertion.
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-cooldown-'))
+    const dir = await tempRoot('evo-commands-cooldown-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(skillDir, { recursive: true })
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
-    try {
-      const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          captured = definition as typeof captured
-          return () => {}
-        },
-      })
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', { provider: () => io })
-      let starts = 0
-      const plan = { verdict: 'no_issues', plan: [], notes: [] }
-      ctx.provide('subagents', {
-        async start(_kind: string, _options: unknown) {
-          starts += 1
-          return { result: Promise.resolve({ text: 'x', structured: plan }) }
-        },
-      })
-      await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
-      const first = await captured!.handler({ rawInput: 'maintain' })
-      expect(first.kind).toBe('success')
-      expect(starts).toBe(1)
-      // V10-08 (F-04): the cooldown refusal is kind:'error' now.
-      const second = await captured!.handler({ rawInput: 'maintain' })
-      expect(second.kind).toBe('error')
-      expect(second.text).toContain('cooldown')
-      expect(starts).toBe(1)
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    let starts = 0
+    const plan = { verdict: 'no_issues', plan: [], notes: [] }
+    ctx.provide('subagents', {
+      async start(_kind: string, _options: unknown) {
+        starts += 1
+        return { result: Promise.resolve({ text: 'x', structured: plan }) }
+      },
+    })
+    await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
+    const first = await captured!.handler({ rawInput: 'maintain' })
+    expect(first.kind).toBe('success')
+    expect(starts).toBe(1)
+    // V10-08 (F-04): the cooldown refusal is kind:'error' now.
+    const second = await captured!.handler({ rawInput: 'maintain' })
+    expect(second.kind).toBe('error')
+    expect(second.text).toContain('cooldown')
+    expect(starts).toBe(1)
   })
 
   it('binds the command registration to the fiber so unmount unregisters it (S6.2 E-29)', async () => {
@@ -800,12 +645,7 @@ describe('evolution-commands', () => {
       await mkdir(join(target, 'preset.yml.tmp'))
       const ctx = new Context()
       let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
+      ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
       ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
@@ -830,12 +670,7 @@ describe('evolution-commands', () => {
   it('help documents the mutations and maintain --facts subcommands (S6.6-1 E-64)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }>; input?: { hint?: string } } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     // Both the input-declaration hint and the bare /evolution help list the
     // previously-hidden subcommands.
@@ -866,12 +701,7 @@ describe('evolution-commands', () => {
     try {
       const ctx = new Context()
       let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
+      ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       ctx.provide('subagents', {
         async start(_kind: string, _options: unknown) {
@@ -942,12 +772,7 @@ describe('evolution-commands', () => {
   it('pending --detail renders a resolving-undefined staged payload via the explicit branch (F-13/F-13)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionApproval', {
       list: async (status?: string) => status === 'pending'
         ? [{ id: 'c3', kind: 'skill', status: 'pending', summary: 'fn args', args: () => 'unserializable', createdAt: '', origin: 'background_review' }]
@@ -962,12 +787,7 @@ describe('evolution-commands', () => {
   it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionApproval', {
       list: async (status?: string) => status === 'pending'
         ? [{ id: 'c4', kind: 'skill', status: 'pending', summary: 'whitespace probe', args: {}, createdAt: '', origin: 'foreground' }]
@@ -988,42 +808,28 @@ describe('evolution-commands', () => {
   // core batch). Default-empty semantics: a non-empty list is accepted and the
   // restructure write path behaves exactly as before on threat-free content.
   it('restructure accepts the threatExemptLabels config and keeps write behavior (P2-18)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-exempt-'))
+    const dir = await tempRoot('evo-commands-exempt-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(skillDir, { recursive: true })
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
-    try {
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', {
-        register: (definition: unknown) => {
-          handler = definition as typeof handler
-          return () => {}
-        },
-      })
-      const io = nodeEvolutionIo()
-      ctx.provide('evolutionIo', { provider: () => io })
-      await ctx.plugin(Commands, { root: root, threatExemptLabels: ['ssh_backdoor'] })
-      const result = await handler!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
-      expect(result.kind).toBe('success')
-      const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
-      expect(support).toContain('old detail')
-    } finally {
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    await ctx.plugin(Commands, { root: root, threatExemptLabels: ['ssh_backdoor'] })
+    const result = await handler!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
+    expect(result.kind).toBe('success')
+    const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
+    expect(support).toContain('old detail')
   })
 
 
   it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const pendingRecord = {
       id: 'a1', kind: 'skill' as const, status: 'pending' as const, summary: 'create demo',
       args: { operation: { action: 'create', name: 'demo' }, content: 'x'.repeat(700) },
@@ -1063,12 +869,7 @@ describe('evolution-commands', () => {
   it('V6-41: a damaged mutations/report shape renders unreadable instead of a TypeError (0.3.36)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionCurator', {
       skills: {
         listMutations: async () => [
@@ -1092,12 +893,7 @@ describe('evolution-commands', () => {
   it('V6-29: maintain --timeout above the AbortSignal domain is rejected at the command gate (0.3.36)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', {
-      register: (definition: unknown) => {
-        captured = definition as typeof captured
-        return () => {}
-      },
-    })
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     // 5e9 > 2^32-1: AbortSignal.timeout would throw a synchronous RangeError.
     const result = await captured!.handler({ rawInput: 'maintain --timeout 5000000000' })
@@ -1131,12 +927,7 @@ describe('evolution-commands', () => {
 it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every state-touching subcommand, never a throw', async () => {
   const ctx = new Context()
   let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-  ctx.provide('commands', {
-    register: (definition: unknown) => {
-      captured = definition as typeof captured
-      return () => {}
-    },
-  })
+  ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
   // Any property access on these services throws — the corrupted-state /
   // transient-IO shape (quarantine, lock budget, EIO) that the wrapper exists
   // for. The guard iterates the REGISTRY's state-touching subcommands, so a

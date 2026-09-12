@@ -766,7 +766,7 @@ export class EvolutionCurator extends Service {
     // window, so it must see THIS run's freshly computed scores — the old
     // order (transitions → scoring) applied last run's warn state and delayed
     // the quality-warn stale path by a full curator cycle.
-    await this.scoreTree(usage, treeNames)
+    await this.scoreTree(usage, treeNames, contents)
     // V9-02 (0.3.50): pass protectedNames into the transition engine — V8-14
     // wired the core signature and the scope view, but the PRODUCTION run
     // call stayed 4-argument, so marker-protected agent skills still entered
@@ -1008,10 +1008,10 @@ export class EvolutionCurator extends Service {
    * flags, so overwriting feedback here is what used to make negative
    * feedback decision-irrelevant; field ownership on `UsageRecord`).
    */
-  private async scoreTree(usage: UsageMap, treeNames: Set<string>): Promise<void> {
+  private async scoreTree(usage: UsageMap, treeNames: Set<string>, contents: ReadonlyMap<string, string>): Promise<void> {
     const supportDirs = new Map<string, number>()
     for (const name of treeNames) supportDirs.set(name, await this.skills.countSupportDirs(name))
-    const quality = computeQualityScores({ usage, supportDirs, referenceCounts: await this.referenceCounts(treeNames) })
+    const quality = computeQualityScores({ usage, supportDirs, referenceCounts: this.referenceCounts(contents) })
     for (const [name, score] of quality) {
       const record = usage.get(name)
       if (record) {
@@ -1027,11 +1027,12 @@ export class EvolutionCurator extends Service {
    * other skill names counts as one reference to each of them, so hub skills
    * that are explicitly named by peers get a non-zero references factor.
    */
-  private async referenceCounts(treeNames: Set<string>): Promise<Map<string, number>> {
+  private referenceCounts(contents: ReadonlyMap<string, string>): Map<string, number> {
     const counts = new Map<string, number>()
-    for (const name of treeNames) {
-      const content = await this.skills.read(name)
-      if (!content) continue
+    // C4 (v35): the run already read every tree skill for the dedup pool; the
+    // unreadable entries are absent from that map exactly as the former
+    // per-skill read skipped them, so this pass needs no second traversal.
+    for (const [name, content] of contents) {
       // Single-source parsing (G3): identical semantics to the former inline
       // scan, plus dedupe — one referrer counts once per target no matter how
       // often it repeats in the list.

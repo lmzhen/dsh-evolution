@@ -112,7 +112,11 @@
     "website/.vitepress/**/*.ts",
     "packages/evolution/test-support/row-contract.ts",
     "packages/evolution/test-support/cordis-rows.ts",
-    "packages/evolution/test-support/state-provider-consistency.ts"
+    "packages/evolution/test-support/state-provider-consistency.ts",
+    "packages/evolution/test-support/fake-io.ts",
+    "packages/evolution/test-support/temp-home.ts",
+    "packages/evolution/test-support/commands-stub.ts",
+    "packages/evolution/test-support/state-stack.ts"
   ],
   "exclude": [
     "packages/client/*/src/**",

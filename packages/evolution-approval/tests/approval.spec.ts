@@ -1,42 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
-import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
-import EvolutionState from '@deepseek-ai/dsh-evolution-state'
 import EvolutionApproval from '../src/index.ts'
 import { effectiveSessionPolicy } from '../src/index.ts'
+import { tempRoot } from '../../test-support/temp-home.ts'
+import { mountStateStack } from '../../test-support/state-stack.ts'
 
 describe('evolution-approval', () => {
   it('ignores a self-reported "never" when the platform service is mounted without a never stance (S3.1, E-22)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3a-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
+    const home = await tempRoot('dsh-approval-s3a-')
+    const ctx = await mountStateStack(home, { evolution: true })
     ctx.provide('approval', { overrideOf: () => undefined })
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     const staged = await ctx.evolutionApproval.request({
       kind: 'memory', summary: 'x', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'never',
     })
     expect(staged.action).toBe('staged') // the self-report lost; default stands
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-27: a deployment-level config.policy=never allows without a session override (0.3.37)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-v627-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
+    const home = await tempRoot('dsh-approval-v627-')
+    const ctx = await mountStateStack(home, { evolution: true })
     // Platform mounted with NO per-session override: the deployment default
     // applies (overrideOf ?? config.policy ?? 'ask' — the exported chain).
     ctx.provide('approval', { overrideOf: () => undefined, config: { policy: 'never' } })
@@ -45,17 +28,11 @@ describe('evolution-approval', () => {
       kind: 'memory', summary: 'z', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
     })
     expect(allowed.action).toBe('allow')
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V6-27: the platform-shaped overrideOf receives the SESSION OBJECT, never the id string (0.3.40)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-v627-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
+    const home = await tempRoot('dsh-approval-v627-')
+    const ctx = await mountStateStack(home, { evolution: true })
     // REAL platform shape (user-approval): overrideOf resolves the policy from
     // the session log view — `snapshotEvents()` from 0.1.5 on — with NO guard,
     // so a bare id string would throw (`undefined.length`). Record what it saw.
@@ -89,17 +66,11 @@ describe('evolution-approval', () => {
     })
     expect(fallback.action).toBe('staged')
     expect(probed).toBe(sessionShape) // unchanged — no string probe happened
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('allows when the platform service derives "never" even if the caller said "ask" (S3.1, E-22)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3b-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
+    const home = await tempRoot('dsh-approval-s3b-')
+    const ctx = await mountStateStack(home, { evolution: true })
     ctx.provide('approval', { overrideOf: () => 'never' })
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     const allowed = await ctx.evolutionApproval.request({
@@ -107,18 +78,11 @@ describe('evolution-approval', () => {
       session: { id: 's1', snapshotEvents: () => [] }, sessionPolicy: 'ask',
     })
     expect(allowed.action).toBe('allow')
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('a crashed approve is never replayed: executing records block approve and reject cleans up (S3.3, E-24)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-s3crash-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-s3crash-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     let executions = 0
     ctx.evolutionApproval.registerRunner('memory', async () => { executions += 1; return { ok: true, message: 'ok' } })
     await ctx.evolutionApproval.request({ kind: 'memory', summary: 'x', args: {}, origin: 'background_review' })
@@ -139,18 +103,11 @@ describe('evolution-approval', () => {
     const cleanup = await ctx.evolutionApproval.reject(staged.id)
     expect(cleanup.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('pending').then(rows => rows.length)).toBe(0)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('stages background writes, keeps audit records and replays through a registered runner', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
 
     let applied = 0
     ctx.evolutionApproval.registerRunner('memory', async (args) => {
@@ -174,18 +131,11 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
     expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
 
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('keeps a pending record when the runner fails and retains rejection audit', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-fail-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-fail-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'replay failed' }))
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'fail', args: {}, origin: 'background_review' })
     const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
@@ -194,18 +144,11 @@ describe('evolution-approval', () => {
     const rejected = await ctx.evolutionApproval.reject(decision.pendingId!)
     expect(rejected.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('runs the replay exactly once when approve is called concurrently', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-atomic-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-atomic-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
 
     let applied = 0
     ctx.evolutionApproval.registerRunner('memory', async () => {
@@ -232,18 +175,11 @@ describe('evolution-approval', () => {
     expect(applied).toBe(1)
     expect([a.ok, b.ok].every(Boolean)).toBe(true)
 
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('reject on an executing record races an in-flight approve: audit stays honest, write still runs once (S3.3, F-204)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-race-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-race-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
 
     let executions = 0
     let releaseRunner: (() => void) | undefined
@@ -286,18 +222,11 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('allows writes without staging when the session policy is never', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-never-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-never-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
 
     const decision = await ctx.evolutionApproval.request({
       kind: 'memory', summary: 'unattended write', args: { action: 'add', facts: 'x' }, origin: 'foreground', sessionPolicy: 'never',
@@ -312,18 +241,11 @@ describe('evolution-approval', () => {
     })
     expect(askDecision.action).toBe('staged')
 
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('normalizes approval summaries: truncation, batch label and archive warning', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-summary-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-summary-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
 
     await ctx.evolutionApproval.request({
       kind: 'memory', summary: 'x'.repeat(300), args: { action: 'add', facts: 'a' }, origin: 'background_review',
@@ -344,34 +266,20 @@ describe('evolution-approval', () => {
     expect(pending.some(item => item.summary === 'memory batch of 3 operations')).toBe(true)
     expect(pending.some(item => item.summary === 'skill delete old-skill (warning: archive)')).toBe(true)
 
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
   it('hasRunner mirrors the runner registry for the P1-9 pre-check', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-hasrunner-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-hasrunner-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(false)
     const dispose = ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: true, message: 'ok' }))
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(true)
     dispose()
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(false)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V4-18: a rotated/unknown id is reported out of the pending window, not as a live concurrent writer', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-v4-18-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-v4-18-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     // A never-staged id (or one rotated past PENDING_RESOLVED_CAP) is NOT a
     // live "another writer" — the old message mis-attributed it. Both approve
     // and reject must name the real cause.
@@ -389,18 +297,11 @@ describe('evolution-approval', () => {
     const executing = await ctx.evolutionApproval.approve(id)
     expect(executing.ok).toBe(false)
     expect(executing.message).toContain('executing')
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V9-12: a replay runner that THROWS keeps the record pending with its claim released (distinct from {ok:false})', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-throw-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-throw-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     ctx.evolutionApproval.registerRunner('memory', async () => { throw new Error('runner backend exploded') })
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'boom', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
@@ -416,18 +317,11 @@ describe('evolution-approval', () => {
     expect(retry.message).not.toContain('already resolved')
     const rejected = await ctx.evolutionApproval.reject(id)
     expect(rejected.ok).toBe(true)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('V9-12: approve with NO replay runner releases the claim — record stays pending and rejectable', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-norunner-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-norunner-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     // No registerRunner at all (host-only composition case).
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'orphan', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
@@ -439,18 +333,11 @@ describe('evolution-approval', () => {
     const rejected = await ctx.evolutionApproval.reject(id)
     expect(rejected.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   it('0.3.66: a capability record outlives the retired adapter — stageable and answerable with no runner', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'dsh-approval-capability-'))
-    const ctx = new Context()
-    await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(EvolutionIoRegistry)
-    await ctx.plugin(NodeIo)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
-    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const home = await tempRoot('dsh-approval-capability-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
     // The adapter that produced capability writes was removed in 0.3.66, so a
     // record staged by a ≤0.3.65 install is the only consumer this kind has left:
     // staging must still work with no runner, and approving must resolve it
@@ -461,7 +348,6 @@ describe('evolution-approval', () => {
     expect(approved.ok).toBe(true)
     expect(approved.message).toContain('no code was executed')
     expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
   describe('effectiveSessionPolicy (G4.8, F-341)', () => {
@@ -508,14 +394,8 @@ describe('evolution-approval', () => {
 })
 
 it('v28 G1.3 (APPR-01): a failed resolve after a successful runner reports the landed write instead of throwing', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-approval-g13-'))
-  const ctx = new Context()
-  await ctx.plugin(EvolutionStateStorageRegistry)
-  await ctx.plugin(EvolutionIoRegistry)
-  await ctx.plugin(NodeIo)
-  await ctx.plugin(JsonState, { root: home })
-  await ctx.plugin(EvolutionState)
-  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  const home = await tempRoot('dsh-approval-g13-')
+  const ctx = await mountStateStack(home, { evolution: true, approval: true })
   ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: true, message: 'memory written' }))
   const decision = await ctx.evolutionApproval.request({
     kind: 'memory', summary: 'x', args: {}, origin: 'background_review', sessionId: 's1', sessionPolicy: 'ask',
@@ -539,5 +419,4 @@ it('v28 G1.3 (APPR-01): a failed resolve after a successful runner reports the l
   const again = await ctx.evolutionApproval.approve(pendingId)
   expect(again.ok).toBe(false)
   expect(again.message).toMatch(/executing|already/i)
-  await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
