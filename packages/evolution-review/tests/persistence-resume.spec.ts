@@ -14,13 +14,19 @@ import * as Review from '../src/index.ts'
 
 /**
  * A-line P0-1 acceptance (rc.42): evolution review activity must never enter
- * the session log. The persistence read path refuses any log carrying a type
- * outside the host's KNOWN_SESSION_EVENT_TYPES (assertEventsSupported), and
- * `Session.append` cannot write the `ignorable` marker — so a single
- * `evolution/*` append made whole sessions unresumable. These tests drive the
- * REAL persistence backend (JSONL on a temp dir) through a REAL session:
- * write → dispose (flush) → fresh-context reload, the in-process equivalent
- * of a process restart over one durable log.
+ * the session log. A build refuses to interpret a stored log carrying a type
+ * outside its generated KNOWN_SESSION_EVENT_TYPES set unless the event is
+ * marked `ignorable: true` (`validateStoredEvents`), and `Session.append`
+ * cannot write that marker — so one `evolution/*` append makes the whole
+ * session unreadable.
+ *
+ * v33 (0.1.5) rewrote how that refusal is reached, so these tests write the
+ * durable log through the platform's own storage handle instead of relying on
+ * a bare `ctx.sessions.create()` append to persist: 0.1.5 makes the agent loop
+ * the owner of the write handle (`agent-loop/src/index.ts` opens
+ * `sessionPersistence.open(id, 'write')`), and the removed
+ * `SessionPersistence.load()` is replaced by a read handle whose `read()`
+ * runs the same validator.
  */
 
 const REVIEWER = 'I prefer concise answers and want you to remember that preference. '.repeat(6)
@@ -97,23 +103,33 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
       expect(scheduled).toHaveLength(1)
       expect(scheduled[0]).toMatchObject({ sessionId: 'evo-resume-e2e', kind: 'memory' })
 
-      // The durable log stays native-only — no evolution/* type was appended.
-      const types = session.events.map(event => event.type)
+      // The session log stays native-only — no evolution/* type was appended.
+      const types = session.snapshotEvents().map(event => event.type)
       expect(types.some(type => type.startsWith('evolution/'))).toBe(false)
 
-      // Restart equivalence: dispose flushes the write-behind buffer and
-      // closes the backend; a fresh context + backend over the same root
+      // Persist exactly that log through the platform's write handle: this is
+      // the durable artifact a restart replays (0.1.5: the loop owns the handle).
+      const handle = await ctx.sessionPersistence.create(session.header)
+      await handle.append([...session.snapshotEvents()])
+      await handle.close()
+
+      // Restart equivalence: a fresh context + backend over the same root
       // reload the durable log from disk.
       await fiber.dispose()
       const ctx2 = new Context()
       await mountAgentLoopTestDependencies(ctx2)
       const fiber2 = await ctx2.plugin(JsonlSessionPersistence, { root, compression: 'none' })
       try {
-        const inspection = await ctx2.sessionPersistence.load(SessionId('evo-resume-e2e'))
-        const reloadedTypes = inspection.events.map(event => event.type)
-        expect(reloadedTypes.some(type => type.startsWith('evolution/'))).toBe(false)
-        expect(reloadedTypes).toContain('user/message')
-        expect(reloadedTypes).toContain('turn/end')
+        const reader = await ctx2.sessionPersistence.open(SessionId('evo-resume-e2e'), 'read')
+        try {
+          const inspection = await reader.read()
+          const reloadedTypes = inspection.events.map(event => event.type)
+          expect(reloadedTypes.some(type => type.startsWith('evolution/'))).toBe(false)
+          expect(reloadedTypes).toContain('user/message')
+          expect(reloadedTypes).toContain('turn/end')
+        } finally {
+          await reader.close()
+        }
       } finally {
         await fiber2.dispose()
       }
@@ -130,14 +146,19 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
       const fiber = await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
 
       const session = ctx.sessions.create(SessionId('evo-resume-negative'))
-      // Emulate the OLD (pre-rc.42) behavior deliberately: a direct
-      // session.append of an evolution type. The cast is the point — since
-      // rc.42 this is not even expressible through typed append.
-      const legacyAppend = (type: string, data: unknown): void => {
-        ;(session.append as unknown as (t: string, d: unknown) => unknown)(type, data)
-      }
-      legacyAppend('evolution/plan-applied', { planId: 'legacy', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
-      session.append('turn/start', { turn: 1 })
+      const handle = await ctx.sessionPersistence.create(session.header)
+      await handle.append([{ type: 'turn/start', seq: 0, time: Date.now(), data: { turn: 1 } } as never])
+      // Emulate the OLD (pre-rc.42) behavior deliberately: a direct durable
+      // append of an evolution type. The cast is the point — since rc.42 this
+      // is not even expressible through the typed session append, and the
+      // storage writer accepts it (the refusal is the READ path's).
+      await handle.append([{
+        type: 'evolution/plan-applied',
+        seq: 1,
+        time: Date.now(),
+        data: { planId: 'legacy', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 },
+      } as never])
+      await handle.close()
 
       await fiber.dispose()
 
@@ -145,8 +166,18 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
       await mountAgentLoopTestDependencies(ctx2)
       const fiber2 = await ctx2.plugin(JsonlSessionPersistence, { root, compression: 'none' })
       try {
-        const failure = await ctx2.sessionPersistence.load(SessionId('evo-resume-negative'))
-          .then(() => undefined, (error: unknown) => error)
+        // The refusal lands on the read path (open and/or read) — capture either.
+        const failure = await ctx2.sessionPersistence
+          .open(SessionId('evo-resume-negative'), 'read')
+          .then(async (reader) => {
+            try {
+              await reader.read()
+              return undefined
+            } finally {
+              await reader.close()
+            }
+          })
+          .catch((error: unknown) => error)
         // The upstream gate is real: the poisoned log is refused wholesale.
         expect(failure).toBeInstanceOf(SessionFormatUnsupportedError)
       } finally {

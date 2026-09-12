@@ -16,6 +16,25 @@ The full `all` bundle is the new-install default; `host` is the shrink path
 (same automation, no memory/skill model tools — the read-only
 `maintenance_probe` diagnostic remains). Shrinking = uninstall `all`, install `host`.
 
+### Install-form status against the validated platform line (`0.1.5-rc.2`)
+
+Column 3 says whether the form was EXERCISED on `0.1.5-rc.2` or only judged from
+the source diff — a form is "已验证" only when an install ran against that line.
+
+| Form | Audit label | Status on `0.1.5-rc.2` | Basis |
+|---|---|---|---|
+| §1 Layered (`--mode layered`, source checkout) | M4 | **部分已验证** | preset resolution now probes the 0.1.5 shipped location first and is covered by `installer.spec.ts` (G2.1); the profile write path itself is unchanged and still only exercised on the dev tree |
+| §2 Host-only (`--mode host`) | M2 (host half) | **未验证**（源码级判定） | the host bundle overrides two platform base rows whose text is byte-identical on both lines; no `0.1.5-rc.2` install has been run |
+| §3 Agent-only (`--mode agent`) | M4 (preset half) | **部分已验证** | same preset-resolution coverage as §1 |
+| §4 One-click (`@lmzhen/dsh-evolution-preset`) | M3 | **未验证**（源码级判定） | no platform package is mounted by the bundle; the row set is the same one §2 uses |
+| §5 Production (`dsh plugin add @lmzhen/dsh-evolution-all`) | M1 | **未验证**（源码级判定） | the published ranges are `^0.1.5-rc.2` (see `scripts/verify-platform-ranges.mjs`); resolution against a real 0.1.5 profile has not been run |
+
+Reading the matrix: "未验证" is a statement about evidence, not about expected
+behaviour — the source-level judgement for M1/M3 is that the family mounts no
+platform package and only overrides two base rows, so the 0.1.1→0.1.5 platform
+delta does not touch the install surface. Treat the cells as the checklist for
+the first real 0.1.5 install.
+
 > ⚠️ **`dsh-evolution-all`, `dsh-evolution-host` and `dsh-evolution-preset` are
 > mutually exclusive install targets — never add more than one of these bundles
 > to the same profile.** `all` and the preset expose the model tools
@@ -32,6 +51,13 @@ The full `all` bundle is the new-install default; `host` is the shrink path
 
 ## Prerequisites
 
+- **Validated platform line: DSH `0.1.5-rc.2`.** This family does not support
+  two platform generations at once: `0.1.1-rc.2` and earlier are outside the
+  support window. The published `@deepseek-ai/dsh-*` ranges are `^0.1.5-rc.2`,
+  which under node-semver's prerelease rule does not admit an earlier
+  prerelease line — an older platform fails at dependency resolution, not at
+  runtime. `release.yml`'s `PLATFORM_VERSION` is the single definition of that
+  anchor; `scripts/verify-platform-ranges.mjs` asserts it.
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
   or a published `@deepseek-ai/dsh-evolution-host` bundle available to pnpm.
 - For the local installer below: Node 22+ and the source checkout.

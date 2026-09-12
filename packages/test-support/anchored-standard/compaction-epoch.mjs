@@ -33,7 +33,12 @@ export function createEpochPromotion(promoteEvents, options = {}) {
   const scan = (session) => {
     let boundary = -1
     let promoted = false
-    for (const event of session.events) {
+    // v33 G0.1: 0.1.5 removed the `Session.events` getter — the copy this
+    // fixture mirrors reads the log through `snapshotEvents()`. The removed
+    // accessor threw here, the assemble filter's catch turned that into
+    // "expose the full catalog", and the anchored-compat tests silently lost
+    // their subject.
+    for (const event of session.snapshotEvents()) {
       const seq = event.seq ?? 0 // events without a seq are treated as post-boundary
       if (event.type === 'compaction/end') {
         boundary = seq

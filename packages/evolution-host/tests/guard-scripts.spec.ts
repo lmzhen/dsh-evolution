@@ -114,4 +114,48 @@ describe('guard scripts (V4-30 sentry)', () => {
       expect(error?.stderr).toContain(missing)
     }
   })
+
+  it('G4.1 (v33): declared-config recomputes the platform planes and fails loud on drift', async () => {
+    const declaredConfig = join(scripts, 'verify-declared-config.mjs')
+    // Positive: the real tree with no platform checkout behaves as before.
+    const ok = await run(process.execPath, [declaredConfig, psRoot, '--strict'], { encoding: 'utf8' })
+    expect(ok.stdout).toContain('0 upstream-drift violation(s)')
+    // Violation: a platform tree whose base plane does not carry the rows the
+    // snapshot lists. The recomputation must report the drift instead of
+    // accepting a partial (or empty) plane as agreement.
+    const tree = await mkdtemp(join(tmpdir(), 'guard-declared-'))
+    const plane = join(tree, 'packages', 'bundle', 'base')
+    await mkdir(plane, { recursive: true })
+    await writeFile(
+      join(plane, 'cordis.patch.yml'),
+      "- id: timer\n  name: '@deepseek-ai/dsh-timer'\n- id: skill-badge\n  name: '@deepseek-ai/dsh-skill-badge'\n  disabled: true\n",
+      'utf8',
+    )
+    try {
+      const error = await run(process.execPath, [declaredConfig, psRoot, '--strict', '--upstream', tree], { encoding: 'utf8' })
+        .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+      expect(error).not.toBeNull()
+      expect(error?.code).toBe(1)
+      expect(error?.stderr).toContain('upstream-planes-drift')
+    } finally {
+      await rm(tree, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('G4.2 (v33): platform-contract names the recorded anchors an empty tree lacks', async () => {
+    const contract = join(scripts, 'verify-platform-contract.mjs')
+    // Vacuity sentry: with no platform tree present, every recorded anchor is
+    // reported by name — the probe can never pass by finding nothing.
+    const empty = await mkdtemp(join(tmpdir(), 'guard-contract-'))
+    try {
+      const error = await run(process.execPath, [contract, psRoot, '--upstream', empty], { encoding: 'utf8' })
+        .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+      expect(error).not.toBeNull()
+      expect(error?.code).toBe(1)
+      expect(error?.stderr).toContain('host-surface difference')
+      expect(error?.stderr).toContain('session-events-accessor')
+    } finally {
+      await rm(empty, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
 })

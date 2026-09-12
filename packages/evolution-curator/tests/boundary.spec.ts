@@ -73,7 +73,9 @@ describe('evolution-curator boundaries', () => {
       list: () => {
         listCalls += 1
         if (listCalls === 1) return []
-        return [{ session: { events: [{ type: 'turn/start', seq: 1, time: Date.now(), data: { turn: 1 } }] } }]
+        // v33 G0.1: the double presents the post-0.1.5 accessor; the removed
+        // `events` getter made this stub fail with a TypeError instead.
+        return [{ session: { snapshotEvents: () => [{ type: 'turn/start', seq: 1, time: Date.now(), data: { turn: 1 } }] } }]
       },
     })
     // v32 TEST-02 (CUR-04): a live skill with NO usage sidecar must get its

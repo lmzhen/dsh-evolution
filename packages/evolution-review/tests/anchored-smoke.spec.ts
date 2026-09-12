@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createToolResultMessage, createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
+import { createToolResultMessage, createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -178,7 +178,7 @@ describe('anchored-standard review smoke', () => {
       session.append('tool/call', {
         turn: 1,
         step: 0,
-        callId: CallId('read-doomed-skill'),
+        callId: ToolCallId('read-doomed-skill'),
         name: 'skill',
         arguments: JSON.stringify({ name: 'doomed-skill' }),
       })
@@ -188,7 +188,7 @@ describe('anchored-standard review smoke', () => {
       session.append('tool/result', {
         turn: 1,
         step: 0,
-        message: createToolResultMessage({ callId: CallId('read-doomed-skill'), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
+        message: createToolResultMessage({ callId: ToolCallId('read-doomed-skill'), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
       }, { surfaceOp: 'append' })
       session.append('user/message', createUserMessage({
         content: [{
@@ -210,7 +210,7 @@ describe('anchored-standard review smoke', () => {
       // suite). Poll each contract signal instead —the contract is final
       // consistency.
       await expect.poll(() => capturedRequest !== undefined, { timeout: 3000, interval: 50 }).toBe(true)
-      // The actual archive landed (schedule-review ran executePlan 鈫?direct path).
+      // The actual archive landed (schedule-review ran executePlan → direct path).
       await expect.poll(async () => (await library.list()).some(s => s.name === 'doomed-skill'), { timeout: 3000, interval: 50 }).toBe(false)
       // In-memory registry view (what markArchived mutated —first signal).
       const memory = ctx.get('skillUsage') as { report(): Promise<Map<string, { state?: string; archived_at?: string | null; patch_count?: number }>> }
@@ -298,12 +298,12 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       ctx.agents.register(agent)
       session.append('turn/start', { turn: 1 })
       session.append('tool/call', {
-        turn: 1, step: 0, callId: CallId('read-target'),
+        turn: 1, step: 0, callId: ToolCallId('read-target'),
         name: 'skill', arguments: JSON.stringify({ name: 'target-skill' }),
       })
       session.append('tool/result', {
         turn: 1, step: 0,
-        message: createToolResultMessage({ callId: CallId('read-target'), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
+        message: createToolResultMessage({ callId: ToolCallId('read-target'), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
       }, { surfaceOp: 'append' })
       session.append('user/message', createUserMessage({
         content: [{ type: 'text', text: 'Please improve the target skill. '.repeat(12) }],
@@ -379,12 +379,12 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       ctx.agents.register(agent)
       session.append('turn/start', { turn: 1 })
       session.append('tool/call', {
-        turn: 1, step: 0, callId: CallId('read-guarded'),
+        turn: 1, step: 0, callId: ToolCallId('read-guarded'),
         name: 'skill', arguments: JSON.stringify({ name: 'guarded-skill' }),
       })
       session.append('tool/result', {
         turn: 1, step: 0,
-        message: createToolResultMessage({ callId: CallId('read-guarded'), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
+        message: createToolResultMessage({ callId: ToolCallId('read-guarded'), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
       }, { surfaceOp: 'append' })
       session.append('user/message', createUserMessage({
         content: [{ type: 'text', text: 'Please improve the guarded skill. '.repeat(6) }],
@@ -471,12 +471,12 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       // successful result (REV-06(a)) — the same shape TEST-01 uses, and what
       // makes BOTH update ops survive filterUnreadSkillOps.
       session.append('tool/call', {
-        turn: 1, step: 0, callId: CallId(`read-${name}`),
+        turn: 1, step: 0, callId: ToolCallId(`read-${name}`),
         name: 'skill', arguments: JSON.stringify({ name }),
       })
       session.append('tool/result', {
         turn: 1, step: 0,
-        message: createToolResultMessage({ callId: CallId(`read-${name}`), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
+        message: createToolResultMessage({ callId: ToolCallId(`read-${name}`), content: [{ type: 'text', text: 'skill loaded' }], isError: false }),
       }, { surfaceOp: 'append' })
       session.append('user/message', createUserMessage({
         content: [{ type: 'text', text: `Please improve the ${name}. `.repeat(12) }],

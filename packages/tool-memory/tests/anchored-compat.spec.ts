@@ -19,7 +19,7 @@ const anchorEntry = fileURLToPath(new URL('../../test-support/anchored-standard/
 const Anchored = await import(pathToFileURL(anchorEntry).href) as { apply(ctx: Context, config?: unknown): Promise<void> | void }
 
 function agent(events: Array<Record<string, unknown>> = []) {
-  return { session: { id: `session-${events.length}-${Math.random()}`, events } }
+  return { session: { id: `session-${events.length}-${Math.random()}`, snapshotEvents: () => events } }
 }
 
 function stringTool(name: string) {

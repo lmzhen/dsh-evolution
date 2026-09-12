@@ -24,6 +24,10 @@ function invocationOf(rawInput: string, session: { id?: string; header?: { origi
   return {
     commandId: 'graph-test' as CommandInvocation['commandId'],
     rawInput,
+    // 0.1.5 made `attachments` a required CommandInvocation field; this handler
+    // reads only `rawInput` and `agent.session`, so the fixture passes the empty
+    // list the registry sends when no attachment store is composed.
+    attachments: [],
     signal: new AbortController().signal,
     agent: { session: { id: 'graph-test-session', header: {}, ...session } } as unknown as CommandInvocation['agent'],
   }

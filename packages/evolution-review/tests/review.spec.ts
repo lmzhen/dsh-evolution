@@ -510,7 +510,10 @@ async function mountReviewFixture(options: {
     // seq=1 ⇒ foldTurn starts at 0 and scans the tool/call below (substantive).
     seq: 1,
     header: { origin: undefined },
-    events: [
+    // v33 G0.1: the fixture presents the post-0.1.5 accessor. The removed
+    // `events` getter made every production reader throw inside the pipeline,
+    // which surfaced as "no review was scheduled/injected" instead of an error.
+    snapshotEvents: () => [
       { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: options.skillArguments ?? '{}' } },
       ...(options.events ?? []),
     ],
@@ -913,7 +916,7 @@ async function mountTwoSessions() {
       id: SessionId(id),
       seq: 1,
       header: { origin: undefined },
-      events: [{ type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } }],
+      snapshotEvents: () => [{ type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } }],
       deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
     } as unknown as Session
     const agent = {

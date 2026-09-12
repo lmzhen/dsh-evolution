@@ -171,8 +171,9 @@ export function foldTurn(session: Session, fromSeq: number): TurnSignals {
     memorySignal: false,
     skillSignal: false,
   }
-  for (let index = Math.max(0, fromSeq); index < session.events.length; index += 1) {
-    const event = session.events[index]
+  const events = session.snapshotEvents()
+  for (let index = Math.max(0, fromSeq); index < events.length; index += 1) {
+    const event = events[index]
     if (event) observeEvent(signal, event)
   }
   return signal

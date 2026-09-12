@@ -370,7 +370,8 @@ Walk through this list on every upstream bump (see `UPSTREAM_SHA`):
 
 1. **Skill-provider shadow rank** (`evolution-skill-catalog`): our provider
    registers `EVOLUTION_SKILL_RANK = 390` and relies on the upstream
-   `USER_DSH_RANK` (400 in 0.1.1-rc.2) sorting ABOVE it — lower rank wins the
+   `USER_DSH_RANK` (400; re-verified unchanged on `0.1.5-rc.2`,
+   `packages/skill/skill-filesystem/src/index.ts:39`) sorting ABOVE it — lower rank wins the
    `user-dsh` source shadow. Both constants are private to their owners: if
    upstream changes either value or the comparison semantics, our provider
    silently loses the shadow. Re-verify both sides on upgrade.

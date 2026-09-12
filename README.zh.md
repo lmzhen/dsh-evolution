@@ -348,7 +348,7 @@ vitest run packages/evolution
 **上游升级对照清单（I-02，每次升级过一遍）**：
 
 1. **技能 provider 影子 rank**：本插件 `evolution-skill-catalog` 以
-   `EVOLUTION_SKILL_RANK=390` shadow 上游 `USER_DSH_RANK`（0.1.1-rc.2 为 400，低 rank
+   `EVOLUTION_SKILL_RANK=390` shadow 上游 `USER_DSH_RANK`（`0.1.5-rc.2` 复核仍为 400，低 rank
    胜出、抢占 `user-dsh` source）。两侧常量互为私有：上游改动任一数值或比较语义，本侧
    会**静默**失去 shadow——升级时两侧复核。
 2. **`@deepseek-ai` 包名撞名检查**：本家族在官方 `@deepseek-ai` scope 下发布自有包名

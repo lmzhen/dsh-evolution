@@ -26,12 +26,20 @@
  *                   reach that rotted is a violation, not a note.
  * Anything else is a violation: a declared key with no plane that reads it.
  *
- * UPSTREAM_PLANES holds the platform facts (which rows a plane disables) with
- * their upstream file:line anchors: the mirror does not carry
- * `packages/bundle/**`, so this table is the repository's record of them and
- * the thing to re-check whenever an upstream bundle changes. A row the table
- * does not know is reported as `unknown-row` (warn) — never silently assumed
- * reachable.
+ * UPSTREAM_PLANES holds the platform facts (which rows a plane disables) as a
+ * SNAPSHOT of `packages/bundle/<plane>/cordis.patch.yml`: the mirror does not
+ * carry `packages/bundle/**`, so this table is the repository's record of them
+ * and the thing to re-check whenever an upstream bundle changes. The `source`
+ * field names the platform file WITHOUT line anchors — a hand-copied line
+ * number rots silently, which is exactly what v33 P2-F1 found. Pass
+ * `--upstream <platform-tree>` to RECOMPUTE every plane's classification from
+ * the platform's own patch files and fail on drift
+ * (`upstream-planes-drift`); without it the table is used as-is.
+ *
+ * The same `--upstream` run also recomputes the platform `Config` key set of
+ * every overridden row and checks that the bundle patches NAME each key in
+ * their whole-config-replacement note (v33 G2.3): a platform key added
+ * upstream must be acknowledged where the wholesale replacement happens.
  *
  * 0.3.68 (v27 G3.1): WARN mode by default — batch 3 wires each new gate in warn
  * mode for one release before flipping it, matching verify-arch-guards. Pass
@@ -41,12 +49,20 @@
  * mirror `packages/scripts/…`; the root argument is the evolution packages tree
  * in either layout, and the composer anchors resolve relative to it):
  *   node <scripts-dir>/verify-declared-config.mjs <evolution-root> [--strict]
+ *     [--upstream <platform-tree>]
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const root = resolve(process.argv[2] ?? 'packages/evolution')
-const strict = process.argv.includes('--strict') || process.env.DSH_EVOLUTION_DECLARED_CONFIG_STRICT === '1'
+const argv = process.argv.slice(2)
+const root = resolve(argv[0] ?? 'packages/evolution')
+const strict = argv.includes('--strict') || process.env.DSH_EVOLUTION_DECLARED_CONFIG_STRICT === '1'
+const upstreamArg = argv.indexOf('--upstream')
+const upstream = upstreamArg >= 0 ? resolve(argv[upstreamArg + 1] ?? '') : null
+if (upstreamArg >= 0 && (!argv[upstreamArg + 1] || (argv[upstreamArg + 1] ?? '').startsWith('--'))) {
+  console.error('verify-declared-config: --upstream needs a platform tree path (the checkout carrying packages/bundle/*/cordis.patch.yml)')
+  process.exit(2)
+}
 
 /** The three bundle patch layers that declare deployment config. */
 const BUNDLE_PATCHES = ['evolution-all', 'evolution-host', 'evolution-preset']
@@ -62,22 +78,93 @@ const PROFILE_PLANES = {
 }
 
 /**
- * Platform plane facts. `disabled` lists the plugin ids the plane turns OFF at
- * profile root; `mounted` lists the ids this table has confirmed the plane
- * mounts enabled (the rows the family overrides). Every other row is
- * `unknown-row`: reported, never assumed reachable.
+ * Platform plane facts, SNAPSHOTTED from the target platform line
+ * (0.1.5-rc.2). Recomputed and compared by `--upstream`; with no platform tree
+ * the table is the authority, so it must stay complete:
+ *   - `disabled` is EXACT — every row the plane turns off, because that set
+ *     decides whether a declared override reaches anything at profile root. A
+ *     missing entry would silently upgrade an unreachable override to
+ *     `profile-root`.
+ *   - `mounted` is a CONFIRMATION LIST — the rows this table has confirmed the
+ *     plane mounts enabled (the rows the family overrides). Each entry must
+ *     still exist and be enabled upstream; completeness is not required, since
+ *     no declaration in this repository targets any other row.
+ * `source` names the platform file with no line anchor: a copied line number
+ * rots without a signal, which is what `--upstream` exists to prevent.
  */
 const UPSTREAM_PLANES = {
   base: {
-    disabled: ['skill-badge'],
+    disabled: ['hmr', 'skill-badge'],
     mounted: ['session-query-sqlite', 'tool-skill'],
-    source: 'packages/bundle/base/cordis.patch.yml:117-121 (session-query-sqlite mounted with path/openAt), :243-245 (skill-badge disabled:true), :247-248 (tool-skill mounted, no config)',
+    source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; skill-badge and hmr disabled:true)',
   },
   'web-app': {
-    disabled: ['skill-filesystem', 'tool-skill'],
+    disabled: [
+      'ui-schedule',
+      'tool-bash',
+      'tool-pwsh',
+      'tool-jobs',
+      'tool-fs',
+      'tool-fs-search',
+      'skill-filesystem',
+      'tool-skill',
+      'command-goal',
+      'tool-goal',
+      'plan-mode',
+      'compaction-basic',
+      'command-compact',
+      'tool-result-pruner',
+      'tool-subagent-control',
+      'tool-subagent-list-agents',
+      'tool-subagent',
+      'tool-subagent-fork',
+      'workflow-worker-thread',
+      'tool-workflow',
+      'tool-ralph',
+      'agent-instructions',
+      'tool-todo',
+      'tool-web',
+    ],
     mounted: [],
-    source: 'packages/bundle/web-app/cordis.patch.yml:330-333 (skill-filesystem and tool-skill both disabled:true — the platform moves the per-agent skill rows into presets)',
+    source: 'packages/bundle/web-app/cordis.patch.yml (skill-filesystem and tool-skill disabled:true — the platform moves the per-agent skill rows into presets)',
   },
+}
+
+/**
+ * Platform `Config` keys of every row this repository OVERRIDES, snapshotted
+ * from the target platform line. Two consumers:
+ *   - `--upstream` recomputes them from the platform sources listed in
+ *     PLATFORM_ROW_CONFIG_SOURCES and fails on drift;
+ *   - every run checks that each key is NAMED in the bundle patches'
+ *     whole-config-replacement note, so the acknowledgment cannot go stale
+ *     when the platform adds a key (v33 G2.3).
+ * Overrides replace a row's `config` wholesale, so an unnamed key silently
+ * falls back to its schema default.
+ */
+const PLATFORM_ROW_CONFIG_KEYS = {
+  'session-query-sqlite': [
+    'path',
+    'openAt',
+    'journalMode',
+    'defaultLimit',
+    'maxLimit',
+    'snippetChars',
+    'readWindowMax',
+    'persistedReadConcurrency',
+    'preparedSessionCacheSize',
+  ],
+  'tool-skill': ['catalogDescriptionMaxLength'],
+}
+
+/** Platform sources carrying each row's `Config` interface: the row's own
+ * module plus any base `Config` it extends (`session-query-sqlite` extends the
+ * backend-independent session-query Config). */
+const PLATFORM_ROW_CONFIG_SOURCES = {
+  'session-query-sqlite': [
+    'packages/session-query/session-query-sqlite/src/index.ts',
+    'packages/session-query/session-query/src/config.ts',
+  ],
+  'tool-skill': ['packages/skill/tool-skill/src/index.ts'],
 }
 
 /**
@@ -137,6 +224,70 @@ function parsePatchItems(text, file) {
 }
 
 const composerEntry = (row, key) => COMPOSER_REACHED.find(entry => entry.row === row && entry.key === key)
+
+/**
+ * Recompute one plane's row classification from the platform's own patch file.
+ *
+ * @param plane - the bundle plane id (`base` / `web-app`).
+ * @returns `{ path, disabled, mounted }`, or `null` when the platform tree has
+ *   no such plane file.
+ */
+function classifyPlane(plane) {
+  const path = join(upstream, 'packages', 'bundle', plane, 'cordis.patch.yml')
+  if (!existsSync(path)) return null
+  const items = parsePatchItems(readFileSync(path, 'utf8'), path)
+  return {
+    path,
+    disabled: items.filter(item => item.disabled === 'true').map(item => item.id),
+    mounted: items.filter(item => item.name !== null).map(item => item.id),
+  }
+}
+
+/**
+ * Member names of every `interface Config` block in one platform source file.
+ *
+ * @param text - the file's content.
+ * @returns the member names at the interface's top level (nested object members
+ *   and JSDoc text are not collected).
+ */
+function configKeysIn(text) {
+  const keys = []
+  const lines = text.split('\n')
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^export interface Config\b/.test(lines[index])) continue
+    let depth = 0
+    for (let cursor = index; cursor < lines.length; cursor += 1) {
+      const line = lines[cursor]
+      if (cursor > index && depth === 1) {
+        const member = /^\s+([A-Za-z0-9_]+)\??:/.exec(line)
+        if (member !== null) keys.push(member[1])
+      }
+      for (const character of line) {
+        if (character === '{') depth += 1
+        else if (character === '}') depth -= 1
+      }
+      if (cursor > index && depth === 0) break
+    }
+  }
+  return keys
+}
+
+/**
+ * The platform `Config` key set of one overridden row, read from the platform
+ * sources (the row module plus any base `Config` it extends).
+ *
+ * @param row - the platform plugin id.
+ * @returns the deduplicated key names.
+ */
+function platformConfigKeys(row) {
+  const keys = []
+  for (const rel of PLATFORM_ROW_CONFIG_SOURCES[row] ?? []) {
+    const path = join(upstream, 'packages', ...rel.split('/').slice(1))
+    if (!existsSync(path)) continue
+    keys.push(...configKeysIn(readFileSync(path, 'utf8')))
+  }
+  return [...new Set(keys)]
+}
 
 /**
  * Judge one declaration against one profile.
@@ -219,10 +370,70 @@ if (unknownRows.length > 0) {
   if (strict) process.exit(1)
 }
 
+/**
+ * Platform drift checks (v33 G4.1 / G2.3). With `--upstream` the plane
+ * classification and the overridden rows' `Config` key sets are recomputed from
+ * the platform tree; every run additionally checks that the bundle patches name
+ * each platform key in their whole-config-replacement note.
+ *
+ * @returns the drift messages, empty when the snapshot still matches.
+ */
+function upstreamDrift() {
+  const drift = []
+  if (upstream !== null) {
+    for (const [plane, declared] of Object.entries(UPSTREAM_PLANES)) {
+      const actual = classifyPlane(plane)
+      if (actual === null) {
+        drift.push(`${plane}: no platform plane file under ${join(upstream, 'packages', 'bundle', plane)} — point --upstream at the platform checkout root`)
+        continue
+      }
+      console.log(`verify-declared-config: upstream ${plane} — disabled: ${actual.disabled.join(', ') || '(none)'}; mounted: ${actual.mounted.join(', ') || '(none)'}`)
+      const tableOnly = declared.disabled.filter(id => !actual.disabled.includes(id))
+      const platformOnly = actual.disabled.filter(id => !declared.disabled.includes(id))
+      if (tableOnly.length > 0 || platformOnly.length > 0) {
+        drift.push(`${plane}: disabled set drifted — the table disables ${tableOnly.join(', ') || '(none)'} that the platform keeps enabled, and the platform disables ${platformOnly.join(', ') || '(none)'} that the table omits`)
+      }
+      const notMounted = declared.mounted.filter(id => !actual.mounted.includes(id) || actual.disabled.includes(id))
+      if (notMounted.length > 0) drift.push(`${plane}: the table lists ${notMounted.join(', ')} as mounted, but the platform does not mount that row enabled`)
+    }
+  }
+  for (const [row, keys] of Object.entries(PLATFORM_ROW_CONFIG_KEYS)) {
+    if (upstream !== null) {
+      const actual = platformConfigKeys(row)
+      if (actual.length === 0) {
+        drift.push(`${row}: no platform \`interface Config\` found for ${row} under ${upstream} — the recomputation cannot confirm the snapshotted key set`)
+      } else {
+        const tableOnly = keys.filter(key => !actual.includes(key))
+        const platformOnly = actual.filter(key => !keys.includes(key))
+        if (tableOnly.length > 0 || platformOnly.length > 0) {
+          drift.push(`${row}: platform Config keys drifted — the table lists ${tableOnly.join(', ') || '(none)'} that the platform no longer declares, and the platform declares ${platformOnly.join(', ') || '(none)'} that the table omits`)
+        }
+      }
+    }
+    for (const bundle of BUNDLE_PATCHES) {
+      const path = join(root, bundle, 'cordis.patch.yml')
+      if (!existsSync(path)) continue
+      const text = readFileSync(path, 'utf8')
+      const unnamed = keys.filter(key => !new RegExp(`(^|[^A-Za-z0-9_])${key}([^A-Za-z0-9_]|$)`).test(text))
+      if (unnamed.length > 0) {
+        drift.push(`${bundle}: the whole-config-replacement note has no mention of platform key(s) ${unnamed.join(', ')} for row ${row} — an override replaces \`config\` wholesale, so an unacknowledged key silently falls back to its schema default`)
+      }
+    }
+  }
+  return drift
+}
+
+const drift = upstreamDrift()
+if (drift.length > 0) {
+  console.error(`verify-declared-config: ${strict ? 'FAIL' : 'WARN'} — ${drift.length} upstream-planes-drift violation(s)${upstream === null ? ' (platform table only; pass --upstream <platform-tree> to recompute from the platform)' : ''}:`)
+  console.error(drift.join('\n'))
+}
+
 const declared = declarations.length
 const reaching = declared * Object.keys(PROFILE_PLANES).length - violations.length
 console.log(
-  `verify-declared-config: summary — ${declared} declaration(s) × ${Object.keys(PROFILE_PLANES).length} profile(s): ${reaching} reachable, ${violations.length} violation(s)`
-  + (violations.length > 0 && !strict ? ' (warn-only mode: pass --strict to fail)' : ''),
+  `verify-declared-config: summary — ${declared} declaration(s) × ${Object.keys(PROFILE_PLANES).length} profile(s): ${reaching} reachable, ${violations.length} violation(s), ${drift.length} upstream-drift violation(s)`
+  + (upstream === null ? ' (platform table not recomputed)' : ` (recomputed from ${upstream})`)
+  + ((violations.length > 0 || drift.length > 0) && !strict ? ' (warn-only mode: pass --strict to fail)' : ''),
 )
-process.exit(violations.length > 0 && strict ? 1 : 0)
+process.exit((violations.length > 0 || drift.length > 0) && strict ? 1 : 0)

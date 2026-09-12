@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-review",
   "description": "Background review orchestration",
-  "version": "0.3.69",
+  "version": "0.3.70",
   "publishConfig": {
     "access": "public"
   },
@@ -50,6 +50,7 @@
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-curator": "workspace:^",
     "@deepseek-ai/dsh-evolution-plan-validator": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",

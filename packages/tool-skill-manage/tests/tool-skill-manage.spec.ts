@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
@@ -91,7 +91,7 @@ describe('tool-skill-manage', () => {
   it('reports the authoring check on create and refuses under descriptionStrict (P0)', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`authoring-${Math.random()}`),
+      callId: ToolCallId(`authoring-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
       agent: fakeAgent(undefined),
@@ -115,7 +115,7 @@ describe('tool-skill-manage', () => {
     expect(tool?.description ?? '').toContain('replace_all')
     expect(tool?.description ?? '').toContain('file_path')
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`g51-${Math.random()}`),
+      callId: ToolCallId(`g51-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
       agent: fakeAgent(undefined),
@@ -144,7 +144,7 @@ describe('tool-skill-manage', () => {
   it('v20 (D-1): a non-string scalar arg is refused structurally, not as a bare TypeError', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`scalar-guard-${Math.random()}`),
+      callId: ToolCallId(`scalar-guard-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
       agent: fakeAgent(undefined),
@@ -236,7 +236,7 @@ describe('tool-skill-manage', () => {
   it('reports the write-point frontmatter auto-quote on create (0.3.11)', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`norm-${Math.random()}`),
+      callId: ToolCallId(`norm-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
       agent: fakeAgent(undefined),
@@ -264,7 +264,7 @@ describe('tool-skill-manage', () => {
       await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
       const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
       const result = await ctx.tools.execute({
-        callId: CallId(`strict-${Math.random()}`),
+        callId: ToolCallId(`strict-${Math.random()}`),
         name: 'skill_manage',
         arguments: { action: 'create', name: 'strict-skill', content: SKILL.replace('boundary-skill', 'strict-skill').replace('lifecycle boundary test', over) },
         agent: fakeAgent(undefined),
@@ -284,7 +284,7 @@ describe('tool-skill-manage', () => {
   it('marks review-created skills for curator lifecycle management, but not foreground writes', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = async (origin: string | undefined, name: string) => ctx.tools.execute({
-      callId: CallId(`create-${origin ?? 'foreground'}-${name}`),
+      callId: ToolCallId(`create-${origin ?? 'foreground'}-${name}`),
       name: 'skill_manage',
       arguments: { action: 'create', name, content: SKILL.replace('boundary-skill', name) },
       agent: fakeAgent(origin),
@@ -308,7 +308,7 @@ describe('tool-skill-manage', () => {
     let mutationEvents = 0
     ctx.on('evolution/skill-mutated', () => { mutationEvents += 1 })
     const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`review-skip-${Math.random()}`),
+      callId: ToolCallId(`review-skip-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
       agent: fakeAgent(undefined),
@@ -342,7 +342,7 @@ describe('tool-skill-manage', () => {
   it('review text aggregates quality-warned skills into one guidance line', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`quality-warn-${Math.random()}`),
+      callId: ToolCallId(`quality-warn-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
       agent: fakeAgent(undefined),
@@ -363,7 +363,7 @@ describe('tool-skill-manage', () => {
   it('review text marks protection with [pinned] (N-1)', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`pin-mark-${Math.random()}`),
+      callId: ToolCallId(`pin-mark-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
       agent: fakeAgent(undefined),
@@ -395,7 +395,7 @@ describe('tool-skill-manage', () => {
       const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
       // edit routes to the same full-content update as update — the gate must not be bypassable.
       const result = await ctx.tools.execute({
-        callId: CallId(`edit-strict-${Math.random()}`),
+        callId: ToolCallId(`edit-strict-${Math.random()}`),
         name: 'skill_manage',
         arguments: { action: 'edit', name: 'edit-strict', content: SKILL.replace('boundary-skill', 'edit-strict').replace('lifecycle boundary test', over) },
         agent: fakeAgent(undefined),
@@ -438,7 +438,7 @@ description: restructure fixture.
 Use it.
 `
       const created = await ctx.tools.execute({
-        callId: CallId(`restructure-create-${Math.random()}`),
+        callId: ToolCallId(`restructure-create-${Math.random()}`),
         name: 'skill_manage',
         arguments: { action: 'create', name: 'fat-body', content: body },
         agent: fakeAgent(undefined),
@@ -446,7 +446,7 @@ Use it.
       })
       expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
       const moved = await ctx.tools.execute({
-        callId: CallId(`restructure-move-${Math.random()}`),
+        callId: ToolCallId(`restructure-move-${Math.random()}`),
         name: 'skill_manage',
         arguments: { action: 'restructure', name: 'fat-body', restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] },
         agent: fakeAgent(undefined),
@@ -482,7 +482,7 @@ Use it.
   it('V4-27: a no-op update/patch (byte-equivalent, noop:true) is not counted as a modification', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`noop-${Math.random()}`),
+      callId: ToolCallId(`noop-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
       agent: fakeAgent(undefined),
@@ -534,7 +534,7 @@ Use it.
       })
       const longName = 'n'.repeat(65)
       const created = await ctx.tools.execute({
-        callId: CallId(`nan-${Math.random()}`),
+        callId: ToolCallId(`nan-${Math.random()}`),
         name: 'skill_manage',
         arguments: { action: 'create', name: longName, content: SKILL.replace('boundary-skill', longName) },
         agent: fakeAgent(undefined),
@@ -552,7 +552,7 @@ Use it.
   it('V6-15: a byte-equivalent write_file is a no-op — no patch_count bump (0.3.36)', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`wf-${Math.random()}`),
+      callId: ToolCallId(`wf-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
       agent: fakeAgent(undefined),
@@ -577,7 +577,7 @@ Use it.
   it('V8-09: a non-array restructure argument is a structured refusal, not a TypeError (0.3.47)', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
-      callId: CallId(`v809-${Math.random()}`),
+      callId: ToolCallId(`v809-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
       agent: fakeAgent(undefined),
@@ -747,7 +747,7 @@ it('v32 TEST-05: the tool channel refuses autonomous (subagent-origin) writes on
   })
   const subagent = fakeAgent('subagent')
   const execute = (args: Record<string, unknown>) => ctx.tools.execute({
-    callId: CallId(`tsm05-${Math.random()}`),
+    callId: ToolCallId(`tsm05-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,
     agent: subagent,

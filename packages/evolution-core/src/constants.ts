@@ -119,3 +119,18 @@ export const MAX_TIMER_DELAY_MS = 2_147_483_647
 export const DEFAULT_MEMORY_REVIEW_MODEL = 'deepseek-v4-flash'
 export const DEFAULT_SKILL_REVIEW_MODEL = 'deepseek-v4-pro'
 export const DEFAULT_CURATOR_MODEL = 'deepseek-v4-pro'
+
+// ── Model-visible prompt-section orders ──────────────────────────────────────
+// The platform's `PromptSection.order` scale is a platform-internal constant
+// table (`SECTION_ORDERS`, core/system-prompt), not a published contract: the
+// 0.1.5 line re-scaled every first-party section from -1000 to 10200
+// (`DEPLOYMENT_PERSONA_SUFFIX` is the highest), so a third-party literal that
+// used to sort last could silently sort into the middle of the tool guidance.
+// Both family sections are operational guidance for the model, so they belong
+// AFTER every first-party section on every line. These values sit above 0.1.5's
+// maximum; scripts/verify-platform-contract.mjs --upstream re-reads the
+// platform's scale and fails when it grows past them.
+/** Order of the `evolution:memory-guidance` section (before the skills one). */
+export const MEMORY_GUIDANCE_SECTION_ORDER = 11000
+/** Order of the `evolution-skills-guidance` section (last of the two). */
+export const SKILLS_GUIDANCE_SECTION_ORDER = 11100

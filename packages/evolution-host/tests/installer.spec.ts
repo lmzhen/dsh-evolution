@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, cp, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -399,6 +399,74 @@ describe('layered installer', () => {
       dsh?: { profile?: { bundles?: string[] } }
     }
     expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-evolution-host'])
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 60_000)
+
+  it('G2.1 (v33): resolves the preset from the 0.1.5 shipped location, not the legacy CLI config dir', async () => {
+    // 0.1.5 ships the agent presets INSIDE the platform package
+    // (`node_modules/@deepseek-ai/dsh-agent-presets/presets/`, the package's
+    // SHIPPED_PRESET_ROOT) and stopped publishing the CLI's `config/`
+    // directory. The overlay below carries only the shipped location, so the
+    // installer must find it there; a resolution that still only knew the
+    // legacy path would fail the preset install entirely.
+    const tree = await mkdtemp(join(tmpdir(), 'dsh-installer-shipped-'))
+    const scripts = join(tree, 'packages', 'evolution', 'scripts')
+    const home = join(tree, 'home')
+    await mkdir(scripts, { recursive: true })
+    // The script resolves its own tree from its file URL, so the copy defines
+    // where the walk-up starts.
+    await cp(installer, join(scripts, 'install-layered.mjs'))
+    const shippedRoot = join(tree, 'packages', 'evolution', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets')
+    await mkdir(join(shippedRoot, 'standard'), { recursive: true })
+    const shippedComposition = '# v33-G2.1 platform-shipped standard composition\n- id: persona\n- id: tool-session-query\n'
+    await writeFile(join(shippedRoot, 'standard', 'agent.cordis.yml'), shippedComposition)
+    const delta = join(tree, 'delta.yml')
+    await writeFile(delta, '# evolution delta\n- id: tool-memory\n')
+    // A real install also copies the preset container manifest from the family
+    // package, so the overlay carries a minimal one.
+    await mkdir(join(tree, 'packages', 'evolution', 'evolution-agent'), { recursive: true })
+    await writeFile(join(tree, 'packages', 'evolution', 'evolution-agent', 'preset.yml'), 'name: Evolution\ndescription: overlay fixture\norder: 10\n')
+    await run(process.execPath, [
+      join(scripts, 'install-layered.mjs'), '--mode', 'agent', '--profile', 'g21', '--home', home,
+    ], { env: { ...process.env, DSH_EVOLUTION_DELTA_PATH: delta } })
+    const composition = await readFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'utf8')
+    // The generated preset starts with the standard rows VERBATIM, so its first
+    // line identifies which composition was resolved.
+    expect(composition.split('\n')[0]).toBe(shippedComposition.split('\n')[0])
+    expect(composition).toContain('- id: tool-memory')
+    await rm(tree, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 60_000)
+
+  it('G2.2 (v33): a self-created profile carries the platform template bundles and patch reload', async () => {
+    // The installer creates a profile before `dsh` ever touches it, so it seeds
+    // the platform's `PROFILE_TEMPLATES[name]` by hand. The 0.1.5 table has
+    // five names and a `patchReload` field; without them a self-created
+    // `sdk-minimal` profile would mount only the base row (D-4's original
+    // defect, one generation later).
+    const home = await mkdtemp(join(tmpdir(), 'dsh-installer-seed-'))
+    await runInstaller(home, 'host', 'sdk-minimal')
+    const minimal = JSON.parse(await readFile(join(home, 'profiles', 'sdk-minimal', 'package.json'), 'utf8')) as {
+      dsh?: { profile?: { bundles?: string[]; patchReload?: string } }
+    }
+    // sdk-minimal's template is the single sdk package — no base row. The row
+    // the install itself mounts is appended after the seeded template.
+    expect(minimal.dsh?.profile?.bundles).toEqual([
+      '@deepseek-ai/dsh-sdk-minimal',
+      '@deepseek-ai/dsh-evolution-host',
+    ])
+    expect(minimal.dsh?.profile?.patchReload).toBe('startup')
+
+    await runInstaller(home, 'host', 'web')
+    const web = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as {
+      dsh?: { profile?: { bundles?: string[]; patchReload?: string } }
+    }
+    expect(web.dsh?.profile?.bundles).toEqual([
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-evolution-host',
+    ])
+    // Only `web` ships live patch reload.
+    expect(web.dsh?.profile?.patchReload).toBe('live')
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 

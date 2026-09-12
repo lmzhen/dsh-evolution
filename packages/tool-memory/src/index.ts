@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { clampedNumber, resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -135,7 +135,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   if (systemPrompt) {
     ctx.effect(() => systemPrompt.section({
       name: 'evolution:memory-guidance',
-      order: 150,
+      order: MEMORY_GUIDANCE_SECTION_ORDER,
       text: MEMORY_GUIDANCE,
     }), 'tool-memory.memory-guidance')
     ctx.effect(() => systemPrompt.context({
@@ -326,8 +326,8 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
           // derivation — leaving CI/cron writes stuck in staging.
           // F-06: full-depth optional chaining (see above).
           ...exec.agent?.session?.id ? { sessionId: exec.agent.session.id } : {},
-          // V6-27 (0.3.40): the platform overrideOf reads session.events — the
-          // session OBJECT, not the id, is what it can probe.
+          // V6-27 (0.3.40): the platform overrideOf resolves the policy from the
+          // session's log view — the session OBJECT, not the id, is what it can probe.
           // F-06: full-depth optional chaining (see above).
           ...exec.agent?.session ? { session: exec.agent.session } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},

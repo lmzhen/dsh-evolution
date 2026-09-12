@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -105,7 +105,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // tool-memory was migrated, this call site was missed).
   const systemPrompt = ctx.get('systemPrompt') as { section(section: PromptSection): () => void } | undefined
   if (systemPrompt) {
-    ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: 900, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
+    ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: SKILLS_GUIDANCE_SECTION_ORDER, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   // V6-06 (0.3.35): the numeric limits go through the assembly-time clamp so a
@@ -489,8 +489,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // derive the platform override (see tool-memory for the rationale).
           // F-06: full-depth optional chaining (see above).
           ...exec.agent?.session?.id ? { sessionId: exec.agent.session.id } : {},
-          // V6-27 (0.3.40): the platform overrideOf reads session.events — the
-          // session OBJECT, not the id, is what it can probe.
+          // V6-27 (0.3.40): the platform overrideOf resolves the policy from the
+          // session's log view — the session OBJECT, not the id, is what it can probe.
           // F-06: full-depth optional chaining (see above).
           ...exec.agent?.session ? { session: exec.agent.session } : {},
           ...sessionPolicy !== undefined ? { sessionPolicy } : {},

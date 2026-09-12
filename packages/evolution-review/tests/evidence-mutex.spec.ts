@@ -194,7 +194,8 @@ async function mountReviewFixture(options: {
     id: SessionId('v10-review-fixture'),
     seq: 1,
     header: { origin: undefined },
-    events: [
+    // v33 G0.1: post-0.1.5 accessor (see review.spec.ts's fixture).
+    snapshotEvents: () => [
       { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } },
       ...(options.events ?? []),
     ],

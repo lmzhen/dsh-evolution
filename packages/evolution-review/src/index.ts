@@ -1443,7 +1443,7 @@ function collectReadSkillNames(session: Session): Set<string> {
   // the review could blind-overwrite content the model never saw.
   const callNames = new Map<string, string>()
   const okCallIds = new Set<string>()
-  for (const event of session.events) {
+  for (const event of session.snapshotEvents()) {
     if (event.type === 'tool/call') {
       if (event.data.name !== 'skill') continue
       const raw = event.data.arguments
@@ -1606,7 +1606,7 @@ function buildReviewRequest(
   // output it never saw, so append recent tool calls and results as structured
   // lines (budgeted: truncated per event, and capped to the last 12 events).
   const toolLines: string[] = []
-  const events = session.events
+  const events = session.snapshotEvents()
   for (let index = events.length - 1; index >= 0 && toolLines.length < 12; index -= 1) {
     const event = events[index] as { type?: string; data?: unknown } | undefined
     if (event?.type === 'tool/call') {

@@ -40,7 +40,7 @@ env:
   # said ^0.1.0-rc.6 while the compat gate validated 0.1.1-rc.2). The pinned
   # development baseline (UPSTREAM_SHA) stays a validate-only dev anchor and
   # must never feed release metadata.
-  PLATFORM_VERSION: 0.1.1-rc.2
+  PLATFORM_VERSION: 0.1.5-rc.2
   UPSTREAM_REPO: deepseek-ai/deepseek-harness
   # Tags publish as their own semver; non-tag pushes (main) pack with a
   # semver-safe dev placeholder so the publish dry-run can parse the version.

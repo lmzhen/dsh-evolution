@@ -184,18 +184,41 @@ async function copyPackage(source, destination) {
  * bundles. The hand-rolled copy seeded an EMPTY list, so a profile the
  * installer created itself lacked the platform base/web-app rows. Platform
  * packages are always `@deepseek-ai`-scoped (only the family packages are
- * scope-rewritten at publish). */
-const PROFILE_SEED_BUNDLES = {
-  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
-  headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
+ * scope-rewritten at publish).
+ *
+ * FROZEN COPY of the platform's `PROFILE_TEMPLATES` +
+ * `DEFAULT_PROFILE_PATCH_RELOAD` (`packages/boot/app-boot/src/profile.ts`).
+ * The installer runs BEFORE any dsh profile exists, so it cannot ask the
+ * platform — this table is a snapshot by design, and
+ * `scripts/verify-platform-contract.mjs --upstream <platform-tree>` is the
+ * probe that turns it red when the platform's table moves. */
+const PROFILE_SEED_TEMPLATES = {
+  acp: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-app'], patchReload: 'startup' },
+  web: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'], patchReload: 'live' },
+  headless: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'], patchReload: 'startup' },
+  sdk: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'], patchReload: 'startup' },
+  // The platform's `sdk-minimal` template carries the sdk package alone.
+  'sdk-minimal': { bundles: ['@deepseek-ai/dsh-sdk-minimal'], patchReload: 'startup' },
 }
-const DEFAULT_SEED_BUNDLES = ['@deepseek-ai/dsh-base']
+/** Upstream `DEFAULT_PROFILE_BUNDLES` / `DEFAULT_PROFILE_PATCH_RELOAD`: a
+ * profile name with no shipped template gets the base row and live reload. */
+const DEFAULT_SEED_TEMPLATE = { bundles: ['@deepseek-ai/dsh-base'], patchReload: 'live' }
+
+/** The platform template a profile name resolves to.
+ * @param profile - the profile name.
+ * @returns the template's bundles and patch-file lifecycle. */
+function profileSeed(profile) {
+  return Object.prototype.hasOwnProperty.call(PROFILE_SEED_TEMPLATES, profile)
+    ? PROFILE_SEED_TEMPLATES[profile]
+    : DEFAULT_SEED_TEMPLATE
+}
 
 async function ensureProfile(home, profile) {
   const dir = profileDirectory(home, profile)
   await mkdir(dir, { recursive: true })
   const manifestPath = join(dir, 'package.json')
   if (!existsSync(manifestPath)) {
+    const seed = profileSeed(profile)
     // v31 INST-01: the seed write is atomic like every other manifest write.
     await writeManifestAtomic(manifestPath, JSON.stringify({
       name: `dsh-profile-${profile}`,
@@ -203,9 +226,8 @@ async function ensureProfile(home, profile) {
       dependencies: {},
       dsh: {
         profile: {
-          bundles: [...(Object.prototype.hasOwnProperty.call(PROFILE_SEED_BUNDLES, profile)
-            ? PROFILE_SEED_BUNDLES[profile]
-            : DEFAULT_SEED_BUNDLES)],
+          bundles: [...seed.bundles],
+          patchReload: seed.patchReload,
         },
       },
     }, null, 2) + '\n')
@@ -350,17 +372,36 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
  * Locate the `standard` agent preset composition at install time.
  *
  * Discovery order (rc.53 — the preset must follow the RUNTIME platform, not a
- * vendored baseline):
+ * vendored baseline; v33 G2.1 — ask the platform first):
  *   1. `DSH_AGENT_PRESET_ROOT` (explicit, points at an agent-presets root);
- *   2. a nearby source tree (`apps/cli/config/agent-presets/...`) — the CI
- *      overlay layout and upstream dev checkouts both carry the real file;
- *   3. the globally installed `@deepseek-ai/dsh` (npm root -g).
+ *   2. `node_modules/@deepseek-ai/dsh-agent-presets/presets` — the 0.1.5+
+ *      shipped-preset location (the platform resolves it through
+ *      `SHIPPED_PRESET_ROOT`, and the CLI package no longer publishes
+ *      `config/`);
+ *   3. `packages/preset/agent-presets/presets` — the 0.1.5 SOURCE-checkout
+ *      location (the presets left the CLI package in 0.1.5);
+ *   4. `apps/cli/config/agent-presets/...` — the pre-0.1.5 source/CLI-package
+ *      location, kept as a fallback;
+ *   5. the globally installed `@deepseek-ai/dsh` (npm root -g), in the nested
+ *      `dsh/node_modules/@deepseek-ai/dsh-agent-presets/presets` form npm
+ *      actually produces, the sibling `dsh-agent-presets/presets` form, and the
+ *      legacy `dsh/config/agent-presets` form.
  * Fails loud otherwise: a preset built from a guessed baseline would silently
  * mismatch the platform it runs on.
  */
 async function resolveStandardComposition() {
   const standardName = join('standard', 'agent.cordis.yml')
   const direct = (root) => join(root, standardName)
+  /** Candidate agent-preset roots under one tree level, platform form first. */
+  const rootsAt = (level) => [
+    join(level, 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
+    // v33 G0 (post-migration sweep): the 0.1.5 SOURCE layout. The presets left
+    // the CLI package, so `apps/cli/config/agent-presets` no longer exists in a
+    // 0.1.5 checkout and this branch — not the node_modules one, which needs a
+    // linked workspace — is what a source tree actually has.
+    join(level, 'packages', 'preset', 'agent-presets', 'presets'),
+    join(level, 'apps', 'cli', 'config', 'agent-presets'),
+  ]
 
   const explicit = process.env.DSH_AGENT_PRESET_ROOT?.trim()
   if (explicit) {
@@ -374,8 +415,10 @@ async function resolveStandardComposition() {
   // root within a few levels.
   const scriptDir = dirname(fileURLToPath(import.meta.url))
   for (let level = scriptDir; level !== dirname(level); level = dirname(level)) {
-    const path = direct(join(level, 'apps', 'cli', 'config', 'agent-presets'))
-    if (existsSync(path)) return await readFile(path, 'utf8')
+    for (const root of rootsAt(level)) {
+      const path = direct(root)
+      if (existsSync(path)) return await readFile(path, 'utf8')
+    }
   }
 
   try {
@@ -390,8 +433,17 @@ async function resolveStandardComposition() {
         join(homedir(), 'AppData', 'Roaming', 'npm', 'node_modules'),
       ]
       for (const root of roots) {
-        const path = direct(join(root, '@deepseek-ai', 'dsh', 'config', 'agent-presets'))
-        if (existsSync(path)) return await readFile(path, 'utf8')
+        for (const candidate of [
+          // The npm GLOBAL shape: `dsh-agent-presets` is a DEPENDENCY of the CLI
+          // package, so npm nests it under `dsh/node_modules/...`; the sibling
+          // form below only exists when the user installed it separately.
+          join(root, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
+          join(root, '@deepseek-ai', 'dsh-agent-presets', 'presets'),
+          join(root, '@deepseek-ai', 'dsh', 'config', 'agent-presets'),
+        ]) {
+          const path = direct(candidate)
+          if (existsSync(path)) return await readFile(path, 'utf8')
+        }
       }
     } else {
       // R-08 (V10): `npm` is a PATH executable on POSIX and the Windows branch
@@ -399,8 +451,14 @@ async function resolveStandardComposition() {
       // child process in this script (shell: true re-introduced the injection
       // surface and quoting hazards the rest of the file deliberately avoids).
       const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim()
-      const path = direct(join(globalRoot, '@deepseek-ai', 'dsh', 'config', 'agent-presets'))
-      if (existsSync(path)) return await readFile(path, 'utf8')
+      for (const candidate of [
+        join(globalRoot, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
+        join(globalRoot, '@deepseek-ai', 'dsh-agent-presets', 'presets'),
+        join(globalRoot, '@deepseek-ai', 'dsh', 'config', 'agent-presets'),
+      ]) {
+        const path = direct(candidate)
+        if (existsSync(path)) return await readFile(path, 'utf8')
+      }
     }
   } catch {
     // npm root -g is unavailable; fall through to the loud error below.
@@ -408,7 +466,12 @@ async function resolveStandardComposition() {
 
   throw new Error(
     'install-layered: cannot find a runtime `standard` agent preset — install dsh first, '
-    + 'set DSH_AGENT_PRESET_ROOT, or run from a source checkout containing apps/cli/config/agent-presets',
+    + 'set DSH_AGENT_PRESET_ROOT, or run from a source checkout. DSH 0.1.5+ ships the presets '
+    + 'inside the dsh-agent-presets package — probed as '
+    + '<tree>/node_modules/@deepseek-ai/dsh-agent-presets/presets, '
+    + '<tree>/packages/preset/agent-presets/presets (source checkout), and the global '
+    + '<npm-root>/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-presets/presets; '
+    + 'pre-0.1.5 platforms kept them at apps/cli/config/agent-presets.',
   )
 }
 

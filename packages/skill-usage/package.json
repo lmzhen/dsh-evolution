@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-skill-usage",
   "description": "Skill usage telemetry service",
-  "version": "0.3.69",
+  "version": "0.3.70",
   "publishConfig": {
     "access": "public"
   },

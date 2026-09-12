@@ -244,6 +244,35 @@ runs:
         # violations on this tree, so CI now runs it strict (the plan's §5 flip).
         node packages/evolution/scripts/verify-declared-config.mjs packages/evolution --strict
 
+    - name: Verify the platform contract against the checked-out upstream ref (v33 G4.1/G4.2)
+      if: inputs.copy_host_tsconfig == 'false'
+      shell: bash
+      working-directory: upstream
+      run: |
+        # v33 G4.1/G4.2: the two probes that turn hand-copied platform facts into
+        # a red light. They run ONLY in this job: the baseline job's tree is the
+        # dev anchor (UPSTREAM_SHA), not the platform line the family targets, so
+        # its plane classification, Config keys and anchor text are EXPECTED to
+        # differ and the probes would report exactly that as drift.
+        #
+        # verify-declared-config --upstream: recomputes each plane's disabled set
+        # and each overridden row's Config key set from the platform's own
+        # sources instead of trusting the snapshot in the guard, and checks that
+        # every platform key is acknowledged in the bundle patches'
+        # whole-config-replacement note (an override replaces `config` wholesale).
+        #
+        # verify-platform-contract runs in its DEFAULT (strict) mode: v33 G0
+        # re-recorded every anchor to this platform line, so any difference now
+        # fails again — a platform symbol the family imports that is gone, a
+        # service name nobody provides, a re-scaled section order, or a recorded
+        # anchor whose text moved. The NEXT upgrade starts by running the same
+        # script with --accept-recorded to turn this red light into a decision
+        # list, then re-records the anchors and drops the flag once more.
+        node packages/evolution/scripts/verify-declared-config.mjs \
+          packages/evolution --strict --upstream .
+        node packages/evolution/scripts/verify-platform-contract.mjs \
+          packages/evolution --upstream .
+
     - name: Publish dry-run
       shell: bash
       working-directory: upstream

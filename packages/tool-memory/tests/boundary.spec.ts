@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import MemoryRegistry from '@deepseek-ai/dsh-memory'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
@@ -49,7 +49,7 @@ describe('tool-memory execution boundaries', () => {
   it('accepts a normal write through the native tool pipeline', async () => {
     const { ctx, root } = await setup()
     const result = await ctx.tools.execute({
-      callId: CallId('normal'),
+      callId: ToolCallId('normal'),
       name: 'memory',
       arguments: { target: 'memory', action: 'add', facts: 'boundary normal' },
       agent: fakeAgent(),
@@ -63,7 +63,7 @@ describe('tool-memory execution boundaries', () => {
   it('policy guard denies model-shaped control-plane fields before execution', async () => {
     const { ctx, root } = await setup()
     const result = await ctx.tools.execute({
-      callId: CallId('policy'),
+      callId: ToolCallId('policy'),
       name: 'memory',
       arguments: { target: 'memory', action: 'add', facts: 'boundary policy', policy: 'override' },
       agent: fakeAgent(),
@@ -98,7 +98,7 @@ describe('tool-memory execution boundaries', () => {
     // schema-less callers. Pin the observable pipeline behavior: a proper
     // array-shape error, no silent single-op write.
     const result = await ctx.tools.execute({
-      callId: CallId('shape'),
+      callId: ToolCallId('shape'),
       name: 'memory',
       arguments: { target: 'memory', action: 'add', facts: 'ghost write', operations: { action: 'add' } },
       agent: fakeAgent(),

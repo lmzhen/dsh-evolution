@@ -71,7 +71,7 @@ describe('tool-memory', () => {
     })
     await ctx.plugin(ToolMemory, {})
     const tool = ctx.tools.get('memory')!
-    const execArg = { agent: { session: { header: { version: 0, id: 's1', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const execArg = { agent: { session: { header: { version: 0, id: 's1', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     await tool.execute(
       { target: 'memory', action: 'add', facts: 'remember x' },
       execArg,
@@ -96,7 +96,7 @@ describe('tool-memory', () => {
     })
     await ctx.plugin(ToolMemory, {})
     const tool = ctx.tools.get('memory')!
-    const execArg = { agent: { session: { header: { version: 0, id: 's4', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const execArg = { agent: { session: { header: { version: 0, id: 's4', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     // A lone add to the default 'memory' target was previously staged as
     // "memory memory add" (normalizeSummary only rewrote batches >1). F-329
     // applies the single-word rule for a single op at the summary source.
@@ -169,7 +169,7 @@ describe('tool-memory', () => {
     await ctx.plugin(ToolMemory, {})
     const spy = vi.spyOn(ctx.memory, 'renderContext')
     const tool = ctx.tools.get('memory')!
-    const execArg = { agent: { session: { header: { version: 0, id: 's2', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const execArg = { agent: { session: { header: { version: 0, id: 's2', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     await tool.execute({ target: 'memory', action: 'add', facts: 'E20-tool-fact' }, execArg)
     // Allow the event→renderContext→snapshotText chain to settle.
     await new Promise(resolve => setTimeout(resolve, 80))
@@ -223,7 +223,7 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryFiles, { root: await makeTmp() })
     // A write through the tool cures the empty snapshot via the applied event.
     const tool = ctx.tools.get('memory')!
-    const execArg = { agent: { session: { header: { version: 0, id: 's3', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const execArg = { agent: { session: { header: { version: 0, id: 's3', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     const result = await tool.execute({ target: 'memory', action: 'add', facts: 'E67-late-provider-fact' }, execArg) as MemoryToolResult
     expect(result.ok).toBe(true)
     await new Promise(resolve => setTimeout(resolve, 80))
@@ -244,7 +244,7 @@ describe('tool-memory', () => {
     // echoed an EMPTY preview for every entry instead of the default cap.
     await ctx.plugin(ToolMemory, { entryPreviewChars: NaN })
     const tool = ctx.tools.get('memory')!
-    const execArg = { agent: { session: { header: { version: 0, id: 's6', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const execArg = { agent: { session: { header: { version: 0, id: 's6', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     const result = await tool.execute({ target: 'memory', action: 'add', facts: 'x'.repeat(300) }, execArg) as MemoryToolResult
     expect(result.ok).toBe(true)
     const entries = result.entries
@@ -266,7 +266,7 @@ describe('tool-memory', () => {
     })
     await ctx.plugin(ToolMemory, {})
     const tool = ctx.tools.get('memory')!
-    const execArg = { agent: { session: { header: { version: 0, id: 's8', createdAt: 0 }, events: [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const execArg = { agent: { session: { header: { version: 0, id: 's8', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     const result = await tool.execute({ target: 'memory', operations: [] as never }, execArg) as MemoryToolResult
     expect(result.ok).toBe(false)
     expect(result.message).toContain('No operations provided')

@@ -48,8 +48,22 @@ policy, prompts, routing, state, and audit history are control-plane data.
 
 ## Installation
 
+**Validated platform line: DSH `0.1.5-rc.2`.** That single version is what
+`.github/workflows/release.yml` pins as `PLATFORM_VERSION`, what the CI
+`compat-check` job validates against (`dsh-v0.1.5-rc.2`), and what every
+published `@deepseek-ai/dsh-*` dependency range declares (`^0.1.5-rc.2`).
+`0.1.1-rc.2` and earlier are **outside the support window**: a `^0.1.5-rc.2`
+range does not resolve them (node-semver rejects a prerelease from a different
+major.minor.patch), so installing this line on an older platform fails at
+resolution rather than misbehaving at runtime. See
+`scripts/verify-platform-ranges.mjs` — the support window *is* the anchor, and
+that script asserts it.
+
 See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
-compatibility flow, and profile override examples.
+compatibility flow, and profile override examples. Its install-form table also
+carries the per-form status against this platform line (verified / not yet
+exercised), and `docs/v33-no-action-register.md` records every platform change
+reviewed this round that needs no code action.
 
 ## Command reference
 
@@ -100,6 +114,25 @@ pins the equality).
 | DSH_EVOLUTION_DELTA_PATH | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment path the layered installer composes from; default stays the packaged `evolution-agent/agent.cordis.yml`. Plugin runtime never reads it |
 | DSH_EVOLUTION_ARCH_STRICT | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
 | DSH_EVOLUTION_DECLARED_CONFIG_STRICT | guard scripts only (`verify-declared-config.mjs`) | `1` makes the declared-config-reach guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
+
+### Model-visible prompt prefix and the KV cache
+
+The family contributes exactly two `systemPrompt.section` entries — the memory
+guidance (`MEMORY_GUIDANCE_SECTION_ORDER`) and the skills guidance
+(`SKILLS_GUIDANCE_SECTION_ORDER`), both in `evolution-core/src/constants.ts`.
+They are part of the system prefix, so **changing their text or their order
+invalidates every session's KV-cache prefix once**. The other injected surface,
+the memory snapshot, is registered as `systemPrompt.context`: it is a persisted
+user-role snapshot appended at the message tail and skipped while its text is
+unchanged, so it is not part of the prefix.
+
+0.1.5-rc.2 re-scaled the platform's first-party section orders from `-100…190`
+to `-1000…10200` and changed the equal-order tie-break to code-unit name order,
+which moved both family sections into the middle of the tool guidance. The two
+orders were therefore re-stated as the named constants above — above every
+first-party section on the target line — and that is the single prefix shift of
+this round. `scripts/verify-platform-contract.mjs --upstream <tree>` fails when
+the platform's highest first-party order ever reaches them.
 
 ## Composition
 

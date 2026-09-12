@@ -56,13 +56,18 @@ describe('evolution-approval', () => {
     await ctx.plugin(NodeIo)
     await ctx.plugin(JsonState, { root: home })
     await ctx.plugin(EvolutionState)
-    // REAL platform shape (user-approval): overrideOf reads session.events with
-    // NO guard — a string would throw (`undefined.length`). Record what it saw.
+    // REAL platform shape (user-approval): overrideOf resolves the policy from
+    // the session log view — `snapshotEvents()` from 0.1.5 on — with NO guard,
+    // so a bare id string would throw (`undefined.length`). Record what it saw.
     let probed: unknown
     const overrideOf = (session: unknown): 'ask' | 'never' | undefined => {
       probed = session
-      const events = (session as { events?: Array<{ type: string; data: { policy: string } }> }).events
-      if (!events) return undefined
+      // 0.1.5 removed the `events` getter, so the probe calls the accessor
+      // unconditionally: a session without the log view must fail loudly here
+      // instead of silently falling through to the config chain (a guarded
+      // call kept this case green on BOTH platform lines and lost its edge).
+      const snapshot = session as { snapshotEvents: () => Array<{ type: string; data: { policy: string } }> }
+      const events = snapshot.snapshotEvents()
       for (let index = events.length - 1; index >= 0; index -= 1) {
         if (events[index]?.type === 'approval/policy') return events[index]!.data.policy as 'ask' | 'never'
       }
@@ -71,7 +76,7 @@ describe('evolution-approval', () => {
     ctx.provide('approval', { overrideOf, config: { policy: 'ask' } })
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     // Caller passes the SESSION object (the session-override is honored).
-    const sessionShape = { id: 's1', events: [{ type: 'approval/policy', data: { policy: 'never' } }] }
+    const sessionShape = { id: 's1', snapshotEvents: () => [{ type: 'approval/policy', data: { policy: 'never' } }] }
     const allowed = await ctx.evolutionApproval.request({
       kind: 'memory', summary: 'z', args: {}, origin: 'background_review', sessionId: 's1', session: sessionShape,
     })
@@ -99,7 +104,7 @@ describe('evolution-approval', () => {
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     const allowed = await ctx.evolutionApproval.request({
       kind: 'memory', summary: 'y', args: {}, origin: 'background_review', sessionId: 's1',
-      session: { id: 's1', events: [] }, sessionPolicy: 'ask',
+      session: { id: 's1', snapshotEvents: () => [] }, sessionPolicy: 'ask',
     })
     expect(allowed.action).toBe('allow')
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

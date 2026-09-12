@@ -43,6 +43,9 @@
     },
     {
       "path": "../evolution-policy"
+    },
+    {
+      "path": "../evolution-curator"
     }
   ]
 }

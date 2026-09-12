@@ -20,6 +20,7 @@ import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evoluti
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
+import type { Session } from '@deepseek-ai/dsh-session'
 
 
 /** Quality-warned skills may turn stale after this many idle days (package-private tunable, P2-8). */
@@ -1318,7 +1319,7 @@ export class EvolutionCurator extends Service {
 
   private recentSessionActive(): boolean {
     const agents = this.ctx.get('agents') as {
-      list(): Array<{ session: { events: ReadonlyArray<{ time: number }> } }>
+      list(): Array<{ session: Session }>
     } | undefined
     if (!agents) {
       // E-54: fail-open is the shipped default — an always-off `agents` service
@@ -1329,7 +1330,7 @@ export class EvolutionCurator extends Service {
     }
     let latest = 0
     for (const agent of agents.list()) {
-      const events = agent.session.events
+      const events = agent.session.snapshotEvents()
       const last = events.length === 0 ? 0 : events[events.length - 1]?.time ?? 0
       latest = Math.max(latest, last)
     }
