@@ -141,6 +141,20 @@ runs:
       working-directory: upstream
       run: pnpm install --frozen-lockfile
 
+    - name: Build the host native addon (POSIX flock binding)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The platform's JSONL session persistence locks its log through
+        # @deepseek-ai/node-addon-system's flock binding. A source checkout ships
+        # no prebuilt binding and the package has NO install-time compile
+        # fallback (native/system/AGENTS.md: "missing flock bindings reject
+        # acquisition"), so any test that opens a real persistence handle dies
+        # with MODULE_NOT_FOUND .../bin/glibc/system.node on the runner.
+        # Upstream's own repository tests build exactly this host addon through
+        # the root script, so the overlay does the same before running them.
+        pnpm run build:native-system
+
     - name: Build, test and lint
       shell: bash
       working-directory: upstream
