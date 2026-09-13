@@ -19,7 +19,13 @@ const tailOf = (name: string): string => name.slice(name.lastIndexOf('/') + 1)
 const EVOLUTION_BUNDLE_TAILS = new Set(['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset'])
 
 export interface DoctorReport {
-  installForm: 'full' | 'host' | 'preset' | 'layered' | 'none'
+  /** OPT-23 (2026-09): `preset-only` — the delivered Evolution preset
+   * artifact exists but NO profile carries an evolution bundle (e.g. the
+   * host bundle was removed after a layered install). Before, this healthy
+   * per-session install reported `none` and the action ladder advised
+   * installing `all` — which double-mounts the preset's model rows (the
+   * exact conflict this report flags). */
+  installForm: 'full' | 'host' | 'preset' | 'layered' | 'preset-only' | 'none'
   /** Aggregated across ALL profiles under `home` (N13, v12): doctor answers
    * "is any profile carrying an evolution bundle / which install forms exist"
    * — not "what this runtime mounted". `services.review` is the runtime-side
@@ -185,11 +191,20 @@ export async function diagnose(
     }
   }
 
-  const installForm: DoctorReport['installForm'] = full ? 'full' : preset ? 'preset' : layered ? 'layered' : host ? 'host' : 'none'
+  const installForm: DoctorReport['installForm'] = full ? 'full' : preset ? 'preset' : layered ? 'layered' : host ? 'host' : presetDirInstalled ? 'preset-only' : 'none'
+
+  // OPT-22 (2026-09): only real double-mount rows drive the action ladder's
+  // "keep exactly one" advice. The enumeration/manifest DEGRADED detail also
+  // lives in `conflicts` (report + --json compatibility) — but that detail
+  // fires on an unreadable profiles dir or a torn manifest, where "uninstall
+  // bundles" is the WRONG remedy (there may be no bundle conflict at all).
+  // The word `DEGRADED` is the marker both degraded rows carry by contract.
+  const mountConflicts = conflicts.filter(row => !row.includes('DEGRADED'))
 
   const actions: string[] = []
-  if (conflicts.length > 0) actions.push('Resolve the conflict first: keep exactly one of evolution-all / evolution-host / evolution-preset / layered.')
+  if (mountConflicts.length > 0) actions.push('Resolve the conflict first: keep exactly one of evolution-all / evolution-host / evolution-preset / layered.')
   else if (installForm === 'none') actions.push('Install the default full bundle: dsh plugin --profile web add @lmzhen/dsh-evolution-all')
+  else if (installForm === 'preset-only') actions.push('The Evolution preset is delivered but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or remove .agent-presets/evolution if the layered layout is no longer wanted.')
   else if (installForm === 'layered') actions.push('Model tools follow the Evolution preset per session; add @lmzhen/dsh-evolution-all instead if every session should have them.')
   const env = envIssues()
   if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')

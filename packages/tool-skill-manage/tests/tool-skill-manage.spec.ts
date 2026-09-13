@@ -654,6 +654,46 @@ it('v30 REV-02: a replayed write onto a policy-protected skill is refused (backg
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('OPT-01: an update/write_file lands through the REAL runtime with the approval service mounted — the stage anchor must never be written onto the frozen `args` (P0 regression pin)', async () => {
+  const { ctx, root, previousHome } = await setup()
+  // The DEFAULT bundles (host/all) mount evolution-approval with enabled:false —
+  // the service OBJECT is present, so the tool's staging-anchor block runs even
+  // though staging is off. The platform ToolRuntime DEEP-FREEZES the arguments
+  // object before execute (core/tools `deepFreeze` on the execution context);
+  // the old in-place `args.staged_from_sha256 = ...` threw
+  // `TypeError: ... not extensible` on EVERY update/edit/write_file/remove_file
+  // dispatch. This harness's plain setup() mounts no approval service, so its
+  // update tests skipped the block entirely and never saw the freeze — this
+  // test mounts it and pins the real dispatch path.
+  ctx.provide('evolutionState', {
+    listPending: async () => [],
+    savePending: async () => {},
+    tryResolvePending: async () => ({ record: null, applied: false }),
+    claimPending: async () => null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: false })
+  const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    callId: ToolCallId(`opt01-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: arguments_,
+    agent: fakeAgent(undefined),
+    signal: new AbortController().signal,
+  })
+  const created = await execute({ action: 'create', name: 'frozen-pin', content: SKILL.replace('boundary-skill', 'frozen-pin') })
+  expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+  const updated = await execute({ action: 'update', name: 'frozen-pin', content: SKILL.replace('boundary-skill', 'frozen-pin').replace('Body.', 'Updated body.') })
+  expect((updated.value as { ok?: boolean } | undefined)?.ok, (updated.value as { message?: string } | undefined)?.message).toBe(true)
+  // write_file exercises the 'absent' sentinel assignment branch.
+  const written = await execute({ action: 'write_file', name: 'frozen-pin', file_path: 'references/note.md', file_content: 'note' })
+  expect((written.value as { ok?: boolean } | undefined)?.ok, (written.value as { message?: string } | undefined)?.message).toBe(true)
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('v30 REV-03: a staged support-file write refuses to replay when the file changed after staging', async () => {
   const { ctx, root, previousHome } = await setup()
   ctx.provide('evolutionState', {

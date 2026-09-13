@@ -284,7 +284,15 @@ export function scanMemoryThreats(text: string, maxScanChars = 65_536, options: 
 export function scanContentThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
   const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
-  return `Blocked by security scan (${findings[0]?.label ?? 'unknown'}). This content appears to contain potentially malicious instructions.${THREAT_EXEMPTION_HINT}`
+  // OPT-11 (2026-09): name an actual BLOCKING pattern, not `findings[0]` —
+  // scanThreats pushes the `severity: 'report'` unicode findings FIRST, so
+  // content with a soft hyphen plus a real injection phrase used to be told
+  // it was blocked by `unicode_typography`. Exempting that label (the hint's
+  // self-heal path) then did nothing — the operator only met the real label
+  // on a second attempt. The memory variant already filtered this way.
+  const pattern = findings.find(f => f.category !== 'unicode_obfuscation')
+  if (pattern) return `Blocked by security scan (${pattern.label}). This content appears to contain potentially malicious instructions.${THREAT_EXEMPTION_HINT}`
+  return `Blocked by security scan: invisible or potentially malicious Unicode detected. This content appears to contain potentially malicious instructions.${THREAT_EXEMPTION_HINT}`
 }
 
 /**

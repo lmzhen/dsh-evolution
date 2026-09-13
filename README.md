@@ -83,7 +83,7 @@ repeating the same prose.
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
 | `evolution-activity` | Durable audit store for self-evolution plan outcomes (`evolution/plan-applied`) |
-| `evolution-feedback` | Durable feedback → `feedback_score`/`feedback_warn` → curator (union-read with `quality_warn`) |
+| `evolution-feedback` | Durable feedback store; exposes `evolutionFeedback.record()` for hosts/custom commands — the family ships NO producer (the upstream `/feedback` event is free text), so `feedback_score`/`feedback_warn` fire only when a deployment wires one (union-read with `quality_warn` in the curator) |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |
@@ -313,6 +313,19 @@ joins only when mounted (D-30):
     catalogDescriptionMaxLength: 60
 ```
 
+## Development: extension points (OPT, 2026-09)
+
+Where to add a capability — and where NOT to:
+
+| You want to… | Touch | Do not touch |
+|---|---|---|
+| Add a state backend | `evolution-state-storage` — register a new provider next to the JSON/domain ones | `evolution-state-json` (stays the portable default) |
+| Serve a remote/alternate media location | `ctx.evolutionIo` — a new provider via `evolution-io`'s registry | any policy/store code |
+| Add a plan operation | the shared required-fields table (core `SKILL_ACTION_REQUIRED_FIELDS`) + the executor's dispatch + the validator's checks — one table, both consumers | control flow / guard chain |
+| Change per-skill visibility | per-skill frontmatter parsing in `evolution-skill-catalog` (OPT-10) or the row config | upstream registry semantics |
+| Feed feedback data | `evolutionFeedback.record()` from a host-side command/event | curator read logic |
+| Read plan outcomes | `evolution/plan-applied` process events, the activity store, or replay | the review pipeline |
+
 ## Control-plane invariants
 
 1. Model writes only `memory` and `skills`; policy/prompts/routing/state are
@@ -383,3 +396,22 @@ Walk through this list on every upstream bump (see `UPSTREAM_SHA`):
    `agent.cordis.yml` and built `.js`/`.d.ts`. Before adopting an upstream
    release, check its package list for new names that collide with ours — a
    collision makes resolution ambiguous.
+3. **ToolRuntime argument freeze (OPT, 2026-09)**: `core/tools` passes a
+   `deepFreeze`d snapshot of the arguments to `tool.execute`
+   (`packages/core/tools/src/index.ts`, the `createExecution` path). Any tool
+   execute that wants to ADD data on the way to the approval service must
+   build a NEW object (`{ ...args, key }`), never assign onto `args` — a
+   frozen-object write throws `TypeError` in strict mode and turns the whole
+   action into a tool error. The OPT-01 test in `tool-skill-manage/tests`
+   pins this through the real runtime.
+4. **Per-skill invocation frontmatter**: upstream `skill-filesystem` parses
+   `disable-model-invocation` / `user-invocable` per SKILL.md (and throws on
+   legacy camelCase keys). Our shadowing provider must keep parsing the same
+   keys per skill (`evolution-skill-catalog`, OPT-10) — re-verify the key
+   names and the legacy-key posture on upgrade, or per-skill visibility
+   controls silently stop working under the shadow again.
+5. **Home-path semantics**: upstream `resolveDshHome` (`@deepseek-ai/dsh-home-paths`)
+   trims, expands `~`, and resolves to an absolute path. `evolutionRoot`
+   (core `state-store.ts`) mirrors this since OPT-27 — the skill-catalog
+   shadow and the preset installer both depend on landing on the SAME
+   directory the platform serves. Re-diff both implementations on upgrade.

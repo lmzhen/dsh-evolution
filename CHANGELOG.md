@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.72 (patch) — 全量审计 31/32 步落地：P0 冻结参数写入路径 + 4×P1 + 22×P2 收口
+
+> **输入**：`dsh-evolution-mirror-审计报告-2026-09-13.md`（1 P0 / 4 P1 / 22 P2，逐条附双端行号与触发场景）、`dsh-evolution-mirror-优化计划-2026-09-13.md`（G0–G7 共 32 步 + 5 个决策点）、`dsh-evolution-mirror-实施报告-2026-09-13.md`（31 步落地说明与 3 处实施偏差）。
+> **发布门禁（本版实测，0.1.5-rc.2 验证树）**：全链 **10/10** —— `native-system`、`build-lib`（29 包）、`vitest` **112 文件 / 1085 用例全绿**（`--maxWorkers=2 --testTimeout=30000`）、`tsc -b tsconfig.host.json` **0 错**、`oxlint` **0 warnings / 0 errors**（211 文件）、`verify-dependency-closure`、`verify-arch-guards`、`verify-event-pairing`、`verify-declared-config`、`run-load-sensitive`；三树 `authority↔mirror↔overlay` **354 文件 0 差异**。
+> **发布前补齐的三处（实施报告未覆盖的面，全部由门禁抓出）**：① 跨源目录探针原用 `ctx.skills` **属性代理**——本插件并未注入 `skills`（运行期会抛，类型上 `Context` 也无该成员），改为 `ctx.get('skills')` + 平台 `SkillSummary` 类型，并在 `tool-skill-manage` 补 `@deepseek-ai/dsh-skill` 的 peer/dev 依赖与 tsconfig 工程引用（依赖闭包守卫要求）；② 5 处 lint（`arrow-parens` ×3、`max-len` ×1、`no-unnecessary-boolean-literal-compare` ×2、`no-unnecessary-type-assertion` ×1）；③ A6 守卫登记行号随位移同步（`evolution-skill-catalog:97→98`）。**这三处正是 vitest 面看不见、而 `tsc-host`/`oxlint`/`build-lib` 面才暴露的缺陷**——实施期的验证只跑了 vitest。
+
+### 一、P0：上游冻结工具参数使写入路径必崩
+
+- `tool-skill-manage`：staging 锚不再**原地写**到 `args`（0.1.5-rc.2 的 `ToolRuntime` 对 args 做 `deepFreeze`，原地赋值使每次真实分派的 update/edit/write_file/remove_file 抛 `TypeError: … not extensible`），改为浅拷贝 `operation = { ...args, staged_from_sha256 }`，同时喂给审批 staged 记录与直执行路径。**回归钉**：新用例挂载 approval 服务 + 真实 `ctx.tools.execute`（走 deepFreeze 路径）断言 update 与 `write_file`（`'absent'` 哨兵分支）均正常落地；既有用例全绿的原因是它们不挂 approval 服务、staging 段整段被跳过。
+
+### 二、P1（4）
+
+- **consolidate 丢失更新**：源读取 / `parts` 与 `referenceWrites` 构建 / archive 循环 / target 合并 / 提交 / 回滚整体移入单个 `this.serial` 回调（与 `restructure` 同型包装）；确认 archive/restoreFromArchive 不持串行链，队内嵌套调用无自锁，全部拒绝路径仍发生在任何副作用之前。
+- **CRLF 脱敏失效**：`evolution-core/redact` 的块锚改为容忍 `\r`（键行 `\s*:(?:\r)?$`、值行 `([ \t]*)(?:\r)?$`），不做整体行尾归一化（保持送入模型上下文的文本形态）；新增 LF/CRLF 双形态用例（AWS 形 + 任意口令形）。
+- **卸载误删共享预设**：`scripts/install-layered.mjs` 的 `readInstallJournal` 补 `await`——Promise 恒为真值使 `?.agentPreset` 恒 `undefined`，v31 INST-04 守卫对"仅 journal、无 bundle 行"这一目标形态从未生效，卸载清扫会删掉另一个 profile 仍拥有的 home-global 预设。跨 profile 用例钉住（A 仅 journal + B layered 卸载 → 预设必须保留）。
+- **目录影子覆盖每技能可见性**：`evolution-skill-catalog` 扫描时逐技能读 SKILL.md 并解析 `disable-model-invocation` / `user-invocable`，**按字段**覆盖行级默认（文件未设置的字段回落行默认；legacy/非法值 warn 一次后回落，不 throw 以免坏文件炸掉整个目录扫描）；新增 4 形态 + 坏布尔回落用例。
+
+### 三、P2（按层归并）
+
+- **G0 组合与工具链**：三份 `cordis.patch.yml` 的 `tool-skill` 行补注释（如实说明 web 平面根行被上游禁用、覆盖仅达 base/预设平面）；README「Upstream upgrade checklist」追加 3 条（ToolRuntime 参数 deepFreeze 契约、每技能 invocation 键、`resolveDshHome` 的 trim/expand/resolve 语义）。
+- **G2 安全面**：技能写阻断消息改述**真实阻断模式**（过滤 unicode 类别后取首个 label，纯 unicode 走独立文案；与 memory 变体对齐）；必填字段表两端同源（core `SKILL_ACTION_REQUIRED_FIELDS`，plan-validator 与工具共用一张表——此前 `write_file`/`remove_file` 缺 `file_path` 能过校验、到工具才被拒）。
+- **G3 核心域存储**：archive 提交点复检（`hasWriteLock` 后、`moveDir` 前）；快照复制后复探写锁（新上锁者降级进 `skipped`，manifest 如实反映）；restore 追加大小写变体探测（撞名给出定向修复文案）；`skill-store` 模块头新增「Concurrency discipline」小节（三种原语分工、非重入约束、三处已文档化残余）。
+- **G4 状态与 IO 接缝**：`evolution-state-json` 关闭"幽灵孪生"（gate 丢弃的已决议 id 不再被 legacy `pending` 孪生复活，新增 `onGateDrop` 回报）；pending/executing 行数超 `PENDING_RESOLVED_CAP` 时一次性 warn（不做淘汰，C-6 契约保持）。
+- **G5 演化循环**：`patch` 加入陈旧锚新鲜度门（落地前现读现比，读失败按漂移拒绝，fail-closed）；快照后、应用变更前二次复检活跃会话（命中则持久化种子基线并结构化返回 `skipped: 'active-session'`）；evidence 上界改为**计划成稿时刻**的 seq（子代理运行期新增事件不再放宽校验）；curator 汇总行 `consolidated:` 改用真实计数；`setPaused` 无状态分支文案改为"pause NOT effective"；子代理未返回结构化计划时透出 `stopReason`/`diagnostic`。
+- **G6 交互与观测**：`doctor` 新增 `preset-only` 安装形态（有预设工件、无 bundle → 建议重挂 host、**勿加 all**，会双挂模型行），并只在**真实双挂行**上给"keep exactly one"建议（降级行保留在报告与 `--json`）；`atomicWriteFiles` 的 temp 清理失败不再吞掉已提交披露的诊断；`feedback` 的 `snapshot()` 标注 `@internal` test-support，README 如实写明**家族不带 feedback 生产者**（`feedback_score`/`feedback_warn` 仅在部署方接线后生效）。
+- **G7 横切**：boot-cache 计数的超限**钳制 + warn**（与迁移读取器同一常量、同一威胁模型，对称）；`evolutionRoot` 语义升级（见下）；`evolution-core/src/index.ts` 包头新增「Layer map」导读（本物理包承载横切基础 / 安全原语 / 核心域三层）。
+
+### 四、行为变更（部署方需要知道的）
+
+- **新 Config**：`tool-skill-manage` 的 `strictCrossSource`（默认 `false` = 同名跨源写入仅 **warn**；`true` = **拒绝**）。用于"平台目录把同一技能名解析到更高优先级的 project/custom 源"这一形态——写入仍落在家族树，目录并不服务那份字节。
+- **路径语义**：`evolutionRoot` / `memoryRoot` / `skillsRoot` 现在展开 `~` 并把相对值 `resolve` 成绝对路径（对齐上游 `resolveDshHome`）；**绝对路径字节不变**，只有 `~` 前缀与相对值改变落点（此前 `~/x` 会在 CWD 下建一个字面名为 `~` 的目录，与上游监视的 `<home>/skills` 形成分脑）。
+- **`patch` 动作**加入陈旧锚门（与 update/edit 同门，拒绝文案按算子分词）。
+- **`evolution-review`** 的 evidence 上界=计划成稿时刻的 seq。
+- **新依赖**：`tool-skill-manage` → `@deepseek-ai/dsh-skill`（peer + dev，仅类型面使用）。
+- **顺延（1/32）**：浮动 Promise 的 lint 规则（`no-floating-promises` 或等价）需在 CI overlay 树的 lint 配置里落地，并单独清点全库存量违例——镜像仓库自身只跑 release 工作流、不跑 lint（P1-3 即此类缺陷的实例，已修）。
+
+### 五、验证
+
+- 实施期：定向套件首轮 20 失败 → 修三处偏差（`operation` 作用域、invocation 按字段融合、feedback 对称钳制）+ 两处测试适配后全绿；全量 `--maxWorkers 3` **112 文件 / 1085 用例**；时敏用例的失败集合逐轮不同、隔离复跑全绿，判为负载抖动。
+- 本版发布前：三树逐字节一致 + 全量门禁 **10/10**，并额外覆盖实施期未跑的 `tsc-host` / `oxlint` / `build-lib` 三步（抓出上节"发布前补齐的三处"）。
+
 ## 0.3.71 (patch) — v34 文本面降长（净 −1.5k 行）＋ v35 结构面 I/O 与正确性收口
 
 > **范围**：① `dsh-evolution-mirror-loc-audit-v34.md` §8 的杠杆 D/B/C 逐项实测、E 面六方向榨取；② `dsh-evolution-mirror-codepath-audit-v35.md` 的「能做，但要带条件」清单逐项裁决后，只做**不损可维护性与鲁棒性**的那一类；③ 两项零语义风险的收口（C11 窄版、A6 防漂移守卫）。

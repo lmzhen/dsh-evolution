@@ -11,7 +11,7 @@
  * the mismatch as known naming debt.
  */
 
-import { join } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
 /**
@@ -24,13 +24,29 @@ import { homedir } from 'node:os'
  * C-11: the adoption test and the RETURNED value now come from the
  * SAME trimmed source — the old form tested `trim()` but returned the raw
  * value, so `DSH_HOME=" /x "` was accepted AND persisted with literal spaces.
- * Known tradeoff vs upstream `resolveDshHome`: `~` is NOT expanded here —
- * documented as a deliberate difference in the v10 audit; revisit only if a
- * real deployment needs it.
+ * OPT-27 (2026-09, plan D5 — accepted): the v10-era "no `~` expansion, no
+ * resolve" divergence from upstream `resolveDshHome` is RETIRED. It became
+ * load-bearing when the skill-catalog shadow made "same tree as the upstream
+ * `USER_DSH_RANK` provider" a hard contract: upstream watches the EXPANDED
+ * absolute `<home>/skills` while this value fed a literal `~/x` (a directory
+ * named `~` under the host CWD) or a CWD-relative path — split-brain skill
+ * trees, preset installs the platform never reads, doctor probes of a
+ * directory nothing serves. Behavior now matches upstream:
+ * `resolve(expandHomePath(selected))`. Only `~`-prefixed and RELATIVE
+ * DSH_HOME values change landing spot; absolute homes are byte-identical.
  */
 export function evolutionRoot(env: NodeJS.ProcessEnv = process.env): string {
   const home = env.DSH_HOME?.trim()
-  return home ? home : join(homedir(), '.dsh')
+  const selected = home ? home : join(homedir(), '.dsh')
+  // Mirror upstream expandHomePath (util/home-paths): `~` alone is the OS
+  // home; `~/` and `~\` prefix the OS home; anything else is taken literally
+  // — then resolved to an absolute path like upstream resolveDshHome.
+  const expanded = selected === '~'
+    ? homedir()
+    : selected.startsWith('~/') || selected.startsWith('~\\')
+      ? join(homedir(), selected.slice(2))
+      : selected
+  return isAbsolute(expanded) ? expanded : resolve(expanded)
 }
 
 /** Evolution home path helper: `$DSH_HOME/evolution` for plugin-owned sidecar

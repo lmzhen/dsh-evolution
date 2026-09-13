@@ -868,7 +868,25 @@ export function atomicWriteFiles(
       }
     }
   } catch (error) {
-    for (const { name } of writes) fs.rmSync(stage(name), { force: true, recursive: true })
+    // OPT-24 (2026-09): the cleanup loop runs INSIDE the catch — an rmSync
+    // that hits EPERM/EBUSY (Windows: AV indexer, open handle; force only
+    // suppresses ENOENT) escaped the catch and REPLACED the carefully built
+    // recovery diagnostic (including the already-committed disclosure), and
+    // left the remaining staged temps behind. Cleanup failures are now
+    // collected and appended to the original error; every temp gets its
+    // removal attempt.
+    const cleanupFailures: string[] = []
+    for (const { name } of writes) {
+      try {
+        fs.rmSync(stage(name), { force: true, recursive: true })
+      } catch (cleanupError) {
+        cleanupFailures.push(`${name}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`)
+      }
+    }
+    if (cleanupFailures.length > 0) {
+      const original = error instanceof Error ? error.message : String(error)
+      throw new Error(`${original} (staged-temp cleanup also failed: ${cleanupFailures.join('; ')})`)
+    }
     throw error
   }
 }

@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
-import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, SKILL_ACTION_REQUIRED_FIELDS, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
   target?: string
@@ -219,6 +219,19 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   if (!hasValidEvidence(op.evidence, context.sessionSeq)) return `skill op ${index}: evidence is required and must reference a valid session seq`
   const action = op.action ?? 'patch'
   if (!SKILL_ACTIONS.has(action)) return `skill op ${index}: unknown action ${action}`
+  // OPT-05 (2026-09): required-field gate from the SAME table the tool's
+  // argument gate reads (core SKILL_ACTION_REQUIRED_FIELDS). A plan was able
+  // to pass validation with a write_file/remove_file that had no file_path —
+  // the staged write then failed deterministically at every approve. Only
+  // missing (null/undefined) fields are caught here; payload emptiness keeps
+  // its dedicated `.trim()` checks below (their wording is pinned by tests).
+  const requiredFields = SKILL_ACTION_REQUIRED_FIELDS[action]
+  if (requiredFields !== undefined) {
+    const record = op as unknown as Record<string, unknown>
+    for (const field of requiredFields) {
+      if (record[field] === undefined || record[field] === null) return `skill op ${index}: ${action} requires ${field}`
+    }
+  }
   if ((action === 'create' || action === 'edit' || action === 'update') && !(op.content ?? '').trim()) {
     return `skill op ${index}: ${action} requires content`
   }

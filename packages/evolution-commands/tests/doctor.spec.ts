@@ -171,7 +171,40 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(seen).toHaveLength(1)
       const report = await diagnose(stub, { home })
       expect(report.conflicts.some(conflict => conflict.includes('a profile manifest could not be read or parsed'))).toBe(true)
-      expect(report.actions[0]).toContain('Resolve the conflict first')
+      // OPT-22: the DEGRADED detail alone must NOT trigger the uninstall
+      // advice — there is no bundle conflict here, and "keep exactly one of
+      // …" sent operators to uninstall bundles they may not have. The advice
+      // is reserved for real double-mount rows; the degraded detail stays in
+      // the report for visibility.
+      expect(report.actions.some(action => action.includes('Resolve the conflict first'))).toBe(false)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('OPT-23: a delivered preset dir with NO bundles reports preset-only — and never advises installing all', async () => {
+    // V27 G6.4's real state: the host bundle was removed after a layered
+    // install, leaving the self-contained delta preset. The old form ladder
+    // reported `none` and its advice installed all — the exact
+    // all × preset double-mount this report flags.
+    const home = await mkdtemp(join(tmpdir(), 'doctor-preset-only-'))
+    try {
+      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      const report = await diagnose(stub, { home })
+      expect(report.installForm).toBe('preset-only')
+      expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
+      expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-host'))).toBe(true)
+      expect(report.actions.some(action => action.includes('double-mount'))).toBe(true)
+      // A plain 'none' install (nothing anywhere) keeps the install-all advice.
+      const empty = await mkdtemp(join(tmpdir(), 'doctor-none-'))
+      try {
+        const noneReport = await diagnose(stub, { home: empty })
+        expect(noneReport.installForm).toBe('none')
+        expect(noneReport.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(true)
+      } finally {
+        await rm(empty, { recursive: true, force: true })
+      }
     } finally {
       await rm(home, { recursive: true, force: true })
     }

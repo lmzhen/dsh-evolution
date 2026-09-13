@@ -478,6 +478,23 @@ describe('layered installer', () => {
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
+  it('OPT-02: uninstalling profile B KEEPS the home-global preset while profile A carries only a preset-owning journal (INST-04)', async () => {
+    // The exact shape the v31 INST-04 sweep guard exists for: profile A has a
+    // journal with `agentPreset: true` and NO bundle rows. Before OPT-02 the
+    // sweep's `readInstallJournal` call was missing its await — `otherJournal`
+    // was a Promise, `?.agentPreset` was always undefined, and B's uninstall
+    // deleted the shared preset out from under A's sessions.
+    const home = await tempRoot('dsh-installer-journal-')
+    await runInstaller(home, 'agent', 'evo-a')
+    const journalA = JSON.parse(await readFile(join(home, 'profiles', 'evo-a', '.evolution-install.json'), 'utf8')) as { agentPreset?: boolean }
+    expect(journalA.agentPreset).toBe(true)
+    await runInstaller(home, 'layered', 'evo-b')
+    await runInstaller(home, 'layered', 'evo-b', ['--uninstall'])
+    // The home-global preset survives because A still owns it.
+    expect(existsSync(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'))).toBe(true)
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 120_000)
+
   it('INST-05: --scope --version 0.1.0 does not bind --version as the scope value', async () => {
     // The guard runs at module scope, BEFORE any pack/staging work, so this
     // spawns the real script and reads its refusal instead of producing a

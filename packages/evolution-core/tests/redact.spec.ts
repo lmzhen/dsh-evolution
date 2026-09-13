@@ -154,3 +154,21 @@ it('v31 REDACT-03: block-style keys with connected prefixes (AWS_CLIENT_DB forms
   // A non-credential block key stays untouched.
   expect(redactSecrets('configuration:\n    plain value line')).toBe('configuration:\n    plain value line')
 })
+
+// OPT-03 (2026-09): the line-paired pass must behave identically on LF and
+// CRLF text. The key-line pattern (`\s*$`) always absorbed the `\r`, but the
+// value-line anchor (`[ \t]*$`) did not — on Windows-authored
+// .env / compose / kubectl YAML the key matched, the value silently
+// `continue`d, and the secret crossed to the review subagent verbatim.
+it('OPT-03: CRLF block-style secrets are redacted exactly like LF ones', () => {
+  const lf = 'aws_secret_access_key:\n    wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n'
+  const crlf = 'aws_secret_access_key:\r\n    wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\r\n'
+  expect(redactSecrets(lf)).not.toContain('wJalrXUtnFEMI')
+  expect(redactSecrets(lf)).toContain('<redacted>')
+  expect(redactSecrets(crlf)).not.toContain('wJalrXUtnFEMI')
+  expect(redactSecrets(crlf)).toContain('<redacted>')
+  // Arbitrary passphrases have no value-shape pattern — the block pass is
+  // their only layer, so the CRLF path must cover them too.
+  const passphraseCrlf = 'password:\r\n    hunter2-strength-phrase\r\n'
+  expect(redactSecrets(passphraseCrlf)).not.toContain('hunter2-strength-phrase')
+})

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-skill-manage",
   "description": "Model-facing skill_manage tool",
-  "version": "0.3.71",
+  "version": "0.3.72",
   "publishConfig": {
     "access": "public"
   },
@@ -38,6 +38,7 @@
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-skill": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^"
@@ -47,6 +48,7 @@
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-skill": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^"

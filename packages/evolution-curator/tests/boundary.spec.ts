@@ -100,10 +100,13 @@ describe('evolution-curator boundaries', () => {
     // No evolutionState service mounted: the optional-chain form used to make
     // setPaused a silent no-op — the command surface reported success while
     // nothing was persisted. The warn must declare the loss.
+    // OPT-21: the wording also declares the in-process effect (none — there
+    // is no memory paused flag; auto-runs continue in this process).
     const ctx = await mount(home)
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
     await expect(ctx.evolutionCurator.setPaused(true)).resolves.toBeUndefined()
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('curator state service absent; pause not persisted'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('curator state service absent — pause NOT effective'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('this process keeps auto-running'))
     warnSpy.mockRestore()
   })
 })

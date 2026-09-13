@@ -171,4 +171,36 @@ describe('evolution-skill-catalog', () => {
     expect(names).not.toContain('other')
   })
 
+  it('OPT-10: per-skill `disable-model-invocation` / `user-invocable` frontmatter overrides the row default', async () => {
+    // Before, the row-level policy was stamped onto EVERY candidate — a
+    // user's `disable-model-invocation: true` in the shared tree was
+    // silently re-advertised as model-invocable by the shadow (the upstream
+    // provider it shadows parses this frontmatter per skill).
+    const root = await tempRoot('dsh-skill-catalog-invocation-')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(Catalog, { root, modelInvocable: false })
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'hidden-from-model', 'SKILL.md'), '---\nname: hidden-from-model\ndescription: Must not reach the model.\ndisable-model-invocation: true\n---\n\n# Hidden\n')
+    await io.writeText(join(root, 'user-only', 'SKILL.md'), '---\nname: user-only\ndescription: User surfaces only.\nuser-invocable: false\n---\n\n# UserOnly\n')
+    await io.writeText(join(root, 'plain-skill', 'SKILL.md'), '---\nname: plain-skill\ndescription: Row defaults apply.\n---\n\n# Plain\n')
+    ctx.emit('evolution/skills-refresh')
+    const skills = (await ctx.skills.snapshot()).skills
+    const hidden = skills.find(skill => skill.name === 'hidden-from-model')
+    const userOnly = skills.find(skill => skill.name === 'user-only')
+    const plain = skills.find(skill => skill.name === 'plain-skill')
+    expect(hidden?.invocation).toEqual({ modelInvocable: false, userInvocable: true })
+    expect(userOnly?.invocation).toEqual({ modelInvocable: false, userInvocable: false })
+    // No frontmatter → the ROW default (modelInvocable:false here) applies.
+    expect(plain?.invocation).toEqual({ modelInvocable: false, userInvocable: true })
+    // A malformed boolean falls back to the row default with a warn, not a
+    // broken scan (upstream would throw; the shadow degrades).
+    await io.writeText(join(root, 'bad-flag', 'SKILL.md'), '---\nname: bad-flag\ndescription: Bad boolean.\ndisable-model-invocation: maybe\n---\n\n# Bad\n')
+    ctx.emit('evolution/skills-refresh')
+    const bad = (await ctx.skills.snapshot()).skills.find(skill => skill.name === 'bad-flag')
+    expect(bad?.invocation).toEqual({ modelInvocable: false, userInvocable: true })
+  })
+
 })

@@ -103,7 +103,18 @@ const PEM_PRIVATE_KEY_PATTERN = new RegExp(`${PEM_HEAD}[\\s\\S]*?${PEM_TAIL}`, '
 // A2-6's `[\w-]{0,64}[_\-]` form). Without it, every prefixed block key
 // missed the pass AND the AWS residual sweep (the underscore blocks every
 // `\b`), so the secret shipped verbatim (executed-verified leak).
-const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]{0,64}[_\-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_\-][\w-]{0,64})?)\s*:\s*$/i
+// v31 REDACT-03: the key carries the same connected-prefix group as the
+// inline pattern (`AWS_SECRET_ACCESS_KEY`, `CLIENT_SECRET`, `DB_PASSWORD` —
+// A2-6's `[\w-]{0,64}[_\-]` form). Without it, every prefixed block key
+// missed the pass AND the AWS residual sweep (the underscore blocks every
+// `\b`), so the secret shipped verbatim (executed-verified leak).
+// OPT-03 (2026-09): the trailing `\s*$` already absorbed a `\r` on the KEY
+// line, but the VALUE-line pattern below still anchored `[ \t]*$` — on CRLF
+// text the key line matched, the value line silently `continue`d, and the
+// secret crossed verbatim. Both anchors now tolerate an optional `\r` so the
+// line-paired pass behaves identically on LF and CRLF input (Windows-authored
+// .env / compose / kubectl YAML is the realistic carrier).
+const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]{0,64}[_\-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_\-][\w-]{0,64})?)\s*:(?:\r)?$/i
 
 /**
  * Mask credential-shaped text before it crosses a session boundary.
@@ -140,7 +151,9 @@ export function redactSecrets(text: string): string {
     // The value is the first non-empty indented line after the bare key.
     // Over-masking an indented line under a credential key is acceptable for a
     // redactor (same policy as P2-7); an unindented line is NOT the value.
-    const [, indent, value, tail] = /^([ \t]+)(\S.*?)([ \t]*)$/.exec(next) ?? []
+    // OPT-03: `(?:\r)?$` — see BLOCK_KEY_ONLY_LINE above; without it a CRLF
+    // value line never matched and the secret crossed unredacted.
+    const [, indent, value, tail] = /^([ \t]+)(\S.*?)([ \t]*)(?:\r)?$/.exec(next) ?? []
     if (indent === undefined || value === undefined) continue
     if (value.includes('<redacted>')) continue
     lines[i + 1] = `${indent}<redacted>${tail ?? ''}`

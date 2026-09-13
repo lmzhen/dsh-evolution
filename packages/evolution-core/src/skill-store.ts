@@ -5,6 +5,32 @@
  * the default dsh skill-filesystem user root. The plugin only manages skills
  * it created unless a `.hermes-managed` marker opts a skill in. Archival is a
  * move to `.archive/` — never a hard delete.
+ *
+ * ## Concurrency discipline (OPT-09, 2026-09) — read before adding a mutator
+ *
+ * Three primitives, three distinct jobs (they compose, they do not replace
+ * each other):
+ *
+ * 1. **In-process serial queue** (`this.serial`, makeSerialQueue) — orders the
+ *    read→plan→commit phases of one skill's mutation against OTHER mutators
+ *    in this process. Used by: create/update/patch/setPinned/restructure/
+ *    writeSupportFile/removeSupportFile and (whole-mutation) consolidate.
+ *    NON-reentrant: a callback must never call a public method that wraps
+ *    itself in `this.serial` (archive/restoreFromArchive deliberately do not).
+ * 2. **Per-directory write lock** (io.ts LOCK_*) — cross-process mutual
+ *    exclusion plus in-process crash ownership (tickets, takeover). Checked
+ *    with `hasWriteLock` before any destructive move (archive/restore/
+ *    snapshot); held inside transactIo by byte writers.
+ * 3. **CAS baseline (`expected:`)** — any read whose bytes feed a later write
+ *    must either live inside the serial section that commits the write, or
+ *    carry its plan-time bytes as `expected` so the commit fails closed on
+ *    drift (V8-11 / V24-01). A read outside the serial section WITHOUT a
+ *    baseline is a lost-update bug; this file's history is the test suite.
+ *
+ * Known residuals (deliberate, documented at their sites): the archive commit
+ * re-check narrows but does not close the pin race (OPT-06); snapshotAll
+ * re-probes after its copies so a mid-copy writer demotes to `skipped`
+ * (OPT-07); the movers' probe→rename window is owned by the io.ts protocol.
  */
 
 import { basename, dirname, join } from 'node:path'
@@ -2320,6 +2346,23 @@ export class SkillLibrary {
     if (await this.hasWriteLock(dir)) {
       return { ok: false, message: `Skill "${name}" is being written (write lock present); retry archiving once the write completes.` }
     }
+    // OPT-06 (2026-09): pin/protection RE-CHECK at the commit point. The
+    // protection probe near the top runs several awaits before the move; a
+    // `.pinned` marker landing in that window used to be archived anyway
+    // (the same race A1-14 closed for update by holding the serial chain —
+    // archive cannot take that chain because consolidate calls it from
+    // inside one). This re-check shrinks the window to the single gap
+    // before moveDir; fully closing it would need check-under-lock semantics
+    // in the io.ts mover protocol, which is deliberately out of scope here.
+    const commitProtection = await this.deleteProtection(name, options)
+    if (commitProtection) {
+      return {
+        ok: false,
+        message: commitProtection === 'pinned'
+          ? `Skill "${name}" is pinned and cannot be archived. Remove the \`.pinned\` marker in its directory, then retry.`
+          : `Skill "${name}" is protected (${commitProtection}).`,
+      }
+    }
     const moveFailure = await this.moveDir(dir, dest)
     if (moveFailure !== undefined) return { ok: false, message: `Skill "${name}" archive failed: ${moveFailure}.` }
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
@@ -2391,71 +2434,83 @@ export class SkillLibrary {
     // V8-11 (0.3.46): the targetMd pre-read below MOVED into the serial queue
     // (commit section) — a concurrent patch between the old pre-read and the
     // commit used to be silently overwritten by the merged body.
-    const referenceWrites: TreeChangeWrite[] = []
-    const parts: string[] = []
-    if (mode === 'append') {
-      for (const source of normalizedSources) {
-        const protection = await this.deleteProtection(source)
-        if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
-        const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-        if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
-        const parsed = parseFrontmatter(sourceMd)
-        if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
-        // Package integrity (009-I): an append must never leave dangling
-        // support links — refuse before ANY side effect (no archive, no write).
-        if (await this.countSupportDirs(source) > 0) {
-          return { ok: false, message: `Consolidation rejected: source "${source}" carries support files — use mode:'reference' or archive the whole package instead.` }
+    // OPT-04 (2026-09): the ENTIRE mutation phase — source reads, source
+    // archives, target merge, commit and rollback — now runs inside the
+    // in-process serialize queue (the same wrapper restructure uses). Before,
+    // the source bodies were read OUTSIDE the queue and the commit reused
+    // those stale bytes: a patch landing on a SOURCE between its read and its
+    // archive was silently dropped from the merged output (lost update — the
+    // same defect class V8-11/V24-01 closed for the target side only, now
+    // closed for the sources too). archive()/restoreFromArchive() take no
+    // serial lock themselves, so the nested calls here cannot self-deadlock.
+    // Every refusal below (protection, missing skill, package integrity)
+    // still fires before ANY side effect, so the pre-side-effect refusal
+    // semantics are unchanged.
+    return await this.serial(async (): Promise<SkillActionResult> => {
+      const referenceWrites: TreeChangeWrite[] = []
+      const parts: string[] = []
+      if (mode === 'append') {
+        for (const source of normalizedSources) {
+          const protection = await this.deleteProtection(source)
+          if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
+          const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+          if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
+          const parsed = parseFrontmatter(sourceMd)
+          if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
+          // Package integrity (009-I): an append must never leave dangling
+          // support links — refuse before ANY side effect (no archive, no write).
+          if (await this.countSupportDirs(source) > 0) {
+            return { ok: false, message: `Consolidation rejected: source "${source}" carries support files — use mode:'reference' or archive the whole package instead.` }
+          }
+          const refs = supportRefs(parsed.body)
+          if (refs.length > 0) {
+            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.` }
+          }
+          parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
         }
-        const refs = supportRefs(parsed.body)
-        if (refs.length > 0) {
-          return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.` }
+      } else {
+        for (const source of normalizedSources) {
+          const protection = await this.deleteProtection(source)
+          if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
+          const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+          if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
+          const parsed = parseFrontmatter(sourceMd)
+          if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to demote.` }
+          const refs = supportRefs(parsed.body)
+          if (refs.length > 0) {
+            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.` }
+          }
+          const target = join(targetDir, 'references', `${source}.md`)
+          referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
         }
-        parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
+        // Discoverability: the umbrella's body gains one pointer per demoted
+        // source — built INSIDE the serial queue below against the fresh target
+        // (V8-11), so it never merges over a concurrent patch.
       }
-    } else {
-      for (const source of normalizedSources) {
-        const protection = await this.deleteProtection(source)
-        if (protection) return { ok: false, message: `Skill "${source}" is protected (${protection}).` }
-        const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-        if (!sourceMd) return { ok: false, message: `Skill "${source}" not found.` }
-        const parsed = parseFrontmatter(sourceMd)
-        if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to demote.` }
-        const refs = supportRefs(parsed.body)
-        if (refs.length > 0) {
-          return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.` }
+      // Two-phase commit so a failure partway never leaves the tree inconsistent:
+      // (1) archive every source first — a source that cannot be archived aborts
+      //     before target is touched; (2) only when all sources are safely in
+      //     .archive does the kernel commit the writes (byte-level rollback).
+      const archived: string[] = []
+      try {
+        // V9-04 (0.3.50): restore the cheap target-existence pre-check BEFORE
+        // the destructive archive loop — V8-11 moved the authoritative read into
+        // the serial queue, which silently turned a clean "Skill not found"
+        // refusal into "archive ALL sources, then roll back" (a half-completed
+        // tree when a restore fails). The serial read stays authoritative for
+        // the merge; this probe keeps the failure path non-destructive.
+        const preTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
+        if (!preTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
+        for (const source of normalizedSources) {
+          const result = await this.archive(source, { absorbedInto: targetName })
+          if (!result.ok) throw new Error(result.message)
+          archived.push(source)
         }
-        const target = join(targetDir, 'references', `${source}.md`)
-        referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
-      }
-      // Discoverability: the umbrella's body gains one pointer per demoted
-      // source — built INSIDE the serial queue below against the fresh target
-      // (V8-11), so it never merges over a concurrent patch.
-    }
-    // Two-phase commit so a failure partway never leaves the tree inconsistent:
-    // (1) archive every source first — a source that cannot be archived aborts
-    //     before target is touched; (2) only when all sources are safely in
-    //     .archive does the kernel commit the writes (byte-level rollback).
-    const archived: string[] = []
-    try {
-      // V9-04 (0.3.50): restore the cheap target-existence pre-check BEFORE
-      // the destructive archive loop — V8-11 moved the authoritative read into
-      // the serial queue, which silently turned a clean "Skill not found"
-      // refusal into "archive ALL sources, then roll back" (a half-completed
-      // tree when a restore fails). The serial read stays authoritative for
-      // the merge; this probe keeps the failure path non-destructive.
-      const preTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
-      if (!preTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
-      for (const source of normalizedSources) {
-        const result = await this.archive(source, { absorbedInto: targetName })
-        if (!result.ok) throw new Error(result.message)
-        archived.push(source)
-      }
-      // V8-11 (0.3.46): the target pre-read and the merged/pointer construction
-      // moved INSIDE the in-process serialize queue — a concurrent
-      // patch/update between the old pre-read and the commit used to be
-      // silently overwritten (the serial chain is the same second layer
-      // update/patch/restructure/writeSupportFile use).
-      const result = await this.serial(async (): Promise<SkillActionResult> => {
+        // V8-11 (0.3.46): the target pre-read and the merged/pointer construction
+        // happen INSIDE the in-process serialize queue — a concurrent
+        // patch/update between the old pre-read and the commit used to be
+        // silently overwritten (the serial chain is the same second layer
+        // update/patch/restructure/writeSupportFile use).
         const freshTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
         if (!freshTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
         // V10-01 (P2-2): reference-mode targets APPEND, mirroring restructure
@@ -2486,7 +2541,7 @@ export class SkillLibrary {
           if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
           writes.push({ target: join(targetDir, 'SKILL.md'), content: extended, expected: freshTargetMd })
         }
-        return await this.applyTreeChange({
+        const result = await this.applyTreeChange({
           name: targetName,
           origin,
           protection: 'write',
@@ -2495,31 +2550,31 @@ export class SkillLibrary {
           auditSummary: `consolidated ${normalizedSources.join(', ')} (${mode}) into ${targetName}`,
           eventAction: 'consolidate',
         })
-      })
-      if (!result.ok) throw new Error(result.message)
-      return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
-    } catch (error) {
-      // Bring back every source we already archived so the merge is fully
-      // undone. 0.3.16 (T-14): a failed restore used to be swallowed by
-      // `.catch(() => {})` while the message still claimed a full rollback —
-      // the source stayed in .archive silently. Surface it.
-      const reason = error instanceof Error ? error.message : String(error)
-      const failedRestores: string[] = []
-      for (const source of archived.reverse()) {
-        try {
-          const restored = await this.restoreFromArchive(source)
-          if (!restored.ok) failedRestores.push(source)
-        } catch {
-          // restoreFromArchive never rejects by contract; if it ever does,
-          // count the source as unrestored rather than replacing the report.
-          failedRestores.push(source)
+        if (!result.ok) throw new Error(result.message)
+        return { ok: true, message: `Consolidated ${normalizedSources.join(', ')} into "${targetName}".`, path: targetDir }
+      } catch (error) {
+        // Bring back every source we already archived so the merge is fully
+        // undone. 0.3.16 (T-14): a failed restore used to be swallowed by
+        // `.catch(() => {})` while the message still claimed a full rollback —
+        // the source stayed in .archive silently. Surface it.
+        const reason = error instanceof Error ? error.message : String(error)
+        const failedRestores: string[] = []
+        for (const source of archived.reverse()) {
+          try {
+            const restored = await this.restoreFromArchive(source)
+            if (!restored.ok) failedRestores.push(source)
+          } catch {
+            // restoreFromArchive never rejects by contract; if it ever does,
+            // count the source as unrestored rather than replacing the report.
+            failedRestores.push(source)
+          }
         }
+        if (failedRestores.length > 0) {
+          return { ok: false, message: `Consolidation failed (${reason}); rolled back EXCEPT ${failedRestores.join(', ')} — still in .archive, restore them with /evolution skill restore.` }
+        }
+        return { ok: false, message: `Consolidation failed and was rolled back: ${reason}` }
       }
-      if (failedRestores.length > 0) {
-        return { ok: false, message: `Consolidation failed (${reason}); rolled back EXCEPT ${failedRestores.join(', ')} — still in .archive, restore them with /evolution skill restore.` }
-      }
-      return { ok: false, message: `Consolidation failed and was rolled back: ${reason}` }
-    }
+    })
   }
 
   /**
@@ -2778,6 +2833,28 @@ export class SkillLibrary {
         message: hasSkillFile
           ? `Skill "${name}" already exists in the active root; refusing to overwrite.`
           : `Skill directory "${name}" already exists in the active root but carries no SKILL.md; remove or repair it before restoring.`,
+      }
+    }
+    // OPT-08 (2026-09): case-variant collision probe, the restore-side twin of
+    // create()'s D-6 scan. The exact-name probe above passes when a
+    // DIFFERENTLY-CASED sibling directory already exists (hand maintenance, a
+    // git round-trip on a case-sensitive filesystem) and the restore then
+    // created a second same-name-different-case skill: duplicate catalog
+    // entries and an ambiguous consolidate/patch target. Case-insensitive
+    // filesystems are already covered by the exists() probe; this closes the
+    // POSIX side.
+    let caseVariant: string | undefined
+    try {
+      const rootEntries = await this.io.list(this.root)
+      caseVariant = rootEntries.find(entry => entry !== name && entry.toLowerCase() === name.toLowerCase())
+    } catch {
+      // An unreadable root fails loudly at the move below; this probe must
+      // not mask that error with an invented refusal.
+    }
+    if (caseVariant !== undefined) {
+      return {
+        ok: false,
+        message: `Skill "${caseVariant}" (same name, different letter case) already exists in the active root; restoring "${name}" beside it would create ambiguous duplicates — restore as "${caseVariant}" or remove the variant first.`,
       }
     }
     const archiveRoot = join(this.root, '.archive')
@@ -3045,6 +3122,29 @@ export class SkillLibrary {
       }))
       const copyFailure = copyResults.find((result): result is PromiseRejectedResult => result.status === 'rejected')
       if (copyFailure) throw copyFailure.reason
+      // OPT-07 (2026-09): post-copy lock RE-PROBE. The probe above runs
+      // before the copies; a byte-writer that started AFTER its skill was
+      // probed but BEFORE its copy landed used to produce a torn snapshot
+      // whose manifest still said `skipped: []` — restoreLatestSnapshot
+      // would then roll the live tree back over that writer's landed bytes.
+      // Re-probing keeps the manifest honest: any skill whose lock appeared
+      // mid-copy is demoted to `skipped` (its copied bytes are suspect and
+      // never referenced by a restore — restoreLatestSnapshot refuses an
+      // incomplete snapshot outright, V27 G0.1). The stale directory copy
+      // stays on disk but is unreachable through the manifest.
+      const suspect: string[] = []
+      for (const name of copyable) {
+        if (await this.hasWriteLock(this.dirOf(name))) suspect.push(name)
+      }
+      if (suspect.length > 0) {
+        for (const name of suspect) {
+          console.warn(`skill-store: snapshot demoted "${name}" to skipped — a write lock appeared while its copy ran; the copied bytes are suspect`)
+        }
+        for (const name of suspect) {
+          copyable.splice(copyable.indexOf(name), 1)
+        }
+        skipped.push(...suspect)
+      }
       // Sidecar co-snapshot: a rollback that restores the tree but leaves the
       // post-archival usage/suppression state behind would immediately let the
       // curator re-decide on stale records (rollback integrity).

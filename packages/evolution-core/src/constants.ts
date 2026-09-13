@@ -22,6 +22,34 @@
 
 // ── Fixed protocol / format / security invariants ────────────────────────────
 
+/**
+ * Required argument names per `skill_manage` action — the SINGLE SOURCE read
+ * by the tool's argument gate (tool-skill-manage executeCore) and the plan
+ * validator (evolution-plan-validator), so the two can never drift.
+ * OPT-05 (2026-09): the plan validator used to accept a `write_file`/
+ * `remove_file` op without `file_path` while the executor required it — the
+ * staged write then failed at EVERY approve until rejected.
+ * Rows here are the op-level requirements only: `delete` additionally
+ * requires `absorbed_into` at the PLAN layer (review passes may only delete
+ * into an umbrella) and `pin`/`unpin` are tool-only actions — each consumer
+ * adds its own extras on top of this table. An empty-string argument is NOT
+ * caught here (the tool's gate deliberately lets it reach the library for a
+ * more specific remedy message); the validator adds its own `.trim()`
+ * emptiness checks for payload fields.
+ */
+export const SKILL_ACTION_REQUIRED_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  create: ['name', 'content'],
+  edit: ['name', 'content'],
+  update: ['name', 'content'],
+  patch: ['name', 'old_string', 'new_string'],
+  delete: ['name'],
+  write_file: ['name', 'file_path', 'file_content'],
+  remove_file: ['name', 'file_path'],
+  restructure: ['name'],
+  pin: ['name'],
+  unpin: ['name'],
+}
+
 /** Skill frontmatter `name` validated for the file name (lowercase + hyphen).
  * 计划 B-4 (v18): tightened to the UPSTREAM `SKILL_NAME` shape
  * (`/^[a-z0-9]+(?:-[a-z0-9]+)*$/`, packages/skill/skill/src/index.ts:20). The

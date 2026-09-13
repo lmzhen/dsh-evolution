@@ -28,9 +28,14 @@ export const inject = ['skills', 'evolutionIo']
 
 export interface Config {
   root?: string
-  /** Whether catalog skills are advertised/loadable by the model. */
+  /** Row-level DEFAULT invocation policy. OPT-10 (2026-09): a skill's own
+   * SKILL.md frontmatter (`disable-model-invocation` / `user-invocable`) now
+   * overrides this per skill — before, the row default was stamped onto every
+   * candidate and a user's `disable-model-invocation: true` in the shared
+   * tree was silently re-advertised as model-invocable. */
   modelInvocable?: boolean
-  /** Whether catalog skills are advertised/loadable from user surfaces. */
+  /** Whether catalog skills are advertised/loadable from user surfaces
+   * (per-skill `user-invocable` frontmatter overrides — see modelInvocable). */
   userInvocable?: boolean
   /** Restrict the published catalog to these skill names (empty = all). */
   includeSkillNames?: string[]
@@ -134,6 +139,50 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let summariesEpoch = 0
   // v31 CAT-01: warn-once per DISTINCT scan failure (consults repeat per turn).
   let lastScanWarn = ''
+  // OPT-10 (2026-09): per-skill invocation policy parsed from the SAME
+  // frontmatter keys the shadowed upstream provider reads
+  // (`disable-model-invocation` / `user-invocable`). Upstream THROWS on the
+  // legacy/misspelled keys and on non-boolean values; the shadow WARNS ONCE
+  // and falls back to the row default instead — a malformed frontmatter file
+  // must not break the whole catalog scan (same posture as CAT-01).
+  let invocationCache: Map<string, SkillInvocationPolicy> | null = null
+  const warnedFrontmatter = new Set<string>()
+  const warnFrontmatterOnce = (name: string, key: string, detail: string): void => {
+    const slot = `${name}:${key}`
+    if (warnedFrontmatter.has(slot)) return
+    warnedFrontmatter.add(slot)
+    ctx.logger.warn(`evolution-skill-catalog: "${name}" frontmatter ${detail}`)
+  }
+  const frontmatterBool = (name: string, data: Record<string, unknown>, key: string): boolean | undefined => {
+    if (!Object.hasOwn(data, key)) return undefined
+    const value = data[key]
+    if (typeof value === 'boolean') return value
+    if (value === 1 || value === '1') return true
+    if (value === 0 || value === '0') return false
+    if (typeof value === 'string') {
+      const lowered = value.toLowerCase()
+      if (lowered === 'true' || lowered === 'yes' || lowered === 'on') return true
+      if (lowered === 'false' || lowered === 'no' || lowered === 'off') return false
+    }
+    warnFrontmatterOnce(name, key, `"${key}" must be a boolean; the row-level default applies until fixed`)
+    return undefined
+  }
+  const invocationFromFrontmatter = (name: string, data: Record<string, unknown>): SkillInvocationPolicy => {
+    // Upstream rejects these legacy/alias keys outright; the mirror never
+    // accepted them either (they are NOT the row config), so a file carrying
+    // one is authoring drift worth one warn.
+    for (const legacy of ['disableModelInvocation', 'modelInvocable', 'userInvocable'] as const) {
+      if (Object.hasOwn(data, legacy)) warnFrontmatterOnce(name, legacy, `field "${legacy}" is not accepted by the upstream registry; use the canonical kebab key`)
+    }
+    const disableModel = frontmatterBool(name, data, 'disable-model-invocation')
+    const user = frontmatterBool(name, data, 'user-invocable')
+    // Per-FIELD override: a frontmatter key the file does not set falls back
+    // to the ROW-level default (which upstream models as its constant `true`).
+    return {
+      modelInvocable: disableModel !== undefined ? !disableModel : invocation.modelInvocable,
+      userInvocable: user !== undefined ? user : invocation.userInvocable,
+    }
+  }
   async function summaries(): Promise<SkillSummary[]> {
     const stamp = await io.mtime?.(library.root) ?? null
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) return summariesCache
@@ -164,6 +213,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       control?.invalidate()
       lastScanWarn = ''
     }
+    // OPT-10: rebuild the per-skill invocation map alongside the scan — one
+    // extra SKILL.md read per skill, and scans only run on mutation/refresh/
+    // first-consult. A file whose frontmatter cannot be parsed keeps the row
+    // default (absent from the map), same posture as its description.
+    const invocationMap = new Map<string, SkillInvocationPolicy>()
+    for (const summary of scanned) {
+      const raw = await io.readText(join(summary.path, 'SKILL.md')).catch(() => null)
+      if (raw === null) continue
+      const parsed = parseFrontmatter(raw)
+      if (!parsed) continue
+      invocationMap.set(summary.name, invocationFromFrontmatter(summary.name, parsed.frontmatter))
+    }
+    invocationCache = invocationMap
     if (epochAtScanStart === summariesEpoch) {
       summariesCache = scanned
       summariesStamp = stamp
@@ -176,8 +238,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const dropSummariesCache = (): void => {
     summariesEpoch += 1
     summariesCache = null
+    invocationCache = null
     control?.invalidate()
   }
+  // OPT-10: the row-level policy is the FALLBACK — a per-skill frontmatter
+  // policy wins for that skill (absent entry = unparseable/unreadable file).
+  const invocationFor = (name: string): SkillInvocationPolicy => invocationCache?.get(name) ?? invocation
 
   const provider: SkillProvider = {
     name: 'dsh-evolution',
@@ -202,7 +268,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // frontmatter; this shadowing provider must too, or the host/UI routing
         // hint disappears while it shadows `skill-filesystem`.
         ...summary.whenToUse !== undefined ? { whenToUse: summary.whenToUse } : {},
-        invocation,
+        invocation: invocationFor(summary.name),
         source: 'user-dsh' as const,
         provider: 'dsh-evolution',
         rank: EVOLUTION_SKILL_RANK,
@@ -240,7 +306,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         name,
         description: summary.description,
         ...summary.whenToUse !== undefined ? { whenToUse: summary.whenToUse } : {},
-        invocation,
+        invocation: invocationFor(name),
         source: 'user-dsh',
         provider: 'dsh-evolution',
         resourceBase: { kind: 'directory', path: summary.path },

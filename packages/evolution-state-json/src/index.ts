@@ -322,6 +322,13 @@ export async function jsonTransact<T>(
   root: string,
   file: string,
   task: (current: T | null) => T | null | Promise<T | null>,
+  // OPT-12 (2026-09): bridge for apply-scoped callers that must know WHICH
+  // record ids the baseline field gate just dropped (after a successful
+  // quarantine) — the legacy pending-merge consults this set so a gate-dropped
+  // resolved twin cannot be "revived" by its still-valid legacy
+  // `status:'pending'` copy (V5-02 ghost-twin replay). An empty id list means
+  // "the latest gate run of this file dropped nothing" (a clear signal).
+  options?: { onGateDrop?: (file: string, ids: string[]) => void },
 ): Promise<void> {
   await transactIo(io(), join(root, file), async (current) => {
     let parsed: T | null = null
@@ -370,9 +377,15 @@ export async function jsonTransact<T>(
         const preserved = await ensureCorruptCopy(ctx, io, root, file, bad)
         if (preserved) {
           parsed = good as T
+          options?.onGateDrop?.(file, failing.map(([id]) => id))
         } else {
+          // The records stay in the live map (nothing was dropped), so the
+          // consumer's dropped-id set is cleared rather than left stale.
+          options?.onGateDrop?.(file, [])
           ctx.logger.warn(`evolution-state-json: keeping ${failing.length} malformed record(s) in ${file} — the quarantine copy could not be written, so rewriting the file without them would destroy the only copy`)
         }
+      } else {
+        options?.onGateDrop?.(file, [])
       }
     }
     const next = await task(parsed)
@@ -417,9 +430,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
-  // The shared quarantine machinery lives at module scope (see above): the
-  // transact baseline runs inside jsonTransact, a module-level wrapper that
-  // cannot reach apply-scoped closures.
+  // OPT-12 (2026-09): ids the per-record field gate DROPPED from the most
+  // recent clean read/transact of the pending state file. `filterLegacy` and
+  // the legacy retirement merge consult this set in addition to `id in
+  // current`: a RESOLVED twin whose fields went bad is quarantined away from
+  // `current`, and without this set its legacy `status:'pending'` twin (old
+  // valid data, passes the gate) passed "current wins" and got resurrected as
+  // a claimable ghost — an approve then replayed an already-landed write (the
+  // V5-02 replay, reopened through the corruption-recovery path).
+  // The transact baseline runs inside module-level jsonTransact (it cannot
+  // reach this closure directly); `retireLegacyOnce` forwards the drops via
+  // jsonTransact's `onGateDrop` callback.
+  const gateDroppedCurrent = new Set<string>()
+  const noteGateDrop = (file: string, ids: string[]): void => {
+    if (file !== PENDING_STATE_FILE) return
+    gateDroppedCurrent.clear()
+    for (const id of ids) gateDroppedCurrent.add(id)
+  }
+  // OPT-13: one-shot latch for the pending-capacity warn; re-armed when the
+  // live count falls back under the cap.
+  let warnedPendingCapacity = false
 
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
@@ -463,8 +493,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // write as done.
       reportGateViolation(ctx, file, failing)
       await ensureCorruptCopy(ctx, io, root, file, bad)
+      if (file === PENDING_STATE_FILE) {
+        gateDroppedCurrent.clear()
+        for (const id of Object.keys(bad)) gateDroppedCurrent.add(id)
+      }
       return good as T
     }
+    if (file === PENDING_STATE_FILE) gateDroppedCurrent.clear()
     return parsed
   }
 
@@ -561,6 +596,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     for (const [id, record] of Object.entries(legacy)) {
       if (id in (current ?? {})) continue
       if (archivedIds.has(id)) continue
+      // OPT-12: a twin whose resolved copy was just gate-dropped from current
+      // must NOT survive as pending — the quarantine replaced the usual
+      // "current wins" guard with an absence the legacy merge would misread
+      // as genuinely-unresolved work.
+      if (gateDroppedCurrent.has(id)) continue
       retired[id] = record
     }
     return retired
@@ -586,11 +626,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         for (const [id, record] of Object.entries(legacy)) {
           if (id in merged) continue
           if (archivedIds.has(id)) continue
+          // OPT-12: same exclusion as filterLegacy — the baseline gate may
+          // have quarantined the resolved twin away from `fresh` just now
+          // (reported through onGateDrop below); the legacy pending twin
+          // must not be re-imported on top of that absence.
+          if (gateDroppedCurrent.has(id)) continue
           merged[id] = record
           retired[id] = record
         }
         return merged
-      })
+      }, { onGateDrop: noteGateDrop })
       await io().rename(pathOf(PENDING_LEGACY_FILE), `${pathOf(PENDING_LEGACY_FILE)}.migrated`)
       legacyMigrated = true
       return retired
@@ -894,6 +939,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})), [record.id]: record }
+          // OPT-13 (2026-09, plan D2): pending/executing rows are never
+          // trimmed (the seam's deliberate C-6 contract) — this warn is the
+          // growth signal. Without it, an absent approver plus a
+          // cadence-driven review pipeline grew the file (and every
+          // mutation's full rewrite) with no observable trace.
+          const liveCount = Object.values(map).filter(entry => entry.status === 'pending' || entry.status === 'executing').length
+          if (liveCount > PENDING_RESOLVED_CAP && !warnedPendingCapacity) {
+            warnedPendingCapacity = true
+            ctx.logger.warn(`evolution-state-json: ${liveCount} pending/executing staged records exceed the resolved cap (${PENDING_RESOLVED_CAP}) — they are never trimmed by design; resolve or reject them (/evolution pending) or the file keeps growing`)
+          }
+          if (liveCount <= PENDING_RESOLVED_CAP) warnedPendingCapacity = false
           return map
         })
       })

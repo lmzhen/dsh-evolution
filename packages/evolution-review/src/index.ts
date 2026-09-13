@@ -835,6 +835,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // the plan is authored against this state; executePlan refuses a
       // full-content update whose target drifted while the review ran.
       const preRunHashes = await treeSkillHashes()
+      // OPT-15 (2026-09): the evidence bound is the seq the plan was authored
+      // against — read it BEFORE the subagent runs, not after `run.result`.
+      // The post-run read let every event appended during the (≤120s) review
+      // window — which the model never saw — widen the accepted evidence
+      // range (the validator accepts any integer in [0, sessionSeq]).
+      const sessionSeqAtPlanTime = session.seq - 1
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: reviewText }],
@@ -873,7 +879,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
             ctx.logger.warn(`dsh-evolution-review: review-error emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
           }
-          ctx.logger.warn('dsh-evolution-review: review subagent returned no structured plan')
+          // OPT-17 (2026-09): carry the upstream failure taxonomy — a refusal
+          // or a token-ceiling stop is a different operator problem from a
+          // schema miss, and this failure path always falls through to the
+          // synchronous inject re-review (a second full review), so the log
+          // must say WHY the child produced nothing.
+          const failureShape = result as { stopReason?: unknown; diagnostic?: unknown }
+          const stopDetail = typeof failureShape.stopReason === 'string' ? failureShape.stopReason : undefined
+          const diagDetail = typeof failureShape.diagnostic === 'string' ? failureShape.diagnostic : undefined
+          ctx.logger.warn(`dsh-evolution-review: review subagent returned no structured plan${stopDetail !== undefined ? ` (stopReason=${stopDetail}${diagDetail !== undefined ? `; diagnostic=${diagDetail}` : ''})` : ''}`)
           return false
         }
         // v3-round self-check: collect AFTER the subagent finished so its own
@@ -884,7 +898,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const plan: unknown = result.structured
         const policyFingerprint = fingerprintPolicy(snapshot)
         const validation = validateEvolutionPlan(plan as EvolutionPlan, {
-          sessionSeq: session.seq - 1,
+          sessionSeq: sessionSeqAtPlanTime,
           maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
           protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
           maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
@@ -1147,7 +1161,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // same contract as the tool's staging (the runner refuses a replay
         // whose live content no longer matches). Review ops re-read through a
         // lightweight read-only library; patch ops carry old_string anchors
-        // and need no hash.
+        // and get no stage-time hash — their drift check happens at execute
+        // time against the pre-run snapshot (OPT-16, see the hash gate below).
         let stageCurrent: string | null = null
         if ((args.action === 'update' || args.action === 'edit') && hashLibrary && typeof args.name === 'string' && args.name !== '') {
           stageCurrent = await hashLibrary.read(args.name).catch(() => null)
@@ -1167,17 +1182,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // work is not clobbered (both-writers-success eliminated on this
         // channel). Runs for BOTH the direct and the staged path.
         const opName = typeof args.name === 'string' ? args.name : ''
-        const hashChecked = (args.action === 'update' || args.action === 'edit') && opName !== '' && preRunHashes?.has(opName) === true
+        // OPT-16 (2026-09): patch ops join the REV-06(b) staleness gate. They
+        // previously skipped it on the theory that old_string anchors carry
+        // their own protection — but a patch applies whenever the anchor
+        // still OCCURS, so a rewritten v2 that retained the anchor sentence
+        // took the patch on top of content the review never saw (the exact
+        // concurrent-writer window this gate exists for). Same refusal
+        // wording and fail-closed reading as update/edit.
+        const hashChecked = (args.action === 'update' || args.action === 'edit' || args.action === 'patch') && opName !== '' && preRunHashes?.has(opName) === true
         if (hashChecked) {
           // C10 (v35): the staging read above already holds this skill's bytes —
           // for update/edit ops nothing awaited in between — so the pre-run
           // comparison reuses them instead of issuing a second read of the same
           // file (a null here also covers the no-library case, as before).
-          const live = stageCurrent
+          // OPT-16: patch ops were never stage-read; they read the CURRENT
+          // bytes fresh (a null reads as drift and refuses, fail-closed).
+          const live = args.action === 'patch'
+            ? (hashLibrary ? await hashLibrary.read(opName).catch(() => null) : null)
+            : stageCurrent
           const preRun = preRunHashes.get(opName)
           if (live === null || (preRun !== undefined && contentHash(live) !== preRun)) {
             ok = false
-            failedOps.push(`skill ${args.action} ${args.name}: the skill changed while this review ran — update refused as stale; produce a fresh plan`)
+            failedOps.push(`skill ${args.action} ${args.name}: the skill changed while this review ran — ${args.action === 'patch' ? 'patch' : 'update'} refused as stale; produce a fresh plan`)
             continue
           }
         }

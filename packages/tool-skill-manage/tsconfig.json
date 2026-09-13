@@ -8,6 +8,7 @@
     { "path": "../evolution-core" },
     { "path": "../skill-usage" },
     { "path": "../../core/tools" },
+    { "path": "../../skill/skill" },
     { "path": "../../test-support/agent-loop-testkit" },
     { "path": "../evolution-io" }
   ]

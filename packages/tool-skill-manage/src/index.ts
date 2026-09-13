@@ -21,8 +21,9 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
 export const name = 'tool-skill-manage'
@@ -46,6 +47,11 @@ export interface Config {
    * strict ANY-hit-blocks behavior is unchanged; deployments opt in per
    * label for known false-positive content. */
   threatExemptLabels?: string[]
+  /** OPT-19 (2026-09, plan D3): when true, a write whose name the platform
+   * catalog resolves to a NON-family source (project/custom sources outrank
+   * the family tree) is REFUSED instead of warned about. Default false —
+   * warn only, keeping the family tree an autonomous evolution zone. */
+  strictCrossSource?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -60,6 +66,8 @@ export const Config: z<Config> = z.object({
   // V10-03 (P2-18): default empty — the strict ANY-hit-blocks threat scan is
   // unchanged unless a deployment explicitly opts labels in.
   threatExemptLabels: z.array(z.string()).default([]),
+  // OPT-19 (plan D3): default warn-only on cross-source same-name writes.
+  strictCrossSource: z.boolean().default(false),
 })
 
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
@@ -137,6 +145,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (numericClamped.length > 0) {
     ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
   }
+  // OPT-19 (plan D3): soft view of the platform catalog for the cross-source
+  // check below. `ctx.get` rather than the property proxy: this plugin does
+  // not inject `skills`, so an absent service must read as `undefined`
+  // instead of throwing (the type import above carries the platform's
+  // `Context.skills` augmentation). `undefined` also covers an unknown name
+  // and a failed discovery; the write then proceeds family-local exactly as
+  // before this check existed.
+  const catalogWinner = async (name: string): Promise<SkillSummary | undefined> => {
+    const catalog = ctx.get('skills')
+    if (catalog === undefined) return undefined
+    try {
+      const summaries = await catalog.list()
+      return summaries.find(summary => summary.name === name)
+    } catch {
+      return undefined
+    }
+  }
 
   async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[] }> {
     const action = args.action
@@ -194,18 +219,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // action, before anything is read or written. An EMPTY string still reaches
     // the library: its messages carry the more specific remedy (e.g. an empty
     // patch anchor points at `update`).
-    const REQUIRED_ARGS: Record<string, readonly string[]> = {
-      create: ['name', 'content'],
-      edit: ['name', 'content'],
-      update: ['name', 'content'],
-      patch: ['name', 'old_string', 'new_string'],
-      delete: ['name'],
-      write_file: ['name', 'file_path', 'file_content'],
-      remove_file: ['name', 'file_path'],
-      restructure: ['name'],
-      pin: ['name'],
-      unpin: ['name'],
-    }
+    // OPT-05 (2026-09): the table moved to core `SKILL_ACTION_REQUIRED_FIELDS` —
+    // the plan validator reads the same rows, so a plan can no longer pass
+    // validation for an op the tool would then refuse for missing arguments
+    // (write_file/remove_file lacked a file_path requirement validator-side).
+    const REQUIRED_ARGS = SKILL_ACTION_REQUIRED_FIELDS
     // `action` is optional on the queued/staged args shape, so the index needs
     // a narrowing first (an unknown action is refused by its own branch below).
     // v29 TSM-01: the guard must be an OWN-property check — a plain-object
@@ -442,10 +460,41 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // (`exec.agent?.session.header.origin`) — an execution without a session
       // object would TypeError here. Full-depth chaining matches the exec
       // contract (agent and session are both optional); same fix as tool-memory.
+      // OPT-01 (2026-09, against platform 0.1.5-rc.2): ToolRuntime passes a
+      // DEEP-FROZEN args object to execute (core/tools `deepFreeze` on the
+      // execution context), so the stage anchor is built into a SHALLOW COPY
+      // instead of being assigned onto `args` — the in-place write threw
+      // `TypeError: ... not extensible` on EVERY real dispatch of
+      // update/edit/write_file/remove_file (the plain-harness tests passed
+      // because they mount no approval service and skip the block entirely).
+      // The copy feeds BOTH the staged record and the direct executeCore call,
+      // so the direct path keeps the same lock-verified staleness guard it had
+      // while the tag lived on `args`. Declared unconditionally: create/delete
+      // (and approval-less compositions) pass `args` through untouched.
+      let operation: SkillWriteArgs = args
       const origins = resolveOrigins(exec.agent?.session?.header.origin)
       const reviewOrigin = origins.approval
       const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
+      // OPT-19 (2026-09, plan D3): the library is pinned to the family root,
+      // but the platform catalog may resolve the SAME name to a higher-rank
+      // source (project-dsh / project-agents / custom all outrank the family
+      // tree) — the model then edits bytes the catalog never serves, and both
+      // sides report success. Compare against the catalog's winning summary
+      // and warn (or refuse under `strictCrossSource`). The catalog service
+      // is soft-probed: a host without ctx.skills, a missing name (family
+      // skill not yet published) or a discovery failure writes family-local
+      // exactly as before.
+      if (typeof args.name === 'string' && args.name !== '' && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
+        const winner = await catalogWinner(args.name)
+        if (winner !== undefined && winner.provider !== 'dsh-evolution') {
+          const message = `skill "${args.name}" resolves to a higher-priority "${winner.source}" skill (provider "${winner.provider}"); this write lands on the family copy, which the catalog does NOT serve — edit the "${winner.source}" copy or rename.`
+          if (rawConfig.strictCrossSource === true) {
+            return { ok: false, message: `Refused: ${message}`, skills: [] }
+          }
+          ctx.logger.warn(`skill_manage: ${message}`)
+        }
+      }
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
         // v23 (AP-3): full-content updates carry the stage-time content hash so
@@ -454,7 +503,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // found" naturally.
         if ((args.action === 'update' || args.action === 'edit') && typeof args.name === 'string' && args.name !== '') {
           const stageCurrent = await library.read(args.name).catch(() => null)
-          if (stageCurrent !== null) (args as { staged_from_sha256?: string }).staged_from_sha256 = contentHash(stageCurrent)
+          if (stageCurrent !== null) operation = { ...args, staged_from_sha256: contentHash(stageCurrent) }
         }
         // v30 REV-03: the anchor extends to support-file writes/removes —
         // the staged sha covers the file's current bytes, or the sentinel
@@ -462,7 +511,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // unreadable target stays unanchored (documented residual).
         if ((args.action === 'write_file' || args.action === 'remove_file') && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
           const stageFile = await library.readSupportFile(args.name, args.file_path).catch(() => undefined)
-          if (stageFile !== undefined) (args as { staged_from_sha256?: string }).staged_from_sha256 = stageFile === null ? 'absent' : contentHash(stageFile)
+          if (stageFile !== undefined) operation = { ...args, staged_from_sha256: stageFile === null ? 'absent' : contentHash(stageFile) }
         }
         const decision = await approval.request({
           kind: 'skill',
@@ -471,7 +520,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // origin (review channel for any subagent) AND the library origin
           // (a delegated subagent stays 'subagent'), so replay preserves the
           // pinned-guard distinction instead of folding subagent to review.
-          args: { operation: args, origin: reviewOrigin, libraryOrigin },
+          args: { operation, origin: reviewOrigin, libraryOrigin },
           origin: reviewOrigin,
           // 0.3.20 (N-1): session id rides along so the approval service can
           // derive the platform override (see tool-memory for the rationale).
@@ -493,7 +542,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
         }
       }
-      return await executeCore(args, libraryOrigin)
+      return await executeCore(operation, libraryOrigin)
     },
   }))
 

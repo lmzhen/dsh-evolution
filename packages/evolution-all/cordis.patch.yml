@@ -154,6 +154,12 @@
 # `tool-skill` Config): catalogDescriptionMaxLength.
 # verify-declared-config.mjs --upstream recomputes this list from the platform
 # source and fails when the row gains a key this comment does not name.
+# OPT-29 (2026-09): on the WEB plane the upstream web-app patch disables the
+# profile-root tool-skill row entirely (web-app/cordis.patch.yml: tool-skill
+# disabled: true) — there this override patches an entry that never starts.
+# That is harmless today (root sessions on web have no skill tool at all), and
+# preset-scope sessions are covered by the composer injection; the override
+# reaches base-plane (headless) root sessions only.
 - id: tool-skill
   config:
     catalogDescriptionMaxLength: 60

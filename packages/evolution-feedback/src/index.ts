@@ -322,6 +322,14 @@ export class EvolutionFeedback {
     return (record.positive - record.negative) / total
   }
 
+  /**
+   * Deep-copy view of the live aggregate.
+   *
+   * OPT-26 (2026-09): `@internal` — test-support API, NO production consumer
+   * in the family (mirrors the explicit posture of evolution-replay's
+   * `plansSnapshot()`). External consumers should read the rendered
+   * score/warn surfaces instead of relying on this shape.
+   */
   snapshot(): FeedbackState {
     // P3 (v15): deep-enough copy — the records themselves are copied too, so
     // a consumer mutating a snapshot record can no longer poison the live
@@ -487,12 +495,28 @@ function parseCache(raw: string | null, warn: (message: string) => void = () => 
 /** Per-record numeric-domain validation (S6.4): a record whose `positive` or
  * `negative` is not a finite number >= 0, or whose `lastNote` is not a string,
  * would fold as NaN into the usage aggregate — skip it with a warn instead of
- * corrupting the state. A record with no valid count is dropped entirely. */
+ * corrupting the state. A record with no valid count is dropped entirely.
+ * OPT-25 (2026-09): a count ABOVE `MAX_MIGRATED_EVENTS_PER_RECORD` is now
+ * CLAMPED here with a warn, symmetric with the migration reader's clamp (same
+ * file, same threat model — V24-05 covered the migration side only). Before,
+ * a poisoned boot-cache count folded as-is into every downstream decision;
+ * the clamp bounds the skew to the same ceiling migration accepts. */
 function sanitizeCacheRecords(input: Record<string, unknown>, kind: 'skill' | 'session', warn: (message: string) => void): Record<string, FeedbackRecord> {
   const out: Record<string, FeedbackRecord> = {}
   for (const [target, value] of Object.entries(input)) {
     const record = sanitizeFeedbackRecord(value, target, kind, warn)
-    if (record) out[target] = record
+    if (record) {
+      let clamped: FeedbackRecord | undefined
+      if (record.positive > MAX_MIGRATED_EVENTS_PER_RECORD || record.negative > MAX_MIGRATED_EVENTS_PER_RECORD) {
+        warn(`evolution-feedback: cache record for ${kind} "${target}" exceeds the clamp ceiling (${MAX_MIGRATED_EVENTS_PER_RECORD}) — clamping like the migration reader`)
+        clamped = {
+          positive: Math.min(record.positive, MAX_MIGRATED_EVENTS_PER_RECORD),
+          negative: Math.min(record.negative, MAX_MIGRATED_EVENTS_PER_RECORD),
+          ...(record.lastNote !== undefined ? { lastNote: record.lastNote } : {}),
+        }
+      }
+      out[target] = clamped ?? record
+    }
   }
   return out
 }

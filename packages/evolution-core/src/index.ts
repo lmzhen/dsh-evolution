@@ -7,6 +7,23 @@
  * the host auto-assembles to register this package's no-op invariant);
  * consumers import named exports from the package root so published npm
  * bundles never depend on source subpaths.
+ *
+ * ## Layer map (OPT-28, 2026-09) — locate code by LAYER, not by directory
+ *
+ * This one physical package carries THREE architecture layers of the family;
+ * when adding or looking for something, go by the export's layer:
+ *
+ * - **Cross-cutting basics** — `state-store.ts` (env roots — the single
+ *   source of DSH-home semantics), `serial.ts`, `numeric.ts`, `constants.ts`,
+ *   `mutations.ts`, `events.ts`, `gates.ts`.
+ * - **Security primitives** — `threats.ts` (content threat scanner),
+ *   `redact.ts` (credential masking at model boundaries). Consumers:
+ *   evolution-policy/threat, both stores, review, maintenance.
+ * - **Core domain stores/logic** — `skill-store.ts` (skill tree engine +
+ *   IO-seam consumer), `memory-store.ts`, `usage.ts`, `curator.ts`,
+ *   `quality.ts`, `signals.ts`, `drift-signals.ts`, `skill-health.ts`,
+ *   `preset-composition.ts`, `prompts.ts`, `learn-prompt.ts`,
+ *   `evolution-events.ts`, `io.ts` (the ctx.evolutionIo seam itself).
  * @module @deepseek-ai/dsh-evolution-core
  */
 

@@ -36,7 +36,7 @@ policy, prompts, routing, state, and audit history are control-plane data.
 | `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
 | `evolution-activity` | Durable audit store for self-evolution plan outcomes (`evolution/plan-applied`) |
-| `evolution-feedback` | Durable feedback → `feedback_score`/`feedback_warn` → curator (union-read with `quality_warn`) |
+| `evolution-feedback` | Durable feedback store; exposes `evolutionFeedback.record()` for hosts/custom commands — the family ships NO producer (the upstream `/feedback` event is free text), so `feedback_score`/`feedback_warn` fire only when a deployment wires one (union-read with `quality_warn` in the curator) |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
 | `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |

@@ -321,8 +321,12 @@ export class EvolutionCurator extends Service {
     // surface reports success) but nothing was persisted, and the very next
     // auto-check ran as if never paused. Declare the loss on the logger: the
     // pause is NOT persisted and will not survive the process.
+    // OPT-21 (2026-09): the wording now also states the part operators
+    // assumed and the code never did — there is NO in-memory paused flag, so
+    // on a state-less composition the pause does not apply WITHIN this
+    // process either. The next due tick runs a full pass regardless.
     if (!stateService) {
-      this.ctx.logger.warn('evolution-curator: curator state service absent; pause not persisted')
+      this.ctx.logger.warn('evolution-curator: curator state service absent — pause NOT effective (not persisted, and this process keeps auto-running; mount the evolution-state stack to pause)')
       return
     }
     // E-16 (S5.5): one atomic read-modify-write instead of the previous
@@ -835,6 +839,32 @@ export class EvolutionCurator extends Service {
       }
     }
     const snapshotPath = dryRun ? undefined : await this.snapshotFull('pre-curator-run')
+    // OPT-18 (2026-09): post-snapshot re-check of the same min-idle gate. The
+    // v28 G4.2 commit-boundary check above runs BEFORE `snapshotFull` — a
+    // whole-tree copy of unbounded duration — so a session activating DURING
+    // the snapshot still slipped into the mutation phase against a review
+    // that may be mid-flight. The re-check closes that residual window; the
+    // already-taken snapshot is retained and pruned by the usual rotation.
+    // The seeded usage baseline is persisted here too (v29 CUR-04 rationale:
+    // discarding it would re-seed a NEWER created_at on every blocked attempt).
+    if (!ignoreGates && this.minIdleHours > 0 && this.recentSessionActive()) {
+      if (!dryRun) {
+        try {
+          await mutateUsage(root, this.io, (map) => {
+            for (const [name, record] of usage) {
+              if (!map.has(name)) map.set(name, { ...record })
+            }
+          })
+        } catch (error) {
+          this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
+        }
+      }
+      return {
+        stale: [], archived: [], errors: [],
+        report: this.skippedReport(runId, startedAt),
+        skipped: 'active-session',
+      }
+    }
     const { archivedSkills, errors, consolidated } = await this.applyMutations({
       dryRun,
       archiveCandidates,
@@ -918,7 +948,11 @@ export class EvolutionCurator extends Service {
     const llmHint = !this.llmReview && result.markStale.length > 0
       ? ' (llmReview: off - deterministic archive only; set llmReview: true for the LLM merge channel)'
       : ''
-    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${gatedNominations.consolidations.length}${llmHint}`
+    // OPT-20 (2026-09): count EXECUTED merges (the same list the JSON report
+    // carries), not gate-passed nominations — refused/failed consolidations
+    // were counted here, so curator status overstated executed merges while
+    // the report told the truth.
+    const summary = `${dryRun ? 'dry-run' : 'auto'}: stale:${result.markStale.length} archived:${archivedSkills.length} consolidated:${consolidated.length}${llmHint}`
     // Preserve an operator pause (rc.43 G2 regression fix): the paused gate
     // read `persisted` at run start, but the operator may pause while this
     // pass is in flight — and a manual run is ALLOWED while paused. Either

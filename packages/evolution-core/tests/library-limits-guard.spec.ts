@@ -24,8 +24,8 @@ const REGISTERED_DEFAULTS: Record<string, string> = {
   'evolution-learning-graph/src/index.ts:451': 'read-only: withSkills() serves reads and the graph read path',
   'evolution-maintenance/src/tools.ts:78': 'read-only: the maintenance probe walks the tree',
   'evolution-review/src/index.ts:760': 'read-only: the pre-run hash snapshot',
-  'evolution-review/src/index.ts:1101': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
-  'evolution-skill-catalog/src/index.ts:93': 'read-only: the catalog walk',
+  'evolution-review/src/index.ts:1115': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
+  'evolution-skill-catalog/src/index.ts:98': 'read-only: the catalog walk',
 }
 
 const WRITE_CALL = /\.(?:create|update|patch|archive|writeSupportFile|removeSupportFile|setPinned|restructure|consolidate)\(/

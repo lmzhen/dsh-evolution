@@ -713,7 +713,13 @@ export async function uninstall(options = {}) {
             console.warn(`install-layered: ${warnError instanceof Error ? warnError.message : String(warnError)}`)
           })
           if (others.length > 0) { otherProfileStillUsesPreset = true; break }
-          const otherJournal = readInstallJournal(join(profilesDir, entry.name))
+          // OPT-02 (2026-09): `readInstallJournal` is async — the missing
+          // await made `otherJournal` a Promise, `?.agentPreset` was always
+          // undefined, and the v31 INST-04 guard never fired for exactly its
+          // target case (a journal-only profile with no bundle rows). The
+          // uninstall sweep then deleted the home-global Evolution preset
+          // while another profile's journal said it still owns it.
+          const otherJournal = await readInstallJournal(join(profilesDir, entry.name))
           if (otherJournal?.agentPreset === true) { otherProfileStillUsesPreset = true; break }
         }
       }

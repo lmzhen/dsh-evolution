@@ -172,12 +172,31 @@ describe('evolution-plan-validator', () => {
 
   it('P3 (v15): write_file is gated on file_content ONLY (executor parity)', () => {
     // The old `?? op.content` fallback admitted a write_file whose executor
-    // write landed an EMPTY support file.
+    // write landed an EMPTY support file. OPT-05 note: file_path is supplied
+    // here so this case isolates the file_content gate (the file_path
+    // requirement is covered by its own test below).
     const result = validateEvolutionPlan({
       memoryOps: [{ target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }],
-      skillOps: [{ action: 'write_file', name: 'demo', content: 'content only', evidence: [{ event_seq: 1 }] }],
+      skillOps: [{ action: 'write_file', name: 'demo', content: 'content only', file_path: 'references/note.md', evidence: [{ event_seq: 1 }] }],
     }, { sessionSeq: 10 })
     expect(result.ok).toBe(false)
     expect(result.rejected.some(r => r.reason.includes('write_file requires file_content'))).toBe(true)
+  })
+
+  it('OPT-05: write_file / remove_file without file_path are rejected (shared required-fields table, executor parity)', () => {
+    // The validator used to accept these ops; the executor requires file_path,
+    // so every approve of the staged write failed deterministically and the
+    // row could only be rejected. The requirement now comes from the SAME
+    // core table the tool's argument gate reads (SKILL_ACTION_REQUIRED_FIELDS).
+    const result = validateEvolutionPlan({
+      memoryOps: [{ target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }],
+      skillOps: [
+        { action: 'write_file', name: 'demo', file_content: 'body', evidence: [{ event_seq: 1 }] },
+        { action: 'remove_file', name: 'demo', evidence: [{ event_seq: 1 }] },
+      ],
+    }, { sessionSeq: 10 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected.some(r => r.reason.includes('write_file requires file_path'))).toBe(true)
+    expect(result.rejected.some(r => r.reason.includes('remove_file requires file_path'))).toBe(true)
   })
 })
