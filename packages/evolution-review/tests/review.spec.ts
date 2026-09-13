@@ -485,6 +485,12 @@ async function mountReviewFixture(options: {
   noFollowup?: boolean
   failSaveFrom?: number
   events?: Array<Record<string, unknown>>
+  /** 0.3.73: register a CLASS agent whose wake primitives are prototype methods
+   * touching `this` (the platform ReactLoopAgent shape) instead of the bound
+   * arrow-property stub. A detached call throws here — the stub above cannot
+   * express that, which is why the suite stayed green while every real delivery
+   * threw (see the 0.3.73 regression case). */
+  classAgent?: boolean
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
@@ -519,8 +525,25 @@ async function mountReviewFixture(options: {
     ],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
   } as unknown as Session
-  const agent = { id: session.id, session, inject: (message: unknown) => { options.onInject?.(message) } } as unknown as Agent
-  if (!options.noFollowup) {
+  const record = (kind: 'inject' | 'followup', message: unknown): void => {
+    if (kind === 'followup' && options.onFollowup) options.onFollowup(message)
+    else options.onInject?.(message)
+  }
+  // Prototype methods that go through `this` — a detached reference throws
+  // exactly like the platform's ReactLoopAgent.followup does (`this.send`).
+  // Without the `this` hop the stub would survive detachment, which is the
+  // blind spot this fixture exists to close.
+  const makeClassAgent = (): Agent => new (class {
+    readonly id = session.id
+    readonly session = session
+    inject(message: unknown): void { this.forward('inject', message) }
+    followup(message: unknown): void { this.forward('followup', message) }
+    forward(kind: 'inject' | 'followup', message: unknown): void { record(kind, message) }
+  })() as unknown as Agent
+  const agent = options.classAgent === true
+    ? makeClassAgent()
+    : { id: session.id, session, inject: (message: unknown) => { options.onInject?.(message) } } as unknown as Agent
+  if (options.classAgent !== true && !options.noFollowup) {
     ;(agent as { followup: unknown }).followup = (message: unknown) => {
       if (options.onFollowup) options.onFollowup(message)
       else options.onInject?.(message)
@@ -656,6 +679,68 @@ it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires 
   // turn7: after the second zero the new segment is silent again.
   emitEnd(7); await settle()
   expect(injected).toHaveLength(2)
+})
+
+it('0.3.73: the wake delivery calls followup ON the agent — a prototype method must keep its receiver', async () => {
+  // Control first: this environment throws when a prototype method is detached
+  // (module code is strict) — the platform behaviour the case below depends on,
+  // and the reason a bound arrow stub cannot reproduce the defect.
+  class Probe {
+    mark(): void { this.touch() }
+    touch(): void { /* receiver reached */ }
+  }
+  // The cast erases the METHOD-ness for the type checker (which is exactly why
+  // `typescript(unbound-method)` stays silent on the production form, where the
+  // receiver is a cast shape too) while the runtime value is still the prototype
+  // method — so the detached call throws.
+  const detached = (new Probe() as unknown as { mark: () => void }).mark
+  expect(() => { detached() }).toThrow()
+
+  const injected: unknown[] = []
+  const followed: unknown[] = []
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    classAgent: true,
+    onInject: message => injected.push(message),
+    onFollowup: message => followed.push(message),
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(followed).toHaveLength(1) })
+  expect(injected).toHaveLength(0)
+  // The delivery reached the host, so the segment IS consumed: both counters are
+  // zeroed. (Pre-0.3.73 the detached call threw inside deliverMessage, the catch
+  // warned, and this reset ran anyway — nothing was queued and nothing retried.)
+  const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
+  expect(saved.turnsSinceMemory).toBe(0)
+  expect(saved.turnsSinceSkill).toBe(0)
+})
+
+it('0.3.73: a refused wake delivery is not consumed — the review retries at the next boundary', async () => {
+  const followed: unknown[] = []
+  let refuse = true
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    classAgent: true,
+    onFollowup: (message) => {
+      if (refuse) throw new Error('host refused the wake')
+      followed.push(message)
+    },
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
+  emitEnd(1); await settle()
+  // The delivery was refused: the counters must NOT be zeroed (the former silent
+  // consumption declared a segment that never got its review).
+  const afterRefusal = stateBox.current as { turnsSinceSkill: number }
+  expect(afterRefusal.turnsSinceSkill).toBeGreaterThan(0)
+  expect(followed).toHaveLength(0)
+  // The latch survives, so the next completed boundary retries and delivers.
+  refuse = false
+  emitEnd(2); await settle()
+  expect(followed).toHaveLength(1)
 })
 
 it('0.3.45: the review output schema stays inside the raw JSON-Schema type whitelist (V8-01)', () => {

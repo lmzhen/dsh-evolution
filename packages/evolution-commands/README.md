@@ -15,6 +15,11 @@ Human commands for the evolution family
 P2-22 (v11) correction: this package's **only** direct model-visible token is the
 `/evolution learn` injection — the full learning guidance is injected as a user
 message in this session. Everything else adds no tokens; consumers add their own.
+The injection goes through the agent's waking primitive (`followup`, falling back
+to `inject` when the host lacks it), **called on the agent instance**: the
+platform's `Agent.followup` is a prototype method (`this.send(...)`), so a
+detached reference throws and queues nothing (0.3.73 fix; the same shape is
+pinned by `evolution-host/tests/wake-delivery-guard.spec.ts`).
 
 #### KV Cache effect
 

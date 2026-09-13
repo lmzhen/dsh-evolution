@@ -81,6 +81,33 @@ describe('evolution-commands', () => {
     expect(injected).toHaveLength(1)
   })
 
+  it('0.3.73: learn calls the wake primitive ON the agent (a prototype method keeps its receiver)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    await ctx.plugin(Commands)
+    const followed: unknown[] = []
+    // The platform Agent is a CLASS whose `followup` is a prototype method that
+    // calls `this.send(...)`; the object-literal stub in the case above is a
+    // bound arrow property, so it stayed green while the 0.3.68 form
+    // (`const followup = agent.followup; followup(message)`) threw on every real
+    // learn and queued nothing.
+    class PlatformLikeAgent {
+      readonly injected: unknown[] = []
+      followup(message: unknown): void { this.record(message) }
+      inject(message: unknown): void { this.injected.push(message) }
+      private record(message: unknown): void { followed.push(message) }
+    }
+    const agent = new PlatformLikeAgent()
+    const result = await captured!.handler({ rawInput: 'learn capture the wake-path lesson', agent })
+    expect(result.text).toContain('Follow it now')
+    expect(followed).toHaveLength(1)
+    expect(agent.injected).toHaveLength(0)
+    const message = followed[0] as { role?: string; content?: Array<{ text?: string }> }
+    expect(message.role).toBe('user')
+    expect(message.content?.[0]?.text).toContain('capture the wake-path lesson')
+  })
+
   it('skills health renders degraded structure rows or a clean verdict (rc.73 A1)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined

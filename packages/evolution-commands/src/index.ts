@@ -362,9 +362,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             content: [{ type: 'text', text: buildLearnPrompt(request) }],
             source: { kind: 'plugin', plugin: 'dsh-evolution-commands', form: 'notice', summary: 'learn request' },
           })
-          const followup = (invocation.agent as unknown as { followup?: (message: unknown) => void }).followup
-          const woke = typeof followup === 'function'
-          if (woke) followup(message)
+          // 0.3.73: call the wake primitive ON the agent. Reading it into a local
+          // (the 0.3.68 form) detaches the receiver, and the platform Agent's
+          // `followup` is a prototype method that calls `this.send(...)` — every
+          // detached call threw, nothing was queued, and the command still
+          // reported "Follow it now". Bound arrow stubs in tests cannot show it.
+          const woke = typeof (invocation.agent as { followup?: unknown }).followup === 'function'
+          if (woke) (invocation.agent as unknown as { followup: (message: unknown) => void }).followup(message)
           else invocation.agent.inject(message)
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is

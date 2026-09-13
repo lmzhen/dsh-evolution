@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.3.73 (patch) — 修复「注入提示词自 2026-09-07 起静默消失」：唤醒投递丢接收者 + 同类全库排查 + 机械门禁
+
+> **症状**：很久没有出现 `[Auto-review — Skills]` 注入提示词（用户报告）。
+> **根因（不是计数、也不是时机，是接口用法）**：`deliverMessage` 把 `agent.followup` **取成局部变量后再调用**——方法脱离了实例，`this` 丢失。平台 `ReactLoopAgent.followup` 是**原型方法**（`this.send(input, 'next-turn', true)`），因此每次投递都抛 `TypeError: Cannot read properties of undefined (reading 'send')`；调用点的 `catch` 只 `ctx.logger.warn`（console，不落任何会话记录），而**计数照旧清零** → 每段任务的复习被"静默消费"：既没有提示词，也没有结果通知，也没有任何重试。
+> **时间线证据**：会话 `b7f84810` 累计 **212 次**注入、最后一次 **2026-09-07 19:30:23**；同一天 **0.3.40（`6bd59d5`）** 引入该写法（0.3.42 `b4eff81` 把"结果通知"也接上它），此后 6 天 **0 次**注入，而期间**触发一切正常**（本会话 `review-state.json` 的 `lastTurn` 与会话日志的 `turn/end` 逐字对齐；近 14 小时 24 次 review 子代理照常生成）。
+> **同类全库排查**：扫描 230 个生产文件（`const x = obj.method` 赋值、对象字面量回调、解构、`map/then/on` 传方法引用四类形态）→ 命中 **2 处**，已全部修复；另 1 处同类形态经核验**安全**。
+
+### 修复
+
+- **`evolution-review`**：`deliverMessage` 改为**在实例上调用**唤醒原语，并返回 `boolean`（失败只 `warn`，不再抛）。**投递被拒时不再清零计数、不再丢弃 latch**：该段复习保留到下一个 `completed` 边界重试——四处调用（显式 `inject` 模式、子代理失败回退、completion 通道、deferred 队列 drain）统一该契约。结果通知改为直接调用（内部自警，不再需要外层 try/catch）。
+- **`evolution-commands`**：`/evolution learn` 同样改为在实例上调用（0.3.68 `6baea33` 引入；症状＝命令报 "Follow it now" 而实际什么都没投递）。
+- **核验安全**：`skill-store` 的 `const t = ioLike.transact; t(path, task)` 属同类形态但**安全**——seam 类型显式声明 `transact?(this: void, …)`，且两个实现（`nodeEvolutionIo` 的对象字面量、io adapter 的箭头属性）都不使用 `this`。
+
+### 为什么既有测试与 lint 都没抓到
+
+- 所有桩都是**对象字面量箭头函数**（`followup: (m) => {…}`）——天然绑定，脱离调用照常工作；平台是**真类实例**（原型方法）。
+- `typescript(unbound-method)` 规则**确实处于启用状态**，但原写法把接收者 cast 成**属性形态**（`(agent as { followup?: (m) => void }).followup`），"方法性"被擦除，规则因此看不见——**cast 成函数属性 = 同时骗过类型系统与 lint**。
+
+### 新增门禁与回归（红/绿实证）
+
+| 测试 | 钉住的契约 |
+|---|---|
+| `evolution-review/tests/review.spec.ts` 新增 2 条 | 类实例（原型方法经 `this`）上投递必须成功；**投递被拒时不得消费该段**（计数不清零 + 下一次边界重试成功） |
+| `evolution-commands/tests/commands.spec.ts` 新增 1 条 | learn 的唤醒原语在实例上调用（走 `followup` 而非 `inject`） |
+| `evolution-host/tests/wake-delivery-guard.spec.ts`（新增） | **机械门禁**：生产 `src` 中禁止把 `followup`/`inject`/`steer` 取成局部或解构；自带检测器正例自证 + 扫描非空断言（正则失效不得空转通过） |
+| 红/绿实证 | 把两处临时改回"脱离实例"形态 → **4 条断言全红**（review ×2、commands ×1、守卫报出 2 处站点），恢复后 **69/69 绿**；全量门禁 **10/10**（vitest **113 文件 / 1089 用例**全绿、`tsc -b tsconfig.host.json` 0 错、`oxlint` 0 warnings / 0 errors） |
+
+### 行为变更
+
+- 投递失败从"静默消费一段复习"变为"**warn + 该段复习保留重试**"（计数不再无条件清零）。
+
+### 已知残余（本版未做，实测数据供决策）
+
+- `reviewTimeoutMs` 默认 **120 s**：近 14 小时 **24 次** review 子代理中 **17 次在恰好 120 秒被父级中止**（`turn/end reason {"kind":"aborted","reason":{"kind":"parent"}}`）——读技能 + 出计划跑不完。投递修好后中止会回退为"把提示词注入会话"（可见），但子代理通道成功率仍低；是否把默认抬到 300 s 属部署调优（`Config.reviewTimeoutMs` 已可覆盖）。
+- 投递失败仍只进 logger（不再静默吞掉整段复习，但也没有会话可见信号）。
+
 ## 0.3.72 (patch) — 全量审计 31/32 步落地：P0 冻结参数写入路径 + 4×P1 + 22×P2 收口
 
 > **输入**：`dsh-evolution-mirror-审计报告-2026-09-13.md`（1 P0 / 4 P1 / 22 P2，逐条附双端行号与触发场景）、`dsh-evolution-mirror-优化计划-2026-09-13.md`（G0–G7 共 32 步 + 5 个决策点）、`dsh-evolution-mirror-实施报告-2026-09-13.md`（31 步落地说明与 3 处实施偏差）。

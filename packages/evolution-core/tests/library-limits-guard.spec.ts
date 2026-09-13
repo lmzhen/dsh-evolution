@@ -17,14 +17,14 @@ import { fileURLToPath } from 'node:url'
  * here and forces the decision, while the register below stays the to-do list.
  */
 const REGISTERED_DEFAULTS: Record<string, string> = {
-  'evolution-commands/src/index.ts:389': 'read-only: the commands listing walks the tree, no write goes through this instance',
-  'evolution-commands/src/index.ts:468': 'read-only: as above',
-  'evolution-commands/src/index.ts:676': 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
+  'evolution-commands/src/index.ts:393': 'read-only: the commands listing walks the tree, no write goes through this instance',
+  'evolution-commands/src/index.ts:472': 'read-only: as above',
+  'evolution-commands/src/index.ts:680': 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
   'evolution-curator/src/index.ts:214': 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
   'evolution-learning-graph/src/index.ts:451': 'read-only: withSkills() serves reads and the graph read path',
   'evolution-maintenance/src/tools.ts:78': 'read-only: the maintenance probe walks the tree',
-  'evolution-review/src/index.ts:760': 'read-only: the pre-run hash snapshot',
-  'evolution-review/src/index.ts:1115': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
+  'evolution-review/src/index.ts:776': 'read-only: the pre-run hash snapshot',
+  'evolution-review/src/index.ts:1122': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
   'evolution-skill-catalog/src/index.ts:98': 'read-only: the catalog walk',
 }
 
