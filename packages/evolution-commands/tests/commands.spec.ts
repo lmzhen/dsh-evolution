@@ -555,6 +555,32 @@ describe('evolution-commands', () => {
     expect(existsSync(join(target, 'preset.yml'))).toBe(true)
   })
 
+  it('preset install --base ptc writes the ptc variant from the shared base table (0.3.75)', async () => {
+    const home = await tempHome('evo-commands-preset-ptc-')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // The base table is evolution-agent/bases.json — the SAME file
+    // install-layered.mjs reads. The npm path used to hardcode `standard`, so
+    // the ptc variant was unreachable here; the registry id is the base name.
+    const platformFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
+    const reads: string[] = []
+    ctx.provide('agentPresets', { read: async (id: string) => { reads.push(id); if (id !== 'ptc') throw new Error(`unknown preset ${id}`); return platformFixture } })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install --base ptc' })
+    expect(result.kind).toBe('success')
+    expect(reads).toEqual(['ptc'])
+    const target = join(home, '.agent-presets', 'evolution-ptc')
+    expect(readFileSync(join(target, 'agent.cordis.yml'), 'utf8')).toContain(platformFixture.trim())
+    expect(readFileSync(join(target, 'preset.ptc.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.ptc.yml', import.meta.url), 'utf8'))
+    // The variant dir carries its OWN metadata file, never the standard one.
+    expect(existsSync(join(target, 'preset.yml'))).toBe(false)
+    const unknown = await handler!.handler({ rawInput: 'preset install --base nonsense' })
+    expect(unknown.kind).toBe('error')
+    expect(unknown.text).toContain('bases.json')
+  })
+
   it('preset install fails loud when delta rows collide with the runtime standard (0.3.15)', async () => {
     await tempHome('evo-commands-preset-')
     const ctx = new Context()

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-io",
   "description": "IO seam for evolution providers",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -29,10 +29,6 @@
     "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
-  },
-  "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^"
   }
 }

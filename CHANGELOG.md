@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.3.75 (patch) — 依赖闭包**双向**化 · `newSkillLibrary()` 单一构造点 · 架构守卫 N12–N14（v41 阶段一，家族侧非破坏批次）
+
+> **本批的四条主线**（v41 §5.3 未落地项 + §6.1 npm/PTC 缺口 + §8 盲区）：
+> 1. **依赖闭包只朝一个方向看**：0.3.21 的守卫只问"import 了却没声明"，从不问"声明了却没人引用"——后者**永远不会让构建失败**，所以能活过任意次重构。实测：29 个包共 **71 条死声明**（其中 58 条 = 已退役的 `@deepseek-ai/dsh-invariants` companion，peer+dev 各 29），全部随发布清单出厂，给每个用户装上一堆幻影平台依赖。
+> 2. **`new SkillLibrary(...)` 有 11 个构造点**，各自重新推导 root、各自手搓 `evolution/skill-mutated` 事件箭头——事件名是跨包契约（catalog 就靠那个字符串失效缓存），第二份拼写就是一次静默分叉。
+> 3. **文档型结论没有机械锚**：`iface-audit/storage.md` 结论 4 引用的 `core/io.ts:*` 根本不存在（真实锚点见下）。
+> 4. **npm 路径够不到 ptc 变体**：base 表只活在 `install-layered.mjs` 里（源码树工具），`/evolution preset install` 把 `standard` 硬编码在**五处**，npm 用户无法安装 ptc 预设。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `scripts/verify-dependency-closure.mjs` | **新增正向半边**：`dependencies/peerDependencies/optionalDependencies/devDependencies` 的每一条声明都必须在本包内有**引用点**。引用点 = **带引号的模块说明符**（`from 'X'` / `import('X')` / `require("X")` / tsconfig `paths` 键 / bundle 行 `name: 'X'`）或其子路径（`X/tools`）；注释与 README 散文**故意不算**（`dsh-invariants` 的 58 条正是靠散文提及活下来的）。`@types/foo` 与其主语 `foo` 视为**同一个事实**（TS 就是从 import 推出 types 包）。新增 `--json`（把同一份规则交给修复器/测试，而不是再写一遍），未知标志 → exit 2（`--stict` 不再静默跑默认扫描） |
+| 29 × `package.json` | 删除 **71 条无人引用的声明**：`@deepseek-ai/dsh-invariants`（29 peer + 29 dev，0 引用 0 tsconfig 引用）、`@deepseek-ai/cordis`（4 个纯组合包的 peer/dev，src/tests 0 引用；其 `tsconfig` 工程引用保留——构建图边不等同于清单声明）、`@deepseek-ai/dsh-evolution-io/-io-node/-state-json`（approval/state 的 devDeps）。声明的总量 320 → **249**，且每条都有引用点 |
+| `evolution-core/src/skill-store.ts` | 新增 **`newSkillLibrary({ config, io, limits?, ctx?, transact?, threatExemptLabels? })`** + `NewSkillLibraryOptions` + `SkillMutationSink`：root 解析、limits 决策、`evolution/skill-mutated` 事件接线、`threatExemptLabels` 防御性拷贝各**只有一处**实现 |
+| `evolution-curator/commands/review/skill-catalog/learning-graph/maintenance` · `tool-skill-manage` | 11 个构造点全部改走 helper；学习图那处多余的 `graphSkillsRoot` 预解析删除（解析归 `resolveSkillsRoot` 一处） |
+| `scripts/verify-arch-guards.mjs` | **N7 收敛**：`SKILL_LIBRARY_TODO` 清空——任何 core 之外的新 `new SkillLibrary(` 直接失败，违规输出带**可直接粘贴的** `newSkillLibrary({...})` 形参清单 |
+| `scripts/verify-arch-guards.mjs` | **新增 N12–N14**（v41 §5.3 待落地项）：N12 模块级可变存储登记（当前 5 条，含 `signals.ts :: dispatchLedgers`）；N13a 非唤醒原语上的"必须执行"载荷登记（2 条债务：`evolution-commands :: invocation.agent.inject(message)`、`evolution-review :: agent.inject(message)`）；N13b 唤醒原语读入局部变量（0 处）；N14 持久读失败吞异常登记（4 条）。同时加**启动自检**：docblock 规则 id 必须与 `RULES` 注册表一一对应（本轮立刻抓到 N3/H2 缺席 docblock），每条规则必须在自己的人造片段上**报得出违规**，否则守卫 exit 1；新增 `--list-rules` |
+| `scripts/verify-arch-guards.mjs` | **新增 N15**：家族 Markdown 里的代码锚（`evolution-core/src/x.ts:42`）必须解析得到——文件存在且行号落在文件内。散文引代码永远不会让构建失败，所以符号搬走/改名后文档会继续描述一棵已经不存在的树（audit-v37 的 `core/io.ts:475-481` 就是这样活过两轮审计的）。`<pkg>/<file>` 是单 src 包简称；上游路径锚不属本规则（`verify-platform-contract` 负责已登记的平台锚） |
+| `docs/hermes-alignment-audit-rc39.md` | 修正一条真实失效锚：`evolution-review/src/redact.ts:9-31` → `evolution-core/src/redact.ts:11-35`（redact 早已迁到 core，N15 首次运行即抓到） |
+| `evolution-host/tests/wake-delivery-guard.spec.ts` | **删除**：N13b 的唯一实现移入守卫（单一来源），两份 README 的引用改指"规则 N13b" |
+| `evolution-host/tests/guard-scripts.spec.ts` | 新增正向半边的哨兵用例（含 `@types/js-yaml` 不得误报、`--stict` → exit 2）；真空根仍 exit 1（与 `verify-dependency-closure` 的 V4-29 同一约定），`verify-arch-guards` 的真空 `--strict` 由 exit 2 改回 **exit 1**——退出码家族统一为「0 干净 / 1 跑了且不合格 / 2 跑不起来（用法、缺根）」 |
+| `evolution-core/tests/library-limits-guard.spec.ts` | v35 A6 登记表**改锚到 helper 边界**（内容寻址的 `newSkillLibrary({...})` 实参文本）：11 个构造点变成 2 处显式 `limits:` + 9 条登记默认值（3 条 KNOWN GAP 原样保留），并屏蔽行注释（一处散文提及不再重钉登记表） |
+| `evolution-agent/bases.json`（新增，随包发布） | **base 表的唯一数据源**：`default: standard` + `standard → { id: evolution, metadata: preset.yml }`、`ptc → { id: evolution-ptc, metadata: preset.ptc.yml }`。`name` 是一个事实：`--base` 取值 = 平台组合目录 = 运行时 agent-preset 注册表 id |
+| `scripts/install-layered.mjs` | `AGENT_PRESET_BASES` / `DEFAULT_AGENT_PRESET_BASE` 改为**读 bases.json**（缺失/结构错/默认值不在表内一律 fail-loud），不再自带字面量表 |
+| `evolution-commands`（`/evolution preset install`） | 支持 `--base <name>`：从 bases.json 取 id/metadata/name，写到 `.agent-presets/<id>/` 并以该 base 的平台组合做 compose；未知 base fail-loud 并列出可用名字；未匹配的 `preset …` 参数不再落进 help（真拒绝）。**这是 npm 用户此前完全够不到 ptc 变体的直接原因** |
+| `scripts/prepare-release.mjs` | 组合文件重写从**硬编码四文件白名单**改为**遍历 staged 副本里的每个 `.yml/.yaml`**（`preset.ptc.yml` 原本在白名单之外，只剩 V24-18 扫描兜底）；预设容器检查改为**从 exports map 派生**元数据变体（第三个 base 不会再逃过检查） |
+| `INSTALL.md`（根 + `packages/`）· `evolution-agent/README.md` · `evolution-commands/src/registry.ts` | 文档与帮助同步：`--base ptc` 落点目录、`bases.json` 是唯一表、`preset install [--base <name>]` |
+
+### 新增回归（含红/绿实证）
+
+| 测试 / 探针 | 钉住的契约 | 红 → 绿 |
+|---|---|---|
+| 正向闭包（`guard-scripts.spec.ts`） | 无引用点的声明必须 exit 1 且点名该包该节；`@types/*` 不得误报；未知标志 exit 2 | 旧守卫对 HEAD 树 exit 0「OK」→ 新守卫 **71 条**点名（`audit-v42/red-tree` 复现）；清理后 0 条 |
+| 哨兵真空根 | 空根 exit 1（不得空手「OK」） | 两向共用 |
+| N7 收敛 | core 之外的 `new SkillLibrary(` 必报，并给出 helper 形参 | 11 处曾被 TODO 名单豁免 → 名单清空后夹具 `bad-skill-library.ts` 立即被点名 |
+| N12–N14 | 每条规则在自己的人造片段上报得出（否则守卫 exit 1） | 夹具 4 文件 → 四条规则全部点名；真空根 exit 2 |
+| 启动自检 | docblock id 集合 == `RULES` 注册表 | 立即抓到 N3/H2 缺席 |
+| v35 A6 限值决策 | 每个 `newSkillLibrary(` 调用要么显式 `limits:`，要么在登记表里给出理由；登记项过期即失败 | 空表 → 打印 10 条待登记键（含一条注释误报，已由屏蔽修正）→ 9 条登记后绿 |
+| N15 锚存在性 | 家族 Markdown 中 177 条家族锚全部可解析（含 `<pkg>/<file>` 简称）；探测器的解析+行号判定在启动自检里各自证伪/证实 | 首轮实测 **1 条**失效锚（`evolution-review/src/redact.ts`）→ 真树 0 违规；夹具树仍 7 违规 |
+| `preset install --base ptc` | 注册表按 `ptc` 读；写 `.agent-presets/evolution-ptc/` + `preset.ptc.yml`，绝不写 standard 元数据；未知 base 报错并提 bases.json | 旧命令只认 `standard`（`input === 'preset install'`）→ 新用例覆盖变体与拒绝路径 |
+| base 表单一来源（`installer-preset-base.spec.ts`） | `AGENT_PRESET_BASES` 必须**逐字等于** `bases.json`，且首个键 == `bases.json.default` | 安装器的字面量表 → 数据表 |
+
+### 验证
+
+- 全量门禁（overlay 树，CI 等价路径）：`tsc -b tsconfig.host.json` · `oxlint packages/evolution` · `vitest run packages/evolution --maxWorkers=2 --testTimeout=30000` · 四个 `verify-*` 脚本（`--strict`）· `verify-platform-contract` 全绿；`mirror-sync check` `differ=0 / onlyOverlay=0`。
+- 守卫实测：真树 exit 0（15 规则、N12=5 / N13a=2 / N13b=0 / N14=4）；夹具树 exit 1（四条新规则 + N7 全部点名）；真空树 exit 2。
+
+### 本批未做（下一批，勿读成本批已交付）
+
+| 项 | 为什么留到下一批 |
+|---|---|
+| **P2-25 后半**：`skill_manage` 常驻描述瘦身 | 现状已定位（`tool-skill-manage/src/index.ts:412-423` 的 description 引用核心常量 `DSH_AUTHORING_STANDARDS`，非复制；`SKILLS_GUIDANCE` 走 `:116` 的 prompt section）。要动**模型可见文本**，必须配一次真实会话验证与一条"标准文本单一来源"回归，不塞进 patch 尾巴 |
+| **家族三态 `Probe<T>` 过渡模块 + `deliverEnsuringWake`** | 需先列全 `protectionUnknown`/`unverifiable` 两态补丁点再迁移，否则只是换类型不改语义；守卫侧已由 N13a（2 条 `agent.inject` 债务）与 N13b（唤醒原语读入局部 = 0 处）钉住 |
+| **`audit-v37/iface-audit/storage.md` 平台锚** | 结论 4 的 `core/io.ts:*` 在 0.1.5-rc.2 不存在；本轮已加 append-only 更正块（真实锚 `fs/fs-local/src/fsio.ts:216-220,263`、`fs/fs-sandbox/src/containment.ts:12`）。**指向平台仓的锚的机械核验**（`platform:<pkg>/<file>:<line>` 前缀 + `verify-platform-contract --upstream`）留待独立批次 |
+| **N12 的 `apply()` 体内实例状态 AST 覆盖** | 现为文本级 + 已文档化边界；扩到实例态需要 AST 或高误报启发式 |
+
 ## 0.3.74 (patch) — 审查默认改为 `reviewMode: 'inject'`：子代理与主代理**不可能**共享前缀缓存（附成本证据）
 
 > **问题**：默认的 `reviewMode: 'subagent'` 下，子代理与主代理能否共享前缀缓存以降本？

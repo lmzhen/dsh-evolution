@@ -1,0 +1,15 @@
+{
+  "default": "standard",
+  "bases": [
+    {
+      "name": "standard",
+      "id": "evolution",
+      "metadata": "preset.yml"
+    },
+    {
+      "name": "ptc",
+      "id": "evolution-ptc",
+      "metadata": "preset.ptc.yml"
+    }
+  ]
+}

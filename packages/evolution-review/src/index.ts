@@ -11,7 +11,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, evolutionIoAdapter, foldTurn, markReviewChannel, resolveOrigins, resolveRootConfig, resolveSkillsRoot, SkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, evolutionIoAdapter, foldTurn, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
@@ -850,7 +850,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const hashes = new Map<string, string>()
     const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
     if (!io) return hashes
-    const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()))
+    const library = newSkillLibrary({ config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
     // v35 C3(a)/C11: the listing already reads every SKILL.md, so ask it for the
     // bodies instead of re-reading each skill just to hash it (the pre-run
     // snapshot ran once per review, for both kinds).
@@ -1220,7 +1220,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const hashLibrary = (() => {
       const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
       if (!io) return null
-      return new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()))
+      return newSkillLibrary({ config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
     })()
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
     const origins = resolveOrigins(undefined, true)
@@ -1435,12 +1435,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // ran on DEFAULT_SKILL_LIMITS, so the approval-disabled autonomous
       // channel wrote up to 10x the configured tool limit.
       const policySnapshot = policySnapshotOf(ctx.get('evolutionPolicy'))
-      const library = new SkillLibrary(
-        resolveSkillsRoot({ root: rootConfig.root }),
-        evolutionIoAdapter(() => io.provider()),
-        { ...DEFAULT_SKILL_LIMITS, maxSkillContentChars: policySnapshot?.skillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars },
-        (event) => { ctx.emit('evolution/skill-mutated', event) },
-      )
+      const library = newSkillLibrary({
+        config: rootConfig,
+        io: evolutionIoAdapter(() => io.provider()),
+        limits: {
+          ...DEFAULT_SKILL_LIMITS,
+          maxSkillContentChars: policySnapshot?.skillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
+        },
+        ctx,
+      })
       const op = skillArgs
       const name = op.name ?? ''
       const origin: WriteOrigin = origins.library

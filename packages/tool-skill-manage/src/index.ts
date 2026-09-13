@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, isReviewChannelSession, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, isReviewChannelSession, newSkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -127,18 +127,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (value !== undefined && result !== value) numericClamped.push(name)
     return result
   }
-  // V10-03 (P2-18): forward the threat-exemption allowlist as the library's
-  // 6th constructor argument (`threatExemptLabels` → core
-  // `ScanOptions.excludeLabels`). The core-side constructor option landed in
-  // the same change window (plan batch 3a.3). No behavioral fork: absent
-  // config stays `[]` (strict scan).
+  // V10-03 (P2-18): forward the threat-exemption allowlist through the
+  // library's `threatExemptLabels` option (→ core
+  // `ScanOptions.excludeLabels`). No behavioral fork: absent config stays
+  // `[]` (strict scan).
   const libraryOptions: SkillLimits = {
     maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
     maxSkillContentChars: limit('maxSkillContentChars', rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
   }
-  const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io, libraryOptions, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, [...(rawConfig.threatExemptLabels ?? [])])
+  const library = newSkillLibrary({ config: rawConfig, io, limits: libraryOptions, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
   // V7-12 (0.3.43): the warn must run AFTER the limit() calls above — the
   // former position evaluated the always-empty array before any limit ran,
   // so an invalid config value was never surfaced.

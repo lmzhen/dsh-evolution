@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-catalog",
   "description": "Native ctx.skills provider for the evolution-managed skill tree",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -32,13 +32,11 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^"
   }
 }

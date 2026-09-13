@@ -21,7 +21,7 @@ import type {
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { evolutionIoAdapter, parseFrontmatter, resolveSkillsRoot, SkillLibrary, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, parseFrontmatter, newSkillLibrary, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'
@@ -96,7 +96,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     userInvocable: rawConfig.userInvocable ?? true,
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-  const library = new SkillLibrary(resolveSkillsRoot(rawConfig), io)
+  const library = newSkillLibrary({ config: rawConfig, io })
   const included = new Set(rawConfig.includeSkillNames ?? [])
   const excluded = new Set(rawConfig.excludeSkillNames ?? [])
   const visible = (name: string) => (included.size === 0 || included.has(name)) && !excluded.has(name)

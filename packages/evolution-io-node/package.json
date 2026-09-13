@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-io-node",
   "description": "Local atomic node:fs IO provider",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -29,12 +29,10 @@
     "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^"
   }
 }

@@ -145,15 +145,44 @@ export function profileDirectory(home, profile) {
  * its SHIPPED ids only, so a family variant must publish its own `name` /
  * `description` / `order` in `metadata`.
  */
-export const AGENT_PRESET_BASES = Object.freeze({
-  /** The platform `standard` preset — the historical, and still the default, base. */
-  standard: Object.freeze({ id: 'evolution', metadata: 'preset.yml' }),
-  /** The platform `ptc` preset (run_code as the composition surface) — variant base. */
-  ptc: Object.freeze({ id: 'evolution-ptc', metadata: 'preset.ptc.yml' }),
-})
+// 0.3.75 (v41 P2-26 sibling): the table lives in the agent package's
+// bases.json, which is ALSO what `/evolution preset install --base` reads at
+// runtime — the npm path used to know `standard` only, so an npm-installed
+// family could not reach the ptc variant at all. `name` is one fact: the
+// `--base` value, the platform composition directory, and the agent-preset
+// registry id the runtime composes against.
+export const AGENT_PRESET_BASES = Object.freeze(Object.fromEntries(
+  readAgentPresetTable().bases.map(base => [base.name, Object.freeze({ id: base.id, metadata: base.metadata })]),
+))
 
-/** The base a run composes on when the caller names none. */
-export const DEFAULT_AGENT_PRESET_BASE = 'standard'
+function readAgentPresetTable() {
+  const path = fileURLToPath(new URL('../evolution-agent/bases.json', import.meta.url))
+  let parsed
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    throw new Error(`install-layered: cannot read the agent-preset table ${path} (${error instanceof Error ? error.message : String(error)})`)
+  }
+  const bases = parsed?.bases
+  if (!Array.isArray(bases) || bases.length === 0) {
+    throw new Error(`install-layered: ${path} carries no bases[] — refusing to install without a preset table`)
+  }
+  const table = bases.map(base => {
+    if (typeof base?.name !== 'string' || typeof base?.id !== 'string' || typeof base?.metadata !== 'string') {
+      throw new Error(`install-layered: ${path} entry ${JSON.stringify(base)} needs name/id/metadata strings`)
+    }
+    return { name: base.name, id: base.id, metadata: base.metadata }
+  })
+  const defaultBase = parsed?.default
+  if (typeof defaultBase !== 'string' || !table.some(base => base.name === defaultBase)) {
+    throw new Error(`install-layered: ${path} default ${JSON.stringify(defaultBase)} is not one of ${table.map(base => base.name).join(', ')}`)
+  }
+  return { defaultBase, bases: table }
+}
+
+/** The base a run composes on when the caller names none — bases.json's
+ * `default`, so the table and its default cannot disagree. */
+export const DEFAULT_AGENT_PRESET_BASE = readAgentPresetTable().defaultBase
 
 /**
  * Resolve one base name to its canonical entry.

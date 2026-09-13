@@ -15,20 +15,36 @@ import { fileURLToPath } from 'node:url'
  * may not read one; this guard pins the reviewed set instead, so a NEW
  * construction (or a new write call in a previously read-only module) fails
  * here and forces the decision, while the register below stays the to-do list.
+ *
+ * v41 P2-26 (0.3.75) moved the construction itself into core's
+ * `newSkillLibrary()` (arch rule N7 owns "no direct `new SkillLibrary`"), so
+ * the decision now sits at the helper boundary: a call either names
+ * `limits:` or it takes the defaults and belongs in this register.
  */
 const REGISTERED_DEFAULTS: Record<string, string> = {
-  'evolution-commands/src/index.ts :: resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider()': 'read-only: the commands listing walks the tree, no write goes through this instance',
-  'evolution-commands/src/index.ts :: resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider() #2': 'read-only: as above',
-  "evolution-commands/src/index.ts :: resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, config.threatExemptLabels ?? []": 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
-  "evolution-curator/src/index.ts :: resolveSkillsRoot({ root: config.root }), this.io, undefined, (event) => { this.ctx.emit('evolution/skill-mutated', event) }": 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
-  "evolution-learning-graph/src/index.ts :: graphSkillsRoot, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, [...(rawConfig.threatExemptLabels ?? [])]": 'read-only: withSkills() serves reads and the graph read path',
-  'evolution-maintenance/src/tools.ts :: resolveSkillsRoot({ root: rootConfig.root }), ioRegistry.provider()': 'read-only: the maintenance probe walks the tree',
-  'evolution-review/src/index.ts :: resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider())': 'read-only: the pre-run hash snapshot',
-  'evolution-review/src/index.ts :: resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()) #2': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
-  'evolution-skill-catalog/src/index.ts :: resolveSkillsRoot(rawConfig), io': 'read-only: the catalog walk',
+  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider() }': 'read-only: the commands listing walks the tree, no write goes through this instance',
+  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider() } #2': 'read-only: as above',
+  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider(), ctx, threatExemptLabels: config.threatExemptLabels }': 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
+  'evolution-curator/src/index.ts :: { config, io: this.io, ctx: this.ctx }': 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
+  'evolution-learning-graph/src/index.ts :: { config: rawConfig, io: evolutionIoAdapter(() => io.provider()), ctx, threatExemptLabels: rawConfig.threatExemptLabels }': 'read-only: withSkills() serves reads and the graph read path',
+  'evolution-maintenance/src/tools.ts :: { config: rootConfig, io: ioRegistry.provider() }': 'read-only: the maintenance probe walks the tree',
+  'evolution-review/src/index.ts :: { config: rootConfig, io: evolutionIoAdapter(() => io.provider()) }': 'read-only: the pre-run hash snapshot',
+  'evolution-review/src/index.ts :: { config: rootConfig, io: evolutionIoAdapter(() => io.provider()) } #2': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
+  'evolution-skill-catalog/src/index.ts :: { config: rawConfig, io }': 'read-only: the catalog walk',
 }
 
 const WRITE_CALL = /\.(?:create|update|patch|archive|writeSupportFile|removeSupportFile|setPinned|restructure|consolidate)\(/
+/** The helper, by name. The def line (`export function newSkillLibrary(`) is
+ * not a call site; every construction below it stays single-sourced. */
+const CALL_SITE = /newSkillLibrary\(/
+const DEFINITION = /function\s+newSkillLibrary\s*\(/
+
+/** Prose is not a call site, and a masked real call would surface as a STALE
+ * register entry — the failure direction stays loud either way. */
+function withoutLineComments(line: string): string {
+  const at = line.indexOf('//')
+  return at < 0 ? line : line.slice(0, at)
+}
 
 interface SourceFile {
   /** Family-relative path, identical in every tree the family is checked out in. */
@@ -72,13 +88,14 @@ function constructions(text: string, file: string): Array<{ key: string; limits:
   // only a real change to the construction (or a new duplicate) fires it.
   const perAnchor = new Map<string, number>()
   lines.forEach((line, index) => {
-    const at = line.indexOf('new SkillLibrary(')
-    if (at < 0) return
+    const code = withoutLineComments(line)
+    if (!CALL_SITE.test(code) || DEFINITION.test(code)) return
     let depth = 0
     const parts: string[] = []
-    for (let i = index; i < lines.length && parts.length < 8; i++) {
-      const source = lines[i]
-      if (source === undefined) break
+    for (let i = index; i < lines.length && parts.length < 12; i++) {
+      const raw = lines[i]
+      if (raw === undefined) break
+      const source = withoutLineComments(raw)
       parts.push(source)
       for (const ch of source) {
         if (ch === '(') depth++
@@ -87,23 +104,16 @@ function constructions(text: string, file: string): Array<{ key: string; limits:
       if (depth <= 0 && parts.length > 0) break
     }
     const call = parts.join(' ').replace(/\s+/g, ' ')
-    const args = call.slice(call.indexOf('new SkillLibrary(') + 'new SkillLibrary('.length, -1)
-    // The 3rd argument (index 2) carries the limits; an explicit `undefined`
-    // is the same decision as omitting it.
-    let level = 0
-    let commas = 0
-    let third = ''
-    for (const ch of args) {
-      if (ch === '(' || ch === '[' || ch === '{') level++
-      else if (ch === ')' || ch === ']' || ch === '}') level--
-      else if (ch === ',' && level === 0) { commas++; continue }
-      if (commas === 2) third += ch
-    }
-    const anchor = args.trim().replace(/\s+/g, ' ')
+    const args = call.slice(call.indexOf('newSkillLibrary(') + 'newSkillLibrary('.length, -1)
+    // Trailing commas are FORMATTING, not content: reformatting a call into
+    // the repo's multi-line style must not re-pin the register.
+    const anchor = args.trim().replace(/\s+/g, ' ').replace(/,\s*\}$/, ' }')
     const nth = perAnchor.get(anchor) ?? 0
     perAnchor.set(anchor, nth + 1)
     const suffix = nth === 0 ? '' : ` #${nth + 1}`
-    found.push({ key: `${file} :: ${anchor}${suffix}`, limits: third.trim() !== '' && third.trim() !== 'undefined' })
+    // The defaults decision is the ABSENCE of the named option — no positional
+    // index to count any more (`limits: undefined` is an explicit decision).
+    found.push({ key: `${file} :: ${anchor}${suffix}`, limits: /(?:^|[{,\s])limits:/.test(anchor) })
   })
   return found
 }

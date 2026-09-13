@@ -14,7 +14,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveOrigins, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -308,7 +308,7 @@ export function capRenderedLines(lines: string[]): string {
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   // V10-11 (P2-7): single root resolution for every graph skill read/edit —
   // empty config falls through to the shared default root inside the resolver.
-  const graphSkillsRoot = resolveSkillsRoot(rawConfig)
+  // P2-26 (0.3.75): the resolution moved into newSkillLibrary(rawConfig).
   ctx.inject(['commands'], (commandCtx) => {
     // V27 G5.2: the platform's `Context.commands` augmentation and its
     // `CommandDefinition` type are the contract (previously a local cast to
@@ -448,7 +448,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // V10-11 (P2-7): the resolver now reads THIS package's Config.root
           // (empty = the shared default root), so a custom-root deployment no
           // longer has the graph edit/delete write the wrong tree.
-          return new SkillLibrary(graphSkillsRoot, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, [...(rawConfig.threatExemptLabels ?? [])])
+          return newSkillLibrary({
+            config: rawConfig,
+            io: evolutionIoAdapter(() => io.provider()),
+            ctx,
+            threatExemptLabels: rawConfig.threatExemptLabels,
+          })
         }
 
         async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {

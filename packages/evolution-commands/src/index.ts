@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
@@ -400,7 +400,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // no subagent call, no cooldown (the cooldown guards LLM calls).
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
-          const library = new SkillLibrary(resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider())
+          const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
           const enrichment = await buildEnrichment(ctx, library)
           const snapshots = await snapshotFromLibrary(library, {
             descriptions: enrichment.descriptions,
@@ -482,7 +482,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // AND failure.
           try {
             maintainInFlightSince = Date.now()
-            const library = new SkillLibrary(resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider())
+            const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
             const enrichment = await buildEnrichment(ctx, library)
             const outcome = await runMaintain(
               // E-55 (0.3.18): same-source model routing — the maintain subagent
@@ -559,7 +559,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // rejection. Reject it here.
           return err('Unknown maintain arguments: expected bare `maintain`, `maintain --timeout <ms>` or `maintain --timeout=<ms>` (a positive integer). Got: ' + input)
         }
-        if (input === 'preset install') {
+        const presetInstall = /^preset install(?: --base (\S+))?$/.exec(input)
+        if (presetInstall !== null || /^preset\b/.test(input)) {
+          // 0.3.75 (v41 §6.1): this path knew `standard` only, so an
+          // npm-installed family could not reach the ptc variant at all. The
+          // base table now lives in the agent package's bases.json — the SAME
+          // file install-layered.mjs reads, so the two install paths cannot
+          // disagree about ids or metadata names.
+          if (presetInstall === null) {
+            return err('Unknown preset arguments: expected `preset install` or `preset install --base <name>` (the names live in the agent package\'s bases.json). Got: ' + input)
+          }
           // v28 G3.2 (CMD-03): the same three-way mutual exclusion
           // install-layered.mjs enforces up front, applied at the command's
           // write boundary. Writing the preset product while the `all` bundle
@@ -598,16 +607,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // be the runtime `standard` composition + the delta — 0.3.14 copied
           // the delta alone, which would produce an agent with only the delta
           // rows (no tools, no persona).
-          const target = join(evolutionRoot(), '.agent-presets', 'evolution')
           try {
             const source = resolveAgentPresetDir(import.meta.url)
+            const table = readAgentPresetBases(source)
+            const requested = presetInstall[1] ?? table.defaultBase
+            const base = table.entries.find(entry => entry.name === requested)
+            if (base === undefined) {
+              return err(`Unknown agent-preset base "${requested}" — ${join(source, 'bases.json')} lists ${table.entries.map(entry => entry.name).join(', ')}`)
+            }
+            const target = join(evolutionRoot(), '.agent-presets', base.id)
             const deltaPath = join(source, 'agent.cordis.yml')
-            const presetPath = join(source, 'preset.yml')
+            const presetPath = join(source, base.metadata)
             if (!existsSync(deltaPath) || !existsSync(presetPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
             const registry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
             if (!registry) return err('Agent preset registry not mounted — cannot compose the Evolution preset against the runtime standard.')
-            const standard = await registry.read('standard')
-            const composition = composePresetComposition(standard, readFileSync(deltaPath, 'utf8'))
+            const platform = await registry.read(base.name)
+            const composition = composePresetComposition(platform, readFileSync(deltaPath, 'utf8'))
             mkdirSync(target, { recursive: true })
             // S6.3 (E-40): commit both files atomically — each staged to a
             // sibling `<name>.tmp` then renamed into place, a pre-existing file
@@ -617,9 +632,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // file, one old) is impossible.
             atomicWriteFiles(target, [
               { name: 'agent.cordis.yml', content: composition },
-              { name: 'preset.yml', content: readFileSync(presetPath) },
+              { name: base.metadata, content: readFileSync(presetPath) },
             ], undefined, (message) => { ctx.logger.warn(message) })
-            return ok(`Evolution agent preset installed to ${target} (runtime standard + delta). Restart the session switcher to select it.`)
+            return ok(`Evolution agent preset installed to ${target} (runtime ${base.name} + delta). Restart the session switcher to select it.`)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }
@@ -690,7 +705,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // field is named `threatExemptLabels` (P2-18 core batch; the field
           // name is the linkage contract, keep in sync). Empty/omitted keeps
           // the strict scan unchanged.
-          const library = new SkillLibrary(resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, config.threatExemptLabels ?? [])
+          const library = newSkillLibrary({
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            threatExemptLabels: config.threatExemptLabels,
+          })
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
           if (!result.ok) return err(result.message)
           // Same mutating observation surface as skill_manage performs for the
@@ -730,6 +750,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
  * name (`evolution-agent` vs `@lmzhen/dsh-evolution-agent-preset` — the rc.44
  * dir≠name trap), so BOTH sibling shapes are probed.
  */
+/** The agent-preset base table (evolution-agent/bases.json). The installer
+ * (install-layered.mjs) reads the SAME file — the literal that used to live in
+ * each of them is what kept this path on `standard` while the installer knew
+ * `ptc` too. Fails loud: a missing table is an incomplete install, never a
+ * silent fallback to the default base. */
+function readAgentPresetBases(source: string): { defaultBase: string; entries: Array<{ name: string; id: string; metadata: string }> } {
+  const path = join(source, 'bases.json')
+  const parsed = JSON.parse(readFileSync(path, 'utf8')) as { default?: unknown; bases?: unknown }
+  if (!Array.isArray(parsed.bases) || parsed.bases.length === 0) throw new Error(`${path} carries no bases[]`)
+  const entries = parsed.bases.map((raw) => {
+    const entry = raw as { name?: unknown; id?: unknown; metadata?: unknown }
+    if (typeof entry.name !== 'string' || typeof entry.id !== 'string' || typeof entry.metadata !== 'string') {
+      throw new Error(`${path} entry ${JSON.stringify(raw)} needs name/id/metadata strings`)
+    }
+    return { name: entry.name, id: entry.id, metadata: entry.metadata }
+  })
+  const declared = parsed.default
+  if (typeof declared !== 'string' || !entries.some(entry => entry.name === declared)) {
+    throw new Error(`${path} default ${JSON.stringify(declared)} is not one of ${entries.map(entry => entry.name).join(', ')}`)
+  }
+  return { defaultBase: declared, entries }
+}
+
 function resolveAgentPresetDir(importMetaUrl: string): string {
   const dir = dirname(fileURLToPath(importMetaUrl))
   // D-13 (v18): the overlay sibling is `evolution-agent` two levels up

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-learning-graph",
   "description": "Learning graph over skills and memory",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -32,11 +32,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/dsh-commands": "workspace:^"
   }
 }

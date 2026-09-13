@@ -12,7 +12,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { assertSkillsRootAliasRetired, SkillLibrary, redactSecrets, resolveRootConfig, resolveSkillsRoot, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { assertSkillsRootAliasRetired, newSkillLibrary, redactSecrets, resolveRootConfig, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 import { buildEnrichment } from './enrichment.ts'
 import { snapshotFromLibrary } from './drift-scan.ts'
@@ -75,7 +75,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const target = args.target
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return { signal, detail: ['evolution-io registry not mounted'], ...(target ? { target } : {}) }
-          const library = new SkillLibrary(resolveSkillsRoot({ root: rootConfig.root }), ioRegistry.provider())
+          const library = newSkillLibrary({ config: rootConfig, io: ioRegistry.provider() })
           // 0.3.9: build snapshots through the SAME enrichment the scan uses
           // (descriptions/supportFiles/quality) — previously the probe fed
           // body-only snapshots and answered "description=missing" while the

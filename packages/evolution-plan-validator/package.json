@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-plan-validator",
   "description": "Deterministic validator for model-produced evolution plans",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -27,12 +27,5 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
-  },
-  "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^"
   }
 }

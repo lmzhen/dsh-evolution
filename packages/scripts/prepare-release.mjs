@@ -33,6 +33,18 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/** Every .yml/.yaml under one staged package copy, tests/node_modules already
+ * filtered out by the cpSync that produced it. */
+function stagedYamlFiles(dir) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...stagedYamlFiles(full))
+    else if (/\.ya?ml$/.test(entry.name)) out.push(full)
+  }
+  return out
+}
+
 const evolutionRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = resolve(evolutionRoot, '../..')
 const distRoot = join(evolutionRoot, 'dist')
@@ -308,9 +320,14 @@ for (const dir of sourceDirs) {
   const manifestPath = join(staged, 'package.json')
   const manifest = rewritePackage(readJson(manifestPath), new Set(names.keys()), dir)
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
-  for (const file of ['cordis.yml', 'cordis.patch.yml', 'agent.cordis.yml', 'preset.yml']) {
-    const path = join(staged, file)
-    if (existsSync(path)) writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names.keys()))
+  // 0.3.75: EVERY staged YAML is rewritten, not a hardcoded four-file list —
+  // preset.ptc.yml (the ptc variant's metadata) was outside the list and only
+  // the V24-18 shipped-list scan below stood between it and a published raw
+  // `@deepseek-ai/dsh-*` reference. Walking the staged copy (tests/ and
+  // node_modules are filtered out by the cpSync above) also covers the next
+  // composition file without an edit here. The scan stays as the backstop.
+  for (const path of stagedYamlFiles(staged)) {
+    writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names.keys()))
   }
   // names.keys() is a ONE-SHOT iterator: passing it straight into the walk
   // would let the first file's rewrite consume every name and leave all
@@ -432,8 +449,14 @@ for (const item of tarballs) {
   }
   // The preset container is mountable only with BOTH compositions; the
   // exports map is the declaration that says "this package is that container".
-  if (manifest.exports?.['./agent.cordis.yml'] !== undefined || manifest.exports?.['./preset.yml'] !== undefined) {
-    for (const rel of ['agent.cordis.yml', 'preset.yml']) {
+  // The metadata variants come from the exports map itself, so a third base
+  // (bases.json) cannot ship a metadata file this check never heard of; the
+  // composition half of the pair stays required (mounting needs both).
+  const presetExports = Object.keys(manifest.exports ?? {})
+    .map(key => key.replace(/^\.\//, ''))
+    .filter(rel => /^preset[^/]*\.ya?ml$/.test(rel))
+  if (presetExports.length > 0 || manifest.exports?.['./agent.cordis.yml'] !== undefined) {
+    for (const rel of ['agent.cordis.yml', ...presetExports]) {
       if (!inShipped(rel)) failures.push(`${item.name}: preset container is missing ${rel}`)
     }
   }

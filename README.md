@@ -115,7 +115,7 @@ single source with the input hint and the emitted help/README text):
 | `/evolution skills refresh` | drop the catalog caches and re-read the tree |
 | `/evolution learn [request]` | send a learning request to this session |
 | `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
-| `/evolution preset install` | generate the Evolution agent preset into the user root |
+| `/evolution preset install [--base <name>]` | generate the Evolution agent preset into the user root (bases from the agent package's bases.json) |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
 | `/evolution replay` | compare plan outcomes across sessions and restarts (backfilled from the activity store) |
 

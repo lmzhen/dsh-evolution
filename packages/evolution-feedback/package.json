@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-feedback",
   "description": "Feedback-to-quality scoring for self-evolution",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -30,13 +30,11 @@
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^"

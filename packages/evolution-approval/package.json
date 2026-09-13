@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-approval",
   "description": "Stage/pending approval service for Hermes-style self-evolution writes",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -29,17 +29,12 @@
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-json": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state": "workspace:^"
   }
 }

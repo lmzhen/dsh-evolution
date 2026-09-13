@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-agent-preset",
   "description": "Agent preset exposing memory and skill evolution tools to a session",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -13,6 +13,7 @@
   "type": "module",
   "files": [
     "agent.cordis.yml",
+    "bases.json",
     "preset.yml",
     "preset.ptc.yml",
     "package.json",
@@ -32,17 +33,10 @@
       "default": "./lib/index.js"
     },
     "./agent.cordis.yml": "./agent.cordis.yml",
+    "./bases.json": "./bases.json",
     "./preset.yml": "./preset.yml",
     "./preset.ptc.yml": "./preset.ptc.yml",
     "./package.json": "./package.json"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
-  },
-  "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
   },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts"

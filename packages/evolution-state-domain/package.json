@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-state-domain",
   "description": "storage-domain provider for evolution state",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -29,13 +29,11 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-storage": "workspace:^",

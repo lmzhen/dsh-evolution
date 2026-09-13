@@ -32,8 +32,10 @@ vendored — the preset follows whichever platform the user actually has.
 | `standard` (default) | `<platform>/standard/agent.cordis.yml` | `evolution` | `preset.yml` |
 | `ptc` | `<platform>/ptc/agent.cordis.yml` | `evolution-ptc` | `preset.ptc.yml` |
 
-`AGENT_PRESET_BASES` in the installer is the single table behind all four columns, so a base
-cannot be half-added (a directory one consumer knows about and another does not). A base whose
+`bases.json` in this package is the single table behind all four columns — the installer
+(`AGENT_PRESET_BASES`) and the host command (`/evolution preset install --base <name>`) both
+read THIS file, so a base cannot be half-added (a directory one consumer knows about and
+another does not) and the two install paths cannot disagree. It also carries `default`. A base whose
 runtime composition is absent — an older platform with no `ptc` preset, a preset root that does
 not carry it — is REFUSED with a named error; it is never composed from another base. The V10-14
 `tool-skill` catalog-cap injection (`injectToolSkillCap`) runs on the composed output
@@ -55,9 +57,10 @@ Known limitations of this base:
 - **A deployment without a code runtime refuses the preset at mount**, naming
   `tool-presentation`; that row and its requirement come from the platform `ptc` preset and are
   not something this variant can soften.
-- **Only the source installer produces this variant.** The npm `/evolution preset install`
-  command composes the `standard` base today (`evolution-commands`); the `ptc` variant is
-  reachable through `install-layered.mjs --base ptc` (a source checkout or a scoped staging tree).
+- **Both install paths produce this variant** (0.3.75): `/evolution preset install --base ptc`
+  (npm, `evolution-commands`) and `install-layered.mjs --base ptc` (source checkout) read the same
+  `bases.json` and write `.agent-presets/evolution-ptc/`. It still only composes a platform that
+  actually ships the `ptc` preset; a `standard`-only runtime is refused by name.
 - **Tool-use observation under PTC** depends on the family reading dispatches through
   `evolution-core`'s dispatch normalizer rather than matching a platform event vocabulary; a
   consumer that matches `tool/call` directly goes blind in this mode (the arch guard rejects that

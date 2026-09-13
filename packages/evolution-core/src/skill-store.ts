@@ -3703,3 +3703,42 @@ export class SkillLibrary {
     }
   }
 }
+
+/** The emit surface the helper needs — structurally the platform context's
+ * `emit`, so core states the contract without importing the platform type. */
+export interface SkillMutationSink {
+  emit: (type: 'evolution/skill-mutated', event: EvolutionSkillMutatedEvent) => unknown
+}
+
+/** V41 P2-26 (0.3.75): the ONE SkillLibrary construction point.
+ *
+ * Eleven call sites used to re-derive the root and hand-roll the
+ * `evolution/skill-mutated` arrow (the catalog invalidates its cache on that
+ * exact string, so a second spelling is a silent divergence), and each one
+ * re-decided its own limits. `config` stays the RAW family config: resolving
+ * an empty `root` to the family default is `resolveSkillsRoot`'s policy, not
+ * a per-caller detail. */
+export interface NewSkillLibraryOptions {
+  /** Raw family config; only `root` is read, through resolveSkillsRoot. */
+  config?: { root?: string | undefined } | undefined
+  io: EvolutionIoLike
+  limits?: SkillLimits | undefined
+  /** Supplying it wires the mutation event HERE — never at the call site. */
+  ctx?: SkillMutationSink | undefined
+  transact?: typeof transactIo | undefined
+  threatExemptLabels?: readonly string[] | undefined
+}
+
+export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
+  const { config, io, limits, ctx, transact, threatExemptLabels } = options
+  return new SkillLibrary(
+    resolveSkillsRoot(config ?? {}),
+    io,
+    limits,
+    ctx ? (event) => { ctx.emit('evolution/skill-mutated', event) } : undefined,
+    transact,
+    // Copied once, here: the library holds the array for its lifetime and must
+    // not alias a config object the caller still owns.
+    [...(threatExemptLabels ?? [])],
+  )
+}

@@ -19,7 +19,7 @@ The injection goes through the agent's waking primitive (`followup`, falling bac
 to `inject` when the host lacks it), **called on the agent instance**: the
 platform's `Agent.followup` is a prototype method (`this.send(...)`), so a
 detached reference throws and queues nothing (0.3.73 fix; the same shape is
-pinned by `evolution-host/tests/wake-delivery-guard.spec.ts`).
+pinned by rule N13b in `packages/scripts/verify-arch-guards.mjs`, which masks comments and string literals before matching and self-tests its detector at startup).
 
 #### KV Cache effect
 

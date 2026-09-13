@@ -405,6 +405,10 @@ describe('layered installer', () => {
     // package, so the overlay carries a minimal one.
     await mkdir(join(tree, 'packages', 'evolution', 'evolution-agent'), { recursive: true })
     await writeFile(join(tree, 'packages', 'evolution', 'evolution-agent', 'preset.yml'), 'name: Evolution\ndescription: overlay fixture\norder: 10\n')
+    // 0.3.75: the base table is a DATA file the installer reads from the agent
+    // package — the overlay carries the real one, and a missing table is a
+    // loud failure by design (never a silent fallback to `standard`).
+    await cp(fileURLToPath(new URL('../../evolution-agent/bases.json', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-agent', 'bases.json'))
     await run(process.execPath, [
       join(scripts, 'install-layered.mjs'), '--mode', 'agent', '--profile', 'g21', '--home', home,
     ], { env: { ...process.env, DSH_EVOLUTION_DELTA_PATH: delta } })

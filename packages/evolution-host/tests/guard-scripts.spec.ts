@@ -39,6 +39,36 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect((error as { stderr?: string }).stderr).toContain('not declared')
   })
 
+  it('dependency-closure rejects a declaration nothing in the package references', async () => {
+    // Forward half (0.3.75, v41 P2-24): the backward scan cannot see a
+    // declaration with no import — the retired dsh-invariants companion
+    // survived a whole release line because no build ever failed on it.
+    const root = await tempRoot('guard-forward-')
+    const pkg = join(root, 'demo-pkg')
+    await mkdir(join(pkg, 'src'), { recursive: true })
+    await writeFile(join(pkg, 'package.json'), JSON.stringify({
+      name: '@deepseek-ai/dsh-demo-pkg',
+      version: '0.0.0',
+      dependencies: { '@deepseek-ai/dsh-evolution-core': 'workspace:^', '@deepseek-ai/dsh-invariants': 'workspace:^' },
+      devDependencies: { '@types/js-yaml': '^4.0.9' },
+    }), 'utf8')
+    // @types/js-yaml is referenced THROUGH its subject: the pair states one
+    // fact, so the types package must not read as a second, orphaned one.
+    await writeFile(join(pkg, 'src', 'index.ts'), "import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'\nimport { load } from 'js-yaml'\n", 'utf8')
+    const error = await run(process.execPath, [closure, root], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('unreferenced declaration')
+    expect(error?.stderr).toContain('@deepseek-ai/dsh-invariants')
+    expect(error?.stderr).not.toContain('@types/js-yaml')
+    // A misspelled flag must fail loud instead of silently running the
+    // default scan (the gate chain passes --strict, humans type).
+    const typo = await run(process.execPath, [closure, root, '--stict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(typo?.code).toBe(2)
+    expect(typo?.stderr).toContain('unknown flag')
+  })
+
   it('architecture guards pass strict on the real tree and fail on a vacuum root', async () => {
     const ok = await run(process.execPath, [archGuards, psRoot, '--strict'], { encoding: 'utf8' })
     expect(ok.stdout).toContain('OK')

@@ -80,7 +80,10 @@ This performs:
 2. adds `@deepseek-ai/dsh-evolution-host` to
    `<home>/profiles/<profile>/package.json` `dsh.profile.bundles`;
 3. copies the `Evolution` agent preset to
-   `<home>/.agent-presets/evolution/`.
+   `<home>/.agent-presets/evolution/` (`--base ptc` installs the ptc variant to
+   `<home>/.agent-presets/evolution-ptc/` instead — the base names the runtime
+   platform composition and the installed directory, and the table behind both
+   is `evolution-agent/bases.json`).
 
 The installer is source-layout aware: if a package's `lib/index.js` has not
 been built yet it prints an `unbuilt:` warning. Boot such a profile with the
@@ -161,6 +164,8 @@ That file is a DELTA (4 model-tool rows, see its own header) and the
 COMPLETE composition — a hand-copied delta would mount an agent missing every
 standard row. Use `dsh plugin add` + the installer (or copy only a
 standard+delta SYNTHESIZED composition when a manual path is truly needed).
+The npm-only path is `/evolution preset install [--base <name>]`, which reads
+the same `evolution-agent/bases.json` table and writes that base's variant.
 
 ## Profile override examples
 

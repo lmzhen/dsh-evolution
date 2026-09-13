@@ -333,6 +333,15 @@ describe('agent preset bases (--base standard|ptc)', () => {
     // install.
     const table = await callInstaller('return installer.AGENT_PRESET_BASES') as Record<string, { id: string; metadata: string }>
     expect(Object.keys(table)).toEqual(['standard', 'ptc'])
+    // The table is a DATA file the runtime command reads too
+    // (evolution-agent/bases.json): a literal in each consumer is exactly how
+    // the npm path stayed on `standard` while the installer knew `ptc`.
+    const basesJson = JSON.parse(await readFile(join(agentPackage, 'bases.json'), 'utf8')) as {
+      default: string
+      bases: Array<{ name: string; id: string; metadata: string }>
+    }
+    expect(table).toEqual(Object.fromEntries(basesJson.bases.map(base => [base.name, { id: base.id, metadata: base.metadata }])))
+    expect(Object.keys(table)[0]).toBe(basesJson.default)
     // The platform's own PRESET_ID (packages/preset/agent-presets/src/preset.ts):
     // an id is a directory name under the preset root, so this is a containment
     // rule rather than a style one. Inlined because evolution-host declares no

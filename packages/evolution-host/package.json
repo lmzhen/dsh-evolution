@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-host",
   "description": "Self-evolution automation bundle — infrastructure only, plus the read-only maintenance_probe diagnostic; the shrink-path install",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -51,7 +51,6 @@
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "exports": {
@@ -63,7 +62,6 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "main": "lib/index.js",

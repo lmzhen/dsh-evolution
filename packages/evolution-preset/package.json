@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle (legacy; new installs should use evolution-all)",
-  "version": "0.3.74",
+  "version": "0.3.75",
   "publishConfig": {
     "access": "public"
   },
@@ -63,14 +63,6 @@
     "./cordis.yml": "./cordis.yml",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
-  },
-  "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
   },
   "types": "lib/types/index.d.ts"
 }
