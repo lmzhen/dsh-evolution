@@ -160,7 +160,16 @@ runs:
       working-directory: upstream
       run: |
         node packages/evolution/scripts/build-lib.mjs
-        node node_modules/vitest/vitest.mjs run packages/evolution
+        # Worker cap + explicit timeout: the suite has IO-heavy lock/CAS cases
+        # (write-lock takeover, cross-process RMW, dir-fsync) that are sensitive
+        # to machine load. At vitest's defaults (full parallelism, 5s testTimeout)
+        # a loaded runner produced a false red on 2026-09-13 — the two
+        # REV-06(b) lock cases (anchored-smoke TEST-06/TEST-07) lost their write
+        # to a takeover and failed; the identical commit passed on the sibling
+        # job and on an immediate rerun. This is the same configuration the
+        # release-time local gate uses (and has been green 10/10 repeatedly):
+        # maxWorkers=2, testTimeout=30s.
+        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000
         node node_modules/oxlint/bin/oxlint packages/evolution
 
     - name: Typecheck the test files (G7.1, D-9)
