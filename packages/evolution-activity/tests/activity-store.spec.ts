@@ -278,7 +278,7 @@ function serialize(items: EvolutionActivityRecord[]): string {
     }, DEFAULT_MAX_ITEMS, 7)
     expect(record).toHaveLength(1)
     const item = record[0]!
-    for (const key of ['policyFingerprint', 'executionFailures', 'executionError', 'evidenceQuotes', 'estimatedInputChars']) {
+    for (const key of ['policyFingerprint', 'skippedUnread', 'executionFailures', 'executionError', 'evidenceQuotes', 'estimatedInputChars']) {
       expect(key in item, `${key} should be absent`).toBe(false)
     }
     // Present values keep their keys (and their key names exactly).
@@ -293,6 +293,56 @@ function serialize(items: EvolutionActivityRecord[]): string {
     expect('executionError' in full).toBe(true)
   })
 
+
+  it('P2-14: the skippedUnread dimension folds into the record and round-trips through the sidecar', () => {
+    // Before the fix the fold dropped the R-03 dimension (and the reader would
+    // not have kept it either), so a plan whose ops were ALL skipped persisted
+    // as a clean "0 accepted / 0 rejected" record.
+    const skipped = payload({ memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 })
+    const folded = applyActivityEvent([], skipped, DEFAULT_MAX_ITEMS, 1000)
+    expect(folded[0]?.skippedUnread).toBe(2)
+    expect(parseActivityContent(serializeActivity(folded))[0]?.skippedUnread).toBe(2)
+    // A payload without the dimension keeps the key ABSENT (H-05 invariant).
+    const plain = applyActivityEvent([], payload(), DEFAULT_MAX_ITEMS, 1000)
+    expect('skippedUnread' in plain[0]!).toBe(false)
+  })
+
+  it('P2-14: a plan-applied carrying skippedUnread=2 persists the dimension end to end', { timeout: 20_000 }, async () => {
+    const root = await tempHome('dsh-activity-skip-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(apply, { maxItems: 10 })
+    ctx.emit('evolution/plan-applied', payload({ memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 }))
+    const items = await pollUntil(root, 'plan-1')
+    expect(items[0]).toMatchObject({ memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 })
+    await ctx.fiber.dispose()
+  })
+
+  it('P2-15: an unparsable sidecar is quarantined to .corrupt instead of being overwritten by the next event', { timeout: 20_000 }, async () => {
+    const root = await tempHome('dsh-activity-corrupt-')
+    const file = activityFile(join(root, 'evolution'))
+    // Truncated write / hand edit — bytes that may still be recoverable.
+    const original = '{"version":2,"items":[{"planId":"lost-in-the-truncation"'
+    await nodeEvolutionIo().writeText(file, original)
+    // The READ path stays total (readers degrade to empty, never throw)…
+    expect(await loadActivity(join(root, 'evolution'), nodeEvolutionIo())).toEqual([])
+
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    await ctx.plugin(apply, { maxItems: 10 })
+    ctx.emit('evolution/plan-applied', payload({ planId: 'after-corrupt' }))
+    const items = await pollUntil(root, 'after-corrupt')
+    // …and the WRITE path quarantines the bytes BEFORE restarting the store,
+    // so the fold-overwrite cannot destroy the only recoverable copy.
+    expect(items.map(item => item.planId)).toEqual(['after-corrupt'])
+    expect(await readFile(`${file}.corrupt`, 'utf8')).toBe(original)
+    expect(warnSpy.mock.calls.some(call => typeof call[0] === 'string' && call[0].includes('.corrupt'))).toBe(true)
+    warnSpy.mockRestore()
+    await ctx.fiber.dispose()
+  })
 
   it('P3-23 (v14): a malformed counter in a persisted entry drops that entry instead of propagating NaN', () => {
     // P3 (v15): `at` is a REQUIRED field (epoch-ms) — both fixtures carry it;

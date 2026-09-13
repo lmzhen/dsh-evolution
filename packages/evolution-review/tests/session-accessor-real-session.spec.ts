@@ -162,3 +162,100 @@ describe('G0.3: the migrated session accessor reads a real session log', () => {
     expect(applied[0]).toMatchObject({ sessionId: 'session-accessor-g03', skillApplied: 1 })
   })
 })
+
+/**
+ * v37 P7a: the SAME read-before-write credit, driven by the PTC dispatch
+ * vocabulary instead of the native call/result pair.
+ *
+ * The platform writes only one vocabulary per dispatch mode: a `run_code`
+ * program's sub-dispatches are logged as the PTC dispatch pair and NO
+ * `tool/call` exists anywhere in the log. Before P7a the read instrument
+ * matched `tool/call`, so `readNames` stayed EMPTY for every PTC session and
+ * `filterUnreadSkillOps` dropped the update of a skill the session had
+ * genuinely read — the review then reported nothing to do and no one could see
+ * why. This case fails in exactly that way if the instrument goes back to
+ * matching one modality by event type.
+ */
+describe('v37 P7a: the read credit over a PTC-only session log', () => {
+  it('credits a skill read dispatched by a run_code program', { timeout: 30_000 }, async () => {
+    await tempHome('dsh-session-ptc-accessor-')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const library = new SkillLibrary(undefined, nodeEvolutionIo())
+    await ctx.plugin(SkillUsageRegistry, { root: library.root })
+    await library.create('target-skill', SKILL('target-skill'), 'foreground')
+    ctx.provide('evolutionState', {
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    const applied: EvolutionPlanAppliedEvent[] = []
+    ctx.on('evolution/plan-applied', (event) => { applied.push(event) })
+    ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('subagents', {
+      start: async () => ({
+        result: Promise.resolve({
+          structured: {
+            summary: 'update the skill the program read',
+            skillOps: [{
+              action: 'update',
+              name: 'target-skill',
+              content: `${SKILL('target-skill')}\nUpdated by the P7a PTC read credit.\n`,
+              evidence: [{ event_seq: 1 }],
+            }],
+          },
+        }),
+        localAgent: null,
+        dispose: async () => {},
+      }),
+    })
+    ctx.provide('evolutionPolicy', {
+      get: () => ({ maxOpsPerPlan: 10, protectedSkillNames: [], skillContentChars: 100_000 }),
+    })
+    await ctx.plugin(Review, {
+      reviewEnabled: true,
+      reviewMode: 'subagent',
+      memoryInterval: 1,
+      skillInterval: 1,
+    })
+    const session = ctx.sessions.create(SessionId('session-ptc-p7a'))
+    ctx.agents.register({ id: session.id, session, ctx, inject: () => {} } as unknown as Agent)
+
+    // A REAL log in the PTC vocabulary ONLY: the run_code sub-dispatch pair for
+    // the skill read, a substantive user turn, and the completed boundaries.
+    session.append('turn/start', { turn: 1 })
+    session.append('tool/ptc-dispatch-start', {
+      rootCallId: ToolCallId('run-code-call'),
+      parentCallId: ToolCallId('run-code-call'),
+      subCallId: ToolCallId('run-code-call:ptc:1'),
+      name: 'skill',
+      arguments: { action: 'read', name: 'target-skill' },
+    })
+    session.append('tool/ptc-dispatch', {
+      rootCallId: ToolCallId('run-code-call'),
+      parentCallId: ToolCallId('run-code-call'),
+      subCallId: ToolCallId('run-code-call:ptc:1'),
+      name: 'skill',
+      arguments: { action: 'read', name: 'target-skill' },
+      isError: false,
+      content: [{ type: 'text', text: 'skill loaded' }],
+    } as never)
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: REVIEWER }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    // The sub-dispatch is a PROGRAM dispatch: it must not inflate the
+    // model-facing call counter, but it must raise the skill signal.
+    const signals = foldTurn(session, 0)
+    expect(signals.toolCalls).toBe(0)
+    expect(signals.skillSignal).toBe(true)
+
+    session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    await expect.poll(() => applied.length, { timeout: 10_000, interval: 50 }).toBeGreaterThan(0)
+    expect(applied[0]).toMatchObject({ sessionId: 'session-ptc-p7a', skillApplied: 1 })
+  })
+})
+

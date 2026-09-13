@@ -44,13 +44,27 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
     // unprotected (see SkillSummary.protectionUnknown).
     if (entry.protectionUnknown) protectedMap.set(entry.name, 'unknown')
     else if (entry.protectedBy) protectedMap.set(entry.name, entry.protectedBy)
-    const body = (await library.read(entry.name)) as string | null | undefined
+    // E-9 parity with drift-scan.ts: one unreadable ENTRY (transient EACCES/EIO)
+    // degrades that entry alone; a throw here would fail the whole scan before
+    // the sibling guard below ever runs.
+    // `unknown`, not `string | null`: the reader contract is JSON-shaped in
+    // practice, and F-01 records a backend that resolves undefined — the guard
+    // below must stay reachable, so the value is narrowed rather than trusted.
+    let body: unknown
+    try {
+      body = await library.read(entry.name)
+    } catch (error) {
+      // Swallowed on purpose: the entry's enrichment stays unknown (never a
+      // fabricated value) and the fact that it was skipped stays visible.
+      ctx.logger.warn(`evolution-maintenance: enrichment skipped unreadable skill "${entry.name}": ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
     // F-01: the empty-read guard matches drift-scan.ts (null AND
     // undefined) — an injected reader that resolves undefined (instead of the
     // concrete SkillLibrary's null) must skip the entry, not TypeError inside
     // parseFrontmatter below. The `as` widens the typed read exactly because
     // the reader contract is JSON-shaped in practice.
-    if (body === undefined || body === null) continue
+    if (typeof body !== 'string') continue
     const parsed = parseFrontmatter(body)
     // V27 G2.1: one read carries both the values and the catalog verdict. The
     // platform catalog parses strict YAML, so an unquoted `: ` or a block the

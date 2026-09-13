@@ -30,3 +30,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - Each event lands through `transactIo` (like `feedback.json`), so append cycles are cross-process atomic at the single-write granularity; the read-modify-write of one event is serialized in-process and atomic on disk. A multi-record batch is still one event at a time — no batch transaction exists.
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

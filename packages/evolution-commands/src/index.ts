@@ -9,7 +9,7 @@ import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, resolveSkillsRoot, SkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
+import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -250,7 +250,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ].join('\n'))
         }
         if (input === 'curator report') {
-          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }> } | null> } | undefined
+          const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }>; aborted?: string; unattributed?: string[] } | null> } | undefined
           if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
           const report: unknown = await curator.latestReport()
           if (!report) return ok('No curator report available.')
@@ -269,6 +269,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             startedAt: string
             archived: unknown[]
             failed: unknown[]
+            // Out-of-band editable like every other field: read defensively.
+            aborted?: unknown
+            unattributed?: unknown
           }
           const nameOf = (item: unknown): string =>
             typeof item === 'object' && item !== null && typeof (item as { name?: unknown }).name === 'string'
@@ -278,11 +281,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             typeof item === 'object' && item !== null && typeof (item as { reason?: unknown }).reason === 'string'
               ? (item as { reason: string }).reason
               : '?'
+          // P2-16 (v38): an interrupted run reports failed=(none) and used to
+          // read as a clean pass here, while the .md digest printed **Aborted**
+          // (V27 CUR-2). Carry the same run-level facts on the command surface.
+          const aborted = typeof reportAny.aborted === 'string' ? reportAny.aborted : undefined
+          const unattributed = Array.isArray(reportAny.unattributed) ? reportAny.unattributed.length : 0
           const lines = [
             `runId=${reportAny.runId}`,
             `startedAt=${reportAny.startedAt}`,
             `archived=${reportAny.archived.map(nameOf).join(', ') || '(none)'}`,
             `failed=${reportAny.failed.map(item => `${nameOf(item)}: ${reasonOf(item)}`).join(', ') || '(none)'}`,
+            ...aborted === undefined ? [] : [`aborted=${aborted}`],
+            ...unattributed === 0 ? [] : [`unattributed=${unattributed}`],
           ]
           return ok(lines.join('\n'))
         }
@@ -455,7 +465,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             return err(`Maintenance cooldown active (${remaining}s)${latest}; re-running now would spend another model call.`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-          const subagents = ctx.get('subagents') as { start(kind: string, options: unknown): Promise<{ result: Promise<unknown> }> } | undefined
+          // I-5 (v37): the LOCAL view must match MaintainRuntime's tightened subagents
+          // contract ('spawn' + a platform-shaped request); a wider local type made the
+          // real service assignable while hiding a future miss from `tsc`.
+          const subagents = ctx.get('subagents') as MaintainRuntime['subagents'] | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
           // 0.3.14 (P2-1): set the in-flight flag BEFORE the first await

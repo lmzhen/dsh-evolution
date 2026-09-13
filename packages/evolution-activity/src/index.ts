@@ -30,6 +30,10 @@ export interface EvolutionActivityRecord {
   memoryApplied: number
   skillApplied: number
   rejectedOps: number
+  /** R-03: ops skipped because the session never read the named skill — a third
+   * "not done" cause that is neither a validation reject nor a failure. Optional
+   * so payloads/sidecars without it keep parsing (absent = none recorded). */
+  skippedUnread?: number | undefined
   /** V6-10 (0.3.36): execution-layer failures (not validation rejections) —
    * optional so pre-0.3.36 sidecars keep parsing (missing = none recorded). */
   executionFailures?: number | undefined
@@ -71,6 +75,9 @@ export function applyActivityEvent(
     memoryApplied: event.memoryApplied,
     skillApplied: event.skillApplied,
     rejectedOps: event.rejectedOps,
+    // R-03: a plan whose ops were ALL skipped (session never read the skill)
+    // has nothing accepted and nothing rejected — keep the third dimension.
+    ...event.skippedUnread !== undefined ? { skippedUnread: event.skippedUnread } : {},
     // V6-10 (0.3.36): a plan that failed entirely at execution must not fold
     // into a clean "0/0" record — keep the failure dimension (V5-19 payload).
     ...event.executionFailures !== undefined ? { executionFailures: event.executionFailures } : {},
@@ -123,11 +130,14 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
       // counters. A hand-edited sidecar entry missing/NaN on any of these is
       // dropped instead of half-parsed.
       && isTimestampEpochMs((item as EvolutionActivityRecord).at)
+      && isOptionalCount((item as EvolutionActivityRecord).skippedUnread)
       && isOptionalCount((item as EvolutionActivityRecord).executionFailures)
       && isOptionalCount((item as EvolutionActivityRecord).evidenceQuotes)
       && isOptionalCount((item as EvolutionActivityRecord).estimatedInputChars))
   } catch {
-    // Malformed sidecar is treated as empty; observability is best-effort.
+    // Unparsable bytes fold to empty so every READER stays total; the single
+    // WRITE path (see apply) quarantines those bytes before it can overwrite
+    // them, which is where the loss would actually happen.
     return []
   }
 }
@@ -142,6 +152,20 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
  */
 export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
   return parseActivityContent(await io.readText(activityFile(root)))
+}
+
+/** True when bytes exist but are not a readable activity envelope: unparsable
+ * JSON, or a missing `items` array (a scalar/array/other-shaped file). A missing
+ * file (null) is NOT corruption — it is a first write. */
+function isCorruptActivity(raw: string | null): boolean {
+  if (raw === null) return false
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as { items?: unknown }).items)
+  } catch {
+    // Unparsable bytes are exactly the corruption this guard exists for.
+    return true
+  }
 }
 
 export const name = 'evolution-activity'
@@ -195,9 +219,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     let chain: Promise<unknown> = Promise.resolve()
     ioCtx.on('evolution/plan-applied', (event) => {
       const run = chain.then(() =>
-        transactIo(io, activityFile(root), (current) => {
+        transactIo(io, activityFile(root), async (current) => {
+          const file = activityFile(root)
+          if (isCorruptActivity(current)) {
+            // P2-15: folding would restart from [] and overwrite bytes that are
+            // still recoverable — quarantine them first (state-json/usage posture).
+            const rescued = await io.writeText(`${file}.corrupt`, current as string).then(() => true, () => false)
+            if (!rescued) {
+              ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable`)
+              return current
+            }
+            ioCtx.logger.warn(`evolution-activity: ${file} is unreadable (unparsable JSON or wrong top-level shape); the original bytes were copied to ${file}.corrupt and the store restarts from the readable entries`)
+          }
           const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
-          return Promise.resolve(serializeActivity(items))
+          return serializeActivity(items)
         }),
       )
       chain = run.then(() => undefined, () => undefined)

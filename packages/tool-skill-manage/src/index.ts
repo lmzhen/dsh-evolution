@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, isReviewChannelSession, SkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, resolveSkillsRoot, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -145,21 +145,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (numericClamped.length > 0) {
     ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
   }
-  // OPT-19 (plan D3): soft view of the platform catalog for the cross-source
-  // check below. `ctx.get` rather than the property proxy: this plugin does
-  // not inject `skills`, so an absent service must read as `undefined`
-  // instead of throwing (the type import above carries the platform's
-  // `Context.skills` augmentation). `undefined` also covers an unknown name
-  // and a failed discovery; the write then proceeds family-local exactly as
-  // before this check existed.
-  const catalogWinner = async (name: string): Promise<SkillSummary | undefined> => {
+  // OPT-19 (plan D3) + v39 scope correction: a scope-less `skills.list()` reads
+  // the GLOBAL layer only, so a PRESET-mounted catalog (the family's own provider
+  // is a preset row) is invisible here and the guard used to no-op silently —
+  // fail-open even under `strictCrossSource`. An empty or failed view is UNKNOWN,
+  // not "no winner": the caller reports it, and strict mode refuses rather than
+  // pretending the check ran. A non-empty view without the name stays a pass (the
+  // family skill is simply not published yet).
+  let crossSourceViewWarned = false
+  const catalogWinner = async (name: string): Promise<{ winner: SkillSummary | undefined; unverifiable: string | undefined }> => {
     const catalog = ctx.get('skills')
-    if (catalog === undefined) return undefined
+    if (catalog === undefined) return { winner: undefined, unverifiable: 'the skills service is not mounted' }
     try {
       const summaries = await catalog.list()
-      return summaries.find(summary => summary.name === name)
-    } catch {
-      return undefined
+      if (summaries.length === 0) return { winner: undefined, unverifiable: 'the catalog view is empty (a scope-less list() reads the global layer only)' }
+      return { winner: summaries.find(summary => summary.name === name), unverifiable: undefined }
+    } catch (error) {
+      return { winner: undefined, unverifiable: `the catalog lookup failed (${error instanceof Error ? error.message : String(error)})` }
     }
   }
 
@@ -472,7 +474,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // while the tag lived on `args`. Declared unconditionally: create/delete
       // (and approval-less compositions) pass `args` through untouched.
       let operation: SkillWriteArgs = args
-      const origins = resolveOrigins(exec.agent?.session?.header.origin)
+      // S2.2 (v37): the 'inject' review prompt runs in the PARENT session, whose
+      // header carries no origin — the family mark (core review-channel.ts) is
+      // what identifies the review's own writes there, resolving to the same
+      // origins the subagent executor uses. Unmarked sessions are unchanged.
+      const origins = resolveOrigins(exec.agent?.session?.header.origin, isReviewChannelSession(exec.agent?.session?.id))
       const reviewOrigin = origins.approval
       const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
@@ -486,8 +492,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // skill not yet published) or a discovery failure writes family-local
       // exactly as before.
       if (typeof args.name === 'string' && args.name !== '' && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
-        const winner = await catalogWinner(args.name)
-        if (winner !== undefined && winner.provider !== 'dsh-evolution') {
+        const probe = await catalogWinner(args.name)
+        if (probe.unverifiable !== undefined) {
+          // v39: the check could not run — say so instead of pretending it passed.
+          if (rawConfig.strictCrossSource === true) {
+            return { ok: false, message: `Refused: the cross-source check could not be performed — ${probe.unverifiable}. Fix the catalog view (or drop strictCrossSource) before writing "${args.name}".`, skills: [] }
+          }
+          if (!crossSourceViewWarned) {
+            crossSourceViewWarned = true
+            ctx.logger.warn(`skill_manage: cross-source check skipped for this session — ${probe.unverifiable}`)
+          }
+        } else if (probe.winner !== undefined && probe.winner.provider !== 'dsh-evolution') {
+          const winner = probe.winner
           const message = `skill "${args.name}" resolves to a higher-priority "${winner.source}" skill (provider "${winner.provider}"); this write lands on the family copy, which the catalog does NOT serve — edit the "${winner.source}" copy or rename.`
           if (rawConfig.strictCrossSource === true) {
             return { ok: false, message: `Refused: ${message}`, skills: [] }
@@ -501,9 +517,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // the replay (executeCore staleness guard) can refuse a stale overwrite.
         // A missing current skill stays unhashed — the replay surfaces "not
         // found" naturally.
+        // P1-13 (v37): the 'absent' sentinel covers a target that does not exist
+        // YET — same as the support-file anchor below. Unanchored staging let a
+        // foreground create between staging and approval be overwritten silently.
         if ((args.action === 'update' || args.action === 'edit') && typeof args.name === 'string' && args.name !== '') {
-          const stageCurrent = await library.read(args.name).catch(() => null)
-          if (stageCurrent !== null) operation = { ...args, staged_from_sha256: contentHash(stageCurrent) }
+          const stageCurrent = await library.read(args.name).catch(() => undefined)
+          if (stageCurrent !== undefined) operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }
         }
         // v30 REV-03: the anchor extends to support-file writes/removes —
         // the staged sha covers the file's current bytes, or the sentinel

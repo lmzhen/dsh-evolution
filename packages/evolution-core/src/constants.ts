@@ -118,8 +118,11 @@ export const DEFAULT_CURATOR_REVIEW_MAX_TOKENS = 2_048
 
 /** 0.3.17 (S3.10, T-1): control-plane fields a model-facing write call may
  * never carry — single source for plan-validator, evolution-policy and the
- * threat scanner (they used to each hardcode the list). */
-export const FORBIDDEN_CONTROL_KEYS = ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config'] as const
+ * threat scanner (they used to each hardcode the list).
+ * P2-13 (v37): staged_from_sha256 joins the list — it is the replay's own
+ * staleness anchor, and the tool-arguments root is an OPEN object, so a model
+ * could otherwise choose the anchor that decides the write's outcome. */
+export const FORBIDDEN_CONTROL_KEYS = ['policy', 'threshold', 'prompt_hash', 'model_route', 'evolution_config', 'staged_from_sha256'] as const
 
 /** 0.3.17 (S3.10): the model-facing write tools the policy guard and threat
  * scanner cover. */

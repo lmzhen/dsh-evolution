@@ -89,6 +89,25 @@ function stripDatePrefix(entry: string): string {
   return entry.replace(/^## \d{4}-\d{2}-\d{2}\n/, '')
 }
 
+/**
+ * Neutralize the platform's `{{name}}` prompt-variable syntax in text that is
+ * about to be registered as a `systemPrompt.context` contribution.
+ *
+ * The platform interpolates every context/section text once per model step and
+ * THROWS on an unknown or malformed reference — so one stored memory entry
+ * containing `{{...}}` (a CI expression, a Jinja/Helm/Vue template, a doc
+ * placeholder) used to fail `assemble()` on EVERY later pre-step of every
+ * session under this DSH_HOME, while a registered name such as `{{cwd}}` was
+ * silently substituted into the "memory" the model reads. Only the INJECTED
+ * text is neutralized: stored entries keep their original bytes.
+ *
+ * @param text - rendered context text about to leave for the prompt surface.
+ * @returns the same text with every `{{` split so it cannot start a reference.
+ */
+export function neutralizePromptVariables(text: string): string {
+  return text.includes('{{') ? text.replaceAll('{{', '{ {') : text
+}
+
 /** F-201: does `content` carry the on-disk entry delimiter or a trailing
  * `\n§` fragment that would combine with the render terminator into a real
  * delimiter boundary? Both split the fact into multiple entries on read-back
@@ -624,7 +643,16 @@ export class MemoryStore {
         parts.push(`## ${label} — ${entries.length} entries withheld by the security scan; none injected`)
       }
     }
-    return parts.join('\n\n')
+    // S0.1 (v37 P0-1): the platform interpolates \`{{name}}\` in every
+    // \`systemPrompt.context\` text and THROWS on an unknown/malformed reference
+    // (`core/system-prompt` interpolate; consumed once per model step). A memory
+    // entry is arbitrary user/model text (CI expressions, Jinja/Helm templates,
+    // doc placeholders), so an un-neutralized entry made EVERY subsequent
+    // pre-step of every session under this DSH_HOME fail — with registered
+    // variables (`{{cwd}}`) silently substituted instead. Neutralize only the
+    // INJECTED text: the stored entries keep their original bytes, so the file
+    // still round-trips and an operator sees exactly what was written.
+    return neutralizePromptVariables(parts.join('\n\n'))
   }
 
   /**

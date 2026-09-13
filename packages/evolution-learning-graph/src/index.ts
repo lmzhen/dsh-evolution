@@ -505,7 +505,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // v23 (AP-3): stage-time staleness hash — the replay refuses a
               // full-content overwrite of a skill that changed between staging
               // and approval (same contract as the tool/review stagings).
-              const stageCurrent = await withSkills().read(parsed.name).catch(() => null)
+              // P1-13 (v37): the catch answers UNDEFINED (unreadable = no anchor),
+              // so a missing target still reaches the 'absent' sentinel below.
+              const stageCurrent: string | null | undefined = await withSkills().read(parsed.name).catch((): undefined => undefined)
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph edit ${parsed.name}`,
@@ -514,7 +516,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                     action: 'update',
                     name: parsed.name,
                     content,
-                    ...(stageCurrent !== null ? { staged_from_sha256: contentHash(stageCurrent) } : {}),
+                    // P1-13 (v37): a not-yet-existing target anchors as 'absent' —
+                    // an unanchored staging let a foreground create between staging
+                    // and approval be overwritten silently.
+                    staged_from_sha256: typeof stageCurrent === 'string' ? contentHash(stageCurrent) : 'absent',
                   },
                   origin: origins.approval,
                   libraryOrigin: origins.library,

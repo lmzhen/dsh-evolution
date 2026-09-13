@@ -787,7 +787,10 @@ export class EvolutionCurator extends Service {
       suppressedNames,
       referencedSkillNames: this.referencedSkillNames,
     }, new Date(), gates, protectedNames)
+    // P1-10 (v38): this pool is rendered line by line into the LLM prompt, so a
+    // hand-edited sidecar key outside the skill charset must never reach it.
     const recommendPool = [...new Set([...result.markStale, ...dedupMembers])]
+      .filter(name => SKILL_NAME_RE.test(name))
     const nominations = this.llmReview
       ? await this.recommend(recommendPool, { dryRun })
       : { prunings: [], consolidations: [], warnings: [] as string[] }
@@ -1135,6 +1138,10 @@ export class EvolutionCurator extends Service {
       this.ctx.logger.warn('evolution-curator: run aborted at the archive gate (plugin disposed mid-run)')
       return { archivedSkills: [], errors: ['run aborted: evolution-curator was disposed mid-run'], suppressedChanged: false, consolidated: [] }
     }
+    // P2-17 (v38): the merge gate below must treat a source as already archived
+    // only when the archive LANDED - a failed archive (write lock) used to be
+    // read as "already archived" and silently dropped its merge nomination.
+    const alreadyArchived = new Set<string>()
     for (const name of archiveCandidates) {
       // E-15 (S5.4) two-phase self-heal: the archive rename (skills.archive
       // moves the directory into .archive) and the usage sidecar fold
@@ -1177,6 +1184,13 @@ export class EvolutionCurator extends Service {
         // (skill-store archive naming) — probe BOTH shapes; and a probe
         // failure is a warn, never a silent "not bundled" (which would skip
         // the suppression write).
+        // P1-10 (v38): `name` is a usage-sidecar KEY (parseUsage sanitizes
+        // values only), so reject it before any path is built from it. Same
+        // charset constant as the RegExp guard below.
+        if (!SKILL_NAME_RE.test(name)) {
+          this.ctx.logger.warn(`evolution-curator: usage sidecar key "${name}" is not a valid skill name - skipped (no archive/marker probe, no suppression write)`)
+          continue
+        }
         let wasBundled = false
         try {
           wasBundled = await this.io.exists(join(this.skills.root, '.archive', name, markerEntryName('bundled')))
@@ -1250,6 +1264,7 @@ export class EvolutionCurator extends Service {
           stateOwned.add(name)
         }
         archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
+        alreadyArchived.add(name)
         if (bundledNames.has(name)) {
           suppressedNames.add(name)
           suppressedAdded.add(name)
@@ -1257,7 +1272,6 @@ export class EvolutionCurator extends Service {
         }
       }
     }
-    const alreadyArchived = new Set(archiveCandidates)
     // v21 (L-4) / v22 (R-1) / v23 (BR-1): mid-run dispose gate — consolidation
     // is the second tree-mutating phase. This gate must NOT early-return: the
     // archive loop above has already moved directories and collected real
@@ -1297,7 +1311,13 @@ export class EvolutionCurator extends Service {
         stateOwned.add(nomination.from)
       }
       alreadyArchived.add(nomination.from)
-      executedConsolidations.push({ from: nomination.from, into: nomination.into })
+      // P2-18 (v38): the run report is this channel's only audit trail - carry
+      // the executed mode so a demote cannot be read back as an append.
+      executedConsolidations.push({
+        from: nomination.from,
+        into: nomination.into,
+        ...nomination.mode === undefined ? {} : { mode: nomination.mode },
+      })
       // v28 G4.3 (CUR-03): no fabricated path. The consolidation flow points
       // `path` at the TARGET; the source's real archive dir is chosen by
       // SkillLibrary.archive() with a stamp suffix on collision, so the
@@ -1394,11 +1414,12 @@ export class EvolutionCurator extends Service {
     }
     const real: Array<{ name: string; startedAt: number }> = []
     const errors: Array<{ name: string; startedAt: number }> = []
+    let unorderableWarned = false
     for (const name of entries.filter(entry => entry.startsWith('curator-') && entry.endsWith('.json'))) {
       try {
         const raw = await this.io.readText(join(reportsRoot, name))
         if (raw === null) continue
-        const parsed = JSON.parse(raw) as { startedAt?: string }
+        const parsed = JSON.parse(raw) as { startedAt?: string; at?: string }
         let startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN
         // F-327: error reports (`curator-error-*.json`) carry no `startedAt`,
         // so the old code never ordered them and the sweep kept them forever.
@@ -1408,7 +1429,17 @@ export class EvolutionCurator extends Service {
           const mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
           if (mtime !== null) startedAt = mtime
         }
+        // P2-4 (v38): the mtime probe is OPTIONAL - without it the report stayed
+        // unorderable and was never recycled. The error writer stamps `at` on
+        // every report, so use it before giving up on the file.
+        if (!Number.isFinite(startedAt) && typeof parsed.at === 'string') startedAt = Date.parse(parsed.at)
         if (Number.isFinite(startedAt)) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt })
+        else if (!unorderableWarned) {
+          // No usable timestamp at all: KEPT (never delete what we cannot
+          // order), and said out loud once - this file escapes the window.
+          unorderableWarned = true
+          this.ctx.logger.warn(`evolution-curator: report "${name}" carries no usable timestamp and this backend has no mtime probe - it is kept outside the retention window`)
+        }
       } catch {
         // Unclassifiable report: keep it — never delete what we cannot order.
       }
@@ -1438,16 +1469,37 @@ export class EvolutionCurator extends Service {
 
   async latestReport(): Promise<CuratorRunReport | null> {
     const reportsRoot = join(evolutionHome(), 'reports')
-    const names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
+    let names: string[]
+    try {
+      names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
+    } catch (error) {
+      // P2-4 (v38): this reader answers null, it never throws (boundary spec:
+      // a damaged report must not crash it). The warn keeps the READ failure
+      // distinguishable from "there are no reports".
+      this.ctx.logger.warn(`evolution-curator: latestReport could not list the reports directory (${error instanceof Error ? error.message : String(error)}) - answering "no report"`)
+      return null
+    }
     // E-54: filenames carry randomUUIDs — lexicographic order is NOT
     // chronological, and the old `.sort()` was a misleading no-op. Order by
     // each file's mtime (the report write time, from the optional mtime probe);
     // a report whose mtime is unavailable is never the latest (sorts last).
     let latest: { name: string; mtime: number } | null = null
+    let probeWarned = false
     for (const name of names) {
       // mtime is an OPTIONAL probe (0.3.18, E-71): a backend without one
       // reports null via the adapter — such a report is never the latest.
-      const mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
+      let mtime: number | null
+      try {
+        mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
+      } catch (error) {
+        // P2-4 (v38): a REJECTING probe is "unknown age" for this report only;
+        // warn once so the degradation is not silent.
+        if (!probeWarned) {
+          probeWarned = true
+          this.ctx.logger.warn(`evolution-curator: latestReport could not read a report mtime (${error instanceof Error ? error.message : String(error)}) - the affected report(s) are not eligible as the latest`)
+        }
+        continue
+      }
       if (mtime === null) continue
       if (latest === null || mtime > latest.mtime) latest = { name, mtime }
     }

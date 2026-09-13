@@ -30,3 +30,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 - The memory drift snapshot covers only the node label (first line, first 80 chars): a change confined to a later line of the same entry is not detected, because the rendered node label is the comparison anchor.
 - A hand-typed bare `memory:<source>:<index>` id has no snapshot and skips the drift check (legacy path; the rendered ids always carry the snapshot).
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

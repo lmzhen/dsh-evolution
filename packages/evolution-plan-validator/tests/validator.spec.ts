@@ -36,6 +36,22 @@ describe('evolution-plan-validator', () => {
     expect(skill.rejected[0]?.reason).toContain('forbidden field threshold')
   })
 
+  // P2-13 (v37): the tool's arguments root is an OPEN object, so the replay-only
+  // `staged_from_sha256` was reachable by the model and decided the write's outcome
+  // (the audit measured 'absent' changing execution). It is a control key now.
+  it('rejects a plan op that carries the replay anchor staged_from_sha256', () => {
+    const skill = validateEvolutionPlan({
+      skillOps: [{ action: 'update', name: 'a', content: 'body', evidence: [{ event_seq: 1 }], staged_from_sha256: 'absent' }],
+    } as never, { sessionSeq: 10 })
+    expect(skill.ok).toBe(false)
+    expect(skill.rejected[0]?.reason).toContain('forbidden field staged_from_sha256')
+    const mem = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }], staged_from_sha256: 'absent' }],
+    } as never, { sessionSeq: 10 })
+    expect(mem.ok).toBe(false)
+    expect(mem.rejected[0]?.reason).toContain('forbidden field staged_from_sha256')
+  })
+
   it('rejects malformed ops per-item instead of throwing (E-60, 0.3.17)', () => {
     const result = validateEvolutionPlan({
       memoryOps: [null, 'x', { action: 'add', target: 'memory', facts: 'ok', evidence: [{ event_seq: 1 }] }],

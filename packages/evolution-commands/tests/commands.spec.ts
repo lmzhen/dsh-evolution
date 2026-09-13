@@ -917,6 +917,41 @@ describe('evolution-commands', () => {
     expect(report.text).toContain('Report file unreadable.')
   })
 
+  it('P2-16 (v38): /evolution curator report surfaces an interrupted run instead of failed=(none)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionCurator', {
+      latestReport: async () => ({
+        runId: 'r-aborted',
+        startedAt: '2026-09-11T00:00:00.000Z',
+        archived: [{ name: 'landed-skill', reason: 'Lifecycle: reached archive threshold' }],
+        failed: [],
+        aborted: 'evolution-curator was disposed mid-run - consolidation skipped; archives that landed above are still accounted',
+        unattributed: ['some run-level error with no skill name'],
+      }),
+    })
+    await ctx.plugin(Commands)
+    const result = await captured!.handler({ rawInput: 'curator report' })
+    expect(result.kind).toBe('success')
+    // The skill-attributable list is empty, so the run-level facts are the only
+    // signal that this pass did not complete (V27 CUR-2 false-clean, command side).
+    expect(result.text).toContain('failed=(none)')
+    expect(result.text).toContain('aborted=evolution-curator was disposed mid-run')
+    expect(result.text).toContain('unattributed=1')
+    // A clean report keeps the previous shape: no run-level lines at all.
+    let clean: typeof captured
+    const cleanCtx = new Context()
+    cleanCtx.provide('commands', captureCommands((definition) => { clean = definition as typeof captured }))
+    cleanCtx.provide('evolutionCurator', {
+      latestReport: async () => ({ runId: 'r-clean', startedAt: '2026-09-11T01:00:00.000Z', archived: [], failed: [] }),
+    })
+    await cleanCtx.plugin(Commands)
+    const cleanResult = await clean!.handler({ rawInput: 'curator report' })
+    expect(cleanResult.text).not.toContain('aborted=')
+    expect(cleanResult.text).not.toContain('unattributed=')
+  })
+
   it('V6-29: maintain --timeout above the AbortSignal domain is rejected at the command gate (0.3.36)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined

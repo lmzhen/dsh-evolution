@@ -115,12 +115,30 @@ interface StorageDomainLike {
  * Bounded open() retry (rc.42 audit P1-4, package-private): a rejected open
  * used to poison the shared `opening` promise forever, so one transient
  * backend failure (lock, busy) took the provider down until process restart.
- * Transient failures now recover within the budget; deterministic failures
- * (corrupt domain version) surface after it, and the cleared promise lets a
- * later call start a fresh budget.
+ * Only transient failures retry (v37 S2.5): a deterministic failure surfaces
+ * at once instead of re-running the whole-domain loadAll three times, and the
+ * cleared promise lets a later call start a fresh budget.
  */
 const OPEN_MAX_ATTEMPTS = 3
 const OPEN_RETRY_BASE_MS = 100
+
+/** Retry cannot heal these — the stored record or the medium fails its own
+ * schema/version, or the backend cannot serve the domain at all. Both storage
+ * vocabularies (DomainError, StorageError) carry the code as stable API. */
+const DETERMINISTIC_OPEN_CODES: ReadonlySet<string> = new Set([
+  'invalid-record',
+  'malformed-medium',
+  'version-mismatch',
+  'facet-unsupported',
+  'backend-not-found',
+  'closed',
+])
+
+function isTransientOpenFailure(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return true
+  const code: unknown = (error as Record<string, unknown>).code
+  return typeof code !== 'string' || !DETERMINISTIC_OPEN_CODES.has(code)
+}
 
 export function apply(ctx: Context): void {
   let domain: Domain<typeof EVOLUTION_DOMAIN> | null = null
@@ -138,9 +156,10 @@ export function apply(ctx: Context): void {
             return await facility.open(EVOLUTION_DOMAIN)
           } catch (error) {
             lastError = error
-            if (attempt < OPEN_MAX_ATTEMPTS) {
-              await new Promise(resolve => setTimeout(resolve, OPEN_RETRY_BASE_MS * 2 ** (attempt - 1)))
-            }
+            // P2-6 (v37): retrying a deterministic failure only re-runs the
+            // whole-domain loadAll and delays the same rejection.
+            if (!isTransientOpenFailure(error) || attempt === OPEN_MAX_ATTEMPTS) break
+            await new Promise(resolve => setTimeout(resolve, OPEN_RETRY_BASE_MS * 2 ** (attempt - 1)))
           }
         }
         throw lastError

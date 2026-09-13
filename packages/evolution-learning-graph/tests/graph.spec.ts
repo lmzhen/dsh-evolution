@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -543,5 +543,62 @@ describe('learning graph', () => {
     expect(result.kind).toBe('error')
     expect(result.text).toContain('cannot be staged')
     expect(result.text).toContain('tool-memory')
+  })
+
+  // P1-13 (v37), graph channel: TWO findings, both pinned here.
+  // (a) The graph cannot reach the pre-fix hole at all — nodeEdit refuses a skill the
+  // live library does not hold (:361), so a graph edit is never staged for a
+  // not-yet-existing target. Pinned so a future relaxation of that probe is visible.
+  it('P1-13: a graph edit of a NOT-YET-EXISTING skill is refused before staging', async () => {
+    await tempHome('evo-graph-absent-')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
+    ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let captured: { args?: { origin?: unknown; operation?: { staged_from_sha256?: string } } } | undefined
+    ctx.provide('evolutionApproval', {
+      hasRunner: () => true,
+      request: async (input: unknown) => {
+        captured = input as typeof captured
+        return { action: 'staged', message: 'staged for approval' }
+      },
+    })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf('edit fresh-skill new body', { id: 'sess-absent', header: { origin: 'subagent' } }))
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('not found in the live skill library')
+    // Nothing was staged: the request must not have been reached.
+    expect(captured).toBeUndefined()
+  })
+
+  // (b) The anchor the graph DOES write for a live skill: the content hash of the bytes
+  // it staged from. This is the other half of the same contract (a present target must
+  // still be pinned, or the widened sentinel would have traded one hole for another).
+  it('P1-13: a graph edit of an EXISTING skill stages its content hash', async () => {
+    const root = await tempHome('evo-graph-anchored-')
+    const skillsDir = join(root, 'skills', 'live-skill')
+    await mkdir(skillsDir, { recursive: true })
+    const body = '---\nname: live-skill\ndescription: Live skill.\n---\n\nbody\n'
+    await writeFile(join(skillsDir, 'SKILL.md'), body, 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('skillUsage', { report: async () => new Map<string, unknown>() })
+    ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let captured: { args?: { operation?: { staged_from_sha256?: string } } } | undefined
+    ctx.provide('evolutionApproval', {
+      hasRunner: () => true,
+      request: async (input: unknown) => {
+        captured = input as typeof captured
+        return { action: 'staged', message: 'staged for approval' }
+      },
+    })
+    await ctx.plugin(Graph)
+    const result = await handler!.handler(invocationOf('edit live-skill new body', { id: 'sess-anchored', header: { origin: 'subagent' } }))
+    expect(result.kind, result.text).toBe('success')
+    expect(captured?.args?.operation?.staged_from_sha256).toBe(contentHash(body))
   })
 })

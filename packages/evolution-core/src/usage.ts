@@ -232,22 +232,16 @@ export async function mutateUsage(
   })
 }
 
-/**
- * Curator-owned usage fields (rc.67 K-2): the curator writes ONLY this set —
+/** Curator-owned usage fields (rc.67 K-2): the curator writes ONLY this set —
  * lifecycle state, archive stamp, the six-factor quality pair, and the
- * marker-mirrored pin flag. Counter and activity-stamp fields belong to the
- * tool-telemetry side (skill-usage / tool-skill-manage), which bumps them
- * through its own transact-backed RMW. A whole-record overwrite by either
- * side would clobber the other side's concurrent increment, so cross-side
- * folds copy this set only.
- */
-export function applyCuratorFields(disk: UsageRecord, curated: UsageRecord): void {
-  applyCuratorMetaFields(disk, curated)
-  applyCuratorLifecycleFields(disk, curated)
-}
+ * marker-mirrored pin flag; counters and activity stamps belong to the
+ * tool-telemetry side and are never copied by a fold. P2-12 (v39): the
+ * combined `applyCuratorFields` wrapper had no production caller (folds go
+ * through {@link foldCuratorFields}), so the two field copies below are the
+ * whole contract. */
 
 /** Copy only the lifecycle pair (state/archived_at) — see the ownership split
- * rationale on {@link applyCuratorMetaFields}. */
+ * rationale above. */
 export function applyCuratorLifecycleFields(disk: UsageRecord, curated: UsageRecord): void {
   disk.state = curated.state
   disk.archived_at = curated.archived_at

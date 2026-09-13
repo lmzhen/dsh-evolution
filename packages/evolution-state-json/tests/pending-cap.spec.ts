@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
@@ -252,26 +252,31 @@ describe('evolution-state-json pending resolution cap (G2.7, F-336)', () => {
     expect(once.filter(record => record.id === 'dup')).toHaveLength(1)
   })
 
-  it('V6-30: eviction is by the oldest entry KEYS —a same-id twin keeps its own slot (0.3.37)', async () => {
+  it('P2-5: a same-id twin under a drifted key collapses to ONE row, which is still evicted exactly once (V6-30)', async () => {
     const root = await tempRoot('dsh-json-v630-')
     const ctx = await mountStateStack(root)
     const provider = ctx.evolutionStateStorage.provider('json')
     const io = ctx.evolutionIo.provider('node')
     const map: Record<string, PendingRecord> = {}
-    // Two entries SHARE one id under different keys; only the older one is in
-    // the eviction window —it must leave with its own key while the twin
-    // stays (pre-fix: both left, one was archived).
+    // Two entries SHARE one id under different keys (hand-edited file). claim and
+    // resolve look a record up BY ID, so the two rows are one logical record with
+    // two slots — one of them unreachable and, being resolved-or-pending, never
+    // evicted. The load re-keys by record.id and keeps a single row (the
+    // canonical slot would win; among drifted keys the first in file order does).
     map['twin-old'] = { id: 'shared-id', kind: 'memory', summary: 'old', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z' }
     map['twin-new'] = { id: 'shared-id', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2021-01-01T00:00:00.000Z' }
-    for (let i = 0; i < 198; i += 1) {
+    for (let i = 0; i < 199; i += 1) {
       map[`live-${i}`] = { id: `live-${i}`, kind: 'skill', summary: `l${i}`, args: {}, createdAt: 'now', status: 'approved', resolvedAt: new Date(Date.UTC(2021, 0, 1, 0, 0, i)).toISOString() }
     }
     map['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'n', args: {}, createdAt: 'now', status: 'pending' }
     await io.writeText(join(root, 'pending-state.json'), JSON.stringify(map))
     await provider.tryResolvePending('to-resolve', 'approved')
     const after = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
-    expect('twin-new' in after).toBe(true)
-    expect('twin-old' in after).toBe(false)
+    // No zombie row under either drifted key survives the write-back…
+    expect(Object.keys(after)).not.toContain('twin-old')
+    expect(Object.keys(after)).not.toContain('twin-new')
+    // …and the single id-keyed row (the oldest, hence the eviction victim) was
+    // archived EXACTLY once — not once per slot under the shared id.
     const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
     const archivedShared = archive.filter(record => record.id === 'shared-id')
     expect(archivedShared).toHaveLength(1)
@@ -503,4 +508,158 @@ it('v30 STATE-07: a byte-equal user file named `<file>.corrupt.notes.md` is NOT 
   // …and the user file is untouched (still exactly its own bytes, never
   // pointed at as the rescue copy).
   expect(await io.readText(join(root, 'pending-state.json.corrupt.notes.md'))).toBe(corruptPayload)
+})
+
+describe('evolution-state-json approval surface under a corrupt audit sidecar (P1-11)', () => {
+  // Valid JSON whose top level is NOT the archive array: the shape the read path
+  // quarantines and the write path repairs. Pre-fix the read path rethrew it.
+  const poisoned = '{"someone":"hand-edited me"}'
+  const legacyOnly = JSON.stringify({
+    'legacy-a': { id: 'legacy-a', kind: 'memory', summary: 'awaiting approval', args: {}, createdAt: 'now', status: 'pending' },
+  })
+
+  it('listPending still lists (and retires) the unretired legacy record', async () => {
+    const root = await tempRoot('dsh-json-p111-list-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending.json'), legacyOnly)
+    await io.writeText(join(root, 'pending-state-archive.json'), poisoned)
+
+    const ids = (await provider.listPending('pending')).map(record => record.id)
+    expect(ids).toContain('legacy-a')
+    // Retirement still ran (the READ path is no longer the repair path)…
+    expect(await io.exists(join(root, 'pending.json'))).toBe(false)
+    expect(await io.exists(join(root, 'pending.json.migrated'))).toBe(true)
+    // …and the failed archive read preserved its rescue bytes.
+    expect(await io.readText(join(root, 'pending-state-archive.json.corrupt'))).toBe(poisoned)
+  })
+
+  it('savePending still stages a record', async () => {
+    const root = await tempRoot('dsh-json-p111-save-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending.json'), legacyOnly)
+    await io.writeText(join(root, 'pending-state-archive.json'), poisoned)
+
+    await provider.savePending({ id: 'staged-new', kind: 'skill', summary: 'queued', args: {}, createdAt: 'now', status: 'pending' })
+    const ids = (await provider.listPending('pending')).map(record => record.id)
+    expect(ids).toContain('staged-new')
+    expect(ids).toContain('legacy-a')
+  })
+
+  it('claimPending still claims the unretired legacy record', async () => {
+    const root = await tempRoot('dsh-json-p111-claim-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending.json'), legacyOnly)
+    await io.writeText(join(root, 'pending-state-archive.json'), poisoned)
+
+    const claimed = await provider.claimPending('legacy-a', 'claim-p111')
+    expect(claimed?.status).toBe('executing')
+    expect(claimed?.claimedBy).toBe('claim-p111')
+    expect(claimed?.id).toBe('legacy-a')
+  })
+
+  it('tryResolvePending still resolves the unretired legacy record', async () => {
+    const root = await tempRoot('dsh-json-p111-resolve-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending.json'), legacyOnly)
+    await io.writeText(join(root, 'pending-state-archive.json'), poisoned)
+
+    const resolved = await provider.tryResolvePending('legacy-a', 'approved')
+    expect(resolved.applied).toBe(true)
+    expect(resolved.record?.status).toBe('approved')
+  })
+
+  it('a corrupt .bak alone does not block the read either', async () => {
+    const root = await tempRoot('dsh-json-p111-bak-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending.json'), legacyOnly)
+    await io.writeText(join(root, 'pending-state-archive.json'), '[]')
+    await io.writeText(join(root, 'pending-state-archive.json.bak'), poisoned)
+
+    const ids = (await provider.listPending('pending')).map(record => record.id)
+    expect(ids).toContain('legacy-a')
+  })
+
+  it('the next resolve above the cap quarantines the corrupt file and rebuilds the array', async () => {
+    const root = await tempRoot('dsh-json-p111-repair-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    const seeded: Record<string, PendingRecord> = {}
+    for (let i = 0; i < 200; i += 1) {
+      seeded[`seed-${i}`] = {
+        id: `seed-${i}`, kind: 'memory', summary: 's', args: {}, createdAt: 'now',
+        status: 'approved', resolvedAt: new Date(Date.UTC(2020, 0, 1, 0, 0, i)).toISOString(),
+      }
+    }
+    seeded['to-resolve'] = { id: 'to-resolve', kind: 'memory', summary: 'new', args: {}, createdAt: 'now', status: 'pending' }
+    await io.writeText(join(root, 'pending-state.json'), JSON.stringify(seeded))
+    await io.writeText(join(root, 'pending.json'), legacyOnly)
+    await io.writeText(join(root, 'pending-state-archive.json'), poisoned)
+
+    const resolved = await provider.tryResolvePending('to-resolve', 'approved')
+    expect(resolved.applied).toBe(true)
+    // The corrupt bytes are preserved for the operator…
+    expect(await io.readText(join(root, 'pending-state-archive.json.corrupt'))).toBe(poisoned)
+    // …and the sidecar is a fresh array again — the SELF-LOCK is broken: the
+    // append that repairs it used to sit behind the read that threw.
+    const archive = JSON.parse((await io.readText(join(root, 'pending-state-archive.json')))!) as PendingRecord[]
+    expect(archive.map(record => record.id)).toEqual(['seed-0'])
+  })
+})
+
+describe('evolution-state-json pending table key/id asymmetry (P2-5)', () => {
+  // Hand-edited file: the entry answers to 'odd-key' while its record id is
+  // 'drifted' — the id claim/resolve look up.
+  const driftedEntry = JSON.stringify({
+    'odd-key': { id: 'drifted', kind: 'skill', summary: 'staged', args: {}, createdAt: 'now', status: 'pending' },
+  })
+
+  it('re-saving a drifted-key id leaves exactly ONE row (no unreachable zombie twin)', async () => {
+    const root = await tempRoot('dsh-json-p25-save-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending-state.json'), driftedEntry)
+
+    await provider.savePending({ id: 'drifted', kind: 'skill', summary: 'restaged', args: {}, createdAt: 'now', status: 'pending' })
+
+    const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
+    expect(Object.keys(map)).toEqual(['drifted'])
+    expect(map['drifted']?.summary).toBe('restaged')
+    // The read view carries the id once, not once per slot.
+    const ids = (await provider.listPending('pending')).map(record => record.id)
+    expect(ids).toEqual(['drifted'])
+  })
+
+  it('a drifted-key row is claimable and resolvable by record.id, and the re-key warns once', async () => {
+    const root = await tempRoot('dsh-json-p25-claim-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'pending-state.json'), driftedEntry)
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+
+    const claimed = await provider.claimPending('drifted', 'claim-p25')
+    expect(claimed?.status).toBe('executing')
+    const resolved = await provider.tryResolvePending('drifted', 'approved', 'claim-p25')
+    expect(resolved.applied).toBe(true)
+    expect(resolved.record?.status).toBe('approved')
+
+    const map = JSON.parse((await io.readText(join(root, 'pending-state.json')))!) as Record<string, PendingRecord>
+    expect(Object.keys(map)).toEqual(['drifted'])
+    expect(map['drifted']?.status).toBe('approved')
+    // Two mutations read the table twice; the drift warn is latched to ONE.
+    const driftWarns = warnSpy.mock.calls.filter(call => String(call[0]).includes('re-keyed by id'))
+    expect(driftWarns).toHaveLength(1)
+  })
 })

@@ -4,7 +4,6 @@
     { "path": "../evolution-approval" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
-    { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../core/tools" },
     { "path": "../../core/agent" },
     { "path": "../../llm/llm" },

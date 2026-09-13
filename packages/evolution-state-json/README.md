@@ -26,3 +26,5 @@ Independent of request-prefix construction. This package does not alter the asse
 - V25-11 (v25): the review-state table is likewise BOUNDED — `REVIEW_STATE_SESSION_CAP` (500, seam constant) rows keyed by session; on every save the least-recently-active sessions (provider-stamped `updatedAt`, stored on disk only) are pruned. The stamp is stripped on read, so the consumer-facing record shape is unchanged.
 - JSON provider serializes writers inside one process AND through the IO backend's cross-process transact lock (an internal transact wrapper — not public API, audit v10 S-03 — wraps every mutation, 0.3.20/0.3.27) — this provider is NOT limited to single-process safety. The caveat below is about the DSH storage-domain providers (`storage-json` documents no cross-process write locking) when the DOMAIN provider is used instead; multi-process deployments should route the evolution domain to a backend with cross-process semantics such as SQLite or remote storage.
 
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+

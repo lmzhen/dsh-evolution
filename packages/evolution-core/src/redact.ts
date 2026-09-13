@@ -49,9 +49,10 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 // for well-formed values because they are tried first.
 //
 // A2-6 (v18): the old `(?:\b|[\w-]+[_\-])` prefix was O(n²) on a long word
-// with no separator (100k chars measured ~23-26s, synchronously). The prefix
-// is now anchored by `(^|[^\w-])` and bounded to 64 chars, so the regex is
-// linear in the input and cannot stall the event loop.
+// with no separator (100k chars measured ~23-26s, synchronously). P2-2 (v37):
+// the `{0,64}` bound added then is GONE — a 65-char key prefix crossed
+// verbatim. Linearity now rests on the mandatory left anchor `(^|[^\w-])`:
+// only a key run behind `^`/a non-word char is attempted, and once per run.
 // P2-7/P2-8 (v19): the value is the WHOLE rest of the line — one branch, no
 // quoted/unquoted alternation. Two defects forced this: the separator's `[\s]*`
 // matched a newline, so `api_key:` with no same-line value swallowed the NEXT
@@ -68,8 +69,8 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 // well-known token prefixes; an arbitrary passphrase like `hunter2` had no
 // layer left to catch it.
 const INLINE_ASSIGNMENT_PATTERN = new RegExp(
-  '(^|[^\\w-])([\\w-]{0,64}[_\\-])?((?:token|api[_-]?key|secret|password|passwd)' +
-  '(?:[_\\-][\\w-]{0,64})?)\\b(["\\\']?[\\t ]*[:=][\\t ]*)' +
+  '(^|[^\\w-])([\\w-]*[_\\-])?((?:token|api[_-]?key|secret|password|passwd)' +
+  '(?:[_\\-][\\w-]*)?)\\b(["\\\']?[\\t ]*[:=][\\t ]*)' +
   '([^\\r\\n]+)',
   'gi',
 )
@@ -77,7 +78,10 @@ const INLINE_ASSIGNMENT_PATTERN = new RegExp(
 // v22 (SEC-4): a scheme://user:password@host URL — only the password segment
 // is masked; the group-preserving replace keeps the scheme/user readable so a
 // connection string stays diagnosable.
-const URL_CREDENTIALS_PATTERN = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s/@]+)@/gi
+// P2-28 (v39): the scheme run is capped at 64 characters — unbounded, a
+// scheme-free 60k blob cost 2.1-4.4s per call (the engine re-walks the run at
+// every offset, synchronously, on the outbound redaction path); 25ms now.
+const URL_CREDENTIALS_PATTERN = /([a-z][a-z0-9+.-]{0,63}:\/\/[^\s:/@]+:)([^\s/@]+)@/gi
 
 // v28 G5.1 (REDACT-02): a PEM private key block is masked WHOLE (header to
 // footer). threats.ts blocks the same shape on the WRITE path
@@ -100,12 +104,14 @@ const PEM_PRIVATE_KEY_PATTERN = new RegExp(`${PEM_HEAD}[\\s\\S]*?${PEM_TAIL}`, '
 // key plus its mapping separator; the following INDENTED line is its value.
 // v31 REDACT-03: the key carries the same connected-prefix group as the
 // inline pattern (`AWS_SECRET_ACCESS_KEY`, `CLIENT_SECRET`, `DB_PASSWORD` —
-// A2-6's `[\w-]{0,64}[_\-]` form). Without it, every prefixed block key
+// the inline pattern's connected-prefix form, unbounded since P2-2 (v37)).
+// Without it, every prefixed block key
 // missed the pass AND the AWS residual sweep (the underscore blocks every
 // `\b`), so the secret shipped verbatim (executed-verified leak).
 // v31 REDACT-03: the key carries the same connected-prefix group as the
 // inline pattern (`AWS_SECRET_ACCESS_KEY`, `CLIENT_SECRET`, `DB_PASSWORD` —
-// A2-6's `[\w-]{0,64}[_\-]` form). Without it, every prefixed block key
+// the inline pattern's connected-prefix form, unbounded since P2-2 (v37)).
+// Without it, every prefixed block key
 // missed the pass AND the AWS residual sweep (the underscore blocks every
 // `\b`), so the secret shipped verbatim (executed-verified leak).
 // OPT-03 (2026-09): the trailing `\s*$` already absorbed a `\r` on the KEY
@@ -114,7 +120,18 @@ const PEM_PRIVATE_KEY_PATTERN = new RegExp(`${PEM_HEAD}[\\s\\S]*?${PEM_TAIL}`, '
 // secret crossed verbatim. Both anchors now tolerate an optional `\r` so the
 // line-paired pass behaves identically on LF and CRLF input (Windows-authored
 // .env / compose / kubectl YAML is the realistic carrier).
-const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]{0,64}[_\-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_\-][\w-]{0,64})?)\s*:(?:\r)?$/i
+const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]*[_\-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_\-][\w-]*)?)\s*:(?:\r)?$/i
+
+// S0.3 (v37 P0-2): the two patterns above cannot express a camelCase hump —
+// they are case-INSENSITIVE, so [A-Z] would match lowercase too. This pair
+// decides by a case-insensitive KEYWORD test that rejects a lowercase
+// continuation: clientSecret= / accessToken= / SecretAccessKey= are masked,
+// while tokenizer= / secretary: / passwordless: stay untouched.
+const CREDENTIAL_KEY_RE = /(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]asswd|[Aa]pi[_-]?[Kk]ey)(?![a-z])/
+// P2-2 (v37): the candidate key carried the same defect class in `{1,80}` form —
+// a longer camelCase key (this pass is the ONLY layer that can reach one) was
+// skipped wholesale. The cap is gone; the scan stays linear (see A2-6 above).
+const CANDIDATE_ASSIGNMENT_PATTERN = /(^|[^\w-])([\w-]+)(["']?[\t ]*[:=][\t ]*)([^\r\n]+)/g
 
 /**
  * Mask credential-shaped text before it crosses a session boundary.
@@ -139,6 +156,11 @@ export function redactSecrets(text: string): string {
   out = out.replace(URL_CREDENTIALS_PATTERN, (_match, lead?: string) => `${lead ?? ''}<redacted>@`)
   out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, lead?: string, prefix?: string, key?: string, separator?: string) =>
     `${lead ?? ''}${prefix ?? ''}${key ?? ''}${separator ?? ''}<redacted>`)
+  // S0.3: camelCase keys ride this second, case-aware pass (see CREDENTIAL_KEY_RE).
+  out = out.replace(CANDIDATE_ASSIGNMENT_PATTERN, (match, lead?: string, key?: string, separator?: string) => {
+    if (typeof key !== 'string' || !CREDENTIAL_KEY_RE.test(key)) return match
+    return `${lead ?? ''}${key}${separator ?? ''}<redacted>`
+  })
   // Line-paired passes on the split lines. Order matters: the block-style pass
   // runs first so the `<redacted>` it plants still enables the AWS residual
   // pass below (a 40-char secret on the block value line is already gone, but
@@ -146,7 +168,11 @@ export function redactSecrets(text: string): string {
   const lines = out.split('\n')
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i]
-    if (line === undefined || !BLOCK_KEY_ONLY_LINE.test(line)) continue
+    if (line === undefined) continue
+    // S0.3: a bare camelCase key line (`clientSecret:` / `SecretAccessKey:`) pairs
+    // with its indented value through the same case-aware predicate as the inline pass.
+    const camelKey = /^([\w-]+)\s*:(?:\r)?$/.exec(line)?.[1]
+    if (!(BLOCK_KEY_ONLY_LINE.test(line) || (camelKey !== undefined && CREDENTIAL_KEY_RE.test(camelKey)))) continue
     const next = lines[i + 1] ?? ''
     // The value is the first non-empty indented line after the bare key.
     // Over-masking an indented line under a credential key is acceptable for a

@@ -216,14 +216,14 @@ export function parseCuratorNominations(text: string): CuratorNominations {
       section = header[1] === 'consolidations' ? 'consolidations' : 'prunings'
       continue
     }
-    const consolidated = /^\s*-\s*from:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
+    const consolidated = /^\s*-\s*from:\s*([a-z0-9][a-z0-9-]*)(?:\s*#.*)?\s*$/.exec(line)
     if (consolidated) {
       section = 'consolidations'
       currentFrom = consolidated[1] ?? ''
       currentMode = undefined
       continue
     }
-    const mode = /^\s*mode:\s*(append|reference)\s*$/.exec(line)
+    const mode = /^\s*mode:\s*(append|reference)(?:\s*#.*)?\s*$/.exec(line)
     if (mode) {
       if (currentFrom !== '') currentMode = mode[1] === 'reference' ? 'reference' : 'append'
       // V6-35: a `mode:` with no preceding `- from:` (or after the `into:` that
@@ -233,7 +233,7 @@ export function parseCuratorNominations(text: string): CuratorNominations {
       else warnings.push(`mode: ${mode[1]} ignored — no preceding "- from:" entry (the consolidation falls back to append)`)
       continue
     }
-    const into = /^\s*into:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
+    const into = /^\s*into:\s*([a-z0-9][a-z0-9-]*)(?:\s*#.*)?\s*$/.exec(line)
     if (into) {
       const intoName = into[1] ?? ''
       if (section === 'consolidations' && currentFrom !== '' && currentFrom !== intoName) {
@@ -247,7 +247,7 @@ export function parseCuratorNominations(text: string): CuratorNominations {
       currentMode = undefined
       continue
     }
-    const pruned = /^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)\s*$/.exec(line)
+    const pruned = /^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)(?:\s*#.*)?\s*$/.exec(line)
     if (pruned) {
       // V6-35: a `- name:` inside the consolidations section flips the parse
       // to prunings — every later entry is re-read as a pruning. Warn so the
@@ -256,6 +256,13 @@ export function parseCuratorNominations(text: string): CuratorNominations {
       section = 'prunings'
       const name = pruned[1]
       if (name) prunings.push(name)
+      continue
+    }
+    // P1-9 (v38): an anchor KEY with an unusable value (a name outside the
+    // charset, an unknown mode) used to vanish without a trace - and `- name:`
+    // is the LLM channel's only archive path. Say it instead.
+    if (/^\s*(?:-\s*(?:from|name)\s*:|(?:into|mode)\s*:)/.test(line)) {
+      warnings.push(`"${line.trim()}" ignored - not a usable nomination line (names are lowercase letters, digits and hyphens; one optional trailing "# comment" is allowed)`)
     }
   }
   const valid = (name: string) => NOMINATION_NAME_RE.test(name)

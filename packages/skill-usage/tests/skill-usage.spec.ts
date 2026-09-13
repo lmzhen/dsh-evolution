@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
+import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
+import type { CodeRunRequest, CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
+// `dsh-evolution-io-node` is a FUNCTION plugin (named `name`/`inject`/`apply`,
+// no default export), so it is mounted as a namespace; the two service packages
+// default-export their class.
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '../src/index.ts'
 import { eventsFile, loadUsage, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
@@ -119,6 +127,37 @@ describe('skill-usage', () => {
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('demo-read')
     expect(seen?.view_count).toBe(1)
+  })
+
+  it('v37 P7a: counts a skill read dispatched inside a run_code program (PTC modality)', async () => {
+    const root = await tempRoot('dsh-usage-ptc-')
+    // The REAL platform PTC stack: ToolRuntime in 'ptc' mode plus the run_code
+    // bridge, with a stub CodeRuntime whose program calls the SDK's skill
+    // binding. The sidecar consumes the same session/event stream the platform
+    // produces — before P7a it matched 'tool/call', which the PTC bridge never
+    // writes, so the view counter stayed at zero and the observation window
+    // never opened.
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt, {})
+    await ctx.plugin(PtcProbeCodeRuntime)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
+    await ctx.plugin(ToolRuntime, { mode: 'ptc' })
+    ctx.tools.register(PtcSkillTool)
+    await ctx.skillUsage.ensureRecordCreated('ptc-read', false)
+    const session = ctx.sessions.create(SessionId('usage-ptc'))
+    const agent = { id: SessionId('usage-ptc'), session, ctx } as never
+    await ctx.tools.execute({
+      callId: 'c1', name: 'run_code',
+      arguments: { code: 'await tools.skill({name:"ptc-read"})', description: 'read one skill' },
+      agent, signal: new AbortController().signal,
+    } as never)
+    await ctx.skillUsage.invalidate()
+    expect((await ctx.skillUsage.report()).get('ptc-read')?.view_count).toBe(1)
+    const { events } = await readEvolutionTimeline(nodeEvolutionIo(), eventsFile(root))
+    expect(events.filter(event => event.type === 'usage')).toHaveLength(1)
   })
 
   it('appends the observation-window anchor once, on the first observed read (C)', async () => {
@@ -250,4 +289,28 @@ describe('skill-usage', () => {
     }
     expect(views).toBe(1)
   })
+})
+
+/** Stub CodeRuntime: runs a one-line program that reads ONE skill through the SDK binding. */
+class PtcProbeCodeRuntime extends CodeRuntime {
+  readonly language = 'typescript'
+  readonly isolation = 'p7a-spec'
+  async run(request: CodeRunRequest): Promise<CodeRunResult> {
+    const namespace = request.bindings.find(entry => entry.global === 'tools')
+    if (namespace === undefined) return { logs: [], error: { kind: 'exception', message: 'no tools namespace' } }
+    const value = await namespace.functions['skill']!({ name: 'ptc-read' })
+    return { value, logs: [] }
+  }
+}
+
+/** The `skill` tool the PTC program reaches through the SDK namespace. */
+const PtcSkillTool = defineTool({
+  name: 'skill',
+  description: 'Load one skill body by name.',
+  parameters: { name: { type: 'string', required: true } },
+  output: {
+    schema: { type: 'object', additionalProperties: false, properties: { body: { type: 'string', required: true } } },
+    render: (_args, value) => [{ type: 'text', text: value.body }],
+  },
+  async execute() { return { body: 'ptc skill body' } },
 })

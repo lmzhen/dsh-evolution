@@ -50,9 +50,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (value !== undefined && result !== value) clamped.push(name)
     return result
   }
+  // P2-23 (v37): a fractional char limit reached the store unchanged, and the
+  // tool surface declares `limit` as an integer — every memory call then failed
+  // platform output validation AFTER the write had landed. The char limit is a
+  // counted quantity, so it is floored at the one point where it enters the store
+  // (floor, not round: a limit must never grow past what the operator configured).
+  const floorLimit = (value: number): number => Math.floor(value)
   const config = Object.assign({}, rawConfig, {
-    memoryCharLimit: field('memoryCharLimit', rawConfig.memoryCharLimit, DEFAULT_MEMORY_CHAR_LIMIT),
-    userCharLimit: field('userCharLimit', rawConfig.userCharLimit, DEFAULT_USER_CHAR_LIMIT),
+    memoryCharLimit: floorLimit(field('memoryCharLimit', rawConfig.memoryCharLimit, DEFAULT_MEMORY_CHAR_LIMIT)),
+    userCharLimit: floorLimit(field('userCharLimit', rawConfig.userCharLimit, DEFAULT_USER_CHAR_LIMIT)),
     maxConsolidationFailures: field('maxConsolidationFailures', rawConfig.maxConsolidationFailures, DEFAULT_CONSOLIDATION_FAILURES),
   }) as Required<Config>
   if (clamped.length > 0) {

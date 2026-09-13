@@ -14,6 +14,7 @@
   "files": [
     "agent.cordis.yml",
     "preset.yml",
+    "preset.ptc.yml",
     "package.json",
     "lib/*.js",
     "lib/types/**/*.d.ts"
@@ -26,16 +27,13 @@
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
   },
   "exports": {
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
-    },
     ".": {
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
     "./agent.cordis.yml": "./agent.cordis.yml",
     "./preset.yml": "./preset.yml",
+    "./preset.ptc.yml": "./preset.ptc.yml",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

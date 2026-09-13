@@ -209,4 +209,104 @@ describe('doctor (WB2, 0.3.55)', () => {
       await rm(home, { recursive: true, force: true })
     }
   })
+  it('S0.2 (v37 P0-1): reports memory entries carrying the platform template syntax', async () => {
+    // The platform interpolates `{{name}}` in every prompt-context text and throws
+    // on an unknown reference, so on a build without the render-time neutralization
+    // one such entry bricks every later turn. Doctor surfaces it (read-only) with a
+    // fix instruction — an older running process cannot be repaired from inside the
+    // session it broke.
+    const home = await mkdtemp(join(tmpdir(), 'doctor-memory-'))
+    try {
+      await mkdir(join(home, 'memories'), { recursive: true })
+      await writeFile(join(home, 'memories', 'MEMORY.md'), 'Deploy template: {{APP_NAME}}\n', 'utf8')
+      await writeFile(join(home, 'memories', 'USER.md'), 'plain profile note\n', 'utf8')
+      const report = await diagnose(stub, { home })
+      expect(report.memoryIssues).toHaveLength(1)
+      expect(report.memoryIssues[0]).toContain('MEMORY.md')
+      expect(renderDoctorText(report)).toContain('memory:')
+      expect(report.actions.some(action => action.includes('Rewrite the memory entries'))).toBe(true)
+      // A clean home reports nothing and adds no action.
+      const clean = await mkdtemp(join(tmpdir(), 'doctor-memory-clean-'))
+      try {
+        await mkdir(join(clean, 'memories'), { recursive: true })
+        await writeFile(join(clean, 'memories', 'MEMORY.md'), 'nothing to see\n', 'utf8')
+        const cleanReport = await diagnose(stub, { home: clean })
+        expect(cleanReport.memoryIssues).toEqual([])
+        expect(cleanReport.actions.some(action => action.includes('Rewrite the memory entries'))).toBe(false)
+      } finally {
+        await rm(clean, { recursive: true, force: true })
+      }
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+  it('S2.1 (v37 P1-3): the platform-owned profiles/node_modules is not a profile', async () => {
+    // `app-boot` creates `$DSH_HOME/profiles/node_modules` on every launch and it
+    // never holds a manifest. Before S2.1 the enumeration reported ENOENT as a torn
+    // profile, so the preset-install exclusion gate refused on EVERY healthy install
+    // and doctor printed a fake DEGRADED conflict naming a platform directory.
+    const home = await mkdtemp(join(tmpdir(), 'doctor-node-modules-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      await mkdir(join(home, 'profiles', 'node_modules'), { recursive: true })
+      await mkdir(join(home, 'profiles', '.hidden'), { recursive: true })
+      const report = await diagnose(stub, { home })
+      expect(report.installForm).toBe('full')
+      expect(report.conflicts).toEqual([])
+      // The preset-install gate rethrows this callback's error — it must not throw.
+      expect(() => collectEvolutionBundles(home, (error) => { throw error })).not.toThrow()
+      expect(collectEvolutionBundles(home)).toEqual(['@lmzhen/dsh-evolution-all'])
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+    // A genuinely unreadable manifest still fails closed (the INST-01 contract).
+    const torn = await mkdtemp(join(tmpdir(), 'doctor-torn-'))
+    try {
+      const dir = join(torn, 'profiles', 'web')
+      await mkdir(dir, { recursive: true })
+      await writeFile(join(dir, 'package.json'), '{ not json', 'utf8')
+      expect(() => collectEvolutionBundles(torn, (error) => { throw error })).toThrow()
+    } finally {
+      await rm(torn, { recursive: true, force: true })
+    }
+  })
+
+  it('S2.1 (v37 P2-19): a DEGRADED read never produces the install-all advice', async () => {
+    // The fail-open INST-01 exists to prevent: a bundle row nobody could read
+    // reads as "no bundles", so the ladder advised adding `all` to a deployment
+    // that already carries it. Unreadable data must refuse to advise at all.
+    const home = await mkdtemp(join(tmpdir(), 'doctor-degraded-manifest-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      await writeFile(join(home, 'profiles', 'web', 'package.json'), '{"dsh":{"profile":{"bundles":["@lmzhen/dsh-evol', 'utf8')
+      const report = await diagnose(stub, { home })
+      expect(report.conflicts.some(row => row.includes('DEGRADED'))).toBe(true)
+      expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
+      expect(report.actions.some(action => action.includes('Install the default full bundle'))).toBe(false)
+      expect(report.actions.join('\n')).toContain('/evolution doctor')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+    // The other degraded scope: `profiles` is a FILE, so enumeration itself fails.
+    const fileHome = await mkdtemp(join(tmpdir(), 'doctor-degraded-dir-'))
+    try {
+      await writeFile(join(fileHome, 'profiles'), 'not a directory', 'utf8')
+      const report = await diagnose(stub, { home: fileHome })
+      expect(report.conflicts.some(row => row.includes('DEGRADED'))).toBe(true)
+      expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
+      expect(report.actions.join('\n')).toContain('/evolution doctor')
+    } finally {
+      await rm(fileHome, { recursive: true, force: true })
+    }
+    // Control: nothing to read is NOT degraded — the healthy empty home keeps
+    // its install advice, so the guard above cannot pass by suppressing it always.
+    const empty = await mkdtemp(join(tmpdir(), 'doctor-undegraded-'))
+    try {
+      const report = await diagnose(stub, { home: empty })
+      expect(report.conflicts).toEqual([])
+      expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(true)
+    } finally {
+      await rm(empty, { recursive: true, force: true })
+    }
+  })
 })

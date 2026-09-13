@@ -114,6 +114,33 @@ describe('tool-memory', () => {
     expect(summaries[1]).not.toMatch(/memory memory/)
   })
 
+  // P2-23 (v37): the tool's declared output contract — validated by the platform with
+  // Number.isInteger for `integer` fields — is the invariant the fix has to satisfy.
+  it('P2-23: a fractional configured char limit still satisfies the declared integer output', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // 21000.5 is the reported deployment value: the schema passes it (.min(1)).
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-'), memoryCharLimit: 21_000.5 })
+    await ctx.plugin(ToolMemory, {})
+    const declared = (ctx.tools.get('memory') as unknown as {
+      output: { schema: { properties: Record<string, { type?: string } | undefined> } }
+    }).output.schema.properties
+    expect(declared.chars?.type).toBe('integer')
+    expect(declared.limit?.type).toBe('integer')
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: undefined } as unknown as Parameters<typeof tool.execute>[1]
+    const result = await tool.execute({ target: 'memory', action: 'add', facts: 'user prefers terse' }, execArg) as MemoryToolResult
+    expect(result.ok).toBe(true)
+    // Platform validation for the declared 'integer': both fields must be whole numbers.
+    expect(Number.isInteger(result.limit)).toBe(true)
+    expect(Number.isInteger(result.chars)).toBe(true)
+    expect(result.limit).toBe(21_000)
+    expect(await ctx.memory.read('memory')).toContain('user prefers terse')
+  })
+
   it('V24-20a: a null operations ELEMENT is refused structurally through the schema-bypassed replay runner', async () => {
     // The tool schema rejects `operations: [null]` before execute, so the
     // reachable route for this garbage is the approval replay runner, which

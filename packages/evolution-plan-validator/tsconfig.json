@@ -2,7 +2,6 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     { "path": "../../../vendor/cordis" },
-    { "path": "../evolution-core" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    { "path": "../evolution-core" }
   ]
 }

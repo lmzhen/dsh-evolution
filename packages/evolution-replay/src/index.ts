@@ -32,6 +32,9 @@ export interface ReplayPlan {
   skillOps: number
   evidenceQuotes: number
   estimatedInputChars: number
+  /** R-03: ops skipped because the session never read the named skill — a plan
+   * whose ops were all skipped must not read as a clean "0/0" either. */
+  skippedUnread?: number | undefined
   /** V6-10 (0.3.36): execution-layer failures — a plan must not read as a
    * clean "0/0" when its ops all failed at execution (V5-19 payload). */
   executionFailures?: number | undefined
@@ -118,7 +121,7 @@ export function comparePlans(plans: ReplayPlan[], weights: ReplayWeights = DEFAU
     winner: winner.plan.policyId,
     margin,
     plans,
-    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected${(plan.executionFailures ?? 0) > 0 ? `, ${plan.executionFailures} failed${plan.executionError !== undefined ? `: ${plan.executionError}` : ''}` : ''})`).join('\n') + singleNote,
+    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected${(plan.skippedUnread ?? 0) > 0 ? `, ${plan.skippedUnread} op(s) skipped (skill not read this session)` : ''}${(plan.executionFailures ?? 0) > 0 ? `, ${plan.executionFailures} failed${plan.executionError !== undefined ? `: ${plan.executionError}` : ''}` : ''})`).join('\n') + singleNote,
   }
 }
 
@@ -239,6 +242,9 @@ export class EvolutionReplayDriver {
       // poisoning the scored dimension.
       evidenceQuotes: countOr(plan.evidenceQuotes, memoryApplied + skillApplied),
       estimatedInputChars: count(plan.estimatedInputChars),
+      // R-03: report-only like executionFailures (E4/P1-10) — the skips are a
+      // refusal cause the score does not weigh, but the text must show them.
+      skippedUnread: count(plan.skippedUnread),
       // V6-10 (0.3.36): keep the failure dimension for the leaderboard —
       // a plan whose ops all failed must not score as a clean empty plan.
       // E4 (P1-10, v11): the failure dimension is a REPORT-ONLY field (shown
@@ -254,8 +260,9 @@ export class EvolutionReplayDriver {
   }
 
   /**
-   * V25-01 (v25): backfill the leaderboard from the activity sidecar, ONCE
-   * per driver instance. The inject callback that loads the sidecar re-runs
+   * V25-01 (v25): backfill the leaderboard from the activity sidecar — once
+   * per driver instance, and only for a load that carried records (an empty
+   * read is not evidence, see below). The inject callback that loads the sidecar re-runs
    * whenever the `evolutionIo` dependency is replaced (cordis derived-fiber
    * reload — plugin restart / HMR) while THIS driver survives at the apply
    * scope, so the dedupe guard must live here, not in the callback: without
@@ -264,6 +271,11 @@ export class EvolutionReplayDriver {
    */
   backfill(items: ReadonlyArray<import('@deepseek-ai/dsh-evolution-activity').EvolutionActivityRecord>): void {
     if (this.backfilled) return
+    // P2-15: an EMPTY list does not prove the sidecar was read — a quarantined
+    // activity.json loads as [] too. Latching on it would lock the leaderboard
+    // empty for the process lifetime, so the latch commits on the first load
+    // that actually carried records; repeating backfill([]) duplicates nothing.
+    if (items.length === 0) return
     this.backfilled = true
     // V26-05 (v25): drop the sidecar copies of plans that were already
     // recorded live inside the read window (same planId — ids are unique per

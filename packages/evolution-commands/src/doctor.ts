@@ -34,6 +34,12 @@ export interface DoctorReport {
   bundles: string[]
   conflicts: string[]
   envIssues: string[]
+  /** S0.2 (v37 P0-1): memory files carrying the platform's `{{` prompt-variable
+   * syntax. Residual-risk detector — current builds neutralize the INJECTED text
+   * (`MemoryStore.renderContext`), but a still-running older build fails every
+   * pre-step of every session under this home, and an operator may want to clean
+   * the file regardless. */
+  memoryIssues: string[]
   services: { review: boolean; curator: boolean; approval: boolean; skillUsage: boolean; io: boolean }
   pendingCount: number | null
   /** v23 (AP-2): claimed-but-crashed records — the only state that needs an
@@ -79,8 +85,24 @@ export function collectEvolutionBundles(home: string, onReadError?: (error: unkn
     // `bundles: (none)` and the preset-install mutual-exclusion gate let the
     // double-mounted install through. A manifest that cannot be read is not
     // evidence of absence — report it and let each caller decide.
+    // S2.1 (v37 P1-3): `profiles/node_modules` is a PLATFORM-created directory
+    // (`app-boot` heals the profile module fallback there on every launch) and
+    // never carries a manifest. Reading it as a torn profile made every healthy
+    // install fail the preset-install exclusion gate and print a fake DEGRADED
+    // conflict. Dot-entries are not profiles either.
+    if (profile.name === 'node_modules' || profile.name.startsWith('.')) continue
+    let raw: string
     try {
-      const manifest = JSON.parse(readFileSync(join(profilesDir, profile.name, 'package.json'), 'utf8')) as {
+      raw = readFileSync(join(profilesDir, profile.name, 'package.json'), 'utf8')
+    } catch (error) {
+      // ENOENT means "this directory is not a profile", not "a profile manifest
+      // is torn" — only a REAL read failure (EACCES/EIO) is fail-closed.
+      if ((error as { code?: string } | undefined)?.code === 'ENOENT') continue
+      onReadError?.(error, 'profile-manifest')
+      continue
+    }
+    try {
+      const manifest = JSON.parse(raw) as {
         dsh?: { profile?: { bundles?: string[] } }
       }
       for (const name of manifest.dsh?.profile?.bundles ?? []) {
@@ -100,6 +122,36 @@ function envIssues(): string[] {
   const query = process.env.DSH_EVOLUTION_SESSION_QUERY
   if (query && !SESSION_QUERY_MODES.has(query)) {
     issues.push(`DSH_EVOLUTION_SESSION_QUERY="${query}" is not one of startup|first-search|never — the patch normalizes it to 'startup' silently; set it to a listed mode.`)
+  }
+  return issues
+}
+
+/** S0.2 (v37 P0-1): memory files that still carry the platform's `{{` prompt
+ * variable syntax. The platform interpolates EVERY `systemPrompt.context` text
+ * once per model step and throws on an unknown/malformed reference, so one such
+ * entry used to fail every turn of every session under this home. Current
+ * builds neutralize the injected text (`MemoryStore.renderContext`), which is
+ * why this is a residual-risk report instead of a hard failure: an older
+ * still-running process is still bricked, and an operator may prefer to clean
+ * the file. Read-only; an unreadable file is skipped (the doctor never throws).
+ * @param home - resolved DSH_HOME.
+ * @returns one message per affected memory file.
+ */
+function memoryInterpolationIssues(home: string): string[] {
+  const issues: string[] = []
+  for (const file of ['MEMORY.md', 'USER.md']) {
+    const path = join(home, 'memories', file)
+    if (!existsSync(path)) continue
+    let raw: string
+    try {
+      raw = readFileSync(path, 'utf8')
+    } catch {
+      continue
+    }
+    const hits = raw.split('{{').length - 1
+    if (hits > 0) {
+      issues.push(`${file}: ${hits} "{{" occurrence(s) — the platform interpolates this syntax in prompt context and throws on an unknown reference, so a build without the render-time neutralization fails every later turn; rewrite the affected entries`)
+    }
   }
   return issues
 }
@@ -200,9 +252,14 @@ export async function diagnose(
   // bundles" is the WRONG remedy (there may be no bundle conflict at all).
   // The word `DEGRADED` is the marker both degraded rows carry by contract.
   const mountConflicts = conflicts.filter(row => !row.includes('DEGRADED'))
+  // S2.1 (v37 P2-19): a DEGRADED read leaves `bundles` undecidable, and the
+  // ladder derived `none` from it — advising a deployment that already mounts
+  // `all` to add it again (the double mount INST-01 exists to prevent).
+  const undecidable = mountConflicts.length !== conflicts.length
 
   const actions: string[] = []
   if (mountConflicts.length > 0) actions.push('Resolve the conflict first: keep exactly one of evolution-all / evolution-host / evolution-preset / layered.')
+  else if (undecidable) actions.push('The install form is UNDECIDABLE (see the DEGRADED row above): an unreadable profiles directory or profile manifest hides whatever is installed, so this report must not add or remove a bundle. Fix the reported read failure, then re-run /evolution doctor.')
   else if (installForm === 'none') actions.push('Install the default full bundle: dsh plugin --profile web add @lmzhen/dsh-evolution-all')
   else if (installForm === 'preset-only') actions.push('The Evolution preset is delivered but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or remove .agent-presets/evolution if the layered layout is no longer wanted.')
   else if (installForm === 'layered') actions.push('Model tools follow the Evolution preset per session; add @lmzhen/dsh-evolution-all instead if every session should have them.')
@@ -216,9 +273,11 @@ export async function diagnose(
   // flight — the flat "the approving run crashed" story steered operators into
   // rejecting a live run (the F-204 divergence). Dual attribution, matching
   // the pending-view hint and the approve surface.
+  const memoryIssues = memoryInterpolationIssues(home)
+  if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended.`)
 
-  return { installForm, bundles, conflicts, envIssues: env, services, pendingCount, executingCount, actions }
+  return { installForm, bundles, conflicts, envIssues: env, memoryIssues, services, pendingCount, executingCount, actions }
 }
 
 export function renderDoctorText(report: DoctorReport): string {
@@ -235,6 +294,7 @@ export function renderDoctorText(report: DoctorReport): string {
   ]
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
+  if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
   return lines.join('\n')
 }

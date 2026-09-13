@@ -9,6 +9,12 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
 
+/** Deterministic log fixture for the persistence regressions below: `seq` is
+ * the ordering key and `at` derives from it, so every boot reads one log. */
+const logEvent = (seq: number, target: string, rating: 'positive' | 'negative', kind: 'skill' | 'session' = 'skill') =>
+  ({ seq, at: new Date(Date.UTC(2026, 0, 1, 0, 0, seq)).toISOString(), type: 'feedback', target, kind, rating })
+const eventLog = (events: unknown[]): string => JSON.stringify({ version: 1, events }, null, 2)
+
 describe('evolution-feedback', () => {
   it('exports the function-plugin namespace without a default export', () => {
     // The Loader's unwrapExports prefers `.default` and discards the rest of
@@ -633,4 +639,142 @@ describe('evolution-feedback', () => {
     expect(countFor('good-skill')).toBe(2)
     expect(feedback.snapshot().skills['good-skill']).toMatchObject({ positive: 2, negative: 0 })
   }, 60_000)
+
+  it('P1-7 (v37): persistCache keeps the band the cache carries below the retained window', async () => {
+    const home = await tempHome('dsh-feedback-p1-7-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    // Boot 1: the log holds seqs 1-3, the boot cache is written from them.
+    await io.writeText(eventsPath, eventLog([logEvent(1, 'x', 'positive'), logEvent(2, 'x', 'positive'), logEvent(3, 'x', 'positive')]))
+    const first = new Feedback.EvolutionFeedback(io, home)
+    await first.restore(io)
+    await first.waitIdle()
+    expect(first.snapshot().skills['x']?.positive).toBe(3)
+    // The retained window is pruned: seqs 1-3 are gone from the timeline (their
+    // archive was rotated away and pruned), so only the cache still carries them.
+    await io.writeText(eventsPath, eventLog([logEvent(4, 'x', 'positive'), logEvent(5, 'x', 'positive'), logEvent(6, 'x', 'positive')]))
+    // Boot 2: the READ side folds the delta onto that band (3 + 3).
+    const second = new Feedback.EvolutionFeedback(io, home)
+    await second.restore(io)
+    await second.waitIdle()
+    expect(second.snapshot().skills['x']?.positive).toBe(6)
+    // The unload-time snapshot must keep it: a window-only fold here erased the
+    // band and stamped lastSeq=6, sealing the loss for every later boot.
+    await second.persistCache()
+    const cache = JSON.parse(await io.readText(cachePath) ?? '{}') as { lastSeq?: number; skills?: Record<string, { positive: number }> }
+    expect(cache.lastSeq).toBe(6)
+    expect(cache.skills?.['x']?.positive).toBe(6)
+    // Boot 3 proves nothing was sealed.
+    const third = new Feedback.EvolutionFeedback(io, home)
+    await third.restore(io)
+    await third.waitIdle()
+    expect(third.snapshot().skills['x']?.positive).toBe(6)
+  })
+
+  it('P1-8 (v37): a transient "log missing" boot never re-appends the history the log holds', async () => {
+    const home = await tempHome('dsh-feedback-p1-8-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const base = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    // Temporal order (a+, b+, a-) — the synthesizer's order is "all positives,
+    // then all negatives", so the old contiguous-run gate could never match it.
+    await base.writeText(eventsPath, eventLog([logEvent(1, 'a', 'positive'), logEvent(2, 'b', 'positive'), logEvent(3, 'a', 'negative')]))
+    const cacheFixture = {
+      version: 2,
+      lastSeq: 3,
+      skills: { a: { positive: 1, negative: 1 }, b: { positive: 1, negative: 0 } },
+      sessions: {},
+    }
+    await base.writeText(cachePath, JSON.stringify(cacheFixture, null, 2))
+    // io.ts documents the rename window: a LOCKLESS reader can observe a
+    // just-committed file as missing, and restore's first read is lockless.
+    const bootWithTransientMiss = async (): Promise<Feedback.EvolutionFeedback> => {
+      let missed = false
+      const io: typeof base = {
+        ...base,
+        readText: async (path: string): Promise<string | null> => {
+          if (path === eventsPath && !missed) { missed = true; return null }
+          return await base.readText(path)
+        },
+      }
+      const feedback = new Feedback.EvolutionFeedback(io, home)
+      await feedback.restore(io)
+      await feedback.waitIdle()
+      return feedback
+    }
+    for (let boot = 0; boot < 3; boot += 1) {
+      const feedback = await bootWithTransientMiss()
+      expect(feedback.snapshot().skills['a'], `boot ${boot}`).toMatchObject({ positive: 1, negative: 1 })
+      expect(feedback.snapshot().skills['b'], `boot ${boot}`).toMatchObject({ positive: 1, negative: 0 })
+      expect((await readEvolutionEvents(base, eventsPath)).events, `boot ${boot}`).toHaveLength(3)
+    }
+    const cache = JSON.parse(await base.readText(cachePath) ?? '{}') as { lastSeq?: number }
+    expect(cache.lastSeq).toBe(3)
+  })
+
+  it('P2-1 (v37): a rotate landing inside the read window keeps the archived band', async () => {
+    const home = await tempHome('dsh-feedback-toctou-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const base = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    await base.writeText(eventsPath, eventLog([
+      logEvent(101, 'a', 'positive'), logEvent(102, 'b', 'positive'),
+      logEvent(103, 'c', 'positive'), logEvent(104, 'd', 'positive'),
+    ]))
+    const cacheFixture = { version: 2, lastSeq: 100, skills: { old: { positive: 60, negative: 0 } }, sessions: {} }
+    await base.writeText(cachePath, JSON.stringify(cacheFixture, null, 2))
+    // The archive listing is a snapshot taken BEFORE the timeline read: fire a
+    // real rotation right after it, exactly the window the audit reported.
+    let fired = false
+    const io: typeof base = {
+      ...base,
+      list: async (path: string): Promise<string[]> => {
+        const names = await base.list(path)
+        if (!fired && !names.some(name => /^events-\d+\.json$/.test(name))) {
+          fired = true
+          await appendEvolutionEvent(base, eventsPath, { type: 'feedback', target: 'e', kind: 'skill', rating: 'positive' }, 4)
+        }
+        return names
+      },
+    }
+    const feedback = new Feedback.EvolutionFeedback(io, home)
+    await feedback.restore(io)
+    await feedback.waitIdle()
+    // Both the just-archived band (a, b) and the cache-carried pre-window band
+    // (old) survive the race; the pre-fix read saw only the truncated active.
+    expect(feedback.snapshot().skills['old']?.positive).toBe(60)
+    expect(feedback.snapshot().skills['a']).toMatchObject({ positive: 1, negative: 0 })
+    expect(feedback.snapshot().skills['b']).toMatchObject({ positive: 1, negative: 0 })
+    expect(feedback.snapshot().skills['c']).toMatchObject({ positive: 1, negative: 0 })
+    // …and the boot-cache rewrite did not seal the loss either.
+    const cache = JSON.parse(await base.readText(cachePath) ?? '{}') as { lastSeq?: number; skills?: Record<string, { positive: number }> }
+    expect(cache.lastSeq).toBe(105)
+    expect(cache.skills?.['old']?.positive).toBe(60)
+  })
+
+  it('P1-8 (v37): migration never overwrites an event log it cannot read (fail-closed)', async () => {
+    const home = await tempHome('dsh-feedback-p1-8-unreadable-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    await io.writeText(eventsPath, '{corrupt log')
+    const warns: string[] = []
+    // A corrupt body reads as an EMPTY timeline, so migrating on that read
+    // failure would have overwritten bytes the append path refuses to touch.
+    await Feedback.migrateFeedbackEvents(io, eventsPath, { skills: { 'old-skill': { positive: 2, negative: 1 } }, sessions: {} }, message => warns.push(message))
+    expect(await io.readText(eventsPath)).toBe('{corrupt log')
+    expect(warns.some(message => message.includes('unreadable'))).toBe(true)
+  })
 })

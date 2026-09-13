@@ -3,7 +3,6 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
-    { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../core/tools" },
     { "path": "../evolution-core" },
     { "path": "../../test-support/agent-loop-testkit" }

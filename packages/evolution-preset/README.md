@@ -35,3 +35,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 - Compatibility one-click bundle exposes model tools profile-wide. Prefer the layered host/agent install for stricter session control.
 
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+

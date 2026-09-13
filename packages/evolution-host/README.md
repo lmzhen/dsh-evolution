@@ -48,3 +48,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 - Host-only by design. It provides no memory/skill write tools — the read-only `maintenance_probe` diagnostic is the one exception; pair it with the Evolution agent preset to expose `memory`/`skill_manage`.
 
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+

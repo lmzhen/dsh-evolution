@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { appendEvolutionEvent, eventsFile, EVENT_LOG_RETAIN_ARCHIVES, nodeEvolutionIo, readEvolutionEvents, readEvolutionTimeline, retainEventArchives } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, EVENT_LOG_RETAIN_ARCHIVES, evolutionEventPayloadIssue, nodeEvolutionIo, readEvolutionEvents, readEvolutionTimeline, retainEventArchives } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution event log (rc.68)', () => {
@@ -243,22 +243,81 @@ it('v31 EVENTS-01: a rotation whose archive name collides MERGES both seq bands 
   const root = await tempRoot('dsh-evo-events-collide-')
   const io = nodeEvolutionIo()
   const path = eventsFile(root)
-  // Simulate the post-rollback state: archives events-2.json (seq 1..2) and
-  // events-4.json (seq 3..4) exist, while the ACTIVE log rolled back to
-  // seqs 1..2 (4 records, rotateAt 4). The next rotation's computed name —
-  // events-4.json (anchor = tail[0].seq 5 - 1 = 4) — collides with the
-  // existing 3..4 band.
-  const mk = (seq: number, type: string) => ({ seq, type })
-  await io.writeText(join(root, 'events-2.json'), JSON.stringify({ version: 1, events: [mk(1, 'feedback'), mk(2, 'feedback')] }))
-  await io.writeText(join(root, 'events-4.json'), JSON.stringify({ version: 1, events: [mk(3, 'feedback'), mk(4, 'feedback')] }))
-  await io.writeText(path, JSON.stringify({ version: 1, events: [mk(1, 'feedback'), mk(2, 'feedback'), mk(3, 'feedback'), mk(4, 'feedback')] }))
-  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })
-  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'y', kind: 'skill', rating: 'positive' })
-  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'z', kind: 'skill', rating: 'positive' })
-  await appendEvolutionEvent(io, path, { type: 'feedback', target: 'w', kind: 'skill', rating: 'positive' })
+  const dir = join(root, 'evolution')
+  // The post-rollback state: the ACTIVE was rolled back to seq 1..4 (rotateAt
+  // 4), while the name this rotation computes — events-2.json (anchor =
+  // tail[0].seq 3 - 1) — already holds a DIFFERENT band (11..12). The fixtures
+  // live BESIDE the active log: the first version of this test wrote them to
+  // the temp root, so no rotation ran and the merge path stayed untested.
+  const event = (seq: number) => ({ seq, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: `t${seq}`, kind: 'skill', rating: 'positive' })
+  await io.writeText(join(dir, 'events-2.json'), JSON.stringify({ version: 1, events: [event(11), event(12)] }, null, 2))
+  await io.writeText(path, JSON.stringify({ version: 1, events: [event(1), event(2), event(3), event(4)] }, null, 2))
+  expect(await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' }, 4)).toBe(5)
 
-  const timeline = await readEvolutionEvents(io, path)
-  const seqs = timeline.events.map(event => event.seq).sort((a, b) => a - b)
-  // The 3..4 band must survive the collision (merged, not overwritten).
-  expect(seqs).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+  const archive = JSON.parse(await io.readText(join(dir, 'events-2.json')) ?? '{}') as { version: number; events: Array<{ seq: number }> }
+  // Both bands survive the collision (merged, not overwritten) ...
+  expect(archive.version).toBe(1)
+  expect(archive.events.map(entry => entry.seq)).toEqual([1, 2, 11, 12])
+  // ... and the rotated head band is still in the logical timeline.
+  const timeline = await readEvolutionTimeline(io, path)
+  expect(timeline.events.map(entry => entry.seq)).toEqual([1, 2, 3, 4, 5, 11, 12])
+})
+
+it('P2-11 (v37): a rotation colliding with a FUTURE-format archive is refused, never downgraded', async () => {
+  const root = await tempRoot('dsh-evo-events-collide-v2-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  const dir = join(root, 'evolution')
+  const event = (seq: number) => ({ seq, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: `t${seq}`, kind: 'skill', rating: 'positive' })
+  const active = JSON.stringify({ version: 1, events: [event(1), event(2), event(3), event(4)] }, null, 2)
+  // A version-2 archive squatting the name this rotation computes: the merge
+  // used to rewrite it as version 1 and drop every v2-only field.
+  const v2 = JSON.stringify({ version: 2, events: [event(11), event(12)], v2Only: { compacted: true } }, null, 2)
+  await io.writeText(join(dir, 'events-2.json'), v2)
+  await io.writeText(path, active)
+  await expect(appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' }, 4)).rejects.toThrow(/collision/)
+
+  // Both files keep their bytes, no band left the timeline, and no shift-aside
+  // artifact was minted.
+  expect(await io.readText(join(dir, 'events-2.json'))).toBe(v2)
+  expect(await io.readText(path)).toBe(active)
+  expect((await io.list(dir)).filter(name => name.endsWith('.collide'))).toEqual([])
+})
+
+it('P2-11 (v37): a collision with an archive whose "events" container is gone is refused, not emptied', async () => {
+  const root = await tempRoot('dsh-evo-events-collide-records-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  const dir = join(root, 'evolution')
+  const event = (seq: number) => ({ seq, at: '2026-01-01T00:00:00.000Z', type: 'feedback', target: `t${seq}`, kind: 'skill', rating: 'positive' })
+  await io.writeText(path, JSON.stringify({ version: 1, events: [event(1), event(2), event(3), event(4)] }, null, 2))
+  // v2 renamed the container AND a current-version body lost its array: both
+  // used to merge with prior=[] and REPLACE the archive with just the head band.
+  for (const body of [
+    JSON.stringify({ version: 2, records: [event(11), event(12)] }, null, 2),
+    JSON.stringify({ version: 1, records: [event(11), event(12)] }, null, 2),
+  ]) {
+    await io.writeText(join(dir, 'events-2.json'), body)
+    await expect(appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' }, 4)).rejects.toThrow(/collision/)
+    expect(await io.readText(join(dir, 'events-2.json'))).toBe(body)
+  }
+})
+
+it('P2-10 (v37): a feedback event without a NON-EMPTY target is refused at the durable boundary', async () => {
+  const root = await tempRoot('dsh-evo-events-target-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  // The only folder (evolution-feedback applyFeedbackEvent) returns silently on
+  // an undefined target, and `target: ''` folds a phantom '' key — neither may
+  // reach the log.
+  expect(evolutionEventPayloadIssue({ type: 'feedback', kind: 'skill', rating: 'positive' })).toMatch(/non-empty target/)
+  expect(evolutionEventPayloadIssue({ type: 'feedback', target: '', kind: 'skill', rating: 'positive' })).toMatch(/non-empty target/)
+  expect(evolutionEventPayloadIssue({ type: 'feedback', target: '   ', kind: 'skill', rating: 'positive' })).toMatch(/non-empty target/)
+  expect(evolutionEventPayloadIssue({ type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })).toBeNull()
+  await expect(appendEvolutionEvent(io, path, { type: 'feedback', kind: 'skill', rating: 'positive' } as never)).rejects.toThrow(/non-empty target/)
+  await expect(appendEvolutionEvent(io, path, { type: 'feedback', target: '', kind: 'skill', rating: 'positive' } as never)).rejects.toThrow(/non-empty target/)
+  // Nothing was persisted and no phantom record was minted ...
+  expect(await io.readText(path)).toBeNull()
+  // ... while a well-formed feedback still appends.
+  expect(await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })).toBe(1)
 })

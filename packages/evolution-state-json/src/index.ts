@@ -549,34 +549,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // .bak — read it too, so an archived id evicted to the bak keeps
       // excluding its legacy twin (the retirement filter never loses its
       // evidence). Best-effort: an unreadable bak only weakens the filter.
-      // V25-06 (v25): the swallow is now OBSERVABLE — a quarantine (bak
-      // present but corrupt) rethrows like the active-archive branch below,
-      // and a transient read failure warns, per the same E-52 discipline the
-      // outer catch applies. Silently dropping the bak ids disabled the
-      // V5-02 ghost-twin filter for ids that live ONLY in the bak.
+      // P1-11: a quarantine here is best-effort like any other read failure —
+      // rethrowing it blocked every merge, and the write path that repairs the
+      // sidecar runs BEHIND this read (self-lock).
       try {
         const rawBak = await readJson<Array<{ id?: string } | null>>(PENDING_ARCHIVE_BAK_FILE)
         if (Array.isArray(rawBak)) {
           for (const entry of rawBak) if (entry && typeof entry.id === 'string') ids.add(entry.id)
         }
       } catch (bakError) {
-        if ((bakError as { name?: unknown } | undefined)?.name === QUARANTINE_ERROR_NAME) throw bakError
         ctx.logger.warn(`evolution-state-json: pending archive .bak unreadable (${bakError instanceof Error ? bakError.message : String(bakError)}) — archived ids that live only in the .bak do not exclude their legacy twins until the sidecar is readable again`)
       }
     } catch (error) {
-      // V24-07 (v24): this catch used to be bare, which silently DISABLED the
-      // V5-02 ghost-twin filter whenever the archive was unreadable — a
-      // corrupted archive file throws a quarantine error out of readJson, the
-      // empty set merged every not-yet-retired legacy `pending` record back
-      // into the current table, and a months-old staged write could be
-      // re-claimed and replayed with zero observable cause. The E-52 family
-      // discipline (every swallow is observable) applies: the quarantine
-      // (data present but unreadable) now fails loud so the operator clears
-      // the `.corrupt` copy; a transient READ failure stays best-effort but
-      // warns, matching `appendArchive` / `retireLegacyOnce` on the same file
-      // family.
-      const name = (error as { name?: unknown } | undefined)?.name
-      if (name === QUARANTINE_ERROR_NAME) throw error
+      // P1-11: an unreadable sidecar only WEAKENS the V5-02 ghost-twin filter
+      // and must never take the approval surface down with it — the warning
+      // keeps the swallow observable, and the next archive append rewrites the
+      // file (quarantining the bad bytes to .corrupt first).
       ctx.logger.warn(`evolution-state-json: pending archive sidecars unreadable (${error instanceof Error ? error.message : String(error)}) — the V5-02 legacy ghost-twin filter runs WITHOUT the archived-id exclusion until the archive is readable again`)
     }
     return ids
@@ -605,10 +593,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     return retired
   }
+  // P2-5: claim/resolve look a record up BY `record.id`, so a table entry whose
+  // KEY drifted from it answered listPending yet was unreachable — and, being
+  // `pending`, never evicted. Every read re-keys by record.id: the canonical
+  // slot wins, else the first entry in file order.
+  let pendingKeyWarned = false
+  function keyPendingById(map: Record<string, PendingRecord> | null): Record<string, PendingRecord> {
+    const keyed: Record<string, PendingRecord> = {}
+    if (map === null) return keyed
+    let drifted = 0
+    let dropped = 0
+    for (const [key, record] of Object.entries(map)) {
+      const id = typeof record.id === 'string' ? record.id : key
+      if (key !== id) {
+        if (keyed[id] !== undefined) {
+          dropped += 1
+          continue
+        }
+        drifted += 1
+      }
+      keyed[id] = record
+    }
+    if ((drifted > 0 || dropped > 0) && !pendingKeyWarned) {
+      pendingKeyWarned = true
+      ctx.logger.warn(`evolution-state-json: ${drifted} pending table entr(ies) were keyed by something other than record.id (${dropped} same-id residue row(s) dropped) — re-keyed by id, so a drifted row is reachable by claim/resolve again`)
+    }
+    return keyed
+  }
   async function retireLegacyOnce(
     legacy: Record<string, PendingRecord>,
   ): Promise<Record<string, PendingRecord>> {
     if (legacyMigrated) return {}
+    const keyedLegacy = keyPendingById(legacy)
     try {
       // v22 (LOCK-3): the archived-id filter now runs INSIDE the transact task
       // against a FRESH archive read, matching the four mutation paths (they
@@ -620,10 +636,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // Gate fix (0.3.66): the old `current` parameter was left unused by that
       // move (the fresh basis comes from the transact task), so it is gone.
       const retired: Record<string, PendingRecord> = {}
-      await jsonTransact(ctx, io, root, PENDING_STATE_FILE, async (fresh) => {
-        const merged: Record<string, PendingRecord> = { ...(fresh ?? {}) }
+      await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (fresh) => {
+        const merged: Record<string, PendingRecord> = keyPendingById(fresh)
         const archivedIds = await readArchivedIds()
-        for (const [id, record] of Object.entries(legacy)) {
+        for (const [id, record] of Object.entries(keyedLegacy)) {
           if (id in merged) continue
           if (archivedIds.has(id)) continue
           // OPT-12: same exclusion as filterLegacy — the baseline gate may
@@ -667,11 +683,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       readJson<Record<string, PendingRecord>>(PENDING_STATE_FILE),
       readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE),
     ])
+    const keyed = keyPendingById(current)
     if (legacy !== null) {
       const retired = await retireLegacyOnce(legacy)
-      return { ...retired, ...(current ?? {}) }
+      return { ...retired, ...keyed }
     }
-    return { ...(current ?? {}) }
+    return { ...keyed }
   }
   /** V6-01 (0.3.34): single-sourced legacy merge for the four mutation paths —
    * the SAME exclusion as the retirement read path, so a mutation that runs
@@ -682,9 +699,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     legacy: Record<string, PendingRecord> | null,
     current: Record<string, PendingRecord>,
   ): Promise<Record<string, PendingRecord>> {
-    if (legacy === null) return current
+    const keyed = keyPendingById(current)
+    if (legacy === null) return keyed
     const archivedIds = await readArchivedIds()
-    return { ...filterLegacy(legacy, current, archivedIds), ...current }
+    return { ...filterLegacy(keyPendingById(legacy), keyed, archivedIds), ...keyed }
   }
 
   /** 0.3.22 (F-336): when the live pending map holds more than
@@ -938,6 +956,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
+          // P2-5: the merged basis is id-keyed (keyPendingById), so writing by
+          // `record.id` cannot leave an older entry under a drifted key behind.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})), [record.id]: record }
           // OPT-13 (2026-09, plan D2): pending/executing rows are never
           // trimmed (the seam's deliberate C-6 contract) — this warn is the

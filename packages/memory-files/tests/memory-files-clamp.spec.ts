@@ -43,4 +43,20 @@ describe('memory-files G3.1 numeric clamping', () => {
     expect(result.ok).toBe(true)
     expect(await ctx.memory.read('memory')).toContain('user prefers terse')
   })
+
+  // P2-23 (v37): a fractional char limit reached the store unchanged, and the
+  // `memory` tool declares `limit` as an integer — the platform then rejected the
+  // tool's output AFTER the write had landed, so the model saw a failed write.
+  it('P2-23: a fractional memoryCharLimit is floored before it reaches the store', async () => {
+    const ctx = await mount({ memoryCharLimit: 21_000.5, userCharLimit: 1_375.75 })
+    const added = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'user prefers terse' }])
+    expect(added.ok).toBe(true)
+    // floor, never round: the configured limit is an upper bound, so the store
+    // must not enforce MORE than the operator asked for.
+    expect(added.limit).toBe(21_000)
+    expect(Number.isInteger(added.limit)).toBe(true)
+    expect(Number.isInteger(added.chars)).toBe(true)
+    const user = await ctx.memory.applyBatch('user', [{ action: 'add', facts: 'limengzhen' }])
+    expect(user.limit).toBe(1_375)
+  })
 })

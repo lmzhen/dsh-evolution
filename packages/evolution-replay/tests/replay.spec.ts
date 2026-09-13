@@ -159,6 +159,37 @@ describe('evolution-replay', () => {
     driver.backfill([{ ...plan('pre-1'), at: 3 }])
     expect(driver.plansSnapshot().filter(entry => entry.policyId === 'pre-1')).toHaveLength(1)
   })
+
+  it('P2-14: the skippedUnread dimension reaches the leaderboard text (a fully-skipped plan is not a clean 0/0)', () => {
+    const driver = new EvolutionReplayDriver()
+    // R-03: every op was refused because the session never read the skill, so
+    // accepted/rejected are both 0 — the old report printed exactly that.
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 })
+    expect(driver.plansSnapshot()[0]?.skippedUnread).toBe(2)
+    expect(driver.compare().report).toContain('2 op(s) skipped (skill not read this session)')
+    // A malformed count degrades to 0 like every other counter (never NaN).
+    const poisoned = new EvolutionReplayDriver()
+    poisoned.record({ sessionId: 's', planId: 'r', policyFingerprint: 'p', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, skippedUnread: Number.NaN })
+    expect(poisoned.plansSnapshot()[0]?.skippedUnread).toBe(0)
+    // A plan without the dimension renders exactly as before (no empty segment).
+    const clean = new EvolutionReplayDriver()
+    clean.record({ sessionId: 's', planId: 'r2', policyFingerprint: 'p', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    expect(clean.compare().report).toContain('(1 accepted, 0 rejected)')
+  })
+
+  it('P2-15: an empty backfill does not commit the latch, so the leaderboard is not locked empty', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    // A quarantined/corrupt sidecar loads as [] — that is not evidence the
+    // sidecar was read, so the next (successful) load must still land.
+    driver.backfill([])
+    driver.backfill([item])
+    expect(driver.plansSnapshot().map(entry => entry.policyId)).toEqual(['policy-a'])
+    // Once records arrived the latch IS committed (V25-01): an io reload that
+    // re-runs the loader against the same driver must not double the entries.
+    driver.backfill([item, { ...item, planId: 'run-2' }])
+    expect(driver.plansSnapshot()).toHaveLength(1)
+  })
 })
 
 it('v28 G4.4 (RPL-01): a single plan yields margin null and an explicit no-comparison note', () => {

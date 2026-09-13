@@ -203,4 +203,92 @@ describe('evolution-skill-catalog', () => {
     expect(bad?.invocation).toEqual({ modelInvocable: false, userInvocable: true })
   })
 
+  it('§9 I-2: a degraded scan is an incomplete observation, so the registry re-consults', async () => {
+    const root = await tempRoot('dsh-skill-catalog-degraded-')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    let treeScans = 0
+    let failing = true
+    ctx.evolutionIo.registerProvider({
+      name: 'flaky',
+      ...base,
+      // ONLY the tree listing fails: that throw leaves `SkillLibrary.list()` like
+      // the EACCES REG-01 posture, while a failure listing one skill DIRECTORY
+      // is absorbed as "no markers" and would not abort the scan.
+      list: async (path) => {
+        if (path === root) {
+          treeScans += 1
+          if (failing) throw new Error('simulated EACCES on the skill tree')
+        }
+        return base.list(path)
+      },
+    })
+    await ctx.plugin(Catalog, { root })
+    await base.writeText(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n')
+    // The bare-array fallback was the platform's `complete: true` shorthand: the
+    // empty catalog got cached under the current revision, so this consult is the
+    // only one that ever asked the provider.
+    const degraded = await ctx.skills.snapshot()
+    expect(degraded.complete).toBe(false)
+    expect(degraded.skills).toEqual([])
+    expect(treeScans).toBe(1)
+
+    failing = false
+    const recovered = await ctx.skills.snapshot()
+    expect(recovered.complete).toBe(true)
+    expect(recovered.skills.map(skill => skill.name)).toEqual(['demo-skill'])
+    expect(treeScans).toBe(2)
+  })
+
+  it('P1-12: a scan that started before a drop never republishes its pre-mutation invocation map', async () => {
+    const root = await tempRoot('dsh-skill-catalog-invocation-epoch-')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    const make = (description: string, extra: string) => `---\nname: zeta-skill\ndescription: ${description}\n${extra}---\n\n# Zeta\n`
+    const target = join(root, 'zeta-skill', 'SKILL.md')
+    await base.writeText(target, make('Pre mutation.', 'disable-model-invocation: true\n'))
+    await base.writeText(join(root, 'alpha-skill', 'SKILL.md'), '---\nname: alpha-skill\ndescription: Alpha.\n---\n\n# Alpha\n')
+    let targetReads = 0
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let reached: () => void = () => {}
+    const atGate = new Promise<void>((resolve) => { reached = resolve })
+    ctx.evolutionIo.registerProvider({
+      name: 'gated',
+      ...base,
+      // Read BEFORE pausing, so scan A's invocation map holds the pre-mutation
+      // bytes; hold only its SECOND read of the target (the invocation-map pass
+      // that runs after `SkillLibrary.list()`).
+      readText: async (path) => {
+        const text = await base.readText(path)
+        if (path === target && (targetReads += 1) === 2) {
+          reached()
+          await gate
+        }
+        return text
+      },
+    })
+    await ctx.plugin(Catalog, { root })
+    const first = ctx.skills.list()
+    await atGate
+    // Content-only edit: the ROOT directory mtime is unchanged, so the summaries
+    // cache keeps serving scan B once the interleave settles.
+    await base.writeText(target, make('Post mutation.', ''))
+    ctx.emit('evolution/skill-mutated', { action: 'update', name: 'zeta-skill' })
+    await ctx.skills.snapshot()
+    release()
+    await first
+
+    // A different `cwd` is a different collect key, so these reads reach
+    // provider.list()/get() again while the summaries cache is still warm.
+    const listed = (await ctx.skills.list({ cwd: root })).find(skill => skill.name === 'zeta-skill')
+    const loaded = await ctx.skills.get('zeta-skill', { cwd: root })
+    expect(listed?.invocation.modelInvocable).toBe(true)
+    expect(loaded?.invocation).toEqual(listed?.invocation)
+  })
+
 })

@@ -10,44 +10,19 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
 import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
+import { ToolDispatchNormalizer, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 /**
- * Read tool names -> usage kind. The single declarative classification table
- * for read-side observation (A2): any tool listed here records a `view` when
- * its call arguments name a skill.
+ * Folds the session's dispatch events into one signal per READ (A2).
+ *
+ * The read tool table (only the real `skill` tool — the DSH catalog has no
+ * `skill_load`/`skill_search` discovery pair, 0.3.18 E-59e) and the arguments
+ * parse both live in evolution-core's `tool-dispatch` module: this sidecar used
+ * to match `tool/call` itself, so every PTC session (`tool/ptc-dispatch*`)
+ * counted zero views and never opened the observation window.
  */
-const READ_TOOL_KIND: Record<string, 'view'> = {
-  // Only the real `skill` tool is a read (0.3.18 E-59e): the DSH catalog has no
-  // `skill_load`/`skill_search` discovery pair, so the former phantom key was
-  // removed to keep this table aligned with evolution-review's read-instrument.
-  skill: 'view',
-}
-
-/**
- * Skill name from a tool/call arguments payload (A2, mirrors
- * evolution-review's collectReadSkillNames): JSON strings are re-parsed and
- * `name` wins over `skill`. Empty when unparseable or anonymous.
- */
-function skillNameFromToolCall(raw: unknown): string {
-  let parsed: unknown = {}
-  if (typeof raw === 'string') {
-    try {
-      // F-203 (0.3.23): `JSON.parse('null')`/`JSON.parse('123')` succeed but
-      // yield a null/primitive, so guard the result before reading `name`.
-      parsed = JSON.parse(raw) as unknown
-    } catch {
-      return ''
-    }
-  } else if (raw && typeof raw === 'object') {
-    parsed = raw
-  }
-  if (!parsed || typeof parsed !== 'object') return ''
-  const obj = parsed as Record<string, unknown>
-  return typeof obj.name === 'string' ? obj.name : typeof obj.skill === 'string' ? obj.skill : ''
-}
-
 /** Cumulative library-wide usage totals (C observation-window event counts). */
 function usageTotals(map: UsageMap): { skills: number; views: number; use: number; patches: number } {
   let views = 0
@@ -100,28 +75,33 @@ export class SkillUsageRegistry extends Service {
     // value is truthy and used to become a CWD-relative path.
     this.eventsHome = config.eventsHome?.trim() || evolutionRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    // A2 observation: `session/event` tool/call records are the read-side
+    // A2 observation: `session/event` DISPATCH records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
     // makes the sidecar's view counters live; names without a usage record are
     // skipped so unrelated reads never mint entries (records are authored by
     // creation / patch / seed, never by observation).
+    //
+    // v37 P7a: the records are read through evolution-core's `tool-dispatch`
+    // normalizer, never by matching an event type here — the two platform
+    // dispatch vocabularies are its business. One normalizer per sidecar,
+    // because a dispatch's start and settle are two events and the pair must
+    // count as ONE view.
     // V6-43 (0.3.37): registered through ctx.effect for symmetry with
     // tool-memory/skill-catalog. Note `ctx.on` already ties the listener to the
     // current fiber (vendor/cordis events.ts: "Register an event listener owned
     // by the current fiber"), so the wrapper is symmetry/explicitness, not a
     // leak fix.
     ctx.effect(() => {
+      const reads = new ToolDispatchNormalizer()
       const dispose = ctx.on('session/event', (_session, event) => {
-        if (event.type !== 'tool/call') return
-        // E-65: an external emitter can inject a malformed tool/call — `data`
+        // E-65: an external emitter can inject a malformed dispatch — `data`
         // absent, `name` missing, or `name` not a string. None of these is a
-        // read this listener can attribute, so skip the event instead of
-        // throwing; the review side reads the same payload via `data?.name`.
-        const data = event.data as { name?: unknown; arguments?: string | Record<string, unknown> } | undefined
-        const kind = typeof data?.name === 'string' ? READ_TOOL_KIND[data.name] : undefined
-        if (!kind) return
-        const name = skillNameFromToolCall(data?.arguments)
-        if (!name) return
+        // read this listener can attribute, so the normalizer answers `null`
+        // and the event is skipped instead of throwing.
+        const dispatch = reads.advance(event)
+        if (dispatch === null) return
+        const name = skillReadNameOf(dispatch)
+        if (name === undefined) return
         void this.observeRead(name).catch(() => {
           // Observation is best-effort: a telemetry write failure must never
           // surface in the conversation that just read a skill.

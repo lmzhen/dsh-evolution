@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { buildEnrichment } from '../src/index.ts'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
@@ -40,6 +40,24 @@ describe('buildEnrichment', () => {
     expect(enrichment.descriptions.has('ghost-skill')).toBe(false)
     expect(enrichment.quality.has('ghost-skill')).toBe(false)
     expect(enrichment.descriptions.get('real-skill')).toBe('Real skill.')
+  })
+
+  it('P2-21: one entry whose read throws degrades to unknown instead of failing the whole scan', async () => {
+    // The deployed maintain path runs enrichment BEFORE the drift scan, so a
+    // transient EACCES/EIO on one entry used to reject the entire run and made
+    // drift-scan's own E-9 guard unreachable.
+    const ctx = new Context()
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    const enrichment = await buildEnrichment(ctx, fakeLibrary(async (name) => {
+      if (name === 'ghost-skill') throw new Error('EACCES: permission denied, open SKILL.md')
+      return '---\nname: real-skill\ndescription: Real skill.\n---\n\n# Real\n'
+    }))
+    expect(enrichment.descriptions.has('ghost-skill')).toBe(false)
+    // The readable sibling is still enriched — the guard is per entry.
+    expect(enrichment.descriptions.get('real-skill')).toBe('Real skill.')
+    // The degradation is visible, not silent.
+    expect(warnSpy.mock.calls.some(call => typeof call[0] === 'string' && call[0].includes('ghost-skill'))).toBe(true)
+    warnSpy.mockRestore()
   })
 
   it('F-01: protection markers are collected even when the body read is empty', async () => {

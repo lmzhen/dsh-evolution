@@ -29,3 +29,5 @@ Independent of request-prefix construction. This package does not alter the asse
 - **`content` is the BODY, not the file (V27 G5.3).** The published `SkillDefinition.content` is the SKILL.md text AFTER the frontmatter block, matching the upstream filesystem provider (`skill-filesystem`: `content: parsed.body.trim()`). This provider shadows that provider for the same skills, so publishing the whole file made the model load a different skill depending on which provider served it. A file whose frontmatter block cannot be read keeps its raw text (the entry stays visible; the audit reports the file through `frontmatterCatalogInvalid`).
 - **Protection markers are best-effort per entry (A1-17, v18).** When the directory listing AND the per-marker probes fail, `SkillSummary.protectionUnknown` is true and consumers (curator, maintenance) treat the entry as protected rather than unprotected.
 
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+

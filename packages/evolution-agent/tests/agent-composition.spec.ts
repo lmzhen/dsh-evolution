@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { cordisRows, rowId, rowName } from '../../test-support/cordis-rows.ts'
@@ -13,6 +14,44 @@ import { AGENT_EVOLUTION_ROW_NAMES } from '../../test-support/row-contract.ts'
 // verbatim + delta) is asserted end-to-end by evolution-host's installer.spec.
 const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))))
 const preset = readFileSync(fileURLToPath(new URL('../preset.yml', import.meta.url)), 'utf8')
+// The PTC variant's display metadata. It is a SECOND metadata file, not a
+// second package: the composition (the delta) is base-independent, so only the
+// metadata differs between `--base standard` and `--base ptc`
+// (AGENT_PRESET_BASES in packages/scripts/install-layered.mjs).
+const ptcPreset = readFileSync(fileURLToPath(new URL('../preset.ptc.yml', import.meta.url)), 'utf8')
+const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as {
+  files?: string[]
+  exports?: Record<string, string>
+}
+
+/** The `key: value` pairs of one preset metadata file (`preset.yml` is flat). */
+function metadataFields(text: string): Record<string, string> {
+  const fields: Record<string, string> = {}
+  for (const line of text.split('\n')) {
+    const match = /^([a-z]+):\s*(.+)$/.exec(line)
+    if (match?.[1] !== undefined && match[2] !== undefined) fields[match[1]] = match[2].trim()
+  }
+  return fields
+}
+
+/**
+ * The platform's shipped `ptc` metadata, resolved by walking up to
+ * `packages/preset/agent-presets/presets` the way the installer resolves it.
+ * The family suite runs inside the platform monorepo, so this is the real
+ * runtime text the variant must NOT duplicate.
+ * @returns the shipped ptc preset metadata, or undefined when no platform preset
+ * root is reachable (the family mirror run without the platform tree).
+ */
+function shippedPtcMetadata(): Record<string, string> | undefined {
+  let dir = fileURLToPath(new URL('.', import.meta.url))
+  for (;;) {
+    const candidate = join(dir, 'packages', 'preset', 'agent-presets', 'presets', 'ptc', 'preset.yml')
+    if (existsSync(candidate)) return metadataFields(readFileSync(candidate, 'utf8'))
+    const parent = dirname(dir)
+    if (parent === dir) return undefined
+    dir = parent
+  }
+}
 
 describe('evolution-agent composition', () => {
   it('is an agent entry list, not a patch', () => {
@@ -51,5 +90,42 @@ describe('evolution-agent composition', () => {
   it('ships preset metadata for the roster', () => {
     expect(preset).toContain('name: Evolution')
     expect(preset).toContain('Standard coding agent')
+  })
+
+  it('ships PTC variant metadata that names the base it is composed on', () => {
+    const variant = metadataFields(ptcPreset)
+    expect(variant.name).toBe('Evolution PTC')
+    expect(variant.description).toContain('Based on the platform ptc preset')
+    expect(variant.description).toContain('family rows')
+    expect(variant.order).toBe('11')
+  })
+
+  it('publishes variant metadata distinct from both the standard base and the shipped ptc preset', () => {
+    const variant = metadataFields(ptcPreset)
+    const standard = metadataFields(preset)
+    // Distinct from the family's own standard-base metadata: a roster row that
+    // repeated it would list two presets a user cannot tell apart.
+    expect(variant.name).not.toBe(standard.name)
+    expect(variant.description).not.toBe(standard.description)
+    // Distinct from the PLATFORM's shipped ptc metadata, which the platform
+    // resolves through its own localized copy keys before our file is read:
+    // the variant lists after the family preset and never claims its name/order.
+    const shipped = shippedPtcMetadata()
+    if (shipped !== undefined) {
+      expect(variant.name).not.toBe(shipped.name)
+      expect(variant.order).not.toBe(shipped.order)
+      expect(variant.description).not.toBe(shipped.description)
+      expect(Number(variant.order)).toBeGreaterThan(Number(shipped.order))
+    }
+  })
+
+  it('ships and exports the variant metadata (the installer reads it from this package)', () => {
+    // The installer copies the metadata its base table names
+    // (AGENT_PRESET_BASES.<base>.metadata) out of THIS package. A file left out
+    // of the files/exports lists disappears from the published tarball and a
+    // scoped install then has no metadata to write.
+    expect(manifest.files).toContain('preset.ptc.yml')
+    expect(manifest.files).toContain('preset.yml')
+    expect(manifest.exports?.['./preset.ptc.yml']).toBe('./preset.ptc.yml')
   })
 })

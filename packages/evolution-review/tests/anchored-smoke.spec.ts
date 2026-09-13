@@ -76,8 +76,13 @@ describe('anchored-standard review smoke', () => {
     }
     expect(capturedRequest).toBeDefined()
     const request = capturedRequest as Record<string, unknown> | undefined
-    // The DSH tool catalog exposes `skill` only —discovery tools don't exist,
-    // so the default allow list is exactly the real tool set.
+    // I-6 correction (v39): a scope-less tools.get() reads the GLOBAL layer only, so
+    // the fixture's registry cannot see a preset-mounted `skill` either. The allow-list
+    // is therefore passed through unchanged — the child scope decides, and the platform
+    // would have accepted this filter (restrict() rejects only names absent from its
+    // own inheritable set). Dropping the name here is what produced a tool-less review.
+    const registry = ctx.get('tools') as { get(name: string): unknown } | undefined
+    expect(registry?.get('skill') == null).toBe(true)
     expect(request?.toolFilter).toEqual({ allow: ['skill'] })
     // No reviewProvider config: the subagent inherits the deployment default
     // route instead of a hardcoded provider name.
@@ -523,5 +528,64 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     // THIS plan landed, and op 1 is refused as stale against the concurrent
     // write, so nothing re-bases op 2 onto the writer's content.
     expect(landed).toBe(writerBytes)
+  })
+})
+
+// I-6 (v37): the platform rejects a `tools.restrict()` naming a tool the registry does
+// not hold, and that rejection used to demote the whole review to the inject channel
+// with only a generic pipeline warning. The allow list is probed before it is listed.
+describe('review tool filter probe (I-6)', () => {
+  it('an unregistered allow-list tool is dropped with an explicit warn instead of failing the spawn', { timeout: 20_000 }, async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    const warns: string[] = []
+    const originalWarn = ctx.logger.warn.bind(ctx.logger)
+    ctx.logger.warn = ((message: unknown) => { warns.push(String(message)); originalWarn(message) }) as typeof ctx.logger.warn
+    // Deterministic registry content: register ONE known name into the fixture's real
+    // tools service (a name outside a mounted registry's holdings is exactly what
+    // tools.restrict() refuses).
+    const registry = ctx.get('tools')!
+    const disposeKnown = registry.register({
+      name: 'skill',
+      parameters: {},
+      output: { schema: { type: 'object', properties: {} }, render: () => [] },
+    } as unknown as Parameters<typeof registry.register>[0])
+    let capturedRequest: unknown
+    ctx.provide('subagents', {
+      start: async (_name: string, request: unknown) => {
+        capturedRequest = request
+        return { result: Promise.resolve({ structured: null }), dispose: async () => {} }
+      },
+    })
+    await ctx.plugin(Review, {
+      reviewEnabled: true,
+      reviewMode: 'subagent',
+      memoryInterval: 1,
+      skillInterval: 1,
+      reviewToolAllow: ['skill', 'not-a-registered-tool'],
+    })
+    const session = ctx.sessions.create(SessionId('i6-review-session'))
+    const agent = { id: session.id, session, ctx, inject: () => {} } as unknown as Agent
+    ctx.agents.register(agent)
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'I prefer concise answers and want you to remember that preference. '.repeat(6) }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    const deadline = Date.now() + 5000
+    while (capturedRequest === undefined && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    expect(capturedRequest).toBeDefined()
+    const filter = (capturedRequest as { toolFilter?: { allow?: string[] } }).toolFilter
+    // I-6 correction (v39): the spawn carries the CONFIGURED list unchanged — neither
+    // name is dropped (a scope-less probe cannot prove either is un-restrictable), and
+    // the name missing from the global layer is reported with a warn that names it.
+    expect(filter?.allow).toEqual(['skill', 'not-a-registered-tool'])
+    expect(warns.some(line => line.includes('GLOBAL tool layer'))).toBe(true)
+    expect(warns.some(line => line.includes('not-a-registered-tool'))).toBe(true)
+    disposeKnown()
   })
 })

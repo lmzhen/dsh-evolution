@@ -134,6 +134,30 @@ const ZWJ_OUTSIDE_EMOJI = /(?<!\p{Extended_Pictographic})\u200d(?!\p{Extended_Pi
 const TYPOGRAPHY_CHARS = /[\u00ad\u061c\u180e\u200c\ufe00-\ufe0f]/
 const BIDI_CHARS = /[\u202a-\u202e\u2066-\u2069]/
 
+// S0.4 (v37 P0-3): the splitter universe is the FULL format-control set, not the
+// two hand-written groups above. Every Cf/Zl/Zp character (LRM/RLM, LS/PS, the
+// interlinear annotations, the musical/tag ranges, NUL, ...) splits a payload
+// phrase exactly like a zero-width space, so the reconstruction must be able to
+// remove ANY of them — exempting a label may silence its finding, never blind the
+// detector that finding protects. Findings stay as they are (blocking benign RTL
+// typography would be a false-positive regression); the visibility half is the
+// report-level `unicode_format_control` finding below. The explicit code points
+// after the properties are the UNASSIGNED slots inside those same invisible
+// ranges (U+2065, U+FFF0-FFF8, U+E0080-E00FF): a smuggler does not need an
+// assigned character to split a word.
+const FORMAT_CONTROL_CLASS = '\\p{Cf}\\p{Zl}\\p{Zp}\\u0000\\u2065\\ufff0-\\ufff8\\u{e0080}-\\u{e00ff}'
+const FORMAT_CONTROL_TEST = new RegExp(`[${FORMAT_CONTROL_CLASS}]`, 'u')
+
+/** S0.4 (v37 P0-3): a format control the three finding sets above do NOT report. */
+function hasUnreportedFormatControl(text: string): boolean {
+  for (const character of text) {
+    if (!FORMAT_CONTROL_TEST.test(character)) continue
+    if (ZERO_WIDTH_CHARS.test(character) || TYPOGRAPHY_CHARS.test(character) || BIDI_CHARS.test(character)) continue
+    if (character === '\\u200d') continue
+    return true
+  }
+  return false
+}
 const SCOPE_ORDER: Record<ThreatScope, number> = { all: 1, context: 2, strict: 3 }
 
 /**
@@ -197,6 +221,12 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   if (BIDI_CHARS.test(text) && !excluded.has('unicode_bidi_override')) {
     findings.push({ label: 'unicode_bidi_override', category: 'unicode_obfuscation', scope: 'all' })
   }
+  // S0.4 (v37 P0-3): report (never block) the format controls no set above names —
+  // the splitter universe already defuses the obfuscation, this only makes the
+  // attempt visible in the run report.
+  if (!excluded.has('unicode_format_control') && hasUnreportedFormatControl(text)) {
+    findings.push({ label: 'unicode_format_control', category: 'unicode_obfuscation', scope: 'all', severity: 'report' })
+  }
   const normalized = text.normalize('NFKC')
   // v22 (SEC-1): the report-level typography characters survive NFKC, and
   // every pattern above matches literal words — one ZWNJ inside "ignore all"
@@ -220,7 +250,7 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   // silence its FINDING; it may never blind the detector that the finding
   // protects. ZWJ rides along (its own report is context-sensitive) because a
   // ZWJ between words splits a pattern just as effectively.
-  const OBFUSCATION_SPLITTERS = new RegExp(`[${INVISIBLE_CHAR_CLASS}\\u200d]`, 'gu')
+  const OBFUSCATION_SPLITTERS = new RegExp(`[${FORMAT_CONTROL_CLASS}]`, 'gu')
   const patternTexts = [
     normalized.replace(SPACE_SPLITTERS, ' ').replace(OBFUSCATION_SPLITTERS, ' '),
     normalized.replace(SPACE_SPLITTERS, '').replace(OBFUSCATION_SPLITTERS, ''),

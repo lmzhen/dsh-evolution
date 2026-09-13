@@ -36,7 +36,7 @@
 import { basename, dirname, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
-import { LOCK_BODY_RE, LOCK_SUFFIX, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
+import { LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -377,19 +377,41 @@ export interface Frontmatter {
  * platform ignored the file: family visibility split from platform visibility,
  * which is exactly what a strict-YAML frontmatter is supposed to prevent.
  */
+/**
+ * S1.1 (v37 P1-4): the frontmatter block is split on LF and every line keeps its
+ * own `\r`, so the byte-preserving rebuild (`lines.join('\n')`) is exact. Line
+ * MATCHERS must therefore look at a CR-stripped view: JS `.` does not match `\r`,
+ * so `(.*)$` never reaches the end of a CRLF line.
+ * @param line - one block line, possibly CR-terminated.
+ * @returns the line without its trailing CR.
+ */
+function withoutCr(line: string): string {
+  return line.endsWith('\r') ? line.slice(0, -1) : line
+}
+
 export function frontmatterBlock(content: string): { block: string; lines: string[]; end: number; nl: string } | null {
   if (!content.trimStart().startsWith('---')) return null
-  const nl = content.includes('\r\n') ? '\r\n' : '\n'
-  const lines = content.split(nl)
-  if ((lines[0] ?? '').replace(/\r$/, '') !== '---') return null
+  // S1.1 (v37 P1-4): the block is located by splitting on '\n' and tolerating a
+  // trailing '\r' on every line — the rule upstream `skill-filesystem` uses. The
+  // old "the whole file picks ONE newline style" test made a MIXED-ending file
+  // (LF first line plus any CRLF later: PowerShell Add-Content, an editor, a git
+  // hunk conversion) look like a file with NO frontmatter — every family write was
+  // refused with a misleading message while the platform read the same bytes fine.
+  // Lines keep their '\r', so joining them with '\n' reproduces the original bytes;
+  // `nl` reports the file's FIRST line ending and is used only to rebuild text.
+  const firstBreak = content.indexOf('\n')
+  const nl = firstBreak > 0 && content[firstBreak - 1] === '\r' ? '\r\n' : '\n'
+  const lines = content.split('\n')
+  const opening = (lines[0] ?? '').replace(/\r$/, '')
+  if (opening !== '---') return null
   let end = -1
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
     if (line === undefined) continue
-    if (line.replace(/\r$/, '') === '---') { end = i; break }
+    if (line === '---' || line === '---\r') { end = i; break }
   }
   if (end < 0) return null
-  return { block: lines.slice(1, end).join(nl), lines, end, nl }
+  return { block: lines.slice(1, end).join('\n'), lines, end, nl }
 }
 
 /**
@@ -408,9 +430,14 @@ export interface FrontmatterRead {
   /** Whether the frontmatter is not valid AS WRITTEN for the strict platform
    * catalog: the strict parser rejects the block, or an unquoted value would
    * read as something other than its text (a dropped ` # ` comment, a
-   * number/bool shorthand the catalog refuses as a string field). The write
-   * path quotes such a value on its next edit. */
+   * number/bool shorthand the catalog refuses as a string field), or a
+   * platform string field carries a non-string value. The write path quotes
+   * such a value on its next edit. */
   catalogInvalid: boolean
+  /** Platform string fields (`name`/`description`/`whenToUse`) whose YAML value
+   * is not a string: the strict catalog reads such a field as ABSENT and, for an
+   * absent name/description, ignores the whole file (P2-9/v37). */
+  platformStringSplit: PlatformStringSplit[]
 }
 
 /**
@@ -424,8 +451,9 @@ export interface FrontmatterRead {
 function unsafeFrontmatterEntries(block: string, nl: string): Array<{ key: string; value: string }> {
   const found: Array<{ key: string; value: string }> = []
   for (const line of block.split(nl)) {
-    if (line.includes('\n') || line.includes('\r')) continue
-    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    const clean = withoutCr(line)
+    if (clean.includes('\n') || clean.includes('\r')) continue
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(clean)
     if (!match) continue
     const key = match[1]
     if (key === undefined) continue
@@ -436,9 +464,34 @@ function unsafeFrontmatterEntries(block: string, nl: string): Array<{ key: strin
 }
 
 /**
+ * Frontmatter fields the platform catalog reads as STRINGS (`stringField` /
+ * `optionalString` in `skill-filesystem`): any other YAML type reads as
+ * ABSENT there, and an absent `name`/`description` makes the catalog ignore the
+ * whole file. The family publishes text for these keys anyway (its lenient
+ * read), which is the one split a write must not create.
+ */
+const PLATFORM_STRING_FIELDS: readonly string[] = ['name', 'description', 'whenToUse']
+
+/** One `name`/`description`/`whenToUse` entry the strict catalog cannot read as
+ * a string, with the YAML kind the parser found. */
+export interface PlatformStringSplit {
+  key: string
+  /** The YAML type read for this field. `scalar` covers number/boolean (the
+   * E-47 auto-quote repair handles those); `sequence`/`mapping` are the shapes
+   * no rewrite can repair without inventing text — see `validateFrontmatter`. */
+  kind: 'sequence' | 'mapping' | 'scalar' | 'null'
+}
+
+interface StrictFrontmatterValues {
+  values: Map<string, string>
+  split: PlatformStringSplit[]
+}
+
+/**
  * Frontmatter values as the STRICT platform catalog reads them — js-yaml, the
  * parser `normalizeFrontmatter` also verifies rewrites with — or `null` when
- * the block is not loadable as a YAML mapping.
+ * the block is not loadable as a YAML mapping. Also reports the platform string
+ * fields whose value is not a string ({@link PlatformStringSplit}).
  *
  * Scalars publish their text (`name`, `description`, `whenToUse` are strings by
  * contract; a number/boolean-shaped value keeps the text the family always
@@ -449,26 +502,30 @@ function unsafeFrontmatterEntries(block: string, nl: string): Array<{ key: strin
  * chomping appends a newline that the family's single-line routing fields never
  * carried.
  */
-function strictFrontmatterValues(block: string): Map<string, string> | null {
+function strictFrontmatterValues(block: string): StrictFrontmatterValues | null {
   // An empty or comment-only block has no entries and is NOT a parser failure:
   // the catalog's complaint about it is the missing name, which
   // `validateFrontmatter` reports.
-  if (block.trim() === '') return new Map()
+  if (block.trim() === '') return { values: new Map(), split: [] }
   let loaded: unknown
   try {
     loaded = loadYaml(block)
   } catch {
     return null
   }
-  if (loaded === null || loaded === undefined) return new Map()
+  if (loaded === null || loaded === undefined) return { values: new Map(), split: [] }
   if (typeof loaded !== 'object' || Array.isArray(loaded)) return null
   const values = new Map<string, string>()
+  const split: PlatformStringSplit[] = []
   for (const [key, value] of Object.entries(loaded as Record<string, unknown>)) {
+    if (typeof value !== 'string' && PLATFORM_STRING_FIELDS.includes(key)) {
+      split.push({ key, kind: value === null || value === undefined ? 'null' : Array.isArray(value) ? 'sequence' : typeof value === 'object' ? 'mapping' : 'scalar' })
+    }
     if (typeof value === 'string') { values.set(key, value.trim()); continue }
     if (typeof value === 'number' || typeof value === 'boolean') { values.set(key, String(value)); continue }
     if (Array.isArray(value)) { values.set(key, `[${value.map(item => String(item)).join(', ')}]`); continue }
   }
-  return values
+  return { values, split }
 }
 
 /**
@@ -481,7 +538,7 @@ function lenientFrontmatterValues(block: string, nl: string): Map<string, string
   const values = new Map<string, string>()
   const blockLines = block.split(nl)
   for (let i = 0; i < blockLines.length; i += 1) {
-    const line = blockLines[i] ?? ''
+    const line = withoutCr(blockLines[i] ?? '')
     const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
     if (!match) continue
     const [, key, value] = match
@@ -532,6 +589,9 @@ interface FrontmatterBlockRead {
   unsafeValues: Array<{ key: string; value: string }>
   /** The strict parser rejected the block outright. */
   strictFailed: boolean
+  /** Platform string fields the strict parser could not read as text (empty
+   * when the block itself failed to parse — `strictFailed` owns that case). */
+  platformStringSplit: PlatformStringSplit[]
 }
 
 /**
@@ -546,12 +606,18 @@ interface FrontmatterBlockRead {
 function readFrontmatterBlock(content: string): FrontmatterBlockRead | null {
   const found = frontmatterBlock(content)
   if (!found) return null
-  const body = found.lines.slice(found.end + 1).join(found.nl).trim()
+  const body = found.lines.slice(found.end + 1).join('\n').trim()
   const strict = strictFrontmatterValues(found.block)
-  const values = strict ?? lenientFrontmatterValues(found.block, found.nl)
+  const values = strict?.values ?? lenientFrontmatterValues(found.block, found.nl)
   const frontmatter: Frontmatter = {}
   for (const [key, value] of values) frontmatter[key] = value
-  return { frontmatter, body, unsafeValues: unsafeFrontmatterEntries(found.block, found.nl), strictFailed: strict === null }
+  return {
+    frontmatter,
+    body,
+    unsafeValues: unsafeFrontmatterEntries(found.block, found.nl),
+    strictFailed: strict === null,
+    platformStringSplit: strict?.split ?? [],
+  }
 }
 
 /**
@@ -571,7 +637,8 @@ export function parseFrontmatter(content: string): FrontmatterRead | null {
     frontmatter: read.frontmatter,
     body: read.body,
     unsafeValues: read.unsafeValues,
-    catalogInvalid: read.strictFailed || read.unsafeValues.length > 0,
+    catalogInvalid: read.strictFailed || read.unsafeValues.length > 0 || read.platformStringSplit.length > 0,
+    platformStringSplit: read.platformStringSplit,
   }
 }
 
@@ -587,7 +654,7 @@ export function parseFrontmatter(content: string): FrontmatterRead | null {
  */
 export function frontmatterCatalogInvalid(content: string): boolean {
   const read = readFrontmatterBlock(content)
-  if (read !== null) return read.strictFailed || read.unsafeValues.length > 0
+  if (read !== null) return read.strictFailed || read.unsafeValues.length > 0 || read.platformStringSplit.length > 0
   // v28 G2.3 (CORE-SK-02): fail closed for the DETECTION failures this guard
   // exists for — a BOM-prefixed fence or mixed line endings make the block
   // undetectable to the byte-exact extractor while a real YAML parser (the
@@ -682,7 +749,9 @@ export interface FrontmatterNormalizeResult {
 export function normalizeFrontmatter(content: string): FrontmatterNormalizeResult {
   const block = frontmatterBlock(content)
   if (!block) return { content, changed: false, fields: [], issues: [] }
-  const { lines, end, nl } = block
+  // S1.1: `nl` is no longer needed here — every line keeps its own CR and the
+  // rebuild joins on LF, which reproduces the original bytes.
+  const { lines, end } = block
   const fields: string[] = []
   const issues: string[] = []
   // Detection shares the predicate with the audit side
@@ -692,9 +761,9 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
   const originalValues = new Map<string, string>()
   let changed = false
   for (let i = 1; i < end; i++) {
-    const line = lines[i]
-    if (line === undefined) continue
-    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    const raw = lines[i]
+    if (raw === undefined) continue
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(withoutCr(raw))
     if (!match) continue
     const key = match[1]
     if (key === undefined) continue
@@ -716,7 +785,9 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
     const quoted = value.includes('"') || value.includes('\\')
       ? `'${value.replace(/'/g, "''")}'`
       : `"${value}"`
-    lines[i] = `${key}: ${quoted}`
+    // S1.1: keep the line's own CR — the block is split on LF now, so the line
+    // ending lives in the string itself (join('\n') restores the original bytes).
+    lines[i] = `${key}: ${quoted}${raw.endsWith('\r') ? '\r' : ''}`
     originalValues.set(key, value)
     fields.push(key)
     changed = true
@@ -729,7 +800,7 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
   // rule can mis-detect a multiline flow collection (`[a,` + continuation)
   // or any shape the plain-scalar approximation does not know. A failure must
   // roll back, never ship a value mutation.
-  const rewrittenBlock = lines.slice(1, end).join(nl)
+  const rewrittenBlock = lines.slice(1, end).join('\n')
   try {
     const parsed = loadYaml(rewrittenBlock) as Record<string, unknown>
     for (const key of fields) {
@@ -737,7 +808,7 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
         throw new Error(`rewritten value for ${key} differs from the original`)
       }
     }
-    return { content: lines.join(nl), changed: true, fields, issues }
+    return { content: lines.join('\n'), changed: true, fields, issues }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     return {
@@ -777,12 +848,48 @@ export function relatedSkillNames(content: string, exclude?: string): string[] {
   return [...names]
 }
 
-export function validateFrontmatter(content: string, expectedName?: string, limits: SkillLimits = DEFAULT_SKILL_LIMITS): string | null {
+/** S1.2 (v37 P2-1): the content limit applies to the bytes that LAND ON DISK.
+ * Every write normalizes with `trimEnd() + '\n'`, so judging the raw argument let
+ * a 100_000-character body with no trailing newline land as 100_001 bytes — and
+ * every later patch/update of that skill was then refused, which made it
+ * unmaintainable through `skill_manage` with no repair path at all. */
+function skillMdOnDisk(content: string): string {
+  return content.trimEnd() + '\n'
+}
+
+/** Whether `content` would exceed `limit` once written. */
+function exceedsContentLimit(content: string, limit: number): boolean {
+  return skillMdOnDisk(content).length > limit
+}
+
+/** S1.2: the repair path — a write that makes an already-over-limit file smaller.
+ * Only a NET SHRINK is exempt; an equal or larger write stays refused. */
+function shrinksOverLimit(next: string, current: string | null | undefined, limit: number): boolean {
+  if (current === null || current === undefined || !exceedsContentLimit(current, limit)) return false
+  return skillMdOnDisk(next).length < skillMdOnDisk(current).length
+}
+
+export function validateFrontmatter(
+  content: string,
+  expectedName?: string,
+  limits: SkillLimits = DEFAULT_SKILL_LIMITS,
+  /** On-disk bytes, so a NET SHRINK of an over-limit file is allowed (S1.2). */
+  current?: string | null,
+): string | null {
   const parsed = parseFrontmatter(content)
   // V27 G2.1: name the exact rule (the one the upstream catalog applies) —
   // "start and end with YAML frontmatter" left a ` --- ` fence, or a block with
   // no body, to be discovered by trial and error.
   if (!parsed) return 'SKILL.md must start with a `---` line, close the frontmatter with another exact `---` line (only a trailing `\\r` is tolerated), and include a body below it.'
+  // P2-9 (v37): a SEQUENCE/MAPPING under a platform string field is refused —
+  // the catalog drops the whole file while the family publishes synthesized
+  // text. Number/boolean stay repairable (E-47 auto-quotes them).
+  const unreadable = parsed.platformStringSplit.filter(entry => entry.kind === 'sequence' || entry.kind === 'mapping')
+  if (unreadable.length > 0) {
+    const named = unreadable.map(entry => `"${entry.key}" (a YAML ${entry.kind})`).join(', ')
+    return `Frontmatter field ${named} must be a string: the platform skill catalog reads such a field as absent and ignores the whole file. ` +
+      'Write plain text, or wrap the value in double quotes to keep it literally.'
+  }
   if (!parsed.frontmatter.name) return 'Frontmatter must include a name field.'
   // C-12 (v10 audit): single-source the name shape — the inline copy of
   // SKILL_NAME_RE could silently drift from constants.ts.
@@ -792,7 +899,9 @@ export function validateFrontmatter(content: string, expectedName?: string, limi
   if (!parsed.frontmatter.description) return 'Frontmatter must include a description field.'
   const description = parsed.frontmatter.description
   if (description.length > limits.maxDescriptionLength) return `Description exceeds ${limits.maxDescriptionLength} characters.`
-  if (content.length > limits.maxSkillContentChars) {
+  // S1.2: the limit is judged on the bytes that will land on disk, and a NET
+  // SHRINK of an already-over-limit file is allowed (the repair path).
+  if (exceedsContentLimit(content, limits.maxSkillContentChars) && !shrinksOverLimit(content, current, limits.maxSkillContentChars)) {
     return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters. ` +
       'Consider splitting into a smaller SKILL.md with supporting files.'
   }
@@ -1949,14 +2058,17 @@ export class SkillLibrary {
     const path = join(dir, 'SKILL.md')
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
-    const validation = validateFrontmatter(content, name, this.limits)
+    // S1.2: a lock-free read feeds only the shrink exemption below; the commit
+    // still runs inside the write transaction with its own locked read.
+    const currentForLimit = await this.io.readText(path).catch(() => null)
+    const validation = validateFrontmatter(content, name, this.limits, currentForLimit)
     if (validation) return { ok: false, message: validation }
     // 0.3.11: normalize at the write point (see create) — same reasoning.
     const norm = normalizeFrontmatter(content)
     if (norm.issues.length > 0) return { ok: false, message: `Skill "${name}" frontmatter cannot be auto-fixed: ${norm.issues[0]} — wrap the value in double quotes and retry.` }
     const finalContent = norm.changed ? norm.content : content
     if (norm.changed) {
-      const revalidated = validateFrontmatter(finalContent, name, this.limits)
+      const revalidated = validateFrontmatter(finalContent, name, this.limits, currentForLimit)
       if (revalidated) return { ok: false, message: revalidated }
     }
     const threat = this.contentThreatBlock(finalContent)
@@ -2054,7 +2166,7 @@ export class SkillLibrary {
       let writeContent = patched
       let normalizedFields: string[] | undefined
       if (target === skillMd) {
-        const validation = validateFrontmatter(patched, name, this.limits)
+        const validation = validateFrontmatter(patched, name, this.limits, md)
         if (validation) return { result: { ok: false, message: `Patch rejected: ${validation}` }, write: null }
         // 0.3.11: normalize at the write point (see create) — a patch may edit
         // the frontmatter directly.
@@ -2063,14 +2175,16 @@ export class SkillLibrary {
         if (norm.changed) {
           writeContent = norm.content
           normalizedFields = norm.fields
-          const revalidated = validateFrontmatter(writeContent, name, this.limits)
+          const revalidated = validateFrontmatter(writeContent, name, this.limits, md)
           if (revalidated) return { result: { ok: false, message: `Patch rejected: ${revalidated}` }, write: null }
         }
       }
       if (Buffer.byteLength(writeContent, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
         return { result: { ok: false, message: `Patched file exceeds ${this.limits.maxSkillFileBytes} bytes.` }, write: null }
       }
-      if (writeContent.length > this.limits.maxSkillContentChars && target === skillMd) {
+      const overLimit = exceedsContentLimit(writeContent, this.limits.maxSkillContentChars)
+      const repairing = shrinksOverLimit(writeContent, md, this.limits.maxSkillContentChars)
+      if (overLimit && target === skillMd && !repairing) {
         return { result: { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }, write: null }
       }
       const threat = this.contentThreatBlock(writeContent)
@@ -2161,8 +2275,8 @@ export class SkillLibrary {
    * each support dir (write_file's lock sits next to its file). Residual:
    * NESTED support-subdir locks and the probe→rename TOCTOU itself remain
    * fail-safe (renameWithRetry rides the write out; the writer's locked
-   * re-read refuses on the moved-away file), and a residue `.lock` from a
-   * CRASHED writer also refuses — correct: inspect, don't archive.
+   * re-read refuses on the moved-away file). v37 (P2-8): a residue `.lock` whose
+   * holder is GONE is not a writer — `decideTakeover` owns that verdict.
    */
   private async hasWriteLock(dir: string): Promise<boolean> {
     // P3 (v17): marker writers (pin / hermes-managed) hold root-level locks
@@ -2188,11 +2302,12 @@ export class SkillLibrary {
     return false
   }
 
-  /** P2 (v17): a file only counts as a writer lock when its body has the
-   * `pid:token` shape the io layer writes. User support files legitimately
-   * named `*.lock` (allowed by SUPPORT_FILE_NAME_RE) must not trip the probe
-   * or be swept as residue — the v16 first cut matched on suffix alone,
-   * which permanently refused archiving and deleted user content on restore. */
+  /** P2 (v17): a `*.lock` file counts as a writer lock only when its body
+   * carries the io layer's protocol — `pid:token`, a bare pid, or an empty body
+   * (a creator between create and body write); anything else is user content
+   * (suffix-only matching refused archiving and deleted user files on restore).
+   * v37 (P2-8): the verdict is `decideTakeover`'s, so the mover refuses exactly
+   * the lock the io layer refuses to reclaim, the 30s empty window included. */
   private async isWriterLock(lockPath: string): Promise<boolean> {
     let body: string | null
     try {
@@ -2204,7 +2319,17 @@ export class SkillLibrary {
       return true
     }
     if (body === null) return false
-    return LOCK_BODY_RE.test(body.trim())
+    const trimmed = body.trim()
+    if (trimmed !== '' && !/^\d+$/.test(trimmed) && !LOCK_BODY_RE.test(trimmed)) return false
+    // A backend without the mtime probe reports an unknown age: read as fresh,
+    // which is also what decideTakeover answers for an unattributable age.
+    let mtimeMs: number | null = null
+    try {
+      mtimeMs = (await this.io.mtime?.(lockPath)) ?? null
+    } catch {
+      mtimeMs = null
+    }
+    return decideTakeover({ body, mtimeMs: mtimeMs ?? Date.now(), alive: isProcessAlive }) === 'none'
   }
 
   /** P2 (v16): best-effort removal of lock residue inside a RESTORED tree.
@@ -2638,7 +2763,7 @@ export class SkillLibrary {
     // text duplicated the frontmatter on every successful restructure (a
     // second `---` block the lenient parser tolerated but strict YAML
     // consumers read as duplicate name/description keys).
-    const header = block.lines.slice(0, block.end + 1).join(block.nl)
+    const header = block.lines.slice(0, block.end + 1).join('\n')
     const bodyRaw = md.slice(header.length)
     const plan = planRestructureSections(bodyRaw.replace(/\r\n/g, '\n'), moves)
     if ('error' in plan) return { ok: false, message: `Restructure rejected: ${plan.error}` }
@@ -2755,13 +2880,21 @@ export class SkillLibrary {
             // assignment) does not narrow it to a literal `false`.
             const baseline = entry.expected === undefined ? entry.previous : entry.expected
             const drift = { seen: false }
+            // S1.4 (v37 P2-7): a transact backend that never invokes the task
+            // (the V6-19 contract) would leave BOTH holders at their initial
+            // values and this write would be reported as a success.
+            const ran = { done: false }
             await this.transact(this.io, entry.target, (current) => {
+              ran.done = true
               if (current !== baseline) {
                 drift.seen = true
                 return current
               }
               return entry.content
             })
+            if (!ran.done) {
+              throw new Error(`internal error: the write transaction for ${entry.target} did not invoke the task; nothing was written`)
+            }
             if (drift.seen) {
               throw new Error(`concurrent modification detected: ${entry.target} changed after the plan was computed (a concurrent writer won the race); no further writes were performed`)
             }
@@ -3031,10 +3164,18 @@ export class SkillLibrary {
     // contract — so nothing is deleted and nothing is audited.
     let verdict = anchorVerdict(anchor, before)
     if (verdict === 'match' && this.transact) {
+      // S1.4 (v37 P2-7): a violating transact backend would leave `verdict` at
+      // its pre-read value, so the "removed" claim (and the audit record and the
+      // mutation event) would all be false while the file stayed on disk.
+      // Holder (not a `let`): the control-flow analysis cannot see the transact
+      // callback's assignment and would narrow a plain flag to a literal.
+      const ran = { done: false }
       await this.transact(this.io, target, (current) => {
+        ran.done = true
         verdict = anchorVerdict(anchor, current)
         return verdict === 'match' ? null : current
       })
+      if (!ran.done) return { ok: false, message: 'internal error: the delete transaction did not invoke the task; nothing was removed' }
     } else if (verdict === 'match') {
       await this.io.remove(target)
     }
@@ -3482,8 +3623,12 @@ export class SkillLibrary {
     let rootEntries: string[]
     try {
       rootEntries = await this.io.list(this.root)
-    } catch {
-      rootEntries = []
+    } catch (error) {
+      // S1.4 (v37 P1-5): a failed root listing must NOT read as "no entries".
+      // The clear loop below would silently degrade into a merge (post-snapshot
+      // skills survive), the live-writer refusal right after it would never run,
+      // and the caller was still told ok:true.
+      throw new Error(`snapshot restore refused: the skill root could not be listed (${error instanceof Error ? error.message : String(error)}) — nothing was changed`)
     }
     // A1-7 (v18): the snapshot channel has no writer probe in v17. Refuse while
     // a skill writer is active; dead lock residue is swept first so a crashed

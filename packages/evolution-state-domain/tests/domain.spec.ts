@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
+import { Storage, storageBackendServiceKey, type KvUnitDescriptor } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionStateStorageRegistry, { REVIEW_STATE_TABLE } from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
@@ -128,6 +128,41 @@ describe('evolution-state-domain', () => {
     // retry budget instead of re-awaiting the poisoned promise.
     await expect(provider.loadCuratorState()).rejects.toThrow('simulated down #6')
     expect(attempts).toBe(6)
+  })
+
+  it('P2-6: a stored record that fails its schema fails the open once, without retrying', async () => {
+    const home = await tempRoot('dsh-state-domain-invalid-')
+    const inner = new JsonStorageBackend(home)
+    // Seed a review-state row the domain schema rejects. `putRecord` is opaque
+    // to the storage layer, so only the domain's own open() can catch it.
+    const seeding = await inner.kv.open(DomainFacility.descriptorOf(DomainState.EVOLUTION_DOMAIN))
+    await seeding.putRecord(REVIEW_STATE_TABLE, 'corrupt-session', { turnsSinceMemory: 'not-a-number' })
+    await seeding.close()
+    // Counting wrapper: the domain facility reaches the medium through the
+    // registry, so every open() attempt is observable here.
+    let opens = 0
+    const backend = {
+      kv: {
+        open: async (descriptor: KvUnitDescriptor) => {
+          opens += 1
+          return inner.kv.open(descriptor)
+        },
+      },
+      close: () => inner.close(),
+    }
+    const ctx = new Context()
+    await ctx.plugin(Storage)
+    ctx.storage.backend.register('test-json', backend)
+    ctx.provide(storageBackendServiceKey('test-json'), backend)
+    await ctx.plugin(DomainFacility, { backend: 'test-json' })
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(DomainState)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    await expect(provider.loadReviewState('s1')).rejects.toThrow(/does not match its schema/)
+    // Deterministic: the record re-reads identically every attempt, so the
+    // 3-attempt budget only re-ran the whole-domain loadAll behind ~315ms of
+    // backoff. Transient failures (no storage code) still retry — see P1-4.
+    expect(opens).toBe(1)
   })
 
 })

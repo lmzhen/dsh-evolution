@@ -9,8 +9,6 @@
  * distillation engine and no model-tool footprint.
  */
 
-import { DSH_AUTHORING_STANDARDS } from './prompts.ts'
-
 /**
  * Build the agent prompt for an open-ended `/evolution learn` request.
  *
@@ -34,7 +32,10 @@ export function buildLearnPrompt(userRequest: string): string {
     '2. Author ONE SKILL.md, applying every requirement, focus, and constraint in the request — these govern what the SKILL.md covers and emphasizes, not just which sources you read.',
     "3. Save it with the `skill_manage` tool (action=\"create\"). Pick a sensible category. If the procedure needs a non-trivial script, add it under the skill's `scripts/` with `skill_manage` write_file and reference it by relative path.",
     '',
-    DSH_AUTHORING_STANDARDS,
+    // P2-25 (v39): the standards live in the `skill_manage` tool description,
+    // which is in context on every turn that can call it — embedding them here
+    // repeated 1840 chars in this one (measured on the constant).
+    'Apply the skill-authoring standards (frontmatter, prose, file layout) carried by the `skill_manage` tool description — that is the single copy; do not restate them here.',
     '',
     'When done, tell the user the skill name, its category, and a one-line summary of what it captured.',
   ].join('\n')

@@ -17,15 +17,15 @@ import { fileURLToPath } from 'node:url'
  * here and forces the decision, while the register below stays the to-do list.
  */
 const REGISTERED_DEFAULTS: Record<string, string> = {
-  'evolution-commands/src/index.ts:393': 'read-only: the commands listing walks the tree, no write goes through this instance',
-  'evolution-commands/src/index.ts:472': 'read-only: as above',
-  'evolution-commands/src/index.ts:680': 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
-  'evolution-curator/src/index.ts:214': 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
-  'evolution-learning-graph/src/index.ts:451': 'read-only: withSkills() serves reads and the graph read path',
-  'evolution-maintenance/src/tools.ts:78': 'read-only: the maintenance probe walks the tree',
-  'evolution-review/src/index.ts:790': 'read-only: the pre-run hash snapshot',
-  'evolution-review/src/index.ts:1136': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
-  'evolution-skill-catalog/src/index.ts:98': 'read-only: the catalog walk',
+  'evolution-commands/src/index.ts :: resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider()': 'read-only: the commands listing walks the tree, no write goes through this instance',
+  'evolution-commands/src/index.ts :: resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider() #2': 'read-only: as above',
+  "evolution-commands/src/index.ts :: resolveSkillsRoot({ root: skillsRootValue }), ioRegistry.provider(), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, config.threatExemptLabels ?? []": 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
+  "evolution-curator/src/index.ts :: resolveSkillsRoot({ root: config.root }), this.io, undefined, (event) => { this.ctx.emit('evolution/skill-mutated', event) }": 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
+  "evolution-learning-graph/src/index.ts :: graphSkillsRoot, evolutionIoAdapter(() => io.provider()), undefined, (event) => { ctx.emit('evolution/skill-mutated', event) }, undefined, [...(rawConfig.threatExemptLabels ?? [])]": 'read-only: withSkills() serves reads and the graph read path',
+  'evolution-maintenance/src/tools.ts :: resolveSkillsRoot({ root: rootConfig.root }), ioRegistry.provider()': 'read-only: the maintenance probe walks the tree',
+  'evolution-review/src/index.ts :: resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider())': 'read-only: the pre-run hash snapshot',
+  'evolution-review/src/index.ts :: resolveSkillsRoot({ root: rootConfig.root }), evolutionIoAdapter(() => io.provider()) #2': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
+  'evolution-skill-catalog/src/index.ts :: resolveSkillsRoot(rawConfig), io': 'read-only: the catalog walk',
 }
 
 const WRITE_CALL = /\.(?:create|update|patch|archive|writeSupportFile|removeSupportFile|setPinned|restructure|consolidate)\(/
@@ -62,10 +62,15 @@ function sourceFiles(): SourceFile[] {
   return out
 }
 
-/** The construction call text, paren-balanced, with its 1-based line. */
+/** The construction call text, paren-balanced, keyed by its argument text. */
 function constructions(text: string, file: string): Array<{ key: string; limits: boolean }> {
   const lines = text.split(/\r?\n/)
   const found: Array<{ key: string; limits: boolean }> = []
+  // v39 (B3 follow-up): the register is keyed by CONTENT, not by line number.
+  // Two rounds in a row, an unrelated edit above a construction re-pinned every
+  // entry and failed this guard; the anchor is the normalized argument list, so
+  // only a real change to the construction (or a new duplicate) fires it.
+  const perAnchor = new Map<string, number>()
   lines.forEach((line, index) => {
     const at = line.indexOf('new SkillLibrary(')
     if (at < 0) return
@@ -94,7 +99,11 @@ function constructions(text: string, file: string): Array<{ key: string; limits:
       else if (ch === ',' && level === 0) { commas++; continue }
       if (commas === 2) third += ch
     }
-    found.push({ key: `${file}:${index + 1}`, limits: third.trim() !== '' && third.trim() !== 'undefined' })
+    const anchor = args.trim().replace(/\s+/g, ' ')
+    const nth = perAnchor.get(anchor) ?? 0
+    perAnchor.set(anchor, nth + 1)
+    const suffix = nth === 0 ? '' : ` #${nth + 1}`
+    found.push({ key: `${file} :: ${anchor}${suffix}`, limits: third.trim() !== '' && third.trim() !== 'undefined' })
   })
   return found
 }
@@ -109,7 +118,7 @@ it('v35 A6: every SkillLibrary construction with default limits is a registered 
       const reason = REGISTERED_DEFAULTS[site.key]
       if (reason === undefined) {
         const writes = WRITE_CALL.test(file.text) ? 'module contains write calls' : 'module is read-only'
-        unregistered.push(site.key + ' (' + writes + ')')
+        unregistered.push(`  '${site.key}': '<reason>',   // ${writes}`)
       }
     }
   }

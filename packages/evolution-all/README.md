@@ -38,3 +38,5 @@ preset are also exclusive** — mounting both double-mounts the model rows.
 
 For fine-grained control (e.g. a custom profile overlay), see the family
 [README](../README.md).
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

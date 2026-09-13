@@ -7,6 +7,7 @@
  */
 
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { ToolDispatchNormalizer, isSkillToolName } from './tool-dispatch.ts'
 
 export type ReviewKind = 'memory' | 'skill' | 'combined'
 
@@ -68,6 +69,25 @@ function textOfBlock(block: unknown): string {
   return candidate.type === 'text' && typeof candidate.text === 'string' ? candidate.text : ''
 }
 
+/**
+ * Per-turn dispatch ledgers, keyed by the signal object they feed.
+ *
+ * `observeEvent` folds ONE event at a time, so the dedup state has to outlive
+ * the call. One WeakMap entry per `TurnSignals`, so a finished fold's ledger is
+ * collectable with the fold itself and two concurrent turns never share one.
+ */
+const dispatchLedgers = new WeakMap<TurnSignals, ToolDispatchNormalizer>()
+
+/** The ledger folding this signal's turn, created on first use. */
+function normalizerForSignal(signal: TurnSignals): ToolDispatchNormalizer {
+  let normalizer = dispatchLedgers.get(signal)
+  if (normalizer === undefined) {
+    normalizer = new ToolDispatchNormalizer()
+    dispatchLedgers.set(signal, normalizer)
+  }
+  return normalizer
+}
+
 /** Fold one session event into the current turn observation. */
 export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
   // P1-1 (v11) carried to the remaining branches (N4, v12): the event union
@@ -101,15 +121,29 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
     signal.assistantChars += text.length
     return
   }
-  if (event.type === 'tool/call') {
-    // P1-1 (v11): this branch used to be the one without a data-shape guard —
-    // a persisted event with missing/non-object `data` TypeErrors here and the
-    // review E-6 catch swallowed the whole turn's remaining signals. Since N4
-    // (v12) the shared guard above covers all three branches.
-    signal.toolCalls += 1
-    const name = (data as { name?: unknown }).name
-    if (name === 'skill' || name === 'skill_manage') signal.skillSignal = true
-  }
+  // Tool evidence (v37 P7a): the dispatch fold lives in `tool-dispatch.ts` —
+  // the ONE reader of the platform's dispatch event types. This branch used to
+  // match `tool/call` itself, so a PTC session (`tool/ptc-dispatch*`) advanced
+  // the cadence by zero tool calls and never raised the skill signal. The
+  // normalizer emits one signal per dispatch, so the start/settle pair of a PTC
+  // sub-dispatch counts once.
+  // P1-1 (v11): this branch used to be the one without a data-shape guard —
+  // a persisted event with missing/non-object `data` TypeErrors here and the
+  // review E-6 catch swallowed the whole turn's remaining signals. Since N4
+  // (v12) the shared guard above covers all three branches; the normalizer
+  // answers `null` for every payload it cannot attribute.
+  const dispatch = normalizerForSignal(signal).advance(event)
+  if (dispatch === null) return
+  // `toolCalls` is the model-facing call count the cadence weights by: a
+  // program's sub-dispatches are not model calls (the `run_code` call that owns
+  // them is logged natively and counted by its own `tool/call`), so only
+  // direct and program-root dispatches advance it. Counting them all would let
+  // one 50-operation program advance the cadence by 50 turns.
+  if (dispatch.kind !== 'program') signal.toolCalls += 1
+  // The skill signal asks whether the model learned from a skill this turn,
+  // which a program's `tools.skill(...)` call does just as much as a direct
+  // read — this is the signal a PTC session used to lose entirely.
+  if (isSkillToolName(dispatch.name)) signal.skillSignal = true
 }
 
 /** Compute review cadence after `turn/end`. */

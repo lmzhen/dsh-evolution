@@ -127,3 +127,23 @@ describe('computeDriftSignals', () => {
     expect(findDriftSignal(report.library, 'prefix_cluster')?.verdict).toBe('pass')
   })
 })
+
+describe('S1.8 (v37 P1-14 / P2-3): LF and CRLF bodies agree', () => {
+  it('duplicateHeadings sees headings in a CRLF body', () => {
+    // `.` does not match `\r` and a non-multiline `$` anchors only at the end of
+    // the input, so a CRLF body reported `dup_heading: none / pass` — a fabricated
+    // positive verdict (the maintenance prompt never asked for the merge).
+    const lf = '## A\n\ntext\n\n## A\n'
+    expect(duplicateHeadings(lf)).toEqual([{ heading: 'A', count: 2 }])
+    expect(duplicateHeadings(lf.replace(/\n/g, '\r\n'))).toEqual([{ heading: 'A', count: 2 }])
+  })
+
+  it('overlongLines counts visible characters, not the CR terminator', () => {
+    const exact = 'x'.repeat(DRIFT_MAX_LINE_CHARS)
+    expect(overlongLines(`${exact}\n`)).toEqual([])
+    expect(overlongLines(`${exact}\r\n`)).toEqual([])
+    const over = 'x'.repeat(DRIFT_MAX_LINE_CHARS + 1)
+    expect(overlongLines(`${over}\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
+    expect(overlongLines(`${over}\r\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
+  })
+})

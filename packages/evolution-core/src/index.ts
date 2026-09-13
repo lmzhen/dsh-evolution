@@ -3,10 +3,9 @@
  *
  * Pure stores, prompts, signals, lifecycle logic, threat scanning, IO seam
  * types, and session-event augmentations. This package ships no runtime
- * plugin beyond the invariant companion entry (`./invariant` — the subpath
- * the host auto-assembles to register this package's no-op invariant);
- * consumers import named exports from the package root so published npm
- * bundles never depend on source subpaths.
+ * plugin and no `./invariant` companion (v37 S2.1); consumers import named
+ * exports from the package root so published npm bundles never depend on
+ * source subpaths.
  *
  * ## Layer map (OPT-28, 2026-09) — locate code by LAYER, not by directory
  *
@@ -40,6 +39,7 @@ export * from './preset-composition.ts'
 export * from './prompts.ts'
 export * from './quality.ts'
 export * from './redact.ts'
+export * from './review-channel.ts'
 export * from './serial.ts'
 export * from './skill-health.ts'
 export * from './signals.ts'
@@ -47,6 +47,7 @@ export * from './drift-signals.ts'
 export * from './skill-store.ts'
 export * from './state-store.ts'
 export * from './threats.ts'
+export * from './tool-dispatch.ts'
 export * from './usage.ts'
 export * from './constants.ts'
 export * from './numeric.ts'

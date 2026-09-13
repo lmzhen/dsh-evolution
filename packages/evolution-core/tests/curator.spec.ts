@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { buildCuratorRunReport, computeLifecycleTransitions, computeScopeView, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, renderCuratorReportMarkdown, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { buildCuratorRunReport, computeLifecycleTransitions, computeScopeView, CURATOR_PROMPT, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, renderCuratorReportMarkdown, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
 it('V27 CUR-2: a run that was cut short carries its abort reason into the report and digest', () => {
   const report = buildCuratorRunReport({
@@ -304,3 +304,57 @@ it('P1-1 (v15): the scope view warns on the union (predicts the engine)', () => 
   const view = computeScopeView(usage, { staleAfterDays: 30, archiveAfterDays: 90 })
   expect(view.qualityWarned).toContain('fb-skill')
 })
+
+it('P1-9 (v38): a trailing YAML comment does not drop a nomination (mode/into/from/name)', () => {
+  // The family prompt template itself shows `mode: reference  # optional ...`
+  // while all four anchors ended in `\s*$`: the demote silently degraded to an
+  // append and comment-carrying entries vanished outright.
+  const parsed = parseCuratorNominations([
+    'consolidations:',
+    '  - from: narrow-a  # the session-detail skill',
+    '    mode: reference  # optional - demote',
+    '    into: umbrella-a  # the umbrella',
+    'prunings:',
+    '  - name: stale-a  # no absorption target',
+  ].join('\n'))
+  expect(parsed.consolidations).toEqual([{ from: 'narrow-a', into: 'umbrella-a', mode: 'reference' }])
+  expect(parsed.prunings).toEqual(['stale-a'])
+  expect(parsed.warnings).toEqual([])
+})
+
+it('P1-9 (v38): the SHIPPED prompt template block parses as printed', () => {
+  // The model is told to format EXACTLY like this block, so the template's own
+  // line (comment included) is the fixture - not a hand-written approximation.
+  const modeLine = CURATOR_PROMPT.split('\n').find(line => line.trimStart().startsWith('mode: reference')) ?? ''
+  expect(modeLine).toContain('#')
+  const parsed = parseCuratorNominations([
+    'consolidations:',
+    '  - from: narrow-skill',
+    modeLine,
+    '    into: umbrella-skill',
+    '    reason: absorb',
+  ].join('\n'))
+  expect(parsed.consolidations).toEqual([{ from: 'narrow-skill', into: 'umbrella-skill', mode: 'reference' }])
+  expect(parsed.warnings).toEqual([])
+})
+
+it('P1-9 (v38): an anchor whose value is unusable warns instead of vanishing', () => {
+  // A name outside the charset and an unknown mode used to be dropped with no
+  // warning at all; `- name:` is the LLM channel's only archive path.
+  const parsed = parseCuratorNominations([
+    'consolidations:',
+    '  - from: narrow-a',
+    '    into: Umbrella-A',
+    'prunings:',
+    '  - name: bad NAME',
+    '    mode: demote',
+  ].join('\n'))
+  expect(parsed.consolidations).toEqual([])
+  expect(parsed.prunings).toEqual([])
+  expect(parsed.warnings).toHaveLength(3)
+  const warnings = parsed.warnings.join(' | ')
+  expect(warnings).toContain('into: Umbrella-A')
+  expect(warnings).toContain('name: bad NAME')
+  expect(warnings).toContain('mode: demote')
+})
+

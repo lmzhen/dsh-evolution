@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
@@ -1676,4 +1676,245 @@ it('F-14 (v18): curatorProvider defaults to deepseek-official and is configurabl
   }
   expect(schema['~standard'].validate({}).value.curatorProvider).toBe('deepseek-official')
   expect(schema['~standard'].validate({ curatorProvider: 'local-llm' }).value.curatorProvider).toBe('local-llm')
+})
+
+it('P1-10 (v38): an unvalidated usage-sidecar key reaches no path, no suppression and no prompt', { timeout: 20_000 }, async () => {
+  const home = await tempHome('dsh-curator-poison-key-')
+  const base = nodeEvolutionIo()
+  const probed: string[] = []
+  let captured = ''
+  const emptyYaml = '## Structured summary (required)\n' + '```yaml\nconsolidations: []\nprunings: []\n```\n'
+  const ctx = new Context()
+  ctx.provide('llm', {
+    stream: async function* (options: { messages: Array<{ content: Array<{ text?: string }> }> }) {
+      captured = options.messages[0]?.content[0]?.text ?? ''
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'text-delta', index: 0, text: emptyYaml }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
+      yield { type: 'finish', reason: 'stop' }
+    },
+  })
+  await ctx.plugin(EvolutionIoRegistry)
+  // Every exists() probe is recorded, so an out-of-root one is PROVEN, not inferred.
+  ctx.evolutionIo.registerProvider({
+    name: 'spy-node',
+    ...base,
+    exists: async (path: string) => { probed.push(path); return await base.exists(path) },
+  }, { default: true })
+  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+  const skills = ctx.evolutionCurator.skills
+  await skills.create('stale-real', basicBody('stale-real'), 'foreground')
+  await skills.create('idle-real', basicBody('idle-real'), 'foreground')
+  const idle200 = new Date(Date.now() - 200 * 86_400_000).toISOString()
+  const idle45 = new Date(Date.now() - 45 * 86_400_000).toISOString()
+  // Both poisoned keys live ONLY in the sidecar (parseUsage sanitizes values,
+  // never keys): one is archivable, the other is stale and therefore
+  // prompt-eligible through the recommendation pool.
+  const POISON_ARCHIVE = '../../escaped-marker'
+  const POISON_PROMPT = '../../escaped-prompt'
+  await saveUsage(skills.root, new Map([
+    ['stale-real', { ...emptyRecord(), created_by: 'agent', created_at: idle200, use_count: 1, view_count: 1, last_viewed_at: idle45, state: 'active' }],
+    ['idle-real', { ...emptyRecord(), created_by: 'agent', created_at: idle200, use_count: 1, last_used_at: idle200, state: 'active' }],
+    [POISON_ARCHIVE, { ...emptyRecord(), created_by: 'agent', created_at: idle200, use_count: 1, last_used_at: idle200, state: 'active' }],
+    [POISON_PROMPT, { ...emptyRecord(), created_by: 'agent', created_at: idle200, use_count: 1, view_count: 1, last_viewed_at: idle45, state: 'active' }],
+  ]), base)
+  // A REAL bundled marker sits exactly where the poisoned key resolves to:
+  // join(root, '.archive', '../../escaped-marker') = <home>/escaped-marker.
+  await mkdir(join(home, 'escaped-marker'), { recursive: true })
+  await writeFile(join(home, 'escaped-marker', '.bundled'), '')
+  const warnSpy = vi.spyOn(ctx.logger, 'warn')
+  const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+  // (a) nothing outside the skills root was ever probed
+  expect(probed.some(path => relative(resolve(skills.root), resolve(path)).startsWith('..'))).toBe(false)
+  // (b) the poisoned key never reached the suppression sidecar
+  expect(await loadSuppressedNames(skills.root, base)).not.toContain(POISON_ARCHIVE)
+  // (c) the raw key never became prompt text for the model
+  expect(captured).toContain('stale-real')
+  expect(captured).not.toContain('escaped')
+  // The refusal is loud, and the run keeps its real work (0.3.18 idleness scale).
+  expect(warnSpy.mock.calls.some(call => String(call[0]).includes('usage sidecar key'))).toBe(true)
+  expect(result.archived).toContain('idle-real')
+  warnSpy.mockRestore()
+  ctx.evolutionCurator.stop()
+})
+
+it('P2-17 (v38): a FAILED archive does not read as "already archived" for its merge nomination', { timeout: 20_000 }, async () => {
+  await tempHome('dsh-curator-p217-')
+  const yaml = [
+    '## Structured summary (required)',
+    '```yaml',
+    'consolidations:',
+    '  - from: narrow-src',
+    '    into: umbrella-skill',
+    '    reason: absorbs the sibling',
+    'prunings:',
+    '  - name: narrow-src',
+    '```',
+  ].join('\n')
+  const ctx = new Context()
+  ctx.provide('llm', {
+    stream: async function* () {
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'text-delta', index: 0, text: yaml }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+      yield { type: 'finish', reason: 'stop' }
+    },
+  })
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  ctx.provide('evolutionState', {
+    loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+    saveCuratorState: async () => {},
+    transactCuratorState: async () => {},
+  })
+  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+  const skills = ctx.evolutionCurator.skills
+  await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
+  await skills.create('narrow-src', basicBody('narrow-src'), 'foreground')
+  // narrow-src is 45d idle: stale (so it IS in the LLM pool) and nominated BOTH
+  // as a pruning (-> archive candidate) and as a consolidation source.
+  await saveUsage(skills.root, new Map([
+    ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
+    ['narrow-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
+  ]), nodeEvolutionIo())
+  // The documented transient failure (write lock held): the FIRST archive attempt
+  // refuses, the retry inside consolidate() finds the lock gone.
+  const realArchive = skills.archive.bind(skills)
+  let attempts = 0
+  const archiveSpy = vi.spyOn(skills, 'archive').mockImplementation(async (rawName: string, options?: Parameters<typeof skills.archive>[1]) => {
+    attempts += 1
+    if (rawName === 'narrow-src' && attempts === 1) {
+      return { ok: false, message: 'Skill "narrow-src" is being written (write lock present); retry archiving once the write completes.' }
+    }
+    return await realArchive(rawName, options)
+  })
+  const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+  archiveSpy.mockRestore()
+  // The lifecycle archive failure is reported, never silent ...
+  expect(result.errors.some(error => error.startsWith('narrow-src:') && error.includes('write lock present'))).toBe(true)
+  // ... and the nominated merge still RUNS instead of being skipped because the
+  // failed archive's name sat in the candidate list.
+  expect(result.archived).toContain('narrow-src')
+  const report = await ctx.evolutionCurator.latestReport()
+  expect(report?.consolidated).toEqual([{ from: 'narrow-src', into: 'umbrella-skill' }])
+  expect(await nodeEvolutionIo().exists(join(skills.root, '.archive', 'narrow-src'))).toBe(true)
+  expect(await skills.read('umbrella-skill') ?? '').toContain('consolidated from narrow-src')
+  ctx.evolutionCurator.stop()
+})
+
+it('P2-18 (v38): the executed consolidation carries its mode into the run report', { timeout: 20_000 }, async () => {
+  await tempHome('dsh-curator-p218-')
+  // Exactly the shape the family prompt template prints: the mode line carries
+  // a trailing YAML comment (P1-9), and the executed mode must survive (P2-18).
+  const yaml = [
+    '## Structured summary (required)',
+    '```yaml',
+    'consolidations:',
+    '  - from: stale-src  # narrow-but-valuable detail',
+    '    mode: reference  # optional - ONLY for a demote',
+    '    into: umbrella-skill',
+    '    reason: session detail belongs under the umbrella',
+    'prunings: []',
+    '```',
+  ].join('\n')
+  const ctx = new Context()
+  ctx.provide('llm', {
+    stream: async function* () {
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'text-delta', index: 0, text: yaml }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
+      yield { type: 'finish', reason: 'stop' }
+    },
+  })
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  ctx.provide('evolutionState', {
+    loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+    saveCuratorState: async () => {},
+    transactCuratorState: async () => {},
+  })
+  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+  const skills = ctx.evolutionCurator.skills
+  await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
+  await skills.create('stale-src', basicBody('stale-src'), 'foreground')
+  await saveUsage(skills.root, new Map([
+    ['umbrella-skill', { ...emptyRecord(), created_by: 'agent', created_at: new Date().toISOString(), use_count: 1 }],
+    ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: new Date(Date.now() - 45 * 86_400_000).toISOString(), use_count: 1, last_used_at: new Date(Date.now() - 45 * 86_400_000).toISOString() }],
+  ]), nodeEvolutionIo())
+  await ctx.evolutionCurator.run({ ignoreGates: true })
+  const report = await ctx.evolutionCurator.latestReport()
+  expect(report?.consolidated).toEqual([{ from: 'stale-src', into: 'umbrella-skill', mode: 'reference' }])
+  // The demote really ran (append would have copied the body into the umbrella).
+  expect(await nodeEvolutionIo().exists(join(skills.root, 'umbrella-skill', 'references', 'stale-src.md'))).toBe(true)
+  expect(await skills.read('umbrella-skill') ?? '').not.toContain('Body of stale-src.')
+  ctx.evolutionCurator.stop()
+})
+
+it('P2-4 (v38): a backend without the mtime probe still recycles error reports', { timeout: 20_000 }, async () => {
+  const home = await tempHome('dsh-curator-no-mtime-')
+  const reports = join(home, 'evolution', 'reports')
+  await mkdir(reports, { recursive: true })
+  // 25 error reports in the writer's own shape: `at`, no `startedAt`.
+  for (let i = 0; i < 25; i += 1) {
+    await writeFile(
+      join(reports, `curator-error-${i}.json`),
+      JSON.stringify({ runId: `e${i}`, failed: true, error: 'x', at: new Date(Date.now() - (25 - i) * 60_000).toISOString() }),
+    )
+  }
+  const { mtime: _omitMtime, ...probeLess } = nodeEvolutionIo()
+  void _omitMtime
+  const ctx = new Context()
+  await ctx.plugin(EvolutionIoRegistry)
+  // `mtime` is an OPTIONAL probe (E-71): this backend omits it, so every report
+  // used to be unorderable - kept forever, never recycled (P2-4).
+  ctx.evolutionIo.registerProvider({ name: 'no-mtime', ...probeLess }, { default: true })
+  ctx.provide('evolutionState', {
+    loadCuratorState: async () => { throw new Error('state store boom') },
+    saveCuratorState: async () => {},
+    transactCuratorState: async () => {},
+  })
+  await ctx.plugin(EvolutionCurator, { enabled: false })
+  // A failing auto-check writes one more error report AND runs retention.
+  await (ctx.evolutionCurator as unknown as { autoCheck(): Promise<void> }).autoCheck()
+  const files = await readdir(reports)
+  const errors = files.filter(name => name.startsWith('curator-error-') && name.endsWith('.json'))
+  expect(errors.length).toBeLessThanOrEqual(10)
+})
+
+it('P2-4 (v38): a rejecting list/mtime probe cannot crash the report reader', { timeout: 20_000 }, async () => {
+  const home = await tempHome('dsh-curator-hostile-probe-')
+  const reports = join(home, 'evolution', 'reports')
+  await mkdir(reports, { recursive: true })
+  const base = nodeEvolutionIo()
+  await base.writeText(join(reports, 'curator-last.json'), JSON.stringify({ runId: 'r1', startedAt: '2026-09-11T00:00:00.000Z' }))
+  const ctx = new Context()
+  await ctx.plugin(EvolutionIoRegistry)
+  // The reader must stay a READER: a rejecting probe is contained and named,
+  // never surfaced as a throw (boundary spec: a damaged report answers null).
+  ctx.evolutionIo.registerProvider({
+    name: 'hostile-mtime',
+    ...base,
+    mtime: async () => { throw new Error('probe boom') },
+  }, { default: true })
+  await ctx.plugin(EvolutionCurator, { enabled: false })
+  const probeWarn = vi.spyOn(ctx.logger, 'warn')
+  await expect(ctx.evolutionCurator.latestReport()).resolves.toBeNull()
+  expect(probeWarn.mock.calls.some(call => String(call[0]).includes('could not read a report mtime'))).toBe(true)
+  probeWarn.mockRestore()
+  // The rejecting LISTING is the second read path of the same reader.
+  const listCtx = new Context()
+  await listCtx.plugin(EvolutionIoRegistry)
+  listCtx.evolutionIo.registerProvider({
+    name: 'hostile-list',
+    ...base,
+    list: async (path: string) => {
+      if (path.endsWith('reports')) throw new Error('list boom')
+      return await base.list(path)
+    },
+  }, { default: true })
+  await listCtx.plugin(EvolutionCurator, { enabled: false })
+  const listWarn = vi.spyOn(listCtx.logger, 'warn')
+  await expect(listCtx.evolutionCurator.latestReport()).resolves.toBeNull()
+  expect(listWarn.mock.calls.some(call => String(call[0]).includes('could not list the reports directory'))).toBe(true)
+  listWarn.mockRestore()
 })

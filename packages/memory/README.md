@@ -22,3 +22,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - `provider` pins the registry to one provider name (V27 G6.3); empty (the default) serves the FIRST registered provider, so with two providers mounted the choice is row order. A pin that no mounted provider satisfies warns when a differently-named provider registers and then fails the first read/write with the pin named — the registry and the registration API are one service, so there is no earlier point to check it.
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

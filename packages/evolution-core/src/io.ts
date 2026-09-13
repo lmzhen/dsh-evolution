@@ -158,6 +158,23 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
  */
 export const pendingSelfCleanup = new Map<string, string>()
 
+/** P2-7 (v11)/P3-10 (v14): record a failed release so the next write to this
+ * path self-heals it, keeping the map's 64-entry cap — a never-re-touched path
+ * must not pin it, while a path whose lock still EXISTS is the last to drop
+ * (dropping it disables the self-heal for a lock that is really there). */
+const recordPendingSelfCleanup = async (lock: string, token: string): Promise<void> => {
+  if (pendingSelfCleanup.size >= 64) {
+    let droppable: string | undefined
+    for (const candidate of pendingSelfCleanup.keys()) {
+      if (candidate === lock) continue
+      if (await readFile(candidate, 'utf8').then(() => false, () => true)) { droppable = candidate; break }
+    }
+    const victim = droppable ?? pendingSelfCleanup.keys().next().value
+    if (victim !== undefined) pendingSelfCleanup.delete(victim)
+  }
+  pendingSelfCleanup.set(lock, token)
+}
+
 // C-28: the transient-EPERM/EBUSY retry budget grows from 3x50ms
 // (~150ms — shorter than a real antivirus/indexer scan window) to ~2s, the
 // same magnitude as the write-lock retry budget (rc.69), with exponential
@@ -376,6 +393,11 @@ export const EMPTY_LOCK_TAKEOVER_MS = 30_000
 /** A body with no parseable pid (crash mid-write): 1h, far above any legal hold
  * and far below "forever". */
 export const LOCK_TEAR_TAKEOVER_MS = 3_600_000
+/** P2-27 (v37): the commit-point ownership re-read. A transient read failure
+ * (EACCES/EMFILE/antivirus hold) must not abort a valid RMW, so the read is
+ * retried in place; only a still-unreadable lock fails the attempt. */
+const OWNERSHIP_READ_ATTEMPTS = 3
+const OWNERSHIP_READ_RETRY_MS = 20
 
 /**
  * V27 G1.3: the error `commitTmp` throws when the rename landed but the parent
@@ -755,7 +777,28 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
       // losing the claim aborts the whole RMW, which the caller then re-runs
       // under a fresh acquisition — a lost lock costs one retry, never data.
       const assertOwned = async (): Promise<void> => {
-        const body = await readFile(lock, 'utf8').catch(() => null)
+        // P2-27 (v37): a FAILED read is not a takeover. Coercing it to `null`
+        // reported an external preemption that never happened and redid the whole
+        // RMW, doubling the task's side effects. Re-read first: only a body that
+        // really differs from our claim is a lost lock.
+        let body = ''
+        let readable = false
+        for (let read = 0; read < OWNERSHIP_READ_ATTEMPTS && !readable; read += 1) {
+          if (read > 0) await new Promise(resolve => setTimeout(resolve, OWNERSHIP_READ_RETRY_MS))
+          const attempt = await readFile(lock, 'utf8').then(
+            value => ({ ok: true as const, value }),
+            () => ({ ok: false as const, value: '' }),
+          )
+          if (attempt.ok) { body = attempt.value; readable = true }
+        }
+        if (!readable) {
+          console.warn(
+            `evolution-io: write lock ${lock} could not be read at the commit point `
+            + `(ownership unverified, ours: ${JSON.stringify(myClaim)}) — `
+            + 'aborting this read-modify-write and retrying under a fresh acquisition',
+          )
+          throw new LostWriteLock()
+        }
         if (body !== myClaim) {
           console.warn(
             `evolution-io: write lock ${lock} was reclaimed by another writer before the commit `
@@ -778,10 +821,20 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         // 0.3.28 (V4-04 follow-up): release ONLY a claim that is still OUR
         // body — a takeover cascade may have moved our lock aside and another
         // peer re-created the name; deleting it would remove a live peer's lock
-        // (cascade double-hold). A foreign body (or a vanished lock) is left
-        // untouched — the owner/rebuilder owns it.
-        const mine = await readFile(lock, 'utf8').catch(() => null)
-        if (mine === myClaim) {
+        // (cascade double-hold). A foreign body, a vanished lock and an
+        // UNREADABLE one are all left in place — the owner/rebuilder owns them.
+        const mine = await readFile(lock, 'utf8').then(
+          body => ({ ok: true as const, body }),
+          (error: unknown) => ({ ok: false as const, missing: isMissing(error) }),
+        )
+        if (!mine.ok) {
+          // P1-6 (v37): a FAILED read must not skip the release record. The name
+          // is never rm-ed unverified (it may carry a peer's live claim), but the
+          // body we wrote is KNOWN — registering it under the self-heal's
+          // byte-compare token keeps the leak recoverable instead of bricking
+          // this path for every writer until the process exits.
+          if (!mine.missing) await recordPendingSelfCleanup(lock, myClaim)
+        } else if (mine.body === myClaim) {
           // V8-05 (0.3.46): record the failed release WITH the lock-body token
           // — the later self-recycle compares the CURRENT body against this
           // snapshot, so a fresh lock another same-process writer created at
@@ -794,23 +847,7 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
           // budget expires — observed as a lost RMW under full-suite load.
           await rm(lock, { force: true, maxRetries: 20, retryDelay: 100 }).catch(async () => {
             const body = await readFile(lock, 'utf8').catch(() => '')
-            // P2-7 (v11): a never-again-touched lock path would stay registered
-            // forever (the entry only leaves on a successful self-heal) —
-            // cap the map at 64 entries, dropping the oldest on overflow.
-            // P3-10 (v14): dropping a path whose lock STILL EXISTS permanently
-            // disables the self-heal for it (every later write burns the full
-            // retry budget and fails). Prefer an entry whose lock is already
-            // gone; only when none is droppable fall back to the oldest.
-            if (pendingSelfCleanup.size >= 64) {
-              let droppable: string | undefined
-              for (const candidate of pendingSelfCleanup.keys()) {
-                if (candidate === lock) continue
-                if (await readFile(candidate, 'utf8').then(() => false, () => true)) { droppable = candidate; break }
-              }
-              const victim = droppable ?? pendingSelfCleanup.keys().next().value
-              if (victim !== undefined) pendingSelfCleanup.delete(victim)
-            }
-            pendingSelfCleanup.set(lock, body)
+            await recordPendingSelfCleanup(lock, body)
           })
         }
       }

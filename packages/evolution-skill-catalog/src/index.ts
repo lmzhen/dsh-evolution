@@ -17,6 +17,7 @@ import type {
   SkillLookupOptions,
   SkillProvider,
   SkillProviderControl,
+  SkillProviderObservation,
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
@@ -183,9 +184,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       userInvocable: user !== undefined ? user : invocation.userInvocable,
     }
   }
-  async function summaries(): Promise<SkillSummary[]> {
+  // §9 I-2: the scan reports its own completeness — a degraded read must
+  // reach `list()` as an explicit incomplete observation, never as the bare
+  // array the platform reads as "complete" and caches.
+  async function summaries(): Promise<{ summaries: SkillSummary[]; complete: boolean }> {
     const stamp = await io.mtime?.(library.root) ?? null
-    if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) return summariesCache
+    if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) {
+      return { summaries: summariesCache, complete: true }
+    }
     if (summariesCache !== null && stamp !== null) control?.invalidate()
     const epochAtScanStart = summariesEpoch
     // v31 CAT-01: a loud read failure on ONE SKILL.md (EACCES — the REG-01
@@ -203,7 +209,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         lastScanWarn = message
         ctx.logger.warn(`evolution-skill-catalog: ${message}`)
       }
-      return summariesCache ?? []
+      return { summaries: summariesCache ?? [], complete: false }
     }
     if (lastScanWarn !== '') {
       // v31 CAT-02: recovery after a degraded consult — the registry cached
@@ -225,15 +231,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (!parsed) continue
       invocationMap.set(summary.name, invocationFromFrontmatter(summary.name, parsed.frontmatter))
     }
-    invocationCache = invocationMap
+    // P1-12: BOTH caches live under the guard — an unguarded invocationCache
+    // write let a scan that started before a drop republish pre-mutation
+    // policies over a newer scan's map.
     if (epochAtScanStart === summariesEpoch) {
       summariesCache = scanned
       summariesStamp = stamp
+      invocationCache = invocationMap
     }
     // A drop during the scan returns the scanned list to THIS caller (it is
     // a coherent snapshot) but leaves the cache empty — the next consult
     // rescans and observes the mutation.
-    return scanned
+    return { summaries: scanned, complete: true }
   }
   const dropSummariesCache = (): void => {
     summariesEpoch += 1
@@ -248,13 +257,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const provider: SkillProvider = {
     name: 'dsh-evolution',
 
-    async list(options: SkillLookupOptions) {
+    async list(options: SkillLookupOptions): Promise<readonly SkillCandidate[] | SkillProviderObservation> {
       // E-10 (v18): the upstream registry aborts discovery; honor the signal
       // before and after the tree scan so a cancelled call settles promptly.
       options.signal?.throwIfAborted()
-      const all = await summaries()
+      const scan = await summaries()
       options.signal?.throwIfAborted()
-      return all.filter((summary) => {
+      const candidates = scan.summaries.filter((summary) => {
         if (!visible(summary.name)) return false
         if (!publishableSkill(summary.name, summary.description)) {
           warnUnpublishable(summary.name, summary.description)
@@ -276,13 +285,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         path: join(summary.path, 'SKILL.md'),
         resourceBase: { kind: 'directory' as const, path: summary.path },
       }))
+      // §9 I-2: a degraded scan is an INCOMPLETE observation. The bare array is
+      // the platform's `complete: true` shorthand, so the degraded catalog used
+      // to be cached until the next revision.
+      return scan.complete ? candidates : { candidates, complete: false }
     },
 
     async get(candidate: SkillCandidate, options?: SkillLookupOptions): Promise<SkillDefinition | undefined> {
       options?.signal?.throwIfAborted()
       const name = candidate.name
       if (!visible(name)) return undefined
-      const all = await summaries()
+      const all = (await summaries()).summaries
       const summary = all.find(item => item.name === name)
       if (!summary) return undefined
       // P1-1 (v18): get() is the second publish path — an invalid candidate

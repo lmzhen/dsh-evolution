@@ -153,9 +153,15 @@ export class EvolutionFeedback {
           }
         }
       }
-      // The archives listed above ride along: the timeline reader would
-      // otherwise scan the same directory again.
-      const { events } = await readEvolutionTimeline(io, eventsPath, archiveNames)
+      // The archives listed above ride along (one directory scan). P2-1 (v37):
+      // that list is a snapshot taken BEFORE the read, so a rotate landing in
+      // between archives a band this read never sees — re-list and fold the union.
+      const initial = await readEvolutionTimeline(io, eventsPath, archiveNames)
+      // A repeated full read is idempotent: the merge dedupes by seq.
+      const lateArchives = (await listEventArchives(io, eventsPath)).filter(name => !archiveNames.includes(name))
+      const events = lateArchives.length === 0
+        ? initial.events
+        : (await readEvolutionTimeline(io, eventsPath, [...archiveNames, ...lateArchives])).events
       const cache = parseCache(rawCache, this.warn)
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       const floor = events[0]?.seq ?? 0
@@ -357,7 +363,21 @@ export class EvolutionFeedback {
       const { events } = await readEvolutionTimeline(recordIo, eventsPath)
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       if (maxSeq === 0) return
-      const body = JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...foldFeedbackState(events, this.warn) }, null, 2)
+      // P1-7 (v37): the read side accepts `lastSeq >= floor - 1` as "this cache
+      // carries the band the log no longer holds", so a window-only fold stamped
+      // with `maxSeq` would erase that band and seal the loss. Fold the delta.
+      let rawCache: string | null
+      try {
+        rawCache = await recordIo.readText(path)
+      } catch {
+        // A failed cache read is NOT an absent cache — folding from zero would
+        // erase the band it carries. Skip the refresh (fail-closed).
+        return
+      }
+      const cache = parseCache(rawCache, this.warn)
+      const floor = events[0]?.seq ?? 0
+      const state = cache && cache.lastSeq >= floor - 1 ? foldWithDelta(cache, events, this.warn) : foldFeedbackState(events, this.warn)
+      const body = JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...state }, null, 2)
       await recordIo.writeText(path, body)
     } catch {
       // Best-effort: the cache is disposable.
@@ -373,27 +393,46 @@ export class EvolutionFeedback {
   }
 }
 
-/** True when `existing` contains the legacy sequence as a contiguous run on
- * its semantic fields (skip case). `seq` and `at` are excluded: after a merge
- * the legacy events carry shifted seqs, and a re-synthesis stamps a different
- * `at` — the semantic identity is type/kind/target/rating/note. A coincidental
- * semantic match of an already-appended user sequence yields the identical
- * aggregation, so the skip is harmless for counts and notes. */
-function containsLegacySequence(existing: EvolutionEvent[], expected: EvolutionEvent[]): boolean {
+/** Semantic identity of one event: `seq` and `at` are excluded (a merge
+ * shifts seqs, a re-synthesis stamps a different `at`), so type/kind/target/
+ * rating/note is everything a fold can see. */
+function sameSemantics(a: EvolutionEvent, b: EvolutionEvent): boolean {
+  return a.type === b.type && a.kind === b.kind && a.target === b.target && a.rating === b.rating && a.note === b.note
+}
+
+/** True when `existing` already carries the WHOLE legacy batch (the skip case).
+ * P1-8 (v37): counted as a MULTISET, never as a contiguous run — the
+ * synthesizer emits "all positives, then all negatives" per target while the
+ * real log is in temporal order, so the run-based gate read an already-migrated
+ * log as unmigrated and re-appended the whole history (3 events became 6, and
+ * every further boot doubled it again). */
+function containsLegacyMultiset(existing: EvolutionEvent[], expected: EvolutionEvent[]): boolean {
   if (expected.length === 0) return true
-  for (let start = 0; start <= existing.length - expected.length; start += 1) {
-    let match = true
-    for (let offset = 0; offset < expected.length; offset += 1) {
-      const a = expected[offset]
-      const b = existing[start + offset]
-      if (!a || !b || a.type !== b.type || a.kind !== b.kind || a.target !== b.target || a.rating !== b.rating || a.note !== b.note) {
-        match = false
-        break
-      }
-    }
-    if (match) return true
+  const pool = [...existing]
+  for (const event of expected) {
+    const at = pool.findIndex(candidate => sameSemantics(candidate, event))
+    if (at < 0) return false
+    pool.splice(at, 1)
   }
-  return false
+  return true
+}
+
+/** True when the body the migration transact just read may be written over:
+ * absent or blank (the append path's own "missing" definition), or a v1 body
+ * this reader can actually interpret. `parseEvolutionEvents` maps a corrupt or
+ * future-version body to an EMPTY timeline, so without this gate a read failure
+ * would be folded as "nothing was ever migrated" and the synthesized log would
+ * overwrite bytes the append path refuses to touch. */
+function isReadableEventBody(current: string | null): boolean {
+  if (current === null || current.trim() === '') return true
+  try {
+    const parsed: unknown = JSON.parse(current)
+    if (!isRecord(parsed)) return false
+    if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return false
+    return Array.isArray(parsed.events)
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -424,11 +463,18 @@ export async function migrateFeedbackEvents(
     return
   }
   await transactIo(io, eventsPath, (current) => {
+    // P1-8 (v37): the gate reads the content INSIDE the transact — a lockless
+    // read outside it can report a just-committed log as missing, and the
+    // migration must never translate that read into a write.
+    if (!isReadableEventBody(current)) {
+      warn('evolution-feedback: migration left unreadable event-log bytes untouched (neither migrated nor overwritten)')
+      return Promise.resolve(current)
+    }
     const existing = parseEvolutionEvents(current)
     // Skip = hand back `current` untouched: null means "no file" in the
     // transact contract, so an empty legacy aggregate never creates one
     // (rc.70 F-4).
-    if (containsLegacySequence(existing, expected)) return Promise.resolve(current)
+    if (containsLegacyMultiset(existing, expected)) return Promise.resolve(current)
     const maxSeq = existing.reduce((max, event) => Math.max(max, event.seq), 0)
     const merged = [...existing, ...expected.map((event, index) => ({ ...event, seq: maxSeq + index + 1 }))]
     return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: merged }, null, 2))

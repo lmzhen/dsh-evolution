@@ -26,3 +26,5 @@ package owns assembly and rendering only.
   instruction (`MAINTAIN_OUTPUT_INSTRUCTION`, V10 F-16) ship in `evolution-core`
   `PROMPT_BUNDLE`; the joint-signature mismatch protocol is honored by
   `renderFacts` callers, not by this package alone.
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

@@ -172,3 +172,93 @@ it('OPT-03: CRLF block-style secrets are redacted exactly like LF ones', () => {
   const passphraseCrlf = 'password:\r\n    hunter2-strength-phrase\r\n'
   expect(redactSecrets(passphraseCrlf)).not.toContain('hunter2-strength-phrase')
 })
+
+it('S0.3 (v37 P0-2): camelCase credential keys are masked like snake_case ones', () => {
+  // A key that starts at a lower->upper hump, INCLUDING a keyword in the middle
+  // of the identifier. Before S0.3 the left boundary required a word boundary or
+  // a trailing separator, so every camelCase key crossed verbatim — even though
+  // JSON is the carrier this module names as the common one.
+  expect(redactSecrets('clientSecret: "s3cr3t-value-xyz"')).toBe('clientSecret: <redacted>')
+  expect(redactSecrets('accessToken=abcdef1234567890')).toBe('accessToken=<redacted>')
+  expect(redactSecrets('refreshToken: abcdef1234567890')).toBe('refreshToken: <redacted>')
+  expect(redactSecrets('dbPassword: hunter2')).toBe('dbPassword: <redacted>')
+  expect(redactSecrets('userPassword = hunter2')).toBe('userPassword = <redacted>')
+  expect(redactSecrets('SecretAccessKey = wJalrXUtnFEMI')).toBe('SecretAccessKey = <redacted>')
+  // JSON keeps the family's documented convention (the key's closing quote is
+  // consumed with the separator — see the V27 G0.5 case above).
+  expect(redactSecrets('{"SecretAccessKey":"wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY"}'))
+    .toBe('{"SecretAccessKey":<redacted>')
+  expect(redactSecrets('apiKey: abcdef1234567890')).toBe('apiKey: <redacted>')
+  // Block style (a bare key line plus its indented value) gets the same treatment,
+  // on LF and on CRLF input.
+  expect(redactSecrets('clientSecret:\n  hunter2-value\nnext: keep')).toBe('clientSecret:\n  <redacted>\nnext: keep')
+  // CRLF: the value line's `\r` is consumed with the value (same normalization
+  // the OPT-03 case documents), so assert the secret is gone, not the bytes.
+  const crlfBlock = redactSecrets('SecretAccessKey:\r\n  wJalrXUtnFEMI\r\nnext: keep')
+  expect(crlfBlock).not.toContain('wJalrXUtnFEMI')
+  expect(crlfBlock).toContain('<redacted>')
+  expect(crlfBlock).toContain('next: keep')
+})
+
+it('S0.3 (v37 P0-2): the relaxation does not over-mask unrelated words', () => {
+  // A lowercase continuation after the keyword is still not a key: the guard
+  // must not degrade into "contains the word token/secret anywhere".
+  expect(redactSecrets('tokenizer=abcdefghijklmnop')).toBe('tokenizer=abcdefghijklmnop')
+  expect(redactSecrets('secretary: Jane Doe')).toBe('secretary: Jane Doe')
+  expect(redactSecrets('passwordless: enabled')).toBe('passwordless: enabled')
+  expect(redactSecrets('monkey=abcdefghijklmnop')).toBe('monkey=abcdefghijklmnop')
+  expect(redactSecrets('compass=abcdefghijklmnop')).toBe('compass=abcdefghijklmnop')
+  expect(redactSecrets('The TokenBudget was fine.')).toBe('The TokenBudget was fine.')
+})
+
+it('P2-2 (v37): a key prefix past the old 64-char cap is still masked (64/65 boundary)', () => {
+  // The A2-6 prefix bound leaked every longer key: 'A'*64+'_PASSWORD=hunter2'
+  // was masked, the 65-char form crossed verbatim.
+  const at64 = `${'A'.repeat(64)}_PASSWORD=hunter2`
+  const at65 = `${'A'.repeat(65)}_PASSWORD=hunter2`
+  expect(redactSecrets(at64)).toBe(`${'A'.repeat(64)}_PASSWORD=<redacted>`)
+  expect(redactSecrets(at65)).toBe(`${'A'.repeat(65)}_PASSWORD=<redacted>`)
+  expect(redactSecrets(at65)).not.toContain('hunter2')
+  // The keyword-continuation cap (PASSWORD_<65 chars>=) and the camelCase key
+  // cap ({1,80}) were the same defect class, one layer apart.
+  expect(redactSecrets(`PASSWORD_${'B'.repeat(65)}=hunter2`)).toBe(`PASSWORD_${'B'.repeat(65)}=<redacted>`)
+  const longCamel = `db${'x'.repeat(80)}Password: hunter2`
+  expect(redactSecrets(longCamel)).toBe(`db${'x'.repeat(80)}Password: <redacted>`)
+  // Block style (a bare key line plus its indented value) carries the same
+  // connected-prefix group.
+  const block = `${'C'.repeat(65)}_PASSWORD:\n    hunter2\n`
+  expect(redactSecrets(block)).not.toContain('hunter2')
+})
+
+it('P2-2 (v37): the removed caps do not mask unrelated long keys and do not stall', () => {
+  // The relaxed prefix must not degrade into "any long word before '=' is a key".
+  const benign = `${'A'.repeat(65)}_value=plain text`
+  expect(redactSecrets(benign)).toBe(benign)
+  const benignWord = `${'A'.repeat(65)}monkey=abcdefghijklmnop`
+  expect(redactSecrets(benignWord)).toBe(benignWord)
+  // A 200k-char connected prefix: the mandatory left anchor keeps the scan
+  // linear (the pre-A2-6 prefix shape took ~23-26s on 100k, and the old 64-char
+  // cap leaked this input verbatim). `_` keeps the input out of the unrelated
+  // URL pass, so this guard measures the prefix scan alone.
+  const started = Date.now()
+  const big = `${'_'.repeat(200_000)}PASSWORD=hunter2`
+  expect(redactSecrets(big)).toBe(`${'_'.repeat(200_000)}PASSWORD=<redacted>`)
+  expect(Date.now() - started).toBeLessThan(2000)
+})
+// P2-28 (v39): the URL-credentials pass used an unbounded scheme run, so a
+// scheme-free blob (base64, minified JS, long token) retried the run at every
+// offset — seconds per call on the outbound redaction path.
+describe('redact: URL scheme bound (P2-28)', () => {
+  it('masks only the password segment of a connection string', () => {
+    expect(redactSecrets('postgres://app:s3cret@db.internal:5432/x')).toBe(
+      'postgres://app:<redacted>@db.internal:5432/x',
+    )
+  })
+
+  it('stays linear on a scheme-free 60k blob', () => {
+    const started = Date.now()
+    const blob = 'A1b2C3d4'.repeat(7500)
+    expect(redactSecrets(blob)).toBe(blob)
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
+})

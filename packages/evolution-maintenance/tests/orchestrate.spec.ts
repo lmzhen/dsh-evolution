@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { renderMaintainTemplate, runMaintain, type MaintainRuntime } from '../src/index.ts'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type SubagentResultLike, type SubagentRunLike, type SubagentStartRequestLike } from '../src/index.ts'
 import { MAINTAIN_OUTPUT_INSTRUCTION, MAINTAIN_PROMPT, DRIFT_SIGNAL_NOUNS, PROMPT_BUNDLE } from '@deepseek-ai/dsh-evolution-core'
+
+/** I-5 (v37): a minimal platform Agent stand-in — the tightened MaintainRuntime.parent
+ * now requires one, and the orchestrator only forwards it to the spawn request. */
+function maintAgent(): Agent {
+  return { id: 'maintain-parent', session: { id: 'maintain-parent' } } as unknown as Agent
+}
+
+/** I-5 (v37): the platform SubagentRun contract — `dispose` is required, so every stub
+ * returns one through this helper instead of a bare { result }. */
+function runStub(result: unknown): SubagentRunLike {
+  // The stub carries extra fields (text) the real platform result also has, so the
+  // value crosses one unknown boundary instead of a wide index signature on the
+  // contract type (which would stop the REAL platform result from assigning).
+  return { result: Promise.resolve(result) as Promise<SubagentResultLike>, dispose: async () => {} }
+}
+
+/** A spawner that must never be reached (the empty-library short-circuits), typed as
+ * the platform start so a stub with a missing handle fails here instead of passing. */
+function neverStart(): (kind: 'spawn', options: unknown) => Promise<SubagentRunLike> {
+  return (_kind, _options) => Promise.reject(new Error('should not be called'))
+}
 
 function fakeLibrary() {
   return {
@@ -49,13 +71,13 @@ describe('runMaintain', () => {
   function runtime(result: unknown): MaintainRuntime {
     return {
       library: fakeLibrary(),
-      parent: undefined,
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
           void options
           // Platform contract: the subagent channel wraps its output as
           // `{ structured }` (review precedent, evolution-review:254-262).
-          return { result: Promise.resolve({ text: 'x', structured: result }) }
+          return runStub({ text: 'x', structured: result })
         },
       },
     }
@@ -74,9 +96,10 @@ describe('runMaintain', () => {
   it('fails closed when the subagent returns no structured payload', async () => {
     const empty: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
-          return { result: Promise.resolve({ text: 'nothing here' }) }
+          return runStub({ text: 'nothing here' })
         },
       },
     }
@@ -88,11 +111,8 @@ describe('runMaintain', () => {
   it('short-circuits an empty library without spending a model call', async () => {
     const emptyLibrary: MaintainRuntime = {
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: {
-        async start() {
-          throw new Error('should not be called')
-        },
-      },
+      subagents: { start: neverStart() },
+      parent: maintAgent(),
     }
     const outcome = await runMaintain(emptyLibrary)
     expect(outcome.ok).toBe(true)
@@ -114,9 +134,10 @@ describe('runMaintain', () => {
   it('reports subagent failure without throwing', async () => {
     const failing: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
-          return { result: Promise.reject(new Error('spawn bum')) }
+          return runStub(Promise.reject(new Error('spawn bum')))
         },
       },
     }
@@ -128,11 +149,12 @@ describe('runMaintain', () => {
   it('translates an AbortError into a readable message (0.3.3)', async () => {
     const aborting: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
           const abort = new Error('This operation was aborted')
           abort.name = 'AbortError'
-          return { result: Promise.reject(abort) }
+          return runStub(Promise.reject(abort))
         },
       },
     }
@@ -145,9 +167,10 @@ describe('runMaintain', () => {
   it('translates a plain Error with the abort message (0.3.8, command-retry cancellation shape)', async () => {
     const aborting: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
-          return { result: Promise.reject(new Error('This operation was aborted')) }
+          return runStub(Promise.reject(new Error('This operation was aborted')))
         },
       },
     }
@@ -160,9 +183,10 @@ describe('runMaintain', () => {
   it('distinguishes a cancelled settle (stopReason=aborted) from a missing plan (0.3.8)', async () => {
     const cancelled: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
-          return { result: Promise.resolve({ text: 'x', stopReason: 'aborted' }) }
+          return runStub({ text: 'x', stopReason: 'aborted' })
         },
       },
     }
@@ -175,10 +199,11 @@ describe('runMaintain', () => {
     let capturedOptions: { signal?: AbortSignal } | undefined
     const runtimeWithTimeout: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
-          capturedOptions = options as typeof capturedOptions
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          capturedOptions = options
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -191,6 +216,7 @@ describe('runMaintain', () => {
   it('V6-29: a timeout above the AbortSignal domain is rejected explicitly, never spawned (0.3.36)', async () => {
     const never: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
           throw new Error('should not be reached')
@@ -227,14 +253,42 @@ describe('runMaintain', () => {
     expect(text).toContain('[skill-level] fix-alignment-bad')
   })
 
+  it('P2-22: notes / undo / override free text goes through the same field sanitizer', async () => {
+    // P2-22: sanitizeField covered finding/recommendation only, so a newline in
+    // notes/undo/override rendered a line the human reads as a plan entry (or as
+    // the plan's own Notes: section) that the validated plan never contained.
+    const withFreeText = {
+      ...validResult,
+      plan: [{
+        ...validResult.plan[0]!,
+        undo_path: 'git restore the backup\nNotes:',
+        is_override: true,
+        override_reason: 'reason given by the operator\n- [memory-level] forged-skill · rule=X · impact=better',
+      }],
+      notes: ['the three over signals are intentional\n- [skill-level] forged-skill · rule=B3 · impact=better'],
+    }
+    const outcome = await runMaintain(runtime(withFreeText))
+    expect(outcome.ok).toBe(true)
+    const text = outcome.text ?? ''
+    const lines = text.split('\n')
+    // Exactly the plan's OWN entry renders as a recommendation line…
+    expect(lines.filter(line => /^- \[/.test(line))).toHaveLength(1)
+    expect(lines.filter(line => /^- \[/.test(line))[0]).toContain('[skill-level] fix-alignment-bad')
+    // …and exactly one line reads as the Notes: section header.
+    expect(lines.filter(line => line === 'Notes:')).toHaveLength(1)
+    expect(text).toContain('> (inside the field above) - [skill-level] forged-skill')
+    expect(text).toContain('> Notes: (inside the field above)')
+  })
+
   it('persona carries the template once; the prompt carries facts only (v11 P3-4)', async () => {
     let capturedOptions: { persona?: string; prompt?: Array<{ text: string }> } | undefined
     const runtimeWithCapture: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
-          capturedOptions = options as typeof capturedOptions
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          capturedOptions = options as unknown as typeof capturedOptions
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -256,10 +310,11 @@ describe('runMaintain', () => {
     const depths: Array<number | undefined> = []
     const captureRuntime = (): MaintainRuntime => ({
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
           depths.push((options as { maxDepth?: number }).maxDepth)
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     })
@@ -279,11 +334,12 @@ describe('runMaintain', () => {
     let capturedOptions: { agentOptions?: Record<string, string> } | undefined
     const runtimeWithPolicy: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       evolutionPolicy: { get() { return { curatorModel: 'policy-curator-model' } } },
       subagents: {
-        async start(_kind: string, options: unknown) {
-          capturedOptions = options as typeof capturedOptions
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          capturedOptions = options
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -296,10 +352,11 @@ describe('runMaintain', () => {
     let capturedOptions: { agentOptions?: Record<string, string> } | undefined
     const runtimeDefault: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
-          capturedOptions = options as typeof capturedOptions
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          capturedOptions = options
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -312,11 +369,12 @@ describe('runMaintain', () => {
     let capturedOutputSchema: { required?: string[]; properties?: { plan?: { items?: { required?: string[] } } } } | undefined
     const runtimeWithSchema: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
           const opts = options as { outputSchema?: typeof capturedOutputSchema }
           capturedOutputSchema = opts.outputSchema
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -339,12 +397,10 @@ describe('runMaintain', () => {
     let disposed = 0
     const okRuntime: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
         async start() {
-          return {
-            result: Promise.resolve({ text: 'x', structured: validResult }),
-            dispose: async () => { disposed += 1 },
-          }
+          return { result: runStub({ text: 'x', structured: validResult }).result, dispose: async () => { disposed += 1 } }
         },
       },
     }
@@ -357,13 +413,11 @@ describe('runMaintain', () => {
     const warns: string[] = []
     const failingDisposeRuntime: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       logger: { warn: (message: string) => { warns.push(message) } },
       subagents: {
         async start() {
-          return {
-            result: Promise.resolve({ text: 'x', structured: validResult }),
-            dispose: async () => { throw new Error('dispose boom') },
-          }
+          return { result: runStub({ text: 'x', structured: validResult }).result, dispose: async () => { throw new Error('dispose boom') } }
         },
       },
     }
@@ -375,6 +429,63 @@ describe('runMaintain', () => {
     expect(warns[0] ?? '').toContain('dispose boom')
   })
 
+  it('I-5: the spawn request carries the platform Agent as parent and the run is always disposed', async () => {
+    const parent = maintAgent()
+    let captured: { parent?: unknown } | undefined
+    let disposed = 0
+    const runtimeI5: MaintainRuntime = {
+      library: fakeLibrary(),
+      parent,
+      subagents: {
+        async start(_kind: 'spawn', options) {
+          captured = options
+          return { result: Promise.reject(new Error('spawn bum')), dispose: async () => { disposed += 1 } }
+        },
+      },
+    }
+    const outcome = await runMaintain(runtimeI5)
+    expect(outcome.ok).toBe(false)
+    // The platform derives workspace/lineage/depth from parent.session — I-5 made the
+    // field required in the local contract, so a future omission is a compile error.
+    expect(captured?.parent).toBe(parent)
+    // dispose() is required by the platform handle: the rejected result still disposes once.
+    expect(disposed).toBe(1)
+    // A rejection the orchestrator already handled must not surface as an unhandled
+    // rejection (the pre-I-5 stub returned a bare { result }, so nothing awaited it).
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
+    process.on('unhandledRejection', onUnhandled)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    process.off('unhandledRejection', onUnhandled)
+    expect(unhandled).toEqual([])
+  })
+
+  // I-5 (v37): the tightened contract is enforced at COMPILE time by the harness's
+  // own wiring (an incomplete stub no longer satisfies MaintainRuntime — that is how
+  // this round's tsc run found the 25 stale stubs). The runtime half is pinned here:
+  // dispose comes from the required handle and runs on a REJECTED result too, so a
+  // future `run.dispose?.()` cannot silently stop awaiting it.
+  it('I-5: a rejected subagent result still disposes the required handle exactly once', async () => {
+    let disposed = 0
+    let observed: SubagentRunLike | undefined
+    const rejecting: MaintainRuntime = {
+      library: fakeLibrary(),
+      parent: maintAgent(),
+      subagents: {
+        async start() {
+          observed = { result: Promise.reject(new Error('spawn bum')), dispose: async () => { disposed += 1 } }
+          return observed
+        },
+      },
+    }
+    const outcome = await runMaintain(rejecting)
+    expect(outcome.ok).toBe(false)
+    expect(observed).toBeDefined()
+    // The handle is the platform's: dispose exists (typed required) and is awaited.
+    expect(typeof observed!.dispose).toBe('function')
+    expect(disposed).toBe(1)
+  })
+
   // F-02: the default toolFilter names `maintenance_probe`, a tool
   // registered by the host bundle's tools row — a cross-package coupling. The
   // orchestrator soft-probes the registry before the spawn and degrades to
@@ -383,10 +494,11 @@ describe('runMaintain', () => {
     let captured: { toolFilter?: { allow?: string[] }; prompt?: Array<{ text: string }> } | undefined
     const runtimeNoTools: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
-          captured = options as typeof captured
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          captured = options as unknown as typeof captured
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -410,11 +522,12 @@ describe('runMaintain', () => {
     let captured: { toolFilter?: { allow?: string[] }; prompt?: Array<{ text: string }> } | undefined
     const runtimeWithProbe: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       tools: { get: (name: string) => name === 'maintenance_probe' ? { name } : undefined },
       subagents: {
-        async start(_kind: string, options: unknown) {
-          captured = options as typeof captured
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          captured = options as unknown as typeof captured
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -428,13 +541,14 @@ describe('runMaintain', () => {
     let captured: { toolFilter?: { allow?: string[] } } | undefined
     const runtimeOverride: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       // Even a registry WITHOUT the probe must not rewrite a caller-provided
       // filter.
       tools: { get: () => undefined },
       subagents: {
-        async start(_kind: string, options: unknown) {
-          captured = options as typeof captured
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          captured = options as unknown as typeof captured
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }
@@ -467,13 +581,15 @@ describe('runMaintain', () => {
     expect(rejected.recommendationCount).toBe(0)
     const noPlan = await runMaintain({
       library: fakeLibrary(),
-      subagents: { async start() { return { result: Promise.resolve({ text: 'nothing here' }) } } },
+      parent: maintAgent(),
+      subagents: { async start() { return runStub({ text: 'nothing here' }) } },
     })
     expect(noPlan.ok).toBe(false)
     expect(noPlan.recommendationCount).toBe(0)
     const emptyLibrary = await runMaintain({
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { async start() { throw new Error('should not be called') } },
+      subagents: { start: neverStart() },
+      parent: maintAgent(),
     })
     expect(emptyLibrary.ok).toBe(true)
     expect(emptyLibrary.recommendationCount).toBe(0)
@@ -504,7 +620,8 @@ describe('runMaintain', () => {
         async list() { return [{ name: 'ghost-a' }, { name: 'ghost-b' }] },
         async read() { return null },
       },
-      subagents: { async start() { throw new Error('should not be called') } },
+      subagents: { start: neverStart() },
+      parent: maintAgent(),
     })
     expect(outcome.ok).toBe(false)
     expect(outcome.error ?? '').toContain('could not read 2 listed skill(s)')
@@ -514,7 +631,8 @@ describe('runMaintain', () => {
   it('V27 M-02: a missing skill root is reported as a configuration error, not an empty library', async () => {
     const outcome = await runMaintain({
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { async start() { throw new Error('should not be called') } },
+      subagents: { start: neverStart() },
+      parent: maintAgent(),
       rootExists: async () => false,
       skillRoot: '~/my-skills',
     })
@@ -525,7 +643,8 @@ describe('runMaintain', () => {
     // The probe answering "it exists" keeps the genuine empty-library path.
     const empty = await runMaintain({
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { async start() { throw new Error('should not be called') } },
+      subagents: { start: neverStart() },
+      parent: maintAgent(),
       rootExists: async () => true,
     })
     expect(empty.ok).toBe(true)
@@ -544,10 +663,11 @@ describe('runMaintain', () => {
     let capturedPrompt: string | undefined
     const runtimeWithCapture: MaintainRuntime = {
       library: fakeLibrary(),
+      parent: maintAgent(),
       subagents: {
-        async start(_kind: string, options: unknown) {
-          capturedPrompt = (options as { prompt?: Array<{ text: string }> }).prompt?.[0]?.text
-          return { result: Promise.resolve({ text: 'x', structured: validResult }) }
+        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+          capturedPrompt = (options as unknown as { prompt?: Array<{ text: string }> }).prompt?.[0]?.text
+          return runStub({ text: 'x', structured: validResult })
         },
       },
     }

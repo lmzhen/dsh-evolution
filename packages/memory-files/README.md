@@ -22,3 +22,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - `providerName` (default `files`) is the name this provider registers under. Nothing selects it implicitly: `memory.provider` pins the registry to one name (V27 G6.3), and with the pin empty the FIRST registered provider serves every read/write — so with two providers mounted, set the pin or the choice is row order.
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

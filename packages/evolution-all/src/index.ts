@@ -23,7 +23,7 @@
  *   • all is ALSO exclusive with the layered Evolution agent preset (the
  *     preset scope's model rows would double-mount the tools); use layered =
  *     host + `/evolution preset install` if per-session tool choice is wanted.
- * This module carries no runtime API beyond the invariant.
+ * This module carries no runtime API.
  * @module @deepseek-ai/dsh-evolution-all
  */
 

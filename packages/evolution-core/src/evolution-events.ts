@@ -60,6 +60,8 @@ export interface EvolutionEvent {
    * count snapshot at the moment the observation window opened), and
    * maintain scans (011: verdict + recommendation count + runId). */
   type: 'feedback' | 'learn' | 'usage' | 'maintain'
+  /** Fold key for a `feedback` event: required and non-empty there (P2-10),
+   * optional on the other tags and on a record this version only reads. */
   target?: string | undefined
   kind?: 'skill' | 'session' | undefined
   rating?: 'positive' | 'negative' | undefined
@@ -74,6 +76,13 @@ export interface EvolutionEvent {
   /** Anchor fields for one event (usage: the observation window). */
   window?: { opened?: string } | undefined
 }
+
+/** The durable-write shape of one event: `feedback` REQUIRES a `target` —
+ * the fold key the aggregate is keyed by (P2-10). The other tags keep every
+ * field optional, exactly as the runtime payload gate treats them. */
+export type EvolutionEventInput =
+  | (Omit<EvolutionEvent, 'seq' | 'at' | 'target'> & { type: 'feedback'; target: string })
+  | (Omit<EvolutionEvent, 'seq' | 'at'> & { type: 'learn' | 'usage' | 'maintain' })
 
 export function eventsFile(home: string): string {
   return join(home, 'evolution', 'events.json')
@@ -96,6 +105,10 @@ export function evolutionEventPayloadIssue(event: { type?: unknown } & Partial<E
     case 'feedback':
       if (event.kind !== 'skill' && event.kind !== 'session') return 'feedback event requires kind skill|session'
       if (event.rating !== 'positive' && event.rating !== 'negative') return 'feedback event requires rating positive|negative'
+      // P2-10 (v37): target is the fold key — the only folder skips a
+      // target-less feedback silently and `target: ''` folds a phantom key, so
+      // neither may pass this durable boundary.
+      if (typeof event.target !== 'string' || event.target.trim() === '') return 'feedback event requires a non-empty target'
       return null
     case 'maintain':
       return typeof event.runId === 'string' ? null : 'maintain event requires runId'
@@ -195,7 +208,12 @@ export async function listEventArchives(io: EvolutionIoLike, path: string): Prom
  * — the active restarts AFTER the highest archived seq, never at 1, so a new
  * event can never shadow an archived one in the seq-deduped timeline.
  */
-export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, event: Omit<EvolutionEvent, 'seq' | 'at'>, rotateAt = EVENT_LOG_ROTATE_AT): Promise<number> {
+export async function appendEvolutionEvent(
+  io: EvolutionIoLike,
+  path: string,
+  event: EvolutionEventInput,
+  rotateAt = EVENT_LOG_ROTATE_AT,
+): Promise<number> {
   // I-5 (v18): refuse an unfoldable record at the durable write boundary.
   const issue = evolutionEventPayloadIssue(event)
   if (issue !== null) throw new Error(`evolution event refused: ${issue}`)
@@ -230,7 +248,14 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
         return current
       }
     }
-    const events = await rotateIfDue(io, path, v1EventRecords(parsedBody), rotateAt)
+    const rotated = await rotateIfDue(io, path, v1EventRecords(parsedBody), rotateAt)
+    if (!rotated.ok) {
+      // P2-11: an unmergeable archive collision writes NOTHING — the active
+      // keeps the full band and the append reports the refusal.
+      refuseMessage = rotated.reason
+      return current
+    }
+    const events = rotated.events
     // P2-1 (v11): a single rotate pass — the second call was either a no-op
     // (production threshold) or a double rotation (small test thresholds).
     // v23 (ML-3): seq continues from the max of BOTH the active file and the
@@ -243,7 +268,7 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
     for (const name of await listEventArchives(io, path)) {
       maxSeq = Math.max(maxSeq, Number.parseInt(name.slice(EVENT_ARCHIVE_PREFIX.length, name.length - 5), 10))
     }
-    const record: EvolutionEvent = { ...event, seq: maxSeq + 1, at: new Date().toISOString() }
+    const record: EvolutionEvent = { ...(event as Omit<EvolutionEvent, 'seq' | 'at'>), seq: maxSeq + 1, at: new Date().toISOString() }
     assigned = record.seq
     return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...events, record] }, null, 2)
   })
@@ -251,6 +276,21 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
     throw new Error(`${refuseMessage || 'evolution event log is malformed and was not touched'}: ${path}`)
   }
   return assigned
+}
+
+/** Rotation outcome: the next active body, or a refusal that aborts the append
+ * without writing (P2-11: an archive collision this v1 writer cannot merge). */
+type RotateOutcome = { ok: true; events: EvolutionEvent[] } | { ok: false; reason: string }
+
+/** The collision archive is mergeable only when this v1 writer can read it
+ * (P2-11): a foreign `version` (F-338) or a body without an `events` array is
+ * refused, so a merge can never downgrade it or empty it out.
+ * @param parsed - the parsed collision archive body.
+ * @returns the usable events, or null when the archive must not be rewritten. */
+function mergeableCollisionEvents(parsed: { version?: unknown; events?: unknown }): EvolutionEvent[] | null {
+  if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return null
+  if (!Array.isArray(parsed.events)) return null
+  return parsed.events.filter(isEventRecord)
 }
 
 /**
@@ -261,14 +301,14 @@ export async function appendEvolutionEvent(io: EvolutionIoLike, path: string, ev
  * under the threshold; `rotateAt < 2` is a guarded no-op (rc.72 G-1: a
  * one-event rotate would archive everything and restart seqs at 1).
  */
-async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionEvent[], rotateAt: number): Promise<EvolutionEvent[]> {
+async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionEvent[], rotateAt: number): Promise<RotateOutcome> {
   // A2-10 (v18): a NaN rotateAt made both comparisons false, so the log
   // rotated on EVERY append. Treat non-finite as "no rotation".
-  if (!Number.isFinite(rotateAt) || rotateAt < 2 || events.length < rotateAt) return events
+  if (!Number.isFinite(rotateAt) || rotateAt < 2 || events.length < rotateAt) return { ok: true, events }
   const mid = Math.ceil(events.length / 2)
   const head = events.slice(0, mid)
   const tail = events.slice(mid)
-  if (tail.length === 0) return events
+  if (tail.length === 0) return { ok: true, events }
   const anchor = tail[0]?.seq ?? 0
   const archivePath = join(dirname(path), `${EVENT_ARCHIVE_PREFIX}${anchor - 1}.json`)
   // v31 EVENTS-01: after a manual active-file rollback the recomputed archive
@@ -279,17 +319,9 @@ async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionE
   let archived = head
   const existing = await io.readText(archivePath).catch(() => null)
   if (existing !== null) {
-    try {
-      const parsed = JSON.parse(existing) as { events?: Array<{ seq?: number }> }
-      const prior = (Array.isArray(parsed.events) ? parsed.events : []) as EvolutionEvent[]
-      // v33 F-3: the merge validates like every reader does - a collision
-      // archive with damaged entries must not re-persist junk into the
-      // canonical band (isEventRecord is the same filter the timeline uses).
-      const usablePrior = prior.filter(isEventRecord)
-      const bySeq = new Map(usablePrior.map(event => [event.seq, event]))
-      for (const event of head) bySeq.set(event.seq, event)
-      archived = [...bySeq.values()].sort((a, b) => a.seq - b.seq)
-    } catch {
+    let parsed: { version?: unknown; events?: unknown } | null = null
+    try { parsed = JSON.parse(existing) as { version?: unknown; events?: unknown } } catch { parsed = null }
+    if (parsed === null) {
       // An unparsable collision file must not be destroyed: shift this
       // rotation's head aside under a distinct name instead. v31 EVENTS-02:
       // the shift-aside is OBSERVABLE (the band leaves the logical timeline —
@@ -300,12 +332,27 @@ async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionE
       console.warn(`evolution-events: rotation hit an unparsable archive collision — the rotated head band was preserved at ${shiftPath} but is OUTSIDE the logical timeline; inspect and merge it manually`)
       await retainEventArchives(io, path)
       await pruneCollideArchives(io, path)
-      return tail
+      return { ok: true, events: tail }
     }
+    const prior = mergeableCollisionEvents(parsed)
+    if (prior === null) {
+      // P2-11 (v37): merging REWRITES the collision archive, so an archive this
+      // v1 writer cannot read must never be merged — a future version would be
+      // downgraded (F-338) and a body without `events` was emptied and
+      // destroyed. Refuse the rotation: the active keeps its full band, the
+      // archive keeps its bytes, and no band leaves the logical timeline.
+      return { ok: false, reason: `evolution event archive collision at ${archivePath} is not a readable version-${EVENT_LOG_VERSION} archive (future version, or no "events" array) and was not touched` }
+    }
+    // v33 F-3: the merge validates like every reader does - a collision
+    // archive with damaged entries must not re-persist junk into the
+    // canonical band (isEventRecord is the same filter the timeline uses).
+    const bySeq = new Map(prior.map(event => [event.seq, event]))
+    for (const event of head) bySeq.set(event.seq, event)
+    archived = [...bySeq.values()].sort((a, b) => a.seq - b.seq)
   }
   await io.writeText(archivePath, JSON.stringify({ version: EVENT_LOG_VERSION, events: archived }, null, 2))
   await retainEventArchives(io, path)
-  return tail
+  return { ok: true, events: tail }
 }
 
 /**

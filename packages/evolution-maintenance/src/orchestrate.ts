@@ -25,21 +25,55 @@ import {
   type DriftReport,
   type DriftSkillSnapshot,
 } from '@deepseek-ai/dsh-evolution-core'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { renderFacts } from './render-facts.ts'
 import { validateAndNormalizeMaintainPlan, type ValidationResult } from './validate-plan.ts'
 
+/** I-5 (v37): the platform's `SubagentStartRequest` fields this orchestrator sends.
+ * Typed locally (not imported) because the platform type lives behind the subagent row this
+ * package does not depend on; the required `parent` and `signal` mirror the platform. */
+export interface SubagentStartRequestLike {
+  readonly label: string
+  readonly prompt: readonly { readonly type: 'text'; readonly text: string }[]
+  readonly parent: Agent
+  readonly signal: AbortSignal
+  readonly maxDepth: number
+  readonly agentOptions: Record<string, string>
+  readonly persona: string
+  readonly toolFilter: { readonly allow: readonly string[] }
+  readonly outputSchema: Record<string, unknown>
+}
+
+/** I-5 (v37): the platform's `SubagentResult` fields the outcome mapping reads. The
+ * index signature keeps a REAL platform result assignable (the platform type is
+ * wider than these three fields); the fields below are the ones this code relies on. */
+export interface SubagentResultLike {
+  readonly structured?: unknown
+  readonly diagnostic?: string
+  readonly stopReason: string
+}
+
+/** I-5 (v37): the platform's `SubagentRun` contract the orchestrator owns — `dispose` is
+ * NOT optional (the platform declares it required and every exit path here awaits it). */
+export interface SubagentRunLike {
+  readonly result: Promise<SubagentResultLike>
+  dispose(): Promise<void>
+}
+
 export interface MaintainRuntime {
   /** SkillLibrary-like reader for snapshot assembly. */
   library: SkillLibraryLike
-  /** Subagent spawner (platform `subagents` service — minimal shape for injection).
-   * `dispose` is optional: not every provider exposes it, so the run is only
-   * disposed when the platform provides the handle (rc.42 P1-3 parity with review). */
+  /** Subagent spawner (platform `subagents` service — the request fields this
+   * orchestrator sends, typed as the platform requires them: I-5 (v37) tightened the
+   * request from `unknown` and `dispose` from optional to the platform's
+   * always-present handle, so a future miss fails `tsc` instead of a runtime TypeError. */
   subagents: {
-    start(kind: string, options: unknown): Promise<{ result: Promise<unknown>; dispose?: () => Promise<void> }>
+    start(kind: 'spawn', options: SubagentStartRequestLike): Promise<SubagentRunLike>
   }
-  /** Parent agent/session handle passed through to the subagent, when available. */
-  parent?: unknown
+  /** The spawning agent (platform `SubagentStartRequest.parent`, required: in-process
+   * providers derive workspace, lineage and delegation depth from its durable session). */
+  parent: Agent
   /** Optional logger for dispose-failure traces; when absent the failure is
    * swallowed without surfacing (the orchestrator is a pure function). */
   logger?: { warn(message: string): void } | undefined
@@ -169,15 +203,17 @@ export function buildMaintainFacts(
   return { report, facts, signalsVersion, signature }
 }
 
-/** V6-38 (0.3.36): a field value carrying its own standalone `Notes:` line is
- * indistinguishable from the plan's section header in the RENDERED text, which
- * made the rendered plan read as if it ended early. Mark such lines so they
- * can never read as the header. (The former text-based recommendation counter
- * that motivated this marker is gone — V10-09/F-05 moved the count into
- * `MaintainOutcome.recommendationCount` — but the rendered text stays
- * unambiguous for the human reader.) */
+/** V6-38: a field value carrying its own standalone `Notes:` line is
+ * indistinguishable from the plan's section header in the RENDERED text, and a
+ * line shaped like a rendered recommendation (`- [kind] …`) reads as a plan
+ * entry that the validated plan does not contain. Mark both while leaving the
+ * rest of the field untouched. Notes/undo/override are free text and need this
+ * exactly as much as finding/recommendation do. */
 function sanitizeField(value: string): string {
-  return value.split('\n').map(line => line === 'Notes:' ? '> Notes: (inside the field above)' : line).join('\n')
+  return value.split('\n').map((line) => {
+    if (line === 'Notes:') return '> Notes: (inside the field above)'
+    return /^\s*- \[/.test(line) ? `> (inside the field above) ${line}` : line
+  }).join('\n')
 }
 
 function formatPlan(validated: ValidationResult, runId: string): string {
@@ -191,7 +227,7 @@ function formatPlan(validated: ValidationResult, runId: string): string {
   // read "Nothing to do." and never saw why the signals needed no action.
   const noteLines = plan.notes.length === 0
     ? []
-    : ['Notes:', ...plan.notes.map(note => `- ${note}`)]
+    : ['Notes:', ...plan.notes.map(note => `- ${sanitizeField(note)}`)]
   if (plan.verdict === 'no_issues') {
     lines.push('No drift issues detected. Nothing to do.')
     lines.push(...noteLines)
@@ -207,8 +243,8 @@ function formatPlan(validated: ValidationResult, runId: string): string {
     lines.push(`- [${item.kind}] ${item.names.join(', ')} · rule=${item.rule} · ${flags.join(' ')}`)
     lines.push(`  finding: ${sanitizeField(item.finding)}`)
     lines.push(`  action: ${sanitizeField(item.recommendation)}`)
-    if (item.undo_path && item.undo_path !== 'n/a') lines.push(`  undo: ${item.undo_path}`)
-    if (item.is_override && item.override_reason) lines.push(`  override: ${item.override_reason}`)
+    if (item.undo_path && item.undo_path !== 'n/a') lines.push(`  undo: ${sanitizeField(item.undo_path)}`)
+    if (item.is_override && item.override_reason) lines.push(`  override: ${sanitizeField(item.override_reason)}`)
   }
   if (forcedHuman.length > 0) {
     lines.push(`(quality_low gate: forced needs_human for ${[...new Set(forcedHuman)].join(', ')})`)
@@ -402,15 +438,17 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // the validator-rejected path all route through this finally. Aligns the
     // maintain orchestrator with the review subagent's rc.42 P1-3 treatment.
     try {
-      const runResult = (await run.result) as { structured?: unknown; stopReason?: string } | null | undefined
-      const raw = runResult?.structured
+      // I-5 (v37): the platform settles this promise with a result, never null —
+      // the optional reads are gone so a future nullability change surfaces here.
+      const runResult: SubagentResultLike = await run.result
+      const raw = runResult.structured
       if (raw === undefined) {
         // 0.3.8: a CANCELLED run settles by RESOLVING (driver readResult) with
         // structured=undefined and stopReason="aborted" — distinguish that from
         // "the model produced no structured plan" instead of reporting a bare
         // error (evidence: command retry cancels the previous invocation, which
         // surfaced as both "This operation was aborted" and the no-plan text).
-        if (runResult?.stopReason === 'aborted') {
+        if (runResult.stopReason === 'aborted') {
           return { ok: false, recommendationCount: 0, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
         }
         // Platform contract: the subagent channel wraps its output as
@@ -440,7 +478,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
       // Dispose failures stay observable without masking the outcome that
       // caused the exit (rc.42 P1-3 parity with the review subagent).
       try {
-        await run.dispose?.()
+        await run.dispose()
       } catch (disposeError) {
         runtime.logger?.warn(`dsh-evolution-maintenance: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
       }

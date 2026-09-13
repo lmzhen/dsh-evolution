@@ -321,9 +321,18 @@ describe('v28 G2.3 (CORE-SK-02): undetectable frontmatter blocks fail closed', (
     expect(frontmatterCatalogInvalid(bom)).toBe(true)
   })
 
-  it('mixed line endings are catalogInvalid', () => {
+  it('mixed line endings are readable, so they are NOT catalogInvalid (S1.1)', () => {
+    // The v28 fail-closed detection existed because the byte-exact extractor could
+    // not SEE a block whose newline style varied while the platform's YAML parser
+    // could — a family/platform visibility split. `frontmatterBlock` now splits on
+    // LF and tolerates a trailing CR per line (upstream's rule), so both sides read
+    // the same block and the split risk is gone (see the tool-memory
+    // `frontmatter-mixed-endings` spec for the read/write coverage).
     const mixed = '---\r\nname: mixed-skill\ndescription: Demo.\n---\n\n# Demo\n'
-    expect(frontmatterCatalogInvalid(mixed)).toBe(true)
+    expect(parseFrontmatter(mixed)?.frontmatter.name).toBe('mixed-skill')
+    expect(frontmatterCatalogInvalid(mixed)).toBe(false)
+    // A BOM-prefixed fence stays fail-closed: the platform may still parse it.
+    expect(frontmatterCatalogInvalid('\uFEFF---\nname: x\ndescription: Demo.\n---\n\n# D\n')).toBe(true)
   })
 
   it('a body-only file and an unterminated block stay "not applicable" (structure health owns them)', () => {

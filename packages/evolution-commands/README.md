@@ -29,3 +29,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

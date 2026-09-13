@@ -694,6 +694,95 @@ it('OPT-01: an update/write_file lands through the REAL runtime with the approva
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+// P1-13 (v37): the exact defect — a staged update of a skill that does NOT exist
+// yet carried no anchor, so a foreground `create` landing between staging and
+// approval was overwritten silently on approve. The staging now writes the 'absent'
+// sentinel (same form as the support-file path).
+it('P1-13: a staged update of a missing skill is refused when the skill appears before approval', async () => {
+  const { ctx, root, previousHome } = await setup()
+  const pending: Array<{ args?: { operation?: { staged_from_sha256?: string } } }> = []
+  ctx.provide('evolutionState', {
+    listPending: async () => [],
+    savePending: async (record: unknown) => { pending.push(record as { args?: { operation?: { staged_from_sha256?: string } } }) },
+    tryResolvePending: async () => ({ record: null, applied: false }),
+    claimPending: async () => null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  const session = { id: 'p113', header: { origin: undefined }, snapshotEvents: () => [] }
+  const staged = await ctx.tools.execute({
+    callId: ToolCallId(`p113-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: { action: 'update', name: 'late-skill', content: SKILL.replace('boundary-skill', 'late-skill') },
+    agent: { session } as unknown as Agent,
+    signal: new AbortController().signal,
+  })
+  const stagedValue = staged.value as { ok?: boolean; pending_id?: string }
+  expect(stagedValue.pending_id).toBeTruthy()
+  // The pending record stores the replay wrapper: args.operation is the tool's arg map.
+  const operation = pending[0]?.args?.operation
+  // Pre-fix the operation carried NO staged_from_sha256 at all; the sentinel is the
+  // whole point (an absent target is a first-class anchored state).
+  expect(operation?.staged_from_sha256).toBe('absent')
+  // The foreground session now creates the same skill.
+  const created = await replayRun(ctx, { action: 'create', name: 'late-skill', content: SKILL.replace('boundary-skill', 'late-skill') }, 'foreground')
+  expect(created.ok, created.message).toBe(true)
+  // Approving the stale plan must be REFUSED — pre-fix this returned ok:true and
+  // the freshly created content was replaced by the staged bytes.
+  const replayed = await replayRun(ctx, operation as Record<string, unknown>, 'foreground')
+  expect(replayed.ok).toBe(false)
+  expect(replayed.message).toContain('changed after this write was staged')
+  const onDisk = await readFile(join(root, 'skills', 'late-skill', 'SKILL.md'), 'utf8')
+  expect(onDisk).toContain('lifecycle boundary test')
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+// P1-13 (v37) second half: the same defect through the approval service (approve
+// instead of the replay runner) — the sentinel must survive the pending record and
+// the approve must be refused, leaving the created content in place.
+it('P1-13: approving the staged update is refused once the skill exists', async () => {
+  const { ctx, root, previousHome } = await setup()
+  let stored: { id?: string } | undefined
+  ctx.provide('evolutionState', {
+    listPending: async () => [],
+    savePending: async (record: unknown) => { stored = record as { id?: string } },
+    tryResolvePending: async () => ({ record: null, applied: true }),
+    claimPending: async () => stored ?? null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  // Same staging route as the sibling test (the TOOL), so the anchor under test is the
+  // one the product writes, not a hand-built payload.
+  const session = { id: 'p113b', header: { origin: undefined }, snapshotEvents: () => [] }
+  const toolStaged = await ctx.tools.execute({
+    callId: ToolCallId(`p113b-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: { action: 'update', name: 'no-anchor-skill', content: SKILL.replace('boundary-skill', 'no-anchor-skill') },
+    agent: { session } as unknown as Agent,
+    signal: new AbortController().signal,
+  })
+  const decision = toolStaged.value as { pending_id?: string }
+  expect(decision.pending_id).toBeTruthy()
+  // The foreground session creates the same skill AFTER staging.
+  const created = await replayRun(ctx, { action: 'create', name: 'no-anchor-skill', content: SKILL.replace('boundary-skill', 'no-anchor-skill') }, 'foreground')
+  expect(created.ok, created.message).toBe(true)
+  const approved = await ctx.evolutionApproval.approve(decision.pending_id as string)
+  // Pre-fix this returned ok:true and the created content was replaced.
+  expect(approved.ok).toBe(false)
+  expect(approved.message).toContain('changed after this write was staged')
+  const onDisk = await readFile(join(root, 'skills', 'no-anchor-skill', 'SKILL.md'), 'utf8')
+  expect(onDisk).toContain('lifecycle boundary test')
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('v30 REV-03: a staged support-file write refuses to replay when the file changed after staging', async () => {
   const { ctx, root, previousHome } = await setup()
   ctx.provide('evolutionState', {

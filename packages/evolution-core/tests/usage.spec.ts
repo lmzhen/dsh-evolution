@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { applyCuratorFields, emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
+import { emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 describe('usage sidecar field normalization (P2-3)', () => {
   it('A2-4 (v18): the lifecycle fold is compare-and-set on the run-start state', () => {
@@ -189,23 +189,31 @@ describe('usage sidecar field normalization (P2-3)', () => {
     expect(usage.get('atomic-skill')?.use_count).toBe(8)
   })
 
-  it('applyCuratorFields copies exactly the curator-owned field set (rc.67 K-2)', () => {
-    const disk = { ...emptyRecord(), use_count: 7, view_count: 2, patch_count: 1 }
-    const curated = {
-      ...emptyRecord(),
-      state: 'archived' as const,
-      archived_at: '2026-01-01T00:00:00.000Z',
-      quality_score: 0.2,
-      quality_warn: true,
-      pinned: true,
-      use_count: 999,
-      view_count: 999,
-    }
-    applyCuratorFields(disk, curated)
-    expect(disk.use_count).toBe(7)
-    expect(disk.view_count).toBe(2)
-    expect(disk.patch_count).toBe(1)
-    expect(disk).toMatchObject({
+  // P2-12 (v39): this used to drive the dead `applyCuratorFields` wrapper; the
+  // production path is foldCuratorFields, so the ownership assertion runs there.
+  it('foldCuratorFields copies exactly the curator-owned field set (rc.67 K-2)', () => {
+    const disk = new Map([['k', { ...emptyRecord(), use_count: 7, view_count: 2, patch_count: 1 }]])
+    const curated = new Map([
+      [
+        'k',
+        {
+          ...emptyRecord(),
+          state: 'archived' as const,
+          archived_at: '2026-01-01T00:00:00.000Z',
+          quality_score: 0.2,
+          quality_warn: true,
+          pinned: true,
+          use_count: 999,
+          view_count: 999,
+        },
+      ],
+    ])
+    foldCuratorFields(disk, curated)
+    const rec = disk.get('k')
+    expect(rec?.use_count).toBe(7)
+    expect(rec?.view_count).toBe(2)
+    expect(rec?.patch_count).toBe(1)
+    expect(rec).toMatchObject({
       state: 'archived',
       archived_at: '2026-01-01T00:00:00.000Z',
       quality_score: 0.2,

@@ -5,6 +5,7 @@
  * Modes:
  *   host     install @deepseek-ai/dsh-evolution-host as a profile bundle
  *   agent    install the Evolution agent preset under $DSH_HOME/.agent-presets/evolution
+ *            (or .agent-presets/evolution-ptc with --base ptc)
  *   layered  host + agent
  *   oneclick install the compatibility @deepseek-ai/dsh-evolution-preset bundle
  *
@@ -125,8 +126,71 @@ export function profileDirectory(home, profile) {
   return join(home, 'profiles', profile)
 }
 
-export function agentPresetDirectory(home) {
-  return join(home, '.agent-presets', 'evolution')
+/**
+ * The agent-preset BASES a layered install can compose the Evolution preset on.
+ *
+ * A base names the runtime platform preset whose rows are prepended verbatim
+ * (`<base>/agent.cordis.yml`); the evolution delta is identical for every base,
+ * so a variant differs only in which platform composition it follows, the
+ * preset id it occupies under `$DSH_HOME/.agent-presets/`, and the display
+ * metadata it publishes. This table is the single authority for all three: the
+ * composition resolver, the destination directory, the metadata source, the
+ * refusal sweeps, and uninstall all read it, so a variant cannot be half-added
+ * (a directory one consumer knows and another does not is exactly the stranded
+ * / double-mounted preset this installer keeps re-learning).
+ *
+ * The preset id is the DIRECTORY name and must satisfy the platform's own
+ * `PRESET_ID` (`packages/preset/agent-presets/src/preset.ts`, `/^[a-z0-9][a-z0-9-]*$/`).
+ * The id also decides display copy: the platform resolves localized text for
+ * its SHIPPED ids only, so a family variant must publish its own `name` /
+ * `description` / `order` in `metadata`.
+ */
+export const AGENT_PRESET_BASES = Object.freeze({
+  /** The platform `standard` preset — the historical, and still the default, base. */
+  standard: Object.freeze({ id: 'evolution', metadata: 'preset.yml' }),
+  /** The platform `ptc` preset (run_code as the composition surface) — variant base. */
+  ptc: Object.freeze({ id: 'evolution-ptc', metadata: 'preset.ptc.yml' }),
+})
+
+/** The base a run composes on when the caller names none. */
+export const DEFAULT_AGENT_PRESET_BASE = 'standard'
+
+/**
+ * Resolve one base name to its canonical entry.
+ *
+ * Fails loud on anything outside {@link AGENT_PRESET_BASES}: a silent fallback
+ * to `standard` would install the wrong preset under the requested variant's
+ * name — a session that mounts rows the user did not ask for, with nothing in
+ * the output saying so. The lookup is own-property only, so an inherited name
+ * (`constructor`, `toString`) cannot pass for a base either.
+ * @param base - the base name; defaults to {@link DEFAULT_AGENT_PRESET_BASE}.
+ * @returns the canonical entry, carrying the resolved `base` name.
+ */
+export function resolveAgentPresetBase(base = DEFAULT_AGENT_PRESET_BASE) {
+  const name = typeof base === 'string' ? base.trim() : ''
+  if (name !== '' && Object.hasOwn(AGENT_PRESET_BASES, name)) return { base: name, ...AGENT_PRESET_BASES[name] }
+  throw new Error(
+    `install-layered: unknown agent-preset base ${JSON.stringify(base)}; expected one of ${Object.keys(AGENT_PRESET_BASES).join(', ')}`,
+  )
+}
+
+export function agentPresetDirectory(home, base = DEFAULT_AGENT_PRESET_BASE) {
+  return join(home, '.agent-presets', resolveAgentPresetBase(base).id)
+}
+
+/**
+ * Every family preset directory under one DSH_HOME, in table order.
+ *
+ * The install/uninstall existence sweeps ask "does this home carry ANY family
+ * preset?", which is not the same question as "does it carry the base I am
+ * installing?" — the family preset is HOME-GLOBAL and sibling bases coexist on
+ * disk, so a sweep narrowed to one base would let a second install (or a
+ * one-click bundle) proceed beside a preset the user already has.
+ * @param home - the resolved DSH_HOME.
+ * @returns one `{ base, directory }` per {@link AGENT_PRESET_BASES} entry.
+ */
+export function agentPresetDirectories(home) {
+  return Object.keys(AGENT_PRESET_BASES).map(base => ({ base, directory: agentPresetDirectory(home, base) }))
 }
 
 function scopedName(packageName) {
@@ -369,7 +433,12 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
 }
 
 /**
- * Locate the `standard` agent preset composition at install time.
+ * Locate the runtime platform composition for one agent-preset BASE.
+ *
+ * `base` selects the platform preset the generated family preset follows; the
+ * caller passes a name already validated by {@link resolveAgentPresetBase}, so
+ * an unknown base fails there, before any resolution work — never here by
+ * silently reading `standard`.
  *
  * Discovery order (rc.53 — the preset must follow the RUNTIME platform, not a
  * vendored baseline; v33 G2.1 — ask the platform first):
@@ -389,9 +458,9 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
  * Fails loud otherwise: a preset built from a guessed baseline would silently
  * mismatch the platform it runs on.
  */
-async function resolveStandardComposition() {
-  const standardName = join('standard', 'agent.cordis.yml')
-  const direct = (root) => join(root, standardName)
+async function resolveRuntimeComposition(base) {
+  const compositionName = join(base, 'agent.cordis.yml')
+  const direct = (root) => join(root, compositionName)
   /** Candidate agent-preset roots under one tree level, platform form first. */
   const rootsAt = (level) => [
     join(level, 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
@@ -403,6 +472,10 @@ async function resolveStandardComposition() {
     join(level, 'apps', 'cli', 'config', 'agent-presets'),
   ]
 
+  // An explicit root is an ANSWER, not the head of a fallback chain: a preset
+  // root that carries no `<base>` directory fails here instead of continuing to
+  // the walk-up, so an operator pointing the installer at one tree never gets
+  // another tree's composition under the requested base.
   const explicit = process.env.DSH_AGENT_PRESET_ROOT?.trim()
   if (explicit) {
     const path = direct(explicit)
@@ -465,8 +538,10 @@ async function resolveStandardComposition() {
   }
 
   throw new Error(
-    'install-layered: cannot find a runtime `standard` agent preset — install dsh first, '
-    + 'set DSH_AGENT_PRESET_ROOT, or run from a source checkout. DSH 0.1.5+ ships the presets '
+    `install-layered: cannot find the runtime platform '${base}' agent preset — install a dsh whose `
+    + `agent-presets package ships it, set DSH_AGENT_PRESET_ROOT, or run from a source checkout. `
+    + 'A base with no runtime composition is refused rather than composed from another preset: the '
+    + 'generated preset must follow the platform it runs on. DSH 0.1.5+ ships the presets '
     + 'inside the dsh-agent-presets package — probed as '
     + '<tree>/node_modules/@deepseek-ai/dsh-agent-presets/presets, '
     + '<tree>/packages/preset/agent-presets/presets (source checkout), and the global '
@@ -490,14 +565,18 @@ function rowIds(composition) {
 }
 
 /**
- * Build the installed Evolution preset composition: the runtime platform's
- * `standard` rows verbatim, then the evolution delta. The delta stays the
- * only evolution-owned text, so the preset tracks every platform version.
+ * Build the installed Evolution preset composition: the runtime platform
+ * composition's rows verbatim, then the evolution delta. The BASE is the
+ * caller's business (`resolveRuntimeComposition` reads `<base>/agent.cordis.yml`
+ * from the AGENT_PRESET_BASES table); this function sees only the two text
+ * fragments, so it composes every base identically. The delta stays the only
+ * evolution-owned text, so the preset tracks every platform version.
  *
  * N-5 collision guard: an id present in BOTH fragments would mount twice
  * (worse, the duplicate could shadow the platform row). Fails loud; the
  * `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1` escape lets an upstream that absorbs
- * a delta row into standard transition (warn + keep both, mounting twice).
+ * a delta row into the platform composition transition (warn + keep both,
+ * mounting twice).
  */
 export function generateAgentPreset(standardComposition, deltaComposition) {
   const standardIds = rowIds(standardComposition)
@@ -576,8 +655,9 @@ export function injectToolSkillCap(composition) {
   return lines.join('\n')
 }
 
-async function installAgentPreset(home, dryRun, force, standardComposition) {
-  const destination = agentPresetDirectory(home)
+async function installAgentPreset(home, dryRun, force, runtimeComposition, base) {
+  const entry = resolveAgentPresetBase(base)
+  const destination = agentPresetDirectory(home, entry.base)
   // v21 (S-3): the composition is resolved by install() BEFORE any profile
   // mutation and passed in here — resolution failures now abort before the
   // host side has committed anything.
@@ -587,8 +667,10 @@ async function installAgentPreset(home, dryRun, force, standardComposition) {
   const deltaComposition = await readFile(deltaPath, 'utf8')
   // V10-14 (P1-2): the cap injection runs INSIDE generateAgentPreset (on the
   // COMPOSED output, after the collision guard) — core composePresetComposition
-  // applies the byte-identical rule, and installer.spec pins the parity.
-  const composition = generateAgentPreset(standardComposition, deltaComposition)
+  // applies the byte-identical rule, and installer.spec pins the parity. The
+  // rule holds for EVERY base: the PTC preset carries its own config-less
+  // `tool-skill` row, so the injection is base-agnostic by construction.
+  const composition = generateAgentPreset(runtimeComposition, deltaComposition)
   // The `exists && !force` result must be reported identically in dry-run and
   // real mode — a dry-run always claiming installed:true hides an already
   // present preset (F-354). Only the write is skipped in dry-run.
@@ -605,11 +687,16 @@ async function installAgentPreset(home, dryRun, force, standardComposition) {
     // R-08 (V10): preset.yml gets the SAME tmp+rename atomic write as
     // agent.cordis.yml above — F-354 previously protected only half of the
     // transaction, so a crash could leave a truncated preset.yml behind.
-    const presetTmp = join(destination, 'preset.yml.tmp')
-    await writeFile(presetTmp, await readFile(join(packageSourceRoot(), 'evolution-agent', 'preset.yml')))
+    // The metadata file comes from the base's table row: the variant must
+    // publish its own display text (name/description/order) — the platform
+    // localizes SHIPPED preset ids only, so a variant that shipped the
+    // standard base's metadata would list beside it as a second "Evolution"
+    // with no way to tell which preset follows which platform composition.
+    const presetTmp = join(destination, `${entry.metadata}.tmp`)
+    await writeFile(presetTmp, await readFile(join(packageSourceRoot(), 'evolution-agent', entry.metadata)))
     await rename(presetTmp, join(destination, 'preset.yml'))
   }
-  return { destination, installed: true }
+  return { destination, installed: true, base: entry.base }
 }
 
 export async function uninstall(options = {}) {
@@ -619,7 +706,7 @@ export async function uninstall(options = {}) {
   const profile = options.profile ?? 'web'
   const dryRun = options.dryRun === true
   const profileDir = profileDirectory(home, profile)
-  const result = { mode, home, profile, profileDir, removedBundle: null, removedPackages: 0, removedAgentPreset: false, packagesKeptFor: [] }
+  const result = { mode, home, profile, profileDir, removedBundle: null, removedPackages: 0, removedAgentPreset: false, removedPresetBases: [], packagesKeptFor: [] }
   // v21 (S-1): consume the journal when present (installs made by this
   // installer since 0.3.65) so the reverse actions scope themselves to what
   // the installer ACTUALLY wrote. Journal-less installs (≤0.3.64) keep the
@@ -694,13 +781,21 @@ export async function uninstall(options = {}) {
     // preset — a pre-existing preset (exists && !force skip) must survive the
     // uninstall of a preset-less host install.
     const presetSkippedByInstall = journal !== null && journal.agentPreset === false
-    const presetDir = agentPresetDirectory(home)
+    // Which preset directories this run owns. With no `--base` the uninstall
+    // is not narrowed: every family preset directory is an installer-generated
+    // home-global artifact of this family, and a variant left behind after
+    // "uninstall" would keep mounting family model rows for any session that
+    // selects it. Naming a base narrows the reverse action to that variant.
+    const presetTargets = options.base === undefined
+      ? agentPresetDirectories(home)
+      : [{ base: resolveAgentPresetBase(options.base).base, directory: agentPresetDirectory(home, options.base) }]
+    const presentPresets = presetTargets.filter(entry => existsSync(entry.directory))
     // v31 INST-04: the preset is HOME-GLOBAL — before deleting it, sweep the
     // other profiles the same way the install side (PRE-1) does. Another
     // profile carrying bundle rows or a preset-owning journal means its
     // sessions still mount the preset's model rows.
     let otherProfileStillUsesPreset = false
-    if (!presetSkippedByInstall && existsSync(presetDir)) {
+    if (!presetSkippedByInstall && presentPresets.length > 0) {
       const profilesDir = join(home, 'profiles')
       if (existsSync(profilesDir)) {
         for (const entry of await readdir(profilesDir, { withFileTypes: true })) {
@@ -724,9 +819,10 @@ export async function uninstall(options = {}) {
         }
       }
     }
-    if (!dryRun && existsSync(presetDir) && !presetSkippedByInstall && !otherProfileStillUsesPreset) {
-      await rm(presetDir, { recursive: true, force: true })
+    if (!dryRun && presentPresets.length > 0 && !presetSkippedByInstall && !otherProfileStillUsesPreset) {
+      for (const entry of presentPresets) await rm(entry.directory, { recursive: true, force: true })
       result.removedAgentPreset = true
+      result.removedPresetBases = presentPresets.map(entry => entry.base)
     } else if (otherProfileStillUsesPreset) {
       console.warn('install-layered: the home-global Evolution preset was KEPT — another profile still carries evolution bundles or a preset-owning journal')
     }
@@ -800,17 +896,23 @@ export async function install(options = {}) {
   const dryRun = options.dryRun === true
   const force = options.force === true
 
+  // The base is validated FIRST, before the mode is even acted on: an unknown
+  // `--base` must not reach a single write, and it must not fall back to
+  // `standard` — the whole point of a variant is that the user asked for a
+  // different platform composition.
+  const presetBase = resolveAgentPresetBase(options.base ?? DEFAULT_AGENT_PRESET_BASE).base
+
   const needsHost = mode === 'host' || mode === 'layered'
   const needsAgent = mode === 'agent' || mode === 'layered'
   const needsCompat = mode === 'oneclick'
 
-  // v21 (S-3): resolve the standard preset composition BEFORE any profile
+  // v21 (S-3): resolve the runtime preset composition BEFORE any profile
   // mutation — the old order committed bundle rows/copies and only tried to
   // build the preset afterwards, leaving a half-installed profile (host
   // mounted, preset missing) when the resolution failed. Resolution is
   // read-only and the "reported up front" intent at installAgentPreset now
   // actually holds.
-  const standardComposition = needsAgent ? await resolveStandardComposition() : undefined
+  const runtimeComposition = needsAgent ? await resolveRuntimeComposition(presetBase) : undefined
 
   // v21 (S-5): agent mode never writes the profile (its deliverable is the
   // preset directory) — do not CREATE one as a side effect. ensureProfile
@@ -823,7 +925,7 @@ export async function install(options = {}) {
   // host/layered/oneclick).
   const profileDir = profileDirectory(home, profile)
   const profileReady = !dryRun && mode !== 'agent'
-  const result = { mode, home, profile, profileDir, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
+  const result = { mode, home, profile, profileDir, base: presetBase, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
   // v21 (S-1): the bundle-dependency outcome, recorded onto the journal at the
   // end of the run (null in dry-run — no journal is written then anyway).
   let dependencyInfo = null
@@ -877,7 +979,7 @@ export async function install(options = {}) {
     }
     // v22 (PRE-1): the two checks above probe only the TARGET profile, but the
     // Evolution agent preset is a HOME-GLOBAL artifact
-    // ($DSH_HOME/.agent-presets/evolution — see agentPresetDirectory). An
+    // ($DSH_HOME/.agent-presets/<base id> — see AGENT_PRESET_BASES). An
     // evolution-all / one-click row in ANY OTHER profile of this DSH_HOME
     // composes the same startup double-mount once the user selects the
     // preset, so the exclusion has to sweep every profile in the home.
@@ -909,9 +1011,14 @@ export async function install(options = {}) {
     // D-1 (v18): the one-click preset bundle mounts the four model rows at
     // profile root; an existing agent preset mounts the same rows in preset
     // scope. Refuse unless --force explicitly confirms.
-    if (needsCompat && existsSync(agentPresetDirectory(home)) && !force) {
+    // The sweep covers EVERY base: a family preset of any variant mounts the
+    // same model rows in preset scope, so a one-click install beside it
+    // double-mounts exactly as the standard-base preset would. Narrowing this
+    // to the base being installed is how a variant becomes an escape hatch.
+    const existingPresets = agentPresetDirectories(home).filter(entry => existsSync(entry.directory))
+    if (needsCompat && existingPresets.length > 0 && !force) {
       throw new Error(
-        `install-layered: the DSH_HOME already carries an Evolution agent preset (${agentPresetDirectory(home)}). `
+        `install-layered: the DSH_HOME already carries an Evolution agent preset (${existingPresets.map(entry => entry.directory).join(', ')}). `
         + 'The one-click preset bundle and the layered agent preset are mutually exclusive install targets (E-33) — '
         + 'both mount the same model rows. Choose ONE '
         + '(remove the preset directory or pass --force to override explicitly).',
@@ -985,7 +1092,7 @@ export async function install(options = {}) {
   }
 
   if (needsAgent) {
-    result.agentPreset = await installAgentPreset(home, dryRun, force, standardComposition)
+    result.agentPreset = await installAgentPreset(home, dryRun, force, runtimeComposition, presetBase)
   }
 
   // P1-3 (v19) + v21 (S-1) + v23 (BR-3/BR-4): the FINAL journal refreshes the
@@ -1021,6 +1128,10 @@ function parseArgs(argv) {
     }
     if (arg === '--mode') options.mode = next()
     else if (arg === '--profile') options.profile = next()
+    // `--base` selects the platform agent preset the generated family preset
+    // follows. Omitted means the historical `standard` base via
+    // resolveAgentPresetBase's default — never a per-call-site default.
+    else if (arg === '--base') options.base = next()
     else if (arg === '--home') options.home = resolve(next())
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true

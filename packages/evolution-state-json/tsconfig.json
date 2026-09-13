@@ -3,7 +3,6 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
-    { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../evolution-core" },
     { "path": "../evolution-io" },
     { "path": "../evolution-state-storage" }

@@ -11,7 +11,7 @@
  * Distinct from `signals.ts` — the session-level review signal gate.
  */
 
-import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, MIN_STAMP_BODY_CHARS } from './skill-health.ts'
+import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from './skill-health.ts'
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
 import { AUTHORING_DESCRIPTION_BAR } from './constants.ts'
 
@@ -102,7 +102,12 @@ export function missingSupportPointers(body: string, supportFiles: readonly stri
 /** Duplicate `## heading` occurrences: singleton results default to head of the file. */
 export function duplicateHeadings(body: string): Array<{ heading: string; count: number }> {
   const counts = new Map<string, number>()
-  for (const line of body.split('\n')) {
+  // S1.8 (v37 P1-14): scan the CR-stripped view — `.` never matches `\r` and a
+  // non-multiline `$` only anchors at the end of the input, so a CRLF body made
+  // every heading line unmatchable and `dup_heading` reported a FALSE `pass`
+  // (the maintenance prompt then never asked for the merge).
+  for (const raw of body.split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
     const m = /^##\s+(.+)$/.exec(line)
     if (m?.[1]) {
       const heading = m[1].trim()
@@ -119,7 +124,11 @@ export function overlongLines(body: string, max = DRIFT_MAX_LINE_CHARS): Array<{
   const out: Array<{ lineNo: number; chars: number }> = []
   const lines = body.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
-    const length = (lines[index] ?? '').length
+    // S1.8 (v37 P2-3): the CR is a line terminator, not a visible character — a
+    // 1500-character CRLF line used to report 1501 and send the model after a
+    // line that already complies.
+    const raw = lines[index] ?? ''
+    const length = raw.endsWith('\r') ? raw.length - 1 : raw.length
     if (length > max) out.push({ lineNo: index + 1, chars: length })
   }
   return out
@@ -192,9 +201,12 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
       DEFAULT_HEALTH_THRESHOLDS,
     )
     const density = health.dims.stampDensityPerKb
+    // P2-12 (v39): density stays null only for an empty body or one below
+    // MIN_STAMP_BODY_CHARS (skill-health.ts gates the measurement there), so
+    // 'below-min-body' is the only reachable reason — 'not-assessed' was dead.
     signals.push(
       density === null
-        ? sig('stamp_density', 'pass', body.length < MIN_STAMP_BODY_CHARS ? 'below-min-body' : 'not-assessed')
+        ? sig('stamp_density', 'pass', 'below-min-body')
         : sig(
           'stamp_density',
           density >= DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb ? 'over' : 'pass',

@@ -22,3 +22,5 @@ Independent of request-prefix construction. This package does not alter the asse
 
 
 - Local node:fs provider. Remote or shared media requires another `ctx.evolutionIo` provider.
+
+**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
