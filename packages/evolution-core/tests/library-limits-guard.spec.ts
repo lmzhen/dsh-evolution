@@ -23,8 +23,8 @@ const REGISTERED_DEFAULTS: Record<string, string> = {
   'evolution-curator/src/index.ts:214': 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
   'evolution-learning-graph/src/index.ts:451': 'read-only: withSkills() serves reads and the graph read path',
   'evolution-maintenance/src/tools.ts:78': 'read-only: the maintenance probe walks the tree',
-  'evolution-review/src/index.ts:776': 'read-only: the pre-run hash snapshot',
-  'evolution-review/src/index.ts:1122': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
+  'evolution-review/src/index.ts:790': 'read-only: the pre-run hash snapshot',
+  'evolution-review/src/index.ts:1136': 'KNOWN GAP (v35 A6): the direct-path executor writes; the construction above it (with policy limits) serves the plan path only',
   'evolution-skill-catalog/src/index.ts:98': 'read-only: the catalog walk',
 }
 

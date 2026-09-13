@@ -89,7 +89,9 @@ export const Config: Schema<Config> = z.object({
   // / legacy reads that bypass the loader schema. The former "strips an
   // unmatching value" wording was wrong and contradicted the V5-33 comment
   // inside the clamp.
-  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
+  // 0.3.74: mirrors the review plugin's default (inject) — the policy snapshot
+  // overrides the plugin config, so the two defaults must not diverge.
+  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject'),
   memoryReviewModel: z.string().default(DEFAULT_MEMORY_REVIEW_MODEL),
   skillReviewModel: z.string().default(DEFAULT_SKILL_REVIEW_MODEL),
   curatorModel: z.string().default(DEFAULT_CURATOR_MODEL),
@@ -139,13 +141,15 @@ export class EvolutionPolicy extends Service {
       substantiveMinUserChars: field('substantiveMinUserChars', config.substantiveMinUserChars, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS),
       substantiveMinAgentChars: field('substantiveMinAgentChars', config.substantiveMinAgentChars, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS),
       reviewMode: (() => {
-        // V5-33 (0.3.31): an invalid reviewMode string fell silently to
-        // 'subagent' — the numeric fields beside it all warn once; the string
-        // surface got the same posture. V7-15 (0.3.44): the type is a closed
-        // union and the cordis loader REJECTS an invalid value at load, so
-        // the clamp's mismatch branch is unreachable by construction — the
-        // fallback below is kept for direct construction / legacy reads.
-        return config.reviewMode === 'inject' ? 'inject' : 'subagent'
+        // V5-33 (0.3.31): an invalid reviewMode string fell silently — the
+        // numeric fields beside it all warn once; the string surface got the
+        // same posture. V7-15 (0.3.44): the type is a closed union and the
+        // cordis loader REJECTS an invalid value at load, so the clamp's
+        // mismatch branch is unreachable by construction — the fallback below
+        // serves direct construction / legacy reads. 0.3.74: the fallback is
+        // 'inject', matching the schema default (only an explicit 'subagent'
+        // selects the child-session split).
+        return config.reviewMode === 'subagent' ? 'subagent' : 'inject'
       })(),
       memoryReviewModel: config.memoryReviewModel ?? DEFAULT_MEMORY_REVIEW_MODEL,
       skillReviewModel: config.skillReviewModel ?? DEFAULT_SKILL_REVIEW_MODEL,

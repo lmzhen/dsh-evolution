@@ -16,6 +16,12 @@ describe('evolution-policy', () => {
     expect((ctx.evolutionPolicy as unknown as Record<string, unknown>).isProtectedPath).toBeUndefined()
   })
 
+  it('0.3.74: the snapshot default reviewMode is inject (mirrors the review plugin default)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionPolicy)
+    expect(ctx.evolutionPolicy.get().reviewMode).toBe('inject')
+  })
+
   it('refuses governance keys inside memory operations[] too (E-28, 0.3.17)', async () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionPolicy)

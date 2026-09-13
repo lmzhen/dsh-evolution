@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.74 (patch) — 审查默认改为 `reviewMode: 'inject'`：子代理与主代理**不可能**共享前缀缓存（附成本证据）
+
+> **问题**：默认的 `reviewMode: 'subagent'` 下，子代理与主代理能否共享前缀缓存以降本？
+> **结论：不能。** 三条结构性原因，逐条有源码坐标：
+> 1. **模型不同** —— 子代理以 `agentOptions: { model }` 显式指定：skill 审查 = `skillReviewModel`（默认 `deepseek-v4-pro`）、memory 审查 = `memoryReviewModel`（默认 `deepseek-v4-flash`），而主会话跑部署默认路由的模型。缓存按（模型 × 前缀字节）寻址，模型不同即无从共享。
+> 2. **系统提示不同** —— 子代理是 `spawn` 子会话、跑**部署默认 preset**（README「Known Limitations」明写：不 fork 父代理组合以保住 `skill` 工具），另带 `persona: reviewPrompt(kind, 'plan')` 与 `toolFilter: { allow: ['skill'] }` —— 第 0 个 token 就分叉。
+> 3. **"对话"字节不同** —— 交给子代理的不是主会话的消息前缀，而是 `buildReviewRequest()` 重新序列化的摘要：**头部前置**（`Review kind: … / Signals: … / Recent tool activity (n): … / Return ONLY the structured JSON plan…`）、消息被改写成 `USER:`/`ASSISTANT:` 并逐条截断（`reviewMessageChars` 默认 2000）、最多 `reviewContextMessages`（默认 60）条、最后整体过 `redactReviewSecrets()` 再改一遍字节。前缀缓存要求从第 0 个 token 起逐字节相同——这里连"同一份历史"都不是。
+>
+> **顺带说明 inject 侧的成本结构**（本次变更的依据）：inject 把**有界的**审查提示词 `reviewPrompt(kind)` 追加到主会话**已经热着的**前缀之后 —— 只需为新增 token 付费，且审查直接在主会话上下文里进行（不需要摘要，因为它本来就有全部历史）；代价是审查自己的读取与计划留在主线程里。
+> **故按指令把默认改为 `reviewMode: 'inject'`**（`subagent` 保留为显式选项）。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-review` | `Config.reviewMode` 默认 `'subagent'` → **`'inject'`**，并补 JSDoc 说明两种模式的缓存/成本差异与适用场景 |
+| `evolution-policy` | 策略快照 schema 默认同步为 `'inject'`（**策略快照会覆盖插件配置**，两层默认不允许分叉）；`reviewMode` 归一化分支由"非 inject 一律回落 subagent"改为"**只有显式 `'subagent'` 才选子代理**"，其余（未设/非法）一律 `'inject'` |
+| README | `evolution-review` 的投递契约段写明新默认与成本理由、`subagent` 适用场景；「Known Limitations」标注模型/上下文路由仅在 subagent 模式生效；家族 README 的能力表同步 |
+
+### 新增回归（含红/绿实证）
+
+| 测试 | 钉住的契约 |
+|---|---|
+| `evolution-review/tests/review.spec.ts`（schema 断言，新增） | `Config` 默认 `reviewMode === 'inject'` |
+| `evolution-review/tests/review.spec.ts`（行为断言，新增） | **无 policy、无显式配置**时，completed 边界把 `[Auto-review …]` 提示词注入父代理，且 `subagents.start` **零调用**、计数被消费 |
+| `evolution-policy/tests/policy.spec.ts`（新增） | 策略快照默认 `reviewMode === 'inject'` |
+| 红/绿实证 | 把默认临时改回 `'subagent'` → 两条断言立刻变红（`expected 'subagent' to be 'inject'`；`expected [ 'spawn' ] to have a length of +0 but got 1`），恢复后 **70/70 绿**（review+policy 两包）；全量门禁 **10/10**（vitest **113 文件 / 1092 用例**全绿、`tsc-host` 0 错、`oxlint` 0/0） |
+
+### 影响与撤回（部署方须知）
+
+- **行为变更**：升级后（重启生效）审查默认在主会话内进行 —— 子代理不再生成，审查读到的技能正文与产出的计划会留在父会话线程里（上下文增长）；审查改用**父代理的模型**，`skillReviewModel`/`memoryReviewModel` 不再是它的路由。
+- **子代理专用旋钮**在 inject 模式下不再生效：`reviewProvider`、`reviewTimeoutMs`、`reviewMaxDepth`、`reviewToolAllow`、以及上面两个 review 模型。
+- **撤回 = 一行配置**（profile patch 的 evolution-review 行）：`reviewMode: subagent`（策略层同理，二选一即可，策略优先）。
+
 ## 0.3.73 (patch) — 修复「注入提示词自 2026-09-07 起静默消失」：唤醒投递丢接收者 + 同类全库排查 + 机械门禁
 
 > **症状**：很久没有出现 `[Auto-review — Skills]` 注入提示词（用户报告）。

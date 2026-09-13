@@ -21,6 +21,11 @@ describe('evolution-review', () => {
     expect(ctx.get('agents')).toBeDefined()
   })
 
+  it('0.3.74: reviewMode defaults to inject — the parent delivers against its own warm prefix', () => {
+    const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { reviewMode: string } } } })['~standard'].validate({}).value
+    expect(value.reviewMode).toBe('inject')
+  })
+
   it('defaults the completion channel to both with a long-conversation threshold', () => {
     const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { skillReviewTrigger: string; skillReviewCompletionMinToolCalls: number } } } })['~standard'].validate({}).value
     expect(value.skillReviewTrigger).toBe('cadence')
@@ -491,6 +496,10 @@ async function mountReviewFixture(options: {
    * express that, which is why the suite stayed green while every real delivery
    * threw (see the 0.3.73 regression case). */
   classAgent?: boolean
+  /** 0.3.74: the message surface returned by `deriveMessages`. The default is
+   * empty, which keeps the substantive gate (user/assistant chars) at zero; pass
+   * role/content entries to exercise the DEFAULT thresholds without a policy. */
+  surface?: Array<{ role: string; content: Array<{ type: string; text: string }> }>
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
@@ -523,7 +532,7 @@ async function mountReviewFixture(options: {
       { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: options.skillArguments ?? '{}' } },
       ...(options.events ?? []),
     ],
-    deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
+    deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => options.surface ?? [],
   } as unknown as Session
   const record = (kind: 'inject' | 'followup', message: unknown): void => {
     if (kind === 'followup' && options.onFollowup) options.onFollowup(message)
@@ -679,6 +688,41 @@ it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires 
   // turn7: after the second zero the new segment is silent again.
   emitEnd(7); await settle()
   expect(injected).toHaveLength(2)
+})
+
+it('0.3.74: the DEFAULT review mode injects into the parent instead of spawning a subagent', async () => {
+  const injected: unknown[] = []
+  const spawns: string[] = []
+  // Real default thresholds (3 tool calls / 200 user chars / 500 assistant chars),
+  // no evolutionPolicy service: the plugin's own Config default decides the mode.
+  const surface = [
+    { role: 'user', content: [{ type: 'text', text: 'u'.repeat(220) }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'a'.repeat(520) }] },
+  ]
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    surface,
+    onInject: message => injected.push(message),
+    events: [
+      { type: 'tool/call', data: { turn: 1, step: 2, callId: 'c2', name: 'skill', arguments: '{}' } },
+      { type: 'tool/call', data: { turn: 1, step: 3, callId: 'c3', name: 'skill', arguments: '{}' } },
+    ],
+  })
+  // A recording subagents service proves the default path never spawns a child.
+  ctx.provide('subagents', {
+    start: async (kind: string) => {
+      spawns.push(kind)
+      return { result: Promise.resolve({}) }
+    },
+  })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(injected).toHaveLength(1) })
+  expect(spawns).toHaveLength(0)
+  const text = (injected[0] as { content?: Array<{ text?: string }> }).content?.[0]?.text ?? ''
+  expect(text).toContain('[Auto-review')
+  // The delivery reached the parent, so the segment counts as reviewed.
+  expect((stateBox.current as { turnsSinceSkill: number }).turnsSinceSkill).toBe(0)
 })
 
 it('0.3.73: the wake delivery calls followup ON the agent — a prototype method must keep its receiver', async () => {

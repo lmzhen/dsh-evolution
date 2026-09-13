@@ -32,6 +32,17 @@ export const inject = ['agents']
 
 export interface Config {
   reviewEnabled?: boolean
+  /** How the flush delivers the review: `'inject'` (default since 0.3.74) hands
+   * the review prompt to the PARENT agent — waking it through the same
+   * followup-first channel — so the review runs on the parent's model against
+   * the parent's already-cached prefix and no separate prefill is paid.
+   * `'subagent'` spawns a one-shot child instead: the parent context stays clean
+   * and the review can use a dedicated model, but the child re-prefills its own
+   * system prompt plus a re-serialized conversation digest
+   * (`buildReviewRequest`, redacted, header-prepended) on a DIFFERENT model —
+   * so no prefix cache is shared with the parent and the input tokens are paid
+   * at full price. Deployments that prefer the clean-context split opt back in
+   * per plugin row. */
   reviewMode?: 'subagent' | 'inject'
   memoryInterval?: number
   skillInterval?: number
@@ -79,7 +90,10 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   reviewEnabled: z.boolean().default(true),
-  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('subagent'),
+  // 0.3.74: default is 'inject' — see the Config JSDoc. 'subagent' stays a
+  // first-class opt-in for deployments that want the parent context kept clean
+  // or a dedicated review model.
+  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject'),
   memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),
