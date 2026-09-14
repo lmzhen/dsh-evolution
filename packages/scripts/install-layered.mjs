@@ -166,8 +166,35 @@ export function profileDirectory(home, profile) {
 // `--base` value, the platform composition directory, and the agent-preset
 // registry id the runtime composes against.
 export const AGENT_PRESET_BASES = Object.freeze(Object.fromEntries(
-  readAgentPresetTable().bases.map(base => [base.name, Object.freeze({ id: base.id, metadata: base.metadata })]),
+  readAgentPresetTable().bases.map(base => [base.name, Object.freeze({ id: base.id, metadata: base.metadata, requires: base.requires, unsupported: base.unsupported })]),
 ))
+
+/**
+ * Why this base cannot be installed here, or undefined when it can.
+ *
+ * A base whose platform composition injects a service the deployment does not
+ * provide would mount-refuse at session start; an `unsupported` base has no
+ * family landing surface at all. Both are refused at INSTALL time instead, with
+ * the reason the platform would have given later. The installer judges
+ * `requires.service` from the target profile's bundle rows because it cannot see
+ * the runtime service store; `/evolution preset install` asks `ctx.get` for the
+ * service itself — the exact reason a mount would refuse. Uninstall does NOT
+ * consult this: removing an already-installed variant must stay possible.
+ * @param entry - a table entry (name + optional ability fields).
+ * @param bundles - the target profile's bundle rows.
+ * @returns the refusal text, or undefined when the base is installable here.
+ */
+export function baseUnavailableReason(entry, bundles = []) {
+  if (typeof entry?.unsupported === 'string' && entry.unsupported !== '') {
+    return `base "${entry.name}" is registered as UNSUPPORTED: ${entry.unsupported}`
+  }
+  const service = entry?.requires?.service
+  if (typeof service !== 'string' || service === '') return undefined
+  const provider = bundles.some(name => String(name).trim().endsWith('dsh-web-app'))
+  return provider
+    ? undefined
+    : `base "${entry.name}" requires the "${service}" service, which only a web-app deployment provides (the target profile mounts no web-app bundle)`
+}
 
 function readAgentPresetTable() {
   const path = fileURLToPath(new URL('../evolution-agent/bases.json', import.meta.url))
@@ -185,7 +212,19 @@ function readAgentPresetTable() {
     if (typeof base?.name !== 'string' || typeof base?.id !== 'string' || typeof base?.metadata !== 'string') {
       throw new Error(`install-layered: ${path} entry ${JSON.stringify(base)} needs name/id/metadata strings`)
     }
-    return { name: base.name, id: base.id, metadata: base.metadata }
+    // G1-② (0.3.78): the optional ability fields are validated, never ignored —
+    // a mistyped requires/unsupported would silently turn a refusal into an
+    // install, which is the failure mode they exist to prevent.
+    if (base.requires !== undefined && (typeof base.requires !== 'object' || base.requires === null || typeof base.requires.service !== 'string')) {
+      throw new Error(`install-layered: ${path} entry "${base.name}" needs requires.service as a string`)
+    }
+    if (base.unsupported !== undefined && (typeof base.unsupported !== 'string' || base.unsupported === '')) {
+      throw new Error(`install-layered: ${path} entry "${base.name}" needs unsupported as a non-empty reason string`)
+    }
+    const entry = { name: base.name, id: base.id, metadata: base.metadata }
+    if (base.requires !== undefined) entry.requires = { service: base.requires.service }
+    if (base.unsupported !== undefined) entry.unsupported = base.unsupported
+    return entry
   })
   const defaultBase = parsed?.default
   if (typeof defaultBase !== 'string' || !table.some(base => base.name === defaultBase)) {
@@ -997,6 +1036,17 @@ export async function install(options = {}) {
   // different platform composition. `bases` (CLI) and `base` (library callers)
   // are the same selection; the first entry stays the reported primary base.
   const presetEntries = resolveAgentPresetBases(options.bases !== undefined && options.bases.length > 0 ? options.bases : options.base)
+  // G1-② (0.3.78): refuse an uninstallable base BEFORE any mutation, quoting the
+  // reason the platform would have given at mount time.
+  for (const entry of presetEntries) {
+    // Runs before `profileDir` exists as a binding, so it is resolved here; a
+    // not-yet-created profile has no bundle rows to read — that is "no web-app",
+    // not a crash.
+    const bundleDir = profileDirectory(home, profile)
+    const bundles = existsSync(bundleDir) ? detectInstalledBundles(bundleDir) : []
+    const reason = baseUnavailableReason({ name: entry.base, ...AGENT_PRESET_BASES[entry.base] }, bundles)
+    if (reason !== undefined) throw new Error(`install-layered: ${reason}`)
+  }
   const presetBase = presetEntries[0].base
 
   const needsHost = mode === 'host' || mode === 'layered'
