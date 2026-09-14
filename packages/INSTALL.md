@@ -53,6 +53,19 @@ the first real 0.1.5 install.
 > `--mode variant`) — where the model rows exist only inside the family preset,
 > so a session on an original preset gets no evolution behaviour at all
 > (`sessionScoped`; `/evolution doctor` prints `deployment: variant|attach`).
+>
+> **Known difference (0.3.78, accepted not fixed):** under **① variant**, a session
+> running a platform original preset still SEES the `/evolution …` commands. The
+> platform registers commands in scope layers (global + calling-agent), and the
+> family registers its command once on the host plane, so it lands in the global
+> layer and every session's command list shows it. The surface is management-only
+> and read-only (`/evolution doctor`, `curator status`, `pending`, …), and the
+> AUTOMATIC paths — review cadence/injection, usage telemetry, curation — are
+> already gated per session by `sessionAudited`, so an original-preset session
+> gets no family behaviour behind the commands. Hiding the command face per
+> session would mean registering inside each agent's scope with its own
+> registration/teardown lifecycle, which this family deliberately does not do
+> (see the optimization plan's "explicitly not doing" list).
 
 ## Platform mode × self-evolution
 
