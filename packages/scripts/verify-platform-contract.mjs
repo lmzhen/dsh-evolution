@@ -3,7 +3,7 @@
  * Platform-contract probe (v33 G4.2): given a platform checkout, report every
  * place the family's host surface has moved.
  *
- * Three checks, all read-only and all mechanical:
+ * Four checks, all read-only and all mechanical:
  *   1. CONTRACT_ANCHORS — signature text the family (or its upgrade checklist)
  *      depends on, RECORDED from the 0.1.5-rc.2 line the family now ships
  *      against (re-recorded at v33 G0 completion; the 0.1.1-rc.2 baseline these
@@ -14,6 +14,12 @@
  *      imports from a platform package must still be exported by that package.
  *   3. Service names — every service the family reads through `ctx.get(name)`
  *      must be provided by the family or by the platform.
+ *   4. Platform anchors (v42 G2) — every platform path the family cites, in the
+ *      `platform:<pkg>/<file>:<line>` convention or as a bare citation, must name a
+ *      path that exists under `--upstream` with every cited line inside it. The
+ *      SEMANTIC_ASSERTIONS table judges what a text-presence check cannot see: a
+ *      disabled patch item, a doc line a consumer rests on, a format version.
+ *      Both are RECORDED drift — `--accept-recorded` tolerates them alone.
  *
  * It is a DETECTOR, not a compatibility layer: nothing here runs on the plugin
  * path, and no check adapts the family to an older platform. A red run is the
@@ -39,8 +45,8 @@
  *   node <scripts-dir>/verify-platform-contract.mjs <evolution-root> \
  *     --upstream <platform-tree> [--accept-recorded]
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 
 const argv = process.argv.slice(2)
 const familyRoot = resolve(argv[0] ?? '')
@@ -314,6 +320,153 @@ const DISPATCH_WRITE_SITES = [
   },
 ]
 
+/**
+ * The platform's top-level vocabulary at the 0.1.5-rc.2 line: every
+ * `packages/<group>` name plus the group-omitted leaf names the family cites in
+ * bare form. The recognizer never reads the tree it audits to decide what to
+ * read, so an empty upstream names citations instead of scanning none.
+ */
+const PLATFORM_ROOTS = new Set(('acp api attachment boot bundle client code-runtime compaction context core credentials e2b evolution ' +
+  'experimental extensions feedback fs goal guard hooks host identity interaction jobs llm lsp mcp plan preset runtime-diagnostics ' +
+  'sandbox schedule sdk session session-query settings shell skill spill storage subagent subprocess terminal test-support todo ' +
+  'typert util web webhook workflow workspace agent-loop app-boot skill-filesystem storage-json subagent-spawn-in-process').split(' '))
+
+/**
+ * A citation in either shape the family writes: the `platform:` convention or the
+ * bare path, each ending in a source extension (with an optional `:LINE` or
+ * `:LINE-LINE`) or in a directory slash.
+ */
+const PLATFORM_CITATION = /(platform:)?((?:[A-Za-z0-9_@.-]+\/)+(?:[A-Za-z0-9_.*-]+\.(?:tsx|ts|mts|cts|mjs|cjs|json|yaml|yml|md|css|html|py|sh|js)|[A-Za-z0-9_.*-]*\/))(?::(\d+)(?:-(\d+))?)?/g
+
+/**
+ * Facts a text-presence anchor cannot see, each judged from the file's own
+ * structure — a patch item from its own block, the scope doc line from the
+ * signature it documents — so no line number is hardcoded. A break is recorded
+ * drift like an anchor, and the shipped mode stays fatal for it.
+ */
+const SEMANTIC_ASSERTIONS = [
+  {
+    id: 'web-app-disables-tool-skill',
+    file: 'packages/bundle/web-app/cordis.patch.yml',
+    kind: 'patch-item-disabled',
+    item: 'tool-skill',
+    consumer: 'the web plane must not mount the host-plane skill tool the family bundles its own skill reads for',
+    finding: 'P2-A2',
+  },
+  {
+    id: 'web-app-disables-skill-filesystem',
+    file: 'packages/bundle/web-app/cordis.patch.yml',
+    kind: 'patch-item-disabled',
+    item: 'skill-filesystem',
+    consumer: 'the web plane must not mount the platform skill filesystem the family catalog reads around',
+    finding: 'P2-A2',
+  },
+  {
+    id: 'web-app-disables-command-goal',
+    file: 'packages/bundle/web-app/cordis.patch.yml',
+    kind: 'patch-item-disabled',
+    item: 'command-goal',
+    consumer: 'the goal command stays on the host plane; the family command plane owns the human command',
+    finding: 'P2-D2',
+  },
+  {
+    id: 'tools-get-scope-doc',
+    file: 'packages/core/tools/src/index.ts',
+    kind: 'doc-line',
+    signature: 'get(name: string, scope?: ScopeKey)',
+    doc: '@param scope',
+    anchor: 'omitted = the global view',
+    consumer: 'evolution-core/src/scope.ts and the N16 callingScope gate: an omitted scope IS the global view',
+    finding: 'N16',
+  },
+  {
+    id: 'session-format-version-is-3',
+    file: 'packages/core/session/src/types.ts',
+    kind: 'text',
+    anchor: 'export const SESSION_FORMAT_VERSION = 3',
+    consumer: 'evolution-review persistence fixtures (v3 headers); the value, not just the declaration',
+    finding: 'P2-B1',
+  },
+  {
+    id: 'known-tool-event-vocabulary',
+    file: 'packages/core/session/src/known-event-types.ts',
+    kind: 'quoted-list',
+    items: ['tool/call', 'tool/result', 'tool/ptc-dispatch-start', 'tool/ptc-dispatch'],
+    consumer: 'evolution-core/src/tool-dispatch.ts folds the native pair and the durable PTC pair from this list',
+    finding: 'P2-A2',
+  },
+]
+
+/** Directories never worth scanning at the platform-anchor surface. */
+const CITATION_SKIP_DIRS = new Set(['node_modules', '.git', 'lib', 'dist', '.next'])
+
+/**
+ * Walk the family tree and hand every non-excluded, non-binary file to `visit`;
+ * citations live in comments, docs and manifests as often as in `.ts` sources.
+ * @param dir - directory to walk.
+ * @param visit - called with the absolute path and the file content.
+ */
+function walkCitationSurface(dir, visit) {
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (CITATION_SKIP_DIRS.has(entry.name) || entry.name.startsWith('.release-staging')) continue
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      walkCitationSurface(path, visit)
+      continue
+    }
+    if (!entry.isFile() && !entry.isSymbolicLink()) continue
+    const text = readFileSync(path, 'utf8')
+    if (text.includes('\u0000')) continue
+    visit(path, text)
+  }
+}
+
+const GLOB_CHARS = /[.*+?^$()|[\]\\]/g
+
+/**
+ * @param pattern - a path segment that may contain `*`.
+ * @param name - the directory entry name to test.
+ * @returns whether the segment matches the name.
+ */
+function globSegment(pattern, name) {
+  return new RegExp('^' + pattern.split('*').map(part => part.replace(GLOB_CHARS, '\\$&')).join('.*') + '$').test(name)
+}
+
+/**
+ * Resolve a cited path under `base`, expanding `*` segments (the family's glob and
+ * directory citations) instead of reading them as literal names.
+ * @param base - the directory the cited path is relative to.
+ * @param rel - the cited path, with `/` separators and optional `*` segments.
+ */
+function resolveCitation(base, rel) {
+  let dirs = [base]
+  for (const part of rel.split('/')) {
+    if (part === '') continue
+    const next = []
+    for (const dir of dirs) {
+      let entries
+      try {
+        entries = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const entry of entries) {
+        if (entry.name === 'node_modules') continue
+        if (part.includes('*') ? globSegment(part, entry.name) : entry.name === part) next.push(join(dir, entry.name))
+      }
+    }
+    dirs = next
+    if (dirs.length === 0) return ''
+  }
+  return dirs[0] ?? ''
+}
+
 const recordedDrift = []
 for (const entry of CONTRACT_ANCHORS) {
   const path = join(upstream, entry.file)
@@ -423,10 +576,111 @@ if (existsSync(sectionOrderPath)) {
   }
 }
 
-console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${writeSiteChecks} dispatch write site(s), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
+// G2 semantic assertions: judged from each file's own structure, never from a
+// recorded line number. A patch item is the block opened by its `- id:` line, so a
+// sibling row moving or a new row landing above it cannot fake the answer.
+let semanticChecks = 0
+for (const entry of SEMANTIC_ASSERTIONS) {
+  semanticChecks += 1
+  const path = join(upstream, entry.file)
+  if (!existsSync(path)) {
+    recordedDrift.push(entry.id + ': ' + entry.file + ' is gone — recorded for ' + entry.consumer)
+    continue
+  }
+  const lines = readFileSync(path, 'utf8').split('\n')
+  const text = lines.join('\n')
+  if (entry.kind === 'patch-item-disabled') {
+    const start = lines.findIndex(line => line.replace(/^\s*-\s*id:\s*/, '').trim() === entry.item && /^\s*-\s*id:\s*\S/.test(line))
+    if (start < 0) {
+      recordedDrift.push(entry.id + ': ' + entry.file + ' no longer lists the ' + entry.item + ' item — recorded for ' + entry.consumer)
+      continue
+    }
+    let end = lines.length
+    for (let i = start + 1; i < lines.length; i += 1) {
+      if (/^\s*-\s*id:\s*\S/.test(lines[i])) {
+        end = i
+        break
+      }
+    }
+    const disabled = lines.slice(start, end).some(line => !line.trimStart().startsWith('#') && /^\s*disabled:\s*true\s*$/.test(line))
+    if (!disabled) {
+      recordedDrift.push(entry.id + ': the ' + entry.item + ' item at ' + entry.file + ':' + (start + 1) + ' no longer carries `disabled: true` in its own block — recorded for ' + entry.consumer)
+    }
+    continue
+  }
+  if (entry.kind === 'doc-line') {
+    const signature = lines.findIndex(line => line.includes(entry.signature))
+    if (signature < 0) {
+      recordedDrift.push(entry.id + ': ' + entry.file + ' no longer declares `' + entry.signature + '` — recorded for ' + entry.consumer)
+      continue
+    }
+    const doc = lines.slice(Math.max(0, signature - 30), signature).reverse().find(line => line.includes(entry.doc))
+    if (doc === undefined || !doc.includes(entry.anchor)) {
+      recordedDrift.push(entry.id + ': the `' + entry.doc + '` line above ' + entry.file + ':' + (signature + 1) + ' no longer contains `' + entry.anchor + '` — recorded for ' + entry.consumer)
+    }
+    continue
+  }
+  if (entry.kind === 'quoted-list') {
+    const missing = entry.items.filter(item => !new RegExp("['\"]" + item.replace(/[.*+?^$()|[\]\\/]/g, '\\$&') + "['\"]").test(text))
+    if (missing.length > 0) {
+      recordedDrift.push(entry.id + ': ' + entry.file + ' no longer lists ' + missing.join(', ') + ' — recorded for ' + entry.consumer)
+    }
+    continue
+  }
+  if (!text.includes(entry.anchor)) {
+    recordedDrift.push(entry.id + ': ' + entry.file + ' no longer contains `' + entry.anchor + '` — recorded for ' + entry.consumer)
+  }
+}
+
+// G2 platform anchors: every platform path the family cites must name a path
+// that exists under --upstream with every cited line in bounds. Bare paths are
+// tried as `packages/<path>`, as `<path>`, then through the group-omitted read
+// the family's shorthand relies on (`llm/src/message.ts:258`, `storage-json/src/atomic.ts:24`).
+const familyChildren = new Set(readdirSync(familyRoot, { withFileTypes: true }).map(entry => entry.name))
+let citationChecks = 0
+const citationFindings = []
+walkCitationSurface(familyRoot, (path, text) => {
+  for (const match of text.matchAll(PLATFORM_CITATION)) {
+    const cited = match[2]
+    const segments = cited.split('/')
+    const head = segments[0]
+    if (match[1] === undefined) {
+      // Not a platform path: a relative or URL form, an elided illustration, a
+      // family package, a mirror-layout family path, or a bare name outside
+      // PLATFORM_ROOTS.
+      if (text.startsWith('...', match.index + match[0].length)) continue
+      if (cited.startsWith('.') || cited.startsWith('/') || cited.startsWith('@') || cited.includes('://')) continue
+      if (familyChildren.has(head)) continue
+      if (head === 'packages') {
+        if (resolveCitation(familyRoot, segments.slice(1).join('/')) !== '') continue
+      } else if (head !== 'apps' && !(segments.includes('src') && PLATFORM_ROOTS.has(head))) continue
+    }
+    citationChecks += 1
+    const at = relative(familyRoot, path) + ':' + text.slice(0, match.index).split('\n').length
+    const resolved = resolveCitation(join(upstream, 'packages'), cited) || resolveCitation(upstream, cited) || resolveCitation(join(upstream, 'packages'), '*/' + cited)
+    if (resolved === '') {
+      citationFindings.push(at + ': cites `' + cited + '`, which is missing under ' + upstream + ' (tried packages/<path>, <path>, packages/*/<path>)')
+      continue
+    }
+    if (match[3] === undefined) continue
+    const line = Math.max(Number(match[3]), match[4] === undefined ? 0 : Number(match[4]))
+    if (!statSync(resolved).isFile()) {
+      citationFindings.push(at + ': cites `' + cited + ':' + line + '`, which resolves to the directory ' + resolved + ' — the line cannot be in bounds')
+      continue
+    }
+    const total = readFileSync(resolved, 'utf8').split('\n').length
+    if (line > total) citationFindings.push(at + ': cites `' + cited + ':' + line + '`, but ' + resolved + ' has ' + total + ' line(s)')
+  }
+})
+if (citationChecks === 0) {
+  drift.push('the platform-citation scan recognized no citation in the family tree — a scan that reads nothing is a vacuum, not a pass')
+}
+for (const finding of citationFindings) recordedDrift.push('platform-citation ' + finding)
+
+console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${writeSiteChecks} dispatch write site(s), ${semanticChecks} semantic assertion(s), ${citationChecks} platform citation(s) (${citationFindings.length} broken), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
 if (recordedDrift.length > 0) {
   const label = acceptRecorded
-    ? 'accepted recorded difference(s) — each has a decision recorded in the anchor table'
+    ? 'accepted recorded difference(s) — each is accounted for by the anchor, semantic-assertion or citation record'
     : 'recorded host-surface difference(s)'
   console.error(`verify-platform-contract: ${recordedDrift.length} ${label}:`)
   console.error(recordedDrift.join('\n'))
@@ -442,5 +696,5 @@ if (recordedDrift.length > 0 && !acceptRecorded) {
   process.exit(1)
 }
 console.log(recordedDrift.length > 0
-  ? `verify-platform-contract: OK — ${recordedDrift.length} recorded difference(s), all accounted for by the anchor table; no unrecorded drift`
-  : 'verify-platform-contract: OK — the recorded host surface is unchanged')
+  ? `verify-platform-contract: OK — ${recordedDrift.length} recorded difference(s), all accounted for by the anchor table; no unrecorded drift (${semanticChecks} semantic assertion(s) checked, ${citationChecks} platform citation(s) resolved)`
+  : `verify-platform-contract: OK — the recorded host surface is unchanged (${semanticChecks} semantic assertion(s) hold, ${citationChecks} platform citation(s) resolved)`)

@@ -167,6 +167,30 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(error?.stderr).toContain('registry-writes-none')
   })
 
+  it('G2 (v42): platform-contract names the semantic assertions and citations an empty tree lacks', async () => {
+    const contract = join(scripts, 'verify-platform-contract.mjs')
+    // Vacuity sentry, extended to the v42 G2 dimensions: a tree with no platform
+    // in it must name every semantic assertion (a patch item's own disabled
+    // block, the scope doc line, the session format facts) and every platform
+    // citation the scan recognized — the discipline the anchors already get.
+    const empty = await tempRoot('guard-contract-g2-')
+    const error = await run(process.execPath, [contract, psRoot, '--upstream', empty], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('web-app-disables-tool-skill')
+    expect(error?.stderr).toContain('tools-get-scope-doc')
+    expect(error?.stderr).toContain('session-format-version-is-3')
+    expect(error?.stderr).toContain('known-tool-event-vocabulary')
+    // The citation scan reads comments, docs and manifests, not just sources: a
+    // recognized citation must be reported with the path it cites.
+    expect(error?.stderr).toContain('platform-citation')
+    expect(error?.stderr).toContain('core/tools/src/index.ts')
+    // The summary line carries the new counts on the run that fails too.
+    expect(error?.stdout).toContain('semantic assertion(s)')
+    expect(error?.stdout).toContain('platform citation(s)')
+  })
+
   it('N17: architecture guards reject a consumer that branches on the dispatch modality', async () => {
     const root = await tempRoot('guard-arch-n17-')
     const pkg = join(root, 'demo-pkg')
