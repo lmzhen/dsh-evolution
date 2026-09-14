@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, isPresent, isReviewChannelSession, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isReviewChannelSession, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -160,9 +160,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const catalogWinner = async (name: string): Promise<Probe<SkillSummary | undefined>> => {
     const catalog = ctx.get('skills')
     if (catalog === undefined) return probeUnknown('the skills service is not mounted')
+    // V41 scope alignment: the family's own catalog provider is a PRESET row, so
+    // a scope-less list() reads the global layer alone (the platform documents
+    // exactly that: skill/skill/src/index.ts:113-120) and this guard would call a
+    // healthy tree "empty". `callingScope` is the single verdict on whose scope
+    // we ask in; an undefined scope stays an EXPLICIT global-layer read.
+    const scope = callingScope(ctx)
     try {
-      const summaries = await catalog.list()
-      if (summaries.length === 0) return probeUnknown('the catalog view is empty (a scope-less list() reads the global layer only)')
+      const summaries = await catalog.list(scope === undefined ? undefined : { scope })
+      if (summaries.length === 0) return probeUnknown(`the catalog view is empty in the ${scope === undefined ? 'global' : 'calling'} scope`)
       return probePresent(summaries.find(summary => summary.name === name))
     } catch (error) {
       return probeUnknown(`the catalog lookup failed (${error instanceof Error ? error.message : String(error)})`)
