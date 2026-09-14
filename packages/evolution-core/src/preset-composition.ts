@@ -38,7 +38,7 @@ export function composePresetComposition(standardComposition: string, deltaCompo
   if (collisions.length > 0) {
     console.warn(`evolution preset composition: warning — delta rows collide with standard rows (${collisions.join(', ')}); keeping both (DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1)`)
   }
-  return injectCatalogDescriptionCap(`${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`)
+  return applyRowOverrides(`${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`)
 }
 
 /**
@@ -59,11 +59,57 @@ export function composePresetComposition(standardComposition: string, deltaCompo
  *     but the missed cap must be observable).
  * install-layered.mjs ships the byte-identical `injectToolSkillCap`.
  */
-function injectCatalogDescriptionCap(composition: string): string {
-  const lines = composition.split('\n')
+interface RowOverride {
+  /** Top-level row id this override targets (`- id: <row>`). */
+  row: string
+  /** The child key whose presence makes the override inert (idempotence). */
+  key: string
+  /** Rendered, already-indented YAML lines to ensure inside the row. */
+  lines: string[]
+  /** One-time warning when the row is absent. */
+  missing: string
+}
+
+/** The composer-owned overrides, as DATA: one place states what the generated
+ * preset must carry beyond the platform composition. V10-14's cap is the first
+ * entry; install-layered.mjs keeps a byte-identical copy of this table. */
+const ROW_OVERRIDES: RowOverride[] = [
+  {
+    row: 'tool-skill',
+    key: 'config',
+    lines: [
+      '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
+      '  # this preset-scope row is the session-visible instance and no profile',
+      '  # patch can reach it. Remove only to run the platform default (500).',
+      '  config:',
+      '    catalogDescriptionMaxLength: 60',
+    ],
+    missing: 'evolution preset composition: warning — no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)',
+  },
+]
+
+/**
+ * Ensure every {@link RowOverride} inside its target row.
+ *
+ * Key-level by construction: we INSERT the override's own lines and leave a row
+ * that already carries the key byte-identical, so a re-run never doubles a key.
+ * This is the deliberate opposite of the platform's patch layers, where an
+ * override REPLACES `config` wholesale — the difference is why the composer can
+ * add a key without erasing the platform's own config defaults.
+ */
+function applyRowOverrides(composition: string, overrides: RowOverride[] = ROW_OVERRIDES): string {
+  let lines = composition.split('\n')
+  for (const override of overrides) {
+    lines = applyOneOverride(lines, override)
+  }
+  return lines.join('\n')
+}
+
+function applyOneOverride(lines: string[], override: RowOverride): string[] {
+  const rowRe = new RegExp('^- id:\\s*' + override.row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$')
   let found = false
   for (let i = 0; i < lines.length; i += 1) {
-    if (!/^- id:\s*tool-skill\s*$/.test(lines[i] ?? '')) continue
+    if (!rowRe.test(lines[i] ?? '')) continue
     found = true
     // Walk the item's continuation lines (indented) up to the next item or
     // top-level line; a blank line terminates the item block.
@@ -79,23 +125,15 @@ function injectCatalogDescriptionCap(composition: string): string {
       // platform preset that grew a nested config map silently skipped the
       // cap injection with no diagnostic (the missed-cap warn fires only when
       // the ROW itself is absent).
-      if (/^ {2}config:(\s|$)/.test(next)) hasConfig = true
+      if (new RegExp('^ {2}' + override.key + ':(\\s|$)').test(next)) hasConfig = true
       end = j
     }
     if (hasConfig) continue
-    lines.splice(end + 1, 0,
-      '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
-      '  # this preset-scope row is the session-visible instance and no profile',
-      '  # patch can reach it. Remove only to run the platform default (500).',
-      '  config:',
-      '    catalogDescriptionMaxLength: 60',
-    )
-    i = end + 5
+    lines.splice(end + 1, 0, ...override.lines)
+    i = end + override.lines.length
   }
-  if (!found) {
-    console.warn('evolution preset composition: warning — no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)')
-  }
-  return lines.join('\n')
+  if (!found) console.warn(override.missing)
+  return lines
 }
 
 function compositionRowIds(composition: string): Set<string> {
