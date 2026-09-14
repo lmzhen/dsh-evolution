@@ -96,6 +96,19 @@
  *       code still looked correct (v37 P7a), and route/dedup is the normalizer's
  *       job. A deliberate exception is registered in MODALITY_BRANCH_REGISTER
  *       with its reason.
+ *   N18. a family consumer that subscribes to the platform's SESSION-scoped
+ *       stream must consult the opt-in gate (evolution-core/src/opt-in.ts). In
+ *       the variant install form the family's model rows live inside a variant
+ *       preset, so a session running a platform ORIGINAL preset never opted in:
+ *       a listener on `session/event` that never asks `sessionAudited` acts on
+ *       sessions the family was never mounted into — the 0.3.77 C-axis class
+ *       (review injected prompts into original-preset sessions and skill-usage
+ *       counted their reads). The gate is
+ *       `sessionAudited(ctx, session.id, config.sessionScoped)` (each row's own
+ *       sessionScoped field); a deliberate exception is registered in
+ *       SESSION_GATE_REGISTER with its reason. Comments are inert (stripped), so
+ *       prose may name the stream; a string literal is not — the subscription
+ *       literal is the signal (N17's posture).
  *
  * Rule ids are APPEND-ONLY labels: docs, probes and register keys reference them,
  * so a landed id is never reused or renumbered. A new rule takes the next free
@@ -113,7 +126,8 @@
  * 0.3.22 (G4.8): N2 single-source moved to evolution-approval/src — the
  * exemption list follows the authority.
  *
- * H2 (0.3.58) heuristic boundary (N18, v12): the ghost-service-key probe is
+ * H2 (0.3.58) heuristic boundary (v12 audit finding N18 — NOT the arch rule of
+ * the same id above): the ghost-service-key probe is
  * textual — it detects `has('evolutionX…')` probes and `super(ctx,'…')` /
  * `.provide('…')` declarations. Forms it does NOT see: double-quoted calls,
  * array-form `inject(['evolutionX'])` declarations, and constant indirection
@@ -197,6 +211,24 @@ function modalityBranchKeys(text) {
     .replace(/^[ \t]*\/\/.*$/gm, mask)
   return [...code.matchAll(MODALITY_KIND_RE)].map(match => squash(match[0]))
 }
+// N18 (0.3.77): a `session/event` listener that never asks the opt-in gate acts
+// on sessions the family was never mounted into (the C-axis class); the receiver
+// idiom is event-pairing's `\w*[Cc]tx` (camelCase aliases count).
+const SESSION_STREAM_RE = /\w*[Cc]tx\.on\(\s*['"`]session\/event['"`]/g
+const SESSION_GATE_RE = /sessionAudited\(|sessionSeesFamilyTools\(/
+const SESSION_GATE_REGISTER = new Map([
+  // EMPTY on purpose (0.3.77, verified): the family's two session/event consumers
+  // (evolution-review, skill-usage) both call sessionAudited at the top of the
+  // listener, so a new entry here is a new divergence, not a debt.
+])
+/** N18: session/event subscriptions in a file that never consults the gate. */
+function ungatedSessionStreamKeys(text) {
+  const code = text
+    .replace(/\/\*[\s\S]*?\*\//g, mask)
+    .replace(/^[ \t]*\/\/.*$/gm, mask)
+  if (SESSION_GATE_RE.test(code)) return []
+  return [...new Set([...code.matchAll(SESSION_STREAM_RE)].map(match => squash(match[0])))]
+}
 // N12 (P5): module-scope mutable process state. Key = '<file> :: <binding>'.
 const MUTABLE_STATE_RE = /^const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*new\s+(?:Set|Map|WeakMap)\b/gm
 const MUTABLE_STATE = new Map([
@@ -278,6 +310,7 @@ const RULES = [
   { id: 'N15', title: 'family Markdown code anchors resolve' },
   { id: 'N16', title: 'platform registry read asks in the calling scope' },
   { id: 'N17', title: 'dispatch modality is read in registered sites only' },
+  { id: 'N18', title: 'session/event consumers consult the opt-in gate' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -609,6 +642,14 @@ function walk(dir) {
           violations.push(`${rel}: ${key} — a consumer must not branch on the dispatch modality; read the names/counts (skillReadNameOf / countDispatches) or register the branch in MODALITY_BRANCH_REGISTER with its reason: ${full}`)
         }
       }
+      // N18 (0.3.77): the session-scoped stream is opt-in gated — see docblock.
+      if (rel.includes('/src/')) {
+        for (const key of ungatedSessionStreamKeys(text)) {
+          const full = `${rel} :: ${key}`
+          if (SESSION_GATE_REGISTER.has(full)) continue
+          violations.push(`${rel}: ${key} — a session/event consumer must consult the opt-in gate; call sessionAudited(ctx, session.id, config.sessionScoped) at the top of the listener, or register the deliberate exception in SESSION_GATE_REGISTER: ${full}`)
+        }
+      }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
       if (rel === `${CORE_SRC}/threats.ts`) {
         for (const match of text.matchAll(REGEXP_CLASS_RE)) {
@@ -650,6 +691,11 @@ if (process.argv.includes('--list-rules')) {
       && modalityBranchKeys("const route = dispatch.kind === 'program' ? 'program' : 'direct'").length === 1
       && modalityBranchKeys("if (dispatch.name === 'skill') return").length === 0
       && modalityBranchKeys("// a PTC session logs dispatch.kind === 'program' in prose only").length === 0],
+    ['N18', () => ungatedSessionStreamKeys("ctx.on('session/event', (session, event) => {})").length === 1
+      && ungatedSessionStreamKeys("ioCtx.on('session/event', () => {})").length === 1
+      && ungatedSessionStreamKeys("ctx.on('session/event', (session) => {\n  if (!sessionAudited(ctx, session.id, config.sessionScoped)) return\n})").length === 0
+      && ungatedSessionStreamKeys("// prose only: ctx.on('session/event' is the platform's stream").length === 0
+      && ungatedSessionStreamKeys("ctx.on('tool/result', () => {})").length === 0],
     ['N15', () => [...'see evolution-core/src/x.ts:42'.matchAll(FAMILY_ANCHOR_RE)].length === 1 && staleAnchor({ line: 42 }, 10) && !staleAnchor({ line: 9 }, 10)],
     ['N12', () => mutableStateBindings('const bad = new Set()\nbad.add(1)\n').length > 0],
     ['N13a', () => [...'agent.inject(message)'.matchAll(AGENT_INJECT_RE)].length > 0],
@@ -763,7 +809,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es))`)
+  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s))`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78

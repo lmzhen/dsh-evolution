@@ -197,4 +197,30 @@ describe('guard scripts (V4-30 sentry)', () => {
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(owned).toBeNull()
   })
+
+  it('N18: architecture guards reject an ungated session/event consumer', async () => {
+    const root = await tempRoot('guard-arch-n18-')
+    const pkg = join(root, 'demo-pkg')
+    await mkdir(join(pkg, 'src'), { recursive: true })
+    // A manifest must exist somewhere under the root or the N8 companion scan
+    // reports a vacuum (a vacuous pass is not a pass).
+    await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-demo-pkg', version: '0.0.0' }), 'utf8')
+    // The C-axis incident shape: a cross-session consumer on the platform's
+    // SESSION-scoped stream that never asks the opt-in gate, so it acts on
+    // sessions the family was never mounted into (0.3.77).
+    await writeFile(join(pkg, 'src', 'index.ts'), "ctx.on('session/event', (session, event) => { void session; void event })\n", 'utf8')
+    const error = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('src/index.ts')
+    expect(error?.stderr).toContain('sessionAudited')
+    expect(error?.stderr).toContain('SESSION_GATE_REGISTER')
+    // The same listener carrying the gate at its top is the fixed shape: the
+    // file consults sessionAudited, so the tree passes.
+    await writeFile(join(pkg, 'src', 'index.ts'), "ctx.on('session/event', (session) => {\n  if (!sessionAudited(ctx, session.id, config.sessionScoped)) return\n})\n", 'utf8')
+    const gated = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(gated).toBeNull()
+  })
 })
