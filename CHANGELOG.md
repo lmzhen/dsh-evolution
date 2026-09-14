@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.77 (patch) — 安装形态命名（① 变体 / ② 挂原版）· C 轴会话 opt-in · 变体多选 · N18
+
+> **本批四件事**：
+> 1. **①/② 有名字了**：两种安装形态此前只以内部模式名（`layered` / `oneclick`）存在，用户与 doctor 都看不出自己装的是哪一种，而这两者的产品语义**正相反**——① 变体是会话级 opt-in（原版 `standard`/`ptc`/`minimal`/`cordis` 会话**不带任何 evolution 行为**），② 挂原版是 profile 级（每个会话都带）。现在 `--mode variant|attach` 是一等公民（旧名保留为别名），安装摘要与 `/evolution doctor` 都打印 `deployment: variant|attach`。
+> 2. **C 轴：跨会话消费者按会话 opt-in**（修复一个可复现的真实缺陷）：变体形态下家族 infra 挂在 profile 根，而 review/telemetry 监听的是宿主平面的 `session/event`——用户装了变体，却在一个**平台原版预设**的会话里被注入 `[Auto-review — Skills]`、被计进 usage。现在这些消费者先过 `sessionAudited`：会话看不到家族自有模型工具 (`skill_manage`/`memory`) 就不作用。
+> 3. **变体多选**：`--base standard,ptc`（installer 与 `/evolution preset install` 同一规则）一次生成多个变体，每个跟随**它自己那个基座**的平台 composition；所有名字先校验再落盘（第二个名字写错则一个都不写）。
+> 4. **N18 架构规则**：家族消费者订阅平台会话流时必须过 opt-in 门，否则失败（附登记表与自检样本）——把 ② 的修复锁成"下一处也不会漏"。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | 新增 `src/opt-in.ts`：`sessionAudited(ctx, sessionId, sessionScoped)` 与 `sessionSeesFamilyTools(ctx, sessionId)`——用**平台自身的可见性语义**判定"这个会话是否带着家族模型工具"（`tools.get(name, scopeOf(agent.ctx))`，`core/tools/src/index.ts:1194`），挂在 profile 根则人人可见、挂在变体预设里只有选了该预设的 agent 可见（`preset/agent-presets/src/mount.ts:4-13`）。**无预设 id 清单、无第二张表、无安装期快照** |
+| `evolution-review` / `skill-usage` | 各加 Config `sessionScoped`（默认 false = 历史行为）并在监听入口过门：变体形态下不被注入、不被计数；② 形态与所有旧部署逐字不变 |
+| `evolution-host` / `evolution-preset` / `evolution-all` | 两条跨会话行**三处逐字节一致**地声明 `sessionScoped: true`（E-33 不变式：`bundle-mutual-exclusion` spec 的比较对象是 name/config/disabled） |
+| `scripts/install-layered.mjs` | `--mode variant|attach` 别名（`MODE_ALIASES` + `normalizeMode`，库调用同样归一）；`result.form` 与安装摘要打印形态；`--base` 接受逗号列表/重复，新增 `resolveAgentPresetBases`，逐基座解析 runtime composition 并逐个生成；`result.bases[]/agentPresets[]`（`agentPreset` 保留为首个，journal/CLI/doctor 读取面不变）；uninstall 支持列表收窄 |
+| `evolution-commands` | `/evolution preset install --base <name>[,<name>...]`：同名先全部解析、再逐个原子写（S6.3 E-40 不变）；doctor 新增 `deploymentForm`（variant/attach/host-only/preset-only/none）并在报告头与动作阶梯里说明两种形态的后果 |
+| `scripts/verify-arch-guards.mjs` | 新增 **N18**：`src/` 内订阅 `session/event` 却未引用 opt-in 门即失败，附 `SESSION_GATE_REGISTER` 登记与自检样本 |
+
+### 新增回归（含红/绿实证）
+
+| 测试 / 探针 | 钉住的契约 |
+|---|---|
+| `evolution-core/tests/opt-in.spec.ts`（5 例） | 无 tools registry 必为假；**全局视图为真**（② 形态根挂载，人人过关）；**按会话作用域为真**（① 形态只有 joined 的 agent 看得到）；只探家族自有工具名（`session_search` 不算）；`sessionScoped` 两态 |
+| `skill-usage.spec.ts` 新增 1 例 | 变体形态下"不可见即不计、可见即计"（同一条 `tool/call` 事件） |
+| `installer-preset-base.spec.ts` 新增 2 例 | 一次安装写两个变体、各自跟随自己的基座；`--mode variant` 摘要打印 `mode: layered` + `form: variant`，近似拼写仍 fail-loud |
+| `doctor.spec.ts` 3 处断言 | `full → attach`、`layered → variant`、`host → host-only` 的形态映射 |
+| `guard-scripts.spec.ts` N18 夹具 | 未接门的 `ctx.on('session/event')` 被判红并点名修法；接门后干净 |
+
+### 验证
+
+- 全量门禁 10/10（`audit-v42/caxis-c2-*`、`multi-form-*`）：`tsc -b` 0、`oxlint` 0-0、全量 vitest 全绿、四个 `verify-*` 0、两个校验器 0、`mirror-sync differ=0 onlyOverlay=0`。
+- 发布链彩排 7/7（`build-lib` → `run-load-sensitive` → `prepare-release` → `verify-platform-ranges` → `publish-scoped --dry-run` → `verify-declared-config` → `verify-platform-contract`）。
+- **真机验证（变体形态，真实 CLI + 真实 profile，`audit-v42/verify-variant-profile.ps1`）**：以 `--mode variant --base standard,ptc` 装进一个全新 DSH_HOME → 安装摘要打印 `form: variant`；`dsh --profile web --dump-config` 组合出 **172 行、零重复 id**，profile 根**只有 infra 行、四条模型行全部缺席**（这正是"原版预设会话不带家族行"的结构保证），`sessionScoped: true` 落在 skill-usage 与 review 两行上；生成的两个变体预设各自携带模型行。
+- **模型可见行为的真机验证（待用户侧一次会话）**：本机 `DEEPSEEK_API_KEY` 不存在，无法在此代替真实会话；需在 web GUI 里各跑一次"变体预设会话"与"平台原版预设会话"，看前者照常有 review/usage、后者零注入零计数。
+
+
 ## 0.3.76 (patch) — 读三态 `Probe<T>` · 作用域对齐（N16） · 预设行覆盖改为数据表 · C 轴收口（N17）
 
 > **本批三件事**（v41 阶段一之后的跟进批次）：
