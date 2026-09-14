@@ -184,8 +184,9 @@ That file is a DELTA (4 model-tool rows, see its own header) and the
 COMPLETE composition — a hand-copied delta would mount an agent missing every
 standard row. Use `dsh plugin add` + the installer (or copy only a
 standard+delta SYNTHESIZED composition when a manual path is truly needed).
-The npm-only path is `/evolution preset install [--base <name>]`, which reads
-the same `evolution-agent/bases.json` table and writes that base's variant.
+The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
+which reads the same `evolution-agent/bases.json` table and writes one variant
+per named base in a single pass.
 
 ## Profile override examples
 

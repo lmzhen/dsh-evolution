@@ -567,7 +567,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // file install-layered.mjs reads, so the two install paths cannot
           // disagree about ids or metadata names.
           if (presetInstall === null) {
-            return err('Unknown preset arguments: expected `preset install` or `preset install --base <name>` (the names live in the agent package\'s bases.json). Got: ' + input)
+            return err('Unknown preset arguments: expected `preset install` or `preset install --base <name>[,<name>...]` (the names live in the agent package\'s bases.json). Got: ' + input)
           }
           // v28 G3.2 (CMD-03): the same three-way mutual exclusion
           // install-layered.mjs enforces up front, applied at the command's
@@ -610,31 +610,49 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             const source = resolveAgentPresetDir(import.meta.url)
             const table = readAgentPresetBases(source)
-            const requested = presetInstall[1] ?? table.defaultBase
-            const base = table.entries.find(entry => entry.name === requested)
-            if (base === undefined) {
-              return err(`Unknown agent-preset base "${requested}" — ${join(source, 'bases.json')} lists ${table.entries.map(entry => entry.name).join(', ')}`)
+            // v41: the selection is a LIST (comma-separated) — a user who
+            // switches between the standard and ptc platform presets wants both
+            // variants on disk, generated against the SAME runtime platform in
+            // one pass. Every name is resolved before anything is written, so a
+            // typo in the second entry cannot leave the first variant installed.
+            const requestedRaw = presetInstall[1] ?? table.defaultBase
+            const requested = [...new Set(requestedRaw.split(',').map(part => part.trim()).filter(part => part !== ''))]
+            if (requested.length === 0) {
+              return err(`No agent-preset base named — ${join(source, 'bases.json')} lists ${table.entries.map(entry => entry.name).join(', ')}`)
             }
-            const target = join(evolutionRoot(), '.agent-presets', base.id)
+            const selected = []
+            for (const name of requested) {
+              const entry = table.entries.find(candidate => candidate.name === name)
+              if (entry === undefined) {
+                return err(`Unknown agent-preset base "${name}" — ${join(source, 'bases.json')} lists ${table.entries.map(candidate => candidate.name).join(', ')}`)
+              }
+              selected.push(entry)
+            }
             const deltaPath = join(source, 'agent.cordis.yml')
-            const presetPath = join(source, base.metadata)
-            if (!existsSync(deltaPath) || !existsSync(presetPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
+            if (!existsSync(deltaPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
             const registry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
             if (!registry) return err('Agent preset registry not mounted — cannot compose the Evolution preset against the runtime standard.')
-            const platform = await registry.read(base.name)
-            const composition = composePresetComposition(platform, readFileSync(deltaPath, 'utf8'))
-            mkdirSync(target, { recursive: true })
-            // S6.3 (E-40): commit both files atomically — each staged to a
-            // sibling `<name>.tmp` then renamed into place, a pre-existing file
-            // keeping a single `.bak`. A failure while staging either file (a
-            // write that throws) removes the staged temps and leaves the
-            // previous composition untouched, so a half-updated preset (one new
-            // file, one old) is impossible.
-            atomicWriteFiles(target, [
-              { name: 'agent.cordis.yml', content: composition },
-              { name: base.metadata, content: readFileSync(presetPath) },
-            ], undefined, (message) => { ctx.logger.warn(message) })
-            return ok(`Evolution agent preset installed to ${target} (runtime ${base.name} + delta). Restart the session switcher to select it.`)
+            const written: string[] = []
+            for (const base of selected) {
+              const target = join(evolutionRoot(), '.agent-presets', base.id)
+              const presetPath = join(source, base.metadata)
+              if (!existsSync(presetPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
+              const platform = await registry.read(base.name)
+              const composition = composePresetComposition(platform, readFileSync(deltaPath, 'utf8'))
+              mkdirSync(target, { recursive: true })
+              // S6.3 (E-40): commit both files atomically — each staged to a
+              // sibling `<name>.tmp` then renamed into place, a pre-existing file
+              // keeping a single `.bak`. A failure while staging either file (a
+              // write that throws) removes the staged temps and leaves the
+              // previous composition untouched, so a half-updated preset (one new
+              // file, one old) is impossible.
+              atomicWriteFiles(target, [
+                { name: 'agent.cordis.yml', content: composition },
+                { name: base.metadata, content: readFileSync(presetPath) },
+              ], undefined, (message) => { ctx.logger.warn(message) })
+              written.push(`${base.name} → ${target}`)
+            }
+            return ok(`Evolution agent preset installed (${written.join('; ')}). Restart the session switcher to select it.`)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }

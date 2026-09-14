@@ -581,6 +581,51 @@ describe('evolution-commands', () => {
     expect(unknown.text).toContain('bases.json')
   })
 
+  it('preset install --base standard,ptc writes BOTH variants, and a typo writes NEITHER (v41)', async () => {
+    const home = await tempHome('evo-commands-preset-multi-')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // One platform composition per base, so a variant composed from the WRONG
+    // base is visible in the written file.
+    const fixtures: Record<string, string> = {
+      standard: '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n',
+      ptc: '- id: tools\n  name: "@deepseek-ai/dsh-tools"\n  config:\n    mode: ptc\n',
+    }
+    const reads: string[] = []
+    ctx.provide('agentPresets', {
+      read: async (id: string) => {
+        reads.push(id)
+        const fixture = fixtures[id]
+        if (fixture === undefined) throw new Error(`unknown preset ${id}`)
+        return fixture
+      },
+    })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-multi-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install --base standard,ptc' })
+    expect(result.kind).toBe('success')
+    // Each variant composes ITS OWN platform preset, in table order.
+    expect(reads).toEqual(['standard', 'ptc'])
+    const standardDir = join(home, '.agent-presets', 'evolution')
+    const ptcDir = join(home, '.agent-presets', 'evolution-ptc')
+    expect(readFileSync(join(standardDir, 'agent.cordis.yml'), 'utf8')).toContain(fixtures.standard!.trim())
+    expect(readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')).toContain(fixtures.ptc!.trim())
+    expect(readFileSync(join(standardDir, 'agent.cordis.yml'), 'utf8')).not.toContain('mode: ptc')
+    // The variant keeps its own metadata file, the standard base its own.
+    expect(existsSync(join(ptcDir, 'preset.ptc.yml'))).toBe(true)
+    expect(existsSync(join(ptcDir, 'preset.yml'))).toBe(false)
+
+    // Every name is resolved before anything is written: the typo aborts the
+    // whole request and the two healthy variants stay exactly as they were.
+    const before = readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')
+    const typo = await handler!.handler({ rawInput: 'preset install --base standard,ptc,nonsense' })
+    expect(typo.kind).toBe('error')
+    expect(typo.text).toContain('nonsense')
+    expect(reads).toEqual(['standard', 'ptc'])
+    expect(readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')).toBe(before)
+  })
+
   it('preset install fails loud when delta rows collide with the runtime standard (0.3.15)', async () => {
     await tempHome('evo-commands-preset-')
     const ctx = new Context()

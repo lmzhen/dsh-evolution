@@ -241,6 +241,38 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(existsSync(join(home, '.agent-presets', 'evolution'))).toBe(false)
   })
 
+  it('one pass with --base standard,ptc writes both variants, each following ITS OWN runtime composition', async () => {
+    const home = await tempRoot('dsh-preset-base-multi-')
+    const presetRoot = join(home, 'preset')
+    await mkdir(join(presetRoot, 'standard'), { recursive: true })
+    await mkdir(join(presetRoot, 'ptc'), { recursive: true })
+    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    await writeFile(join(presetRoot, 'ptc', 'agent.cordis.yml'), PTC_FIXTURE)
+    await runInstaller(home, 'agent', ['--base', 'standard,ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+
+    // The whole point of a multi-base install: two files, each composed from the
+    // platform composition of its OWN base — never one composition copied under
+    // two names (the ptc variant carries the ptc rows, the standard one does
+    // not).
+    const standardComposition = await readFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'utf8')
+    const ptcComposition = await readFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'utf8')
+    expect(standardComposition.split('\n')[0]).toBe(STANDARD_FIXTURE.split('\n')[0])
+    expect(ptcComposition.split('\n')[0]).toBe(PTC_FIXTURE.split('\n')[0])
+    expect(standardComposition).not.toContain('- id: tool-presentation')
+    expect(ptcComposition).toContain('mode: ptc')
+    // The metadata follows the base as well: a variant must publish its own
+    // display text, never the standard preset's.
+    expect(await readFile(join(home, '.agent-presets', 'evolution', 'preset.yml'), 'utf8'))
+      .toBe(await readFile(join(agentPackage, 'preset.yml'), 'utf8'))
+    expect(await readFile(join(home, '.agent-presets', 'evolution-ptc', 'preset.yml'), 'utf8'))
+      .toBe(await readFile(join(agentPackage, 'preset.ptc.yml'), 'utf8'))
+
+    // The selection is a SET resolved in table order, so repeats and a reversed
+    // spelling produce the same run.
+    const resolved = await callInstaller("return installer.resolveAgentPresetBases(['ptc', 'standard,ptc']).map(entry => entry.base)")
+    expect(resolved).toEqual(['standard', 'ptc'])
+  })
+
   it('composes the RUNTIME platform ptc preset (no fixture root) with the family delta', async () => {
     // Without DSH_AGENT_PRESET_ROOT the installer resolves the agent-preset
     // root by walking up from its own location — inside this monorepo, the real
@@ -284,6 +316,14 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(error?.stderr).toContain('standard, ptc')
     // Fail-loud means no half-state: nothing under .agent-presets at all.
     expect(existsSync(join(home, '.agent-presets'))).toBe(false)
+
+    // A typo in the SECOND name of a multi-base selection writes nothing: every
+    // name is resolved before the first variant is composed.
+    const mixedHome = await tempRoot('dsh-preset-base-unknown2-')
+    const mixed = await runInstaller(mixedHome, 'agent', ['--base', 'standard,nonsense'])
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(mixed?.stderr).toContain('unknown agent-preset base')
+    expect(existsSync(join(mixedHome, '.agent-presets'))).toBe(false)
 
     // A value-less --base is a usage error, not a silent default.
     const missing = await runInstaller(home, 'agent', ['--base'])

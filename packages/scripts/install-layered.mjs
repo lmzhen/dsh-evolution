@@ -203,6 +203,39 @@ export function resolveAgentPresetBase(base = DEFAULT_AGENT_PRESET_BASE) {
   )
 }
 
+/**
+ * Resolve the caller's base selection — one name, a comma list, or repeats —
+ * into a deduplicated, table-ordered list.
+ *
+ * The variant install is ONE decision ("which platform compositions should the
+ * family follow?"), not a single choice: a user who switches between the
+ * standard and the ptc platform preset needs both variants on disk, and asking
+ * them to re-run the installer once per base leaves two generated presets that
+ * may follow two different platform versions. Order follows bases.json rather
+ * than argument order, so the same request always produces the same set.
+ * @param selection - `undefined` (the table default), one name, or a list of
+ * names (each entry may itself be a comma list).
+ * @returns the canonical entries, each carrying its resolved `base` name.
+ */
+export function resolveAgentPresetBases(selection = undefined) {
+  const raw = selection === undefined ? [DEFAULT_AGENT_PRESET_BASE] : Array.isArray(selection) ? selection : [selection]
+  const names = new Set()
+  for (const item of raw) {
+    for (const part of String(item).split(',')) {
+      const name = part.trim()
+      if (name === '') continue
+      // Validate EVERY name before any of them is used: a typo in the second
+      // entry must not install the first variant and then abort.
+      resolveAgentPresetBase(name)
+      names.add(name)
+    }
+  }
+  if (names.size === 0) {
+    throw new Error(`install-layered: no agent-preset base selected; expected one or more of ${Object.keys(AGENT_PRESET_BASES).join(', ')}`)
+  }
+  return Object.keys(AGENT_PRESET_BASES).filter(base => names.has(base)).map(base => resolveAgentPresetBase(base))
+}
+
 export function agentPresetDirectory(home, base = DEFAULT_AGENT_PRESET_BASE) {
   return join(home, '.agent-presets', resolveAgentPresetBase(base).id)
 }
@@ -815,9 +848,10 @@ export async function uninstall(options = {}) {
     // home-global artifact of this family, and a variant left behind after
     // "uninstall" would keep mounting family model rows for any session that
     // selects it. Naming a base narrows the reverse action to that variant.
-    const presetTargets = options.base === undefined
+    const presetSelection = options.bases !== undefined && options.bases.length > 0 ? options.bases : options.base
+    const presetTargets = presetSelection === undefined
       ? agentPresetDirectories(home)
-      : [{ base: resolveAgentPresetBase(options.base).base, directory: agentPresetDirectory(home, options.base) }]
+      : resolveAgentPresetBases(presetSelection).map(entry => ({ base: entry.base, directory: agentPresetDirectory(home, entry.base) }))
     const presentPresets = presetTargets.filter(entry => existsSync(entry.directory))
     // v31 INST-04: the preset is HOME-GLOBAL — before deleting it, sweep the
     // other profiles the same way the install side (PRE-1) does. Another
@@ -925,11 +959,13 @@ export async function install(options = {}) {
   const dryRun = options.dryRun === true
   const force = options.force === true
 
-  // The base is validated FIRST, before the mode is even acted on: an unknown
-  // `--base` must not reach a single write, and it must not fall back to
-  // `standard` — the whole point of a variant is that the user asked for a
-  // different platform composition.
-  const presetBase = resolveAgentPresetBase(options.base ?? DEFAULT_AGENT_PRESET_BASE).base
+  // The base selection is validated FIRST, before the mode is even acted on: an
+  // unknown `--base` must not reach a single write, and it must not fall back
+  // to `standard` — the whole point of a variant is that the user asked for a
+  // different platform composition. `bases` (CLI) and `base` (library callers)
+  // are the same selection; the first entry stays the reported primary base.
+  const presetEntries = resolveAgentPresetBases(options.bases !== undefined && options.bases.length > 0 ? options.bases : options.base)
+  const presetBase = presetEntries[0].base
 
   const needsHost = mode === 'host' || mode === 'layered'
   const needsAgent = mode === 'agent' || mode === 'layered'
@@ -941,7 +977,13 @@ export async function install(options = {}) {
   // mounted, preset missing) when the resolution failed. Resolution is
   // read-only and the "reported up front" intent at installAgentPreset now
   // actually holds.
-  const runtimeComposition = needsAgent ? await resolveRuntimeComposition(presetBase) : undefined
+  // One runtime composition per selected base: each variant follows the
+  // platform composition of ITS base (the ptc variant composes the platform's
+  // ptc preset, not the standard one).
+  const runtimeCompositions = new Map()
+  if (needsAgent) {
+    for (const entry of presetEntries) runtimeCompositions.set(entry.base, await resolveRuntimeComposition(entry.base))
+  }
 
   // v21 (S-5): agent mode never writes the profile (its deliverable is the
   // preset directory) — do not CREATE one as a side effect. ensureProfile
@@ -954,7 +996,7 @@ export async function install(options = {}) {
   // host/layered/oneclick).
   const profileDir = profileDirectory(home, profile)
   const profileReady = !dryRun && mode !== 'agent'
-  const result = { mode, home, profile, profileDir, base: presetBase, copied: [], missingEntrypoints: [], bundle: null, agentPreset: null }
+  const result = { mode, home, profile, profileDir, base: presetBase, bases: presetEntries.map(entry => entry.base), copied: [], missingEntrypoints: [], bundle: null, agentPreset: null, agentPresets: [] }
   // v21 (S-1): the bundle-dependency outcome, recorded onto the journal at the
   // end of the run (null in dry-run — no journal is written then anyway).
   let dependencyInfo = null
@@ -1121,7 +1163,13 @@ export async function install(options = {}) {
   }
 
   if (needsAgent) {
-    result.agentPreset = await installAgentPreset(home, dryRun, force, runtimeComposition, presetBase)
+    for (const entry of presetEntries) {
+      result.agentPresets.push(await installAgentPreset(home, dryRun, force, runtimeCompositions.get(entry.base), entry.base))
+    }
+    // `agentPreset` stays the FIRST variant's report: it is the field the
+    // journal, the CLI summary and the doctor have always read, and a
+    // single-base install (the historical call shape) makes it the only one.
+    result.agentPreset = result.agentPresets[0] ?? null
   }
 
   // P1-3 (v19) + v21 (S-1) + v23 (BR-3/BR-4): the FINAL journal refreshes the
@@ -1130,13 +1178,14 @@ export async function install(options = {}) {
   // preserved (a skipped preset still exists on disk and its uninstall
   // deliverable must not be lost to a host/oneclick reinstall).
   if (!dryRun && result.bundle !== null) {
-    await writeInstallJournal(profileDir, journalPayload(result.agentPreset?.installed === true || priorJournal?.agentPreset === true))
+    const installedAny = result.agentPresets.some(entry => entry.installed === true)
+    await writeInstallJournal(profileDir, journalPayload(installedAny || priorJournal?.agentPreset === true))
   }
   // v31 INST-03: `--mode agent` installs the home-global preset with NO
   // bundle row — the old `result.bundle !== null` gate never journaled it, so
   // a later layered uninstall read `agentPreset:false` and left the preset
   // stranded while reporting a clean removal. Journal the ownership.
-  if (!dryRun && result.bundle === null && result.agentPreset?.installed === true) {
+  if (!dryRun && result.bundle === null && result.agentPresets.some(entry => entry.installed === true)) {
     await writeInstallJournal(profileDir, journalPayload(true))
   }
 
@@ -1144,7 +1193,7 @@ export async function install(options = {}) {
 }
 
 function parseArgs(argv) {
-  const options = { mode: 'layered', profile: 'web' }
+  const options = { mode: 'layered', profile: 'web', bases: [] }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     // D-15 (v18): a missing value used to fall through silently (`--mode`
@@ -1160,7 +1209,10 @@ function parseArgs(argv) {
     // `--base` selects the platform agent preset the generated family preset
     // follows. Omitted means the historical `standard` base via
     // resolveAgentPresetBase's default — never a per-call-site default.
-    else if (arg === '--base') options.base = next()
+    // `--base` repeats and accepts a comma list (v41: one install covers every
+    // platform composition the user switches between) — `bases` is the
+    // selection, while `base` stays the single-name API the library callers use.
+    else if (arg === '--base') options.bases.push(next())
     else if (arg === '--home') options.home = resolve(next())
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
@@ -1213,8 +1265,8 @@ if (isMain) {
       if (result.missingEntrypoints.length > 0) {
         console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
       }
-      if (result.agentPreset) {
-        console.log(`preset:   ${result.agentPreset.destination}${result.agentPreset.installed ? '' : ` (${result.agentPreset.reason})`}`)
+      for (const preset of result.agentPresets ?? []) {
+        console.log(`preset:   ${preset.destination}${preset.installed ? '' : ` (${preset.reason})`}`)
       }
       if (options.dryRun) console.log('dry-run:  no files were written')
     }
