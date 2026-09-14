@@ -832,6 +832,48 @@ async function installAgentPreset(home, dryRun, force, runtimeComposition, base)
   return { destination, installed: true, base: entry.base }
 }
 
+/**
+ * G3-①: does the generated preset on disk still describe THIS platform?
+ *
+ * A generated variant is an INSTALL-TIME SNAPSHOT: it embeds the platform
+ * composition of the day it was written, so a platform change or a family
+ * upgrade leaves a file silently describing a platform that no longer exists.
+ * This recomputes what a fresh install would write and reports the comparison.
+ * It never repairs: overwriting a snapshot the user may have hand-tuned is a
+ * decision only the user can make.
+ * @param options - `home`/`env` resolved like the other entry points, `profile` (default 'web').
+ * @returns one `{ base, id, destination, status }` record per INSTALLABLE base.
+ */
+export async function checkAgentPresetFreshness(options = {}) {
+  const home = options.home ?? resolveHome(options.env)
+  const profile = options.profile ?? 'web'
+  // The same judgement the install-time refusal makes, on the same rows: a base
+  // this deployment cannot install has no fresh install to compare against, so
+  // it is SKIPPED rather than reported stale.
+  const profileDir = profileDirectory(home, profile)
+  const bundles = existsSync(profileDir) ? detectInstalledBundles(profileDir) : []
+  const bases = []
+  for (const name of Object.keys(AGENT_PRESET_BASES)) {
+    if (baseUnavailableReason({ name, ...AGENT_PRESET_BASES[name] }, bundles) !== undefined) continue
+    const entry = resolveAgentPresetBase(name)
+    const destination = agentPresetDirectory(home, entry.base)
+    // `absent` is not an error: the user may simply not have installed this base.
+    const compositionPath = join(destination, 'agent.cordis.yml')
+    if (!existsSync(compositionPath)) {
+      bases.push({ base: entry.base, id: entry.id, destination, status: 'absent' })
+      continue
+    }
+    // Replay the install path READ-ONLY: this base's runtime composition plus the
+    // same delta (DSH_EVOLUTION_DELTA_PATH honored) through the same generator,
+    // compared byte-for-byte with the file on disk.
+    const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
+    const fresh = generateAgentPreset(await resolveRuntimeComposition(entry.base), await readFile(deltaPath, 'utf8'))
+    const onDisk = await readFile(compositionPath, 'utf8')
+    bases.push({ base: entry.base, id: entry.id, destination, status: fresh === onDisk ? 'fresh' : 'differs' })
+  }
+  return { bases }
+}
+
 export async function uninstall(options = {}) {
   const mode = normalizeMode(options.mode ?? 'layered')
   if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')} (or the product names variant/attach)`)
@@ -1298,6 +1340,9 @@ function parseArgs(argv) {
     else if (arg === '--home') options.home = resolve(next())
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
+    // `--check-presets` is a FLAG, not a mode: it reports on the presets already
+    // on disk and writes nothing, so it composes with any (or no) --mode.
+    else if (arg === '--check-presets') options.checkPresets = true
     else if (arg === '--uninstall') options.uninstall = true
     else throw new Error(`unknown argument ${arg}`)
   }
@@ -1324,7 +1369,16 @@ const isMain = process.argv[1] !== undefined && (() => {
 if (isMain) {
   try {
     const options = parseArgs(process.argv.slice(2))
-    if (options.uninstall) {
+    if (options.checkPresets) {
+      const report = await checkAgentPresetFreshness(options)
+      for (const entry of report.bases) {
+        console.log(`preset:   ${entry.destination}  ${entry.status === 'differs' ? 'DIFFERS' : entry.status}`)
+      }
+      console.log('check:    DIFFERS means the file on disk is an install-time snapshot of a platform that has moved; re-run the installer to regenerate it (this check only reports, it never overwrites).')
+      // Any difference is a nonzero exit so a script can gate on staleness; a
+      // merely absent preset is not a difference (the user may not want it).
+      if (report.bases.some(entry => entry.status === 'differs')) process.exitCode = 1
+    } else if (options.uninstall) {
       const result = await uninstall(options)
       console.log(`uninstall mode:     ${result.mode}`)
       console.log(`profile:  ${result.profile} (${result.profileDir})`)

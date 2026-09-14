@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,7 +30,9 @@ const agentPackage = fileURLToPath(new URL('../../evolution-agent', import.meta.
 async function callInstaller(body: string): Promise<unknown> {
   const script = [
     `import * as installer from ${JSON.stringify(installerUrl)}`,
-    `const value = (() => { ${body} })()`,
+    // Await an async IIFE: a body may call an async entry point
+    // (checkAgentPresetFreshness), and JSON.stringify(promise) would print `{}`.
+    `const value = await (async () => { ${body} })()`,
     'process.stdout.write(Buffer.from(JSON.stringify(value), "utf8").toString("base64"))',
   ].join('\n')
   const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
@@ -75,6 +77,46 @@ async function runInstaller(home: string, mode: string, extra: string[] = [], en
   return run(process.execPath, [installer, '--mode', mode, '--profile', 'evo-base', '--home', home, ...extra], {
     env: { ...process.env, ...env },
   })
+}
+
+/**
+ * The status word `--check-presets` printed for one destination, or undefined.
+ * The destination and the status are separated by two spaces, and the match is
+ * on the whole destination: `evolution` must not answer for `evolution-ptc`.
+ * @param stdout - the check run's stdout.
+ * @param destination - the preset directory to look up.
+ * @returns `fresh` | `DIFFERS` | `absent`, or undefined when no line names it.
+ */
+function presetStatus(stdout: string, destination: string): string | undefined {
+  for (const line of stdout.split('\n')) {
+    const match = /^preset:\s+(.*?)\s{2}(\S+)\s*$/.exec(line)
+    if (match?.[1] === destination) return match[2]
+  }
+  return undefined
+}
+
+/**
+ * Every directory and file under `root` with its bytes — the probe for "the
+ * check wrote nothing". Content, not just existence: an overwrite that kept the
+ * size would still show up here.
+ * @param root - the directory to walk.
+ * @returns one record per entry, in sorted order.
+ */
+async function treeSnapshot(root: string): Promise<string[]> {
+  const records: string[] = []
+  const walk = async (dir: string, prefix: string): Promise<void> => {
+    for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+      const relative = prefix === '' ? entry.name : `${prefix}/${entry.name}`
+      if (entry.isDirectory()) {
+        records.push(`dir  ${relative}`)
+        await walk(join(dir, entry.name), relative)
+      } else {
+        records.push(`file ${relative} ${(await readFile(join(dir, entry.name))).toString('base64')}`)
+      }
+    }
+  }
+  await walk(root, '')
+  return records
 }
 
 const STANDARD_FIXTURE = [
@@ -470,5 +512,87 @@ describe('agent preset bases (--base standard|ptc)', () => {
     await runInstaller(home, 'agent', ['--uninstall'])
     expect(existsSync(join(home, '.agent-presets', 'evolution'))).toBe(false)
     expect(existsSync(join(home, '.agent-presets', 'evolution-ptc'))).toBe(false)
+  })
+
+  it('G3-①: --check-presets reports a freshly installed variant fresh and writes nothing', async () => {
+    const home = await tempRoot('dsh-preset-freshness-fresh-')
+    const presetRoot = join(home, 'preset')
+    await mkdir(join(presetRoot, 'standard'), { recursive: true })
+    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    const destination = join(home, '.agent-presets', 'evolution')
+    const before = await treeSnapshot(home)
+
+    // Exit 0 is the absence of a rejection: execFile rejects on a non-zero exit.
+    const { stdout } = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetStatus(stdout, destination)).toBe('fresh')
+    // A base the user never installed is absent, not stale — and an unusable base
+    // is not reported at all (it has no fresh install to compare against).
+    expect(presetStatus(stdout, join(home, '.agent-presets', 'evolution-ptc'))).toBe('absent')
+    expect(stdout).not.toContain('evolution-cordis')
+    expect(stdout).not.toContain('evolution-minimal')
+    // The report says what a difference means, and that it is not a repair.
+    expect(stdout).toContain('install-time snapshot')
+    expect(stdout).toContain('never overwrites')
+    // ...and it is a READ: not one byte under the home may move.
+    expect(await treeSnapshot(home)).toEqual(before)
+  })
+
+  it('G3-①: --check-presets reports DIFFERS with exit 1 and never repairs the file', async () => {
+    const home = await tempRoot('dsh-preset-freshness-stale-')
+    const presetRoot = join(home, 'preset')
+    await mkdir(join(presetRoot, 'standard'), { recursive: true })
+    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    const destination = join(home, '.agent-presets', 'evolution')
+    const compositionPath = join(destination, 'agent.cordis.yml')
+    // One hand-edited line stands in for every way the file can drift from what a
+    // fresh install would write: a platform change, a family upgrade, a user edit.
+    const edited = (await readFile(compositionPath, 'utf8')).replace('- id: persona', '- id: persona-edited')
+    await writeFile(compositionPath, edited)
+
+    const failure = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stdout?: string })
+    expect(failure).not.toBeNull()
+    expect(failure?.code).toBe(1)
+    // The line NAMES the stale destination, so a user with several variants knows
+    // which file to regenerate.
+    expect(failure?.stdout).toContain(destination)
+    expect(presetStatus(failure?.stdout ?? '', destination)).toBe('DIFFERS')
+
+    // "Report, never overwrite" is the whole point: the check is not a repair
+    // pass, so the edit survives it and no temp file is left behind.
+    expect(await readFile(compositionPath, 'utf8')).toBe(edited)
+    expect(await readFile(compositionPath, 'utf8')).toContain('persona-edited')
+    expect((await readdir(destination)).sort()).toEqual(['agent.cordis.yml', 'preset.yml'])
+  })
+
+  it('G3-①: --check-presets reports a missing composition absent, exit 0, and skips unusable bases', async () => {
+    const home = await tempRoot('dsh-preset-freshness-absent-')
+    const presetRoot = join(home, 'preset')
+    await mkdir(join(presetRoot, 'standard'), { recursive: true })
+    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    const destination = join(home, '.agent-presets', 'evolution')
+    // Absent is not an error: the user may simply not have kept this variant, so
+    // a removed composition must not turn into a failing check.
+    await rm(join(destination, 'agent.cordis.yml'))
+    const { stdout } = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetStatus(stdout, destination)).toBe('absent')
+    expect(presetStatus(stdout, join(home, '.agent-presets', 'evolution-ptc'))).toBe('absent')
+    expect(existsSync(join(destination, 'agent.cordis.yml'))).toBe(false)
+
+    // The library shape behind the flag: one record per INSTALLABLE base, each
+    // carrying the directory and preset id a caller needs to act on the report.
+    // minimal (registered unsupported) and cordis (needs a web-app profile, and
+    // this home has none) are skipped rather than called stale.
+    const emptyHome = await tempRoot('dsh-preset-freshness-shape-')
+    const report = await callInstaller(`return installer.checkAgentPresetFreshness({ home: ${JSON.stringify(emptyHome)} })`) as {
+      bases: Array<{ base: string; id: string; destination: string; status: string }>
+    }
+    expect(report.bases).toEqual([
+      { base: 'standard', id: 'evolution', destination: join(emptyHome, '.agent-presets', 'evolution'), status: 'absent' },
+      { base: 'ptc', id: 'evolution-ptc', destination: join(emptyHome, '.agent-presets', 'evolution-ptc'), status: 'absent' },
+    ])
   })
 })
