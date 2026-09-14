@@ -26,6 +26,13 @@ export interface DoctorReport {
    * installing `all` — which double-mounts the preset's model rows (the
    * exact conflict this report flags). */
   installForm: 'full' | 'host' | 'preset' | 'layered' | 'preset-only' | 'none'
+  /** The PRODUCT form the install form implies (0.3.77, C axis). `variant` =
+   * session-level opt-in: the model tools live in the Evolution preset, so a
+   * session on any platform original preset carries none of the family and the
+   * cross-session consumers skip it (config `sessionScoped`). `attach` =
+   * profile-level: the model rows sit at profile root and every session carries
+   * them. The two are mutually exclusive install targets (E-33). */
+  deploymentForm: 'variant' | 'attach' | 'host-only' | 'preset-only' | 'none'
   /** Aggregated across ALL profiles under `home` (N13, v12): doctor answers
    * "is any profile carrying an evolution bundle / which install forms exist"
    * — not "what this runtime mounted". `services.review` is the runtime-side
@@ -244,6 +251,12 @@ export async function diagnose(
   }
 
   const installForm: DoctorReport['installForm'] = full ? 'full' : preset ? 'preset' : layered ? 'layered' : host ? 'host' : presetDirInstalled ? 'preset-only' : 'none'
+  // 0.3.77 (C axis): the install form in PRODUCT terms. The distinction decides
+  // whether a platform original preset session is a family session at all — the
+  // cross-session rows carry `sessionScoped: true` and answer it per session.
+  const deploymentForm: DoctorReport['deploymentForm'] = installForm === 'layered'
+    ? 'variant'
+    : installForm === 'full' || installForm === 'preset' ? 'attach' : installForm === 'host' ? 'host-only' : installForm === 'preset-only' ? 'preset-only' : 'none'
 
   // OPT-22 (2026-09): only real double-mount rows drive the action ladder's
   // "keep exactly one" advice. The enumeration/manifest DEGRADED detail also
@@ -262,7 +275,7 @@ export async function diagnose(
   else if (undecidable) actions.push('The install form is UNDECIDABLE (see the DEGRADED row above): an unreadable profiles directory or profile manifest hides whatever is installed, so this report must not add or remove a bundle. Fix the reported read failure, then re-run /evolution doctor.')
   else if (installForm === 'none') actions.push('Install the default full bundle: dsh plugin --profile web add @lmzhen/dsh-evolution-all')
   else if (installForm === 'preset-only') actions.push('The Evolution preset is delivered but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or remove .agent-presets/evolution if the layered layout is no longer wanted.')
-  else if (installForm === 'layered') actions.push('Model tools follow the Evolution preset per session; add @lmzhen/dsh-evolution-all instead if every session should have them.')
+  else if (installForm === 'layered') actions.push('Variant form (session opt-in): model tools follow the Evolution preset, and a session on a platform original preset carries no family rows; add @lmzhen/dsh-evolution-all instead if every session should have them.')
   const env = envIssues()
   if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')
   if (services.review && !services.curator) actions.push('Curator service is not mounted — automatic curation is off; verify the host/all bundle row set is complete.')
@@ -277,12 +290,12 @@ export async function diagnose(
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended.`)
 
-  return { installForm, bundles, conflicts, envIssues: env, memoryIssues, services, pendingCount, executingCount, actions }
+  return { installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, services, pendingCount, executingCount, actions }
 }
 
 export function renderDoctorText(report: DoctorReport): string {
   const lines = [
-    `Evolution doctor — install form: ${report.installForm}`,
+    `Evolution doctor — install form: ${report.installForm} (deployment: ${report.deploymentForm})`,
     `bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
     // v29 DOC-01: `review` is INFERRED from installed bundles across all
     // profiles (no runtime probe exists) — the render now says so, per the

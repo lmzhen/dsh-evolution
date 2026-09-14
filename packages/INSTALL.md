@@ -23,10 +23,10 @@ the source diff — a form is "已验证" only when an install ran against that 
 
 | Form | Audit label | Status on `0.1.5-rc.2` | Basis |
 |---|---|---|---|
-| §1 Layered (`--mode layered`, source checkout) | M4 | **部分已验证** | preset resolution now probes the 0.1.5 shipped location first and is covered by `installer.spec.ts` (G2.1); the profile write path itself is unchanged and still only exercised on the dev tree |
+| §1 ① Variant — layered (`--mode variant` / `layered`, source checkout) | M4 | **部分已验证** | preset resolution now probes the 0.1.5 shipped location first and is covered by `installer.spec.ts` (G2.1); the profile write path itself is unchanged and still only exercised on the dev tree |
 | §2 Host-only (`--mode host`) | M2 (host half) | **未验证**（源码级判定） | the host bundle overrides two platform base rows whose text is byte-identical on both lines; no `0.1.5-rc.2` install has been run |
 | §3 Agent-only (`--mode agent`) | M4 (preset half) | **部分已验证** | same preset-resolution coverage as §1 |
-| §4 One-click (`@lmzhen/dsh-evolution-preset`) | M3 | **未验证**（源码级判定） | no platform package is mounted by the bundle; the row set is the same one §2 uses |
+| §4 ② Attach — one-click (`--mode attach` / `oneclick`, `@lmzhen/dsh-evolution-preset`) | M3 | **未验证**（源码级判定） | no platform package is mounted by the bundle; the row set is the same one §2 uses |
 | §5 Production (`dsh plugin add @lmzhen/dsh-evolution-all`) | M1 | **未验证**（源码级判定） | the published ranges are `^0.1.5-rc.2` (see `scripts/verify-platform-ranges.mjs`); resolution against a real 0.1.5 profile has not been run |
 
 Reading the matrix: "未验证" is a statement about evidence, not about expected
@@ -47,7 +47,12 @@ the first real 0.1.5 install.
 > reason the one-click `preset` bundle is ALSO exclusive with the layered
 > layout (its model rows would double-mount the layered preset's rows).
 > Choose one:
-> full (`all`), layered (`host` + preset), or one-click (`preset`).
+> **② attach** — full (`all`) or one-click (`preset`) — where every session,
+> including one on a platform original preset, carries the family's model rows;
+> or **① variant** — layered (`host` + the generated Evolution preset,
+> `--mode variant`) — where the model rows exist only inside the family preset,
+> so a session on an original preset gets no evolution behaviour at all
+> (`sessionScoped`; `/evolution doctor` prints `deployment: variant|attach`).
 
 ## Platform mode × self-evolution
 

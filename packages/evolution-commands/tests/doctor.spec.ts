@@ -19,6 +19,10 @@ describe('doctor (WB2, 0.3.55)', () => {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
       const report = await diagnose(stub, { home })
       expect(report.installForm).toBe('full')
+      // C axis (0.3.77): 'full' is the ATTACH product form — every session
+      // carries the family's model rows, which is what the session-scoped gate
+      // then resolves per session.
+      expect(report.deploymentForm).toBe('attach')
       expect(report.conflicts).toEqual([])
       expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
       // P0-1 (v11): review is inferred from the bundle (it provides no service
@@ -35,6 +39,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
       const report = await diagnose(stub, { home })
       expect(report.services.review).toBe(true)
+      expect(report.deploymentForm).toBe('host-only')
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -51,6 +56,9 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect((await diagnose(stub, { home })).installForm).toBe('host')
       await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
       expect((await diagnose(stub, { home })).installForm).toBe('layered')
+      // ...and the product name for that layout: the variant form, in which a
+      // session on a platform original preset carries no family rows at all.
+      expect((await diagnose(stub, { home })).deploymentForm).toBe('variant')
     } finally {
       await rm(home, { recursive: true, force: true })
     }

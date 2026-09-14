@@ -307,6 +307,26 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(composition).toContain('- id: present')
   })
 
+  it('names the two product forms: --mode variant = layered, --mode attach = oneclick (0.3.77)', async () => {
+    const home = await tempRoot('dsh-preset-form-')
+    const presetRoot = join(home, 'preset')
+    await mkdir(join(presetRoot, 'standard'), { recursive: true })
+    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    // The product names are ALIASES of the historical modes, not a second mode
+    // table: variant resolves to layered (host bundle + generated preset) and
+    // attach to the one-click preset bundle. The summary names the form, so an
+    // operator sees which of the two mutually exclusive layouts (E-33) this run
+    // installs without decoding the mode name.
+    const variant = await runInstaller(home, 'variant', ['--dry-run'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(variant.stdout).toContain('mode:     layered')
+    expect(variant.stdout).toContain('form:     variant')
+    // The alias table is closed: a near-miss fails loud instead of falling back
+    // to the default mode.
+    const bad = await runInstaller(home, 'variantt', ['--dry-run'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(bad?.stderr).toContain('unknown mode variantt')
+  })
+
   it('refuses an unknown base by name, before any write', async () => {
     const home = await tempRoot('dsh-preset-base-unknown-')
     const error = await runInstaller(home, 'agent', ['--base', 'nonsense'])

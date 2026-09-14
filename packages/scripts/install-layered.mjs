@@ -23,6 +23,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
 
 const MODES = new Set(['host', 'agent', 'layered', 'oneclick'])
+// 0.3.77 (C axis): the two PRODUCT forms get first-class names. `variant` is
+// the session-level opt-in layout (host bundle + generated preset = the
+// historical `layered`); `attach` mounts everything on the original presets
+// (= `oneclick`). The old names stay valid; one normalizer so a library caller
+// and the CLI cannot disagree about which mode was asked for.
+const MODE_ALIASES = new Map([['variant', 'layered'], ['attach', 'oneclick']])
+const normalizeMode = (mode) => MODE_ALIASES.get(mode) ?? mode
+/** The product form a mode installs: ① variant / ② attach / infra-only / preset-only. */
+function deploymentFormOf(mode) {
+  if (mode === 'layered') return 'variant'
+  if (mode === 'oneclick') return 'attach'
+  if (mode === 'host') return 'host-only'
+  return 'preset-only'
+}
 const EVOLUTION_PREFIXES = [
   'dsh-evolution-',
   'dsh-memory',
@@ -762,8 +776,8 @@ async function installAgentPreset(home, dryRun, force, runtimeComposition, base)
 }
 
 export async function uninstall(options = {}) {
-  const mode = options.mode ?? 'layered'
-  if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')}`)
+  const mode = normalizeMode(options.mode ?? 'layered')
+  if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')} (or the product names variant/attach)`)
   const home = options.home ?? resolveHome(options.env)
   const profile = options.profile ?? 'web'
   const dryRun = options.dryRun === true
@@ -952,8 +966,8 @@ function manifestCarriesBundle(profileDir, bundle) {
 }
 
 export async function install(options = {}) {
-  const mode = options.mode ?? 'layered'
-  if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')}`)
+  const mode = normalizeMode(options.mode ?? 'layered')
+  if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')} (or the product names variant/attach)`)
   const home = options.home ?? resolveHome(options.env)
   const profile = options.profile ?? 'web'
   const dryRun = options.dryRun === true
@@ -996,7 +1010,7 @@ export async function install(options = {}) {
   // host/layered/oneclick).
   const profileDir = profileDirectory(home, profile)
   const profileReady = !dryRun && mode !== 'agent'
-  const result = { mode, home, profile, profileDir, base: presetBase, bases: presetEntries.map(entry => entry.base), copied: [], missingEntrypoints: [], bundle: null, agentPreset: null, agentPresets: [] }
+  const result = { mode, form: deploymentFormOf(mode), home, profile, profileDir, base: presetBase, bases: presetEntries.map(entry => entry.base), copied: [], missingEntrypoints: [], bundle: null, agentPreset: null, agentPresets: [] }
   // v21 (S-1): the bundle-dependency outcome, recorded onto the journal at the
   // end of the run (null in dry-run — no journal is written then anyway).
   let dependencyInfo = null
@@ -1259,6 +1273,7 @@ if (isMain) {
       // branch above indents correctly) — realign with the surrounding try.
       console.log(`scope:    ${EVOLUTION_SCOPE}`)
       console.log(`mode:     ${result.mode}`)
+      console.log(`form:     ${result.form}${result.form === 'variant' ? ' (session opt-in: original presets carry no family rows)' : result.form === 'attach' ? ' (profile-level: every session carries the family rows)' : ''}`)
       console.log(`profile:  ${result.profile} (${result.profileDir})`)
       if (result.bundle) console.log(`bundle:   ${result.bundle}`)
       console.log(`copied:   ${result.copied.length} evolution packages`)

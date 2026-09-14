@@ -136,7 +136,7 @@ the platform's highest first-party order ever reaches them.
 
 ## Composition
 
-### Layered install (recommended)
+### ① Variant install — session-level opt-in (recommended)
 
 Install the host bundle into the profile:
 
@@ -145,10 +145,17 @@ Install the host bundle into the profile:
   name: '@deepseek-ai/dsh-evolution-host'
 ```
 
-Then select the `Evolution` agent preset for sessions that should expose the
-`memory` / `skill_manage` tools. Sessions on other presets keep the shared
-automation (review, curator, approval, observability) without model-facing
-evolution tools.
+Then select the `Evolution` agent preset for the sessions that should be family
+sessions. The model tools (`memory` / `skill_manage` / `session_search` / the
+skill catalog) exist only inside that preset, and the cross-session rows carry
+`sessionScoped: true`: review, usage telemetry and the curator act on a session
+only when it carries the family's model tools. **A session running a platform
+original preset (`standard` / `ptc` / `minimal` / `cordis`) therefore gets no
+evolution behaviour at all** — no injected review prompt, no usage counting, no
+curation influence over it (`evolution-core/src/opt-in.ts`).
+
+Installer equivalent: `install-layered --mode variant` (the historical
+`--mode layered`), with `--base standard,ptc` to generate one preset per base.
 
 > **One-time step (V7-06):** before a session can select the `Evolution`
 > preset, run `/evolution preset install` once in a session on any preset —
@@ -156,18 +163,27 @@ evolution tools.
 > profile. See the Chinese README for the same flow; without this step a
 > `dsh plugin add`-installed host is mounted but the preset is absent.
 
-### One-click compatibility install
+### ② Attach install — profile-level (one-click)
 
-Use the legacy preset overlay on a standard DSH host:
+Use the preset bundle on a standard DSH host:
 
 ```yaml
 - id: dsh-evolution
   name: '@deepseek-ai/dsh-evolution-preset'
 ```
 
-This one-click preset and the layered `evolution-host` bundle are ALTERNATIVE
-install targets (mutual exclusion, E-33) — install one, not both, or the shared
-infra rows mount twice. The one-click preset carries its own
+Here the family's model rows sit at profile root, so **every** session carries
+them — including sessions on the platform's original presets, which is this
+form's purpose. The `sessionScoped` probe asks the same question per session and
+every session passes it, so nothing is skipped.
+
+Installer equivalent: `install-layered --mode attach` (the historical
+`--mode oneclick`). `/evolution doctor` reports which form a machine is on
+(`deployment: variant` / `attach`).
+
+This one-click preset and the `evolution-host` bundle are ALTERNATIVE install
+targets (mutual exclusion, E-33) — install one, not both, or the shared infra
+rows mount twice. The one-click preset carries its own
 `evolution-maintenance-tools` row, its own `session-query-sqlite` index
 override and the same root-level `tool-skill` 60-char catalog cap override as
 the host bundle. Sessions running under an agent preset read the PRESET-scope
