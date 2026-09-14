@@ -11,12 +11,26 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
-import { evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
+import { fileURLToPath } from 'node:url'
+import { composePresetComposition, evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
 
 /** D-6 (v18): exact-segment tail match (the loose substring form matched a
  * hypothetical `dsh-evolution-allowlist`). */
 const tailOf = (name: string): string => name.slice(name.lastIndexOf('/') + 1)
 const EVOLUTION_BUNDLE_TAILS = new Set(['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset'])
+
+/** G3-② (B2): one delivered preset variant compared against a fresh generation.
+ * "absent" is the user simply not using that base (never an action); "unknown"
+ * is a comparison that could not run, kept distinct from a verified "fresh". */
+export interface PresetFreshnessRow {
+  /** Agent-preset base name (the id the platform registry read() takes). */
+  base: string
+  /** Install destination <home>/.agent-presets/<base.id> that was compared. */
+  destination: string
+  status: 'fresh' | 'differs' | 'absent' | 'unknown'
+  /** Why the comparison could not run — set on unknown rows only. */
+  detail?: string
+}
 
 export interface DoctorReport {
   /** OPT-23 (2026-09): `preset-only` — the delivered Evolution preset
@@ -52,6 +66,12 @@ export interface DoctorReport {
   /** v23 (AP-2): claimed-but-crashed records — the only state that needs an
    * operator action (reject) to clear; surfaced separately from pending. */
   executingCount: number | null
+  /** G3-② (B2): how the delivered preset variants compare with what a fresh
+   * generation would write against THIS runtime platform. A variant embeds the
+   * platform composition of its install day, so a platform change or a family
+   * upgrade leaves a file describing a platform that no longer exists. Read-only:
+   * a stale snapshot is reported, never repaired. */
+  presetFreshness: PresetFreshnessRow[]
   actions: string[]
 }
 
@@ -163,6 +183,153 @@ function memoryInterpolationIssues(home: string): string[] {
   return issues
 }
 
+/** G3-② (B2): the family delta container. An optionalDependency of this
+ * package, so resolution may legitimately fail; every failure degrades to
+ * "unknown" — the doctor never throws.
+ * Platform anchor: agentPresets.read(id) — preset/agent-presets/src/index.ts:501. */
+const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-evolution-agent-preset'
+
+/** Resolve one asset the package declares in its exports map.
+ * @param asset - bases.json or agent.cordis.yml.
+ * @returns the file path, or null when the package is not installed. */
+function resolveAgentPresetAsset(asset: string): string | null {
+  try {
+    return fileURLToPath(import.meta.resolve(`${AGENT_PRESET_PACKAGE}/${asset}`))
+  } catch {
+    // Optional dependency absent (or the export renamed): "cannot recompute",
+    // which the caller reports as unknown instead of guessing a path.
+    return null
+  }
+}
+
+/** The base rows of bases.json: the comparison iterates the same table the
+ * installer reads, so doctor cannot check a different set of variants.
+ * @param path - resolved bases.json.
+ * @returns the rows, or null when the table is unreadable or malformed. */
+function readAgentPresetBases(path: string): Array<{ name: string; id: string }> | null {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { bases?: unknown }
+    if (!Array.isArray(parsed.bases)) return null
+    const rows: Array<{ name: string; id: string }> = []
+    for (const raw of parsed.bases) {
+      const entry = raw as { name?: unknown; id?: unknown }
+      if (typeof entry.name !== 'string' || typeof entry.id !== 'string') return null
+      rows.push({ name: entry.name, id: entry.id })
+    }
+    return rows.length > 0 ? rows : null
+  } catch {
+    // A missing or torn table is a broken install, not "no bases": the caller
+    // reports unknown rather than comparing against an empty expectation.
+    return null
+  }
+}
+
+/** Preset directories already on disk, used to keep an installed variant
+ * VISIBLE when the base table itself could not be read.
+ * @param root - the .agent-presets directory.
+ * @returns the directory names; empty when nothing is installed. */
+function installedPresetIds(root: string): string[] {
+  const ids: string[] = []
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(root, { withFileTypes: true })
+  } catch {
+    // No .agent-presets yet (or an unreadable one): there is no installed
+    // variant to compare, which the caller renders as no rows at all.
+    return ids
+  }
+  for (const entry of entries) if (entry.isDirectory()) ids.push(entry.name)
+  return ids
+}
+
+/**
+ * G3-② (B2): recompute what a fresh generation would write for every
+ * installed variant and compare it byte-for-byte with the file on disk.
+ *
+ * The recomputation goes through composePresetComposition — the SAME rule
+ * /evolution preset install and install-layered.mjs apply (collision guard +
+ * row-overrides.json), so doctor cannot disagree with the installer about what
+ * "fresh" means. Read-only by contract: the snapshot is never rewritten.
+ * @param home - resolved DSH_HOME.
+ * @param registry - the platform agent-preset registry, undefined when unmounted.
+ * @returns one row per base in the family bases.json.
+ */
+async function probePresetFreshness(
+  home: string,
+  registry: { read(id: string): Promise<string> } | undefined,
+): Promise<PresetFreshnessRow[]> {
+  const presetsRoot = join(home, '.agent-presets')
+  const basesPath = resolveAgentPresetAsset('bases.json')
+  // The package's OWN delta: DSH_EVOLUTION_DELTA_PATH is documented as a
+  // source-installer knob (README), so this session-side comparison must not
+  // read it — doctor answers what /evolution preset install would write.
+  const deltaPath = resolveAgentPresetAsset('agent.cordis.yml')
+  const bases = basesPath === null ? null : readAgentPresetBases(basesPath)
+  // The family half of the comparison. Without the delta there is nothing to
+  // generate, and the reason travels into every row it blocks.
+  let delta: string | null = null
+  let deltaFailure = `${AGENT_PRESET_PACKAGE}/agent.cordis.yml could not be resolved — is the family agent-preset package installed?`
+  if (deltaPath !== null) {
+    try {
+      delta = readFileSync(deltaPath, 'utf8')
+    } catch (error) {
+      deltaFailure = `${deltaPath} could not be read (${error instanceof Error ? error.message : String(error)})`
+    }
+  }
+  if (bases === null) {
+    // No table means no base can be NAMED, but an installed variant is still
+    // visible by directory — report it as unknown instead of silently clean.
+    const tablePath = basesPath ?? `${AGENT_PRESET_PACKAGE}/bases.json`
+    return installedPresetIds(presetsRoot).map(id => ({
+      base: id,
+      destination: join(presetsRoot, id),
+      status: 'unknown' as const,
+      detail: `the family base table could not be read (${tablePath}) — a fresh generation cannot be recomputed`,
+    }))
+  }
+  const rows: PresetFreshnessRow[] = []
+  for (const base of bases) {
+    const destination = join(presetsRoot, base.id)
+    const compositionPath = join(destination, 'agent.cordis.yml')
+    // Not installed is not an error: the user may simply not use this base.
+    if (!existsSync(compositionPath)) {
+      rows.push({ base: base.name, destination, status: 'absent' })
+      continue
+    }
+    if (registry === undefined) {
+      rows.push({ base: base.name, destination, status: 'unknown', detail: 'the platform agent-preset registry is not mounted, so the runtime composition cannot be read' })
+      continue
+    }
+    if (delta === null) {
+      rows.push({ base: base.name, destination, status: 'unknown', detail: deltaFailure })
+      continue
+    }
+    let platform: string
+    try {
+      platform = await registry.read(base.name)
+    } catch (error) {
+      rows.push({ base: base.name, destination, status: 'unknown', detail: `the runtime composition for base "${base.name}" could not be read (${error instanceof Error ? error.message : String(error)})` })
+      continue
+    }
+    let fresh: string
+    try {
+      fresh = composePresetComposition(platform, delta)
+    } catch (error) {
+      rows.push({ base: base.name, destination, status: 'unknown', detail: `a fresh generation refused to compose (${error instanceof Error ? error.message : String(error)})` })
+      continue
+    }
+    let onDisk: string
+    try {
+      onDisk = readFileSync(compositionPath, 'utf8')
+    } catch (error) {
+      rows.push({ base: base.name, destination, status: 'unknown', detail: `${compositionPath} could not be read (${error instanceof Error ? error.message : String(error)})` })
+      continue
+    }
+    rows.push({ base: base.name, destination, status: fresh === onDisk ? 'fresh' : 'differs' })
+  }
+  return rows
+}
+
 /**
  * Diagnose the deployment. `ctx` supplies service presence (a bare stub with
  * only `get` is enough); `home` defaults to the evolution root so tests can
@@ -187,6 +354,11 @@ export async function diagnose(
       : `a profile manifest could not be read or parsed (${detail}) — this profile's bundle rows are UNKNOWN, so the install-form and conflict checks are DEGRADED and may miss installed bundles`)
   })
   const has = (name: string) => ctx.get(name) !== undefined
+  // G3-② (B2): the variant half of the report. Computed before the action
+  // ladder so a stale snapshot contributes its own regeneration step; the
+  // registry probe is the same optional-service read the preset installer does.
+  const presetRegistry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
+  const presetFreshness = await probePresetFreshness(home, presetRegistry)
 
   const full = bundles.some(name => tailOf(name) === 'dsh-evolution-all')
   const host = bundles.some(name => tailOf(name) === 'dsh-evolution-host')
@@ -290,7 +462,19 @@ export async function diagnose(
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended.`)
 
-  return { installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, services, pendingCount, executingCount, actions }
+  // G3-② (B2): only `differs` is actionable — the file is stale, not broken,
+  // and regenerating it is the user's call. `absent` is a base the user never
+  // installed, and `unknown` is a comparison that could not run at all, so
+  // neither may be dressed up as advice to re-run the installer.
+  for (const row of presetFreshness) {
+    if (row.status !== 'differs') continue
+    actions.push(`Preset variant ${row.destination} DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+  }
+
+  return {
+    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, services,
+    pendingCount, executingCount, presetFreshness, actions,
+  }
 }
 
 export function renderDoctorText(report: DoctorReport): string {
@@ -305,6 +489,18 @@ export function renderDoctorText(report: DoctorReport): string {
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
     `executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`,
   ]
+  // G3-② (B2): one line per variant that EXISTS. `absent` rows are omitted —
+  // every base this deployment does not install would otherwise claim a line
+  // about a variant nobody chose; the report data keeps them for --json.
+  for (const row of report.presetFreshness) {
+    if (row.status === 'absent') continue
+    const verdict = row.status === 'fresh'
+      ? 'fresh — a fresh generation matches this file byte-for-byte'
+      : row.status === 'differs'
+        ? 'DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate'
+        : `unknown — a fresh generation could not be recomputed (${row.detail ?? 'reason not recorded'})`
+    lines.push(`preset:   ${row.destination}  ${verdict}`)
+  }
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))

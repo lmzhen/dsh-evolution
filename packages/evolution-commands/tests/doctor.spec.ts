@@ -1,10 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { composePresetComposition } from '@deepseek-ai/dsh-evolution-core'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doctor.ts'
 
 const stub = { get: () => undefined }
+
+/** G3-② (B2): the delta and the base table doctor compares against, resolved
+ * from the installed family package through the same export a user install uses. */
+function familyAsset(asset: string): string {
+  return fileURLToPath(import.meta.resolve(`@deepseek-ai/dsh-evolution-agent-preset/${asset}`))
+}
+
+/** G3-② (B2): the runtime platform registry stub. It carries the
+ * `- id: tool-skill` row the composer injects the 60-char cap onto, so the
+ * fixture exercises the shared row-overrides table as well as the composition. */
+const PLATFORM_COMPOSITION = [
+  '- id: tool-skill',
+  "  name: '@deepseek-ai/dsh-skill-catalog'",
+  '',
+  '- id: persona',
+  "  text: 'harness persona'",
+  '',
+].join('\n')
+
+function presetRegistry(composition: string): { get(name: string): unknown } {
+  return { get: (name: string) => name === 'agentPresets' ? { read: async () => composition } : undefined }
+}
 
 async function makeProfile(home: string, profile: string, bundles: string[]): Promise<void> {
   const dir = join(home, 'profiles', profile)
@@ -315,6 +340,78 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(true)
     } finally {
       await rm(empty, { recursive: true, force: true })
+    }
+  })
+
+  it('G3-② (B2): a variant matching a fresh generation is fresh; a hand-edited one DIFFERS and is left untouched', async () => {
+    // The variant is an INSTALL-TIME snapshot of the platform composition: the
+    // file mounts fine while describing a platform that has moved on, and only a
+    // recompute against the live composition can tell the two apart.
+    const home = await mkdtemp(join(tmpdir(), 'doctor-preset-fresh-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      const delta = readFileSync(familyAsset('agent.cordis.yml'), 'utf8')
+      const destination = join(home, '.agent-presets', 'evolution')
+      const compositionPath = join(destination, 'agent.cordis.yml')
+      await mkdir(destination, { recursive: true })
+      await writeFile(compositionPath, composePresetComposition(PLATFORM_COMPOSITION, delta), 'utf8')
+
+      const report = await diagnose(presetRegistry(PLATFORM_COMPOSITION), { home })
+      const row = report.presetFreshness.find(entry => entry.base === 'standard')
+      expect(row?.destination).toBe(destination)
+      expect(row?.status).toBe('fresh')
+      expect(report.actions.some(action => action.includes(destination))).toBe(false)
+      expect(renderDoctorText(report)).toContain(`${destination}  fresh`)
+
+      // One hand-edited line is the whole failure: the file still mounts, but it
+      // no longer describes a generation this platform can produce.
+      const edited = `${readFileSync(compositionPath, 'utf8')}# hand edit\n`
+      await writeFile(compositionPath, edited, 'utf8')
+      const stale = await diagnose(presetRegistry(PLATFORM_COMPOSITION), { home })
+      expect(stale.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('differs')
+      expect(stale.actions.some(action => action.includes(destination))).toBe(true)
+      // The line a user reads: pinned verbatim, destination included.
+      expect(renderDoctorText(stale)).toContain(`preset:   ${destination}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+      // READ-ONLY: reporting an install-time snapshot never rewrites it.
+      expect(readFileSync(compositionPath, 'utf8')).toBe(edited)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('G3-② (B2): a directory without the composition is absent; an unmounted or failing registry is unknown', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-preset-unknown-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      const destination = join(home, '.agent-presets', 'evolution')
+      const compositionPath = join(destination, 'agent.cordis.yml')
+      await mkdir(destination, { recursive: true })
+      // A leftover directory is not an installed variant (the artifact rule the
+      // install-form check already uses) and is nothing to act on either.
+      const absent = await diagnose(presetRegistry(PLATFORM_COMPOSITION), { home })
+      expect(absent.presetFreshness.map(entry => entry.base)).toEqual(expect.arrayContaining(['standard', 'ptc', 'cordis', 'minimal']))
+      expect(absent.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('absent')
+      expect(absent.actions.some(action => action.includes(destination))).toBe(false)
+      expect(renderDoctorText(absent)).not.toContain(destination)
+
+      await writeFile(compositionPath, 'rows: []\n', 'utf8')
+      // No registry mounted: one half of the comparison is missing, so the
+      // variant is unknown — never a fake fresh.
+      const unmounted = await diagnose(stub, { home })
+      const unmountedRow = unmounted.presetFreshness.find(entry => entry.base === 'standard')
+      expect(unmountedRow?.status).toBe('unknown')
+      expect(unmountedRow?.detail).toContain('registry is not mounted')
+      expect(unmounted.actions.some(action => action.includes(destination))).toBe(false)
+      expect(renderDoctorText(unmounted)).toContain('could not be recomputed')
+
+      // A registry that fails the read (a preset root it cannot open) degrades
+      // the same way instead of reporting the file as clean.
+      const failing = { get: (name: string) => name === 'agentPresets' ? { read: async () => { throw new Error('EACCES: unreadable preset root') } } : undefined }
+      const failedRow = (await diagnose(failing, { home })).presetFreshness.find(entry => entry.base === 'standard')
+      expect(failedRow?.status).toBe('unknown')
+      expect(failedRow?.detail).toContain('EACCES: unreadable preset root')
+    } finally {
+      await rm(home, { recursive: true, force: true })
     }
   })
 })
