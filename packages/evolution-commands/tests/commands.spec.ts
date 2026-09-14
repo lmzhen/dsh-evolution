@@ -626,6 +626,33 @@ describe('evolution-commands', () => {
     expect(readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')).toBe(before)
   })
 
+  it('G1-② (0.3.78): refuses an unsupported base and one whose required service is absent', async () => {
+    // The installer refuses the same two cases from the same table; the command
+    // asks the runtime for the service itself, which is exactly the reason a
+    // mount would refuse. Both paths must agree, or one of them generates a
+    // preset that cannot mount. tempHome FIRST: the E-33 conflict sweep reads
+    // the real DSH_HOME otherwise, and this machine's web profile carries the
+    // evolution-all bundle — every other preset-install case in this file does
+    // the same for the same reason.
+    const home = await tempHome('evo-commands-ability-')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    ctx.provide('agentPresets', { read: async (id: string) => `# ${id}\n- id: persona\n- id: tool-skill\n` })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-ability-skills-')) })
+    const unsupported = await handler!.handler({ rawInput: 'preset install --base minimal' })
+    expect(unsupported.kind).toBe('error')
+    expect(unsupported.text).toContain('UNSUPPORTED')
+    const missing = await handler!.handler({ rawInput: 'preset install --base cordis' })
+    expect(missing.kind).toBe('error')
+    expect(missing.text).toContain('dynamicCordisRunner')
+    ctx.provide('dynamicCordisRunner', {})
+    const allowed = await handler!.handler({ rawInput: 'preset install --base cordis' })
+    expect(allowed.kind).toBe('success')
+    expect(existsSync(join(home, '.agent-presets', 'evolution-cordis', 'agent.cordis.yml'))).toBe(true)
+  })
+
   it('preset install fails loud when delta rows collide with the runtime standard (0.3.15)', async () => {
     await tempHome('evo-commands-preset-')
     const ctx = new Context()

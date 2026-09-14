@@ -628,12 +628,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               }
               selected.push(entry)
             }
+            // 0.3.78 (G1-②): the SAME two refusals the installer applies, read from
+            // the same table — a base registered as unsupported, or one whose
+            // platform composition injects a service this deployment does not
+            // provide, must not produce a preset that refuses to mount later.
+            const rawBases = JSON.parse(readFileSync(join(source, 'bases.json'), 'utf8')) as {
+              bases?: Array<{ name?: string; requires?: { service?: string }; unsupported?: string }>
+            }
             const deltaPath = join(source, 'agent.cordis.yml')
             if (!existsSync(deltaPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
             const registry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
             if (!registry) return err('Agent preset registry not mounted — cannot compose the Evolution preset against the runtime standard.')
             const written: string[] = []
             for (const base of selected) {
+              const ability = rawBases.bases?.find(candidate => candidate.name === base.name)
+              if (typeof ability?.unsupported === 'string') {
+                return err(`Base "${base.name}" is registered as UNSUPPORTED: ${ability.unsupported}`)
+              }
+              const requiredService = ability?.requires?.service
+              if (typeof requiredService === 'string'
+                && (ctx as unknown as { get(name: string): unknown }).get(requiredService) === undefined) {
+                return err(`Base "${base.name}" requires the "${requiredService}" service, which this deployment does not provide — the generated preset would refuse to mount.`)
+              }
               const target = join(evolutionRoot(), '.agent-presets', base.id)
               const presetPath = join(source, base.metadata)
               if (!existsSync(presetPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
