@@ -160,5 +160,41 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('host-surface difference')
     expect(error?.stderr).toContain('session-events-accessor')
+    // The dispatch writer set is measured, not assumed: on a tree that has none
+    // of it, every recorded site must be named — the check may not pass by
+    // finding nothing (the same vacuity sentry the anchors get).
+    expect(error?.stderr).toContain('native-call')
+    expect(error?.stderr).toContain('registry-writes-none')
+  })
+
+  it('N17: architecture guards reject a consumer that branches on the dispatch modality', async () => {
+    const root = await tempRoot('guard-arch-n17-')
+    const pkg = join(root, 'demo-pkg')
+    await mkdir(join(pkg, 'src'), { recursive: true })
+    // A manifest must exist somewhere under the root or the N8 companion scan
+    // reports a vacuum (a vacuous pass is not a pass).
+    await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-demo-pkg', version: '0.0.0' }), 'utf8')
+    // The incident shape: a consumer deciding what to do from HOW the platform
+    // delivered the call — the branch that made PTC accounting read zero while
+    // the code still looked correct (v37 P7a). The detector must name the site
+    // and the register, not merely fail.
+    await writeFile(join(pkg, 'src', 'index.ts'), "export function keep(dispatch: { kind: string }): boolean {\n  if (dispatch.kind === 'program') return false\n  return true\n}\n", 'utf8')
+    const error = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain("dispatch.kind === 'program'")
+    expect(error?.stderr).toContain('MODALITY_BRANCH_REGISTER')
+    // The same comparison inside the module that OWNS the kinds stays clean:
+    // the route fact has to be readable somewhere, or the normalizer could not
+    // dedupe a start/settle pair. The violation file is emptied so the owner
+    // module is the only site the scan can see.
+    await writeFile(join(pkg, 'src', 'index.ts'), '// moved into the owning module\n', 'utf8')
+    const owner = join(root, 'evolution-core', 'src')
+    await mkdir(owner, { recursive: true })
+    await writeFile(join(owner, 'tool-dispatch.ts'), "export function isProgram(kind: string): boolean {\n  return kind === 'program'\n}\n", 'utf8')
+    const owned = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(owned).toBeNull()
   })
 })

@@ -86,6 +86,16 @@
  *       original preset" and the evolution variant preset. Route the read
  *       through callingScope(ctx); a DELIBERATE global-layer read (diagnostics
  *       only) is registered in SCOPE_READ_REGISTER with its reason.
+ *   N17. modality-BLIND accounting: `ToolDispatchSignal.kind` may be
+ *       discriminated only where the counting unit itself is defined —
+ *       `evolution-core/src/signals.ts` splits a program's sub-dispatches from
+ *       model-facing calls so that one 50-operation program does not advance the
+ *       review cadence by 50 turns. Every other consumer reads the record's
+ *       NAMES and COUNTS and never asks how the platform delivered it: the
+ *       per-modality branch is exactly how PTC accounting went blind while the
+ *       code still looked correct (v37 P7a), and route/dedup is the normalizer's
+ *       job. A deliberate exception is registered in MODALITY_BRANCH_REGISTER
+ *       with its reason.
  *
  * Rule ids are APPEND-ONLY labels: docs, probes and register keys reference them,
  * so a landed id is never reused or renumbered. A new rule takes the next free
@@ -172,6 +182,21 @@ const DISPATCH_EVENT_TYPE_RE = /['"`](tool\/(?:call|result|ptc-dispatch-start|pt
 const DISPATCH_GUARD_MODULE = 'evolution-core/src/tool-dispatch.ts'
 /** Synthetic session logs are built in tests; a test may name the types it writes. */
 const DISPATCH_GUARD_TEST_SUFFIXES = ['.spec.ts', '.test.ts', '.probe.ts', '.e2e.ts']
+// N17 (0.3.77): the dispatch KIND is a route fact owned by tool-dispatch.ts.
+// The literals are the signal (so string literals are NOT masked here, unlike
+// the delivery rules); prose in comments still is.
+const MODALITY_KIND_RE = /\b[A-Za-z_$][\w$]*\.kind\s*(?:===|!==)\s*(['"])(?:native|program|program-root)\1|(['"])(?:native|program|program-root)\2\s*(?:===|!==)\s*[A-Za-z_$][\w$]*\.kind\b/g
+const DISPATCH_KIND_OWNER = 'evolution-core/src/tool-dispatch.ts'
+const MODALITY_BRANCH_REGISTER = new Map([
+  ["evolution-core/src/signals.ts :: dispatch.kind !== 'program'", 'v37 P7a: the ONE split that must exist — toolCalls feeds the review cadence, and the sub-dispatches of a program are not model calls (counting them would let one 50-operation program advance the interval by 50 turns). Every other consumer reads names/counts through skillReadNameOf / countDispatches, which are modality-blind.'],
+])
+/** N17: every comparison of a dispatch kind against a modality literal. */
+function modalityBranchKeys(text) {
+  const code = text
+    .replace(/\/\*[\s\S]*?\*\//g, mask)
+    .replace(/^[ \t]*\/\/.*$/gm, mask)
+  return [...code.matchAll(MODALITY_KIND_RE)].map(match => squash(match[0]))
+}
 // N12 (P5): module-scope mutable process state. Key = '<file> :: <binding>'.
 const MUTABLE_STATE_RE = /^const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*new\s+(?:Set|Map|WeakMap)\b/gm
 const MUTABLE_STATE = new Map([
@@ -252,6 +277,7 @@ const RULES = [
   { id: 'N14', title: 'durable-read failure not served as absent' },
   { id: 'N15', title: 'family Markdown code anchors resolve' },
   { id: 'N16', title: 'platform registry read asks in the calling scope' },
+  { id: 'N17', title: 'dispatch modality is read in registered sites only' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -575,6 +601,14 @@ function walk(dir) {
           violations.push(`${rel}: ${key} — a scope-less platform registry read sees the GLOBAL layer alone; ask in the calling scope via callingScope(ctx), or register a deliberate global read: ${full}`)
         }
       }
+      // N17 (0.3.77): modality-blind accounting — see docblock.
+      if (rel !== DISPATCH_KIND_OWNER && rel.includes('/src/')) {
+        for (const key of modalityBranchKeys(text)) {
+          const full = `${rel} :: ${key}`
+          if (MODALITY_BRANCH_REGISTER.has(full)) continue
+          violations.push(`${rel}: ${key} — a consumer must not branch on the dispatch modality; read the names/counts (skillReadNameOf / countDispatches) or register the branch in MODALITY_BRANCH_REGISTER with its reason: ${full}`)
+        }
+      }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
       if (rel === `${CORE_SRC}/threats.ts`) {
         for (const match of text.matchAll(REGEXP_CLASS_RE)) {
@@ -610,6 +644,12 @@ if (process.argv.includes('--list-rules')) {
       && scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name, scope)").length === 0
       && scopeLessReadKeys("const c = ctx.get('skills')\nc.list({ scope })").length === 0
       && scopeLessReadKeys("const c = ctx.get('skills')\nc.list()").length === 1],
+    ['N17', () => modalityBranchKeys("if (dispatch.kind === 'program') return").length === 1
+      && modalityBranchKeys("if (signal.kind !== 'native') return").length === 1
+      && modalityBranchKeys("if ('program-root' === record.kind) return").length === 1
+      && modalityBranchKeys("const route = dispatch.kind === 'program' ? 'program' : 'direct'").length === 1
+      && modalityBranchKeys("if (dispatch.name === 'skill') return").length === 0
+      && modalityBranchKeys("// a PTC session logs dispatch.kind === 'program' in prose only").length === 0],
     ['N15', () => [...'see evolution-core/src/x.ts:42'.matchAll(FAMILY_ANCHOR_RE)].length === 1 && staleAnchor({ line: 42 }, 10) && !staleAnchor({ line: 9 }, 10)],
     ['N12', () => mutableStateBindings('const bad = new Set()\nbad.add(1)\n').length > 0],
     ['N13a', () => [...'agent.inject(message)'.matchAll(AGENT_INJECT_RE)].length > 0],
@@ -723,7 +763,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s))`)
+  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es))`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78

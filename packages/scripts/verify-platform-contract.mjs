@@ -101,7 +101,7 @@ const CONTRACT_ANCHORS = [
     id: 'code-dispatch-waterfall',
     file: 'packages/core/tools/src/index.ts',
     anchor: "'tools/ptc-dispatch-log'(this: Scoped<ToolRuntime>",
-    consumer: 'none — the family observes tool/call and tool/result',
+    consumer: 'none — a waterfall, not the durable vocabulary; the family folds the DURABLE PTC pair (tool/ptc-dispatch-start + tool/ptc-dispatch) through evolution-core/src/tool-dispatch.ts',
     finding: 'P2-A2',
   },
   {
@@ -138,6 +138,20 @@ const CONTRACT_ANCHORS = [
     anchor: 'DEPLOYMENT_PERSONA_PREFIX: 0,',
     consumer: 'none — the persona section split into prefix/suffix section orders',
     finding: 'P1-3 (order scale) / persona split',
+  },
+  {
+    id: 'dispatch-result-seam',
+    file: 'packages/core/tools/src/index.ts',
+    anchor: "'tools/result'(this: Scoped<ToolRuntime>",
+    consumer: 'none yet — the modality-free seam the rootfix P6 probe identified (2026-09-14): it fires for every execution that reaches a final result, native and PTC alike, with exec.parent set on a nested dispatch. The family still folds the durable log, so this anchor exists to make a rename visible BEFORE a consumer lands.',
+    finding: 'v41 §C (P6 probe)',
+  },
+  {
+    id: 'dispatch-result-seam-emit',
+    file: 'packages/core/tools/src/index.ts',
+    anchor: "'tools/result', exec, result,",
+    consumer: 'the seam ONE emission site (registry), recorded as the chokepoint a modality-blind consumer would hang on',
+    finding: 'v41 §C (P6 probe)',
   },
   {
     id: 'persona-order-literal',
@@ -248,6 +262,58 @@ function exportedNames(dir) {
   return names
 }
 
+/**
+ * The durable dispatch vocabularies the family READS and the platform write
+ * sites that produce them (rootfix P6 probe, re-measured 2026-09-14).
+ *
+ * The family's accounting hangs on these events, so the WRITER SET is itself a
+ * contract, not an implementation detail: one vocabulary per mounted runtime
+ * mode, exactly one write site each, and the registry — the one place every
+ * modality passes through — writing no durable dispatch event at all. A second
+ * writer, a moved site or a third vocabulary is a silent-accounting change: the
+ * family keeps folding what it was taught and never learns the modality it was
+ * not (the v37 P7a incident: PTC sessions credited zero skill reads). Arch guard
+ * N11 keeps a second reader from matching a vocabulary directly; this table
+ * keeps the writer side visible. `sites` is the recorded occurrence count.
+ */
+const DISPATCH_WRITE_SITES = [
+  {
+    id: 'native-call',
+    file: 'packages/core/agent-loop/src/tool-calls.ts',
+    needle: "append('tool/call'",
+    sites: 1,
+    owner: 'the agent loop is the ONLY writer of the native call vocabulary',
+  },
+  {
+    id: 'native-result',
+    file: 'packages/core/agent-loop/src/tool-calls.ts',
+    needle: "append('tool/result'",
+    sites: 1,
+    owner: 'the agent loop settles the native call it opened',
+  },
+  {
+    id: 'ptc-dispatch-start',
+    file: 'packages/core/tools/src/ptc.ts',
+    needle: "append('tool/ptc-dispatch-start'",
+    sites: 1,
+    owner: 'the PTC bridge opens one durable record per sub-dispatch',
+  },
+  {
+    id: 'ptc-dispatch-settle',
+    file: 'packages/core/tools/src/ptc.ts',
+    needle: "append('tool/ptc-dispatch'",
+    sites: 1,
+    owner: 'and settles the same record (the family folds the pair into ONE dispatch)',
+  },
+  {
+    id: 'registry-writes-none',
+    file: 'packages/core/tools/src/index.ts',
+    needle: "append('tool/call'",
+    sites: 0,
+    owner: 'the registry writes NO durable dispatch event for a model-direct call — the structural hole that makes the native vocabulary the agent loop business alone',
+  },
+]
+
 const recordedDrift = []
 for (const entry of CONTRACT_ANCHORS) {
   const path = join(upstream, entry.file)
@@ -257,6 +323,22 @@ for (const entry of CONTRACT_ANCHORS) {
   }
   if (!readFileSync(path, 'utf8').includes(entry.anchor)) {
     recordedDrift.push(`${entry.id} (${entry.finding}): ${entry.file} no longer contains \`${entry.anchor}\` — recorded for ${entry.consumer}`)
+  }
+}
+// The writer set, measured rather than assumed. A drift here is recorded like an
+// anchor (--accept-recorded tolerates it) but named with its count, because a
+// second write site and a moved one are the same event for the family: the
+// ledger it folds no longer describes every dispatch.
+const writeSiteChecks = DISPATCH_WRITE_SITES.length
+for (const entry of DISPATCH_WRITE_SITES) {
+  const path = join(upstream, entry.file)
+  if (!existsSync(path)) {
+    recordedDrift.push(`${entry.id}: ${entry.file} is gone — ${entry.owner}`)
+    continue
+  }
+  const sites = readFileSync(path, 'utf8').split(entry.needle).length - 1
+  if (sites !== entry.sites) {
+    recordedDrift.push(`${entry.id}: ${entry.file} now contains ${sites} occurrence(s) of \`${entry.needle}\`, recorded ${entry.sites} — ${entry.owner}`)
   }
 }
 // Checks with no recorded anchor behind them: this is the set that stays fatal
@@ -341,7 +423,7 @@ if (existsSync(sectionOrderPath)) {
   }
 }
 
-console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
+console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${writeSiteChecks} dispatch write site(s), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
 if (recordedDrift.length > 0) {
   const label = acceptRecorded
     ? 'accepted recorded difference(s) — each has a decision recorded in the anchor table'

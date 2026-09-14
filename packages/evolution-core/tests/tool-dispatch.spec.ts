@@ -359,4 +359,46 @@ describe('arch guard N11: one reader for the dispatch vocabulary', () => {
   })
 })
 
+describe('modality parity: the same work reads the same in both runtime modes', () => {
+  /**
+   * The acceptance the C-axis owes (v41 §C): ONE script scenario, driven twice —
+   * two model-direct reads (native) versus one program that reads the same two
+   * skills (PTC). Everything a family CONSUMER may look at has to agree: the
+   * read-name set the review gate credits, the number of dispatches the work
+   * produced, and the review skill signal. A consumer that reintroduces a
+   * per-modality branch fails here before it can go blind in the field (the v37
+   * P7a incident: PTC sessions credited zero reads while the code looked right).
+   *
+   * The two native calls are folded from two single-call logs concatenated: the
+   * fold is a pure function of the event list (dedup is per call id), and the
+   * helper drives the real staged scheduler for each call.
+   */
+  it('two direct reads and one program doing two reads agree on names, count and signal', async () => {
+    const native: LoggedEvent[] = [
+      ...(await nativeLog('parity-n1', 'skill', { name: 'demo-skill' })),
+      ...(await nativeLog('parity-n2', 'skill', { name: 'demo-skill' })),
+    ]
+    const ptc = await ptcLog()
+    // The route is the ONLY permitted difference: who delivered the call.
+    expect(native.map(event => event.type)).toEqual([NATIVE_CALL_EVENT, NATIVE_RESULT_EVENT, NATIVE_CALL_EVENT, NATIVE_RESULT_EVENT])
+    expect(ptc.map(event => event.type)).not.toContain(NATIVE_CALL_EVENT)
+
+    // Modality-blind facts, asserted as equalities between the two logs.
+    expect([...collectReadSkillNames(native)]).toEqual([...collectReadSkillNames(ptc)])
+    expect([...collectReadSkillNames(native)]).toEqual(['demo-skill'])
+    expect(countDispatches(native)).toBe(countDispatches(ptc))
+    for (const log of [native, ptc]) {
+      const signal = freshSignal()
+      for (const event of log) observeEvent(signal, event as never)
+      expect(signal.skillSignal, JSON.stringify(log.map(event => event.type))).toBe(true)
+    }
+    // The model-facing counter is NOT part of the parity claim: it counts the
+    // calls the MODEL made, so the sub-dispatches of a program are excluded by
+    // design (the one registered branch, arch guard N17).
+    const nativeSignal = freshSignal()
+    for (const event of native) observeEvent(nativeSignal, event as never)
+    expect(nativeSignal.toolCalls).toBe(2)
+  })
+})
+
 
