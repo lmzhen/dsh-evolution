@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.3.76 (patch) — 读三态 `Probe<T>` · 作用域对齐（N16） · 预设行覆盖改为数据表
+
+> **本批三件事**（v41 阶段一之后的跟进批次）：
+> 1. **读三态落地**：家族此前把"读失败"与"确实没有"压成两态，N14 只能登记债务。现在 core 有了具名联合 `Probe<T>`，并有第一个真实消费点（跨源守卫），第三态在类型上不可与"空"混淆。
+> 2. **作用域对齐**：平台注册表读取是**作用域敏感**的——`skills.list()` 的 `scope` 注释写明"省略即只读全局层"（`skill/skill/src/index.ts:113-120`），`tools.get(name)` 同语义（`core/tools/src/index.ts:1194`）。而家族自己的目录 provider 是**预设行**，于是"预设挂载形态"下这条守卫会把健康的树判成空视图。现在读取统一走 `callingScope(ctx)`，并新增规则 **N16** 禁止无作用域的平台注册表读取（有意为之的诊断读需登记）。
+> 3. **预设行覆盖改为数据表**：V10-14 的目录描述上限从专用注入器泛化成 `ROW_OVERRIDES` 表；语义上明确"**我们按 key 追加/更新，绝不整对象替换 `config`**"——与平台 patch 层的行为正相反，这是合成器能在不抹掉平台默认值的前提下加键的依据。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | 新增 `src/probe.ts`（`Probe<T>` = present \| absent \| unknown{reason}；`probePresent/probeAbsent/probeUnknown`、`isPresent/isAbsent/isUnknown`、`valueOr`、`mapProbe`）与 `src/scope.ts`（`callingScope(ctx, held?)`、`isGlobalRead`）；新增 peer+dev 依赖 `@deepseek-ai/dsh-scope` |
+| `evolution-core` | `preset-composition.ts`：`injectCatalogDescriptionCap` → `applyRowOverrides(composition, overrides)` + `ROW_OVERRIDES` 数据表；保留幂等、标记注释、行缺失只 warn 三条性质 |
+| `tool-skill-manage` | `catalogWinner` 的 `{ winner, unverifiable }` 迁到 `Probe<SkillSummary \| undefined>`（旧形状允许"既有 winner 又有 unverifiable"的非法组合）；跨源守卫改为 `catalog.list({ scope: callingScope(ctx) })` |
+| `scripts/verify-arch-guards.mjs` | 新增 **N16**（17 条规则）：`src/` 内无作用域的平台注册表读取即失败，附可粘贴修法与 `SCOPE_READ_REGISTER` 理由登记（当前 1 条：review 的有意全局层诊断） |
+
+### 新增回归（含红/绿实证）
+
+| 测试 / 探针 | 钉住的契约 |
+|---|---|
+| `evolution-core/tests/probe.spec.ts` | 三态各自可判别；`mapProbe` 不把 unknown 塌成 absent（只测 present/absent 的实现会失败） |
+| N16 启动自检（4 样本） | 无参 `list()` / 单参 `get(name)` 必命中；`list({ scope })` / `get(name, scope)` 必干净 |
+| N16 夹具（`p5-fixture` 的 `bad-registry.ts`，A 缺陷原始形态） | 真树 0 违规、夹具两条被点名 |
+| `preset-composition` + `commands` spec（43 用例） | 行覆盖泛化后行为逐字不变（含"无 tool-skill 行"告警路径与幂等路径） |
+
+### 验证
+
+- 全量门禁 10/10：`tsc -b` 0、`oxlint` 0-0、全量 vitest 全绿、四个 `verify-*` 0（含 17 条架构规则）、两个校验器 0、`mirror-sync differ=0`。
+
 ## 0.3.75 (patch) — 依赖闭包**双向**化 · `newSkillLibrary()` 单一构造点 · 架构守卫 N12–N14（v41 阶段一，家族侧非破坏批次）
 
 > **本批的四条主线**（v41 §5.3 未落地项 + §6.1 npm/PTC 缺口 + §8 盲区）：
