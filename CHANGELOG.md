@@ -1,11 +1,12 @@
 # Changelog
 
-## 0.3.76 (patch) — 读三态 `Probe<T>` · 作用域对齐（N16） · 预设行覆盖改为数据表
+## 0.3.76 (patch) — 读三态 `Probe<T>` · 作用域对齐（N16） · 预设行覆盖改为数据表 · C 轴收口（N17）
 
 > **本批三件事**（v41 阶段一之后的跟进批次）：
 > 1. **读三态落地**：家族此前把"读失败"与"确实没有"压成两态，N14 只能登记债务。现在 core 有了具名联合 `Probe<T>`，并有第一个真实消费点（跨源守卫），第三态在类型上不可与"空"混淆。
 > 2. **作用域对齐**：平台注册表读取是**作用域敏感**的——`skills.list()` 的 `scope` 注释写明"省略即只读全局层"（`skill/skill/src/index.ts:113-120`），`tools.get(name)` 同语义（`core/tools/src/index.ts:1194`）。而家族自己的目录 provider 是**预设行**，于是"预设挂载形态"下这条守卫会把健康的树判成空视图。现在读取统一走 `callingScope(ctx)`，并新增规则 **N16** 禁止无作用域的平台注册表读取（有意为之的诊断读需登记）。
 > 3. **预设行覆盖改为数据表**：V10-14 的目录描述上限从专用注入器泛化成 `ROW_OVERRIDES` 表；语义上明确"**我们按 key 追加/更新，绝不整对象替换 `config`**"——与平台 patch 层的行为正相反，这是合成器能在不抹掉平台默认值的前提下加键的依据。
+> 4. **C 轴收口**（v41 §C）：记账早已由 `evolution-core/src/tool-dispatch.ts` 把两种派发词汇归一化（v37 P7a），本轮把它钉成可机械检查的三件事——消费方不得按模态分支（新规则 **N17**，唯一登记点 `signals.ts`）、同一脚本场景下 native 与 ptc 的读取技能名集合/派发条数/技能信号必须相等（回归）、平台侧"每个持久派发词汇只有一个写点"实测成表（`verify-platform-contract` 5 条写点记录 + 模态无关接缝 `tools/result` 两条锚）。
 
 ### 变更
 
@@ -14,7 +15,8 @@
 | `evolution-core` | 新增 `src/probe.ts`（`Probe<T>` = present \| absent \| unknown{reason}；`probePresent/probeAbsent/probeUnknown`、`isPresent/isAbsent/isUnknown`、`valueOr`、`mapProbe`）与 `src/scope.ts`（`callingScope(ctx, held?)`、`isGlobalRead`）；新增 peer+dev 依赖 `@deepseek-ai/dsh-scope` |
 | `evolution-core` | `preset-composition.ts`：`injectCatalogDescriptionCap` → `applyRowOverrides(composition, overrides)` + `ROW_OVERRIDES` 数据表；保留幂等、标记注释、行缺失只 warn 三条性质 |
 | `tool-skill-manage` | `catalogWinner` 的 `{ winner, unverifiable }` 迁到 `Probe<SkillSummary \| undefined>`（旧形状允许"既有 winner 又有 unverifiable"的非法组合）；跨源守卫改为 `catalog.list({ scope: callingScope(ctx) })` |
-| `scripts/verify-arch-guards.mjs` | 新增 **N16**（17 条规则）：`src/` 内无作用域的平台注册表读取即失败，附可粘贴修法与 `SCOPE_READ_REGISTER` 理由登记（当前 1 条：review 的有意全局层诊断） |
+| `scripts/verify-arch-guards.mjs` | 新增 **N16**（17 条规则）：`src/` 内无作用域的平台注册表读取即失败，附可粘贴修法与 `SCOPE_READ_REGISTER` 理由登记（当前 1 条：review 的有意全局层诊断）；新增 **N17**（18 条规则）：按派发模态分支即失败，附 `MODALITY_BRANCH_REGISTER`（当前 1 条：`signals.ts` 的模型面计数切分） |
+| `scripts/verify-platform-contract.mjs` | 新增"派发写点单一性"实测表（native call/result 各 1、PTC start/settle 各 1、registry 0）与模态无关接缝 `tools/result` 两条锚（声明 + 唯一发射点）；更正 `code-dispatch-waterfall` 已过时的 consumer 文案 |
 
 ### 新增回归（含红/绿实证）
 
@@ -24,10 +26,14 @@
 | N16 启动自检（4 样本） | 无参 `list()` / 单参 `get(name)` 必命中；`list({ scope })` / `get(name, scope)` 必干净 |
 | N16 夹具（`p5-fixture` 的 `bad-registry.ts`，A 缺陷原始形态） | 真树 0 违规、夹具两条被点名 |
 | `preset-composition` + `commands` spec（43 用例） | 行覆盖泛化后行为逐字不变（含"无 tool-skill 行"告警路径与幂等路径） |
+| `tool-dispatch.spec.ts` 模态对称性 | 同一脚本场景 native vs ptc：读取技能名集合、派发条数、`skillSignal` 三项相等（P7a 事故的恢复点；模型面计数按设计不参与对称） |
+| `guard-scripts.spec.ts` N17 夹具 | 违规树 exit 1 且点名违规表达式与登记表名；同形比较落在 `tool-dispatch.ts` 内则干净 |
+| `verify-platform-contract` vacuity sentry | 空树必须逐条点名 5 个写点（`native-call`…`registry-writes-none`），不得"找不到即通过" |
 
 ### 验证
 
-- 全量门禁 10/10：`tsc -b` 0、`oxlint` 0-0、全量 vitest 全绿、四个 `verify-*` 0（含 17 条架构规则）、两个校验器 0、`mirror-sync differ=0`。
+- 全量门禁 10/10（两次独立复跑，第二次在干净 overlay 上）：`tsc -b` 0、`oxlint` 0-0、全量 vitest **126 文件 / 1228 用例**全绿、四个 `verify-*` 0（18 条架构规则）、两个校验器 0、`mirror-sync differ=0 onlyOverlay=0`。
+- 发布链彩排 7/7 PASS（`build-lib` → `run-load-sensitive`（17 例）→ `prepare-release`（29 包）→ `verify-platform-ranges`（61 条平台范围）→ `publish-scoped --dry-run` → `verify-declared-config` → `verify-platform-contract`）。
 
 ## 0.3.75 (patch) — 依赖闭包**双向**化 · `newSkillLibrary()` 单一构造点 · 架构守卫 N12–N14（v41 阶段一，家族侧非破坏批次）
 
