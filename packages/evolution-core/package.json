@@ -19,12 +19,14 @@
       "default": "./lib/index.js"
     },
     "./package.json": "./package.json",
-    "./row-overrides.json": "./row-overrides.json"
+    "./row-overrides.json": "./row-overrides.json",
+    "./persisted-write-inventory.json": "./persisted-write-inventory.json"
   },
   "files": [
     "lib/*.js",
     "lib/types/**/*.d.ts",
-    "row-overrides.json"
+    "row-overrides.json",
+    "persisted-write-inventory.json"
   ],
   "license": "MIT",
   "dependencies": {

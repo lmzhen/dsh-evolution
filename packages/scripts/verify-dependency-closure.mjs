@@ -39,7 +39,7 @@
  * object so a fixer/test consumes THIS rule instead of restating it.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { extname, join } from 'node:path'
+import { dirname, extname, join, relative, resolve } from 'node:path'
 
 const root = process.argv[2]
 if (!root || !existsSync(root)) {
@@ -60,8 +60,43 @@ const asJson = process.argv.includes('--json')
 const scope = '@deepseek-ai/'
 const offenders = []
 const unreferenced = []
+const undeclaredAssets = []
+
+/**
+ * Does the manifest's \`files\` list cover this package-relative path? npm
+ * semantics: an exact entry matches, a directory entry covers its subtree, and
+ * a "star" matches inside one segment (the only glob npm documents there).
+ */
+function coveredByFiles(list, rel) {
+  if (!Array.isArray(list)) return false
+  for (const raw of list) {
+    let pattern = String(raw)
+    if (pattern.startsWith('./')) pattern = pattern.slice(2)
+    if (pattern.endsWith('/')) pattern = pattern.slice(0, -1)
+    if (pattern === rel || rel.startsWith(pattern + '/')) return true
+    if (!pattern.includes('*')) continue
+    const segments = pattern.split('*')
+    let cursor = 0
+    let matched = true
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index]
+      if (index === 0) {
+        if (!rel.startsWith(segment)) { matched = false; break }
+        cursor = segment.length
+        continue
+      }
+      const found = rel.indexOf(segment, cursor)
+      if (found === -1) { matched = false; break }
+      if (index === segments.length - 1 && found + segment.length !== rel.length) { matched = false; break }
+      cursor = found + segment.length
+    }
+    if (matched) return true
+  }
+  return false
+}
 let inspected = 0
 let declarationCount = 0
+let assetCount = 0
 
 function declared(pkg) {
   const set = new Set()
@@ -162,6 +197,25 @@ for (const dir of readdirSync(root)) {
     }
   }
   collect(pkgDir)
+  // 0.3.78 incident: evolution-core's lib reads ../persisted-write-inventory.json
+  // at module scope, the manifest's files[] did not list it, and the PUBLISHED
+  // package threw ENOENT on import — the whole family failed to load in the GUI
+  // while every gate stayed green (they all run from the source tree, which HAS
+  // the file). An asset the code reaches for BY PATH must be declared, or it is
+  // not in the tarball.
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8')
+    for (const match of text.matchAll(/new URL\(\s*'([^']+)'\s*,\s*import\.meta\.url\s*\)/g)) {
+      const target = match[1]
+      if (target.includes('://') || target.startsWith('data:')) continue
+      const abs = resolve(dirname(file), target)
+      if (!existsSync(abs) || !abs.startsWith(resolve(pkgDir))) continue
+      const rel = relative(pkgDir, abs).split('\\').join('/')
+      assetCount += 1
+      if (coveredByFiles(manifest.files, rel)) continue
+      undeclaredAssets.push({ pkg: dir, asset: rel, from: relative(pkgDir, file).split('\\').join('/') })
+    }
+  }
   const haystack = referenceText.join('\n')
   for (const section of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies']) {
     for (const name of Object.keys(manifest[section] ?? {})) {
@@ -173,11 +227,12 @@ for (const dir of readdirSync(root)) {
 }
 
 const report = {
-  ok: inspected > 0 && offenders.length === 0 && unreferenced.length === 0,
+  ok: inspected > 0 && offenders.length === 0 && unreferenced.length === 0 && undeclaredAssets.length === 0,
   packages: inspected,
   declarations: declarationCount,
   offenders,
   unreferenced,
+  undeclaredAssets,
 }
 
 if (inspected === 0) {
@@ -199,8 +254,12 @@ if (!report.ok) {
       console.error(`verify-dependency-closure: ${unreferenced.length} unreferenced declaration(s) across ${inspected} package(s) — drop the declaration, or import what it names:`)
       for (const u of unreferenced) console.error(`  - ${u.pkg}: declares "${u.name}" (${u.section}) but no file in the package references it`)
     }
+    if (undeclaredAssets.length > 0) {
+      console.error('verify-dependency-closure: ' + undeclaredAssets.length + ' package-root asset(s) the code reads by path but files[] does not publish — the tarball throws ENOENT at import:')
+      for (const a of undeclaredAssets) console.error('  - ' + a.pkg + ': ' + a.from + ' reads "' + a.asset + '", not covered by files[]')
+    }
   }
   process.exit(1)
 }
 if (asJson) console.log(JSON.stringify(report))
-else console.log(`verify-dependency-closure: OK — 0 undeclared import(s), ${declarationCount} declaration(s) all referenced, across ${inspected} package(s)`)
+else console.log(`verify-dependency-closure: OK — 0 undeclared import(s), ${declarationCount} declaration(s) all referenced, ${assetCount} package-root asset(s) published, across ${inspected} package(s)`)
