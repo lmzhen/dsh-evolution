@@ -75,6 +75,17 @@
  *       Family-relative `<pkg>/<file>` is the single-src shorthand; platform
  *       anchors (upstream paths) are out of scope — verify-platform-contract
  *       owns the recorded platform anchors.
+ *   N16. a platform REGISTRY read that a decision depends on must be asked in
+ *       the calling scope: `skills.list()` documents its `scope` as the calling
+ *       agent with "OMITTED READS THE GLOBAL LAYER ALONE"
+ *       (skill/skill/src/index.ts:113-120) and `tools.get(name)` resolves the
+ *       same way (core/tools/src/index.ts:1194 — the method never reads
+ *       this.ctx). A preset-mounted family row lives in its preset's standing
+ *       scope, so a scope-less read calls a healthy tree "empty"/"missing" —
+ *       that is the whole asymmetry between "evolution mounted onto the
+ *       original preset" and the evolution variant preset. Route the read
+ *       through callingScope(ctx); a DELIBERATE global-layer read (diagnostics
+ *       only) is registered in SCOPE_READ_REGISTER with its reason.
  *
  * Rule ids are APPEND-ONLY labels: docs, probes and register keys reference them,
  * so a landed id is never reused or renumbered. A new rule takes the next free
@@ -240,6 +251,7 @@ const RULES = [
   { id: 'N13b', title: 'wake primitive called on its receiver' },
   { id: 'N14', title: 'durable-read failure not served as absent' },
   { id: 'N15', title: 'family Markdown code anchors resolve' },
+  { id: 'N16', title: 'platform registry read asks in the calling scope' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -396,6 +408,27 @@ function docAnchorViolations(dir, packageDirs) {
   return out
 }
 
+/** N16: a read on a registry receiver taken from `ctx.get('skills'|'tools')`
+ * with no scope argument. Text-level by design (same posture as N12/N14). */
+const SCOPE_RECEIVER_RE = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*ctx\.get\('(?:skills|tools)'\)/g
+const SCOPE_READ_REGISTER = new Set([
+  'evolution-review/src/index.ts :: registry.get(name)',
+])
+
+function scopeLessReadKeys(text) {
+  const keys = []
+  for (const receiver of [...text.matchAll(SCOPE_RECEIVER_RE)].map(match => match[1])) {
+    const escaped = receiver.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    for (const call of text.matchAll(new RegExp(`${escaped}\\.(list|get)\\(([^()]*)\\)`, 'g'))) {
+      const args = (call[2] ?? '').trim()
+      const commas = args === '' ? 0 : args.split(',').length - 1
+      const scopeLess = call[1] === 'list' ? args === '' : commas === 0
+      if (scopeLess) keys.push(`${receiver}.${call[1]}(${args})`)
+    }
+  }
+  return keys
+}
+
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
@@ -534,6 +567,14 @@ function walk(dir) {
           }
         }
       }
+      // N16 (v41): scope-less platform registry read — see docblock.
+      if (rel.includes('/src/')) {
+        for (const key of scopeLessReadKeys(text)) {
+          const full = `${rel} :: ${key}`
+          if (SCOPE_READ_REGISTER.has(full)) continue
+          violations.push(`${rel}: ${key} — a scope-less platform registry read sees the GLOBAL layer alone; ask in the calling scope via callingScope(ctx), or register a deliberate global read: ${full}`)
+        }
+      }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
       if (rel === `${CORE_SRC}/threats.ts`) {
         for (const match of text.matchAll(REGEXP_CLASS_RE)) {
@@ -565,6 +606,10 @@ if (process.argv.includes('--list-rules')) {
     process.exit(1)
   }
   const detectors = [
+    ['N16', () => scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name)").length === 1
+      && scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name, scope)").length === 0
+      && scopeLessReadKeys("const c = ctx.get('skills')\nc.list({ scope })").length === 0
+      && scopeLessReadKeys("const c = ctx.get('skills')\nc.list()").length === 1],
     ['N15', () => [...'see evolution-core/src/x.ts:42'.matchAll(FAMILY_ANCHOR_RE)].length === 1 && staleAnchor({ line: 42 }, 10) && !staleAnchor({ line: 9 }, 10)],
     ['N12', () => mutableStateBindings('const bad = new Set()\nbad.add(1)\n').length > 0],
     ['N13a', () => [...'agent.inject(message)'.matchAll(AGENT_INJECT_RE)].length > 0],
@@ -678,7 +723,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15)`)
+  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s))`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78
