@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.79 (patch) — 修复 0.3.78 的发布面缺陷（家族在出厂包里加载即失败）
+
+> 0.3.78 的功能代码属实，但**发布出去的包是坏的**：`evolution-core` 新增的包根数据资产
+> `persisted-write-inventory.json` 没被写进 `files`，而它在模块作用域被读取——tarball 里没有它，
+> 于是任何 `import dsh-evolution-core` 都在导入期抛 `ENOENT`；core 被几乎所有家族包依赖，整族随之死掉。
+> 门禁 10/10、彩排 7/7、CI 全绿都没拦住，因为它们跑的是**源码树**（那里有该文件）。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | `persisted-write-inventory.json` 写进 `files`，并按 `row-overrides.json` 的先例写进 `exports` |
+| `scripts/verify-dependency-closure.mjs` | 新增第三维：**代码按路径读取（`new URL(..., import.meta.url)`）的包根资产必须被 `files[]` 覆盖**（npm glob 语义：精确 / 单段星号 / 目录子树）；OK 行打印资产计数，避免"什么都没匹配到"的静默通过。它同时跑在 10 步门禁与 CI 里 |
+
+### 验证
+
+- 检测器自证：去掉 `files` 登记 → exit 1 并点名 `evolution-core: src/write-inventory.ts reads "persisted-write-inventory.json", not covered by files[]`；恢复 → OK（2 assets）。
+- 出厂面：`prepare-release` 后 `.release-staging/evolution-core/` 与其 tarball 均含 `package/persisted-write-inventory.json`。
+- 安装面：本机 profile 热修后逐个 `import()` 28 个家族包 **28/28 通过**（修复前 8/28）；升级到 0.3.79 后同样复测。
+- 全量门禁 10/10（`audit-v42/release-0.3.79-summary.txt`）+ 彩排 7/7（`release-rehearsal-0.3.79.txt`）。
 ## 0.3.78 (patch) — 单源化 · 门禁升级 · 单实例契约（优化计划 B1–B4）
 
 > 本版按 `audit-v42/optimization-plan-evolution-layers.md` 的四个批次落地，每批各自带回归、各自一轮全量门禁 10/10。B5（变体自包含）按计划仅在"产品要求字面零挂载"时做，本版不做。
