@@ -46,8 +46,13 @@
       name: '@deepseek-ai/dsh-tool-memory'
 
     # ── skills: usage telemetry, model-facing management tool ───────────────
+    # `sessionScoped: true` is shared with evolution-host/all (this row must stay
+    # byte-identical across the bundles — bundle-mutual-exclusion.spec). Here the
+    # model rows are mounted at profile root, so every session carries them.
     - id: skill-usage
       name: '@deepseek-ai/dsh-skill-usage'
+      config:
+        sessionScoped: true
     - id: tool-skill-manage
       name: '@deepseek-ai/dsh-tool-skill-manage'
     - id: tool-session-query
@@ -73,6 +78,9 @@
         # shared-row config byte-identical to host preserves the mutual exclusion
         # between the host bundle and this preset bundle (E-33).
         reviewToolAllow: [skill]
+        # Shared with every bundle (byte-identical row): with the model rows at
+        # profile root every session carries them, so the probe passes for all.
+        sessionScoped: true
     - id: evolution-curator
       name: '@deepseek-ai/dsh-evolution-curator'
     - id: evolution-commands

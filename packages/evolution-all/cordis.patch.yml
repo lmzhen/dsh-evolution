@@ -57,8 +57,12 @@
       name: '@deepseek-ai/dsh-tool-memory'
 
     # ── skills: usage telemetry, model-facing management tools ───────────────
+    # `sessionScoped: true` is shared with evolution-host/preset (byte-identical
+    # row); with the model rows at profile root every session carries them.
     - id: skill-usage
       name: '@deepseek-ai/dsh-skill-usage'
+      config:
+        sessionScoped: true
     - id: tool-skill-manage
       name: '@deepseek-ai/dsh-tool-skill-manage'
     - id: tool-session-query
@@ -87,6 +91,9 @@
         # listing it would be dead configuration. Allow `skill` so review
         # subagents can load skills under the Anchored Standard preset family.
         reviewToolAllow: [skill]
+        # Shared with host/preset (byte-identical row); the model rows are at
+        # profile root here, so every session carries them.
+        sessionScoped: true
     - id: evolution-curator
       name: '@deepseek-ai/dsh-evolution-curator'
     - id: evolution-commands

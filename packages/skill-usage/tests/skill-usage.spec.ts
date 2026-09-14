@@ -64,6 +64,45 @@ describe('skill-usage', () => {
     await fiber.dispose()
   })
 
+  it('C axis (v41): sessionScoped telemetry observes only the sessions that carry the family tools', async () => {
+    // 0.3.77 (C axis): a session that does not carry the family's model rows
+    // is not observed. Inside a variant preset that is every session running
+    // the platform's original presets — before this gate their reads were still
+    // counted (the family observing a session that never mounted it). A
+    // deployment that mounts the model rows at profile root passes the same
+    // probe for every session, and one that declares no scoping is unchanged.
+    const event = { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{"name":"demo"}' } }
+
+    // 1. Variant form, nothing visible: no tools registry in the process means
+    //    no session mounted the family rows, so the event is not observed.
+    const closed = new Context()
+    await closed.plugin(EvolutionIoRegistry)
+    await closed.plugin(NodeIo)
+    await closed.plugin(SkillUsageRegistry, { root: await tempRoot('dsh-usage-scoped-off-'), sessionScoped: true })
+    await closed.skillUsage.record('demo', 'use')
+    closed.emit('session/event', { id: 's1' } as never, event as never)
+    await new Promise(resolve => setTimeout(resolve, 150))
+    expect((await closed.skillUsage.report()).get('demo')?.view_count ?? 0).toBe(0)
+
+    // 2. Variant form with the family's model tool visible (what a preset mount
+    //    does for its agents): the same event counts.
+    const open = new Context()
+    await open.plugin(EvolutionIoRegistry)
+    await open.plugin(NodeIo)
+    open.provide('tools', { get: (name: string) => (name === 'skill_manage' ? { name } : undefined) })
+    await open.plugin(SkillUsageRegistry, { root: await tempRoot('dsh-usage-scoped-on-'), sessionScoped: true })
+    await open.skillUsage.record('demo', 'use')
+    open.emit('session/event', { id: 's1' } as never, event as never)
+    let views = 0
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
+      views = (await open.skillUsage.report()).get('demo')?.view_count ?? 0
+      if (views > 0) break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    expect(views).toBe(1)
+  })
+
   it('markArchived sets state without bumping the patch counter', async () => {
     const root = await tempRoot('dsh-usage-archive-')
     const ctx = new Context()

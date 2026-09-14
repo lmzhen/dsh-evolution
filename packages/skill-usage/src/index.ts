@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
 import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
-import { ToolDispatchNormalizer, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
+import { ToolDispatchNormalizer, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
@@ -46,6 +46,9 @@ export interface Config {
   root?: string
   /** Home for the evolution event timeline (`<eventsHome>/evolution/events.json`); defaults to DSH_HOME or ~/.dsh. */
   eventsHome?: string
+  /** Act only on sessions that carry the family's model tools (evolution-core's
+   * per-session probe). The shipped bundles set it; false observes every session. */
+  sessionScoped?: boolean
 }
 
 export class SkillUsageRegistry extends Service {
@@ -53,6 +56,7 @@ export class SkillUsageRegistry extends Service {
   static Config: Schema<Config> = z.object({
     root: z.string().default(''),
     eventsHome: z.string().default(''),
+    sessionScoped: z.boolean().default(false),
   })
 
   readonly root: string
@@ -93,7 +97,12 @@ export class SkillUsageRegistry extends Service {
     // leak fix.
     ctx.effect(() => {
       const reads = new ToolDispatchNormalizer()
-      const dispose = ctx.on('session/event', (_session, event) => {
+      const dispose = ctx.on('session/event', (session, event) => {
+        // C axis (v41): a session that does not carry the family's model rows
+        // is not observed — view counts and the observation window belong to the
+        // sessions that mounted the family (a deployment without session scoping
+        // is unchanged: sessionScoped stays false there).
+        if (!sessionAudited(ctx, session.id, config.sessionScoped)) return
         // E-65: an external emitter can inject a malformed dispatch — `data`
         // absent, `name` missing, or `name` not a string. None of these is a
         // read this listener can attribute, so the normalizer answers `null`

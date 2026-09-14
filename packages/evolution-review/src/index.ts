@@ -19,7 +19,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { foldToolDispatches, readDispatchSignal, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
+import { foldToolDispatches, readDispatchSignal, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
@@ -95,6 +95,14 @@ export interface Config {
    * config that still sets it reaches {@link assertSkillsRootAliasRetired} and
    * fails the load instead of being silently dropped. Never read. */
   skillsRoot?: string
+  /**
+   * Act only on sessions that carry the family's model tools (evolution-core's
+   * per-session probe). The shipped bundles set it: at profile root every
+   * session carries them, inside a variant preset only the sessions that
+   * selected one do. False — a bare library mount, the host-only infrastructure
+   * mode, and every deployment that predates this field — acts on every session.
+   */
+  sessionScoped?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -127,6 +135,7 @@ export const Config: z<Config> = z.object({
   // for config authors.
   skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER),
   reviewWakeInject: z.boolean().default(true),
+  sessionScoped: z.boolean().default(false),
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
   // V10-11 (P2-7): empty string keeps the default root (resolveSkillsRoot
   // trims and falls back) — the schema default mirrors the Config contract.
@@ -391,6 +400,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.on('session/event', (session, event) => {
+    // C axis (v41): only the sessions that actually carry the family's model
+    // rows are reviewed. Without this gate a user who installed a variant was
+    // still injected with review prompts in a session running the platform's
+    // original preset — the family acting on a session that never opted in.
+    // A deployment that declares no session scoping is unaffected by construction.
+    if (!sessionAudited(ctx, session.id, config.sessionScoped)) return
     // v20 (C-5): subagent sessions never reach the fold — the turn/end handler
     // early-returns on `origin === 'subagent'` BEFORE the delete — so their
     // entries used to sit in the map until the 128-threshold sweep. Don't set
