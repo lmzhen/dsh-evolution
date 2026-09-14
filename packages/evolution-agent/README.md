@@ -71,5 +71,18 @@ Known limitations of this base:
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
 
+### Base coverage
+
+`bases.json` carries `standard` and `ptc`. There is no `cordis` base, and the
+reason is mechanical: the cordis preset's extra row is `tool-cordis`, which
+injects `dynamicCordisRunner` — a service mounted only by the `web-app` bundle.
+A cordis-based preset installed on a headless, ACP or SDK profile would mount a
+row whose injection cannot be satisfied, and a preset row that never activates is
+refused at mount time rather than degraded. Cordis sessions get the family
+through the profile-wide `all` install, which needs no variant.
+
+`minimal` is out of scope for the same class of reason: it mounts no skill or
+file tool rows for the family to write through (see `packages/INSTALL.md`).
+
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 

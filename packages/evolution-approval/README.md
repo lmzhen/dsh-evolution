@@ -9,7 +9,7 @@ runners — `tool-memory` via `registerRunner('memory', …)` and
 `tool-skill-manage` via `registerRunner('skill', …)` — so staged writes are
 replayable only when the corresponding tool package is composed.
 
-Run the companion invariant and tests:
+Run the package tests:
 
 ```sh
 node node_modules/vitest/vitest.mjs run packages/evolution/evolution-approval/tests   # overlay layout

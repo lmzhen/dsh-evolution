@@ -113,6 +113,13 @@ describe('tool-skill-manage', () => {
     const { ctx, root, previousHome } = await setup()
     const tool = ctx.tools.get('skill_manage') as unknown as { description?: string } | undefined
     // The two fields the model could not discover from the tool contract.
+    // v41 A (P2-25): the resident size is PINNED here, captured from the
+    // REGISTERED tool — the only authoritative source. (A static estimate over
+    // the source block promised 3506 = 1666 inline + 1840 constant and was off
+    // by 1151: the expression interpolates more than one constant, which is
+    // exactly why this pin has to be runtime-captured.) De-duplication must
+    // lower this number and say so; growth must be a deliberate edit here.
+    expect((tool?.description ?? '').length).toBe(4657)
     expect(tool?.description ?? '').toContain('replace_all')
     expect(tool?.description ?? '').toContain('file_path')
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({

@@ -49,6 +49,26 @@ the first real 0.1.5 install.
 > Choose one:
 > full (`all`), layered (`host` + preset), or one-click (`preset`).
 
+## Platform mode × self-evolution
+
+Which agent preset a session runs decides how much of the family is usable in
+it. Under `all` (and the infrastructure half of `host`) the family's rows sit at
+profile root, so they mount in every session; what varies is the platform
+surface they stand on.
+
+| Session preset | Self-evolution | Why |
+|---|---|---|
+| `standard` | full | skills, subagents, plan/goal, fs and web tool rows all present |
+| `ptc` | full | same row set plus `tool-presentation`; dispatch accounting covers both vocabularies since 0.3.75 |
+| `cordis` | full | `standard` plus `tool-cordis`. The model can also inspect and mount plugins, so pair it with a deliberate review/approval policy |
+| `minimal` | not usable | mounts `persona` and the shell/terminal rows only — no `skill-filesystem`, no `tool-skill`, no file tools, so the skill surface the family writes to has no home |
+
+Preset variants (`--base`) exist for `standard` and `ptc`; `cordis` sessions get
+the family through the profile-wide `all` install instead, and no `cordis` base
+is published (see `evolution-agent/README.md`). The `sdk-minimal` application
+bundle does not layer over `dsh-base` and ships neither the state, approval nor
+skill rows, so the family has no foothold there either.
+
 ## Prerequisites
 
 - **Validated platform line: DSH `0.1.5-rc.2`.** This family does not support

@@ -71,7 +71,7 @@ repeating the same prose.
 
 | Package | Role |
 |---|---|
-| `evolution-core` | Shared pure stores/prompts/signals/constants; no main Cordis plugin entry (ships the `./invariant` companion entry only) |
+| `evolution-core` | Shared pure stores/prompts/signals/constants; no main Cordis plugin entry and no `./invariant` companion (all 29 companions were removed in 0.3.75 — the platform mounts none, so an unmounted companion is a dead channel; each package README states its own reason) |
 | `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
@@ -358,9 +358,8 @@ stand-alone build, its project references therefore remain
 CI-overlay-only and must not be expected to resolve independently (G5.5).
 The same is true of the per-package `tsconfig.json` files: they keep the dev
 tree's `"extends": "../../../tsconfig.base.json"` depth and reference
-`../../core/session`, `../../../vendor/cordis` and
-`../../runtime-diagnostics/invariants`, none of which exist in the flat
-mirror; `tsconfig.base.json`'s `paths` likewise point at `./packages/evolution/*`
+`../../core/session` and `../../../vendor/cordis`, neither of which exists in
+the flat mirror; `tsconfig.base.json`'s `paths` likewise point at `./packages/evolution/*`
 and `vendor/*`, and `tsconfig.host.json` includes `apps/web/tests/**` and
 `packages/evolution/test-support/**`. Type-checking therefore runs in the CI
 overlay tree, never in the mirror checkout itself.

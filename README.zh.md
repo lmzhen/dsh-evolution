@@ -252,8 +252,8 @@ evolution-approval  stage -> approve/reject -> 审计
 
 ## 兼容性
 
-- 基于 DeepSeek Harness `0.1.1-rc.2` 兼容验证（CI 发布锚点双锚检查）。
-- 与 standard / minimal / code / Creator preset 服务级兼容。
+- 基于 DeepSeek Harness `0.1.5-rc.2` 兼容验证（CI 发布锚点双锚检查）。
+- 与 `standard` / `ptc` / `cordis` 预设服务级兼容；`minimal` 不适用——该预设只挂 persona 与 shell/terminal 行，家族工具仍会挂载但技能面没有落点（见 `packages/docs/known-limitations.md`）。
 - 使用 Anchored Standard 真实插件代码测试：
   - bootstrap 阶段隐藏 evolution 工具；
   - promoted 阶段仍隐藏；
