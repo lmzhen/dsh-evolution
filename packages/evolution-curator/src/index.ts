@@ -16,6 +16,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, isPresent, isUnknown, probeList, probeMtime, releaseInstance } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
@@ -207,6 +208,13 @@ export class EvolutionCurator extends Service {
   private statelessFirstRunDeferred = false
   /** P2-5 (v14): one-shot warning that the interval baseline is process-only. */
   private statelessStateWarned = false
+  /** B3 / G4: the home this instance claimed, plus whether the claim was
+   * granted. A non-owning instance schedules nothing and runs nothing. */
+  private instanceHome = ''
+  private holdsInstance = false
+  /** B3 / G4: this instance's identity in the claim — pid + short token, so the
+   * yielding instance's log line names a concrete holder. */
+  private readonly instanceOwner = `evolution-curator[${process.pid}:${randomUUID().slice(0, 8)}]`
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
@@ -221,6 +229,17 @@ export class EvolutionCurator extends Service {
     // schemastery lets through) and direct construction. `minIdleHours` and
     // `bootGraceSeconds` legitimately allow 0; every other numeric field clamps
     // to at least 1. Warn once when a user-supplied value had to be corrected.
+    // B3 / G4 (0.3.78): the per-home single-instance contract
+    // (core instance-scope.ts). The curator owns <home>/reports and its
+    // retention sweep; that sweep is not one locked file, so two instances
+    // would race it with no exclusion at all. The loser is not an error — it
+    // yields: no scheduler, no pass, and a log line naming the holder.
+    this.instanceHome = evolutionHome()
+    const claim = claimInstance(this.instanceHome, INSTANCE_KEYS.curator, this.instanceOwner)
+    this.holdsInstance = claim.granted
+    if (!claim.granted) {
+      this.ctx.logger.warn(`evolution-curator: this instance YIELDS — ${claim.key} is already held by ${claim.holder}; a second curator over one home would race the report retention sweep. It schedules nothing and every run() returns skipped "instance-held".`)
+    }
     const clamped: string[] = []
     const field = (name: string, value: number | undefined, fallback: number, min: number, max?: number): number => {
       const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
@@ -260,6 +279,7 @@ export class EvolutionCurator extends Service {
       return () => {
         this.disposed = true
         this.stop()
+        releaseInstance(this.instanceHome, INSTANCE_KEYS.curator, this.instanceOwner)
       }
     }, 'evolution-curator.stop')
     // F2: auto-curation starts with the plugin; the interval gate plus
@@ -280,6 +300,8 @@ export class EvolutionCurator extends Service {
   }
 
   start(): void {
+    // B3 / G4: a non-owning instance never schedules (the holder owns the home).
+    if (!this.holdsInstance) return
     if (this.isDisposed() || !this.enabled || this.timer) return
     // Catch-up check after the boot grace (restart with a due persisted state
     // must not wait a full interval; services mounting during boot must not
@@ -571,6 +593,16 @@ export class EvolutionCurator extends Service {
     // preserved); a restore arriving behind a run queues (P2-5 semantics).
     // mutexDepth is incremented SYNCHRONOUSLY inside acquireMutex, so this
     // check is atomic with respect to every other entrant's request.
+    // B3 / G4: the non-owning instance refuses BOTH automatic and manual passes
+    // — mutating the shared tree from a loser is the two-instance collision the
+    // per-home claim exists to prevent. The report names the outcome.
+    if (!this.holdsInstance) {
+      return {
+        stale: [], archived: [], errors: [],
+        report: this.skippedReport('instance-held', new Date().toISOString()),
+        skipped: 'instance-held',
+      }
+    }
     if (this.mutexDepth > 0) {
       return {
         stale: [], archived: [], errors: [],
@@ -1406,12 +1438,14 @@ export class EvolutionCurator extends Service {
    */
   private async retainReports(keep = 20, errorKeep = 10): Promise<void> {
     const reportsRoot = join(evolutionHome(), 'reports')
-    let entries: string[]
-    try {
-      entries = await this.io.list(reportsRoot)
-    } catch {
+    const listed = await probeList(this.io, reportsRoot)
+    // N14: nothing to recycle when the directory is missing; an UNREADABLE one
+    // is not "no reports" — never delete what we cannot enumerate, and say so.
+    if (isUnknown(listed)) {
+      this.ctx.logger.warn(`evolution-curator: report retention skipped — the reports directory could not be listed (${listed.reason})`)
       return
     }
+    const entries = isPresent(listed) ? listed.value : []
     const real: Array<{ name: string; startedAt: number }> = []
     const errors: Array<{ name: string; startedAt: number }> = []
     let unorderableWarned = false
@@ -1426,8 +1460,8 @@ export class EvolutionCurator extends Service {
         // Fall back to the file mtime (the write time) so they age into the
         // retention window too and no longer accumulate unbounded.
         if (!Number.isFinite(startedAt)) {
-          const mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
-          if (mtime !== null) startedAt = mtime
+          const probe = await probeMtime(this.io, join(reportsRoot, name))
+          if (isPresent(probe)) startedAt = probe.value
         }
         // P2-4 (v38): the mtime probe is OPTIONAL - without it the report stayed
         // unorderable and was never recycled. The error writer stamps `at` on
@@ -1469,16 +1503,16 @@ export class EvolutionCurator extends Service {
 
   async latestReport(): Promise<CuratorRunReport | null> {
     const reportsRoot = join(evolutionHome(), 'reports')
-    let names: string[]
-    try {
-      names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
-    } catch (error) {
-      // P2-4 (v38): this reader answers null, it never throws (boundary spec:
-      // a damaged report must not crash it). The warn keeps the READ failure
-      // distinguishable from "there are no reports".
-      this.ctx.logger.warn(`evolution-curator: latestReport could not list the reports directory (${error instanceof Error ? error.message : String(error)}) - answering "no report"`)
+    const listed = await probeList(this.io, reportsRoot)
+    // P2-4 (v38) + N14: this reader answers null, it never throws (boundary
+    // spec: a damaged report must not crash it) — but a MISSING reports
+    // directory and an UNREADABLE one are different states, and only the
+    // second gets the warn.
+    if (isUnknown(listed)) {
+      this.ctx.logger.warn(`evolution-curator: latestReport could not list the reports directory (${listed.reason}) - answering "no report"`)
       return null
     }
+    const names = (isPresent(listed) ? listed.value : []).filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
     // E-54: filenames carry randomUUIDs — lexicographic order is NOT
     // chronological, and the old `.sort()` was a misleading no-op. Order by
     // each file's mtime (the report write time, from the optional mtime probe);
@@ -1488,19 +1522,18 @@ export class EvolutionCurator extends Service {
     for (const name of names) {
       // mtime is an OPTIONAL probe (0.3.18, E-71): a backend without one
       // reports null via the adapter — such a report is never the latest.
-      let mtime: number | null
-      try {
-        mtime = await this.io.mtime?.(join(reportsRoot, name)) ?? null
-      } catch (error) {
-        // P2-4 (v38): a REJECTING probe is "unknown age" for this report only;
-        // warn once so the degradation is not silent.
+      const probe = await probeMtime(this.io, join(reportsRoot, name))
+      if (isUnknown(probe)) {
+        // P2-4 (v38) / N14: a REJECTING probe is "unknown age" for this report
+        // only; warn once so the degradation is not silent.
         if (!probeWarned) {
           probeWarned = true
-          this.ctx.logger.warn(`evolution-curator: latestReport could not read a report mtime (${error instanceof Error ? error.message : String(error)}) - the affected report(s) are not eligible as the latest`)
+          this.ctx.logger.warn(`evolution-curator: latestReport could not read a report mtime (${probe.reason}) - the affected report(s) are not eligible as the latest`)
         }
         continue
       }
-      if (mtime === null) continue
+      if (!isPresent(probe)) continue
+      const mtime = probe.value
       if (latest === null || mtime > latest.mtime) latest = { name, mtime }
     }
     if (latest === null) return null

@@ -1,0 +1,79 @@
+[
+  {
+    "id": "usage",
+    "path": "<skillsRoot>/.usage.json",
+    "writer": "evolution-core/src/usage.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, usageFile(root)",
+    "state": [],
+    "note": "Skill usage counters. RMW under the IO backend's cross-process lock; the reader side rebuilds from the events log."
+  },
+  {
+    "id": "suppressed",
+    "path": "<skillsRoot>/.curator-suppressed.json",
+    "writer": "evolution-core/src/usage.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, suppressedFile(root)",
+    "state": [],
+    "note": "Curator suppression list (archived bundled skills that must not re-seed)."
+  },
+  {
+    "id": "mutations",
+    "path": "<skillsRoot>/.mutations.json",
+    "writer": "evolution-core/src/mutations.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, mutationsFile(root)",
+    "state": [],
+    "note": "Skill mutation audit records (bounded ring)."
+  },
+  {
+    "id": "events",
+    "path": "<evolutionHome>/evolution/events.json",
+    "writer": "evolution-core/src/evolution-events.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, path",
+    "state": [],
+    "note": "The rc.68 evolution event log; feedback/skill-usage stats fold it."
+  },
+  {
+    "id": "memory",
+    "path": "<memoryRoot>/<target>.md",
+    "writer": "evolution-core/src/memory-store.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(this.io, fileFor(this.root, target)",
+    "state": [],
+    "note": "Durable memory documents written by the memory tool."
+  },
+  {
+    "id": "state",
+    "path": "<evolutionHome>/<review|curator|pending>-state.json",
+    "writer": "evolution-state-json/src/index.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io(), join(root, file)",
+    "state": [
+      "evolution-state-json/src/index.ts :: recordGateWarned",
+      "evolution-state-json/src/index.ts :: corruptWritten",
+      "evolution-state-json/src/index.ts :: corruptWriteWarned"
+    ],
+    "note": "The durable state stack (review/curator/pending). Its three warn sets are per-process de-duplication and are registered under N12."
+  },
+  {
+    "id": "curator-reports",
+    "path": "<evolutionHome>/reports/curator-*.json",
+    "writer": "evolution-curator/src/index.ts",
+    "serializedBy": "instance-claim",
+    "marker": "claimInstance(",
+    "instance": "evolution-curator",
+    "state": [],
+    "note": "Curator run reports + their retention sweep. No per-file lock: the writer holds the per-home instance claim, so a second curator yields instead of racing the sweep."
+  },
+  {
+    "id": "skill-tree",
+    "path": "<skillsRoot>/**",
+    "writer": "evolution-core/src/skill-store.ts",
+    "serializedBy": "write-lock",
+    "marker": "LOCK_SUFFIX",
+    "state": [],
+    "note": "The skill tree itself. Per-target `<path>.lock` claims (pid:token body) guard every byte writer; destructive movers refuse a live lock."
+  }
+]

@@ -67,6 +67,9 @@
  *   N14. a `catch` that serves a durable-read failure as `absent` must be
  *       registered: read failure and "nothing is there" are different states
  *       (the read three-state discipline); each entry names its migration path.
+ *       0.3.78 (B3): the four registered debts landed on probeList/probeMtime
+ *       (evolution-core/src/probe.ts) and SWALLOW_CATCH is EMPTY — the rule now
+ *       bites only NEW two-state reads.
  *   N15. a family Markdown anchor (`evolution-core/src/x.ts:42`) must resolve:
  *       the file exists and the cited line is inside it. Prose that cites code
  *       cannot fail a build, so a moved/renamed/deleted symbol leaves the
@@ -109,6 +112,22 @@
  *       SESSION_GATE_REGISTER with its reason. Comments are inert (stripped), so
  *       prose may name the stream; a string literal is not — the subscription
  *       literal is the signal (N17's posture).
+ *   N19. one home per family fact: scripts/family-facts.json names the ONE
+ *       document that states each cross-file fact, every other document cites it
+ *       (a second copy fails), and the machine owners re-derive the values, so a
+ *       stale number or a denied base fails with the value that moved.
+ *   N20. the persisted-write inventory must match the code it describes: every
+ *       declared site names a writer that (a) exists and (b) carries the
+ *       serialization the row declares — the transact marker, the skill-tree
+ *       write lock, or an instance claim held by that writer — and every N12
+ *       state key a row references is live. The family's per-instance serial
+ *       queues (`makeSerialQueue`) are the second serialization layer, so a
+ *       write site with neither a cross-process lock nor an instance claim is
+ *       the "two instances, one file" class: it looks serialized, is not, and
+ *       is invisible until it corrupts a file. Read with
+ *       evolution-core/persisted-write-inventory.json. The rule arms on that
+ *       table: malformed or empty fails, absent is noted here (its presence is
+ *       enforced by core's import-time read and write-inventory.spec.ts).
  *
  * Rule ids are APPEND-ONLY labels: docs, probes and register keys reference them,
  * so a landed id is never reused or renumbered. A new rule takes the next free
@@ -142,6 +161,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { docFactViolations, factTableProblems, formatDocFacts } from './lib-doc-facts.mjs'
 
 const root = process.argv[2] ?? 'packages/evolution'
 // R-03: a missing root used to surface as a raw ENOENT from readdirSync —
@@ -232,6 +252,11 @@ function ungatedSessionStreamKeys(text) {
 // N12 (P5): module-scope mutable process state. Key = '<file> :: <binding>'.
 const MUTABLE_STATE_RE = /^const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*new\s+(?:Set|Map|WeakMap)\b/gm
 const MUTABLE_STATE = new Map([
+  // The "validity single-process" tail of every row is the assumption N20 makes
+  // explicit: evolution-core/persisted-write-inventory.json declares, per write
+  // site, what keeps two writers apart (transact / write-lock / instance claim),
+  // and N20 fails when the declared serialization is not in the code.
+  ['evolution-core/src/instance-scope.ts :: claims', 'B3 / G4 (0.3.78): the per-home single-instance claims (home :: key -> holder). Every sidecar writer runs on a per-instance serial queue, so ONE instance per home may own a writer key; lifecycle claimInstance (get-or-set, re-entrant for the same owner) / releaseInstance (owner-only delete, called from the consumer disposer); evidence evolution-core/tests/instance-scope.spec.ts and evolution-curator/tests/instance-claim.spec.ts; validity single-process (the cross-process half is the IO write lock), listed in persisted-write-inventory.json.'],
   ['evolution-core/src/review-channel.ts :: markedSessions', 'v37 S2.2: session.header.origin is a closed set (only \'subagent\'), so a plugin-driven turn cannot be attributed by the platform; lifecycle markReviewChannel / clearReviewChannel / sweepReviewChannelSessions; evidence evolution-core/tests/review-channel.spec.ts; validity single-process.'],
   ['evolution-state-json/src/index.ts :: recordGateWarned', 'per-file warn de-duplication; the platform exposes no per-session warn channel; lifecycle session-scoped Set; validity single-process.'],
   ['evolution-state-json/src/index.ts :: corruptWritten', 'file -> quarantine copy already written, so repeated corruption does not re-copy; lifecycle written with the .corrupt copy, cleared when the file parses again; validity single-process.'],
@@ -284,12 +309,22 @@ const DURABLE_READ_RE = /\b(?:readFile|readdir|statSync|readText|list|listFiles)
 // allowed the illegal combination, so the union replaced it). The remaining
 // entries below still describe their own site; their "migrate to the union"
 // tail is the checklist for the next pass, not a re-design.
-const SWALLOW_CATCH = new Map([
-  ['evolution-commands/src/index.ts :: try {return statSync(path).mtimeMs} catch -> absent', 'optional mtime probe: the curator treats a null mtime as never-the-latest AND warns once (probeWarned), so an unreadable stat is not a silent clean verdict; migrate to the Probe union when the adapter is typed.'],
-  ['evolution-core/src/skill-store.ts :: try {entries = await this.io.list(dir)} catch -> absent', 'KNOWN GAP (listSupportFiles): the docstring itself conflates "unreadable" with "no support files"; fix = Probe<string[]>, not a register entry.'],
-  ['evolution-core/src/skill-store.ts :: try {entries = await this.io.list(backupRoot)} catch -> absent', 'KNOWN GAP (listSnapshots): an unreadable .backups reads as "no snapshots"; same Probe migration.'],
-  ["evolution-curator/src/index.ts :: try {names = (await this.io.list(reportsRoot)).filter(name => name.startsWith('curator-') && name.endsWit} catch -> absent", 'P2-4 (v38) accepted posture: answers null but logs a warn separating a READ failure from "no reports"; stays listed until the Probe union lands.'],
-])
+// B3 / G4 (0.3.78): the four remaining debts are CLEARED — every durable read
+// behind them now goes through probeList/probeMtime (probe.ts), so an
+// unreadable store is unknown{reason} and only a genuinely missing path (or
+// the backend's own "missing reads as empty", rc.50 P2-4) is absent:
+//   - evolution-commands' fs adapter returns null for ENOENT/ENOTDIR only and
+//     RETHROWS every other stat failure, which probeMtime reports as unknown;
+//   - skill-store's listSupportFiles answers Probe<string[]> (a partial listing
+//     is unknown, never a short list that reads as complete);
+//   - skill-store's listSnapshots answers Probe<...> and BOTH consumers respect
+//     it: retention prunes nothing it cannot enumerate, and the restore refuses
+//     with the read reason instead of "No skill snapshot available";
+//   - evolution-curator's latestReport/retainReports separate a missing reports
+//     directory from an unreadable one (the warn names the failure).
+// The register stays EMPTY on purpose: it is a defect list, and the whole list
+// landed. A new entry means a new two-state read — migrate it, do not grow this.
+const SWALLOW_CATCH = new Map([])
 /** Rule registry (append-only; --list-rules prints it and the docblock must match). */
 const RULES = [
   { id: 'N1', title: 'DSH_HOME single source (evolution-core/src only)' },
@@ -311,6 +346,8 @@ const RULES = [
   { id: 'N16', title: 'platform registry read asks in the calling scope' },
   { id: 'N17', title: 'dispatch modality is read in registered sites only' },
   { id: 'N18', title: 'session/event consumers consult the opt-in gate' },
+  { id: 'N19', title: 'one home per family fact (docs cite, never copy)' },
+  { id: 'N20', title: 'declared persisted write sites match their writers' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -383,6 +420,46 @@ function swallowCatchKeys(text) {
     }
     if (!DURABLE_READ_RE.test(tryBody)) continue
     out.push('try {' + squash(tryBody).slice(0, 100) + '} catch -> absent')
+  }
+  return out
+}
+
+// N20 (B3 / G4): the single-source table of persisted write sites.
+const WRITE_INVENTORY_PATH = 'evolution-core/persisted-write-inventory.json'
+
+/** N20 (B3 / G4): the declared persisted write sites vs the code they describe.
+ * Pure over (sites, source reader) so the startup self-test can prove it bites.
+ * `readSource(file)` returns the writer's text, or null when the file is gone. */
+function inventoryViolations(sites, readSource) {
+  const out = []
+  if (sites.length === 0) {
+    out.push(`${WRITE_INVENTORY_PATH}: declares no write site — the inventory vouches for nothing (a vacuum pass is not a pass)`)
+    return out
+  }
+  const ids = new Set()
+  for (const site of sites) {
+    const id = typeof site?.id === 'string' ? site.id : '<missing id>'
+    if (ids.has(id)) out.push(`${WRITE_INVENTORY_PATH}: duplicate site id "${id}"`)
+    ids.add(id)
+    const source = readSource(site?.writer)
+    if (source === null) {
+      out.push(`${WRITE_INVENTORY_PATH}: ${id} names writer ${String(site?.writer)}, which does not exist under ${root}`)
+      continue
+    }
+    if (site.serializedBy === 'instance-claim') {
+      if (typeof site.instance !== 'string' || site.instance === '') {
+        out.push(`${WRITE_INVENTORY_PATH}: ${id} declares instance-claim without an instance key`)
+      } else if (!source.includes('claimInstance(')) {
+        out.push(`${WRITE_INVENTORY_PATH}: ${id} declares the instance claim "${site.instance}", but ${site.writer} never calls claimInstance() — the declared serialization is not in the code`)
+      }
+    } else if (typeof site.marker !== 'string' || !source.includes(site.marker)) {
+      out.push(`${WRITE_INVENTORY_PATH}: ${id} declares ${String(site.serializedBy)} with marker ${JSON.stringify(site.marker)}, which ${site.writer} does not contain — the declared serialization is not in the code`)
+    }
+    for (const key of Array.isArray(site.state) ? site.state : []) {
+      if (!MUTABLE_STATE.has(key)) {
+        out.push(`${WRITE_INVENTORY_PATH}: ${id} references N12 state key "${key}", which the MUTABLE_STATE registry does not declare`)
+      }
+    }
   }
   return out
 }
@@ -714,6 +791,24 @@ if (process.argv.includes('--list-rules')) {
       && wakeLocalKeys("const woke = typeof (invocation.agent as { followup?: unknown }).followup === 'function'").length === 0
       && wakeLocalKeys("const bad = typeof agent.followup === 'function' ? agent.followup : null").length > 0],
     ['N14', () => swallowCatchKeys('try {\n  const x = await readFile(p)\n} catch {\n  return []\n}\n').length > 0],
+    // Each sample is the incident shape the rule exists for: an empty table, an
+    // unnamed fact, a fact with no home, a fact with nothing to check.
+    ['N19', () => factTableProblems({ facts: [] }).length > 0
+      && factTableProblems({ facts: [{ id: 'x', home: 'README.md', must: [{ text: 't' }] }] }).length === 0
+      && factTableProblems({ facts: [{ id: 'x', must: [{ text: 't' }] }] }).length > 0
+      && factTableProblems({ facts: [{ id: 'x', home: 'README.md' }] }).length > 0
+      && factTableProblems({ facts: [{ home: 'README.md', must: [{ text: 't' }] }] }).length > 0],
+    // N20 follows the same discipline: every shape the rule must bite (a writer
+    // with the wrong serialization, a claim nobody makes, a dangling N12 key, a
+    // writer that is gone, an empty table) AND one shape it must pass.
+    ['N20', () => inventoryViolations([{ id: 'x', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(' }], () => 'const plain = 1').length === 1
+      && inventoryViolations([{ id: 'x', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(' }], () => 'await transactIo(io, p, task)').length === 0
+      && inventoryViolations([], () => '').length === 1
+      && inventoryViolations([{ id: 'c', writer: 'a.ts', serializedBy: 'instance-claim', instance: 'k' }], () => 'claimInstance(home, key, owner)').length === 0
+      && inventoryViolations([{ id: 'c', writer: 'a.ts', serializedBy: 'instance-claim', instance: 'k' }], () => 'no claim here').length === 1
+      && inventoryViolations([{ id: 'c', writer: 'a.ts', serializedBy: 'instance-claim' }], () => 'claimInstance(').length === 1
+      && inventoryViolations([{ id: 's', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(', state: ['a.ts :: ghost'] }], () => 'transactIo(').length === 1
+      && inventoryViolations([{ id: 's', writer: 'gone.ts', serializedBy: 'transact', marker: 'x' }], () => null).length === 1],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {
@@ -727,6 +822,42 @@ walk(root)
 violations.push(...docAnchorViolations(root, new Set(readdirSync(root, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(root, entry.name, 'package.json')))
   .map(entry => entry.name))))
+
+// N19 runs as a whole-tree pass as well (Markdown + the single-source table).
+const docFacts = docFactViolations(root)
+violations.push(...docFacts.violations)
+const docFactSummary = formatDocFacts(docFacts, root)
+console.log(`verify-arch-guards: ${docFactSummary}`)
+
+// N20 runs as a whole-tree pass as well (the inventory table + its writers).
+// It arms on the TABLE's presence: a malformed or empty table is a violation,
+// while a tree without one gets a note (the guard-scripts fixtures build
+// synthetic trees). A DELETED table is not left to this note — the table is
+// load-bearing: evolution-core/src/write-inventory.ts reads it at import and
+// throws, and write-inventory.spec.ts pins it non-empty, so removing it fails
+// the family's own suite before any gate runs.
+let writeInventoryCount = 0
+{
+  const inventoryFile = join(root, WRITE_INVENTORY_PATH)
+  let sites = null
+  try {
+    const parsed = JSON.parse(readFileSync(inventoryFile, 'utf8'))
+    if (Array.isArray(parsed)) sites = parsed
+    else violations.push(`${WRITE_INVENTORY_PATH}: the table is not an array of write sites`)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    if (existsSync(inventoryFile)) violations.push(`${WRITE_INVENTORY_PATH}: unreadable (${reason}) — N20 cannot decide for this tree`)
+    else console.log(`verify-arch-guards: N20 not armed: no ${WRITE_INVENTORY_PATH} under ${root}`)
+  }
+  if (sites !== null) {
+    writeInventoryCount = sites.length
+    violations.push(...inventoryViolations(sites, (file) => {
+      if (typeof file !== 'string') return null
+      const path = join(root, file)
+      return existsSync(path) ? readFileSync(path, 'utf8') : null
+    }))
+  }
+}
 
 // H-6 (v18): a source-tree `.mjs` copy is never legitimate — the runtime is
 // TypeScript under `src/`; scripts live under `scripts/`. The 0.3.63
@@ -809,7 +940,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s))`)
+  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), ${docFactSummary})`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78

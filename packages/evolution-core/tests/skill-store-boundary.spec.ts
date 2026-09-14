@@ -149,7 +149,8 @@ describe('V14 name-guard unification and archive metadata', () => {
     expect(await lib.writeProtection('../outside')).toContain('Invalid skill name')
     expect(await lib.deleteProtection('../outside')).toContain('Invalid skill name')
     expect(await lib.isManaged('../outside')).toBe(false)
-    expect(await lib.listSupportFiles('../outside')).toEqual([])
+    // B3 / N14: the rejected name is ABSENT, not "an empty support list".
+    expect(await lib.listSupportFiles('../outside')).toEqual({ kind: 'absent' })
   })
 
   it('P3-30: an empty or whitespace-only anchor names its own reason, not "not found"', async () => {

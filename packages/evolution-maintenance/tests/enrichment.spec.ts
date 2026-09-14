@@ -15,7 +15,7 @@ function fakeLibrary(read: (name: string) => Promise<string | null | undefined>)
     },
     read,
     async listSupportFiles() {
-      return [] as string[]
+      return { kind: 'absent' } as const
     },
   } as unknown as SkillLibrary
 }
@@ -72,7 +72,7 @@ describe('buildEnrichment', () => {
         return undefined
       },
       async listSupportFiles() {
-        return [] as string[]
+        return { kind: 'absent' } as const
       },
     } as unknown as SkillLibrary
     const enrichment = await buildEnrichment(ctx, library)

@@ -37,6 +37,7 @@ import { basename, dirname, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
+import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -1751,47 +1752,46 @@ export class SkillLibrary {
 
     if (this.badName(name) !== null) return 0
     const dir = this.dirOf(name)
-    let entries: string[]
-    try { entries = await this.io.list(dir) } catch { return 0 }
+    // N14: the read is three-state; the DEGRADATION to "0 groups" happens here,
+    // on a richness input the health report already names, not inside a catch.
+    const listed = await probeList(this.io, dir)
+    if (!isPresent(listed)) return 0
     let count = 0
     for (const subdir of SUPPORT_DIRS) {
-      if (!entries.includes(subdir)) continue
-      try {
-        const files = await this.io.list(join(dir, subdir))
-        if (files.some(file => file !== '.gitkeep')) count += 1
-      } catch {
-        // Unknown support dir entry; not counted.
-      }
+      if (!listed.value.includes(subdir)) continue
+      const files = await probeList(this.io, join(dir, subdir))
+      if (isPresent(files) && files.value.some(file => file !== '.gitkeep')) count += 1
     }
     return count
   }
 
   /**
-   * Relative support-file paths (`references/x.md`) under SUPPORT_DIRS for one
-   * skill; empty when the directory is unreadable or has no support files.
-   * Used by the maintenance enrichment (011 §7) and probe reads.
+   * Support-file paths (`references/x.md`) under SUPPORT_DIRS for one skill,
+   * as a THREE-state read (N14): a missing skill directory is absent, an
+   * unreadable one is unknown. A partial listing is unknown too — the union
+   * promises the present branch is complete (011 §7 enrichment, probe reads).
    */
-  async listSupportFiles(rawName: string): Promise<string[]> {
+  async listSupportFiles(rawName: string): Promise<Probe<string[]>> {
     // P1-1 (v14): no path is built from an unvalidated name here either.
     const name = rawName.trim()
-    if (this.badName(name) !== null) return []
+    if (this.badName(name) !== null) return probeAbsent()
     const dir = this.dirOf(name)
-    let entries: string[]
-    try { entries = await this.io.list(dir) } catch { return [] }
+    const listed = await probeList(this.io, dir)
+    if (!isPresent(listed)) return listed
     const out: string[] = []
     for (const subdir of SUPPORT_DIRS) {
-      if (!entries.includes(subdir)) continue
-      try {
-        const files = await this.io.list(join(dir, subdir))
-        for (const file of files) {
-          if (file === '.gitkeep' || file.startsWith('.')) continue
-          out.push(`${subdir}/${file}`)
-        }
-      } catch {
-        // Subdir unreadable; treat as empty.
+      if (!listed.value.includes(subdir)) continue
+      const files = await probeList(this.io, join(dir, subdir))
+      // A subdir we cannot read makes the WHOLE listing incomplete: answer
+      // unknown rather than a partial list a caller would treat as complete.
+      if (isUnknown(files)) return files
+      if (!isPresent(files)) continue
+      for (const file of files.value) {
+        if (file === '.gitkeep' || file.startsWith('.')) continue
+        out.push(`${subdir}/${file}`)
       }
     }
-    return out
+    return probePresent(out)
   }
 
   /**
@@ -3432,7 +3432,14 @@ export class SkillLibrary {
 
   /** Keep only the newest N snapshots (Hermes keep=5 parity); older ones are removed outright. */
   private async retainSnapshots(keep: number): Promise<void> {
-    const snapshots = await this.listSnapshots()
+    const listed = await this.listSnapshots()
+    // N14: an UNREADABLE .backups is not "no snapshots". Pruning nothing is the
+    // only safe answer there (never delete what we cannot enumerate).
+    if (isUnknown(listed)) {
+      console.warn(`skill-store: snapshot retention skipped — the snapshot directory could not be listed (${listed.reason})`)
+      return
+    }
+    const snapshots = isPresent(listed) ? listed.value : []
     for (const snapshot of snapshots.slice(keep)) {
       try {
         await this.io.remove(snapshot.path)
@@ -3442,12 +3449,15 @@ export class SkillLibrary {
     }
   }
 
-  async listSnapshots(): Promise<Array<{ path: string; createdAt: string; reason: string }>> {
+  /** Snapshots as a THREE-state read (N14): absent = no .backups directory,
+   * unknown = it exists but could not be listed (a caller must not read a
+   * failed listing as "no snapshots to restore"). */
+  async listSnapshots(): Promise<Probe<Array<{ path: string; createdAt: string; reason: string }>>> {
     const backupRoot = join(this.root, '.backups')
-    let entries: string[]
-    try { entries = await this.io.list(backupRoot) } catch { return [] }
+    const listed = await probeList(this.io, backupRoot)
+    if (!isPresent(listed)) return listed
     const out: Array<{ path: string; createdAt: string; reason: string }> = []
-    for (const name of entries.sort().reverse()) {
+    for (const name of listed.value.sort().reverse()) {
       if (!name.startsWith('skills-')) continue
       const manifest = await this.readSnapshotManifest(join(backupRoot, name))
       if (manifest === null) {
@@ -3464,7 +3474,7 @@ export class SkillLibrary {
     // A1-21 (v18): the manifest's createdAt is the authoritative recency
     // (same-millisecond random-suffix names can sort wrongly by name).
     out.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '') || b.path.localeCompare(a.path))
-    return out
+    return probePresent(out)
   }
 
   /**
@@ -3491,8 +3501,13 @@ export class SkillLibrary {
    * snapshot so the rollback itself is undoable with the same state.
    */
   async restoreLatestSnapshot(extras: SnapshotExtra[] = []): Promise<SkillActionResult & { extras?: SnapshotExtra[] }> {
-    const snapshots = await this.listSnapshots()
-    const latest = snapshots[0]
+    const listed = await this.listSnapshots()
+    // N14: a failed listing is NOT "no snapshot" — say which one happened, and
+    // refuse before the pre-rollback snapshot (nothing has changed yet).
+    if (isUnknown(listed)) {
+      return { ok: false, message: `Snapshot restore refused: the snapshot directory could not be read (${listed.reason}) — nothing was changed.` }
+    }
+    const latest = isPresent(listed) ? listed.value[0] : undefined
     if (!latest) return { ok: false, message: 'No skill snapshot available.' }
     // v29 SK-07: the pre-rollback snapshot is the rollback INSURANCE, not part
     // of the restore — a failure taking it (win32 AV/indexer hold on the copy,

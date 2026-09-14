@@ -843,7 +843,14 @@ const defaultFs: FsOps = {
   copyFileSync: (from, to) => { copyFileSync(from, to) },
   renameSync: (from, to) => { renameSync(from, to) },
   rmSync: (path, options) => { rmSync(path, options) },
-  mtime: (path) => { try { return statSync(path).mtimeMs } catch { return null } },
+  // N14: only a MISSING file is "no mtime" (null). Any other stat failure
+  // rejects, so probeMtime() reports it as unknown instead of as absent.
+  mtime: (path) => {
+    try { return statSync(path).mtimeMs } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ENOTDIR') return null
+      throw error
+    }
+  },
 }
 
 /**

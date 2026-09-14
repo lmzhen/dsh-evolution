@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -246,5 +246,113 @@ describe('guard scripts (V4-30 sentry)', () => {
     const gated = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(gated).toBeNull()
+  })
+
+  it('N19 (v42/B4): a family fact with a second home fails the doc gate', async () => {
+    const root = await tempRoot('guard-arch-n19-')
+    // The rule arms on a family manifest plus the single-source table beside the
+    // scripts; the fixture table is deliberately small (the real one is exercised
+    // by the real-tree runs below).
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-core', version: '0.0.0' }), 'utf8')
+    await writeFile(join(root, 'evolution-core', 'src', 'index.ts'), 'export const armed = true\n', 'utf8')
+    await mkdir(join(root, 'scripts'), { recursive: true })
+    const asset = { version: 1, scan: { repoDocs: [], reasonLayer: [], treeDocSkip: ['node_modules'] }, facts: [{ id: 'demo-fact', home: 'INSTALL.md', must: [{ text: 'the one true sentence', unique: true }] }] }
+    await writeFile(join(root, 'scripts', 'family-facts.json'), JSON.stringify(asset), 'utf8')
+    await writeFile(join(root, 'INSTALL.md'), 'the one true sentence\n', 'utf8')
+    const clean = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+    expect(clean.stdout).toContain('1 fact(s)')
+    // The drift this rule exists for: the same conclusion written in two homes.
+    await writeFile(join(root, 'README.md'), 'and elsewhere: the one true sentence\n', 'utf8')
+    const copy = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(copy?.code).toBe(1)
+    expect(copy?.stderr).toContain('SECOND copy')
+    expect(copy?.stderr).toContain('INSTALL.md')
+    // The other half: a home that loses its sentence is not a pass either.
+    await rm(join(root, 'README.md'))
+    await writeFile(join(root, 'INSTALL.md'), 'reworded beyond recognition\n', 'utf8')
+    const lost = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(lost?.code).toBe(1)
+    expect(lost?.stderr).toContain('lost its canonical statement')
+    // Vacuity sentries: the rule may not pass by finding no table, and an empty
+    // table is not a pass either.
+    await writeFile(join(root, 'INSTALL.md'), 'the one true sentence\n', 'utf8')
+    await rm(join(root, 'scripts', 'family-facts.json'))
+    const vacuum = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(vacuum?.code).toBe(1)
+    expect(vacuum?.stderr).toContain('no single-source facts asset')
+    await writeFile(join(root, 'scripts', 'family-facts.json'), JSON.stringify({ ...asset, facts: [] }), 'utf8')
+    const empty = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(empty?.code).toBe(1)
+    expect(empty?.stderr).toContain('zero facts registered')
+  })
+
+  it('N19: the real tree keeps every fact in one home (standalone gate)', async () => {
+    const docFacts = join(scripts, 'verify-doc-facts.mjs')
+    const ok = await run(process.execPath, [docFacts, psRoot, '--strict'], { encoding: 'utf8' })
+    expect(ok.stdout).toContain('doc-facts')
+    expect(ok.stdout).toContain('0 violation(s)')
+    // A misspelled flag must fail loud instead of silently running the default
+    // scan (the gate passes --strict; humans type).
+    const typo = await run(process.execPath, [docFacts, psRoot, '--stict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(typo?.code).toBe(2)
+    expect(typo?.stderr).toContain('unknown flag')
+  })
+
+  it('N20 (v42/B3): a declared write site whose serialization is not in the code fails', async () => {
+    const root = await tempRoot('guard-arch-n20-')
+    await mkdir(join(root, 'demo-pkg', 'src'), { recursive: true })
+    // The table itself is the rule's arm (no family manifest, so the N19 doc
+    // pass stays disarmed on this synthetic tree); a manifest keeps the N8
+    // companion scan from reporting a vacuum.
+    await writeFile(join(root, 'demo-pkg', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-demo-pkg', version: '0.0.0' }), 'utf8')
+    const writer = join(root, 'demo-pkg', 'src', 'index.ts')
+    await writeFile(writer, 'export const plain = 1\n', 'utf8')
+    await mkdir(join(root, 'evolution-core'), { recursive: true })
+    const inventory = join(root, 'evolution-core', 'persisted-write-inventory.json')
+    const table = (over: Record<string, unknown>) => JSON.stringify([{
+      id: 'demo', path: '<home>/demo.json', writer: 'demo-pkg/src/index.ts',
+      serializedBy: 'transact', marker: 'transactIo(', state: [], note: 'fixture', ...over,
+    }])
+    const runGuards = () => run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
+    // The incident shape: the row CLAIMS a cross-process lock no writer takes —
+    // the per-instance serial queue that looks like serialization and is not.
+    await writeFile(inventory, table({}), 'utf8')
+    const wrongLock = await runGuards()
+    expect(wrongLock?.code).toBe(1)
+    expect(wrongLock?.stderr).toContain('demo-pkg/src/index.ts')
+    expect(wrongLock?.stderr).toContain('transactIo(')
+    // The claim half: a row naming an instance claim nobody makes.
+    await writeFile(inventory, table({ serializedBy: 'instance-claim', instance: 'demo-service', marker: '' }), 'utf8')
+    const noClaim = await runGuards()
+    expect(noClaim?.code).toBe(1)
+    expect(noClaim?.stderr).toContain('claimInstance()')
+    // The N12 cross-reference half: a row naming a state key the registry lacks.
+    await writeFile(inventory, table({ state: ['demo-pkg/src/index.ts :: ghost'] }), 'utf8')
+    const dangling = await runGuards()
+    expect(dangling?.code).toBe(1)
+    expect(dangling?.stderr).toContain('MUTABLE_STATE')
+    // The fixed shape: the writer really carries the declared serialization.
+    await writeFile(inventory, table({}), 'utf8')
+    await writeFile(writer, 'export async function save(io: unknown, p: string) { await transactIo(io, p, () => null) }\n', 'utf8')
+    const clean = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+    expect(clean.stdout).toContain('1 site(s)')
+    // A row whose writer is gone names a file the tree does not have.
+    await writeFile(writer, 'export const plain = 1\n', 'utf8')
+    await writeFile(inventory, table({ writer: 'demo-pkg/src/gone.ts' }), 'utf8')
+    const gone = await runGuards()
+    expect(gone?.code).toBe(1)
+    expect(gone?.stderr).toContain('which does not exist')
+    // Vacuity sentry: an empty table is not a pass either.
+    await writeFile(inventory, '[]', 'utf8')
+    const empty = await runGuards()
+    expect(empty?.code).toBe(1)
+    expect(empty?.stderr).toContain('declares no write site')
   })
 })

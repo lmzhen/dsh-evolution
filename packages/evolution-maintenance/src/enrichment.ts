@@ -10,6 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import {
   frontmatterCatalogInvalid,
+  isPresent,
   parseFrontmatter,
   usageObserved,
   type SkillLibrary,
@@ -75,8 +76,10 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
     if (typeof description === 'string' && description.trim().length > 0) {
       descriptions.set(entry.name, description)
     }
+    // N14: only the PRESENT branch may claim "these are the support files" —
+    // an unreadable directory stays out of the map instead of reading as none.
     const files = await library.listSupportFiles(entry.name)
-    if (files.length > 0) supportFiles.set(entry.name, files)
+    if (isPresent(files) && files.value.length > 0) supportFiles.set(entry.name, files.value)
     const record = usageMap?.get(entry.name)
     if (typeof record?.quality_score === 'number') quality.set(entry.name, record.quality_score)
   }
