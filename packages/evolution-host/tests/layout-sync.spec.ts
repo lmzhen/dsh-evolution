@@ -83,6 +83,28 @@ describe('verify-layout-sync (P1-② layout drift guard)', () => {
     expect(error?.stderr).toContain('only-dev.mjs')
   })
 
+  // 0.3.78: the scripts tree gained its first subdirectory (checklists/**), and
+  // the flat per-entry readFileSync turned into EISDIR on the release tag run.
+  // Subdirectories are now compared file by file, so a one-sided nested edit is
+  // still a named drift instead of a crash.
+  it('compares subdirectories file by file (a nested one-sided edit is named)', async () => {
+    const root = await tempRoot('dsh-layout-sync-3-')
+    const dev = join(root, 'dev')
+    const mirror = join(root, 'mirror')
+    await mkdir(join(dev, 'checklists'), { recursive: true })
+    await mkdir(join(mirror, 'checklists'), { recursive: true })
+    await writeFile(join(dev, 'checklists', 'new-package.md'), 'same\n')
+    await writeFile(join(mirror, 'checklists', 'new-package.md'), 'same\n')
+    const ok = await run(process.execPath, [guard, dev, mirror], { encoding: 'utf8' })
+    expect(ok.stdout).toContain('OK')
+    await writeFile(join(mirror, 'checklists', 'extra.md'), 'only here\n')
+    const error = await run(process.execPath, [guard, dev, mirror], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('checklists/extra.md')
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
   // P2-15 / V9-01 (0.3.50): the version half of the guard — mirror CHANGELOG
   // head must equal the root manifest AND every package manifest version. The
   // real incident rewrote 30 manifests to 0.1.0-rc.1 and four releases passed

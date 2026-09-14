@@ -27,12 +27,28 @@ if (!argv[0] || !argv[1]) {
 
 const normalize = (content) => content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
-const names = (dir) => {
+/**
+ * Every FILE under `dir`, as `/`-joined paths relative to it. Recursive since
+ * 0.3.78: the scripts tree gained its first SUBDIRECTORY (`checklists/**`), and
+ * the flat `readFileSync(join(dir, name))` read a directory -> EISDIR. The
+ * guard's only authoritative run is the release chain, so the shape break
+ * surfaced in CI on the 0.3.78 tag run, not locally.
+ */
+const names = (dir, prefix = '') => {
+  let entries
   try {
-    return readdirSync(dir).filter(name => !name.startsWith('.')).sort()
+    entries = readdirSync(dir, { withFileTypes: true })
   } catch {
     return []
   }
+  const found = []
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) found.push(...names(join(dir, entry.name), rel))
+    else found.push(rel)
+  }
+  return found.sort()
 }
 
 const dev = names(devDir)
