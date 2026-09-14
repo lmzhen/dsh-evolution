@@ -1,0 +1,13 @@
+// One row of packages/evolution-agent/bases.json. The whole table is the single
+// source: the installer (AGENT_PRESET_BASES), /evolution preset install and the
+// doc home (evolution-agent/README.md) all read it.
+{
+  "name": "<base>",
+  "id": "evolution-<base>",
+  "metadata": "preset.<base>.yml",
+  "requires": { "service": "<platformServiceMountedBySomePlane>" },
+  "unsupported": "<why this base cannot work at all — omit the key if it can>"
+}
+// requires and unsupported are REFUSALS, not notes: both install paths call
+// baseUnavailableReason() and refuse by name before writing anything. A base
+// that is left out of the table is a base nobody refuses.

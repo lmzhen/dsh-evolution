@@ -62,8 +62,9 @@ that script asserts it.
 See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
 compatibility flow, and profile override examples. Its install-form table also
 carries the per-form status against this platform line (verified / not yet
-exercised), and `docs/v33-no-action-register.md` records every platform change
-reviewed this round that needs no code action.
+exercised) — that table is the record; a platform change reviewed with no family
+action taken is recorded in the CHANGELOG section of the round that reviewed it
+(no separate register file: `packages/docs/**` is not a versioned surface).
 
 ## Command reference
 
@@ -149,10 +150,11 @@ Then select the `Evolution` agent preset for the sessions that should be family
 sessions. The model tools (`memory` / `skill_manage` / `session_search` / the
 skill catalog) exist only inside that preset, and the cross-session rows carry
 `sessionScoped: true`: review, usage telemetry and the curator act on a session
-only when it carries the family's model tools. **A session running a platform
-original preset (`standard` / `ptc` / `minimal` / `cordis`) therefore gets no
-evolution behaviour at all** — no injected review prompt, no usage counting, no
-curation influence over it (`evolution-core/src/opt-in.ts`).
+only when it carries the family's model tools, so a session on a platform
+original preset (`standard` / `ptc` / `minimal` / `cordis`) is left alone
+entirely — no injected review prompt, no usage counting, no curation influence
+over it (`evolution-core/src/opt-in.ts`). Both forms' consequences are
+single-sourced in `INSTALL.md` ("Install forms").
 
 Installer equivalent: `install-layered --mode variant` (the historical
 `--mode layered`), with `--base standard,ptc` to generate one preset per base.
@@ -179,7 +181,9 @@ every session passes it, so nothing is skipped.
 
 Installer equivalent: `install-layered --mode attach` (the historical
 `--mode oneclick`). `/evolution doctor` reports which form a machine is on
-(`deployment: variant` / `attach`).
+(`deployment: variant` / `attach`, and the other three values are tabulated in
+`INSTALL.md`). This section owns the install mechanics; the form semantics live
+in `INSTALL.md` alone.
 
 This one-click preset and the `evolution-host` bundle are ALTERNATIVE install
 targets (mutual exclusion, E-33) — install one, not both, or the shared infra

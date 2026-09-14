@@ -98,26 +98,18 @@ repeating the same prose.
 ### Command surface (`/evolution`)
 
 Generated from the subcommand registry (`evolution-commands/src/registry.ts` —
-single source with the input hint and the emitted help/README text):
+single source with the input hint and the emitted help/README text). **The full
+table is rendered once, in `packages/README.md` §Command reference, where
+`registry.spec.ts` pins it byte-for-byte against the registry** — do not copy it
+here (this table used to live in both files and had already drifted: it still
+offered `preset install [--base <name>]` after 0.3.77 added the multi-base
+form).
 
-| Command | Purpose |
-|---|---|
-| `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
-| `/evolution approve <id>` | replay an approved staged write through its runner |
-| `/evolution reject <id>` | drop a staged write without running it |
-| `/evolution doctor [--json]` | read-only self-check: install form, conflicts, env, services (--json feeds scripts) |
-| `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
-| `/evolution mutations` | list skill-mutation audit records |
-| `/evolution restore` | restore skills from the latest snapshot |
-| `/evolution consolidate <target> <sources...> [--plan <runId>]` | merge source skills into a target umbrella skill |
-| `/evolution skill restore <name>` | restore one archived skill by name |
-| `/evolution skills health` | structure-health verdicts for the skill library |
-| `/evolution skills refresh` | drop the catalog caches and re-read the tree |
-| `/evolution learn [request]` | send a learning request to this session |
-| `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
-| `/evolution preset install [--base <name>]` | generate the Evolution agent preset into the user root (bases from the agent package's bases.json) |
-| `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
-| `/evolution replay` | compare plan outcomes across sessions and restarts (backfilled from the activity store) |
+On day one you need four of them: `/evolution doctor` (what is installed),
+`/evolution pending` + `approve`/`reject` (the staged writes),
+`/evolution curator status` (background curation) and
+`/evolution preset install [--base <name>[,<name>...]]` (generate the family
+agent preset).
 
 ### Configuration dials (5 knobs, underlying fields pinned by tests)
 
@@ -196,9 +188,12 @@ Install the host bundle into the profile:
 ```
 
 Then select the `Evolution` agent preset for sessions that should expose the
-`memory` / `skill_manage` tools. Sessions on other presets keep the shared
-automation (review, curator, approval, observability) without model-facing
-evolution tools. **`all` and this layout are exclusive** — do not combine them.
+`memory` / `skill_manage` tools. This is the **① variant** form: the model rows
+live only inside that preset, so a session on a platform original preset carries
+no family behaviour at all — review, curator, approval and observability
+included. The two forms' consequences are stated once, in
+`packages/INSTALL.md` ("Install forms"); **`all` and this layout are
+exclusive** — do not combine them.
 
 > **One-time step (V7-06, 0.3.43):** before a session can select the `Evolution`
 > preset, run `/evolution preset install` once in a session on any preset —
@@ -221,16 +216,12 @@ layout are ALTERNATIVE installs (mutual exclusion, E-33) — install one, not
 two, or the shared infra rows mount twice and startup fails loud. The one-click
 preset carries its own `evolution-maintenance-tools` row, its own
 `session-query-sqlite` index override and the same root-level `tool-skill`
-60-char catalog cap override as the host bundle. Sessions running under an
-agent preset read the PRESET-scope `tool-skill` row, which no profile patch can
-reach — and under the web profile the platform DISABLES the profile-root row
-(`packages/bundle/web-app/cordis.patch.yml`), so a profile-root override takes
-effect in headless/base installs only. For presets the evolution composer
-generates (`/evolution preset install` and the layered flow — one rule since
-0.3.53) the composer injects the cap onto that preset row; a session running a
-preset the composer did not generate (a platform preset, or one anchored
-before the composer ran) keeps the platform default until the preset is
-recomposed or the upstream default changes. The `verify-declared-config.mjs`
+60-char catalog cap override as the host bundle. **Where that override actually
+takes effect is single-sourced in `packages/README.md` (§② Attach install):** a
+profile-root override reaches headless/base installs only (the web profile
+disables the profile-root row), a composer-generated preset gets the cap
+injected onto its own row, and a preset the composer did not generate keeps the
+platform default until it is recomposed. The `verify-declared-config.mjs`
 guard prints this reach per profile and per declared key. The 60-char authoring
 bar enforced by tool-skill-manage applies regardless.
 

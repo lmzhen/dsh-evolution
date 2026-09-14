@@ -66,6 +66,21 @@ the first real 0.1.5 install.
 > session would mean registering inside each agent's scope with its own
 > registration/teardown lifecycle, which this family deliberately does not do
 > (see the optimization plan's "explicitly not doing" list).
+>
+> **Single source (0.3.78, G5):** this block is the family's ONE statement of what
+> each install form does to a session and of the variant command-face difference.
+> Every other document cites it — `scripts/family-facts.json` names it as the home
+> of those facts, and a second copy fails architecture rule N19.
+
+### What `/evolution doctor` reports
+
+| `deployment:` | Form | What a session gets |
+|---|---|---|
+| `variant` | ① layered (`host` + the generated Evolution preset) | family behaviour only in sessions that selected the family preset |
+| `attach` | ② full (`all`) or one-click (`preset`) | every session, platform original presets included |
+| `host-only` | the host bundle, no model rows | background automation only; no `memory` / `skill_manage` tools |
+| `preset-only` | the Evolution preset is delivered, no bundle is mounted | nothing runs until a bundle is added back |
+| `none` | no family bundle and no generated preset | nothing mounted; install per §5 |
 
 ## Platform mode × self-evolution
 
@@ -81,9 +96,12 @@ surface they stand on.
 | `cordis` | full | `standard` plus `tool-cordis`. The model can also inspect and mount plugins, so pair it with a deliberate review/approval policy |
 | `minimal` | not usable | mounts `persona` and the shell/terminal rows only — no `skill-filesystem`, no `tool-skill`, no file tools, so the skill surface the family writes to has no home |
 
-Preset variants (`--base`) exist for `standard` and `ptc`; `cordis` sessions get
-the family through the profile-wide `all` install instead, and no `cordis` base
-is published (see `evolution-agent/README.md`). The `sdk-minimal` application
+Preset variants (`--base`) exist for every base the agent package's
+`bases.json` carries — the table, each base's installed id and its precondition
+are single-sourced in `evolution-agent/README.md` §Preset variants. `cordis` is
+registered there with `requires: dynamicCordisRunner` and is refused by name
+where that service is absent; `minimal` is registered as unsupported because its
+platform composition carries no skill row to attach to. The `sdk-minimal` application
 bundle does not layer over `dsh-base` and ships neither the state, approval nor
 skill rows, so the family has no foothold there either.
 

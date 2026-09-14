@@ -147,7 +147,8 @@ host 基础设施   review、curator、审批、审计、可观测性、威胁�
   `standard` 组合，合并 `dsh-evolution-agent-preset` 携带的 delta，把组合后的
   `agent.cordis.yml`/`preset.yml` 写入 `$DSH_HOME/.agent-presets/evolution/`），
   再为需要自进化工具的会话选择 **Evolution** 预设。
-  其他预设仍获得 review、curator、审批和观测能力，但不会暴露模型侧的自进化工具。
+  这是 **① 变体形态**：模型行只存在于 Evolution 预设，平台原版预设的会话不携带任何家族行为。
+  两种形态的后果只在 `packages/INSTALL.md` 陈述一次（单一数据源，勿在他处复述）。
   **注意：`all`、`preset` 兼容包与 layered 形态互斥**（preset 兼容包与 all 同样全会话挂模型行，与 layered 双挂载冲突）。
 
 #### 选择安装方式（场景 → 操作 → 你得到什么）
@@ -253,7 +254,7 @@ evolution-approval  stage -> approve/reject -> 审计
 ## 兼容性
 
 - 基于 DeepSeek Harness `0.1.5-rc.2` 兼容验证（CI 发布锚点双锚检查）。
-- 与 `standard` / `ptc` / `cordis` 预设服务级兼容；`minimal` 不适用——该预设只挂 persona 与 shell/terminal 行，家族工具仍会挂载但技能面没有落点（见 `packages/docs/known-limitations.md`）。
+- 与 `standard` / `ptc` / `cordis` 预设服务级兼容；`minimal` 不适用——该预设只挂 persona 与 shell/terminal 行，家族工具仍会挂载但技能面没有落点（见 `packages/INSTALL.md` §Platform mode × self-evolution 的平台预设表）。
 - 使用 Anchored Standard 真实插件代码测试：
   - bootstrap 阶段隐藏 evolution 工具；
   - promoted 阶段仍隐藏；

@@ -1,0 +1,27 @@
+import type { Context } from '@deepseek-ai/cordis'
+import z from 'schemastery'
+import { clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+
+export const name = 'evolution-<pkg>'
+// Platform services this package reads. Keep it to what apply() really uses:
+// every entry is a mount-time injection requirement.
+export const inject = ['evolutionIo']
+
+export interface Config {
+  /** <what this dial does, and the default's reason> */
+  intervalHours?: number
+}
+
+export const Config: z<Config> = z.object({
+  // N3: every numeric field carries a clamp, or NaN/Infinity reaches the loop.
+  intervalHours: clampedNumber({ min: 0, max: 168, default: 6 }),
+})
+
+export function apply(ctx: Context, config: Config): void {
+  const rowConfig = config
+  // Sidecar writes: transact() (file lock) — never a bare writeFile on a shared
+  // file. Read failures are Probe<unknown>, not "empty" (N14).
+  const io = ctx.get('evolutionIo')
+  void io
+  void rowConfig
+}

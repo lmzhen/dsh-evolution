@@ -1,0 +1,23 @@
+{
+  "name": "@deepseek-ai/dsh-<pkg>",
+  "description": "<one line: what this package owns>",
+  "version": "0.3.78",
+  "publishConfig": { "access": "public" },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
+    "./package.json": "./package.json",
+    "./tools": { "types": "./lib/types/tools.d.ts", "default": "./lib/tools.js" },
+    "./invariant": "./lib/invariant.js"
+  },
+  "files": ["lib/*.js", "lib/types/**/*.d.ts"],
+  "license": "MIT",
+  "dependencies": { "@deepseek-ai/dsh-evolution-core": "workspace:^" },
+  "peerDependencies": { "@deepseek-ai/cordis": "workspace:^" },
+  "devDependencies": { "@deepseek-ai/cordis": "workspace:^" }
+}
+// Drop the "./invariant" export and the "./tools" subpath unless they exist —
+// N8 fails a published ./invariant companion no cordis row mounts, and the
+// dependency-closure guard fails an export nothing imports.

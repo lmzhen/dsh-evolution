@@ -1,0 +1,12 @@
+// Producer: emit through the injected io surface, in the family namespace.
+io.emit('evolution/<name>', { target, outcome })
+
+// Consumer: the opt-in gate is the FIRST line — under the ① variant form a
+// session on a platform original preset must be left alone (N18).
+ctx.on('session/event', (session, event) => {
+  if (!sessionAudited(ctx, session.id, config.sessionScoped)) return
+  const seen = readDurableState(session.id) // Probe<T>: present | absent | unknown
+  if (isUnknown(seen)) return // a read failure is not "nothing there" (N14)
+  const catalog = ctx.get('skills')
+  void catalog?.list({ scope: callingScope(ctx) }) // scope-less reads see the global layer only (N16)
+})

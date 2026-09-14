@@ -31,6 +31,8 @@ vendored — the preset follows whichever platform the user actually has.
 |---|---|---|---|
 | `standard` (default) | `<platform>/standard/agent.cordis.yml` | `evolution` | `preset.yml` |
 | `ptc` | `<platform>/ptc/agent.cordis.yml` | `evolution-ptc` | `preset.ptc.yml` |
+| `cordis` (`requires: dynamicCordisRunner`) | `<platform>/cordis/agent.cordis.yml` | `evolution-cordis` | `preset.cordis.yml` |
+| `minimal` (unsupported) | — | `evolution-minimal` | `preset.minimal.yml` |
 
 `bases.json` in this package is the single table behind all four columns — the installer
 (`AGENT_PRESET_BASES`) and the host command (`/evolution preset install --base <name>`) both
@@ -73,16 +75,22 @@ Known limitations of this base:
 
 ### Base coverage
 
-`bases.json` carries `standard` and `ptc`. There is no `cordis` base, and the
-reason is mechanical: the cordis preset's extra row is `tool-cordis`, which
-injects `dynamicCordisRunner` — a service mounted only by the `web-app` bundle.
-A cordis-based preset installed on a headless, ACP or SDK profile would mount a
-row whose injection cannot be satisfied, and a preset row that never activates is
-refused at mount time rather than degraded. Cordis sessions get the family
-through the profile-wide `all` install, which needs no variant.
+`bases.json` carries four bases and is the single table behind the installer
+(`AGENT_PRESET_BASES`), `/evolution preset install --base <name>` and the table
+above: `standard` (default), `ptc`, `cordis` and `minimal`. Two of them carry a
+precondition the table itself declares, and both install paths refuse them by
+name when it is unmet — the preset is never composed from another base:
 
-`minimal` is out of scope for the same class of reason: it mounts no skill or
-file tool rows for the family to write through (see `packages/INSTALL.md`).
+- `cordis` — `requires: { service: 'dynamicCordisRunner' }`. The cordis preset's
+  extra row is `tool-cordis`, which injects `dynamicCordisRunner`, and that
+  service is mounted only by the `web-app` bundle. A cordis-based preset on a
+  headless, ACP or SDK profile would mount a row whose injection cannot be
+  satisfied, and a preset row that never activates is refused at mount time
+  rather than degraded. Cordis sessions otherwise get the family through the
+  profile-wide `all` install, which needs no variant.
+- `minimal` — `unsupported`: the platform minimal composition is only persona +
+  persistent-shell, so it mounts no skill or file tool rows for the family to
+  write through (see `packages/INSTALL.md` §Platform mode × self-evolution).
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 

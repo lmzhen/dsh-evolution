@@ -1,0 +1,230 @@
+{
+  "$comment": [
+    "G5 (0.3.78) single source for the family's cross-file FACTS.",
+    "A fact here is a statement that used to live in two or more tracked documents and",
+    "therefore drifted (0.3.77: the root README still claimed that sessions on other",
+    "presets keep the shared automation, and the agent README still claimed there is no",
+    "cordis base after bases.json grew one).",
+    "Rules of the table: every fact has exactly ONE home document; other documents CITE",
+    "the home (the `cites` entries) instead of restating it; a `must` entry marked",
+    "unique may appear in the home ONLY - a second copy anywhere in the tracked docs",
+    "fails verify-arch-guards rule N19. `machine` entries re-derive the statement from",
+    "the code/data that owns the value, so a changed value with a stale doc also fails.",
+    "Version history (CHANGELOG.md) is the REASON layer and is exempt from `forbid`: a",
+    "released version section records what was true then and is never rewritten.",
+    "packages/docs/** is gitignored (not a versionable surface): it may be a source of",
+    "material, never a home; the lib skips it by name."
+  ],
+  "version": 1,
+  "scan": {
+    "repoDocs": [
+      "README.md",
+      "README.zh.md",
+      "INSTALL.md",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md"
+    ],
+    "reasonLayer": [
+      "CHANGELOG.md"
+    ],
+    "treeDocSkip": [
+      "node_modules",
+      "lib",
+      "dist",
+      "docs",
+      ".release-staging",
+      ".release-staging.next",
+      ".release-staging.previous",
+      "dist.next",
+      ".git"
+    ]
+  },
+  "facts": [
+    {
+      "id": "install-form-semantics",
+      "title": "① variant / ② attach - what each form does to a session",
+      "home": "INSTALL.md",
+      "must": [
+        {
+          "text": "**② attach** — full (`all`) or one-click (`preset`) — where every session,"
+        },
+        {
+          "text": "**① variant** — layered (`host` + the generated Evolution preset,"
+        },
+        {
+          "text": "gets no evolution behaviour at all",
+          "unique": true
+        }
+      ],
+      "forbid": [
+        {
+          "re": "Sessions on other presets keep the shared automation",
+          "why": "false since 0.3.77: under ① variant an original-preset session carries no family behaviour, the shared automation is per-session gated (opt-in.ts)"
+        },
+        {
+          "re": "其他预设仍获得 review、curator、审批和观测能力",
+          "why": "the zh copy of the same 0.3.77-invalidated claim"
+        }
+      ],
+      "cites": [
+        {
+          "file": "README.md",
+          "scope": "repo",
+          "text": "packages/INSTALL.md"
+        },
+        {
+          "file": "README.zh.md",
+          "scope": "repo",
+          "text": "packages/INSTALL.md"
+        },
+        {
+          "file": "README.md",
+          "scope": "tree",
+          "text": "INSTALL.md"
+        }
+      ]
+    },
+    {
+      "id": "preset-bases",
+      "title": "the --base table: which bases exist, their ids and their preconditions",
+      "home": "evolution-agent/README.md",
+      "machine": {
+        "kind": "bases-json",
+        "file": "evolution-agent/bases.json"
+      },
+      "must": [
+        {
+          "text": "| `--base` | Platform composition (read verbatim) | Installed preset id | Metadata file |"
+        }
+      ],
+      "forbid": [
+        {
+          "re": "There is no `cordis` base",
+          "why": "false since 0.3.78 (B1): bases.json registers cordis with requires.service=dynamicCordisRunner and the installer/command refuse it only when that service is absent"
+        },
+        {
+          "re": "`bases.json` carries `standard` and `ptc`",
+          "why": "stale table inventory: bases.json carries four bases"
+        },
+        {
+          "re": "no `cordis` base is published",
+          "why": "same 0.3.78 drift on the install document"
+        }
+      ],
+      "cites": [
+        {
+          "file": "INSTALL.md",
+          "scope": "tree",
+          "text": "evolution-agent/README.md"
+        }
+      ]
+    },
+    {
+      "id": "row-override-cap-reach",
+      "title": "where the 60-char catalog cap actually takes effect (composer-reached row)",
+      "home": "README.md",
+      "machine": {
+        "kind": "row-override-cap",
+        "file": "evolution-core/row-overrides.json",
+        "key": "catalogDescriptionMaxLength"
+      },
+      "must": [
+        {
+          "text": "the composer injects the cap onto that preset row",
+          "unique": true
+        },
+        {
+          "text": "which no profile patch can reach",
+          "unique": true
+        }
+      ],
+      "forbid": [],
+      "cites": [
+        {
+          "file": "README.md",
+          "scope": "repo",
+          "text": "packages/README.md"
+        }
+      ]
+    },
+    {
+      "id": "command-face-variant",
+      "title": "the accepted ① variant known difference: the /evolution command face stays visible",
+      "home": "INSTALL.md",
+      "machine": {
+        "kind": "doctor-forms",
+        "file": "evolution-commands/src/doctor.ts",
+        "field": "deploymentForm"
+      },
+      "must": [
+        {
+          "text": "still SEES the `/evolution …` commands",
+          "unique": true
+        }
+      ],
+      "forbid": [
+        {
+          "re": "the command face is hidden per session",
+          "why": "the family registers its command once on the host plane; per-session registration is an explicitly declined change"
+        }
+      ],
+      "cites": [
+        {
+          "file": "evolution-commands/README.md",
+          "scope": "tree",
+          "text": "INSTALL.md"
+        },
+        {
+          "file": "README.md",
+          "scope": "repo",
+          "text": "packages/INSTALL.md"
+        }
+      ]
+    },
+    {
+      "id": "command-surface",
+      "title": "the /evolution command table (rendered from the registry into one document)",
+      "home": "README.md",
+      "must": [
+        {
+          "text": "| `/evolution preset install [--base <name>[,<name>...]]`",
+          "unique": true
+        }
+      ],
+      "forbid": [
+        {
+          "re": "\\n\\| Command \\| Purpose \\|",
+          "why": "the /evolution command table is rendered from the registry into packages/README.md and pinned byte-for-byte there by registry.spec.ts (T-WD2); a second copy drifts — the root README copy had already lost the 0.3.77 multi-base form"
+        },
+        {
+          "re": "\\| `/evolution preset install \\[--base <name>\\]`",
+          "why": "the pre-0.3.77 single-base spelling: the registry renders [--base <name>[,<name>...]] and registry.spec.ts pins the home to it"
+        }
+      ],
+      "cites": [
+        {
+          "file": "README.md",
+          "scope": "repo",
+          "text": "packages/README.md"
+        }
+      ]
+    }
+  ],
+  "checklists": {
+    "docs": [
+      "scripts/checklists/index.md",
+      "scripts/checklists/new-package.md",
+      "scripts/checklists/new-base.md",
+      "scripts/checklists/new-command.md",
+      "scripts/checklists/new-event.md",
+      "scripts/checklists/new-consumer.md",
+      "scripts/checklists/new-arch-rule.md"
+    ],
+    "repoDocs": [
+      "CONTRIBUTING.md"
+    ],
+    "guardDir": "scripts",
+    "ruleRegistry": "scripts/verify-arch-guards.mjs",
+    "templateRoot": "scripts/checklists/templates"
+  }
+}

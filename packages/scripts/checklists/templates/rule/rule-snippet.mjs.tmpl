@@ -1,0 +1,15 @@
+// packages/scripts/verify-arch-guards.mjs — a new rule is four edits, all in
+// this file (never renumber a landed id; take the next free number).
+// 1. docblock header entry, exact shape the startup inventory reads:
+ *   N<id>. <one-line claim>. <the incident that motivated it, and the register
+ *       a deliberate exception goes into. Comments are inert; a string literal
+ *       is the signal.
+// 2. registry entry, appended at the END of RULES:
+  { id: 'N<id>', title: '<short title>' },
+// 3. detector self-test in the startup `detectors` list — INCIDENT shapes:
+  ['N<id>', () => detector('<the spelling that actually shipped>').length > 0
+    && detector('<a clean shape>').length === 0],
+// 4. the tree pass (or per-file hook) plus its vacuity sentry:
+  if (filesScanned === 0) violations.push(`no <subject> under ${root} — the N<id> scan cannot decide (a vacuum pass is not a pass)`)
+// Then: verify-arch-guards.mjs packages --strict is 0 violations, --list-rules
+// prints it, and guard-scripts.spec.ts gains one positive + one violation case.
