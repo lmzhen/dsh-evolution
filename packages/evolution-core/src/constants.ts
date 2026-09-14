@@ -52,7 +52,7 @@ export const SKILL_ACTION_REQUIRED_FIELDS: Readonly<Record<string, readonly stri
 
 /** Skill frontmatter `name` validated for the file name (lowercase + hyphen).
  * 计划 B-4 (v18): tightened to the UPSTREAM `SKILL_NAME` shape
- * (`/^[a-z0-9]+(?:-[a-z0-9]+)*$/`, packages/skill/skill/src/index.ts:20). The
+ * (`/^[a-z0-9]+(?:-[a-z0-9]+)*$/`, packages/skill/skill/src/index.ts:21). The
  * old form admitted trailing/consecutive hyphens, which upstream
  * `validateCandidate` throws on — and that throw aborts the WHOLE `ctx.skills`
  * collection. The catalog provider still filters such legacy tree entries so

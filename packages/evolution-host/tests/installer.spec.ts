@@ -372,7 +372,7 @@ describe('layered installer', () => {
   it('D-4 (v18): a profile name with no shipped template seeds DEFAULT_PROFILE_BUNDLES', async () => {
     const home = await tempRoot('dsh-installer-d4default-')
     // Upstream DEFAULT_PROFILE_BUNDLES is `['@deepseek-ai/dsh-base']`
-    // (app-boot/src/profile.ts:125); the custom name must not inherit the web
+    // (app-boot/src/profile.ts:124); the custom name must not inherit the web
     // template's web-app row.
     await runInstaller(home, 'host', 'evo-test')
     const manifest = JSON.parse(await readFile(join(home, 'profiles', 'evo-test', 'package.json'), 'utf8')) as {
@@ -409,6 +409,12 @@ describe('layered installer', () => {
     // package — the overlay carries the real one, and a missing table is a
     // loud failure by design (never a silent fallback to `standard`).
     await cp(fileURLToPath(new URL('../../evolution-agent/bases.json', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-agent', 'bases.json'))
+    // 0.3.77 (G1): the row-override table is the SECOND data file the installer
+    // reads out of a family package, so this overlay carries the real one too —
+    // same rule as the base table: a missing file is a loud failure by design
+    // (never a silent fallback to a hand-kept copy).
+    await mkdir(join(tree, 'packages', 'evolution', 'evolution-core'), { recursive: true })
+    await cp(fileURLToPath(new URL('../../evolution-core/row-overrides.json', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-core', 'row-overrides.json'))
     await run(process.execPath, [
       join(scripts, 'install-layered.mjs'), '--mode', 'agent', '--profile', 'g21', '--home', home,
     ], { env: { ...process.env, DSH_EVOLUTION_DELTA_PATH: delta } })

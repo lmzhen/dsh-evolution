@@ -1,4 +1,6 @@
 /* WC (0.3.56): the N-5 escape reads through the single env module. */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { allowRowCollisions } from './env.ts'
 
 /**
@@ -57,8 +59,10 @@ export function composePresetComposition(standardComposition: string, deltaCompo
  *   - a composition WITHOUT a tool-skill row is returned unchanged with a
  *     one-time warning (a renamed platform row must not brick the install,
  *     but the missed cap must be observable).
- * install-layered.mjs ships the byte-identical `injectToolSkillCap`.
+ * The source installer reads the SAME table (`row-overrides.json`) through its
+ * own `injectToolSkillCap`, so the two paths cannot diverge (0.3.77).
  */
+/** One entry of the shared override table (see {@link loadRowOverrides}). */
 interface RowOverride {
   /** Top-level row id this override targets (`- id: <row>`). */
   row: string
@@ -66,27 +70,51 @@ interface RowOverride {
   key: string
   /** Rendered, already-indented YAML lines to ensure inside the row. */
   lines: string[]
-  /** One-time warning when the row is absent. */
-  missing: string
+  /** Warning tail shared by both consumers; each prefixes its own logger tag. */
+  missingReason: string
 }
 
-/** The composer-owned overrides, as DATA: one place states what the generated
- * preset must carry beyond the platform composition. V10-14's cap is the first
- * entry; install-layered.mjs keeps a byte-identical copy of this table. */
-const ROW_OVERRIDES: RowOverride[] = [
-  {
-    row: 'tool-skill',
-    key: 'config',
-    lines: [
-      '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
-      '  # this preset-scope row is the session-visible instance and no profile',
-      '  # patch can reach it. Remove only to run the platform default (500).',
-      '  config:',
-      '    catalogDescriptionMaxLength: 60',
-    ],
-    missing: 'evolution preset composition: warning — no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)',
-  },
-]
+/**
+ * One table, two generation paths: `row-overrides.json` at the PACKAGE ROOT
+ * states what a generated preset must carry beyond the platform composition,
+ * and the source installer (`scripts/install-layered.mjs`) reads the same file.
+ * The path resolves from both `src/` and the built `lib/`, which is why the
+ * file sits at the root and ships in `files`.
+ *
+ * Before 0.3.77 each side carried its own hand-kept copy of this table; they
+ * happened to stay byte-identical, which is exactly the kind of agreement no
+ * test can keep — the entries are now data, and a divergence is impossible.
+ */
+const ROW_OVERRIDES_URL = new URL('../row-overrides.json', import.meta.url)
+let cachedOverrides: RowOverride[] | undefined
+
+/**
+ * Read and validate the shared override table.
+ * @returns the entries, in file order. A malformed table fails LOUD: a composer
+ * that silently skipped an entry would ship a preset running the platform
+ * default while nothing downstream reported it.
+ */
+export function loadRowOverrides(): RowOverride[] {
+  if (cachedOverrides !== undefined) return cachedOverrides
+  const parsed: unknown = JSON.parse(readFileSync(fileURLToPath(ROW_OVERRIDES_URL), 'utf8'))
+  if (!Array.isArray(parsed)) {
+    throw new Error('evolution-core: row-overrides.json must be an array of override entries')
+  }
+  const entries: RowOverride[] = []
+  for (const [index, entry] of parsed.entries()) {
+    const candidate = entry as Partial<RowOverride> | null
+    if (candidate === null || typeof candidate !== 'object'
+      || typeof candidate.row !== 'string' || candidate.row === ''
+      || typeof candidate.key !== 'string' || candidate.key === ''
+      || !Array.isArray(candidate.lines) || candidate.lines.some(line => typeof line !== 'string')
+      || typeof candidate.missingReason !== 'string') {
+      throw new Error(`evolution-core: row-overrides.json entry ${index} is malformed (row/key/lines/missingReason are required)`)
+    }
+    entries.push({ row: candidate.row, key: candidate.key, lines: candidate.lines, missingReason: candidate.missingReason })
+  }
+  cachedOverrides = entries
+  return entries
+}
 
 /**
  * Ensure every {@link RowOverride} inside its target row.
@@ -97,7 +125,7 @@ const ROW_OVERRIDES: RowOverride[] = [
  * override REPLACES `config` wholesale — the difference is why the composer can
  * add a key without erasing the platform's own config defaults.
  */
-function applyRowOverrides(composition: string, overrides: RowOverride[] = ROW_OVERRIDES): string {
+function applyRowOverrides(composition: string, overrides: RowOverride[] = loadRowOverrides()): string {
   let lines = composition.split('\n')
   for (const override of overrides) {
     lines = applyOneOverride(lines, override)
@@ -132,7 +160,7 @@ function applyOneOverride(lines: string[], override: RowOverride): string[] {
     lines.splice(end + 1, 0, ...override.lines)
     i = end + override.lines.length
   }
-  if (!found) console.warn(override.missing)
+  if (!found) console.warn('evolution preset composition: warning — ' + override.missingReason)
   return lines
 }
 

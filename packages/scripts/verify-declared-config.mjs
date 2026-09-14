@@ -6,7 +6,7 @@
  * Root cause this closes (v27 T-1): the bundles declare
  * `tool-skill.catalogDescriptionMaxLength: 60` as a profile-root override, but
  * the platform's `web-app` bundle disables the profile-root `tool-skill` row
- * (`packages/bundle/web-app/cordis.patch.yml:333`) because presets own the
+ * (`packages/bundle/web-app/cordis.patch.yml:405`) because presets own the
  * per-agent skill rows. A patch layer only overrides keys of a row that exists
  * AND is enabled in the plane below it, so "my patch file has the row" was
  * never evidence that the key takes effect — in the default web install the
@@ -179,8 +179,12 @@ const COMPOSER_REACHED = [
     key: 'catalogDescriptionMaxLength',
     reach: 'the preset composer injects this key onto the `- id: tool-skill` row of the preset it composes — that row is the session-visible instance under the web plane',
     anchors: [
-      { file: 'evolution-core/src/preset-composition.ts', needle: 'catalogDescriptionMaxLength: 60' },
-      { file: 'scripts/install-layered.mjs', needle: 'catalogDescriptionMaxLength: 60' },
+      // 0.3.77 (G1): ONE table, two generation paths — the composer
+      // (evolution-core/src/preset-composition.ts) and the source installer
+      // (scripts/install-layered.mjs) both read this file, so it is the anchor
+      // that proves the reach. The former per-file needles are gone with the
+      // copies they used to pin.
+      { file: 'evolution-core/row-overrides.json', needle: 'catalogDescriptionMaxLength: 60' },
     ],
     limits: 'a session running a preset the evolution composer did NOT generate (a platform preset, or one anchored before the composer ran) keeps the platform default until the preset is recomposed or the upstream default changes (F12)',
   },

@@ -675,17 +675,18 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
 }
 
 /**
- * V10-14 (P1-2): inject the Hermes 60-char catalog cap onto the STANDARD
- * sourced `- id: tool-skill` row of the composed preset.
+ * V10-14 (P1-2), 0.3.77: apply the SHARED override table to the composed
+ * preset — `evolution-core/row-overrides.json`, the same file core's composer
+ * reads. The cap lands on the STANDARD-sourced `- id: tool-skill` row.
  *
  * The session-visible `tool-skill` instance mounts in the agent preset's own
  * standing scope; a profile-root patch (evolution-host/cordis.patch.yml)
  * cannot reach it, so before this injection the layered install ran the
  * platform default (500) on the catalog's read side. Text-level rewrite in
  * the same line-scan style as rowIds() above (no YAML library — v2 §10 scope
- * control). 0.3.53: generateAgentPreset now calls this internally; core
- * composePresetComposition ships the byte-identical rule (installer.spec
- * pins the parity), so the npm `/evolution preset install` path applies it too:
+ * control). 0.3.53: generateAgentPreset calls this internally; core's
+ * composePresetComposition applies the same table, so the npm
+ * `/evolution preset install` path gets it too (installer.spec pins parity):
  *   - idempotent: a tool-skill item that already carries a `config:` key is
  *     left byte-identical, so re-running the installer never doubles the key;
  *   - the injected block carries a marker comment so a diff of the generated
@@ -694,41 +695,58 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
  *     one-time warning (a renamed platform row must not brick the install,
  *     but the missed cap must be observable).
  */
+/** The override table, read from the SAME file core's composer reads. The
+ * installer is a source-tree tool: it reads the JSON directly rather than
+ * importing the built core package, so no build is needed to install. */
+const ROW_OVERRIDES_PATH = join(PACKAGES_DIR, 'evolution-core', 'row-overrides.json')
+
+function readRowOverrides() {
+  const parsed = JSON.parse(readFileSync(ROW_OVERRIDES_PATH, 'utf8'))
+  if (!Array.isArray(parsed)) {
+    throw new Error(`install-layered: ${ROW_OVERRIDES_PATH} must be an array of override entries`)
+  }
+  return parsed
+}
+
 export function injectToolSkillCap(composition) {
-  const lines = composition.split('\n')
+  let lines = composition.split('\n')
+  // One table, two generation paths (0.3.77): before this, both sides kept their
+  // own copy of the entries below and stayed byte-identical only by hand.
+  for (const override of readRowOverrides()) {
+    lines = applyRowOverride(lines, override)
+  }
+  return lines.join('\n')
+}
+
+function applyRowOverride(lines, override) {
+  const rowRe = new RegExp('^- id:\\s*' + override.row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$')
   let found = false
   for (let i = 0; i < lines.length; i += 1) {
-    if (!/^- id:\s*tool-skill\s*$/.test(lines[i] ?? '')) continue
+    if (!rowRe.test(lines[i] ?? '')) continue
     found = true
     // Walk the item's continuation lines (indented) up to the next item or
     // top-level line; a blank line terminates the item block.
     let end = i
-    let hasConfig = false
+    let hasKey = false
     for (let j = i + 1; j < lines.length; j += 1) {
       const next = lines[j] ?? ''
       if (next.trim() === '') break
       if (!/^\s/.test(next)) break
-      // v22 (PRE-3): anchor `config:` to the item's own child indent (two
-      // spaces) — byte-identical with core preset-composition.ts. The old
-      // `\s+` form matched a `config:` at any depth, silently skipping the
-      // cap when a platform preset grew nested config maps.
-      if (/^ {2}config:(\s|$)/.test(next)) hasConfig = true
+      // v22 (PRE-3): anchor the child key to the item's own child indent (two
+      // spaces) — byte-identical with core's applyOneOverride. The old `\s+`
+      // form matched the key at any depth, silently skipping the injection when
+      // a platform preset grew nested maps.
+      if (new RegExp('^ {2}' + override.key + ':(\\s|$)').test(next)) hasKey = true
       end = j
     }
-    if (hasConfig) continue
-    lines.splice(end + 1, 0,
-      '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
-      '  # this preset-scope row is the session-visible instance and no profile',
-      '  # patch can reach it. Remove only to run the platform default (500).',
-      '  config:',
-      '    catalogDescriptionMaxLength: 60',
-    )
-    i = end + 5
+    if (hasKey) continue
+    lines.splice(end + 1, 0, ...override.lines)
+    i = end + override.lines.length
   }
   if (!found) {
-    console.warn('install-layered: warning — no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)')
+    console.warn('install-layered: warning — ' + override.missingReason)
   }
-  return lines.join('\n')
+  return lines
 }
 
 async function installAgentPreset(home, dryRun, force, runtimeComposition, base) {

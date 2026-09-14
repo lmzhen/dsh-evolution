@@ -1,0 +1,14 @@
+[
+  {
+    "row": "tool-skill",
+    "key": "config",
+    "lines": [
+      "  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);",
+      "  # this preset-scope row is the session-visible instance and no profile",
+      "  # patch can reach it. Remove only to run the platform default (500).",
+      "  config:",
+      "    catalogDescriptionMaxLength: 60"
+    ],
+    "missingReason": "no `- id: tool-skill` row in the composed preset; the 60-char catalog cap was NOT injected (platform renamed the row? reconcile with the delta)"
+  }
+]
