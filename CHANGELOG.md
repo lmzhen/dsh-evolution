@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.78 (patch) — 单源化 · 门禁升级 · 单实例契约（优化计划 B1–B4）
+
+> 本版按 `audit-v42/optimization-plan-evolution-layers.md` 的四个批次落地，每批各自带回归、各自一轮全量门禁 10/10。B5（变体自包含）按计划仅在"产品要求字面零挂载"时做，本版不做。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | **B1/G1** 新增 `row-overrides.json`（包根数据资产，`files`+`exports` 双声明），`loadRowOverrides()` 带形状校验（fail-loud），`applyRowOverrides` 默认读表；**B3/G4** 新增 `instance-scope.ts`（按 `<home> :: <key>` 的实例认领：同 owner 重挂不算第二实例、第二个认领者被告知持有人、dispose 释放）与 `write-inventory.ts` + `persisted-write-inventory.json`（每个持久写入点：写者／串行化机制／模块级状态绑定）；**B3/N14** 技能列举改为三态读：读不出来或只读出一部分 → `unknown` + 原因，不再把空/短列表当完整 |
+| `evolution-agent` | **B1/G1** `bases.json` 增可选 `requires` / `unsupported` 字段，登记平台自带但家族无法建变体的两个基座（`cordis` 需 web 档的 `dynamicCordisRunner`；`minimal` 无 `tool-skill` 行、技能面无落点）+ 对应 `preset.*.yml` |
+| `scripts/install-layered.mjs` | **B1/G1** `injectToolSkillCap` 改为表驱动（删掉手抄的五行 tool-skill 专用匹配）；基座选择按表拒绝 `unsupported`／按 profile bundle 拒绝缺 web 档的 `requires`；**B2/G3** 新增 `checkAgentPresetFreshness()` + `--check-presets`（只报不写：`fresh` / `DIFFERS` / `absent`） |
+| `evolution-commands` | **B2/G3-②** `/evolution doctor` 新增 `presetFreshness: fresh \| differs \| absent \| unknown`——用 core 的组合规则（含行覆盖表）重算"全新生成会写出什么"再与磁盘逐字节比对，只有 `differs` 进 actions，registry 缺失/资产读不到/组合冲突报 `unknown` 并带原因；doctor 仍然只读 |
+| `evolution-commands/src/index.ts` | **B3/N14** mtime 探针只把 ENOENT/ENOTDIR 当"不存在"，其余 stat 失败一律上抛 → 探针报 `unknown` 而不是 `absent` |
+| `evolution-curator` | **B3/G4** 挂载即认领单实例键，第二个实例被拒时说明持有人 |
+| `scripts/verify-platform-contract.mjs` | **B1/G2** 新增第四维「平台锚」：扫描家族全部非排除文件，认 `platform:<pkg>/<file>:<line>` 约定式与裸引用（`packages/<g>/<pkg>/src/<f>.ts:1194`、`core/tools/src/index.ts:1194`、`llm/src/message.ts:258`、`apps/...`、目录/glob 形），逐个在 `--upstream` 下解析并要求被引行号落在文件内；识别词表是记录式常量、识别到 0 条本身即漂移（空 upstream 不可能静默变绿）；另加 6 条**语义断言**（web-app 三个必须保持 disable 的 ITEM、`tools.get` 的 scope 语义行、会话格式版本值、原生/PTC 工具事件词表），按文件自身结构判定、不钉行号；坏引用与坏断言都是 `recordedDrift`（`--accept-recorded` 容忍，出厂模式致命） |
+| `scripts/verify-arch-guards.mjs` | **B3** 新增"认领点与写入点清单一致"规则 + N12 登记新模块级存储；**B4** 追加规则 **N19**（doc-facts 单源门禁） |
+| `scripts/family-facts.json` 等 | **B4/G5** 新增单一数据源（5 条跨文件事实，每条 = 一个 home + `must(unique)` + `forbid` + `cites` + `machine`）、`lib-doc-facts.mjs` 引擎与 `verify-doc-facts.mjs` 独立 CLI |
+| docs | **B4/G5** 修三条真实漂移（`INSTALL.md`「no cordis base is published」、两处 README 的 60 字可达面逐字重复、根 README 落后于 0.3.77 多基座的命令表）+ `README.zh.md` 同源失效结论与两处指向 gitignore 面 `packages/docs/**` 的引用；**B2/G3-③** `packages/INSTALL.md` 登记命令面已知差异；**B4/G6** 新增 `CONTRIBUTING.md`（三层约定 + 事实登记流程 + 门禁表）与 `packages/scripts/checklists/**`（新包／新基座／新命令／新事件／新消费者／新架构规则的骨架 + 模板） |
+| tsconfig | **B1** 删两条死别名与两个指向已删文件的 include |
+
+### 验证
+
+- 每批一轮全量门禁 **10/10** 绿：`audit-v42/g378-g2-*`（B1/G2）、`g378-installmd-*`（B2/G3-③）、`g378-b234b-*`（B2+B3+B4 并集）；`verify-arch-guards --strict` **21 规则 0 违规**；`mirror-sync differ=0 onlyOverlay=0`。
+- 新增回归：行覆盖表单源（四件套）、基座前置条件（表↔资产一致性 + 两条拒绝路径）、平台锚核验（vacuity 哨兵 + 副本变异：摘 `disabled: true`／删平台文件均红）、doctor 新鲜度四态（含"被检文件未被改动"）、单实例认领（首认领/重入/分 home/释放/分 key）、写入点清单与断言绑定、N19 doc-facts 四态夹具与"第二个家"变异。
+- **真机（安装面）**：临时 `DSH_HOME` 跑 `--mode variant --profile web` → exit 0，自报 `form: variant (session opt-in: original presets carry no family rows)`，生成预设 15490 字节 22 行（平台 standard 行 + 末端 4 条家族模型行）；紧接 `--check-presets` → `evolution fresh` / `evolution-ptc absent`。
+- 途中修掉的真实问题：`verify-declared-config` 的 composer-reach 证据锚改指单一数据源；`installer.spec` 夹具缺新数据文件；安装器判定块早于 `profileDir` 的 TDZ 崩溃；新命令回归缺 `tempHome` 导致 E-33 扫描读到真实 `DSH_HOME`；B3 两个新 spec 的类型错（并集首跑 tsc 红）。
+
+### 已知差异 / 明确不做
+
+- **① 变体形态下，跑平台原版预设的会话仍看得见 `/evolution …` 命令**：平台命令按作用域分层注册，家族只在 host 面注册一次、落进全局层。该面是管理/只读面（doctor、curator status…），**自动路径**（评审节奏与注入、用量遥测、策展）已由 `sessionAudited` 逐会话门控，原版预设会话在命令背后拿不到家族行为。按会话隐藏命令面需要在每个 agent 作用域内注册并自带注册/拆除生命周期，属计划"明确不做"，故登记为已知差异（`packages/INSTALL.md`）。
+- B5（变体自包含）不做；npm 发布不在本批范围内。
+
 ## 0.3.77 (patch) — 安装形态命名（① 变体 / ② 挂原版）· C 轴会话 opt-in · 变体多选 · N18
 
 > **本批四件事**：
