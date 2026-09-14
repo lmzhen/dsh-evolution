@@ -209,6 +209,13 @@ function wakeLocalKeys(text) {
 // N14 (P5): a durable-read failure degraded to 'absent'. Key = 'try {<100 chars>} catch -> absent'.
 const CATCH_ABSENT_RE = /catch\s*(?:\([^)]*\))?\s*\{/g
 const DURABLE_READ_RE = /\b(?:readFile|readdir|statSync|readText|list|listFiles)\s*\(/
+// v41 phase-1 follow-up: the migration the entries below name has LANDED —
+// `evolution-core/src/probe.ts` exports the read three-state
+// (`Probe<T>` = present | absent | unknown{reason}) and its first real
+// consumer is `tool-skill-manage`'s catalogWinner ({ winner, unverifiable }
+// allowed the illegal combination, so the union replaced it). The remaining
+// entries below still describe their own site; their "migrate to the union"
+// tail is the checklist for the next pass, not a re-design.
 const SWALLOW_CATCH = new Map([
   ['evolution-commands/src/index.ts :: try {return statSync(path).mtimeMs} catch -> absent', 'optional mtime probe: the curator treats a null mtime as never-the-latest AND warns once (probeWarned), so an unreadable stat is not a silent clean verdict; migrate to the Probe union when the adapter is typed.'],
   ['evolution-core/src/skill-store.ts :: try {entries = await this.io.list(dir)} catch -> absent', 'KNOWN GAP (listSupportFiles): the docstring itself conflates "unreadable" with "no support files"; fix = Probe<string[]>, not a register entry.'],

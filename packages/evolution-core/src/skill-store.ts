@@ -71,7 +71,12 @@ export interface SkillSummary {
   protectedBy: string | null
   /** A1-17 (v18): the marker probe itself failed (EACCES/EIO), so "no marker"
    * cannot be told apart from "directory unreadable". Consumers must treat this
-   * as protected, never as unprotected. */
+   * as protected, never as unprotected.
+   * v41: this flag and `protectedBy` ARE the read three-state —
+   * (null, false) = no marker, (X, false) = present, (_, true) = unreadable.
+   * Read them together, never this flag alone; it is a published field, so the
+   * encoding stays (core's `Probe<T>` is for internal decisions, not for this
+   * contract). */
   protectionUnknown: boolean
   managed: boolean
   /** E-11 (v18): the frontmatter `whenToUse` routing hint, published so the

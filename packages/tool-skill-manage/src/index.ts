@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, isReviewChannelSession, newSkillLibrary, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, isPresent, isReviewChannelSession, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -152,15 +152,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // pretending the check ran. A non-empty view without the name stays a pass (the
   // family skill is simply not published yet).
   let crossSourceViewWarned = false
-  const catalogWinner = async (name: string): Promise<{ winner: SkillSummary | undefined; unverifiable: string | undefined }> => {
+  // `Probe` (v41 phase-1 follow-up) replaces the { winner, unverifiable } PAIR:
+  // that shape allowed the illegal combination (a winner AND an unverifiable
+  // reason), so "the check could not run" and "there is no winner" were only
+  // told apart by convention. The union makes the third state representable
+  // and the illegal one unrepresentable.
+  const catalogWinner = async (name: string): Promise<Probe<SkillSummary | undefined>> => {
     const catalog = ctx.get('skills')
-    if (catalog === undefined) return { winner: undefined, unverifiable: 'the skills service is not mounted' }
+    if (catalog === undefined) return probeUnknown('the skills service is not mounted')
     try {
       const summaries = await catalog.list()
-      if (summaries.length === 0) return { winner: undefined, unverifiable: 'the catalog view is empty (a scope-less list() reads the global layer only)' }
-      return { winner: summaries.find(summary => summary.name === name), unverifiable: undefined }
+      if (summaries.length === 0) return probeUnknown('the catalog view is empty (a scope-less list() reads the global layer only)')
+      return probePresent(summaries.find(summary => summary.name === name))
     } catch (error) {
-      return { winner: undefined, unverifiable: `the catalog lookup failed (${error instanceof Error ? error.message : String(error)})` }
+      return probeUnknown(`the catalog lookup failed (${error instanceof Error ? error.message : String(error)})`)
     }
   }
 
@@ -492,17 +497,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // exactly as before.
       if (typeof args.name === 'string' && args.name !== '' && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
         const probe = await catalogWinner(args.name)
-        if (probe.unverifiable !== undefined) {
+        if (isUnknown(probe)) {
           // v39: the check could not run — say so instead of pretending it passed.
           if (rawConfig.strictCrossSource === true) {
-            return { ok: false, message: `Refused: the cross-source check could not be performed — ${probe.unverifiable}. Fix the catalog view (or drop strictCrossSource) before writing "${args.name}".`, skills: [] }
+            return { ok: false, message: `Refused: the cross-source check could not be performed — ${probe.reason}. Fix the catalog view (or drop strictCrossSource) before writing "${args.name}".`, skills: [] }
           }
           if (!crossSourceViewWarned) {
             crossSourceViewWarned = true
-            ctx.logger.warn(`skill_manage: cross-source check skipped for this session — ${probe.unverifiable}`)
+            ctx.logger.warn(`skill_manage: cross-source check skipped for this session — ${probe.reason}`)
           }
-        } else if (probe.winner !== undefined && probe.winner.provider !== 'dsh-evolution') {
-          const winner = probe.winner
+        } else if (isPresent(probe) && probe.value !== undefined && probe.value.provider !== 'dsh-evolution') {
+          const winner = probe.value
           const message = `skill "${args.name}" resolves to a higher-priority "${winner.source}" skill (provider "${winner.provider}"); this write lands on the family copy, which the catalog does NOT serve — edit the "${winner.source}" copy or rename.`
           if (rawConfig.strictCrossSource === true) {
             return { ok: false, message: `Refused: ${message}`, skills: [] }
