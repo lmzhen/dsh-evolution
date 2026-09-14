@@ -10,6 +10,20 @@
       "name": "ptc",
       "id": "evolution-ptc",
       "metadata": "preset.ptc.yml"
+    },
+    {
+      "name": "cordis",
+      "id": "evolution-cordis",
+      "metadata": "preset.cordis.yml",
+      "requires": {
+        "service": "dynamicCordisRunner"
+      }
+    },
+    {
+      "name": "minimal",
+      "id": "evolution-minimal",
+      "metadata": "preset.minimal.yml",
+      "unsupported": "the platform minimal composition is only persona + persistent-shell: it carries no tool-skill row, so the family skill surface (and the 60-char cap injection) has nothing to attach to"
     }
   ]
 }

@@ -1,0 +1,3 @@
+name: Evolution Cordis
+description: Based on the platform cordis preset plus the Evolution family rows - the self-modification toolset with durable memory and skill evolution. Needs a deployment that provides dynamicCordisRunner (the web-app bundle).
+order: 12

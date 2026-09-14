@@ -16,6 +16,8 @@
     "bases.json",
     "preset.yml",
     "preset.ptc.yml",
+    "preset.cordis.yml",
+    "preset.minimal.yml",
     "package.json",
     "lib/*.js",
     "lib/types/**/*.d.ts"
@@ -36,6 +38,8 @@
     "./bases.json": "./bases.json",
     "./preset.yml": "./preset.yml",
     "./preset.ptc.yml": "./preset.ptc.yml",
+    "./preset.cordis.yml": "./preset.cordis.yml",
+    "./preset.minimal.yml": "./preset.minimal.yml",
     "./package.json": "./package.json"
   },
   "main": "lib/index.js",

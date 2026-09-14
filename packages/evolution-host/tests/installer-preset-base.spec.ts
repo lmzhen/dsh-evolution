@@ -162,6 +162,8 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(directories).toEqual([
       `standard:${join('H', '.agent-presets', 'evolution')}`,
       `ptc:${join('H', '.agent-presets', 'evolution-ptc')}`,
+      `cordis:${join('H', '.agent-presets', 'evolution-cordis')}`,
+      `minimal:${join('H', '.agent-presets', 'evolution-minimal')}`,
     ])
   })
 
@@ -327,6 +329,29 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(bad?.stderr).toContain('unknown mode variantt')
   })
 
+  it('G1-② (0.3.78): refuses a registered-but-unusable base with its reason, install-time', async () => {
+    // The two platform bases the family cannot derive a variant from are
+    // REGISTERED with their reason instead of failing later at mount: minimal has
+    // no skill landing surface at all, cordis needs a provider only a web-app
+    // deployment mounts. The installer judges the latter from the target
+    // profile's bundle rows; the command (same table) asks ctx.get for the
+    // service itself.
+    const probe = await callInstaller(
+      'const q = (name, bundles) => String(installer.baseUnavailableReason({ name, ...installer.AGENT_PRESET_BASES[name] }, bundles))'
+      + '; return [q(\'minimal\', []), q(\'cordis\', []), q(\'cordis\', [\'@deepseek-ai/dsh-web-app\']), q(\'standard\', [])]',
+    ) as string[]
+    expect(probe[0]).toContain('UNSUPPORTED')
+    expect(probe[1]).toContain('dynamicCordisRunner')
+    expect(probe[2]).toBe('undefined')
+    expect(probe[3]).toBe('undefined')
+    // ...and the refusal is what an install reports, before any mutation.
+    const home = await tempRoot('dsh-preset-unsupported-')
+    const error = await runInstaller(home, 'agent', ['--base', 'minimal'])
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(error?.stderr).toContain('UNSUPPORTED')
+    expect(existsSync(join(home, '.agent-presets'))).toBe(false)
+  })
+
   it('refuses an unknown base by name, before any write', async () => {
     const home = await tempRoot('dsh-preset-base-unknown-')
     const error = await runInstaller(home, 'agent', ['--base', 'nonsense'])
@@ -392,15 +417,22 @@ describe('agent preset bases (--base standard|ptc)', () => {
     // the package does not ship, fails here instead of at a user's first
     // install.
     const table = await callInstaller('return installer.AGENT_PRESET_BASES') as Record<string, { id: string; metadata: string }>
-    expect(Object.keys(table)).toEqual(['standard', 'ptc'])
+    // 0.3.78 (G1-②): the table also REGISTERS the two platform bases the family
+    // cannot derive a variant from, each with the reason it cannot.
+    expect(Object.keys(table)).toEqual(['standard', 'ptc', 'cordis', 'minimal'])
     // The table is a DATA file the runtime command reads too
     // (evolution-agent/bases.json): a literal in each consumer is exactly how
     // the npm path stayed on `standard` while the installer knew `ptc`.
     const basesJson = JSON.parse(await readFile(join(agentPackage, 'bases.json'), 'utf8')) as {
       default: string
-      bases: Array<{ name: string; id: string; metadata: string }>
+      bases: Array<{ name: string; id: string; metadata: string; requires?: { service: string }; unsupported?: string }>
     }
-    expect(table).toEqual(Object.fromEntries(basesJson.bases.map(base => [base.name, { id: base.id, metadata: base.metadata }])))
+    // toMatchObject, not toEqual: the table may carry the ability fields
+    // (requires/unsupported, 0.3.78) that the runtime command also reads; the
+    // identity fields are the ones every consumer must agree on.
+    for (const base of basesJson.bases) {
+      expect(table[base.name], base.name).toMatchObject({ id: base.id, metadata: base.metadata })
+    }
     expect(Object.keys(table)[0]).toBe(basesJson.default)
     // The platform's own PRESET_ID (packages/preset/agent-presets/src/preset.ts):
     // an id is a directory name under the preset root, so this is a containment
@@ -414,7 +446,7 @@ describe('agent preset bases (--base standard|ptc)', () => {
     }
     // Distinct directories: two bases sharing one id would overwrite each
     // other's composition and list one preset twice.
-    expect(Object.values(table).map(entry => entry.id)).toEqual(['evolution', 'evolution-ptc'])
+    expect(Object.values(table).map(entry => entry.id)).toEqual(['evolution', 'evolution-ptc', 'evolution-cordis', 'evolution-minimal'])
   })
 
   it('removes every family preset directory on a base-less uninstall, one when narrowed', async () => {
