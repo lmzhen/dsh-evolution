@@ -637,6 +637,15 @@ for (const entry of SEMANTIC_ASSERTIONS) {
 // tried as `packages/<path>`, as `<path>`, then through the group-omitted read
 // the family's shorthand relies on (`llm/src/message.ts:258`, `storage-json/src/atomic.ts:24`).
 const familyChildren = new Set(readdirSync(familyRoot, { withFileTypes: true }).map(entry => entry.name))
+// Family-owned top-level paths in the MIRROR layout, recorded rather than
+// probed: `packages/docs/` is gitignored (so a CI checkout has no
+// `packages/evolution/docs` to probe, and the platform's OWN docs directory made
+// the citation resolve by accident in the baseline job) and `packages/scripts/`
+// is the family's guard tree. Without this list the family's citations to its
+// own docs were read as platform anchors and reported broken against the
+// released upstream tag — the 0.3.78 compat job (dsh-v0.1.1-rc.2) went red on
+// three of them while the baseline job stayed green.
+const FAMILY_OWNED_UNDER_PACKAGES = new Set(['docs', 'scripts'])
 let citationChecks = 0
 const citationFindings = []
 walkCitationSurface(familyRoot, (path, text) => {
@@ -652,6 +661,7 @@ walkCitationSurface(familyRoot, (path, text) => {
       if (cited.startsWith('.') || cited.startsWith('/') || cited.startsWith('@') || cited.includes('://')) continue
       if (familyChildren.has(head)) continue
       if (head === 'packages') {
+        if (FAMILY_OWNED_UNDER_PACKAGES.has(segments[1] ?? '')) continue
         if (resolveCitation(familyRoot, segments.slice(1).join('/')) !== '') continue
       } else if (head !== 'apps' && !(segments.includes('src') && PLATFORM_ROOTS.has(head))) continue
     }

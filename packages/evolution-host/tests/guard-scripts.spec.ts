@@ -189,6 +189,11 @@ describe('guard scripts (V4-30 sentry)', () => {
     // The summary line carries the new counts on the run that fails too.
     expect(error?.stdout).toContain('semantic assertion(s)')
     expect(error?.stdout).toContain('platform citation(s)')
+    // 0.3.78 compat job: the family's citations to its OWN docs (`packages/docs`,
+    // gitignored, so absent from a CI checkout) must never be read as platform
+    // anchors — against dsh-v0.1.1-rc.2 they were reported broken while the
+    // baseline job resolved them against the platform's own docs directory.
+    expect(error?.stderr).not.toContain('packages/docs/')
   })
 
   it('N17: architecture guards reject a consumer that branches on the dispatch modality', async () => {
