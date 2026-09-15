@@ -178,6 +178,24 @@ describe('usage sidecar field normalization (P2-3)', () => {
     expect(v1.names.sort()).toEqual(['added-skill', 'kept-skill'])
   })
 
+  it('S2-14: an UNREADABLE suppression sidecar is never written over', async () => {
+    const root = await tempRoot('dsh-evo-suppressed-unreadable-')
+    // A failing READ with a succeeding WRITE is the shape that matters: the real
+    // medium answers EISDIR for a directory parked on the sidecar path, and a
+    // permission fault (EACCES) on a read-only mount behaves the same —
+    // `io.readText` returns null only for a MISSING path. This stub pins BOTH
+    // halves, so it discriminates: the read failure must surface AND no write
+    // may happen (the pre-fix fold overwrote a sidecar it could not read).
+    const writes: string[] = []
+    const io = {
+      readText: async () => { throw new Error('EACCES: permission denied, open .curator-suppressed.json') },
+      writeText: async (path: string) => { writes.push(path) },
+    } as unknown as ReturnType<typeof nodeEvolutionIo>
+    const { saveSuppressedNames } = await import('@deepseek-ai/dsh-evolution-core')
+    await expect(saveSuppressedNames(root, new Set(['other']), io)).rejects.toThrow(/EACCES/)
+    expect(writes, 'the pre-fix fold overwrote a sidecar it could not read').toEqual([])
+  })
+
   it('mutateUsage runs an atomic read-modify-write where concurrent bumps are preserved', async () => {
     const root = await tempRoot('dsh-evo-mutate-')
     const io = nodeEvolutionIo()

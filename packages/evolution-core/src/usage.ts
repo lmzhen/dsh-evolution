@@ -411,7 +411,12 @@ export async function saveSuppressedNames(
   // V24-09 (v24): same future-version discipline as the RMW path below and
   // the mutations/usage/events writers (A2-11 / L-1 / F-338) — a newer
   // on-disk schema is never downgraded by this writer.
-  const current = await io.readText(suppressedFile(root)).catch(() => null)
+  // S2-14 (root cause B): and neither is one this writer could not READ. The
+  // former `.catch(() => null)` folded a read failure (EACCES/EIO/EISDIR —
+  // `readText` answers null only for a MISSING path) into "no sidecar", skipped
+  // the version guard and overwrote it: the one fold in this file that permitted
+  // a downgrade. The failure now surfaces to the caller.
+  const current = await io.readText(suppressedFile(root))
   if (current !== null) {
     try {
       const parsed = JSON.parse(current) as { version?: unknown } | null
