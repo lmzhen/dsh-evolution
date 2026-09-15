@@ -2005,6 +2005,13 @@ export class SkillLibrary {
     if (this.transact) {
       try {
         await this.transact(this.io, createPath, (current) => {
+          // v43 audit (FLOW3-1): this callback RE-RUNS when the write lock is
+          // lost before the commit (io redoes the whole RMW), and the flags above
+          // are OR-accumulated across attempts. A stale `existsAtCommit` from the
+          // first attempt made a create whose retry DID write report "already
+          // exists". Reset per attempt so the post-loop decision reads the LAST
+          // attempt's observation only.
+          existsAtCommit = false
           taskRan = true
           if (current !== null) { existsAtCommit = true; return current }
           return onDisk
@@ -2946,6 +2953,11 @@ export class SkillLibrary {
             // values and this write would be reported as a success.
             const ran = { done: false }
             await this.transact(this.io, entry.target, (current) => {
+              // v43 audit (FLOW3-1): per-attempt reset. This callback re-runs on a
+              // lock-loss retry, and a stale `drift.seen` from the previous
+              // attempt threw "concurrent modification" even when the retry's own
+              // write had landed — a partial tree change reported as a failure.
+              drift.seen = false
               ran.done = true
               if (current !== baseline) {
                 drift.seen = true

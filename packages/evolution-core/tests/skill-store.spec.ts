@@ -808,6 +808,31 @@ it('V6-17: a non-exact anchor past the fuzzy budget is refused with an honest me
   expect(exact.ok).toBe(true)
 })
 
+it('v43 (FLOW3-1): a lock-loss retry re-observes the file — the create does not report "already exists" after its retry wrote', async () => {
+  const root = await tempRoot('dsh-evo-skills-retry-')
+  // The failing pair from the audit: attempt #1 sees a file (a peer created it)
+  // and the write lock is lost before the commit, so io redoes the WHOLE RMW.
+  // `existsAtCommit` used to stay true from that attempt, and the create then
+  // reported "already exists" even though attempt #2 had just written the file.
+  const io = {
+    readText: async () => null,
+    writeText: async () => {},
+    remove: async () => {},
+    list: async () => [],
+    exists: async () => false,
+    rename: async () => {},
+    copy: async () => {},
+    transact: async (_path: string, task: (current: string | null) => Promise<string | null>) => {
+      await task('someone-else:deadbeef')
+      return await task(null)
+    },
+  }
+  const lib = new SkillLibrary(root, io as never)
+  const result = await lib.create('retry-skill', SKILL.replace('python-testing', 'retry-skill'), 'foreground')
+  expect(result.ok).toBe(true)
+  expect(result.message).not.toContain('already exists')
+})
+
 it('V6-19: a transact contract violation returns a structured error, not a TypeError (0.3.37)', async () => {
   const root = await tempRoot('dsh-evo-skills-shapeguard-')
   // A backend whose transact never invokes the task (contract violation).
