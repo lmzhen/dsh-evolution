@@ -805,8 +805,10 @@ it('0.3.81: a repeat of the same notice kind REPLACES the pending row instead of
     stateful: true,
     onFollowup: message => followed.push(message),
     inbox: {
-      nextTurn: [pendingRow('pending-1', 'auto-review')],
-      nextStep: [pendingRow('pending-2', 'auto-review')],
+      // v43 P1-4: the summary now NAMES the kind. This fixture crosses BOTH
+      // intervals on one substantive turn, so its cadence kind is 'combined'.
+      nextTurn: [pendingRow('pending-1', 'auto-review:combined')],
+      nextStep: [pendingRow('pending-2', 'auto-review:combined')],
       replace: (id: unknown, message: { content: Array<{ text?: string }> }) => {
         replaced.push({ id, text: message.content.map(part => part.text ?? '').join('') })
         return true
@@ -838,9 +840,12 @@ it('0.3.81: only the SAME kind coalesces — another notice or another plugin st
     stateful: true,
     onFollowup: message => followed.push(message),
     inbox: {
-      // Same plugin, DIFFERENT kind; and a foreign plugin with the SAME summary.
-      nextTurn: [pendingRow('pending-other-kind', 'completion-review')],
-      nextStep: [pendingRow('pending-foreign', 'auto-review', 'someone-else')],
+      // Same plugin but a DIFFERENT kind ('memory' while the delivery is
+      // 'combined') — the v43 P1-4 regression: a pre-fix build replaced this
+      // row in place and the memory review was silently lost. A foreign plugin
+      // carrying the SAME summary must be ignored too.
+      nextTurn: [pendingRow('pending-other-kind', 'auto-review:memory')],
+      nextStep: [pendingRow('pending-foreign', 'auto-review:combined', 'someone-else')],
       replace: (id: unknown) => { replaced.push(id); return true },
     },
   })
@@ -848,7 +853,10 @@ it('0.3.81: only the SAME kind coalesces — another notice or another plugin st
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
   emitEnd(1)
   await vi.waitFor(() => { expect(followed).toHaveLength(1) })
+  // Nothing was replaced: the memory-kind row is still pending, untouched.
   expect(replaced).toHaveLength(0)
+  const delivered = followed[0] as { source?: { summary?: string } }
+  expect(delivered.source?.summary).toBe('auto-review:combined')
 })
 
 it('0.3.81: a refused coalesce (row already claimed) degrades to a fresh delivery', async () => {
@@ -858,7 +866,7 @@ it('0.3.81: a refused coalesce (row already claimed) degrades to a fresh deliver
     stateful: true,
     onFollowup: message => followed.push(message),
     inbox: {
-      nextTurn: [pendingRow('pending-1', 'auto-review')],
+      nextTurn: [pendingRow('pending-1', 'auto-review:combined')],
       nextStep: [],
       // The platform answers false when the row is no longer pending (the loop
       // claimed it between our read and the replace) — the delivery must NOT be

@@ -260,6 +260,16 @@ function isSameKindPending(message: PendingMessageLike, summary: string): boolea
   return source?.kind === 'plugin' && source.plugin === 'dsh-evolution-review'
     && source.form === 'notice' && source.summary === summary
 }
+/**
+ * v43 audit (P1-4 / FLOW1): the cadence summary MUST name the review kind.
+ * The three cadence deliveries used to share the bare `auto-review` summary
+ * while their prompts differ by kind (memory / skill / combined), so
+ * `isSameKindPending` matched ACROSS kinds: a pending memory prompt was replaced
+ * in place by a skill prompt — one kind silently lost, while the caller still
+ * consumed the cadence latch and the deferred drain still emitted
+ * `evolution/review-scheduled` as if both had been delivered.
+ */
+const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
 
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.
@@ -594,7 +604,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
           // 0.3.73: a refused delivery restores the latch and returns BEFORE the
           // reset below, so the segment's review retries instead of vanishing.
-          if (!deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review', true)) {
+          if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
             pendingCadenceReviews.set(session.id, pendingKind)
             return
           }
@@ -651,7 +661,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // subagent could still executePlan, the exact concurrent-writer
             // window E-19's single-flight exists to prevent.
             // 0.3.73: same non-consumption contract as the inject-mode branch.
-            if (!deliverMessage(agent, reviewPrompt(pendingKind), 'auto-review', true)) {
+            if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
               pendingCadenceReviews.set(session.id, pendingKind)
               return
             }
@@ -965,7 +975,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           sessionId: session.id,
           kind,
           prompt: reviewPrompt(kind),
-          label: 'auto-review',
+          label: cadenceSummary(kind),
           channel: 'inject',
           counts: signal as { toolCalls: number; userChars: number; assistantChars: number },
         })
