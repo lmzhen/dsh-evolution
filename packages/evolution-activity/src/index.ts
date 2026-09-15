@@ -157,11 +157,29 @@ export async function loadActivity(root: string, io: EvolutionIoLike): Promise<E
 /** True when bytes exist but are not a readable activity envelope: unparsable
  * JSON, or a missing `items` array (a scalar/array/other-shaped file). A missing
  * file (null) is NOT corruption — it is a first write. */
-function isCorruptActivity(raw: string | null): boolean {
+/**
+ * v43 audit (H-3 / J-6 / FLOW6-6): an UNSUPPORTED version is corrupt for this
+ * writer. The read side has always ignored `version` and taken `items` as-is,
+ * so a future-version sidecar used to fold fine and then be rewritten as
+ * `version: ACTIVITY_FILE_VERSION` on the next append — a silent downgrade that
+ * destroyed whatever the newer format carried. This guard is the write side's
+ * half of the pair: unknown version ⇒ the original bytes are quarantined (the
+ * existing `.corrupt` path) before a current-version file replaces them, which
+ * is the posture `evolution-events` already takes for the same shape.
+ * Residual, stated rather than hidden: `parseActivityContent` still answers `[]`
+ * for such a file (its signature has no "unreadable" channel), so a READ-only
+ * consumer cannot distinguish "newer format" from "no history" — the guard
+ * above is what stops the destructive half.
+ * @internal Exported for this package's own tests (siblings `parseActivityContent`
+ * and `serializeActivity` are exported for the same reason).
+ */
+export function isCorruptActivity(raw: string | null): boolean {
   if (raw === null) return false
   try {
     const parsed = JSON.parse(raw) as unknown
-    return typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as { items?: unknown }).items)
+    if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as { items?: unknown }).items)) return true
+    const version = (parsed as { version?: unknown }).version
+    return version !== undefined && version !== ACTIVITY_FILE_VERSION
   } catch {
     // Unparsable bytes are exactly the corruption this guard exists for.
     return true
