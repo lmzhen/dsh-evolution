@@ -46,6 +46,25 @@ describe('evolution-commands', () => {
     expect(missing.kind).toBe('error')
   })
 
+  // 0.3.80 functional check: a session-less invocation (script / headless probe)
+  // reached the learn wake path with no agent and threw a raw TypeError, while
+  // every sibling branch answered with a documented E-3xx. Both session-backed
+  // branches must ANSWER, never throw.
+  it('answers E-305 instead of throwing when the invocation carries no agent', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    await ctx.plugin(Commands)
+    const learn = await captured!.handler({ rawInput: 'learn capture the no-agent lesson' })
+    expect(learn.kind).toBe('error')
+    expect(learn.text).toContain('E-305')
+    // restructure answers too: with no io registry it says so (its session is
+    // optional now, so it must not dereference the missing agent either).
+    const restructure = await captured!.handler({ rawInput: 'restructure demo "## Heading" references/heading.md' })
+    expect(restructure.kind).toBe('error')
+    expect(restructure.text).toContain('Evolution IO registry not mounted')
+  })
+
   it('V27 G0.5 (U-1): learn delivers through the WAKING channel (followup-first, inject fallback)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: { inject(message: unknown): void; followup?(message: unknown): void } }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined

@@ -135,6 +135,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const input = rawInputTrimmed.replace(/\s+/g, ' ')
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
+        // 0.3.80 functional check: branches that deliver into the session (or
+        // attribute a write to it) dereferenced `invocation.agent` unguarded, so
+        // a session-less caller (a script, a headless probe) got a raw TypeError
+        // while every sibling branch answered with a documented E-3xx. ONE
+        // accessor keeps that answer identical wherever the agent is required.
+        const invocationAgent = invocation.agent as unknown as
+          | (CommandInvocation['agent'] & { followup?: unknown; inject?: unknown })
+          | undefined
+        const agentMissing = (need: string): CommandResult | undefined => invocationAgent === undefined
+          ? err(`E-305: this invocation carries no agent — \`${need}\` needs a session-backed call (run it from a session in the GUI or the CLI).`)
+          : undefined
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         const pendingMatch = /^pending(?: --detail)?$/.exec(input)
         if (pendingMatch) {
@@ -395,9 +406,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // `followup` is a prototype method that calls `this.send(...)` — every
           // detached call threw, nothing was queued, and the command still
           // reported "Follow it now". Bound arrow stubs in tests cannot show it.
-          const woke = typeof (invocation.agent as { followup?: unknown }).followup === 'function'
-          if (woke) (invocation.agent as unknown as { followup: (message: unknown) => void }).followup(message)
-          else invocation.agent.inject(message)
+          const missingAgent = agentMissing('learn')
+          if (missingAgent) return missingAgent
+          const agent = invocationAgent as { followup?: unknown; inject?: unknown }
+          // N13b: never select the primitive into a local — call it ON the
+          // receiver (a prototype method loses its receiver when detached, 0.3.73).
+          let woke = false
+          if (typeof agent.followup === 'function') {
+            (agent as unknown as { followup: (message: unknown) => void }).followup(message)
+            woke = true
+          } else if (typeof agent.inject === 'function') {
+            (agent as unknown as { inject: (message: unknown) => void }).inject(message)
+          } else {
+            return err('E-305: the invocation agent exposes neither `followup` nor `inject` — this learn request has no delivery channel.')
+          }
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is
           // skipped and the inject is never blocked.
@@ -726,9 +748,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // own contract returns undefined when the session is missing — so
             // a session/deployment `'never'` policy never reached this write
             // face and the staged record carried no sessionId attribution.
-            const session = invocation.agent.session
+            // 0.3.80 functional check: a caller without an agent has no session,
+            // so this dereference threw. Requiring the session to exist keeps
+            // V24-10's attribution rule (a staged record always names its
+            // session) and refuses to stage without one instead of crashing.
+            const session = invocationAgent?.session
             const sessionPolicy = effectiveSessionPolicy(ctx, session)
-            const willStage = approval.isEnabled !== false
+            const willStage = session !== undefined
+              && approval.isEnabled !== false
               && sessionPolicy !== 'never'
               && approval.stageForeground !== false
             if (willStage && !approval.hasRunner('skill')) {
@@ -739,10 +766,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
               args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
-              // V27 G5.2: `agent.session` is non-optional on the platform's
-              // Agent type, so the session always rides the staged record.
-              ...session.id ? { sessionId: session.id } : {},
-              session,
+              // 0.3.80 functional check: a session-less caller carries no
+              // session, so it rides the staged record only when present — and
+              // `willStage` above already refuses to stage without one.
+              ...session !== undefined ? { sessionId: session.id, session } : {},
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},
             })
             if (decision.action === 'staged') {
