@@ -8,6 +8,10 @@
 import { cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+// v43 S1-4: the family's ONE definition of "this read failure means it is not
+// there" lives in probe.ts; this backend delegates instead of keeping a second
+// copy of the same two codes.
+import { isMissingPath } from './probe.ts'
 
 export interface EvolutionIoLike {
   readText(path: string): Promise<string | null>
@@ -516,14 +520,17 @@ export function decideTakeover(probe: TakeoverProbe): TakeoverDecision {
  * exceed the default budget and fail loud.
  */
 export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
-  const isMissing = (error: unknown): boolean => {
-    const code = (error as NodeJS.ErrnoException | undefined)?.code
-    // EISDIR deliberately stays OUT: a directory squatting on a file path is
-    // not "absent" — rotation and event reads must still see it as malformed
-    // (rc.72 G-2), while the SkillLibrary.read boundary absorbs EISDIR into
-    // "absent" for its own surface (E-43).
-    return code === 'ENOENT' || code === 'ENOTDIR'
-  }
+  /**
+   * v43 S1-4: delegates to the canonical `isMissingPath` (probe.ts) — one
+   * definition for the whole family instead of a second copy of the same two
+   * codes. EISDIR deliberately stays OUT of that predicate: a directory
+   * squatting on a file path is not "absent" — rotation and event reads must
+   * still see it as malformed (rc.72 G-2), while the SkillLibrary.read boundary
+   * absorbs EISDIR into "absent" for its own surface (E-43).
+   * @param error - the caught read failure.
+   * @returns true only for ENOENT/ENOTDIR.
+   */
+  const isMissing = (error: unknown): boolean => isMissingPath(error)
   /** True when the pid is alive (single source: `isProcessAlive`). */
   const isAlive = isProcessAlive
 
