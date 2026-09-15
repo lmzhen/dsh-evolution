@@ -101,6 +101,15 @@ dev tree is stale — running the publish chain's first steps would robocopy tha
 old tree over the mirror). Its remaining useful half, script-pair parity, has no
 referent here.
 
+The stale tree is `D:/dsh/deepseek-harness` (a platform checkout at `548aa30`
+whose `packages/evolution/*` predates this mirror). It carries an
+`AUTHORING-MOVED.md` marker at its root pointing here, and the drift between the
+two trees is measurable at any time with a **machine-local, warn-only** probe:
+`node D:/dsh/audit-v44/two-tree-drift.mjs` (per-package file hashes; it never
+exits non-zero). It is deliberately NOT a shipped guard — an in-repo script
+cannot assume a second tree exists — which is the same reason rows 8-10 above
+name absolute paths.
+
 `verify-doc-facts.mjs` runs standalone for the same check rule N19 makes, and
 `verify-platform-contract.mjs --upstream <tree>` audits the platform anchors
 (its failures are recorded platform drift, not family drift).
