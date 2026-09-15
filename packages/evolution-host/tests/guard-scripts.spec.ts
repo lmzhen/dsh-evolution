@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 // default 5s per test is too tight for multiple node spawns (audit v10 fix).
 vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -359,5 +360,28 @@ describe('guard scripts (V4-30 sentry)', () => {
     const empty = await runGuards()
     expect(empty?.code).toBe(1)
     expect(empty?.stderr).toContain('declares no write site')
+  })
+
+  it('S3-3: no runtime source cites the gitignored docs path', () => {
+    // `packages/docs/**` is gitignored (CONTRIBUTING: "a source of material, never
+    // a home"), so a citation to it from the family's own source is a dead pointer
+    // for every reader of the published repo — and a broken platform anchor for
+    // the compat job (the case above pins THAT half). The versioned home for such
+    // guidance is the package README's Known Limitations section. Comments count:
+    // a repo reader cannot follow them either.
+    const offenders: string[] = []
+    for (const entry of readdirSync(psRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const srcDir = join(psRoot, entry.name, 'src')
+      if (!existsSync(srcDir)) continue
+      for (const rel of readdirSync(srcDir, { recursive: true })) {
+        const relPath = String(rel)
+        if (!relPath.endsWith('.ts')) continue
+        if (readFileSync(join(srcDir, relPath), 'utf8').includes('packages/docs/')) {
+          offenders.push(entry.name + '/src/' + relPath)
+        }
+      }
+    }
+    expect(offenders, 'cite the package README Known Limitations section instead').toEqual([])
   })
 })

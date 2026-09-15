@@ -698,7 +698,7 @@ if (recordedDrift.length > 0) {
 if (drift.length > 0) {
   console.error(`verify-platform-contract: ${drift.length} unrecorded host-surface difference(s):`)
   console.error(drift.join('\n'))
-  console.error('verify-platform-contract: this is the upgrade diff — decide per difference (see docs/upstream-contract-checklist.md), then record it in the anchor table of this script.')
+  console.error('verify-platform-contract: this is the upgrade diff — decide per difference (see docs/upstream-contract-checklist.md — a working-copy asset: it is gitignored, so a CI checkout has no copy), then record it in the anchor table of this script.')
   process.exit(1)
 }
 if (recordedDrift.length > 0 && !acceptRecorded) {

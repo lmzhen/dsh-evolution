@@ -444,7 +444,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // session and emits no `evolution/plan-applied` — an empty ledger is a
   // property of the composition, so it is disclosed once at load, not per review.
   if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
-    ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (default) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see packages/docs/known-limitations.md). Set reviewMode: "subagent" on the evolution-policy row to keep the audited plan path.')
+    ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (default) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see the evolution-review README, "Known Limitations and Deferred Work"). Set reviewMode: "subagent" on the evolution-policy row to keep the audited plan path.')
   }
 
   // V24-04 (v24): per-session mutex over the persisted review-state RMW.
