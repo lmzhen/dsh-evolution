@@ -85,6 +85,10 @@ export interface DoctorReport {
    * pre-step of every session under this home, and an operator may want to clean
    * the file regardless. */
   memoryIssues: string[]
+  /** S4/P-1+P-2 (platform gap, family mitigation): the session-query corpus
+   * listing failed — reported verbatim, with the isolation recipe. Empty when the
+   * service is absent or answering. */
+  queryIssues: string[]
   /** S2-12③ (FLOW5-4): the memory budget's two configuration surfaces disagree —
    * `memory-files`' store limit vs `evolution-policy`'s planning value. Empty
    * when either surface is absent (nothing to compare) or they agree. */
@@ -553,6 +557,8 @@ export async function diagnose(
   // the pending-view hint and the approve surface.
   const memoryIssues = memoryInterpolationIssues(home)
   const budgetIssues = memoryBudgetIssues(ctx)
+  const queryIssues = await sessionQueryIssues(ctx)
+  if (queryIssues.length > 0) actions.push('Session search is degraded: isolate the session named above (or wait for the platform fix described in the family maintenance notes) before retrying the same query')
   if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryCharLimit/userCharLimit UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
@@ -574,7 +580,7 @@ export async function diagnose(
   }
 
   return {
-    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, services,
+    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, queryIssues, services,
     pendingCount, executingCount, presetFreshness, scopedProbe, actions,
   }
 }
@@ -591,6 +597,35 @@ export async function diagnose(
  * @param ctx - the runtime service view (`get(name)`).
  * @returns one message per disagreeing surface; empty when not comparable.
  */
+/**
+ * S4/P-1+P-2 (platform report P-1/P-2, family mitigation) — the session-query
+ * index can fail AS A WHOLE: a concurrent writer leaves the persistence
+ * observation unstable ('did not stabilize after one retry') and ONE
+ * header-conflicting session aborts the same try block, which the tool surface
+ * folds into 'storage is unavailable'. Doctor cannot read the index's row count
+ * or the last stabilization result (the platform exposes no such API — recorded
+ * in the platform report), but it CAN exercise the corpus listing and report the
+ * verbatim failure with the actionable half: isolate the offending session.
+ *
+ * @param ctx - the runtime service view (`get(name)`).
+ * @returns one or two messages; empty when the service is absent or healthy.
+ */
+async function sessionQueryIssues(ctx: { get(name: string): unknown }): Promise<string[]> {
+  const service = ctx.get('sessionQuery') as { listSessions?: (signal?: AbortSignal) => Promise<unknown> } | undefined
+  if (service?.listSessions === undefined) return []
+  try {
+    const sessions = await service.listSessions()
+    return Array.isArray(sessions)
+      ? []
+      : ['session-query answered a listing with a non-list value — the service is mounted but not honouring its read contract']
+  } catch (error) {
+    return [
+      `session-query listing failed: ${error instanceof Error ? error.message : String(error)}`,
+      'if that mentions an unstable observation or a conflicting session header, isolate the offending session — move it OUT of the corpus with a manifest (never delete it) and re-run; the platform already retries the observation once',
+    ]
+  }
+}
+
 function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
   const budget = ctx.get('evolutionMemoryBudget') as {
     memoryCharLimit?: number
@@ -665,6 +700,7 @@ export function renderDoctorText(report: DoctorReport): string {
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))
   if (report.budgetIssues.length > 0) lines.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
+  if (report.queryIssues.length > 0) lines.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
   return lines.join('\n')
 }

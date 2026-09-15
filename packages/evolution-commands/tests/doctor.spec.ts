@@ -538,8 +538,13 @@ describe('doctor (WB2, 0.3.55)', () => {
 
 describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surfaces', () => {
   /** The runtime view doctor reads: memory-files\u2019 published budget + the policy. */
-  const runtime = (budget: unknown, policy: unknown) => ({
-    get: (name: string) => name === 'evolutionMemoryBudget' ? budget : name === 'evolutionPolicy' ? policy : undefined,
+  const runtime = (budget: unknown, policy: unknown, listSessions?: () => unknown) => ({
+    get: (name: string) => {
+      if (name === 'evolutionMemoryBudget') return budget
+      if (name === 'evolutionPolicy') return policy
+      if (name === 'sessionQuery' && listSessions !== undefined) return { listSessions: async () => listSessions() }
+      return undefined
+    },
   })
 
   it('flags a store/policy disagreement as a doctor finding', async () => {
@@ -558,6 +563,30 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       const text = renderDoctorText(report)
       expect(text).toContain('memory budget:')
       expect(text).toContain('source: config')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S4 (P-1/P-2): a degraded session-query corpus is reported with the isolation recipe', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-query-'))
+    try {
+      // The platform folds both platform gaps into this one failure; doctor's job
+      // is to surface it verbatim next to what an operator can actually do.
+      const degraded = await diagnose(runtime(undefined, undefined, () => {
+        throw new Error('session-search persistence observation did not stabilize after one retry')
+      }), { home })
+      expect(degraded.queryIssues).toHaveLength(2)
+      expect(degraded.queryIssues[0]).toContain('did not stabilize after one retry')
+      expect(degraded.queryIssues[1]).toContain('isolate the offending session')
+      expect(degraded.actions.some(action => action.includes('Session search is degraded'))).toBe(true)
+      const text = renderDoctorText(degraded)
+      expect(text).toContain('session search:')
+      // A healthy corpus (and an absent service) stay silent.
+      const healthy = await diagnose(runtime(undefined, undefined, () => []), { home })
+      expect(healthy.queryIssues).toEqual([])
+      expect(renderDoctorText(healthy)).not.toContain('session search:')
+      expect((await diagnose(stub, { home })).queryIssues).toEqual([])
     } finally {
       await rm(home, { recursive: true, force: true })
     }
