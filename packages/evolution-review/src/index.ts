@@ -1245,10 +1245,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // reset in the finally either way, so the channel recovers instead of
         // silently degrading to inject for the process lifetime.
         const landed: string[] = []
+        // S2-10 (FLOW1-6): the deadline does NOT stop the abandoned write leg.
+        // An op can land AFTER the timeout, when the model has already been told
+        // the review failed — "the model thinks nothing landed while it actually
+        // did" is the most misleading outcome for later decisions. Every landing
+        // is recorded (the list is never discarded) and a late one is reported to
+        // the model as it happens; the plan's own op list bounds the notices.
+        let deadlineMissed = false
+        const lateLandings: string[] = []
+        const noteLanded = (action: string): void => {
+          landed.push(action)
+          if (!deadlineMissed) return
+          lateLandings.push(action)
+          const before = landed.length - lateLandings.length
+          const earlier = before > 0 ? ` (${before} other op(s) had landed before the deadline)` : ''
+          const count = lateLandings.length === 1 ? 'landed AFTER the review timed out' : `landed after the timeout (${lateLandings.length} late so far)`
+          deliverMessage(agent, `\u{1F4BE} Self-improvement review: ${action} ${count}${earlier} \u2014 reconcile before re-requesting the same change.`, 'self-improvement review late landing')
+        }
         let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
         try {
           executed = await withTimeout(
-            executePlan(validation.accepted, session, action => landed.push(action), preRunHashes),
+            executePlan(validation.accepted, session, noteLanded, preRunHashes),
             config.reviewTimeoutMs,
             'review plan execution',
           )
@@ -1256,6 +1273,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // V27 G4.3: the deadline hit mid-write. Everything in `landed` is a
           // durable write that already happened, so it is recorded before the
           // failure propagates (the review itself still fails loud).
+          deadlineMissed = true
           emitApplied({
             actions: landed,
             executionError: `execution timed out after ${config.reviewTimeoutMs}ms`,
@@ -1339,7 +1357,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // an audit record while the fallback inject (caller side) is already
       // writing; reconcile by hand if late writes show up.
       if (error instanceof Error && error.message.includes('plan execution timed out')) {
-        ctx.logger.warn('dsh-evolution-review: plan execution abandoned on timeout — any late write it lands has NO plan-applied record and races the fallback inject; inspect the skill tree and usage sidecar')
+        ctx.logger.warn('dsh-evolution-review: plan execution abandoned on timeout — late writes ARE reported to the model as they land (S2-10) but still have NO plan-applied record and race the fallback inject; inspect the skill tree and usage sidecar')
       }
       return false
     } finally {

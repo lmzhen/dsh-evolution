@@ -37,7 +37,7 @@ Independent of request-prefix construction. This package does not alter the asse
 
 `reviewProvider` selects the LLM provider for review subagents. When omitted, the subagent inherits the deployment default route instead of a hardcoded provider name. Model selection stays on the policy (`memoryReviewModel` / `skillReviewModel`).
 
-`reviewTimeoutMs` bounds each review subagent run (an `AbortSignal.timeout`; `0` aborts immediately). The former `executionTimeoutMs` declaration was removed in v14 (nothing read it, so it was configuration that did nothing); use `reviewTimeoutMs`.
+`reviewTimeoutMs` bounds each review subagent run (an `AbortSignal.timeout`; `0` aborts immediately) and the write leg that executes the plan. The deadline does not stop an abandoned write leg: an op that lands after it is reported to the model as its own notice (S2-10, FLOW1-6), while the `evolution/plan-applied` record stays the deadline snapshot, so late writes still have no plan-applied entry. The former `executionTimeoutMs` declaration was removed in v14 (nothing read it, so it was configuration that did nothing); use `reviewTimeoutMs`.
 
 ### Review delivery contract (0.3.38-0.3.42)
 
