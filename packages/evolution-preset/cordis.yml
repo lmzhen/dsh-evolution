@@ -109,6 +109,11 @@
   name: '@deepseek-ai/dsh-skill-usage'
 - id: tool-skill-manage
   name: '@deepseek-ai/dsh-tool-skill-manage'
+# S3-1 (G-3) LAYER SEMANTICS: this row files into the PRESET layer, which is the
+# NEAREST layer for a session running this preset — it wins duplicate skill names
+# outright, regardless of rank. `includeSkillNames` / `excludeSkillNames` set here
+# are therefore the ones that govern a preset session; the same row in
+# evolution-all (global layer) governs only sessions WITHOUT the preset.
 - id: evolution-skill-catalog
   name: '@deepseek-ai/dsh-evolution-skill-catalog'
 

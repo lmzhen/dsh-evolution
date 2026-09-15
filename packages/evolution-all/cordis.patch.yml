@@ -73,6 +73,16 @@
       name: '@deepseek-ai/dsh-tool-skill-manage'
     - id: tool-session-query
       name: '@deepseek-ai/dsh-tool-session-query'
+    # S3-1 (G-3) LAYER SEMANTICS: this row files into the GLOBAL layer (profile
+    # root). It governs sessions WITHOUT the Evolution agent preset; with the
+    # preset active, the preset layer is NEARER and wins a duplicate name
+    # outright — rank does not cross layers (packages/skill/skill/src/index.ts:
+    # "the nearest layer's entry wins a duplicate name outright, and the rank
+    # order decides duplicates only within one layer"). So `includeSkillNames` /
+    # `excludeSkillNames` set HERE have no effect on a preset session: set them on
+    # the preset's row (evolution-preset/cordis.yml) for those sessions, and
+    # install ONE form (doctor flags all + layered preset as a double-mount).
+    # tests/rank-contract.spec.ts pins both halves mechanically.
     - id: evolution-skill-catalog
       name: '@deepseek-ai/dsh-evolution-skill-catalog'
 

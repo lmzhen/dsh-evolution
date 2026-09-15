@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import type { SkillCandidate, SkillDefinition, SkillProvider } from '@deepseek-ai/dsh-skill'
 
@@ -54,5 +55,53 @@ describe('P2-10: skill rank contract', () => {
     const winner = await ctx.skills.get('shadow-skill')
     expect(winner?.provider).toBe('evolution-rank-390')
     expect(winner?.description).toBe('authored by evolution-rank-390')
+  })
+
+  /** A catalog-shaped provider: same package, per-ROW include filter. */
+  const catalogRow = (name: string, rank: number, included: string[]): SkillProvider => ({
+    name,
+    async list(): Promise<SkillCandidate[]> {
+      return ['kept', 'filtered-out'].map(skill => ({
+        name: skill,
+        description: `published by ${name}`,
+        invocation: { modelInvocable: true, userInvocable: true },
+        source: 'user-dsh',
+        provider: name,
+        rank,
+        locator: { name: skill },
+      })).filter(candidate => included.includes(candidate.name))
+    },
+    async get(candidate: SkillCandidate): Promise<SkillDefinition> {
+      return {
+        name: candidate.name,
+        description: candidate.description,
+        invocation: { modelInvocable: true, userInvocable: true },
+        source: 'user-dsh',
+        provider: name,
+        content: `# ${candidate.name} (${name})`,
+      }
+    },
+  })
+
+  it('S3-1 (G-3): the NEARER layer wins outright, so only the governing row\u2019s include/exclude applies', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    // `evolution-all` mounts this row at PROFILE ROOT (the global layer) with its
+    // own include list; `evolution-preset/cordis.yml` mounts the SAME package in
+    // the preset layer, also with its own list. Both declare rank 390.
+    ctx.skills.registerProvider(() => catalogRow('profile-root-390', 390, ['kept']))
+    const preset = createScope(ctx, { preset: 'evolution' })
+    const scopedSkills = preset.ctx.get('skills') as SkillRegistry
+    scopedSkills.registerProvider(() => catalogRow('preset-layer-390', 390, ['kept', 'filtered-out']))
+
+    // Without a scope (an attach install, no preset session) the global row
+    // governs and its include list decides: the second name is invisible.
+    expect((await ctx.skills.list()).map(skill => skill.name)).toEqual(['kept'])
+    // A preset session reads through ITS scope: the nearer layer wins outright,
+    // regardless of rank — so the global row's include list cannot filter it.
+    const scoped = await ctx.skills.list({ scope: scopeOf(preset.ctx) })
+    expect(scoped.map(skill => skill.name).sort()).toEqual(['filtered-out', 'kept'])
+    expect((await ctx.skills.get('filtered-out', { scope: scopeOf(preset.ctx) }))?.provider).toBe('preset-layer-390')
+    await preset.dispose()
   })
 })
