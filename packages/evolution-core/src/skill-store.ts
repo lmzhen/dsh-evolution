@@ -168,6 +168,26 @@ function anchorRefusalFile(name: string, filePath: string, verdict: Exclude<Anch
   }
 }
 
+/**
+ * v43 S2-14 (FLOW2-1/flow-3): the target could not be READ at all — EISDIR, an
+ * unreadable file, a failing backend. `io.readText` returns null only for a
+ * genuinely missing path and throws for everything else, so a raw errno used to
+ * escape `update` / `patch` / `write_file` to the model while the remove path had
+ * classified the same condition since A-5 (v15). Structured refusal, nothing
+ * written.
+ *
+ * @param label - `name` or `name/filePath`, as the caller's surface names it.
+ * @param error - the read failure.
+ * @returns the refusal result.
+ */
+function unreadableTarget(label: string, error: unknown): SkillActionResult {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  const detail = code === 'EISDIR'
+    ? 'the path is a DIRECTORY, not a file'
+    : error instanceof Error ? error.message : String(error)
+  return { ok: false, message: `Could not read "${label}": ${detail}. Nothing was written.` }
+}
+
 export interface SkillActionResult {
   ok: boolean
   message: string
@@ -662,7 +682,7 @@ export class SkillLibrary {
   private async runSingleWrite(
     path: string,
     task: (current: string | null) => SingleWriteOutcome | Promise<SingleWriteOutcome>,
-    readFailure?: SkillActionResult,
+    readFailure?: (error: unknown) => SkillActionResult,
   ): Promise<SkillActionResult> {
     // v28 G1.1 (EVO-IO-02): `ghostDir` rides the outcome instead of a closure
     // flag — it is set when the task saw a missing body and chose not to
@@ -696,7 +716,7 @@ export class SkillLibrary {
         // failed. The bytes are visible, so this is NOT a failed write: keep the
         // audit/event below and report the durability warning instead of
         // letting a caller roll back (or retry) a write that already happened.
-        if (!progress.entered && readFailure !== undefined) return readFailure
+        if (!progress.entered && readFailure !== undefined) return readFailure(error)
         if (!committedOnly(error)) throw error
         durabilityWarning = error instanceof Error ? error.message : String(error)
       }
@@ -705,7 +725,7 @@ export class SkillLibrary {
       try {
         current = await this.io.readText(path)
       } catch (error) {
-        if (readFailure !== undefined) return readFailure
+        if (readFailure !== undefined) return readFailure(error)
         throw error
       }
       const next = await run(current)
@@ -1432,7 +1452,7 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'update', before: current, after: onDisk, summary: 'updated' },
         event: { action: 'update', name, skillDir: dir },
       }
-    }, anchor !== undefined ? anchorUnverifiable(name, null) : undefined)
+    }, anchor !== undefined ? () => anchorUnverifiable(name, null) : error => unreadableTarget(name, error))
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
@@ -1546,7 +1566,7 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },
       }
-    })
+    }, error => unreadableTarget(name + '/' + patchLabel, error))
   }
 
   /**
@@ -2482,7 +2502,7 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}` },
         event: { action: 'write_file', name, skillDir: dir, file: target },
       }
-    }, anchor !== undefined ? anchorUnverifiable(name, filePath) : undefined)
+    }, anchor !== undefined ? () => anchorUnverifiable(name, filePath) : error => unreadableTarget(name + '/' + filePath, error))
   }
 
   async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
