@@ -37,14 +37,10 @@ function deploymentFormOf(mode) {
   if (mode === 'host') return 'host-only'
   return 'preset-only'
 }
-const EVOLUTION_PREFIXES = [
-  'dsh-evolution-',
-  'dsh-memory',
-  'dsh-memory-files',
-  'dsh-skill-usage',
-  'dsh-tool-memory',
-  'dsh-tool-skill-manage',
-]
+// v43 audit (S1-2): the allowlist moved to lib-family-packages.mjs so this
+// installer and verify-package-discovery.mjs read ONE array. A local copy here
+// let a new package be published while the installer silently ignored it.
+import { EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
 const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
 const BUNDLES = {

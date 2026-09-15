@@ -73,15 +73,31 @@ Run from the two trees (never reorder or rename these steps):
 | 5 | `node packages/scripts/verify-arch-guards.mjs packages --strict` | mirror |
 | 6 | `node packages/scripts/verify-event-pairing.mjs packages --strict` | mirror |
 | 7 | `node packages/scripts/verify-declared-config.mjs packages --strict` | mirror |
-| 8 | `node packages/scripts/verify-layout-sync.mjs packages --strict` | mirror |
-| 9 | `node packages/scripts/verify-profile-bundles.mjs packages --strict` | mirror |
-| 10 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
+| 8 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local (outside this repo) |
+| 9 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local (outside this repo) |
+| 10 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | `D:/dsh` (machine-local) |
+| 11 | `node packages/scripts/verify-profile-bundles.mjs` | mirror |
+| 12 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
+| 13 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.1.5-rc.2` | mirror |
+| 14 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |
 
-(The former machine-specific `D:/dsh/audit-v37` helpers — `check-tsconfigs`,
-`check-manifests`, `mirror-sync` — are retired from this table: tsconfig
-registration is covered by gate 1, manifest version uniformity by the release
-script, and the sync discipline by the workspace's own
-`sync-dev-to-mirror` / `sync-mirror-to-dev` helpers.)
+The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
+writes one log per step plus a summary, and prints the step names it ran, so a
+drift between this table and the executed set is visible in every gate log).
+
+Steps 8-10 live **outside this repository** and are machine-local: tsconfig
+registration, manifest version uniformity and mirror↔overlay parity. Each row
+names its absolute path precisely because these three are NOT shipped guards
+(citing a bare script name here would claim a guard the repository does not
+have). They are part of the executed gate because no in-repo script covers those
+three checks today; a portable replacement belongs in `packages/scripts` if the
+workspace is ever used from another machine.
+
+`verify-layout-sync.mjs` is **retired from this table**: it compares a
+`dev`/`mirror` script pair, and this workspace is mirror-single-line (the former
+dev tree is stale — running the publish chain's first steps would robocopy that
+old tree over the mirror). Its remaining useful half, script-pair parity, has no
+referent here.
 
 `verify-doc-facts.mjs` runs standalone for the same check rule N19 makes, and
 `verify-platform-contract.mjs --upstream <tree>` audits the platform anchors
