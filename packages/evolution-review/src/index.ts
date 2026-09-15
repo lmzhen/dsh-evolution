@@ -23,6 +23,7 @@ import { foldToolDispatches, readDispatchSignal, sessionAudited, skillReadNameOf
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
+import { SessionScopedState } from './session-state.ts'
 
 export const name = 'evolution-review'
 export const inject = ['agents']
@@ -348,7 +349,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // `skillsRoot` alias fails the load instead of being silently ignored.
   assertSkillsRootAliasRetired(rawConfig)
   const rootConfig = resolveRootConfig(rawConfig)
-  const turnStarts = new Map<SessionId, number>()
+  // P1-9 (S2-2): every per-session collection below registers at its declaration
+  // site; the dispose hook clears what was registered instead of a hand-written
+  // list (V7-16 fixed such a list after four additions were missing from it).
+  const sessionState = new SessionScopedState()
+  const turnStarts = sessionState.add('turnStarts', new Map<SessionId, number>())
   // P3 (v15): per-mount one-shot for the stateless warn (was module-level).
   let statelessReviewStateWarned = false
   // Completion-channel state (E-59f): these two are deliberately NOT persisted
@@ -359,16 +364,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // is persisted via ReviewState; the completion channel is a lighter, lossy
   // signal whose cost of losing (a deferred review) is lower than the cost of
   // widening the on-disk record contract.
-  const cumulativeToolCalls = new Map<SessionId, number>()
-  const completionInjected = new Set<SessionId>()
+  const cumulativeToolCalls = sessionState.add('cumulativeToolCalls', new Map<SessionId, number>())
+  const completionInjected = sessionState.add('completionInjected', new Set<SessionId>())
   // V6-53 / 0.3.38 (deferred cadence inject): a threshold-deserved review whose
   // subagent path was unavailable is HELD here (last trigger wins — the most
   // recent relevance) and injected at conversation completion instead of
   // interrupting the task (and invalidating the prefix cache from that point
   // on). Same in-memory discipline as the completion channel: a restart is a
   // fresh conversation boundary, and the deferred review is a light loss.
-  const pendingCadenceReviews = new Map<SessionId, ReviewKind>()
-  const pendingCadenceWarned = new Set<SessionId>()
+  const pendingCadenceReviews = sessionState.add('pendingCadenceReviews', new Map<SessionId, ReviewKind>())
+  const pendingCadenceWarned = sessionState.add('pendingCadenceWarned', new Set<SessionId>())
   // V7-02 (0.3.41): the waking delivery (followup) starts a NEW turn whose
   // only substantive input is our own review prompt — with interval=1 that
   // turn fires cadence again and re-delivers, an unbounded review loop. The
@@ -376,11 +381,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // not lost) but its cadence FIRE is suppressed once; the next real turn
   // re-arms normally. In-memory only: a restart clears the inbox queue, so
   // the loop cannot survive it.
-  const skipNextCadenceFire = new Map<SessionId, boolean>()
+  const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, boolean>())
   // V7-04 (0.3.42): the post-delivery counter reset may fail to persist (state
   // store IO failure) — delivery already happened, so warn once per session
   // about the repeat-review source instead of silently re-delivering forever.
-  const cadenceResetWarned = new Set<SessionId>()
+  const cadenceResetWarned = sessionState.add('cadenceResetWarned', new Set<SessionId>())
   // 0.3.18 (E-19): ONE in-flight review subagent process-wide. The shared
   // skill tree and memory have no cross-writer mutex, so two overlapping
   // reviews (a 120s window is long) could fuzzyPatch the same file
@@ -430,7 +435,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // V24-04 (v24): per-session mutex over the persisted review-state RMW.
   // Entries self-remove when the chain drains (no sweep needed); the dispose
   // hook clears the map like the other per-session state.
-  const reviewStateLocks = new Map<SessionId, Promise<unknown>>()
+  const reviewStateLocks = sessionState.add('reviewStateLocks', new Map<SessionId, Promise<unknown>>())
   async function withReviewStateLock<T>(id: SessionId, task: () => Promise<T>): Promise<T> {
     const previous = reviewStateLocks.get(id) ?? Promise.resolve()
     const next = previous.catch(() => {}).then(task)
@@ -1652,21 +1657,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.effect(() => () => {
-    // V7-16 (0.3.44): enumerate EVERY per-session state map — the 0.3.38-0.3.42
-    // additions (pendingCadenceReviews/pendingCadenceWarned/skipNextCadenceFire/
-    // cadenceResetWarned) were missing from the cleanup list; the closures were
-    // reclaimed with the fiber anyway (no real leak), but the cleanup contract
-    // now matches the full set.
-    turnStarts.clear()
-    cumulativeToolCalls.clear()
-    completionInjected.clear()
-    pendingCadenceReviews.clear()
-    pendingCadenceWarned.clear()
-    skipNextCadenceFire.clear()
-    cadenceResetWarned.clear()
-    // V24-04 (v24): chains self-remove when drained; the clear only covers
-    // locks still pending at unload (their tasks settle into the void).
-    reviewStateLocks.clear()
+    // V7-16 (0.3.44) hand-listed these clears because the 0.3.38-0.3.42
+    // additions were missing from the list. S2-2 clears what registered at its
+    // declaration instead: one collection, one registration, and
+    // tests/session-state-ownership.spec.ts fails when a new per-session map
+    // skips the registry. reviewStateLocks chains self-remove when drained;
+    // this clear only covers locks still pending at unload.
+    sessionState.dispose()
   }, 'dsh-evolution-review.cleanup')
 }
 
