@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, cp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, cp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -393,8 +393,15 @@ describe('layered installer', () => {
     const home = join(tree, 'home')
     await mkdir(scripts, { recursive: true })
     // The script resolves its own tree from its file URL, so the copy defines
-    // where the walk-up starts.
-    await cp(installer, join(scripts, 'install-layered.mjs'))
+    // where the walk-up starts. v43 S1-2: the installer now imports SIBLING
+    // modules from packages/scripts (lib-family-packages.mjs, the single home of
+    // the package-discovery rules), and a real tarball ships every *.mjs in that
+    // directory — copying only the entry point broke here the moment a sibling
+    // appeared, which is a fixture gap rather than a packaging defect.
+    const scriptsDir = fileURLToPath(new URL('../../scripts/', import.meta.url))
+    for (const entry of await readdir(scriptsDir)) {
+      if (entry.endsWith('.mjs')) await cp(join(scriptsDir, entry), join(scripts, entry))
+    }
     const shippedRoot = join(tree, 'packages', 'evolution', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets')
     await mkdir(join(shippedRoot, 'standard'), { recursive: true })
     const shippedComposition = '# v33-G2.1 platform-shipped standard composition\n- id: persona\n- id: tool-session-query\n'

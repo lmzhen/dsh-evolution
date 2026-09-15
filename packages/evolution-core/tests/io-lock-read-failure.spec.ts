@@ -167,7 +167,7 @@ it('v43 (P1-1): a failed release rm registers the claim we wrote, with no read-b
     await io.writeText(target, 'first')
     // Exactly two reads of the lock name: #1 the commit-point assertOwned and
     // #2 the release read. The pre-fix code added a third (the read-back inside
-    // the failed-rm catch) whose failure registered ''. 
+    // the failed-rm catch) whose failure registered ''.
     expect(faults.get(lock)?.seen).toBe(2)
     expect(await readFile(target, 'utf8')).toBe('first')
     // The rm failed, so our claim is still the lock body.
