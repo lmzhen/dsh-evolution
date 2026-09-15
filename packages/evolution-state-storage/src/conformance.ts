@@ -1,4 +1,18 @@
 /**
+ * Published conformance suite for `EvolutionStateStorage` providers (J-5 / S3-2).
+ *
+ * A third-party provider (or a new medium inside this family) runs ONE call to
+ * check the seam contract end to end: field-complete round-trips, claim/resolve
+ * rollback, refusal at the write boundary, clone/alias independence, unknown-field
+ * preservation, and the two seam caps (the resolved pending tail and the
+ * review-state session rows).
+ *
+ * The assertion surface is INJECTED ({@link ConformanceAssert}) rather than
+ * imported: vitest satisfies it in-tree, and a host that only has node:assert can
+ * wrap it in a few lines. That keeps this module free of any test-runner import,
+ * so it ships inside the published package.
+ */
+/**
  * Cross-provider consistency harness (G7.4, 0.3.22; V4-07 0.3.28).
  *
  * Runs the SAME observable operation sequence against an
@@ -15,9 +29,33 @@
  * the same public operations on both providers, so neither medium can keep the
  * bound to itself.
  */
-import { expect } from 'vitest'
-import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state-storage'
-import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+// Self-package imports by NAME would be an undeclared dependency (the closure
+// gate rejects it) and a cycle: the seam's own modules are imported relatively.
+import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from './constants.ts'
+import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord } from './index.ts'
+
+/**
+ * The assertion surface this suite needs. Vitest's `expect` satisfies it in-tree;
+ * a host with any other runner wraps its own in a few lines. Deliberately
+ * structural and minimal — the suite must not import a test runner.
+ */
+export interface ConformanceAssert {
+  (actual: unknown): {
+    toBe(expected: unknown): void
+    toEqual(expected: unknown): void
+    toBeDefined(): void
+    toBeUndefined(): void
+    toBeNull(): void
+    toContain(expected: unknown): void
+    toHaveLength(length: number): void
+    toBeGreaterThan(expected: number): void
+    not: {
+      toBe(expected: unknown): void
+      toContain(expected: unknown): void
+    }
+    rejects: { toThrow(expected?: unknown): Promise<void> }
+  }
+}
 
 /** Build a fixture pending record, optionally carrying origin/sessionId. */
 const pendingOf = (
@@ -35,71 +73,79 @@ const pendingOf = (
 })
 
 /** Every non-holder pending field must equal the input, field by field. */
-const expectPendingCarried = (actual: PendingRecord | null | undefined, input: PendingRecord) => {
-  expect(actual).toBeDefined()
-  expect(actual!.id).toBe(input.id)
-  expect(actual!.kind).toBe(input.kind)
-  expect(actual!.summary).toBe(input.summary)
-  expect(actual!.args).toEqual(input.args)
-  expect(actual!.createdAt).toBe(input.createdAt)
-  expect(actual!.origin).toBe(input.origin)
-  expect(actual!.sessionId).toBe(input.sessionId)
+const expectPendingCarried = (assert: ConformanceAssert, actual: PendingRecord | null | undefined, input: PendingRecord): void => {
+  assert(actual).toBeDefined()
+  const carried = actual as PendingRecord
+  assert(carried.id).toBe(input.id)
+  assert(carried.kind).toBe(input.kind)
+  assert(carried.summary).toBe(input.summary)
+  assert(carried.args).toEqual(input.args)
+  assert(carried.createdAt).toBe(input.createdAt)
+  assert(carried.origin).toBe(input.origin)
+  assert(carried.sessionId).toBe(input.sessionId)
 }
 
-export async function runStateProviderConsistency(provider: EvolutionStateStorage): Promise<void> {
+/** The listing must contain `id`; a missing row fails the SUITE, not the runner. */
+const findRecord = (records: readonly PendingRecord[], id: string): PendingRecord => {
+  const found = records.find(record => record.id === id)
+  if (found === undefined) throw new Error(`conformance: pending record "${id}" missing from the listing`)
+  return found
+}
+
+export async function runStateProviderConsistency(provider: EvolutionStateStorage, assert: ConformanceAssert): Promise<void> {
   // --- review-state round-trip ---
   await provider.saveReviewState('s-consistent', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
-  expect(await provider.loadReviewState('s-consistent')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+  assert(await provider.loadReviewState('s-consistent')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
 
   // --- curator-state: missing seed creates; null = keep; overwrite replaces ---
-  expect(await provider.loadCuratorState()).toBeNull()
+  assert(await provider.loadCuratorState()).toBeNull()
   await provider.transactCuratorState(() => ({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false }))
-  expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false })
+  assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false })
   await provider.transactCuratorState(() => null)
-  expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false })
+  assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false })
   await provider.transactCuratorState(current => ({ ...(current as CuratorStateRecord), lastSummary: 'updated' }))
-  expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'updated', paused: false })
+  assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'updated', paused: false })
 
   // --- claim → resolve (pending → executing → approved) ---
   const live = pendingOf('c-live')
   await provider.savePending(live)
-  expect((await provider.listPending('pending')).map(record => record.id)).toContain('c-live')
+  assert((await provider.listPending('pending')).map(record => record.id)).toContain('c-live')
   const claimed = await provider.claimPending('c-live', 'claim-a')
-  expect(claimed?.status).toBe('executing')
-  expect(claimed?.claimedBy).toBe('claim-a')
-  expectPendingCarried(claimed, live)
-  expect(typeof claimed?.claimedAt).toBe('string')
+  assert(claimed?.status).toBe('executing')
+  assert(claimed?.claimedBy).toBe('claim-a')
+  expectPendingCarried(assert, claimed, live)
+  assert(typeof claimed?.claimedAt).toBe('string')
   const resolved = await provider.tryResolvePending('c-live', 'approved')
-  expect(resolved.applied).toBe(true)
-  expect(resolved.record?.id).toBe('c-live')
-  expect(resolved.record?.status).toBe('approved')
-  expectPendingCarried(resolved.record, live)
-  expect(resolved.record?.claimedBy).toBe('claim-a')
-  expect(typeof resolved.record?.claimedAt).toBe('string')
-  expect(typeof resolved.record?.resolvedAt).toBe('string')
-  expect((await provider.listPending('approved')).map(record => record.id)).toContain('c-live')
-  expect((await provider.listPending('pending')).map(record => record.id)).not.toContain('c-live')
+  assert(resolved.applied).toBe(true)
+  assert(resolved.record?.id).toBe('c-live')
+  assert(resolved.record?.status).toBe('approved')
+  expectPendingCarried(assert, resolved.record, live)
+  assert(resolved.record?.claimedBy).toBe('claim-a')
+  assert(typeof resolved.record?.claimedAt).toBe('string')
+  assert(typeof resolved.record?.resolvedAt).toBe('string')
+  assert((await provider.listPending('approved')).map(record => record.id)).toContain('c-live')
+  assert((await provider.listPending('pending')).map(record => record.id)).not.toContain('c-live')
 
   // --- attribution (origin/sessionId) survives claim → resolve ---
   const attrib = pendingOf('c-attrib', 'memory', { origin: 'background_review', sessionId: 'sess-attrib' })
   await provider.savePending(attrib)
-  expectPendingCarried(await provider.claimPending('c-attrib', 'claim-a'), attrib)
+  expectPendingCarried(assert, await provider.claimPending('c-attrib', 'claim-a'), attrib)
   const attribResolved = await provider.tryResolvePending('c-attrib', 'approved')
-  expectPendingCarried(attribResolved.record, attrib)
-  expect(attribResolved.record?.origin).toBe('background_review')
-  expect(attribResolved.record?.sessionId).toBe('sess-attrib')
-  expect(typeof attribResolved.record?.resolvedAt).toBe('string')
+  expectPendingCarried(assert, attribResolved.record, attrib)
+  assert(attribResolved.record?.origin).toBe('background_review')
+  assert(attribResolved.record?.sessionId).toBe('sess-attrib')
+  assert(typeof attribResolved.record?.resolvedAt).toBe('string')
 
   // --- claim → release rolls executing back to pending (failure path) ---
   const rel = pendingOf('c-release', 'skill')
   await provider.savePending(rel)
-  expect((await provider.claimPending('c-release', 'claim-b'))?.status).toBe('executing')
+  assert((await provider.claimPending('c-release', 'claim-b'))?.status).toBe('executing')
   await provider.releasePendingClaim('c-release', 'claim-b')
   const released = (await provider.listPending('pending')).find(record => record.id === 'c-release')
-  expect(released?.status).toBe('pending')
-  expectPendingCarried(released, rel)
-  expect(released?.claimedBy).toBeUndefined()
-  expect(released?.claimedAt).toBeUndefined()
+  assert(released?.status).toBe('pending')
+  expectPendingCarried(assert, released, rel)
+  assert(released?.claimedBy).toBeUndefined()
+  assert(released?.claimedAt).toBeUndefined()
 
   // --- E1 (v15): claim-scoped resolve (expectedClaimId) is provider-wide
   // contract — a foreign claimId refuses; the owner succeeds; the unscoped
@@ -108,17 +154,17 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   await provider.savePending(scoped)
   await provider.claimPending('c-scoped', 'claim-owner')
   const foreignScope = await provider.tryResolvePending('c-scoped', 'approved', 'claim-foreign')
-  expect(foreignScope.applied).toBe(false)
-  expect((await provider.listPending('executing')).map(record => record.id)).toContain('c-scoped')
+  assert(foreignScope.applied).toBe(false)
+  assert((await provider.listPending('executing')).map(record => record.id)).toContain('c-scoped')
   const ownerScope = await provider.tryResolvePending('c-scoped', 'approved', 'claim-owner')
-  expect(ownerScope.applied).toBe(true)
-  expect(ownerScope.record?.status).toBe('approved')
+  assert(ownerScope.applied).toBe(true)
+  assert(ownerScope.record?.status).toBe('approved')
 
   // --- status filtering is consistent (a pending record is not 'approved') ---
   const filt = pendingOf('c-filter')
   await provider.savePending(filt)
-  expect((await provider.listPending('pending')).map(record => record.id)).toContain('c-filter')
-  expect((await provider.listPending('approved')).map(record => record.id)).not.toContain('c-filter')
+  assert((await provider.listPending('pending')).map(record => record.id)).toContain('c-filter')
+  assert((await provider.listPending('approved')).map(record => record.id)).not.toContain('c-filter')
 
   // --- V8-15 (0.3.46): release AFTER resolve is a no-op on BOTH providers —
   // the resolved record keeps its audit attribution (the domain provider had
@@ -130,16 +176,16 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   await provider.tryResolvePending('c-post-resolve', 'rejected')
   await provider.releasePendingClaim('c-post-resolve', 'claim-c')
   const postResolved = (await provider.listPending('rejected')).find(record => record.id === 'c-post-resolve')
-  expect(postResolved?.status).toBe('rejected')
-  expect(postResolved?.claimedBy).toBe('claim-c')
-  expect(typeof postResolved?.claimedAt).toBe('string')
-  expect(typeof postResolved?.resolvedAt).toBe('string')
+  assert(postResolved?.status).toBe('rejected')
+  assert(postResolved?.claimedBy).toBe('claim-c')
+  assert(typeof postResolved?.claimedAt).toBe('string')
+  assert(typeof postResolved?.resolvedAt).toBe('string')
 
   // --- I-4 (v18): a malformed record must be REFUSED at the write boundary.
   // Both providers gate writes (json's field gate, domain's zod schema), and
   // C-3 aligned them on the required `args` key — a JS caller or a hand-edited
   // file must not persist a record the other provider would refuse to open. ---
-  await expect(provider.savePending({
+  await assert(provider.savePending({
     id: 'c-bad', kind: 'memory', summary: 'bad', createdAt: 'now', status: 'pending',
   } as PendingRecord)).rejects.toThrow()
 
@@ -150,19 +196,18 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   const poison = pendingOf('c-poison')
   poison.args = { nested: { value: 1 } }
   await provider.savePending(poison)
-  const returned = (await provider.listPending('pending')).find(record => record.id === 'c-poison')!
+  const returned = findRecord(await provider.listPending('pending'), 'c-poison')
   returned.summary = 'poisoned'
   ;(returned.args as { nested: { value: number } }).nested.value = 99
-  const reread = (await provider.listPending('pending')).find(record => record.id === 'c-poison')!
-  expect(reread.summary).toBe('memory:c-poison')
-  expect((reread.args as { nested: { value: number } }).nested.value).toBe(1)
+  const reread = findRecord(await provider.listPending('pending'), 'c-poison')
+  assert(reread.summary).toBe('memory:c-poison')
+  assert((reread.args as { nested: { value: number } }).nested.value).toBe(1)
 
   // --- P2-15 (v19): a non-cloneable payload is refused by BOTH providers at
   // the write boundary. The domain read path deep-clones every record, so a
   // single poisoned record would break every later read for every status. ---
-  await expect(provider.savePending({
-    ...pendingOf('c-uncloneable'), args: { fn: () => {} },
-  } as unknown as PendingRecord)).rejects.toThrow()
+  const uncloneable: unknown = { ...pendingOf('c-uncloneable'), args: { fn: () => {} } }
+  await assert(provider.savePending(uncloneable as PendingRecord)).rejects.toThrow()
 
   // --- P2-14 (v19): mutating the CALLER's args after save must not change the
   // stored record (the domain provider used to store the reference). ---
@@ -170,12 +215,12 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   aliased.args = { nested: { value: 1 } }
   await provider.savePending(aliased)
   ;(aliased.args as { nested: { value: number } }).nested.value = 99
-  const aliasedBack = (await provider.listPending('pending')).find(record => record.id === 'c-alias')!
-  expect((aliasedBack.args as { nested: { value: number } }).nested.value).toBe(1)
+  const aliasedBack = findRecord(await provider.listPending('pending'), 'c-alias')
+  assert((aliasedBack.args as { nested: { value: number } }).nested.value).toBe(1)
 
   // --- P2-16 (v19): a malformed schemaVersion is refused by both providers
   // (json used to accept and rewrite it; domain refused it). ---
-  await expect(provider.saveCuratorState({
+  await assert(provider.saveCuratorState({
     lastRunAt: 1, runCount: 0, lastSummary: 'x', paused: false, schemaVersion: -1,
   } as unknown as CuratorStateRecord)).rejects.toThrow()
 
@@ -183,7 +228,7 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   // default strip used to delete them on the domain side only). ---
   await provider.savePending({ ...pendingOf('c-extra'), extraField: 'kept' } as unknown as PendingRecord)
   const extraBack = (await provider.listPending('pending')).find(record => record.id === 'c-extra') as unknown as { extraField?: string }
-  expect(extraBack.extraField).toBe('kept')
+  assert(extraBack.extraField).toBe('kept')
 
   // --- P2-4 (v15) / C-6 (v18): the RESOLVED pending tail is bounded by the
   // seam constant on the resolve path, on BOTH providers. The vector seeds
@@ -200,12 +245,12 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   }
   const resolvedNow = (await provider.listPending('approved')).concat(await provider.listPending('rejected'))
     .filter(record => record.kind !== 'capability')
-  expect(resolvedNow).toHaveLength(PENDING_RESOLVED_CAP)
+  assert(resolvedNow).toHaveLength(PENDING_RESOLVED_CAP)
   const resolvedIds = resolvedNow.map(record => record.id)
-  expect(resolvedIds).not.toContain(capPrefix + '000')
-  expect(resolvedIds).not.toContain(capPrefix + '001')
-  expect(resolvedIds).toContain(capPrefix + String(PENDING_RESOLVED_CAP + 1).padStart(3, '0'))
-  expect((await provider.listPending('pending')).map(record => record.id)).toContain('c-cap-live')
+  assert(resolvedIds).not.toContain(capPrefix + '000')
+  assert(resolvedIds).not.toContain(capPrefix + '001')
+  assert(resolvedIds).toContain(capPrefix + String(PENDING_RESOLVED_CAP + 1).padStart(3, '0'))
+  assert((await provider.listPending('pending')).map(record => record.id)).toContain('c-cap-live')
 
   // --- V24-08 (v24): review-state rows are bounded per session table, and the
   // SAVING session is never the victim — one row is dropped per over-cap save,
@@ -213,11 +258,11 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   const sessionPrefix = 's-cap-'
   const reviewStateOf = (turns: number) => ({ turnsSinceMemory: turns, turnsSinceSkill: 0, lastTurn: turns })
   for (let index = 0; index <= REVIEW_STATE_SESSION_CAP; index += 1) {
-    await provider.saveReviewState(sessionPrefix + index, reviewStateOf(index))
+    await provider.saveReviewState(sessionPrefix + String(index), reviewStateOf(index))
   }
-  expect(await provider.loadReviewState(sessionPrefix + '0')).toBeNull()
-  expect(await provider.loadReviewState(sessionPrefix + '1')).toEqual(reviewStateOf(1))
-  expect(await provider.loadReviewState(sessionPrefix + REVIEW_STATE_SESSION_CAP)).toEqual(reviewStateOf(REVIEW_STATE_SESSION_CAP))
+  assert(await provider.loadReviewState(sessionPrefix + '0')).toBeNull()
+  assert(await provider.loadReviewState(sessionPrefix + '1')).toEqual(reviewStateOf(1))
+  assert(await provider.loadReviewState(sessionPrefix + String(REVIEW_STATE_SESSION_CAP))).toEqual(reviewStateOf(REVIEW_STATE_SESSION_CAP))
   await provider.saveReviewState(sessionPrefix + '0', reviewStateOf(999))
-  expect(await provider.loadReviewState(sessionPrefix + '0')).toEqual(reviewStateOf(999))
+  assert(await provider.loadReviewState(sessionPrefix + '0')).toEqual(reviewStateOf(999))
 }

@@ -1,10 +1,10 @@
-import { describe, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
 import * as JsonState from '../src/index.ts'
-import { runStateProviderConsistency } from '../../test-support/state-provider-consistency.ts'
+import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state-storage'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-state-json cross-provider consistency (G7.4)', () => {
@@ -15,6 +15,6 @@ describe('evolution-state-json cross-provider consistency (G7.4)', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(JsonState, { root })
-    await runStateProviderConsistency(ctx.evolutionStateStorage.provider('json'))
+    await runStateProviderConsistency(ctx.evolutionStateStorage.provider('json'), expect)
   })
 })

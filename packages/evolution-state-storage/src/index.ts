@@ -8,12 +8,19 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+// S3-2: the two caps live in ./constants.ts (the conformance suite reads them
+// without importing this entry); the local import feeds the pure rules below.
+import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from './constants.ts'
 
 // S-06: the state-stack magic strings (singleton key, file names,
 // provider names, table names) are single-sourced here.
 export * from './constants.ts'
 // P2-12/14/15/16/18 (v19): the record contract both providers consume.
 export * from './record-contract.ts'
+// S3-2 (J-5): the published conformance suite — a provider (in-tree or third
+// party) runs `runStateProviderConsistency(provider, expect)` to check the whole
+// seam contract. It imports no test runner; the assert surface is injected.
+export * from './conformance.ts'
 
 /** 0.3.17 (S3.5, D-4): 'skill_batch' removed — nothing ever created one
  * (dead enum member); the historic value, if it ever reached disk, is read as
@@ -42,33 +49,9 @@ export const canResolvePending = (status: PendingStatus): boolean => status === 
  * runner FAILURE is retryable); other statuses pass through unchanged. */
 export const releasedStatus = (status: PendingStatus): PendingStatus => status === 'executing' ? 'pending' : status
 
-/** P2-4 (v15): the live pending map/table is BOUNDED on the RESOLVE path —
- * `tryResolvePending` drops the oldest resolved (approved/rejected) records by
- * `resolvedAt` once more than this many exist. Single source (the v15 audit
- * found the bound was json-only, so domain deployments grew the table without
- * bound).
- *
- * C-6 (v18) contract precision: a direct `savePending` of an already-resolved
- * record does NOT trigger eviction (the cap is maintained by the resolve
- * operation, not by the writer), and pending/executing records are never
- * trimmed. Callers that write resolved audit records themselves own that
- * growth; the seam's resolve path is what keeps the table bounded.
- * The audit ARCHIVE sidecar that json maintains beyond the cap stays
- * json-specific (domain has no sidecar facility) — declared in both READMEs. */
-export const PENDING_RESOLVED_CAP = 200
-
-/**
- * V24-08 (v24): session rows in the review-state table, per session id. The
- * review pipeline saves on EVERY turn/end of EVERY session and nothing ever
- * deleted rows, so the file grew (and was fully rewritten) with the deploy's
- * whole session history — the same unbounded-growth class the pending cap
- * above already fixed for approvals. A review row is advisory cadence state:
- * evicting the least-recently-active session merely lets that session's next
- * review fire from a fresh counter, so a generous cap is loss-less in
- * practice. Enforced by BOTH providers inside their save path (no seam
- * interface change, no background sweeper).
- */
-export const REVIEW_STATE_SESSION_CAP = 500
+// S3-2: the two caps moved to ./constants.ts so the published conformance suite
+// can read them without importing this module (a value import back into the
+// entry would be a cycle). `export * from './constants.ts'` keeps the surface.
 
 /**
  * V27 G2.2: WHICH pending records the audit cap evicts, as one pure rule both

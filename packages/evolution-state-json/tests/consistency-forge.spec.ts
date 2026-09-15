@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EvolutionStateStorage } from '@deepseek-ai/dsh-evolution-state-storage'
-import { runStateProviderConsistency } from '../../test-support/state-provider-consistency.ts'
+import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state-storage'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { mountStateStack } from '../../test-support/state-stack.ts'
 
@@ -24,7 +24,7 @@ describe('state-provider-consistency catches forged field drift (V4-07)', () => 
         return record
       },
     }
-    await expect(runStateProviderConsistency(broken)).rejects.toThrow()
+    await expect(runStateProviderConsistency(broken, expect)).rejects.toThrow()
   })
 
   it('rejects a provider that drops resolvedAt on resolve', async () => {
@@ -39,6 +39,6 @@ describe('state-provider-consistency catches forged field drift (V4-07)', () => 
         return result
       },
     }
-    await expect(runStateProviderConsistency(broken)).rejects.toThrow()
+    await expect(runStateProviderConsistency(broken, expect)).rejects.toThrow()
   })
 })
