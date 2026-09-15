@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { composePresetComposition } from '@deepseek-ai/dsh-evolution-core'
+import { Context } from '@deepseek-ai/cordis'
+import { composePresetComposition, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doctor.ts'
 
 const stub = { get: () => undefined }
@@ -460,6 +461,77 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(failedRow?.detail).toContain('EACCES: unreadable preset root')
     } finally {
       await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S0-4 (v43 G-1 / J-1): reconciles the scoped rows with the probe witness and calls never-hit a finding', async () => {
+    // Before S0-4 the two halves never met: the bundle turns the session scoping
+    // on for evolution-review and skill-usage, and both then answered false for
+    // every session with nothing in the log and nothing in this report.
+    const gate = (seen: { name: string } | undefined): Context => {
+      const ctx = new Context()
+      // The host-only shape returns nothing; a session that carries the family's
+      // model rows returns the definition.
+      ctx.provide('tools', { get: (name: string) => seen !== undefined && name === seen.name ? seen : undefined })
+      return ctx
+    }
+    const home = await mkdtemp(join(tmpdir(), 'doctor-scoped-probe-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      // No session event has reached the gate in this process: the rows are
+      // mounted and the verdict claims nothing yet.
+      const idle = await diagnose(stub, { home })
+      expect(idle.scopedProbe).toEqual({ rows: ['evolution-review', 'skill-usage'], verdict: 'idle', hits: 0, misses: 0 })
+      expect(renderDoctorText(idle)).toContain('scoped rows: evolution-review=on/skill-usage=on, probe=idle')
+
+      // One scoped rejection with no match ever: the gate is wired, and its
+      // answer is "no session is a family session" — the host-only deployment.
+      expect(sessionAudited(gate(undefined), 's1', true)).toBe(false)
+      const never = await diagnose(stub, { home })
+      expect(never.scopedProbe.verdict).toBe('never-hit')
+      expect(never.scopedProbe.misses).toBe(1)
+      const text = renderDoctorText(never)
+      expect(text).toContain('scoped rows: evolution-review=on/skill-usage=on, probe=never-hit')
+      expect(text).toContain('HOST-ONLY installs reach this')
+      // Both readings travel with the finding: the host-only form can never
+      // match, the variant form matches as soon as the preset session runs.
+      const advice = never.actions.join('\n')
+      expect(advice).toContain('HOST-ONLY install')
+      expect(advice).toContain('VARIANT install')
+
+      // A session that DOES carry the tools clears the finding.
+      expect(sessionAudited(gate({ name: 'memory' }), 's2', true)).toBe(true)
+      const hit = await diagnose(stub, { home })
+      expect(hit.scopedProbe.verdict).toBe('hit')
+      expect(hit.actions.join('\n')).not.toContain('HOST-ONLY install')
+      expect(renderDoctorText(hit)).toContain('probe=hit')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+
+    // Control: a home with no bundle mounts no scoped row — there is no gate to
+    // reconcile, and the never-hit finding must not appear for it.
+    const none = await mkdtemp(join(tmpdir(), 'doctor-scoped-none-'))
+    try {
+      const report = await diagnose(stub, { home: none })
+      expect(report.scopedProbe.rows).toEqual([])
+      expect(report.actions.join('\n')).not.toContain('HOST-ONLY install')
+      expect(renderDoctorText(report)).toContain('scoped rows: (none mounted)')
+    } finally {
+      await rm(none, { recursive: true, force: true })
+    }
+
+    // Control: a DEGRADED bundle read leaves the row set UNDECIDABLE — an
+    // unreadable manifest is not evidence that no bundle is installed.
+    const torn = await mkdtemp(join(tmpdir(), 'doctor-scoped-degraded-'))
+    try {
+      await makeProfile(torn, 'web', ['@lmzhen/dsh-evolution-host'])
+      await writeFile(join(torn, 'profiles', 'web', 'package.json'), '{"dsh":{"profile":{"bundles":["@lmzhen/dsh-evol', 'utf8')
+      const report = await diagnose(stub, { home: torn })
+      expect(report.scopedProbe.rows).toBeNull()
+      expect(renderDoctorText(report)).toContain('scoped rows: (undecidable)')
+    } finally {
+      await rm(torn, { recursive: true, force: true })
     }
   })
 })

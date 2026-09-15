@@ -57,6 +57,14 @@
     # its model tools. The shipped bundles all set it — mounted at profile root
     # that is every session, inside a variant preset only the ones that selected
     # it. See evolution-core/src/opt-in.ts.
+    # S0-4 (v43 G-1 / J-1): in the HOST-ONLY form the premise fails — this bundle
+    # mounts NO model tool row (tool-memory / tool-skill-manage are
+    # devDependencies), so the probe matches no session and BOTH this row and
+    # evolution-review below go inert. The row stays enabled: what was missing was
+    # the diagnosis, not the gate. It is no longer silent — the gate leaves one
+    # warn per process, and `/evolution doctor` prints
+    # `scoped rows: evolution-review=on/skill-usage=on, probe=never-hit` with the
+    # host-only and variant readings spelled out.
     - id: skill-usage
       name: '@deepseek-ai/dsh-skill-usage'
       config:
@@ -84,7 +92,10 @@
         # subagents can load skills under the Anchored Standard preset family.
         reviewToolAllow: [skill]
         # See the skill-usage row above: an original-preset session under a
-        # variant install carries no family tools and must not be injected.
+        # variant install carries no family tools and must not be injected. The
+        # host-only caveat there applies here too — a probe that never matches is
+        # reported by the gate's one-time warn and by `/evolution doctor`
+        # (S0-4 / v43 G-1), never inferred from a silent skip.
         sessionScoped: true
     - id: evolution-curator
       name: '@deepseek-ai/dsh-evolution-curator'

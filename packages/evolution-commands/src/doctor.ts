@@ -12,7 +12,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { composePresetComposition, evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetComposition, evolutionRoot, scopedProbeReport, type ScopedProbeReport } from '@deepseek-ai/dsh-evolution-core'
 
 /** D-6 (v18): exact-segment tail match (the loose substring form matched a
  * hypothetical `dsh-evolution-allowlist`). */
@@ -30,6 +30,30 @@ export interface PresetFreshnessRow {
   status: 'fresh' | 'differs' | 'absent' | 'unknown'
   /** Why the comparison could not run — set on unknown rows only. */
   detail?: string
+}
+
+/** S0-4 (v43 G-1 / J-1): the session-scoped rows against the runtime witness.
+ *
+ * The gate has two halves nobody reconciled: the bundle turns `sessionScoped` on
+ * for `evolution-review` and `skill-usage`, and the runtime witness knows
+ * whether ANY session ever saw the family's model tools. `never-hit` with the
+ * rows mounted is a finding — the host-only form mounts no model row at all
+ * (tool-memory / tool-skill-manage are devDependencies of evolution-host) and an
+ * overlay may disable either row, so review injection and skill-usage telemetry
+ * run for nobody. `idle` claims nothing: the gate simply has not been asked yet
+ * in this process. Read-only, like every other row of this report. */
+export interface ScopedProbeCheck {
+  /** The scoped rows the installed bundles mount (`evolution-review`,
+   * `skill-usage`); empty when no bundle is installed, and null when a DEGRADED
+   * bundle read makes the set undecidable — an unreadable manifest is not
+   * evidence of absence (the INST-01 / S2.1 discipline). */
+  rows: string[] | null
+  /** The runtime witness, verbatim (`scopedProbeReport()`). */
+  verdict: ScopedProbeReport['verdict']
+  /** Scoped gate evaluations that resolved true. */
+  hits: number
+  /** Scoped gate evaluations that resolved false. */
+  misses: number
 }
 
 export interface DoctorReport {
@@ -72,6 +96,10 @@ export interface DoctorReport {
    * upgrade leaves a file describing a platform that no longer exists. Read-only:
    * a stale snapshot is reported, never repaired. */
   presetFreshness: PresetFreshnessRow[]
+  /** S0-4 (v43 G-1 / J-1): the scoped rows × the probe witness, so a deployment
+   * whose cross-session consumers are inert for every session stops looking
+   * healthy. See {@link ScopedProbeCheck}. */
+  scopedProbe: ScopedProbeCheck
   actions: string[]
 }
 
@@ -491,6 +519,15 @@ export async function diagnose(
   // `all` to add it again (the double mount INST-01 exists to prevent).
   const undecidable = mountConflicts.length !== conflicts.length
 
+  // S0-4 (v43 G-1 / J-1): the scoped half of the report. `reviewMounted` is the
+  // bundle-derived presence of both scoped rows (every bundle that carries one
+  // carries the other), and an undecidable bundle read must not render as "none
+  // mounted" — the same fail-closed direction INST-01 / S2.1 set for bundles.
+  const scopedProbe: ScopedProbeCheck = {
+    rows: undecidable ? null : reviewMounted ? ['evolution-review', 'skill-usage'] : [],
+    ...scopedProbeReport(),
+  }
+
   const actions: string[] = []
   if (mountConflicts.length > 0) actions.push('Resolve the conflict first: keep exactly one of evolution-all / evolution-host / evolution-preset / layered.')
   else if (undecidable) actions.push('The install form is UNDECIDABLE (see the DEGRADED row above): an unreadable profiles directory or profile manifest hides whatever is installed, so this report must not add or remove a bundle. Fix the reported read failure, then re-run /evolution doctor.')
@@ -509,6 +546,13 @@ export async function diagnose(
   // the pending-view hint and the approve surface.
   const memoryIssues = memoryInterpolationIssues(home)
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
+  // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
+  // answers per session BY DESIGN, so an all-false process looks exactly like a
+  // deployment where every session is an original-preset session; only the row
+  // set plus the witness separates them, and each shape needs a different move.
+  if (scopedProbe.rows !== null && scopedProbe.rows.length > 0 && scopedProbe.verdict === 'never-hit') {
+    actions.push('The session-scoped rows are mounted but the family-tool probe has never matched in this process — review injection and skill-usage telemetry skipped every session observed. HOST-ONLY install: the model rows (tool-memory / tool-skill-manage) sit in evolution-host devDependencies, so no session carries them; install a bundle that mounts them (see INSTALL.md). VARIANT install: only a session on the Evolution preset matches, so open one — a session on a platform original preset is the intended skip, not a fault. Either way, check that no profile overlay disables those two rows.')
+  }
   if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended. For a verified orphan (this build: S2-P2-22), /evolution release <id> returns it to the pending window instead.`)
 
   // G3-② (B2): only `differs` is actionable — the file is stale, not broken,
@@ -522,8 +566,32 @@ export async function diagnose(
 
   return {
     installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, services,
-    pendingCount, executingCount, presetFreshness, actions,
+    pendingCount, executingCount, presetFreshness, scopedProbe, actions,
   }
+}
+
+/** S0-4 (v43 G-1 / J-1): the scoped-row reconciliation line. The verdict is the
+ * runtime witness, the row set is what this home installs, and the two forms are
+ * spelled out because they read identically in the numbers (`never-hit`) while
+ * needing opposite responses: under the host-only form nothing can ever match,
+ * under the variant form the match arrives with the first Evolution-preset
+ * session.
+ * @param check - the report's scoped-row check.
+ * @returns one line, or the earlier diagnostic when either half is unknown. */
+function scopedProbeLine(check: ScopedProbeCheck): string {
+  if (check.rows === null) {
+    return `scoped rows: (undecidable), probe=${check.verdict} — a DEGRADED bundle read hides which bundles are installed, so the scoped rows cannot be reconciled with the probe`
+  }
+  if (check.rows.length === 0) {
+    return `scoped rows: (none mounted), probe=${check.verdict} — no installed bundle carries the session-scoped rows (evolution-review / skill-usage), so the gate is inactive here`
+  }
+  const rows = check.rows.map(row => `${row}=on`).join('/')
+  const detail = check.verdict === 'hit'
+    ? `${check.hits} scoped evaluation(s) carried the family tools`
+    : check.verdict === 'never-hit'
+      ? `${check.misses} scoped evaluation(s) resolved false — review injection and skill-usage telemetry are inert for every session observed; HOST-ONLY installs reach this because tool-memory / tool-skill-manage are not dependencies of evolution-host, VARIANT installs only match once a session runs the Evolution preset`
+      : 'the gate has not evaluated a session in this process yet — no session event has reached it since startup'
+  return `scoped rows: ${rows}, probe=${check.verdict} (${detail})`
 }
 
 export function renderDoctorText(report: DoctorReport): string {
@@ -535,6 +603,9 @@ export function renderDoctorText(report: DoctorReport): string {
     // docblock's promise, so a multi-profile machine cannot pass disk evidence
     // off as a mounted service.
     `services: review=${report.services.review} (inferred from bundles, all profiles) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
+    // S0-4 (v43 G-1 / J-1): appended beside the service line it qualifies; the
+    // existing lines keep their order and wording.
+    scopedProbeLine(report.scopedProbe),
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
     `executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`,
   ]
