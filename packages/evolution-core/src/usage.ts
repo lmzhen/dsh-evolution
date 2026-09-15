@@ -206,7 +206,13 @@ export async function mutateUsage(
         // the freeze now says so — the old silence was indistinguishable from
         // a dead pipeline.
         if (typeof record.version === 'number' && record.version > 1) {
-          options.onQuarantine?.(`usage sidecar ${usageFile(root)} carries schema version ${String(record.version)} (> this runtime) — writes stay frozen and the bytes preserved until the runtime is upgraded`)
+          // S3-5 (J-6): the SAME refusal its siblings report. Handing the message
+          // to `onQuarantine` alone made the freeze silent whenever the caller had
+          // no callback — the one artifact of the four whose version refusal could
+          // go unreported (pinned by tests/version-policy-uniformity.spec.ts).
+          const message = `usage sidecar ${usageFile(root)} carries schema version ${String(record.version)} (> this runtime) — writes stay frozen and the bytes preserved until the runtime is upgraded`
+          if (options.onQuarantine !== undefined) options.onQuarantine(message)
+          else console.warn(message)
           shapePreserved = true
         } else if (Object.values(record).some(isMalformed)) {
           // P2-9 (v19): keep the original bytes in a quarantine copy, warn,
