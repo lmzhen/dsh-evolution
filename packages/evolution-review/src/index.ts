@@ -1573,7 +1573,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (updated.stale === true) return staleRefusal(updated, name, op.file_path)
         // v30 TSM-04: keep the mutation-maturity accounting aligned with the
         // runner path, which bumps patch_count for every content write.
-        if (updated.ok) {
+        // v43 audit (FLOW4-2 / D-1): a NO-OP write must not be recorded. The
+        // skill-store result for unchanged content is { ok: true, noop: true,
+        // 'nothing written' }, and recording it bumped patch_count AND refreshed
+        // last_patched_at — the recency factor then read 1 for 30 days and
+        // suppressed the low-quality warn for a skill nobody touched. The tool
+        // channel guards on result.noop !== true; this path must match it.
+        if (updated.ok && updated.noop !== true) {
           const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
           await usageRegistry?.record?.(name, 'patch').catch(() => {})
         }
@@ -1585,7 +1591,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // first-occurrence-only, so the plan's intent silently shrank).
         const patched = await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', op.replace_all === true, origin)
         // v30 TSM-04: same accounting parity as the runner path.
-        if (patched.ok) {
+        // v43 audit (FLOW4-2 / D-1): same no-op guard as the update path — an
+        // unchanged old_string/new_string pair writes nothing and must not read
+        // as activity.
+        if (patched.ok && patched.noop !== true) {
           const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
           await usageRegistry?.record?.(name, 'patch').catch(() => {})
         }
@@ -1624,7 +1633,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const removedSupport = await library.removeSupportFile(name, op.file_path ?? '', origin, anchor)
         if (removedSupport.stale === true) return staleRefusal(removedSupport, name, op.file_path)
         // v30 TSM-04 parity: support-file removals mutate the skill package.
-        if (removedSupport.ok) {
+        // v43 audit (FLOW4-2 / D-1): a support-file removal that changed
+        // nothing (noop) is not a mutation either.
+        if (removedSupport.ok && removedSupport.noop !== true) {
           const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
           await usageRegistry?.record?.(name, 'patch').catch(() => {})
         }
