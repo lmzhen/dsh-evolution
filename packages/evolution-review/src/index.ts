@@ -25,6 +25,13 @@ import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 import { SessionScopedState } from './session-state.ts'
 
+/** S2-6 (FLOW1-1): how long a subagent handle may keep the in-flight window
+ * open AFTER its own review timeout, before the review abandons it. Caps the
+ * wait at the review timeout itself so a short (test) budget stays short. */
+const REVIEW_SETTLE_MARGIN_MS = 5_000
+/** Error name marking the S2-6 watchdog expiry (see the catch in trySubagentReview). */
+const REVIEW_SETTLE_TIMEOUT = 'ReviewSettleTimeout'
+
 export const name = 'evolution-review'
 export const inject = ['agents']
 
@@ -892,6 +899,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // abandoned op may still land WITHOUT any record, and the fallback inject
   // re-opens the concurrent-writer window until its IO settles (bounded by
   // the underlying IO error handling). The catch below warns explicitly.
+  // S2-6 (FLOW1-1): the platform's abort is not guaranteed to settle the run
+  // handle. `run.result` / `run.dispose` used to be awaited WITHOUT a bound, so
+  // a handle that never settles after the abort left `reviewInFlight` set for
+  // the process lifetime: every later turn deferred instead of reviewing, the
+  // deferred queue never drained, and nothing said so. The watchdog gives the
+  // handle one more margin — capped by the review timeout, so a short test
+  // budget stays short — and its rejection carries REVIEW_SETTLE_TIMEOUT so the
+  // catch below can emit review-error for exactly this case.
+  const settleBudgetMs = (): number => Math.min(config.reviewTimeoutMs, REVIEW_SETTLE_MARGIN_MS)
+  const withSettleWatchdog = <T>(promise: Promise<T>, label: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const ms = settleBudgetMs()
+      const timer = setTimeout(() => {
+        const error = new Error(`dsh-evolution-review: ${label} did not settle within ${ms}ms of the review timeout — abandoning the handle`)
+        error.name = REVIEW_SETTLE_TIMEOUT
+        reject(error)
+      }, ms)
+      promise.then(
+        (value) => { clearTimeout(timer); resolve(value) },
+        (error: unknown) => { clearTimeout(timer); reject(error instanceof Error ? error : new Error(String(error))) },
+      )
+    })
+
   const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => { reject(new Error(`dsh-evolution-review: ${label} timed out after ${ms}ms`)) }, ms)
@@ -1076,7 +1106,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // Everything after start() sits in a try/finally so the child run is
       // disposed on every exit path (success, timeout, validation throw).
       try {
-        const result = await run.result
+        const result = await withSettleWatchdog(run.result, 'subagent review result')
         if (!result.structured) {
           // E-59c: a started subagent that produced no structured plan is NOT a
           // success — the review never happened, so surface review-error and
@@ -1230,7 +1260,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // leaked the child session. Dispose failures stay observable without
         // masking the pipeline error that caused the exit.
         try {
-          await run.dispose()
+          // S2-6: bounded too — a dispose that never settles would hang the
+          // finally itself and leave reviewInFlight set.
+          await withSettleWatchdog(run.dispose(), 'subagent dispose')
         } catch (disposeError) {
           ctx.logger.warn(`dsh-evolution-review: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
         }
@@ -1240,6 +1272,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // visible. Log the reason so a silent "review never fires" is debuggable,
       // and fall through to the synchronous inject path (caller returns false).
       ctx.logger.warn(`dsh-evolution-review: subagent review failed: ${error instanceof Error ? error.message : String(error)}`)
+      // S2-6 (FLOW1-1): the watchdog path is the one failure that must be
+      // visible as a review-error — the platform never settled the handle, so
+      // this turn's review is lost and the caller falls back to inject.
+      if (error instanceof Error && error.name === REVIEW_SETTLE_TIMEOUT) {
+        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
+          ctx.logger.warn(`dsh-evolution-review: review-error emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+        }
+      }
       // v21 (R-1): a plan-execution timeout abandons the write leg mid-flight —
       // the result notice and plan-applied emit live AFTER the awaited call
       // and never run for it. Say so: the abandoned op may still land WITHOUT
