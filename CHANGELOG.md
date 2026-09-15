@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.81 (patch) — 会话面缺陷收口：无 agent 调用不再崩、评审投递就地合并
+
+> 本版来自 0.3.80 的安装后功能核查：一处命令面裸崩溃（脚本/无会话调用者）、一处注入队列堆积（长忙期同一条评审提示被重复入队）。
+> 两处都在发布前拿到源码路径级归因与新增回归；无接口破坏、无新配置项。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-commands` | **E-305**：`/evolution learn` 等需要会话通道的分支此前裸解引用 `invocation.agent`——脚本/无会话调用者拿到的是 `TypeError: Cannot read properties of undefined (reading 'followup')`，而兄弟分支都答文档化的 E-3xx。现由**一个** `agentMissing(need)` 断言器统一作答（含原因与补救：从会话内运行）；唤醒原语仍**在接收者上调用**（N13b / 0.3.73 的接收者丢失教训），既不选进局部变量，宿主两原语都缺时也答同一条 E-305 而不是第二次崩溃；`restructure` 同源的 `invocation.agent.session` 解引用一并收口——session 变可选，且`willStage` 在无 session 时**拒绝** staging（staged 写必须能指名会话），退化为直接写而不是崩或落一条无归属记录 |
+| `evolution-review` | **投递就地合并**：`deliverMessage` 在 append 之前读平台公开的 `agent.inbox.nextTurn/nextStep`，命中**同 kind**（`source.plugin + form + summary`）的待发通知则 `replace(id, message)` 就地换新——长忙期同一条 cadence 评审提示不再被重复排队（`next-turn` 每轮只取一条，重复入队＝之后连开多轮）。合并成功即视为投递成功：调用方的 latch 照常消费、`reviewPrompt` 照常标记评审通道，但**不设** `skipNextCadenceFire`（本次没有唤醒任何轮）。异 kind／异插件照常并排排队；`replace` 返回 `false`（已被某步取走）、宿主无 `inbox`、访问器抛错一律**回退**到原 `followup`/`inject` 分支 |
+| docs | 修正 0.3.80 节自相矛盾的一行（变更表新增 `/evolution release <id>`，"明确不做"却称不新增该命令面） |
+
+### 明确不做
+
+- 投递不做「静默等待 0.5–2s 再判定」的 pending 门：同队列的读与写都是同步的，只要中间不 `await` 就没有 TOCTOU，定时器只会引入不确定性，也修不了「已被取走」；
+- 不区分 `agent/inbox/claimed` 与 `discarded` 来做投递决策：两者载荷相同（只有 `{message}`），**用户手动删除**与 `cancel()` 清队不可区分，据此重投会与用户意图对撞；
+- `evolution-commands` 的 learn 唤醒不做合并：它由用户显式命令触发、一次一条，不存在重复堆积。
+
+### 验证
+
+- 新增回归：`commands.spec.ts` 无 agent 调用答 E-305 而非抛错；`review.spec.ts` 三条合并用例（就地替换且不追加＋计数归零 / 异 kind 与异插件照常排队 / `replace` 被拒仍另发一条），夹具新增 `inbox` 选项；
+- 门禁 10/10（`D:/dsh/audit-v42/release-0.3.81-*`）：tsc-host 0 / oxlint 0-0 / vitest **132 文件 1298 用例** / 四守卫 / 两校验器 / `mirror-sync differ=0`。
+
 ## 0.3.80 (patch) — 架构分层优化：审计收口（3×P1 + 行为级 P2 + 契约对齐）
 
 > 本版按《架构分层优化计划》（2026-09-15）实施：阶段 0 微修复、阶段 1 三项 P1 收口、
