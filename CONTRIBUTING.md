@@ -81,6 +81,7 @@ Run from the two trees (never reorder or rename these steps):
 | 13 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.1.5-rc.2` | mirror |
 | 14 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |
 | 15 | `node packages/scripts/verify-family-tool-names.mjs packages --strict` | mirror |
+| 16 | `node packages/scripts/verify-skill-roots.mjs packages --strict` | mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a
