@@ -589,6 +589,30 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
     }
   })
 
+  it('R-2 (source-first review): a probe that THROWS synchronously is a finding, not a crash', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-syncthrow-'))
+    try {
+      // A mounted-but-broken service can throw before it ever returns a promise;
+      // the probe must capture that exactly like a rejection (the eager
+      // `Promise.resolve(service.list())` form let it escape and crash doctor).
+      // A TRUE synchronous throw: the service object's method itself throws,
+      // before any promise exists (the async-arrow stub form would only produce a
+      // rejection, which the eager `Promise.resolve(service.list())` shape already
+      // handled — see the discriminating check in the commit).
+      const throwingView = {
+        get: (name: string) => name === 'sessionQuery'
+          ? { listSessions: (): never => { throw new Error('session-query service is not initialised') } }
+          : undefined,
+      }
+      const report = await diagnose(throwingView, { home })
+      expect(report.queryIssues).toHaveLength(2)
+      expect(report.queryIssues[0]).toContain('session-query service is not initialised')
+      expect(renderDoctorText(report)).toContain('session search:')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('S4 (P-1/P-2): a degraded session-query corpus is reported with the isolation recipe', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-query-'))
     try {

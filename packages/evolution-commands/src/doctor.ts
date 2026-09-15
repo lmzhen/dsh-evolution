@@ -494,18 +494,19 @@ export async function diagnose(
   let pendingCount: number | null = null
   let executingCount: number | null = null
   const approvalService = ctx.get('evolutionApproval') as { list?: (status: string) => Promise<unknown[]> } | undefined
-  if (approvalService?.list) {
+  const approvalList = approvalService?.list?.bind(approvalService)
+  if (approvalList !== undefined) {
     try {
       // R-1 (same class as the session-query probe): a wedged approval service
       // must render as "unknown", not hang the command.
-      const pendingProbe = await probeBounded(Promise.resolve(approvalService.list('pending')), 'approval pending listing')
+      const pendingProbe = await probeBounded(() => approvalList('pending'), 'approval pending listing')
       const rows = pendingProbe.ok ? pendingProbe.value : undefined
       pendingCount = Array.isArray(rows) ? rows.length : null
       // v23 (AP-2): 'executing' is the one state that can NOT resolve itself —
       // a claimed-but-crashed approve is only ever cleared by an operator
       // reject. Hiding it made doctor report "pending: 0" while a stuck
       // record sat in the queue (visible only via /evolution pending).
-      const executingProbe = await probeBounded(Promise.resolve(approvalService.list('executing')), 'approval executing listing')
+      const executingProbe = await probeBounded(() => approvalList('executing'), 'approval executing listing')
       const executing = executingProbe.ok ? executingProbe.value : undefined
       executingCount = Array.isArray(executing) ? executing.length : null
     } catch {
@@ -611,18 +612,28 @@ const PROBE_TIMEOUT_MS = 5_000
  * Bound a diagnostic probe. A never-settling service is a FINDING, not a hang:
  * the probe reports it like any other failure.
  *
- * @param promise - the probe's work.
+ * Takes a THUNK, not a promise (review R-2): a mounted-but-broken service can
+ * throw synchronously, and `probeBounded(Promise.resolve(service.list()))` would
+ * let that throw escape the probe — crashing the command instead of reporting.
+ *
+ * @param work - the probe's work, invoked inside the guard.
  * @param label - the surface being probed (named in the finding).
  * @returns the value, or a message describing the failure/timeout.
  */
-async function probeBounded<T>(promise: Promise<T>, label: string): Promise<{ ok: true; value: T } | { ok: false; message: string }> {
+async function probeBounded<T>(work: () => Promise<T>, label: string): Promise<{ ok: true; value: T } | { ok: false; message: string }> {
+  let started: Promise<T>
+  try {
+    started = work()
+  } catch (error) {
+    return { ok: false, message: `${label} failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<{ ok: false; message: string }>((resolve) => {
     timer = setTimeout(() => {
       resolve({ ok: false, message: `${label} did not answer within ${PROBE_TIMEOUT_MS}ms — the corpus is blocked (a concurrent writer can stall the observation) or the service is wedged; isolate the most recently written session and re-run` })
     }, PROBE_TIMEOUT_MS)
   })
-  const settled = promise.then(
+  const settled = started.then(
     (value): { ok: true; value: T } => ({ ok: true, value }),
     (error: unknown): { ok: false; message: string } => ({ ok: false, message: `${label} failed: ${error instanceof Error ? error.message : String(error)}` }),
   )
@@ -646,10 +657,14 @@ async function probeBounded<T>(promise: Promise<T>, label: string): Promise<{ ok
  */
 async function sessionQueryIssues(ctx: { get(name: string): unknown }): Promise<string[]> {
   const service = ctx.get('sessionQuery') as { listSessions?: (signal?: AbortSignal) => Promise<unknown> } | undefined
-  if (service?.listSessions === undefined) return []
+  // Bind the receiver: the platform's service methods are prototype methods and a
+  // detached reference loses `this` (the family's N13b rule, learned on the
+  // platform Agent's send()/followup()).
+  const list = service?.listSessions?.bind(service)
+  if (list === undefined) return []
   // R-1: bounded — the listing path is precisely what a concurrent writer stalls,
   // so an unbounded await here would hang the command on the state it reports.
-  const outcome = await probeBounded(Promise.resolve(service.listSessions()), 'session-query listing')
+  const outcome = await probeBounded(() => list(), 'session-query listing')
   if (!outcome.ok) {
     return [
       outcome.message,
