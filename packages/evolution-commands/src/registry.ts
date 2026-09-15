@@ -17,6 +17,7 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { usage: 'pending [--detail]', summary: 'list staged evolution writes (--detail shows staged args)' },
   { usage: 'approve <id>', summary: 'replay an approved staged write through its runner' },
   { usage: 'reject <id>', summary: 'drop a staged write without running it' },
+  { usage: 'release <id>', summary: 'return an orphaned EXECUTING write to the pending window (verify the effect first, then approve or reject)' },
   { usage: 'doctor [--json]', summary: 'read-only self-check: install form, conflicts, env, services (--json feeds scripts)' },
   { usage: 'curator run|pause|resume|status|report|scope', summary: 'run one curation pass, control or inspect automatic curation' },
   { usage: 'mutations', summary: 'list skill-mutation audit records' },

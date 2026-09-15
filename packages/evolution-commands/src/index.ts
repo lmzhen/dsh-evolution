@@ -145,7 +145,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // and claimed executing before snapshot 2 appeared TWICE. Dedupe by
           // id with the later snapshot (executing) winning; pending-first
           // ordering preserved.
-          const listed = approval ? [...await approval.list('pending'), ...await approval.list('executing')] : []
+          // S1-F2: an unmounted approval service is NOT an empty queue — it
+          // used to render as the success line below, so a degraded assembly
+          // read "service unavailable" as "nothing in flight". Match the
+          // E-301 posture of approve/reject instead.
+          if (!approval) return err('E-301: approval service not mounted — pending writes cannot be listed or replayed. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.')
+          const listed = [...await approval.list('pending'), ...await approval.list('executing')]
           const pending = [...new Map(listed.map(row => [row.id, row])).values()]
           if (pending.length === 0) return ok('No pending evolution writes.')
           // F-328: `--detail` renders each record's staged args so an operator
@@ -171,6 +176,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input.startsWith('reject ')) {
           const id = input.slice(7).trim()
           const result = approval ? await approval.reject(id) : { ok: false, message: 'E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.' }
+          return result.ok ? ok(result.message) : err(result.message)
+        }
+        if (input.startsWith('release ')) {
+          // S2-P2-22: the operator exit for an ORPHANED executing record (an
+          // approve that crashed mid-run) — returns it to the pending window
+          // so it can be deliberately re-approved or rejected. A record whose
+          // approve is still running in this process is refused (the in-flight
+          // check lives in the approval service); the single-instance claim
+          // rules out any other live process holding it.
+          const id = input.slice(8).trim()
+          if (!approval) return err('E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.')
+          if (!approval.release) return err('E-304: the mounted approval service predates the release capability — reject the record instead.')
+          const result = await approval.release(id)
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'curator run') {

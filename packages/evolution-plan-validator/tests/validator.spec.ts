@@ -52,6 +52,22 @@ describe('evolution-plan-validator', () => {
     expect(mem.rejected[0]?.reason).toContain('forbidden field staged_from_sha256')
   })
 
+  it('S1-C1: patch ops may carry a boolean replace_all; a non-boolean is rejected', () => {
+    // The tool channel documents replace_all to the model; the validator used
+    // to neither know nor reject the field while the executor hardcoded
+    // first-occurrence-only — a plan carrying it shrank silently.
+    const ok = validateEvolutionPlan({
+      skillOps: [{ action: 'patch', name: 'a', old_string: 'x', new_string: 'y', replace_all: true, evidence: [{ event_seq: 1 }] }],
+    }, { sessionSeq: 10 })
+    expect(ok.ok).toBe(true)
+    expect(ok.accepted.skillOps).toHaveLength(1)
+    const bad = validateEvolutionPlan({
+      skillOps: [{ action: 'patch', name: 'a', old_string: 'x', new_string: 'y', replace_all: 'false', evidence: [{ event_seq: 1 }] }],
+    } as never, { sessionSeq: 10 })
+    expect(bad.ok).toBe(false)
+    expect(bad.rejected[0]?.reason).toContain('replace_all must be a boolean')
+  })
+
   it('rejects malformed ops per-item instead of throwing (E-60, 0.3.17)', () => {
     const result = validateEvolutionPlan({
       memoryOps: [null, 'x', { action: 'add', target: 'memory', facts: 'ok', evidence: [{ event_seq: 1 }] }],

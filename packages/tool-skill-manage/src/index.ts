@@ -21,7 +21,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isReviewChannelSession, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, resolveOrigins, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -152,6 +152,40 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // pretending the check ran. A non-empty view without the name stays a pass (the
   // family skill is simply not published yet).
   let crossSourceViewWarned = false
+  // S1-B2: the cross-source gate as ONE function both entry points read. It
+  // used to run only on the tool path, so the approval REPLAY runner
+  // (approve → run('skill', …)) executed a staged write without re-checking —
+  // a target claimed by a higher-priority source between staging and approve
+  // still landed on the family copy under strictCrossSource. Returns the
+  // refusal message, or null to proceed (warn-only latching preserved).
+  // S2-O1: the refusal tail is phase-aware — staging advice speaks to the
+  // writer (fix the view / drop the flag), replay advice speaks to the
+  // approver (reject the record; the family copy must not take the write).
+  const crossSourceRefusal = async (rawName: unknown, phase: 'stage' | 'replay' = 'stage'): Promise<string | null> => {
+    const replay = phase === 'replay'
+    if (typeof rawName !== 'string' || rawName === '') return null
+    const probe = await catalogWinner(rawName)
+    if (isUnknown(probe)) {
+      // v39: the check could not run — say so instead of pretending it passed.
+      if (rawConfig.strictCrossSource === true) {
+        return replay
+          ? `Refused: the cross-source check could not be performed — ${probe.reason}. Reject this staged write, fix the catalog view, and re-stage "${rawName}".`
+          : `Refused: the cross-source check could not be performed — ${probe.reason}. Fix the catalog view (or drop strictCrossSource) before writing "${rawName}".`
+      }
+      if (!crossSourceViewWarned) {
+        crossSourceViewWarned = true
+        ctx.logger.warn(`skill_manage: cross-source check skipped for this session — ${probe.reason}`)
+      }
+      return null
+    }
+    if (isPresent(probe) && probe.value !== undefined && probe.value.provider !== 'dsh-evolution') {
+      const winner = probe.value
+      const message = `skill "${rawName}" resolves to a higher-priority "${winner.source}" skill (provider "${winner.provider}"); this write lands on the family copy, which the catalog does NOT serve — edit the "${winner.source}" copy or rename.`
+      if (rawConfig.strictCrossSource === true) return `Refused: ${message}`
+      ctx.logger.warn(`skill_manage: ${message}`)
+    }
+    return null
+  }
   // `Probe` (v41 phase-1 follow-up) replaces the { winner, unverifiable } PAIR:
   // that shape allowed the illegal combination (a winner AND an unverifiable
   // reason), so "the check could not run" and "there is no winner" were only
@@ -488,7 +522,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // header carries no origin — the family mark (core review-channel.ts) is
       // what identifies the review's own writes there, resolving to the same
       // origins the subagent executor uses. Unmarked sessions are unchanged.
-      const origins = resolveOrigins(exec.agent?.session?.header.origin, isReviewChannelSession(exec.agent?.session?.id))
+      // S1-B1: resolution moved into core's resolveExecOrigins (one table both
+      // write tools read); behavior here is unchanged.
+      const origins = resolveExecOrigins(exec)
       const reviewOrigin = origins.approval
       const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
@@ -502,24 +538,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // skill not yet published) or a discovery failure writes family-local
       // exactly as before.
       if (typeof args.name === 'string' && args.name !== '' && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
-        const probe = await catalogWinner(args.name)
-        if (isUnknown(probe)) {
-          // v39: the check could not run — say so instead of pretending it passed.
-          if (rawConfig.strictCrossSource === true) {
-            return { ok: false, message: `Refused: the cross-source check could not be performed — ${probe.reason}. Fix the catalog view (or drop strictCrossSource) before writing "${args.name}".`, skills: [] }
-          }
-          if (!crossSourceViewWarned) {
-            crossSourceViewWarned = true
-            ctx.logger.warn(`skill_manage: cross-source check skipped for this session — ${probe.reason}`)
-          }
-        } else if (isPresent(probe) && probe.value !== undefined && probe.value.provider !== 'dsh-evolution') {
-          const winner = probe.value
-          const message = `skill "${args.name}" resolves to a higher-priority "${winner.source}" skill (provider "${winner.provider}"); this write lands on the family copy, which the catalog does NOT serve — edit the "${winner.source}" copy or rename.`
-          if (rawConfig.strictCrossSource === true) {
-            return { ok: false, message: `Refused: ${message}`, skills: [] }
-          }
-          ctx.logger.warn(`skill_manage: ${message}`)
-        }
+        // S1-B2: the shared gate (same body the replay runner runs).
+        const refusal = await crossSourceRefusal(args.name)
+        if (refusal !== null) return { ok: false, message: refusal, skills: [] }
       }
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
@@ -579,7 +600,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
     const dispose = approval.registerRunner('skill', (args) => {
       const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; origin?: 'foreground' | 'background_review'; libraryOrigin?: 'foreground' | 'subagent' | 'background_review' }
-      return executeCore(wrapped.operation ?? {}, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
+      const operation = wrapped.operation ?? {}
+      // S1-B2: the replay re-runs the cross-source gate the tool path ran at
+      // staging time — the catalog ranking may have changed while the write
+      // sat pending. Same action exemptions as the tool path.
+      const replayAction = operation.action
+      if (replayAction !== 'list' && replayAction !== 'review' && replayAction !== 'pin' && replayAction !== 'unpin') {
+        return crossSourceRefusal(operation.name, 'replay').then((refusal) => {
+          if (refusal !== null) return { ok: false, message: `${refusal} (re-checked at approve time: the catalog ranking changed while the write was staged)`, skills: [] }
+          return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
+        })
+      }
+      return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
     })
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })

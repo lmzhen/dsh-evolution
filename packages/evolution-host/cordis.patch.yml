@@ -33,13 +33,18 @@
       name: '@deepseek-ai/dsh-evolution-state-json'
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-state'
-      # No `provider` pin on purpose (V10-16 pinned it only in the standalone
-      # cordis.yml): the registry has NO fallback, so the effective provider is
-      # whichever row registered first. With `evolution-state-domain` disabled
-      # above that is always `json`; an overlay that ENABLES domain makes
-      # `domain` (row order: earlier than json) the implicit default. Pin
-      # `config: { provider: json|domain }` in a profile overlay to make the
-      # choice explicit.
+      # S1-D1 (0.3.80): the medium is PINNED explicitly. The row used to carry
+      # no pin on purpose (V10-16): the registry has NO fallback, so the
+      # effective provider was whichever row registered first — json while the
+      # domain row above stays `disabled: true`, but any overlay that merely
+      # ENABLED the domain row silently switched the family's whole state
+      # medium to an empty domain (pending list blank, approvals unresolvable,
+      # historical json state invisible) with a single ambiguous-provider warn
+      # as the only signal. The pin makes json the deterministic shipped
+      # default; switching to domain is a deliberate overlay override of THIS
+      # row's config (`provider: domain` — the config replaces wholesale).
+      config:
+        provider: json
 
     # ── memory seam: registry and provider, no model tool ───────────────────
     - id: memory

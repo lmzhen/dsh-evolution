@@ -116,8 +116,7 @@ See templates/tpl.md for the template.
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
-it('V10-01 (P2-2): reference mode APPENDS to an existing demotion file — two consolidates never lose the first content', async () => {
-  const { root, lib } = await make()
+it('V10-01 (P2-2): reference mode APPENDS to an existing demotion file — two consolidates never lose the first content', async () => {  const { root, lib } = await make()
   expect((await lib.consolidate('umbrella', ['narrow-a'], 'background_review', { mode: 'reference' })).ok).toBe(true)
   // The rebuild half of "consolidate → rebuild → re-consolidate": the source
   // comes back (same name), the old demotion file is still in references/.
@@ -128,6 +127,31 @@ it('V10-01 (P2-2): reference mode APPENDS to an existing demotion file — two c
   // silently cleared them, leaving exactly one demotion comment).
   expect(demoted.match(/<!-- demoted from narrow-a at /g)?.length).toBe(2)
   expect(demoted).toContain('Body of narrow-a.')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('S1-E1: a merge that fails validation AFTER the sources were archived rolls every source back', async () => {
+  // The two-phase commit used to `return` on the post-archive validation
+  // failure, which skips the catch's rollback — every source stayed in
+  // .archive while the message implied the merge had merely been refused.
+  const { root, lib } = await make()
+  // Each source is individually valid (~55k chars) but the merged body
+  // (umbrella + both) exceeds MAX_SKILL_CONTENT_CHARS (100_000).
+  const fat = (name: string) => `---\nname: ${name}\ndescription: ${name} fat body\n---\n\n${'x'.repeat(55_000)}\n`
+  await lib.update('narrow-a', fat('narrow-a'), 'foreground')
+  await lib.update('narrow-b', fat('narrow-b'), 'foreground')
+  const result = await lib.consolidate('umbrella', ['narrow-a', 'narrow-b'], 'background_review')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('exceeds')
+  expect(result.message).toContain('rolled back')
+  // Both sources are back in the live tree and OUT of .archive.
+  expect(await lib.read('narrow-a')).not.toBeNull()
+  expect(await lib.read('narrow-b')).not.toBeNull()
+  expect(await lib.read('narrow-a')).toContain('x'.repeat(1000))
+  expect(await nodeExists(join(root, '.archive', 'narrow-a'))).toBe(false)
+  expect(await nodeExists(join(root, '.archive', 'narrow-b'))).toBe(false)
+  // The umbrella itself is untouched.
+  expect(await lib.read('umbrella')).toBe(body('umbrella'))
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

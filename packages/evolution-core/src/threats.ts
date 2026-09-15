@@ -148,12 +148,16 @@ const BIDI_CHARS = /[\u202a-\u202e\u2066-\u2069]/
 const FORMAT_CONTROL_CLASS = '\\p{Cf}\\p{Zl}\\p{Zp}\\u0000\\u2065\\ufff0-\\ufff8\\u{e0080}-\\u{e00ff}'
 const FORMAT_CONTROL_TEST = new RegExp(`[${FORMAT_CONTROL_CLASS}]`, 'u')
 
-/** S0.4 (v37 P0-3): a format control the three finding sets above do NOT report. */
+/** S0.4 (v37 P0-3): a format control the three finding sets above do NOT report.
+ * S1-E3: the ZWJ exemption compares the real character. It used to read
+ * `'\\u200d'` — a 6-character literal that never equals a code point — so the
+ * branch was dead and every emoji ZWJ sequence (👨‍👩‍👧) raised the report-level
+ * `unicode_format_control` finding the class comment above promises it will not. */
 function hasUnreportedFormatControl(text: string): boolean {
   for (const character of text) {
     if (!FORMAT_CONTROL_TEST.test(character)) continue
     if (ZERO_WIDTH_CHARS.test(character) || TYPOGRAPHY_CHARS.test(character) || BIDI_CHARS.test(character)) continue
-    if (character === '\\u200d') continue
+    if (character === '\u200d') continue
     return true
   }
   return false

@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, resolveOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -101,7 +101,14 @@ export const Config: z<Config> = z.object({
 })
 
 export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void> {
-  if (!rawConfig.memoryEnabled) return
+  // S1-B3: with the tool disabled, prior staged memory writes used to become
+  // permanently unreachable — approve fell through to "No replay runner
+  // registered" and released the claim back to `pending` with no way forward.
+  // The flag gates only the MODEL-FACING surface (tool + prompt injection);
+  // the trailing approval-runner inject below runs in BOTH modes, so a staged
+  // write from a pre-disable session is either replayed or EXPLICITLY refused
+  // — never orphaned in the pending view.
+  const memoryDisabled = rawConfig.memoryEnabled === false
   // V6-06 (0.3.35): assembly-time clamp — a 0/negative/NaN/±Infinity value
   // falls back to the default instead of turning every echoed entry into a
   // tail slice (`slice(0, negative)` inverted the preview) or an empty string
@@ -126,13 +133,15 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     context(context: PromptContext): () => void
   } | undefined
   let snapshotText = ''
-  try {
-    snapshotText = await ctx.memory.renderContext()
-  } catch (error) {
-    ctx.logger.warn(`tool-memory: memory provider not ready at mount; snapshot starts empty until the first write: ${error instanceof Error ? error.message : String(error)}`)
+  if (!memoryDisabled) {
+    try {
+      snapshotText = await ctx.memory.renderContext()
+    } catch (error) {
+      ctx.logger.warn(`tool-memory: memory provider not ready at mount; snapshot starts empty until the first write: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
-  if (systemPrompt) {
+  if (systemPrompt && !memoryDisabled) {
     ctx.effect(() => systemPrompt.section({
       name: 'evolution:memory-guidance',
       order: MEMORY_GUIDANCE_SECTION_ORDER,
@@ -156,7 +165,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       }
     }
     ctx.effect(() => ctx.on('evolution/memory-applied', () => { void refreshSnapshot() }), 'tool-memory.snapshot-refresh')
-  } else {
+  } else if (!memoryDisabled) {
     ctx.logger.warn('tool-memory: systemPrompt service not mounted; memory guidance and snapshot are not injected (the write tool still works)')
   }
 
@@ -213,145 +222,157 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     }
   }
 
-  ctx.tools.register(defineTool({
-    name: 'memory',
-    description: MEMORY_TOOL_DESCRIPTION,
-    parameters: {
-      target: { type: 'string', enum: ['memory', 'user'], required: true },
-      action: { type: 'string', enum: ['add', 'replace', 'remove'] },
-      facts: { type: 'string' },
-      content: { type: 'string' },
-      old_text: { type: 'string' },
-      operations: {
-        type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            action: { type: 'string', enum: ['add', 'replace', 'remove'], required: true },
-            facts: { type: 'string' },
-            content: { type: 'string' },
-            old_text: { type: 'string' },
+  // S1-B3: gated on memoryDisabled — a disabled tool must not appear in the
+  // catalog. (The approval runner below registers in both modes.)
+  if (!memoryDisabled) {
+    ctx.tools.register(defineTool({
+      name: 'memory',
+      description: MEMORY_TOOL_DESCRIPTION,
+      parameters: {
+        target: { type: 'string', enum: ['memory', 'user'], required: true },
+        action: { type: 'string', enum: ['add', 'replace', 'remove'] },
+        facts: { type: 'string' },
+        content: { type: 'string' },
+        old_text: { type: 'string' },
+        operations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              action: { type: 'string', enum: ['add', 'replace', 'remove'], required: true },
+              facts: { type: 'string' },
+              content: { type: 'string' },
+              old_text: { type: 'string' },
+            },
           },
         },
       },
-    },
-    output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          ok: { type: 'boolean', required: true },
-          message: { type: 'string', required: true },
-          entries: { type: 'array', required: true, items: { type: 'string' } },
-          chars: { type: 'integer', required: true },
-          limit: { type: 'integer', required: true },
-          pending_id: { type: 'string' },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            ok: { type: 'boolean', required: true },
+            message: { type: 'string', required: true },
+            entries: { type: 'array', required: true, items: { type: 'string' } },
+            chars: { type: 'integer', required: true },
+            limit: { type: 'integer', required: true },
+            pending_id: { type: 'string' },
+          },
         },
+        render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
       },
-      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
-    },
-    isConcurrencySafe: () => false,
-    // F-06: `session` is optional in the exec contract too — the
-    // defensive chaining below is only honest if the type says so.
-    async execute(args, exec: { agent?: { session?: { id: string; header: { origin?: string }; events?: readonly unknown[] } } }) {
-      // facts and content are the same field under two names; a differing pair
-      // is ambiguous input, so fail loud instead of silently dropping one.
-      const conflict = (a: { facts?: string; content?: string }): boolean => {
-        if (a.facts === undefined || a.content === undefined) return false
-        return a.facts !== a.content
-      }
-      // V24-20a (v24): element-level shape guard — `operations: [null]` used
-      // to reach `conflict` and throw a bare TypeError (`a.facts` on null).
-      // Same "schema is not a guarantee" posture as V8-09 (array container)
-      // and D-1 (scalar fields); the approval staged-args replay path does
-      // not pass the schema, so the guard is not redundant with it.
-      if (Array.isArray(args.operations)) {
-        for (const op of args.operations) {
-          const raw: unknown = op
-          if (raw === null || typeof raw !== 'object') {
-            return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
-          }
-          if (conflict(op)) return { ok: false, message: 'Provide only one of facts or content per operation (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+      isConcurrencySafe: () => false,
+      // F-06: `session` is optional in the exec contract too — the
+      // defensive chaining below is only honest if the type says so.
+      async execute(args, exec: { agent?: { session?: { id: string; header: { origin?: string }; events?: readonly unknown[] } } }) {
+        // facts and content are the same field under two names; a differing pair
+        // is ambiguous input, so fail loud instead of silently dropping one.
+        const conflict = (a: { facts?: string; content?: string }): boolean => {
+          if (a.facts === undefined || a.content === undefined) return false
+          return a.facts !== a.content
         }
-      } else if (conflict(args)) {
-        return { ok: false, message: 'Provide only one of facts or content (same field); different values were given.', entries: [], chars: 0, limit: 0 }
-      }
-      // V7-07 (0.3.43): an EMPTY operations array is a no-op input — reject it
-      // BEFORE the approval gate (a "memory 0 ops" approval record would be
-      // staged and is meaningless to replay; the 0.3.37 V6-25 declaration
-      // assumed this check existed).
-      if (Array.isArray(args.operations) && args.operations.length === 0) {
-        return { ok: false, message: 'No operations provided (the operations array is empty).', entries: [], chars: 0, limit: 0 }
-      }
-      // F-07: a NON-ARRAY `operations` payload (garbage that slipped
-      // past the schema) used to fall into the single-operation branch, so the
-      // model received an error about the WRONG shape (e.g. "facts required")
-      // instead of the real one. Return a structured shape error before any
-      // normalization/approval; an ABSENT operations field keeps the single-op
-      // path (the documented bare action/content/old_text form).
-      if (args.operations !== undefined && !Array.isArray(args.operations)) {
-        return { ok: false, message: 'Invalid shape: operations must be an array of {action, content?, old_text?} objects (or omit operations for a single operation).', entries: [], chars: 0, limit: 0 }
-      }
-      const target = args.target === 'user' ? 'user' : 'memory'
-      const normalized: MemoryWriteArgs = Array.isArray(args.operations)
-        ? { target, operations: args.operations }
-        : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
-      // F-329 parity for single operations (V4-15): only qualify the summary's
-      // target when it differs from the default 'memory', so a lone add to the
-      // default target reads "memory add" instead of the redundant "memory
-      // memory add". The batch form already gets this through normalizeSummary
-      // (evolution-approval, only for operations.length > 1) — apply the same
-      // single-word rule here for the single-op summary.
-      const targetLabel = target === 'memory' ? '' : `${target} `
-      // Single-source origin table (rc.44 M2-2.3): the approval surface reads
-      // the delegated-subagent-as-review-channel mapping from core.
-      // F-06: the optional chain previously protected only one level
-      // (`exec.agent?.session.header.origin`) — an execution without a session
-      // object would TypeError here. Full-depth chaining matches the exec
-      // contract (agent and session are both optional).
-      const origin = resolveOrigins(exec.agent?.session?.header.origin).approval
-      const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
-      const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
-      if (approval) {
-        const decision = await approval.request({
-          kind: 'memory',
-          summary: `memory ${targetLabel}${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
-          args: normalized,
-          origin,
-          // 0.3.20 (N-1): the session id rides along so the approval service can
-          // DERIVE the platform override ('never' for unattended sessions); the
-          // tool previously sent only the self-reported policy, which the
-          // mounted platform approval service discards in favour of its own
-          // derivation — leaving CI/cron writes stuck in staging.
-          // F-06: full-depth optional chaining (see above).
-          ...exec.agent?.session?.id ? { sessionId: exec.agent.session.id } : {},
-          // V6-27 (0.3.40): the platform overrideOf resolves the policy from the
-          // session's log view — the session OBJECT, not the id, is what it can probe.
-          // F-06: full-depth optional chaining (see above).
-          ...exec.agent?.session ? { session: exec.agent.session } : {},
-          ...sessionPolicy !== undefined ? { sessionPolicy } : {},
-        })
-        if (decision.action === 'staged') {
-          // 0.3.20 (N-1-followup): no `pending_id ?? ''` — absent stays absent
-          // (mirrors the tool-skill-manage E-70 shape).
-          return {
-            ok: true,
-            message: decision.message,
-            entries: [],
-            chars: 0,
-            limit: 0,
-            ...decision.pendingId !== undefined ? { pending_id: decision.pendingId } : {},
+        // V24-20a (v24): element-level shape guard — `operations: [null]` used
+        // to reach `conflict` and throw a bare TypeError (`a.facts` on null).
+        // Same "schema is not a guarantee" posture as V8-09 (array container)
+        // and D-1 (scalar fields); the approval staged-args replay path does
+        // not pass the schema, so the guard is not redundant with it.
+        if (Array.isArray(args.operations)) {
+          for (const op of args.operations) {
+            const raw: unknown = op
+            if (raw === null || typeof raw !== 'object') {
+              return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
+            }
+            if (conflict(op)) return { ok: false, message: 'Provide only one of facts or content per operation (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+          }
+        } else if (conflict(args)) {
+          return { ok: false, message: 'Provide only one of facts or content (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+        }
+        // V7-07 (0.3.43): an EMPTY operations array is a no-op input — reject it
+        // BEFORE the approval gate (a "memory 0 ops" approval record would be
+        // staged and is meaningless to replay; the 0.3.37 V6-25 declaration
+        // assumed this check existed).
+        if (Array.isArray(args.operations) && args.operations.length === 0) {
+          return { ok: false, message: 'No operations provided (the operations array is empty).', entries: [], chars: 0, limit: 0 }
+        }
+        // F-07: a NON-ARRAY `operations` payload (garbage that slipped
+        // past the schema) used to fall into the single-operation branch, so the
+        // model received an error about the WRONG shape (e.g. "facts required")
+        // instead of the real one. Return a structured shape error before any
+        // normalization/approval; an ABSENT operations field keeps the single-op
+        // path (the documented bare action/content/old_text form).
+        if (args.operations !== undefined && !Array.isArray(args.operations)) {
+          return { ok: false, message: 'Invalid shape: operations must be an array of {action, content?, old_text?} objects (or omit operations for a single operation).', entries: [], chars: 0, limit: 0 }
+        }
+        const target = args.target === 'user' ? 'user' : 'memory'
+        const normalized: MemoryWriteArgs = Array.isArray(args.operations)
+          ? { target, operations: args.operations }
+          : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
+        // F-329 parity for single operations (V4-15): only qualify the summary's
+        // target when it differs from the default 'memory', so a lone add to the
+        // default target reads "memory add" instead of the redundant "memory
+        // memory add". The batch form already gets this through normalizeSummary
+        // (evolution-approval, only for operations.length > 1) — apply the same
+        // single-word rule here for the single-op summary.
+        const targetLabel = target === 'memory' ? '' : `${target} `
+        // Single-source origin resolution (S1-B1, on the rc.44 M2-2.3 table):
+        // core's resolveExecOrigins reads the session header origin AND the v37
+        // S2.2 review-channel session mark. This tool used to skip the mark
+        // half, so an inject-mode review's memory writes resolved as
+        // `foreground` — mislabeled in the approval queue and, under
+        // `stageForeground: false`, executing without staging at all.
+        const origin = resolveExecOrigins(exec).approval
+        const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
+        const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+        if (approval) {
+          const decision = await approval.request({
+            kind: 'memory',
+            summary: `memory ${targetLabel}${Array.isArray(args.operations) ? `${args.operations.length} ops` : (args.action ?? 'add')}`,
+            args: normalized,
+            origin,
+            // 0.3.20 (N-1): the session id rides along so the approval service can
+            // DERIVE the platform override ('never' for unattended sessions); the
+            // tool previously sent only the self-reported policy, which the
+            // mounted platform approval service discards in favour of its own
+            // derivation — leaving CI/cron writes stuck in staging.
+            // F-06: full-depth optional chaining (see above).
+            ...exec.agent?.session?.id ? { sessionId: exec.agent.session.id } : {},
+            // V6-27 (0.3.40): the platform overrideOf resolves the policy from the
+            // session's log view — the session OBJECT, not the id, is what it can probe.
+            // F-06: full-depth optional chaining (see above).
+            ...exec.agent?.session ? { session: exec.agent.session } : {},
+            ...sessionPolicy !== undefined ? { sessionPolicy } : {},
+          })
+          if (decision.action === 'staged') {
+            // 0.3.20 (N-1-followup): no `pending_id ?? ''` — absent stays absent
+            // (mirrors the tool-skill-manage E-70 shape).
+            return {
+              ok: true,
+              message: decision.message,
+              entries: [],
+              chars: 0,
+              limit: 0,
+              ...decision.pendingId !== undefined ? { pending_id: decision.pendingId } : {},
+            }
           }
         }
-      }
-      return await executeCore(normalized)
-    },
-  }))
+        return await executeCore(normalized)
+      },
+    }))
+  }
 
   ctx.inject(['evolutionApproval'], (approvalCtx) => {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
-    const dispose = approval.registerRunner('memory', args => executeCore(args as MemoryWriteArgs))
-    approvalCtx.effect(() => dispose, 'tool-memory.approval-runner')
+    // S1-B3: the runner exists in BOTH modes — replay when enabled, an explicit
+    // refusal when disabled — so a staged write can never become an unresolvable
+    // pending record ("No replay runner registered" bounce).
+    const dispose = memoryDisabled
+      ? approval.registerRunner('memory', () => Promise.resolve({
+        ok: false,
+        message: 'Refused: the memory tool is disabled (tool-memory memoryEnabled:false) — its replay runner cannot execute this staged write. Reject the record; re-stage after re-enabling the tool if the write is still wanted.',
+      }))
+      : approval.registerRunner('memory', args => executeCore(args as MemoryWriteArgs))
+    approvalCtx.effect(() => dispose, memoryDisabled ? 'tool-memory.approval-runner-disabled' : 'tool-memory.approval-runner')
   })
 }

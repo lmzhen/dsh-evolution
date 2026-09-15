@@ -36,6 +36,12 @@
       name: '@deepseek-ai/dsh-evolution-state-json'
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-state'
+      # S1-D1 (0.3.80): json medium PINNED explicitly — byte-identical to the
+      # host bundle's row (three-way drift guard). See that file for the full
+      # rationale: the unpinned row let a domain-enabling overlay silently
+      # switch the family's state medium to an empty domain.
+      config:
+        provider: json
 
     # ── memory: registry, provider, model-facing tool ───────────────────────
     - id: memory

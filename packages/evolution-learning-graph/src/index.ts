@@ -356,23 +356,42 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // The memory branches already pre-check their index the same way.
           // `memory:*` ids are MEMORY nodes (their own pre-check covers them)
           // and are exempt here.
+          // S1-F3: only a clean ENOENT reads as "not found" — the old
+          // `.catch(() => null)` folded every read failure (EACCES, EMFILE, a
+          // transient win32 hold) into the not-found refusal, misdirecting the
+          // operator toward deleting/recreating a skill that actually exists
+          // (the E-9 "unreadable ≠ absent" posture the rest of the family
+          // already follows).
           if (!edit[1].startsWith('memory:')) {
-            const stageProbe = await withSkills().read(edit[1]).catch(() => null)
-            if (stageProbe === null) return err(`Skill "${edit[1]}" not found in the live skill library — nothing to edit. (The graph may be showing a stale node.)`)
+            const stageRead = await probeSkillForStaging(edit[1])
+            if (stageRead !== null) return err(stageRead)
           }
           return await nodeEdit(edit[1], edit[2])
         }
         const remove = /^delete\s+(\S+)$/.exec(input)
         if (remove && remove[1]) {
           if (!remove[1].startsWith('memory:')) {
-            const stageProbe = await withSkills().read(remove[1]).catch(() => null)
-            if (stageProbe === null) return err(`Skill "${remove[1]}" not found in the live skill library — nothing to delete.`)
+            const stageRead = await probeSkillForStaging(remove[1])
+            if (stageRead !== null) return err(stageRead)
           }
           return await nodeDelete(remove[1])
         }
         const directory = await renderGraph()
         if (input !== '') return err(`Unknown graph subcommand "${input.split(' ')[0]}". ${directory}`)
         return ok(directory)
+
+        /** S1-F3: the pre-staging existence probe shared by edit and delete.
+         * @returns null to proceed, or the refusal line to show the operator. */
+        async function probeSkillForStaging(name: string): Promise<string | null> {
+          try {
+            const body = await withSkills().read(name)
+            if (body !== null) return null
+            return `Skill "${name}" not found in the live skill library. (The graph may be showing a stale node.)`
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error)
+            return `Skill "${name}" could not be read to verify it exists (${reason}) — refusing to stage. The skill may still exist; resolve the read failure and retry.`
+          }
+        }
 
         async function renderGraph(): Promise<string> {
           const usageReport = await usage.report()

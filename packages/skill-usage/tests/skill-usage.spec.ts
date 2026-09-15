@@ -14,6 +14,13 @@ import SkillUsageRegistry from '../src/index.ts'
 import { eventsFile, loadUsage, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
+/** S2-P2-12: a settled `tool/result` frame — view counting moved to SETTLE, so
+ * a synthetic call must be paired with its outcome to count a view. */
+const toolResult = (callId: string) => ({
+  type: 'tool/result',
+  data: { message: { source: { callId }, content: [{ type: 'tool-result', toolCallId: callId, isError: false }] } },
+}) as never
+
 describe('skill-usage', () => {
   it('records use and persists to disk', async () => {
     const root = await tempRoot('dsh-usage-')
@@ -53,6 +60,7 @@ describe('skill-usage', () => {
     const usage = ctx.skillUsage
     await usage.record('demo', 'use')
     ctx.emit('session/event', { id: 's1' } as never, { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{"name":"demo"}' } } as never)
+    ctx.emit('session/event', { id: 's1' } as never, toolResult('c1'))
     let settled = 0
     const deadline = Date.now() + 3000
     while (Date.now() < deadline) {
@@ -93,6 +101,7 @@ describe('skill-usage', () => {
     await open.plugin(SkillUsageRegistry, { root: await tempRoot('dsh-usage-scoped-on-'), sessionScoped: true })
     await open.skillUsage.record('demo', 'use')
     open.emit('session/event', { id: 's1' } as never, event as never)
+    open.emit('session/event', { id: 's1' } as never, toolResult('c1'))
     let views = 0
     const deadline = Date.now() + 3000
     while (Date.now() < deadline) {
@@ -163,9 +172,65 @@ describe('skill-usage', () => {
     // so only the real `skill` tool is a read — phantom tools must not count.
     ctx.emit('session/event', {} as never, toolCall('skill_load', { skill: 'demo-read' }))
     ctx.emit('session/event', {} as never, toolCall('skill_search', { name: 'demo-read' }))
+    // S2-P2-12: the view counts at settle — pair the `skill` call with its result.
+    ctx.emit('session/event', {} as never, toolResult('c1'))
     await ctx.skillUsage.invalidate()
     const seen = (await ctx.skillUsage.report()).get('demo-read')
     expect(seen?.view_count).toBe(1)
+  })
+
+  it('S2-P2-12: a FAILED skill read (isError result) does not count a view', async () => {
+    const root = await tempRoot('dsh-usage-failed-read-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
+    await ctx.skillUsage.ensureRecordCreated('failed-read', false)
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: JSON.stringify({ name: 'failed-read' }) },
+    } as never)
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/result',
+      data: { message: { source: { callId: 'c1' }, content: [{ type: 'tool-result', toolCallId: 'c1', isError: true }] } },
+    } as never)
+    await ctx.skillUsage.invalidate()
+    expect((await ctx.skillUsage.report()).get('failed-read')?.view_count ?? 0).toBe(0)
+  })
+
+  it('S2-P2-12: a call whose result never arrives is not counted (conservative)', async () => {
+    const root = await tempRoot('dsh-usage-never-settles-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
+    await ctx.skillUsage.ensureRecordCreated('hanging-read', false)
+    ctx.emit('session/event', {} as never, {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: JSON.stringify({ name: 'hanging-read' }) },
+    } as never)
+    await ctx.skillUsage.invalidate()
+    expect((await ctx.skillUsage.report()).get('hanging-read')?.view_count ?? 0).toBe(0)
+  })
+
+  it('S2-P2-12: a PTC end event that reveals its own sub-dispatch counts ONCE even when replayed', async () => {
+    // Edge fixed in review: a PTC end event both REVEALS and SETTLES its
+    // sub-dispatch when the start frame was dropped — the settle channel must
+    // mark it so a duplicated end event cannot count a second view.
+    const root = await tempRoot('dsh-usage-ptc-end-replay-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
+    await ctx.skillUsage.ensureRecordCreated('ptc-orphan', false)
+    const end = {
+      type: 'tool/ptc-dispatch',
+      data: { rootCallId: 'r1', parentCallId: 'r1', subCallId: 'r1:ptc:1', name: 'skill', arguments: '{"name":"ptc-orphan"}', isError: false },
+    } as never
+    ctx.emit('session/event', {} as never, end)
+    ctx.emit('session/event', {} as never, end)
+    await ctx.skillUsage.invalidate()
+    expect((await ctx.skillUsage.report()).get('ptc-orphan')?.view_count ?? 0).toBe(1)
   })
 
   it('v37 P7a: counts a skill read dispatched inside a run_code program (PTC modality)', async () => {
@@ -211,6 +276,7 @@ describe('skill-usage', () => {
         type: 'tool/call',
         data: { turn: 1, step, callId: `c${step}`, name: 'skill', arguments: JSON.stringify({ name: 'anchor-skill' }) },
       } as never)
+      ctx.emit('session/event', {} as never, toolResult(`c${step}`))
     }
     read(1)
     read(2)
@@ -319,6 +385,7 @@ describe('skill-usage', () => {
     // skillNameFromToolCall mirrors the raw arguments `name` (no trim) — the
     // read must land on the trimmed sidecar key.
     ctx.emit('session/event', { id: 's1' } as never, { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{"name":" demo "}' } } as never)
+    ctx.emit('session/event', { id: 's1' } as never, toolResult('c1'))
     const deadline = Date.now() + 3000
     let views = 0
     while (Date.now() < deadline) {

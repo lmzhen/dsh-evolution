@@ -109,6 +109,54 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
+  it('S1-F1: a ptc/cordis layered install is detected like the default base, not misread as none', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-ptc-layered-'))
+    try {
+      // host + `--base ptc` artifact = layered (the old probe saw only the
+      // default `evolution` dir and reported 'host').
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      await mkdir(join(home, '.agent-presets', 'evolution-ptc'), { recursive: true })
+      await writeFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      const hostReport = await diagnose(stub, { home })
+      expect(hostReport.installForm).toBe('layered')
+      expect(hostReport.deploymentForm).toBe('variant')
+      // ptc artifact with NO bundle = preset-only (used to read as 'none' and
+      // the action ladder then recommended installing `all` on top — the
+      // exact double-mount this report exists to prevent).
+      await rm(join(home, 'profiles'), { recursive: true, force: true })
+      const onlyReport = await diagnose(stub, { home })
+      expect(onlyReport.installForm).toBe('preset-only')
+      expect(onlyReport.actions[0]).toContain('double-mounts the model rows')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S1-F1: all × a delivered ptc artifact is flagged; a minimal-base or foreign artifact is not', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-all-ptc-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      // ptc IS a supported family base: the conflict the default id raises
+      // must raise here too.
+      await mkdir(join(home, '.agent-presets', 'evolution-ptc'), { recursive: true })
+      await writeFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      expect((await diagnose(stub, { home })).conflicts.some(conflict => conflict.includes('evolution-ptc'))).toBe(true)
+      // minimal carries NO family model rows (unsupported in bases.json) — it
+      // cannot double-mount, so all + minimal stays healthy.
+      await rm(join(home, '.agent-presets', 'evolution-ptc'), { recursive: true, force: true })
+      await mkdir(join(home, '.agent-presets', 'evolution-minimal'), { recursive: true })
+      await writeFile(join(home, '.agent-presets', 'evolution-minimal', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      expect((await diagnose(stub, { home })).conflicts).toEqual([])
+      // A FOREIGN preset directory is not a family layered install either.
+      await rm(join(home, '.agent-presets', 'evolution-minimal'), { recursive: true, force: true })
+      await mkdir(join(home, '.agent-presets', 'some-other-plugin'), { recursive: true })
+      await writeFile(join(home, '.agent-presets', 'some-other-plugin', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      expect((await diagnose(stub, { home })).conflicts).toEqual([])
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('T-WB2: one-click preset reports preset', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-'))
     try {

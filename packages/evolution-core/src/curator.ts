@@ -208,6 +208,10 @@ export function parseCuratorNominations(text: string): CuratorNominations {
   let section: 'consolidations' | 'prunings' | null = null
   let currentFrom = ''
   let currentMode: 'append' | 'reference' | undefined
+  // S1-C4: an `into:` line (usable or not) already "accounts for" the open
+  // entry — a usable one closes it, an unusable one gets its own P1-9 warning.
+  // The dangling-entry warning below must stay silent in that case.
+  let currentIntoSpoken = false
   for (const line of text.split('\n')) {
     // V6-35: the YAML section HEADERS are tracked so a `- name:` under the
     // prunings header (the normal shape) is not mistaken for a misplaced one.
@@ -218,9 +222,16 @@ export function parseCuratorNominations(text: string): CuratorNominations {
     }
     const consolidated = /^\s*-\s*from:\s*([a-z0-9][a-z0-9-]*)(?:\s*#.*)?\s*$/.exec(line)
     if (consolidated) {
+      // S1-C4: an unfinished previous entry (a `- from:` that never reached an
+      // `into:`) is silently replaced here — and the same silent drop happens
+      // when the output ends mid-entry (maxTokens truncation, the exact
+      // V6-35 case the warnings channel was built for). Warn on both paths;
+      // the drop itself stays (safe side: fewer merges, no content loss).
+      if (currentFrom !== '' && !currentIntoSpoken) warnings.push(`"- from: ${currentFrom}" dropped — no "into:" arrived before the next entry`)
       section = 'consolidations'
       currentFrom = consolidated[1] ?? ''
       currentMode = undefined
+      currentIntoSpoken = false
       continue
     }
     const mode = /^\s*mode:\s*(append|reference)(?:\s*#.*)?\s*$/.exec(line)
@@ -245,6 +256,7 @@ export function parseCuratorNominations(text: string): CuratorNominations {
       }
       currentFrom = ''
       currentMode = undefined
+      currentIntoSpoken = false
       continue
     }
     const pruned = /^\s*-\s*name:\s*([a-z0-9][a-z0-9-]*)(?:\s*#.*)?\s*$/.exec(line)
@@ -262,9 +274,19 @@ export function parseCuratorNominations(text: string): CuratorNominations {
     // charset, an unknown mode) used to vanish without a trace - and `- name:`
     // is the LLM channel's only archive path. Say it instead.
     if (/^\s*(?:-\s*(?:from|name)\s*:|(?:into|mode)\s*:)/.test(line)) {
+      // S1-C4: an unusable `into:` line still ACCOUNTS for the open entry (the
+      // attempted close is visible via this warning), so the dangling-entry
+      // warning below stays silent for it.
+      if (currentFrom !== '' && /^\s*into\s*:/.test(line)) currentIntoSpoken = true
       warnings.push(`"${line.trim()}" ignored - not a usable nomination line (names are lowercase letters, digits and hyphens; one optional trailing "# comment" is allowed)`)
     }
   }
+  // S1-C4: output ended mid-entry (maxTokens truncation or a dropped tail) —
+  // the pending consolidation never reached an `into:` and would otherwise
+  // vanish without a trace in the run report. An `into:` line that already
+  // spoke for the entry (usable closes it; unusable warned via P1-9) does not
+  // warn twice.
+  if (currentFrom !== '' && !currentIntoSpoken) warnings.push(`"- from: ${currentFrom}" dropped — the nomination output ended before its "into:"`)
   const valid = (name: string) => NOMINATION_NAME_RE.test(name)
   return {
     prunings: prunings.filter(valid),

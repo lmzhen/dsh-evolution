@@ -146,6 +146,51 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
   })
 
+  it('S2-P2-22: release returns an orphaned executing record to the pending window', async () => {
+    // An approve that crashed mid-run leaves `executing` + a dead claimId.
+    // Simulate exactly that: stage, then claim with a claim id nobody will
+    // ever resolve (the "crashed" process). Release must roll the record back
+    // to `pending` using the STORED claim as the credential.
+    const home = await tempRoot('dsh-approval-release-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'orphan', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    const claimed = await ctx.evolutionState.claimPending(id, 'dead-claim')
+    expect(claimed?.status).toBe('executing')
+    const released = await ctx.evolutionApproval.release(id)
+    expect(released.ok).toBe(true)
+    expect(released.message).toContain('pending window')
+    const pendingAgain = await ctx.evolutionApproval.list('pending')
+    expect(pendingAgain.find(item => item.id === id)).toBeDefined()
+    expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
+  })
+
+  it('S2-P2-22: release refuses while an approve is in flight in this process', async () => {
+    const home = await tempRoot('dsh-approval-release-live-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    let releaseHang: (result: { ok: boolean; message: string }) => void = () => {}
+    const hung = new Promise<{ ok: boolean; message: string }>((resolve) => { releaseHang = resolve })
+    ctx.evolutionApproval.registerRunner('memory', () => hung)
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'live', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    const running = ctx.evolutionApproval.approve(id)
+    await new Promise(resolve => setTimeout(resolve, 25)) // let the claim land
+    const refused = await ctx.evolutionApproval.release(id)
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain('RUNNING')
+    releaseHang({ ok: true, message: 'memory applied' })
+    expect((await running).ok).toBe(true)
+  })
+
+  it('S2-P2-22: release on a merely-pending record redirects to approve/reject', async () => {
+    const home = await tempRoot('dsh-approval-release-pending-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'plain', args: {}, origin: 'background_review' })
+    const released = await ctx.evolutionApproval.release(decision.pendingId!)
+    expect(released.ok).toBe(false)
+    expect(released.message).toContain('already in the pending window')
+  })
+
   it('runs the replay exactly once when approve is called concurrently', async () => {
     const home = await tempRoot('dsh-approval-atomic-')
     const ctx = await mountStateStack(home, { evolution: true, approval: true })

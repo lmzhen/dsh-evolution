@@ -206,8 +206,7 @@ it('lifecycleCandidate mirrors the transition gate for a bundled-prune mix', () 
   expect(lifecycleCandidate('b', record, config, true)).toBe(true)
 })
 
-it('V6-35: lenient parse warns on a mode after into and on a name inside consolidations (0.3.36)', () => {
-  // `mode:` after `into:` has no preceding open entry (the prompt says mode
+it('V6-35: lenient parse warns on a mode after into and on a name inside consolidations (0.3.36)', () => {  // `mode:` after `into:` has no preceding open entry (the prompt says mode
   // goes BEFORE into) — the intent (demote) silently degraded to append.
   const afterInto = [
     'consolidations:',
@@ -239,6 +238,21 @@ it('V6-35: lenient parse warns on a mode after into and on a name inside consoli
     '  - name: stale-one',
   ].join('\n')
   expect(parseCuratorNominations(canonical).warnings).toEqual([])
+})
+
+it('S1-C4: a dangling "- from:" (no "into:") is dropped WITH a warning, at cut-off and at overwrite', () => {
+  // Output ended mid-entry (maxTokens truncation): the entry used to vanish
+  // without a trace in the run report.
+  const truncated = ['consolidations:', '  - from: demo-d', '    mode: reference'].join('\n')
+  const parsedTruncated = parseCuratorNominations(truncated)
+  expect(parsedTruncated.consolidations).toEqual([])
+  expect(parsedTruncated.warnings.some(w => w.includes('"- from: demo-d" dropped — the nomination output ended before its "into:"'))).toBe(true)
+  // A new "- from:" replacing an unfinished entry warns too; the previous
+  // entry is still dropped (safe side: fewer merges).
+  const overwritten = ['consolidations:', '  - from: demo-e', '  - from: demo-f', '    into: umbrella'].join('\n')
+  const parsedOverwritten = parseCuratorNominations(overwritten)
+  expect(parsedOverwritten.consolidations).toEqual([{ from: 'demo-f', into: 'umbrella' }])
+  expect(parsedOverwritten.warnings.some(w => w.includes('"- from: demo-e" dropped — no "into:" arrived before the next entry'))).toBe(true)
 })
 
 it('V6-36: a protected builtin lands in the protected bucket of the scope view (0.3.36)', () => {

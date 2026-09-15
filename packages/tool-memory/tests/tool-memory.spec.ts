@@ -8,6 +8,7 @@ import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolMemory from '../src/index.ts'
 import { MEMORY_GUIDANCE, MEMORY_TOOL_DESCRIPTION } from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { clearReviewChannel, markReviewChannel } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 /** The `memory` tool's declared output schema, as the tests read it back. */
@@ -78,6 +79,53 @@ describe('tool-memory', () => {
       execArg,
     )
     expect(captured?.sessionPolicy).toBe('never')
+  })
+
+  it('S1-B1: the review-channel session mark resolves memory writes to background_review', async () => {
+    // P1-2 fix: this tool used to skip the v37 S2.2 mark (unlike
+    // skill_manage), so an inject-mode review's memory write resolved as
+    // 'foreground' — mislabeled in the approval queue and, under
+    // `stageForeground: false`, executing without staging at all. The
+    // captured request origin must now match skill_manage's on both sides.
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    const captured: { origin?: string }[] = []
+    ctx.provide('evolutionApproval', {
+      request: async (input: { origin?: string }) => {
+        captured.push(input)
+        return { action: 'staged', message: 'staged' }
+      },
+      registerRunner: () => () => {},
+    })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const MARKED = 's1-b1-marked-review-session'
+    const PLAIN = 's1-b1-plain-session'
+    try {
+      // Marked session (inject-mode review in flight): background_review.
+      // (Session id rides on the session itself — the platform exec shape —
+      // with only the origin on the header, as the platform builds it.)
+      markReviewChannel(MARKED)
+      const markedShape = { agent: { session: { id: MARKED, header: { origin: undefined }, snapshotEvents: () => [] } } }
+      const execMarked = markedShape as unknown as Parameters<typeof tool.execute>[1]
+      await tool.execute({ target: 'memory', action: 'add', facts: 'review-channel fact' }, execMarked)
+      expect(captured.at(-1)?.origin).toBe('background_review')
+      // Unmarked session: unchanged foreground.
+      const plainShape = { agent: { session: { id: PLAIN, header: {}, snapshotEvents: () => [] } } }
+      const execPlain = plainShape as unknown as Parameters<typeof tool.execute>[1]
+      await tool.execute({ target: 'memory', action: 'add', facts: 'foreground fact' }, execPlain)
+      expect(captured.at(-1)?.origin).toBe('foreground')
+      // Delegated subagent session: still background_review (pre-existing rule).
+      const execSubagent = { agent: { session: { id: 's1-b1-sub', header: { origin: 'subagent' }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
+      await tool.execute({ target: 'memory', action: 'add', facts: 'subagent fact' }, execSubagent)
+      expect(captured.at(-1)?.origin).toBe('background_review')
+    } finally {
+      clearReviewChannel(MARKED)
+    }
   })
 
   it('V4-15: a single add to the default memory target does not stage "memory memory" (F-329)', async () => {
@@ -310,6 +358,40 @@ describe('tool-memory', () => {
     await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
     await ctx.plugin(ToolMemory, { memoryEnabled: false })
     expect(ctx.tools.get('memory')).toBeUndefined()
+  })
+
+  it('S1-B3: memoryEnabled:false still registers a refusal runner so staged writes are not orphaned', async () => {
+    // P1-2 companion (STATE-05): with the tool disabled, a prior staged write
+    // used to hit approve with NO runner — the claim was released back to
+    // pending and the record could never be resolved. The refusal runner gives
+    // approve a clear, final answer instead.
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    ctx.provide('evolutionState', {
+      listPending: async () => [],
+      savePending: async () => {},
+      tryResolvePending: async () => ({ record: null, applied: false }),
+      claimPending: async () => null,
+      releasePendingClaim: async () => {},
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    // Shipped composition order: the tool row mounts BEFORE the approval row,
+    // so the runner registers through the trailing availability inject when
+    // approval arrives — exactly what this order exercises.
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    await ctx.plugin(ToolMemory, { memoryEnabled: false })
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    await new Promise(r => setTimeout(r, 50))
+    expect(ctx.tools.get('memory')).toBeUndefined()
+    expect(ctx.evolutionApproval.hasRunner('memory')).toBe(true)    // The replay intent path must answer with the explicit refusal, not the
+    // old "No replay runner registered" bounce.
+    const refusal = await ctx.evolutionApproval.run('memory', { target: 'memory', action: 'add', facts: 'x' }, { interface: 'background_review' })
+    expect(refusal.ok).toBe(false)
+    expect(refusal.message).toContain('memoryEnabled')
   })
 })
 

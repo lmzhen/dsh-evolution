@@ -19,6 +19,13 @@ the cordis loader fails loud on duplicate ids.
 > infrastructure rows, so mounting two double-registers that infrastructure
 > and the loader aborts at startup. Choose ONE form per profile; the repo's
 > `packages/scripts/verify-profile-bundles.mjs` checks the bundle rows.
+>
+> Note (S3-A2): installing `dsh-evolution-all` also pulls in the
+> `dsh-evolution-agent-preset` container as a hard dependency. That package is
+> an install-form EXCLUSIVE with `all` — its rows are never mounted in an
+> `all` profile; the dependency exists only as a forward dependency-closure
+> guard (pinned by `packages/evolution-all/tests/all.spec.ts`), and the
+> layered installer refuses to combine the two forms regardless.
 
 ## Prerequisites
 

@@ -7,8 +7,9 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
 
 - [ ] `packages/<pkg>/package.json`: name `@deepseek-ai/dsh-<pkg>` (publishing
       rewrites the scope to `@lmzhen`), the family `version`, `type: module`,
-      `files` limited to what ships. — *`check-manifests.cjs` fails when one
-      manifest's version drifts from the other 30.*
+      `files` limited to what ships. — *`verify-layout-sync.mjs` fails when the
+      package's layout diverges from the family skeleton, and the release
+      script fails when one manifest's version drifts from the other 30.*
 - [ ] Every import has a declared dependency (`workspace:^` for family packages,
       `peerDependencies` for platform packages), and every declared dependency is
       imported. — *`verify-dependency-closure.mjs packages --strict` fails in both
@@ -23,8 +24,8 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
       probed `evolution*` key with no provider (the doctor ghost-key incident).*
 - [ ] Register the project in `tsconfig.base.json` **and** `tsconfig.host.json`
       (`./packages/evolution/<pkg>` references) and, if it ships a build, in
-      `packages/tsdown.package.config.ts`. — *`tsc -b tsconfig.host.json` fails,
-      and `check-tsconfigs.cjs` checks the reference lists.*
+      `packages/tsdown.package.config.ts`. — *`tsc -b tsconfig.host.json` fails
+      when a reference list is missing the new package.*
 - [ ] Mount it: a row in the composition bundles that must carry it
       (`evolution-agent/agent.cordis.yml` for the preset delta, `cordis.yml` /
       `cordis.patch.yml` for the bundles). Bundles carry rows only, never code. —

@@ -36,6 +36,7 @@
 import { basename, dirname, join } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
+import { isReviewChannelSession } from './review-channel.ts'
 import { LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
@@ -330,6 +331,35 @@ export function resolveOrigins(
   if (isReview) return { approval: 'background_review', library: 'background_review' }
   if (headerOrigin === 'subagent') return { approval: 'background_review', library: 'subagent' }
   return { approval: 'foreground', library: 'foreground' }
+}
+
+/** Minimal structural view of a tool execution context, so the helper below
+ * stays decoupled from the platform's exec type (extra fields are ignored). */
+export interface EvolutionExecOriginView {
+  agent?: {
+    session?: {
+      id?: unknown
+      header?: { origin?: string }
+    }
+  }
+}
+
+/**
+ * S1-E8 (0.3.80): ONE exec→origins resolution for the two write tools — reads
+ * the session header origin AND the v37 S2.2 review-channel session mark, so a
+ * tool cannot forget the mark half (tool-memory shipped without it, which
+ * mislabeled every inject-mode review memory write as `foreground` and let it
+ * bypass staging under `stageForeground: false`).
+ * Single source: both tools call this instead of re-deriving the pair.
+ */
+export function resolveExecOrigins(
+  exec: EvolutionExecOriginView | undefined,
+): { approval: 'foreground' | 'background_review'; library: WriteOrigin } {
+  const session = exec?.agent?.session
+  return resolveOrigins(
+    session?.header?.origin,
+    isReviewChannelSession(typeof session?.id === 'string' ? session.id : undefined),
+  )
 }
 
 function skillDir(root: string, name: string): string {
@@ -2100,7 +2130,7 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'update', before: current, after: onDisk, summary: 'updated' },
         event: { action: 'update', name, skillDir: dir },
       }
-    }, anchor !== undefined ? anchorRefusal(name, 'missing') : undefined)
+    }, anchor !== undefined ? anchorUnverifiable(name, null) : undefined)
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
@@ -2579,6 +2609,13 @@ export class SkillLibrary {
     return await this.serial(async (): Promise<SkillActionResult> => {
       const referenceWrites: TreeChangeWrite[] = []
       const parts: string[] = []
+      // S1-E5: the plan-time bytes per source, re-verified right before that
+      // source is archived. The serial queue closes the read→merge window for
+      // THIS process only; a cross-process writer (shared DSH_HOME, transact
+      // is a supported deployment) could still land a patch between the plan
+      // read and the archive — the OPT-04 "closed for the sources too" claim
+      // was true only in-process. A mismatch aborts through the rollback below.
+      const plannedSourceBytes = new Map<string, string>()
       if (mode === 'append') {
         for (const source of normalizedSources) {
           const protection = await this.deleteProtection(source)
@@ -2597,6 +2634,7 @@ export class SkillLibrary {
             return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.` }
           }
           parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
+          plannedSourceBytes.set(source, sourceMd)
         }
       } else {
         for (const source of normalizedSources) {
@@ -2612,6 +2650,7 @@ export class SkillLibrary {
           }
           const target = join(targetDir, 'references', `${source}.md`)
           referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
+          plannedSourceBytes.set(source, sourceMd)
         }
         // Discoverability: the umbrella's body gains one pointer per demoted
         // source — built INSIDE the serial queue below against the fresh target
@@ -2632,6 +2671,16 @@ export class SkillLibrary {
         const preTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
         if (!preTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
         for (const source of normalizedSources) {
+          // S1-E5: verify the plan-time bytes right before THIS source is
+          // archived. A mismatch throws into the rollback below, so sources
+          // archived before the abort are brought back and nothing lands —
+          // the cross-process gap the serial queue cannot close.
+          if (plannedSourceBytes.has(source)) {
+            const freshSource = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+            if (freshSource !== plannedSourceBytes.get(source)) {
+              throw new Error(`Consolidation aborted: source "${source}" changed while the consolidation ran (its planned bytes are no longer current).`)
+            }
+          }
           const result = await this.archive(source, { absorbedInto: targetName })
           if (!result.ok) throw new Error(result.message)
           archived.push(source)
@@ -2642,7 +2691,14 @@ export class SkillLibrary {
         // silently overwritten (the serial chain is the same second layer
         // update/patch/restructure/writeSupportFile use).
         const freshTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
-        if (!freshTargetMd) return { ok: false, message: `Skill "${targetName}" not found.` }
+        // S1-E1: everything below runs AFTER the sources are already archived —
+        // these three exits used to `return`, which skips the catch's rollback
+        // (JS: return does not pass through catch) and left every source in
+        // .archive while the message implied nothing had happened. Throw so
+        // the T-14 rollback below brings them back; the catch prefixes the
+        // reason with the rollback outcome, so the reasons here name only the
+        // failure itself.
+        if (!freshTargetMd) throw new Error(`target "${targetName}" disappeared mid-consolidate`)
         // V10-01 (P2-2): reference-mode targets APPEND, mirroring restructure
         // (base + '\n\n' + new text) — a second consolidate of a re-created
         // source used to overwrite the first demotion's bytes (silent loss of
@@ -2662,13 +2718,13 @@ export class SkillLibrary {
         if (mode === 'append') {
           const merged = freshTargetMd.trimEnd() + parts.join('\n') + '\n'
           const validation = validateFrontmatter(merged, targetName, this.limits)
-          if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+          if (validation) throw new Error(`merge validation failed: ${validation}`)
           writes.push({ target: join(targetDir, 'SKILL.md'), content: merged, expected: freshTargetMd })
         } else {
           const pointerLines = normalizedSources.map(source => `\n${POINTER_LINE_PREFIX}${source}.md`).join('')
           const extended = freshTargetMd.trimEnd() + pointerLines + '\n'
           const validation = validateFrontmatter(extended, targetName, this.limits)
-          if (validation) return { ok: false, message: `Consolidation rejected: ${validation}` }
+          if (validation) throw new Error(`merge validation failed: ${validation}`)
           writes.push({ target: join(targetDir, 'SKILL.md'), content: extended, expected: freshTargetMd })
         }
         const result = await this.applyTreeChange({
@@ -3529,7 +3585,19 @@ export class SkillLibrary {
     // kept serving the pre-restore view) and the caller was told the restore
     // failed even though it had succeeded — and retrying cleared the tree again.
     // Reading here means a bad manifest aborts before anything is cleared.
-    const snapshotExtras = await this.readSnapshotExtras(latest.path)
+    // S1-E2: a real READ failure on the manifest/extras (transient win32 AV or
+    // indexer hold) used to escape this method as a raw rejection BETWEEN the
+    // two protected tries — the caller's structured SkillActionResult contract
+    // broke exactly on the path the comment above claims is covered. Nothing
+    // has been cleared, so the refusal is structured and retryable, matching
+    // the pre-rollback posture above.
+    let snapshotExtras: SnapshotExtra[]
+    try {
+      snapshotExtras = await this.readSnapshotExtras(latest.path)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      return { ok: false, message: `Snapshot restore was refused before anything was cleared: reading the snapshot manifest/extras failed (${reason}) — the active tree is UNCHANGED. Resolve the read failure and retry.` }
+    }
     try {
       await this.restoreSnapshotIntoRoot(latest.path)
     } catch (error) {

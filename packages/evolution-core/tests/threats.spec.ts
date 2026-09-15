@@ -263,6 +263,13 @@ it('P1-1 (v19): ordinary emoji and typography do NOT block; the smuggling core d
   // Typography is still reported (audit trail), never blocking.
   const report = evaluateThreat('I love this \u2764\ufe0f', 'strict')
   expect(report.findings.some(finding => finding.label === 'unicode_typography' && finding.severity === 'report')).toBe(true)
+  // S1-E3: a ZWJ emoji sequence raises NO format-control report either — the
+  // exemption used to compare a 6-char `'\\u200d'` literal that never matched a
+  // code point, so the finding fired on every joined emoji. ZWJ outside an
+  // emoji sequence keeps its own (blocking) zero-width label, as the hit-list
+  // above already asserts.
+  const family = 'family \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67'
+  expect(scanThreats(family).some(finding => finding.label === 'unicode_format_control')).toBe(false)
   // 命中面：隐写核心必须仍然被拒。
   for (const text of [
     'invisible\u200bmarker', // ZWSP

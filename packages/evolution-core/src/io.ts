@@ -50,16 +50,17 @@ export interface EvolutionIoLike {
    * missing path, stat failure). Intended as a cheap invalidation stamp for a
    * cached directory listing; a backend without it keeps event-driven
    * invalidation only. v20 correction: the former "NO in-tree consumer" note
-   * (V9-07, 0.3.51) went stale — there are now FOUR in-tree consumers, and a
+   * (V9-07, 0.3.51) went stale — in-tree consumers exist, and a
    * custom backend that omits `mtime` degrades them silently (every call
    * site is optional-call + null-fallback, so omission stays legal):
-   *   - evolution-skill-catalog: root-mtime stamp on the summaries cache —
-   *     the second, out-of-band invalidation signal next to the
-   *     `evolution/skill-mutated` / `evolution/skills-refresh` events;
    *   - evolution-curator: run-report recency ordering (2 call sites);
    *   - evolution-commands: `.bak` freshness probe in the preset installer.
-   * With `mtime` absent, catalog invalidation degrades to purely
-   * event-driven. Register new consumers here (the seam contract).
+   * S3-P2-10: evolution-skill-catalog's summaries stamp — the third consumer —
+   * moved to a NAMES-based stamp over `list()` (a required seam method): the
+   * root-mtime stamp was invalidated by the family's own sidecar flushes in
+   * the watched root, so every usage-counter write paid a full rescan. The
+   * names stamp is sidecar-immune and works on mtime-less backends. Register
+   * new consumers here (the seam contract).
    */
   mtime?(this: void, path: string): Promise<number | null>
 }

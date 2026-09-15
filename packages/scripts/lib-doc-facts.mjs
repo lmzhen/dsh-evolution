@@ -159,7 +159,13 @@ function checklistViolations(root, repoRoot, asset, violations) {
   if (registry === null) violations.push(`${config.ruleRegistry}: no rule registry to check checklist citations against (the N19 citation check cannot decide)`)
   const guardDir = join(root, config.guardDir)
   for (const doc of docs) {
-    for (const match of doc.text.matchAll(/\b(verify-[a-z0-9-]+\.mjs)\b/g)) {
+    // S3-G1: the pattern used to match ONLY `verify-*.mjs`, so a checklist citing
+    // a scripts-dir helper under another name (the phantom `check-manifests.cjs`)
+    // was structurally invisible to this existence check. Bare dotted script
+    // names cited from a checklist must resolve under the scripts dir; names
+    // preceded by a path (`node_modules/vitest/vitest.mjs`) or continuing into
+    // a template suffix (`rule-snippet.mjs.tmpl`) are excluded.
+    for (const match of doc.text.matchAll(/(?<![/\w-])([a-z][a-z0-9-]*\.(?:mjs|cjs))(?!\.[a-z0-9])/g)) {
       if (!existsSync(join(guardDir, match[1]))) violations.push(`${doc.rel}: cites guard \`${match[1]}\` which does not exist under ${config.guardDir}`)
     }
     for (const match of doc.text.matchAll(/\b(N\d+[a-z]?)\b/g)) {

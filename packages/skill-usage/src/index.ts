@@ -14,6 +14,12 @@ import { ToolDispatchNormalizer, sessionAudited, skillReadNameOf } from '@deepse
 import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
+/** S2-P2-14 (0.3.80): bound for the live listener's dispatch ledger — it is
+ * dedup state (a call/result pair spans one tool call), so 4096 tracked
+ * dispatches is orders of magnitude above any real pairing window while the
+ * ledger stops growing with the host process lifetime. */
+const LIVE_DISPATCH_LEDGER_CAP = 4096
+
 /**
  * Folds the session's dispatch events into one signal per READ (A2).
  *
@@ -96,7 +102,11 @@ export class SkillUsageRegistry extends Service {
     // by the current fiber"), so the wrapper is symmetry/explicitness, not a
     // leak fix.
     ctx.effect(() => {
-      const reads = new ToolDispatchNormalizer()
+      // S2-P2-14: the ledger is pure dedup state on the live path — bounded, so
+      // a long-lived host stops accumulating one entry per tool call forever.
+      // A call/result pair spans a single tool call, so oldest-first eviction
+      // at this cap cannot re-pair a real pair.
+      const reads = new ToolDispatchNormalizer({ maxTracked: LIVE_DISPATCH_LEDGER_CAP })
       const dispose = ctx.on('session/event', (session, event) => {
         // C axis (v41): a session that does not carry the family's model rows
         // is not observed — view counts and the observation window belong to the
@@ -107,13 +117,20 @@ export class SkillUsageRegistry extends Service {
         // absent, `name` missing, or `name` not a string. None of these is a
         // read this listener can attribute, so the normalizer answers `null`
         // and the event is skipped instead of throwing.
-        const dispatch = reads.advance(event)
-        if (dispatch === null) return
-        const name = skillReadNameOf(dispatch)
-        if (name === undefined) return
-        void this.observeRead(name).catch(() => {
-          // Observation is best-effort: a telemetry write failure must never
-          // surface in the conversation that just read a skill.
+        reads.advance(event)
+        // S2-P2-12: count at SETTLE, not at reveal — a failed load (typo'd
+        // name, unreadable file) is not a view of the skill, and view_count
+        // feeding the write-ghost/stale signals should not grow on failures.
+        // A dispatch that never settles is never counted (conservative), and
+        // the settle channel answers exactly once per dispatch, so a replayed
+        // result event (or a PTC end event that itself reveals a sub-dispatch
+        // whose start was dropped) cannot double-count.
+        const settled = reads.settledSignalOf(event)
+        if (settled === null || settled.ok === false) return
+        const settledName = skillReadNameOf(settled)
+        if (settledName === undefined) return
+        void this.observeRead(settledName).catch(() => {
+          // Best-effort, as above.
         })
       })
       return dispose

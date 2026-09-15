@@ -83,14 +83,15 @@ describe('evolution-skill-catalog', () => {
     const scansAfterFirst = listCalls
     const second = await ctx.skills.get('demo-skill')
     expect(second?.name).toBe('demo-skill')
-    // The provider's get() runs per call but must NOT re-scan the tree.
-    expect(listCalls).toBe(scansAfterFirst)
+    // The provider's get() runs per call but must NOT re-scan the tree: the
+    // only extra list() is the S3-P2-10 names-stamp probe.
+    expect(listCalls).toBe(scansAfterFirst + 1)
 
     // Explicit refresh drops the cache; the next lookup re-scans.
     ctx.emit('evolution/skills-refresh')
     const afterRefresh = await ctx.skills.get('demo-skill')
     expect(afterRefresh?.name).toBe('demo-skill')
-    expect(listCalls).toBeGreaterThan(scansAfterFirst)
+    expect(listCalls).toBeGreaterThan(scansAfterFirst + 1)
   })
 
   it('E-71: an out-of-band tree edit becomes visible via /evolution skills refresh (0.3.18)', async () => {
@@ -233,13 +234,19 @@ describe('evolution-skill-catalog', () => {
     const degraded = await ctx.skills.snapshot()
     expect(degraded.complete).toBe(false)
     expect(degraded.skills).toEqual([])
-    expect(treeScans).toBe(1)
+    // S3-P2-10: two listings — the names-stamp probe AND the scan itself both
+    // fail while the tree listing is broken (each consult pays one stamp probe).
+    expect(treeScans).toBe(2)
 
     failing = false
+    const scansBeforeRecovery = treeScans
     const recovered = await ctx.skills.snapshot()
     expect(recovered.complete).toBe(true)
     expect(recovered.skills.map(skill => skill.name)).toEqual(['demo-skill'])
-    expect(treeScans).toBe(2)
+    // The recovery consult pays its stamp probe + scan; the platform collect
+    // may consult the provider more than once, so only a strict increase (and
+    // the complete observation above) is pinned here.
+    expect(treeScans).toBeGreaterThan(scansBeforeRecovery)
   })
 
   it('P1-12: a scan that started before a drop never republishes its pre-mutation invocation map', async () => {
@@ -275,8 +282,9 @@ describe('evolution-skill-catalog', () => {
     await ctx.plugin(Catalog, { root })
     const first = ctx.skills.list()
     await atGate
-    // Content-only edit: the ROOT directory mtime is unchanged, so the summaries
-    // cache keeps serving scan B once the interleave settles.
+    // Content-only edit: no root ENTRY name changes (S3-P2-10: the stamp is
+    // the non-dot entry-name set, not the mtime), so the summaries cache keeps
+    // serving scan B once the interleave settles.
     await base.writeText(target, make('Post mutation.', ''))
     ctx.emit('evolution/skill-mutated', { action: 'update', name: 'zeta-skill' })
     await ctx.skills.snapshot()

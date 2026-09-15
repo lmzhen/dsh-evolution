@@ -124,13 +124,19 @@ const OPEN_RETRY_BASE_MS = 100
 
 /** Retry cannot heal these — the stored record or the medium fails its own
  * schema/version, or the backend cannot serve the domain at all. Both storage
- * vocabularies (DomainError, StorageError) carry the code as stable API. */
+ * vocabularies (DomainError, StorageError) carry the code as stable API.
+ * S1-D3: `already-open` (DomainError, upstream open()'s single-open constraint)
+ * is deterministic too — a competing consumer of the `evolution` domain never
+ * goes away on retry, so burning the full backoff budget (3× loadAll) and then
+ * leaving `opening` cleared only re-runs the same futile budget on every later
+ * call. */
 const DETERMINISTIC_OPEN_CODES: ReadonlySet<string> = new Set([
   'invalid-record',
   'malformed-medium',
   'version-mismatch',
   'facet-unsupported',
   'backend-not-found',
+  'already-open',
   'closed',
 ])
 
@@ -170,6 +176,10 @@ export function apply(ctx: Context): void {
     domain = await opening
     return domain
   }
+
+  // S1-D2: one warn per provider instance for the pending re-key repair
+  // (same latch discipline as the json provider's P2-5 warn).
+  let pendingKeyWarned = false
 
   const provider: EvolutionStateStorage = {
     name: PROVIDER_DOMAIN,
@@ -319,8 +329,45 @@ export function apply(ctx: Context): void {
       // P2-15 (v19): filter BEFORE cloning — the v18 shape cloned every record
       // first, so one non-cloneable record (a function in `args`, which the
       // write gate now refuses) would have thrown for every status.
-      return [...table.entries()]
-        .filter(([, value]) => value.status === status)
+      // S1-D2: a table entry whose KEY drifted from `record.id` used to be
+      // listed here yet was unreachable by claim/resolve (they look the record
+      // up by id) — and, being `pending`, it was never evicted: a permanent
+      // zombie in the approval view. Parity with the json provider's P2-5
+      // re-key: the read repairs the drift (canonical slot re-put, drifted key
+      // deleted) and warns once.
+      const entries = [...table.entries()]
+      const drifted: Array<{ key: string; record: (typeof entries)[number][1] }> = []
+      for (const [key, record] of entries) {
+        if (key !== record.id && typeof record.id === 'string' && record.id !== '') drifted.push({ key, record })
+      }
+      if (drifted.length > 0) {
+        if (!pendingKeyWarned) {
+          pendingKeyWarned = true
+          ctx.logger.warn(`evolution-state-domain: ${drifted.length} pending table entr(ies) were keyed by something other than record.id — re-keyed by id, so a drifted row is reachable by claim/resolve again`)
+        }
+        for (const { key, record } of drifted) {
+          try {
+            await table.put(record.id, structuredClone(record))
+            await table.delete(key)
+          } catch (error: unknown) {
+            ctx.logger.warn(`evolution-state-domain: pending re-key for "${key}" failed (will retry on the next list): ${error instanceof Error ? error.message : String(error)}`)
+            break
+          }
+        }
+      }
+      // Post-repair snapshot: a repaired row now lives under its canonical id
+      // (and only there), so a plain status filter over the fresh read is the
+      // same list claim/resolve can address. S2-O3: if a repair's delete half
+      // failed, both rows (drifted key + canonical id) can coexist — dedupe by
+      // record.id so the approval view never lists one record twice.
+      const final = drifted.length > 0 ? [...table.entries()] : entries
+      const seen = new Set<string>()
+      return final
+        .filter(([, value]) => {
+          if (seen.has(value.id)) return false
+          seen.add(value.id)
+          return value.status === status
+        })
         .map(([, value]) => structuredClone(value))
     },
 

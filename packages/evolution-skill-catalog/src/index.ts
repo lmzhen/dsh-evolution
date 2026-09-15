@@ -21,7 +21,7 @@ import type {
 } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { evolutionIoAdapter, parseFrontmatter, newSkillLibrary, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, isAbsent, isUnknown, parseFrontmatter, newSkillLibrary, probeList, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'
@@ -128,7 +128,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // Out-of-band structural changes therefore require the explicit refresh
   // (decision C keeps no filesystem watcher); see README Known Limitations.
   let summariesCache: SkillSummary[] | null = null
-  let summariesStamp: number | null = null
+  // S3-P2-10: the stamp is the root's non-dot ENTRY-NAME set (a string), not
+  // an mtime — sidecar flushes in the root no longer invalidate the cache.
+  let summariesStamp: string | null = null
   // V24-02 (v24): generation counter — `dropSummariesCache` bumps it, and a
   // scan that started BEFORE a drop discards its result instead of caching
   // it. Without this, an in-flight `library.list()` (a full tree scan that
@@ -187,8 +189,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // §9 I-2: the scan reports its own completeness — a degraded read must
   // reach `list()` as an explicit incomplete observation, never as the bare
   // array the platform reads as "complete" and caches.
+  // S3-P2-10: the cache stamp is the SET of non-dot root entry names, not the
+  // root's mtime. The mtime stamp was invalidated by the family's OWN sidecar
+  // flushes (`.usage.json` / `.curator-suppressed.json` live in the root, and
+  // their tmp+rename bumps the root mtime), so every usage-counter write paid
+  // a full tree rescan. A names stamp is immune to sidecar churn (their names
+  // never change), still catches external skill add/remove/rename, and works
+  // on mtime-less backends (`list` is a required seam method). A catalog
+  // description change WITHOUT a name change (a direct content edit) is caught
+  // by the event-driven invalidation, exactly as before.
+  async function libraryStamp(): Promise<string | null> {
+    // S3-P2-10: the read goes through the sanctioned three-state probe (N14
+    // discipline — no swallowed durable read here): absent root → empty names
+    // (a stale non-empty cache invalidates); a real listing failure → null
+    // (serve the cache; the scan path re-arms via CAT-01/CAT-02).
+    const probe = await probeList(io, library.root)
+    if (isUnknown(probe)) return null
+    if (isAbsent(probe)) return ''
+    return probe.value.filter(name => !name.startsWith('.')).sort().join('\n')
+  }
   async function summaries(): Promise<{ summaries: SkillSummary[]; complete: boolean }> {
-    const stamp = await io.mtime?.(library.root) ?? null
+    const stamp = await libraryStamp()
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) {
       return { summaries: summariesCache, complete: true }
     }
@@ -220,9 +241,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       lastScanWarn = ''
     }
     // OPT-10: rebuild the per-skill invocation map alongside the scan — one
-    // extra SKILL.md read per skill, and scans only run on mutation/refresh/
-    // first-consult. A file whose frontmatter cannot be parsed keeps the row
-    // default (absent from the map), same posture as its description.
+    // extra SKILL.md read per skill. A file whose frontmatter cannot be parsed
+    // keeps the row default (absent from the map), same posture as its
+    // description.
+    // S3-P2-10: with the names-based stamp (see `libraryStamp`) the scan runs
+    // on real tree changes (name-set changes, event-driven invalidation) and
+    // NO LONGER on every usage-counter flush — the sidecars still live in the
+    // root, but their renames no longer move a stamp this provider reads.
     const invocationMap = new Map<string, SkillInvocationPolicy>()
     for (const summary of scanned) {
       const raw = await io.readText(join(summary.path, 'SKILL.md')).catch(() => null)

@@ -90,6 +90,10 @@ export type ApprovalLike = {
   list(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>
+  /** S2-P2-22 (0.3.80): return an ORPHANED executing record (an approve that
+   * crashed mid-run) to the pending window, so it can be deliberately
+   * re-approved or rejected. Optional: only the real service implements it. */
+  release?(id: string): Promise<{ ok: boolean; message: string }>
 }
 
 /** 0.3.23 (G4.8): the shape of the platform approval-policy probe that the
@@ -260,6 +264,39 @@ export class EvolutionApproval extends Service {
 
   async approve(id: string): Promise<{ ok: boolean; message: string }> {
     return await this.dedupe(`approve:${id}`, () => this.doApprove(id))
+  }
+
+  /** S2-P2-22 (0.3.80): return an ORPHANED executing record to the pending
+   * window. "Orphaned" = status `executing` with no approve running in THIS
+   * process (the family single-instance claim rules out any other live
+   * process, so a claim that is not in this service's in-flight dedupe map
+   * belongs to a dead one). The stored `claimedBy` rides along as the seam's
+   * release credential, so no state-seam expansion is needed. The operator is
+   * expected to verify the effect first: re-approving replays the write
+   * deliberately (duplicates possible if the effect already landed);
+   * rejecting closes the record. */
+  async release(id: string): Promise<{ ok: boolean; message: string }> {
+    const executing = (await this.state().listPending('executing')).find(item => item.id === id)
+    if (!executing) {
+      const pending = (await this.state().listPending('pending')).find(item => item.id === id)
+      if (pending) return { ok: false, message: `Pending write "${id}" is already in the pending window — approve or reject it.` }
+      return { ok: false, message: `Pending write "${id}" is not in the executing window — nothing to release.` }
+    }
+    // The dedupe map keys in-flight work as `approve:${id}` / `reject:${id}`;
+    // either running means the record is NOT an orphan. The family
+    // single-instance claim rules out any other live process holding it.
+    if (this.inFlight.has(`approve:${id}`) || this.inFlight.has(`reject:${id}`)) {
+      return { ok: false, message: `Pending write "${id}" has an approve/reject RUNNING in this process — do not release it. Verify the effect instead; a completed approve resolves its own record.` }
+    }
+    const claimId = typeof (executing as { claimedBy?: unknown }).claimedBy === 'string' ? (executing as { claimedBy: string }).claimedBy : ''
+    if (claimId === '') {
+      return { ok: false, message: `Pending write "${id}" carries no claim to release (unexpected record shape) — reject it instead.` }
+    }
+    await this.state().releasePendingClaim(id, claimId)
+    return {
+      ok: true,
+      message: `Released "${id}" back to the pending window. VERIFY the effect first: approve re-runs the write deliberately (duplicates possible if the effect already landed); reject closes the record.`,
+    }
   }
 
   async reject(id: string): Promise<{ ok: boolean; message: string }> {

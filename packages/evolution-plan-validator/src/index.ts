@@ -24,6 +24,12 @@ export interface SkillOp {
   old_string?: string
   new_string?: string
   file_path?: string
+  /** S1-C1 (0.3.80): patch replaces EVERY occurrence when true — the same
+   * contract `skill_manage` documents to the model. Previously the validator
+   * neither knew nor rejected this field while the review executor hardcoded
+   * first-occurrence-only, so a plan carrying `replace_all` silently shrank
+   * to a single replacement and still reported success. */
+  replace_all?: boolean
   absorbed_into?: string
   /** restructure payload: body sections moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; to_file?: string } | null>
@@ -212,6 +218,11 @@ function validateSkillOp(op: SkillOp, context: ValidationContext, index: number)
   // used to escape the validator and TypeError mid-plan.
   const badField = malformedStringField(op, ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'])
   if (badField) return `skill op ${index}: field ${badField} must be a string`
+  // S1-C1: replace_all is a BOOLEAN flag (the executor passes it verbatim into
+  // the library patch); a non-boolean truthy value would still have "worked",
+  // but a string 'false' flipping the semantics is the kind of silent surprise
+  // the validator exists to catch.
+  if (op.replace_all !== undefined && typeof op.replace_all !== 'boolean') return `skill op ${index}: field replace_all must be a boolean`
   for (const key of FORBIDDEN_KEYS) if (key in op) return `skill op ${index}: forbidden field ${key}`
   const name = (op.name ?? '').trim()
   if (!name) return `skill op ${index}: name is required`

@@ -909,6 +909,35 @@ describe('evolution-commands', () => {
     expect(detail.text).toContain('staged args: (unserializable)')
   })
 
+  it('S2-P2-22: /evolution release routes to the approval service (happy path, and E-304 on an older service)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const released: string[] = []
+    ctx.provide('evolutionApproval', {
+      list: async () => [],
+      release: async (id: string) => {
+        released.push(id)
+        return { ok: true, message: `Released "${id}" back to the pending window.` }
+      },
+    } as never)
+    await ctx.plugin(Commands)
+    const okResult = await captured!.handler({ rawInput: 'release x1' })
+    expect(okResult.kind).toBe('success')
+    expect(okResult.text).toContain('back to the pending window')
+    expect(released).toEqual(['x1'])
+    // A service without the release capability (older build) gets a distinct,
+    // actionable error instead of a TypeError.
+    const older = new Context()
+    let olderCaptured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    older.provide('commands', captureCommands((definition) => { olderCaptured = definition as typeof olderCaptured }))
+    older.provide('evolutionApproval', { list: async () => [], approve: async () => ({ ok: false, message: 'x' }), reject: async () => ({ ok: false, message: 'x' }) } as never)
+    await older.plugin(Commands)
+    const legacy = await olderCaptured!.handler({ rawInput: 'release x1' })
+    expect(legacy.kind).toBe('error')
+    expect(legacy.text).toContain('E-304')
+  })
+
   it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
@@ -1108,7 +1137,7 @@ it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every sta
   // bare branches: pending/approve/reject/curator/mutations/restore/replay.
   const stateTouching = [
     'pending', 'pending --detail',
-    'approve some-id', 'reject some-id',
+    'approve some-id', 'reject some-id', 'release some-id',
     'curator run', 'curator pause', 'curator resume', 'curator status', 'curator report', 'curator scope',
     'mutations', 'skills health',
     'restore', 'replay',

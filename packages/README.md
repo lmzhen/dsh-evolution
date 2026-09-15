@@ -78,6 +78,7 @@ pins the equality).
 | `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
 | `/evolution approve <id>` | replay an approved staged write through its runner |
 | `/evolution reject <id>` | drop a staged write without running it |
+| `/evolution release <id>` | return an orphaned EXECUTING write to the pending window (verify the effect first, then approve or reject) |
 | `/evolution doctor [--json]` | read-only self-check: install form, conflicts, env, services (--json feeds scripts) |
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
 | `/evolution mutations` | list skill-mutation audit records |

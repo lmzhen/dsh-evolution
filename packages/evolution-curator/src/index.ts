@@ -174,6 +174,9 @@ export class EvolutionCurator extends Service {
   private readonly staleAfterDays: number
   private readonly archiveAfterDays: number
   private readonly llmReview: boolean
+  /** S1-C3: one warn per instance when `llmReview` is on but the llm service
+   * is absent — the channel silently degrading must be visible at least once. */
+  private llmAbsentWarned = false
   private readonly curatorProvider: string
   private readonly qualityWarnStaleAfterDays: number
   private readonly minIdleHours: number
@@ -442,7 +445,18 @@ export class EvolutionCurator extends Service {
     // The hand-written shape was: { stream(options: { provider; model;
     // messages: unknown[]; maxTokens }) }.
     const llm = this.ctx.get('llm')
-    if (!llm) return empty
+    // S1-C3: an absent llm service is an observability event, not a silent
+    // empty set — the E-52 discipline ("a silent catch once hid a whole-channel
+    // failure behind an empty nomination set") applies equally to the channel
+    // that was never mounted. `llmReviewEnabled: true` in the run report would
+    // otherwise describe a channel that never fired a single pass.
+    if (!llm) {
+      if (!this.llmAbsentWarned) {
+        this.llmAbsentWarned = true
+        this.ctx.logger.warn('evolution-curator: llmReview is enabled but no llm service is mounted — the LLM nomination channel NEVER runs (every pass degrades to deterministic-only). Mount an llm provider or set llmReview:false.')
+      }
+      return { ...empty, warnings: [...empty.warnings, 'llm channel absent: no llm service is mounted, the LLM nomination pass did not run'] }
+    }
     const policy = this.ctx.get('evolutionPolicy') as { get(): { curatorModel: string } | undefined } | undefined
     const model = policy?.get()?.curatorModel ?? DEFAULT_CURATOR_MODEL
     const clusters = computePrefixClusters(candidates)

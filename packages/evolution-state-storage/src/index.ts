@@ -142,8 +142,10 @@ export function selectSessionOverflow<T>(
  * the runner execution and the resolve leaves the record executing+claimed,
  * and NO later claim is ever accepted (claim only takes pending, so a crashed
  * approve can never double-execute a non-idempotent runner). Only the operator
- * acts on such a record: reject (cleanup, no runner) or release + re-stage
- * after manual verification. Release command surface is deferred.
+ * acts on such a record: reject (cleanup, no runner) or — since S2-P2-22
+ * (0.3.80) — `/evolution release <id>` (the stored `claimedBy` rides along as
+ * the release credential; a record whose approve runs in this process is
+ * refused) followed by a deliberate re-approve or reject.
  */
 
 export interface ReviewStateRecord {

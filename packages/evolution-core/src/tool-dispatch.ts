@@ -41,8 +41,10 @@ export type ToolDispatchKind =
   | 'native'
   /** A sub-dispatch of a code program, logged as the PTC dispatch pair. */
   | 'program'
-  /** A \`run_code\` call itself: a native call whose program dispatches sub-calls. */
-  | 'program-root'
+// S1-E6 (0.3.80): the former third value 'program-root' (the run_code call
+// itself) was UNREACHABLE — the platform appends the root's `tool/call` BEFORE
+// any PTC sub-dispatch pair exists, so the root's signal always emitted as
+// 'native'. Dead vocabulary removed rather than kept as a trap.
 
 /** The platform event type carrying a PTC sub-dispatch start. */
 export const PTC_DISPATCH_START_EVENT = 'tool/ptc-dispatch-start'
@@ -72,7 +74,7 @@ export const DISPATCH_EVENT_TYPES: readonly string[] = [
  * so a consumer that reacted at start already holds the outcome.
  */
 export interface ToolDispatchSignal {
-  /** \`native\` | \`program\` (a code-program sub-dispatch) | \`program-root\` (the \`run_code\` call itself). */
+  /** \`native\` | \`program\` (a code-program sub-dispatch); the \`run_code\` root itself reads as \`native\`. */
   readonly kind: ToolDispatchKind
   /** \`callId\` for a native call, \`subCallId\` for a PTC sub-dispatch — the platform's own identity. */
   readonly callId: string
@@ -203,8 +205,20 @@ function readDispatchRecord(event: { type: string; data?: unknown }): DispatchRe
  */
 export class ToolDispatchNormalizer {
   private readonly records = new Map<string, ToolDispatchSignal>()
-  /** Call ids of \`run_code\`-class calls, i.e. of dispatches whose sub-dispatches are \`program\`. */
-  private readonly programRoots = new Set<string>()
+  /** S2-P2-14: cap for the LEDGER (and the settle markers) — opt-in, meant for
+   * the long-lived live listener (skill-usage) whose ledger is pure dedup
+   * state and would otherwise grow with the process lifetime. `Infinity` (the
+   * default, used by whole-log folding) keeps every dispatch. Eviction is
+   * oldest-first: a call/result pair spans one tool call, so an evicted
+   * dispatch can never be re-paired within any realistic window. */
+  private readonly maxTracked: number
+  /** S2-P2-12: call ids whose outcome has already been reported to the settle
+   * channel — a replayed result event must not settle the same dispatch twice. */
+  private readonly settledIds = new Set<string>()
+
+  constructor(options: { maxTracked?: number } = {}) {
+    this.maxTracked = options.maxTracked ?? Number.POSITIVE_INFINITY
+  }
 
   /**
    * Absorb one session event.
@@ -227,7 +241,7 @@ export class ToolDispatchNormalizer {
       return null
     }
     const signal: ToolDispatchSignal = {
-      kind: record.kind === 'native' && this.programRoots.has(record.callId) ? 'program-root' : record.kind,
+      kind: record.kind,
       callId: record.callId,
       rootCallId: record.rootCallId,
       name: record.name,
@@ -235,10 +249,49 @@ export class ToolDispatchNormalizer {
       ok: record.outcome?.ok,
     }
     this.records.set(record.callId, signal)
-    // A PTC sub-dispatch proves its parent is a program root: the platform logs
-    // these events only inside a \`run_code\` execution (ptc.ts bridge).
-    if (record.kind === 'program' && record.rootCallId !== record.callId) this.programRoots.add(record.rootCallId)
+    this.evict()
+    // S1-E6: a former 'program-root' upgrade lived here (a PTC sub-dispatch
+    // proving its parent was a run_code root) — but the platform appends the
+    // root's `tool/call` BEFORE any PTC pair, so the root's signal had already
+    // emitted as 'native' and the branch never ran. The root counting once as
+    // 'native' and its sub-dispatches as 'program' is the observable contract.
     return signal
+  }
+
+  /**
+   * S2-P2-12: the SETTLE channel. \`advance\` answers \`null\` for the paired
+   * event that settles an already-emitted dispatch, so a consumer that must act
+   * on the OUTCOME (e.g. count successful skill reads only) cannot tell which
+   * dispatch a \`null\` belonged to. Call this with the same event AFTER
+   * \`advance\`: it answers the settled dispatch exactly once (replayed settle
+   * events answer \`null\`).
+   * @param event - the event already absorbed by \`advance\`.
+   * @returns the dispatch this event settled, or \`null\`.
+   */
+  settledSignalOf(event: { type: string; data?: unknown }): ToolDispatchSignal | null {
+    const record = readDispatchRecord(event)
+    if (record === null || record.outcome === undefined) return null
+    if (this.settledIds.has(record.callId)) return null
+    const signal = this.records.get(record.callId)
+    if (signal === undefined) return null
+    this.settledIds.add(record.callId)
+    this.evict()
+    return signal
+  }
+
+  /** Oldest-first eviction once the ledger (or the settle markers) overflows. */
+  private evict(): void {
+    while (this.records.size > this.maxTracked) {
+      const oldest = this.records.keys().next().value
+      if (oldest === undefined) break
+      this.records.delete(oldest)
+      this.settledIds.delete(oldest)
+    }
+    while (this.settledIds.size > this.maxTracked) {
+      const oldest = this.settledIds.values().next().value
+      if (oldest === undefined) break
+      this.settledIds.delete(oldest)
+    }
   }
 
   /** Every emitted dispatch, in first-seen order. */
@@ -378,10 +431,14 @@ export function isProgramToolName(name: string): boolean {
  * Assert that a payload really is the dispatch event it claims to be.
  *
  * The normalizer is deliberately lenient (it also folds persisted logs, where a
- * payload may predate the current declaration); this is the loud gate for the
- * live path, where a malformed payload means the producer is broken. It never
- * silently downgrades: an unrecognized event type or a payload missing a
- * declared field throws a named \`ToolDispatchPayloadError\`.
+ * payload may predate the current declaration). S1-E7 (honesty fix): this
+ * function is an OPT-IN gate — NO production consumer calls it; the shipped
+ * listeners fold tolerant (`'malformed'` synthesis) precisely because a
+ * throwing gate wired into every session event would brick the family on any
+ * upstream payload drift. Deployments that want fail-loud behavior call this
+ * from their own `session/event` listener. It never silently downgrades: an
+ * unrecognized event type or a payload missing a declared field throws a named
+ * \`ToolDispatchPayloadError\`.
  * @param event - the session event to check.
  * @returns nothing; throws when the payload violates the platform declaration.
  */

@@ -1320,6 +1320,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // checked them; `stagedBytes === undefined` (unreadable target) is neither
         // a hash anchor nor the 'absent' sentinel, so it re-reads below as before.
         const anchored: string | null = hashChecked && typeof stagedBytes === 'string' ? stagedBytes : null
+        // S1-C2: when the staging read FAILED (stagedBytes === undefined) but
+        // the gate's fresh read succeeded and hash-matched, those verified
+        // bytes become the anchor source — previously the attach below saw
+        // `null ?? undefined` and stamped the 'absent' sentinel, so the library
+        // deterministically refused an update it had just verified as current.
+        let gateVerifiedBytes: string | null = null
         if (hashChecked) {
           // C10 (v35): the staging read above already holds this skill's bytes —
           // for update/edit ops nothing awaited in between — so the pre-run
@@ -1336,13 +1342,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             failedOps.push(`skill ${args.action} ${args.name}: the skill changed while this review ran — ${args.action === 'patch' ? 'patch' : 'update'} refused as stale; produce a fresh plan`)
             continue
           }
+          if (anchored === null) gateVerifiedBytes = live
         }
         // P1-13 (v37): attach AFTER the staleness gate so a refused op stages
         // nothing. `anchored` holds the bytes the gate verified; the staging read
         // stands in when the gate never ran (no pre-run snapshot for this skill),
-        // so an absent target still anchors as 'absent' and an unreadable one keeps
-        // no anchor at all.
-        const anchorBytes = anchored ?? stagedBytes
+        // and S1-C2 adds the gate's own verified re-read when the staging read
+        // failed: an absent target still anchors as 'absent' (null) and a
+        // verified-current target anchors with its real bytes.
+        const anchorBytes = anchored ?? gateVerifiedBytes ?? stagedBytes
         if ((args.action === 'update' || args.action === 'edit') && anchorBytes !== undefined) {
           (args as { staged_from_sha256?: string }).staged_from_sha256 = anchorBytes === null ? 'absent' : contentHash(anchorBytes)
         }
@@ -1500,7 +1508,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return updated
       }
       if (op.action === 'patch') {
-        const patched = await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', false, origin)
+        // S1-C1: the plan's replace_all now flows through (the tool channel
+        // documents this flag to the model; the executor hardcoded
+        // first-occurrence-only, so the plan's intent silently shrank).
+        const patched = await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', op.replace_all === true, origin)
         // v30 TSM-04: same accounting parity as the runner path.
         if (patched.ok) {
           const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined

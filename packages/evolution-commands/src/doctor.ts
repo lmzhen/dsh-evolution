@@ -204,17 +204,20 @@ function resolveAgentPresetAsset(asset: string): string | null {
 
 /** The base rows of bases.json: the comparison iterates the same table the
  * installer reads, so doctor cannot check a different set of variants.
+ * S1-F1: rows also carry the optional `unsupported` note — the layered-form
+ * detection below must not treat a base that carries NO family model rows
+ * (minimal) as a double-mount participant.
  * @param path - resolved bases.json.
  * @returns the rows, or null when the table is unreadable or malformed. */
-function readAgentPresetBases(path: string): Array<{ name: string; id: string }> | null {
+function readAgentPresetBases(path: string): Array<{ name: string; id: string; unsupported?: string }> | null {
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as { bases?: unknown }
     if (!Array.isArray(parsed.bases)) return null
-    const rows: Array<{ name: string; id: string }> = []
+    const rows: Array<{ name: string; id: string; unsupported?: string }> = []
     for (const raw of parsed.bases) {
-      const entry = raw as { name?: unknown; id?: unknown }
+      const entry = raw as { name?: unknown; id?: unknown; unsupported?: unknown }
       if (typeof entry.name !== 'string' || typeof entry.id !== 'string') return null
-      rows.push({ name: entry.name, id: entry.id })
+      rows.push({ name: entry.name, id: entry.id, ...(typeof entry.unsupported === 'string' ? { unsupported: entry.unsupported } : {}) })
     }
     return rows.length > 0 ? rows : null
   } catch {
@@ -240,6 +243,46 @@ function installedPresetIds(root: string): string[] {
   }
   for (const entry of entries) if (entry.isDirectory()) ids.push(entry.name)
   return ids
+}
+
+/**
+ * S1-F1: ids of the family's DELIVERED layered presets — every
+ * `.agent-presets/<id>/agent.cordis.yml` artifact that can actually carry the
+ * family model rows. The detection used to probe ONLY the default base id
+ * (`evolution`), so a `--base ptc|cordis` layered install was invisible:
+ * installForm degraded to `none`/`host` and the action ladder recommended
+ * installing `evolution-all` on top — the exact double-mount the doctor exists
+ * to prevent (V27 G6.4 closed it for the default id only).
+ *
+ * A directory counts only when the base table names it as a SUPPORTED family
+ * base (the `unsupported` minimal base carries no model rows and cannot
+ * double-mount anything). When the table itself cannot be read, every
+ * delivered artifact counts — the visible-by-directory posture of
+ * {@link probePresetFreshness}: flag rather than stay silent.
+ * @param root - the `.agent-presets` home directory.
+ * @returns installed family base ids whose `agent.cordis.yml` is on disk.
+ */
+function installedLayeredPresetIds(root: string): string[] {
+  const delivered = installedPresetIds(root).filter(id => existsSync(join(root, id, 'agent.cordis.yml')))
+  if (delivered.length === 0) return []
+  const basesPath = resolveAgentPresetAsset('bases.json')
+  const bases = basesPath === null ? null : readAgentPresetBases(basesPath)
+  if (bases === null) {
+    // S2-O4: table unreadable, so base ids cannot arbitrate — fall back to a
+    // content marker instead of counting every delivered directory: a
+    // family-generated composition references at least one `@deepseek-ai/dsh-*`
+    // package, a foreign preset does not. (Fail-safe posture kept: the marker
+    // is cheap, and flagging a doubtful artifact still beats staying silent.)
+    return delivered.filter((id) => {
+      try {
+        return readFileSync(join(root, id, 'agent.cordis.yml'), 'utf8').includes('@deepseek-ai/dsh-')
+      } catch {
+        return false
+      }
+    })
+  }
+  const supported = new Set(bases.filter(row => row.unsupported === undefined).map(row => row.id))
+  return delivered.filter(id => supported.has(id))
 }
 
 /**
@@ -363,14 +406,20 @@ export async function diagnose(
   const full = bundles.some(name => tailOf(name) === 'dsh-evolution-all')
   const host = bundles.some(name => tailOf(name) === 'dsh-evolution-host')
   const preset = bundles.some(name => tailOf(name) === 'dsh-evolution-preset')
-  const presetDir = join(home, '.agent-presets', 'evolution')
   // V25-07/V26-02 (v25/v26): the layered side is detected by its DELIVERED
   // ARTIFACT (`agent.cordis.yml`, the file `/evolution preset install` and the
   // layered installer both write) rather than bare directory existence — an
   // empty or stale leftover directory must not report a layered install or
   // flag a healthy deployment. ONE detection feeds installForm AND every
   // layered conflict row.
-  const presetDirInstalled = existsSync(join(presetDir, 'agent.cordis.yml'))
+  // S1-F1: the artifact is enumerated across EVERY installed family base —
+  // the old single-directory probe (`{home}/.agent-presets/evolution`) was
+  // blind to `--base ptc|cordis` layered installs and misdirected them into
+  // the `all`-on-top advice below.
+  const presetDir = join(home, '.agent-presets')
+  const layeredIds = installedLayeredPresetIds(presetDir)
+  const presetDirInstalled = layeredIds.length > 0
+  const layeredArtifactLabel = presetDirInstalled ? layeredIds.join(', ') : 'evolution'
   const layered = host && presetDirInstalled
 
   if (full && host) conflicts.push('evolution-all and evolution-host are installed together — the infra rows double-mount and startup fails loud. Keep ONE: remove the other bundle.')
@@ -381,7 +430,7 @@ export async function diagnose(
   // profile root, so `all` + a preset directory double-mounts them even when
   // the host bundle is absent (the old `full && layered` condition required
   // host and stayed silent for exactly that combination).
-  if (full && presetDirInstalled) conflicts.push('evolution-all and the layered Evolution preset are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).')
+  if (full && presetDirInstalled) conflicts.push(`evolution-all and the layered Evolution preset (${layeredArtifactLabel}) are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).`)
   // V24-11 (v24): the preset BUNDLE mounts the same four model rows as `all`
   // (tool-memory / tool-skill-manage / tool-session-query / skill-catalog),
   // so bundle × layered preset dir is the same double-mount as all × layered
@@ -389,7 +438,7 @@ export async function diagnose(
   // matrix silently (installForm even reports the healthy 'preset') and a
   // user following the M4 steps on top of the one-click bundle got no
   // conflict at all.
-  if (preset && presetDirInstalled) conflicts.push('evolution-preset and the layered Evolution preset are both present — the model rows double-mount (the preset bundle carries the same model rows as all). Keep ONE (drop the preset bundle, or remove the layered preset).')
+  if (preset && presetDirInstalled) conflicts.push(`evolution-preset and the layered Evolution preset (${layeredArtifactLabel}) are both present — the model rows double-mount (the preset bundle carries the same model rows as all). Keep ONE (drop the preset bundle, or remove the layered preset).`)
 
   // P0-1 fix (v11): `evolutionReview` is NOT a provided service — review only
   // registers session-event hooks. Infer its presence from the install form
@@ -446,7 +495,7 @@ export async function diagnose(
   if (mountConflicts.length > 0) actions.push('Resolve the conflict first: keep exactly one of evolution-all / evolution-host / evolution-preset / layered.')
   else if (undecidable) actions.push('The install form is UNDECIDABLE (see the DEGRADED row above): an unreadable profiles directory or profile manifest hides whatever is installed, so this report must not add or remove a bundle. Fix the reported read failure, then re-run /evolution doctor.')
   else if (installForm === 'none') actions.push('Install the default full bundle: dsh plugin --profile web add @lmzhen/dsh-evolution-all')
-  else if (installForm === 'preset-only') actions.push('The Evolution preset is delivered but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or remove .agent-presets/evolution if the layered layout is no longer wanted.')
+  else if (installForm === 'preset-only') actions.push(`The Evolution preset is delivered but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or remove .agent-presets/${layeredArtifactLabel} if the layered layout is no longer wanted.`)
   else if (installForm === 'layered') actions.push('Variant form (session opt-in): model tools follow the Evolution preset, and a session on a platform original preset carries no family rows; add @lmzhen/dsh-evolution-all instead if every session should have them.')
   const env = envIssues()
   if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')
@@ -460,7 +509,7 @@ export async function diagnose(
   // the pending-view hint and the approve surface.
   const memoryIssues = memoryInterpolationIssues(home)
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
-  if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended.`)
+  if ((executingCount ?? 0) > 0) actions.push(`${executingCount} staged write(s) are EXECUTING (an approve crashed mid-run — or one is still in flight). Inspect with /evolution pending: if you started the approve, verify the landed write and do not reject it; only reject after verifying no write is intended. For a verified orphan (this build: S2-P2-22), /evolution release <id> returns it to the pending window instead.`)
 
   // G3-② (B2): only `differs` is actionable — the file is stale, not broken,
   // and regenerating it is the user's call. `absent` is a base the user never

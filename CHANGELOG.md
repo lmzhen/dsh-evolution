@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.80 (patch) — 架构分层优化：审计收口（3×P1 + 行为级 P2 + 契约对齐）
+
+> 本版按《架构分层优化计划》（2026-09-15）实施：阶段 0 微修复、阶段 1 三项 P1 收口、
+> 阶段 2 行为级 P2、阶段 3 契约与文档对齐。全部改动均有对应回归或守卫验证；
+> 明确不做清单（避免过度开发）见计划文档 §2.2。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | **S1-E1** consolidate 两段式提交中归档后的三处 `return` 改为 `throw`——此前它们绕过 catch 回滚器，源技能留在 `.archive` 而消息声称"只是被拒绝"；**S1-E5** 每个源归档前一刻重读并比对计划期字节，跨进程漂移即中止（走同一回滚）；**S1-E2** `restoreLatestSnapshot` 的 manifest/extras 读取收进结构化拒绝；**S1-E4** 锚定 `update` 的读失败拒绝改用 `anchorUnverifiable`（"无法验证"不再冒充"不存在"）；**S1-E8** 新增 `resolveExecOrigins(exec)` 单点 origin 解析（header origin + v37 S2.2 会话标记二合一）；**S1-E3** 修复威胁扫描 ZWJ 豁免的转义错误（`'\\u200d'` 永不等于真实 U+200D，emoji 组合序列不再误报 `unicode_format_control`）；**S1-E6** 删除 `ToolDispatchKind` 不可达的 `'program-root'` 值（平台事件顺序下不可达）；**S1-C4** 策展提名解析器为悬挂的 `- from:`（截断或覆盖）补 warning |
+| `tool-memory` | **S1-B1** origin 解析迁移到 `resolveExecOrigins`——inject 评审模式的 memory 写不再被误标 `foreground`，`stageForeground:false` 下不再绕过审批 staging；**S1-B3** `memoryEnabled:false` 时注册显式拒绝 runner（经与启用路径相同的 trailing inject），存量 staged 写在 approve 时得到明确答复而非永久孤儿 |
+| `tool-skill-manage` | **S1-B1** origin 解析同点迁移（行为不变）；**S1-B2** `strictCrossSource` 跨源检查提取为共用函数，审批回放路径同样执行（staging 与 approve 之间目标被高优先级 source 占用时拒绝落盘），与工具路径同豁免 list/review/pin/unpin |
+| `evolution-plan-validator` | **S1-C1** `SkillOp` 增 `replace_all?: boolean`（非布尔拒绝）——此前校验面不认识该字段而执行面硬编码首处替换 |
+| `evolution-review` | **S1-C1** patch 执行透传 `op.replace_all`；**S1-C2** REV-06(b) 门内重读成功的字节回填锚附加——staging 读瞬时失败 + 门内验证通过的计划不再被 `'absent'` 哨兵确定性拒绝 |
+| `evolution-commands` | **S1-F1** doctor 的 layered 检测从硬编码 `~/.agent-presets/evolution` 改为枚举全部已交付家族 base（`evolution-ptc`/`evolution-cordis`），`unsupported` 基座（minimal）与外来 preset 目录不计入——ptc/cordis 变体安装不再被误判 `none` 并诱导叠加 `all` 双挂载；**S1-F2** approval 未挂载时 `/evolution pending` 返回结构化错误（对齐 E-301），不再伪装"队列为空"；**S2-O4** bases.json 不可读的回退分支增加内容标记校验（家族生成物必引 `@deepseek-ai/dsh-*`），外来 preset 不再误报冲突 |
+| `evolution-approval` + `evolution-commands` | **S2-P2-22** 新增 `/evolution release <id>`：把孤儿 `executing` 记录（approve 崩溃残留）退回 pending 窗口——凭据取自记录自身 `claimedBy`（无需扩 state seam），双重防护（本进程 inFlight 拒绝 + 家族单实例契约）；doctor 的 EXECUTING 行动项同步指引 |
+| `evolution-state-domain` | **S1-D3** `DETERMINISTIC_OPEN_CODES` 补 `already-open`（确定性失败不再空耗 3 轮退避）；**S1-D2** `listPending` 对"表键 ≠ record.id"的漂移行按 id 重键修复 + 一次性 warn（对齐 json 侧 P2-5，漂移 pending 不再是审批视图永久僵尸）；**S2-O3** 修复失败时的重读按 record.id 去重（put/delete 两步之间失败不再同记录双列） |
+| `evolution-core`（tool-dispatch）+ `skill-usage` | **S2-P2-12** view 计数从 reveal 移到 SETTLE（normalizer 新增 `settledSignalOf` settle 通道，同一 result 事件只结算一次）——拼写错误/读取失败的 skill 加载不再虚增 view_count，未 settle 的调用不计（保守方向）；**S2-P2-14** live 监听器的 ledger 上限 4096（opt-in `maxTracked`，全量日志折叠路径默认无限），长驻宿主不再随工具调用线性增长 |
+| `evolution-skill-catalog` | **S2-P2-10** OPT-10 注释如实化：scan 亦会在 usage 计数落盘后触发（sidecar 位于受监视根内、rename 推高根 mtime）；根因级重设计（sidecar 迁出监视根）留缓做清单 |
+| `evolution-skill-catalog`（第二轮） | **S3-P2-10** summaries 缓存戳从根目录 mtime 改为**非点条目名集合**（经 seam 必需的 `list`，三态 probe）——usage 计数落盘的 tmp+rename 不再触碰该戳，每次计数落盘触发全树重扫的churn消除；对外部增/删/改名的感知不变，且对无 mtime 后端更稳健（`list` 必需）；`io.ts` 的 mtime seam 契约注释同步更新 |
+| `evolution-curator` | **S1-C3** `llmReview:true` 但 llm 服务缺席时补一次性 warn 并在提名结果中显式标注（对齐 E-52 可观测纪律） |
+| `evolution-learning-graph` | **S1-F3** `/graph` edit/delete 前置探测只把 ENOENT 读作"不存在"，其余 IO 错误如实上报（不再把瞬时读失败伪装成"技能不存在"） |
+| `evolution-host` / `evolution-all` / `evolution-preset`（组合） | **S1-D1** `evolution-state` 行显式 `config: { provider: json }`（三方字节一致）——overlay 仅启用 domain 行不再静默把整个状态介质切到空 domain；切换需显式覆盖该 pin |
+| `evolution-preset/cordis.yml` | **S1-A1** 注释如实化：standalone 行**有意**缺 `sessionScoped`（bare mount 全量观察），删除失实的 "byte-consistent" 声明 |
+| `scripts/lib-doc-facts.mjs` + `scripts/checklists/**` | **S3-G1** 引用存在性正则从 `verify-*.mjs` 扩为任意裸脚本名（`.mjs`/`.cjs`，排除带路径引用）——立即抓出并修复 5 个此前不可见的幻影脚本名共 11 处引用（`check-manifests.cjs`、`mirror-sync.mjs`、`check-tsconfigs.cjs`、`rule-snippet.mjs` 及 CONTRIBUTING 中 2 处机器特定路径 `D:/dsh/audit-v37/*`） |
+| docs | **S3-A2/G2** `INSTALL.md` 说明 `evolution-all` 对 `agent-preset` 硬依赖的闭包守卫用途（不改依赖类型）；`CONTRIBUTING.md` 门禁表退役机器特定路径（`D:/dsh/audit-v37/*`），补齐镜像侧 verify 脚本步骤 |
+
+### 明确不做（防过度开发，见计划 §2.2 / §7）
+
+- 不建注释声明校验 DSL；不统一评审/工具两条写路径；不给 normalizer 加后台清理；
+- 不为孤儿 `executing` 审批记录新增 `/evolution release` 命令面（缓做清单）；
+- usage view 计数时点、normalizer 容量上限、catalog 事件驱动失效：列入缓做清单及重启条件。
+
+### 验证
+
+- 行为步骤均携带新增/更新回归（consolidate 回滚、replace_all 校验、doctor 多基座、
+  B1 origin 标记、B3 拒绝 runner、C4 悬挂提名、E3 ZWJ 误报）。
+- 平台 strict tsc 全插件包 0 错误；`verify-doc-facts --strict --require-repo-docs` 0 违规；
+  三方组合行字节一致守卫成立（D1 三文件同步修改）。
+
 ## 0.3.79 (patch) — 修复 0.3.78 的发布面缺陷（家族在出厂包里加载即失败）
 
 > 0.3.78 的功能代码属实，但**发布出去的包是坏的**：`evolution-core` 新增的包根数据资产

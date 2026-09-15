@@ -4,8 +4,9 @@ This repository (the **flat mirror**) is the publication carrier: `packages/*`
 are the packages that ship, and the root documents — `README.md`,
 `README.zh.md`, `INSTALL.md`, `CHANGELOG.md`, this file — are the user-facing
 surface. The CI validation tree is the platform checkout's
-`packages/evolution/`, kept byte-identical to `packages/*` by
-`mirror-sync`. Edit here, sync, then run the gate.
+`packages/evolution/`, kept byte-identical to `packages/*` by the workspace's
+`sync-dev-to-mirror` / `sync-mirror-to-dev` helpers. Edit here, sync, then run
+the gate.
 
 ## Where a fact is allowed to live (G5, 0.3.78)
 
@@ -72,9 +73,15 @@ Run from the two trees (never reorder or rename these steps):
 | 5 | `node packages/scripts/verify-arch-guards.mjs packages --strict` | mirror |
 | 6 | `node packages/scripts/verify-event-pairing.mjs packages --strict` | mirror |
 | 7 | `node packages/scripts/verify-declared-config.mjs packages --strict` | mirror |
-| 8 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | mirror host |
-| 9 | `node D:/dsh/audit-v37/check-manifests.cjs` | mirror host |
-| 10 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | mirror host |
+| 8 | `node packages/scripts/verify-layout-sync.mjs packages --strict` | mirror |
+| 9 | `node packages/scripts/verify-profile-bundles.mjs packages --strict` | mirror |
+| 10 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
+
+(The former machine-specific `D:/dsh/audit-v37` helpers — `check-tsconfigs`,
+`check-manifests`, `mirror-sync` — are retired from this table: tsconfig
+registration is covered by gate 1, manifest version uniformity by the release
+script, and the sync discipline by the workspace's own
+`sync-dev-to-mirror` / `sync-mirror-to-dev` helpers.)
 
 `verify-doc-facts.mjs` runs standalone for the same check rule N19 makes, and
 `verify-platform-contract.mjs --upstream <tree>` audits the platform anchors

@@ -88,7 +88,7 @@ session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
 `packages/evolution-commands/src/registry.ts` 注册表（hint / help / README 表格的单源）的
 全量枚举，版本以 CHANGELOG head 为准（不在此处钉死版本号）：
 
-`pending [--detail]` · `approve <id>` · `reject <id>` · `doctor [--json]` · `curator run` ·
+`pending [--detail]` · `approve <id>` · `reject <id>` · `release <id>`（孤儿 EXECUTING 写回 pending 窗口） · `doctor [--json]` · `curator run` ·
 `curator pause` · `curator resume` · `curator status` · `curator report` ·
 `curator scope` · `mutations` · `restore`（快照恢复） ·
 `consolidate <target> <sources...> [--plan <runId>]` · `skill restore <name>` ·

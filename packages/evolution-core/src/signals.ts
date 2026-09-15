@@ -136,9 +136,11 @@ export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
   if (dispatch === null) return
   // `toolCalls` is the model-facing call count the cadence weights by: a
   // program's sub-dispatches are not model calls (the `run_code` call that owns
-  // them is logged natively and counted by its own `tool/call`), so only
-  // direct and program-root dispatches advance it. Counting them all would let
-  // one 50-operation program advance the cadence by 50 turns.
+  // them is logged natively and counted by its own `tool/call`), so only the
+  // native dispatches advance it — which, since the vocabulary's dead
+  // 'program-root' value was removed (S1-E6), is simply `kind !== 'program'`.
+  // Counting them all would let one 50-operation program advance the cadence
+  // by 50 turns.
   if (dispatch.kind !== 'program') signal.toolCalls += 1
   // The skill signal asks whether the model learned from a skill this turn,
   // which a program's `tools.skill(...)` call does just as much as a direct

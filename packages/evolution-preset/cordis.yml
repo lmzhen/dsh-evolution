@@ -98,6 +98,13 @@
   name: '@deepseek-ai/dsh-tool-memory'
 
 # ── skills: usage telemetry, model-facing management tool ───────────────────
+# S1-A1: the standalone form carries NO `sessionScoped: true` on the
+# skill-usage/review rows — unlike the host/all/preset-patch forms where every
+# session carries the model tools anyway. This is INTENTIONAL (see
+# evolution-core/src/opt-in.ts): a bare mount keeps observing every session,
+# so the observation scope matches the every-session tool reach of this
+# one-click form. It is NOT byte-consistent with the patch forms' rows, and
+# must not be "synced" to them.
 - id: skill-usage
   name: '@deepseek-ai/dsh-skill-usage'
 - id: tool-skill-manage
@@ -120,9 +127,10 @@
 # ── review / curator / observability / human controls ───────────────────────
 - id: evolution-review
   name: '@deepseek-ai/dsh-evolution-review'
-  # V5-24 (0.3.32): keep the standalone review row byte-consistent with the
-  # overlay/host form — the tool allow-list narrows review subagents to the
-  # plain `skill` tool (the DSH catalog exposes it only).
+  # V5-24 (0.3.32): the tool allow-list narrows review subagents to the plain
+  # `skill` tool (the DSH catalog exposes it only). S1-A1: unlike the
+  # host/all/preset-patch rows, this row deliberately omits
+  # `sessionScoped: true` — see the skill-usage note above.
   config:
     reviewToolAllow: [skill]
 - id: evolution-curator

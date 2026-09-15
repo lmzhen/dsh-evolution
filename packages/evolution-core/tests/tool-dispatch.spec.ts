@@ -251,6 +251,45 @@ describe('the one-dispatch invariant', () => {
   })
 })
 
+describe('S2-P2-14 / S2-P2-12: bounded ledger and the settle channel', () => {
+  it('settledSignalOf answers a settle event exactly once and null for reveals', () => {
+    const normalizer = new ToolDispatchNormalizer()
+    const call: LoggedEvent = { type: NATIVE_CALL_EVENT, data: { turn: 1, step: 0, callId: 'n9', name: 'skill', arguments: '{"name":"demo-skill"}' } }
+    const result: LoggedEvent = { type: NATIVE_RESULT_EVENT, data: { turn: 1, step: 0, message: { source: { callId: 'n9' }, content: [] } } }
+    expect(normalizer.settledSignalOf(call)).toBeNull()
+    expect(normalizer.advance(call)).not.toBeNull()
+    // The call itself carries no outcome — nothing settled yet.
+    expect(normalizer.settledSignalOf(call)).toBeNull()
+    // The result event is absorbed by advance (which answers null); the settle
+    // channel then reports WHICH dispatch this event settled.
+    expect(normalizer.advance(result)).toBeNull()
+    const settled = normalizer.settledSignalOf(result)
+    expect(settled?.callId).toBe('n9')
+    expect(settled?.ok).toBe(true)
+    // A replayed result event never settles the same dispatch twice.
+    expect(normalizer.settledSignalOf(result)).toBeNull()
+  })
+
+  it('maxTracked bounds the ledger (S2-P2-14): the oldest dispatch evicts first', () => {
+    const normalizer = new ToolDispatchNormalizer({ maxTracked: 2 })
+    const call = (n: string): LoggedEvent => ({ type: NATIVE_CALL_EVENT, data: { turn: 1, step: 0, callId: n, name: 'skill', arguments: '{"name":"demo-skill"}' } })
+    normalizer.advance(call('a'))
+    normalizer.advance(call('b'))
+    expect(normalizer.signals.map(signal => signal.callId)).toEqual(['a', 'b'])
+    normalizer.advance(call('c'))
+    expect(normalizer.signals.map(signal => signal.callId)).toEqual(['b', 'c'])
+  })
+
+  it('a settle whose call was evicted is not resurrected as a dispatch', () => {
+    const normalizer = new ToolDispatchNormalizer({ maxTracked: 1 })
+    normalizer.advance({ type: NATIVE_CALL_EVENT, data: { turn: 1, step: 0, callId: 'a', name: 'skill', arguments: '{}' } })
+    normalizer.advance({ type: NATIVE_CALL_EVENT, data: { turn: 1, step: 0, callId: 'b', name: 'skill', arguments: '{}' } })
+    const result: LoggedEvent = { type: NATIVE_RESULT_EVENT, data: { turn: 1, step: 0, message: { source: { callId: 'a' }, content: [] } } }
+    normalizer.advance(result)
+    expect(normalizer.settledSignalOf(result)).toBeNull()
+  })
+})
+
 describe('the family signal fold (review cadence)', () => {
   it('advances toolCalls once per sub-dispatch and raises the skill signal in PTC mode', async () => {
     const events = await ptcLog()
