@@ -686,7 +686,18 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
               + `body=${JSON.stringify(holderContent)}, ageMs=${Date.now() - st.mtimeMs}, `
               + `holderPid=${Number.isInteger(holder) && holder > 0 ? holder : 'none'})`,
             )
-            const current = await readFile(lock, 'utf8').catch(() => '')
+            // v43 audit (B-2): a FAILED re-read must not stand in for the
+            // empty-body shape. `''` made the byte-equality gate below pass for
+            // a lock this process could not actually read — and that gate is the
+            // only safety check before the takeover rm. An unreadable lock is an
+            // observation we cannot act on: leave it to the next attempt (the
+            // same discipline as the probe read above, V27 G0.2).
+            const currentRead = await readFile(lock, 'utf8').then(
+              body => ({ ok: true as const, body }),
+              () => ({ ok: false as const, body: '' }),
+            )
+            if (!currentRead.ok) continue
+            const current = currentRead.body
             if (current === holderContent) {
               const ticket = `${lock}.next`
               // First, reclaim a stale ticket (dead pid in its body, or simply
@@ -846,10 +857,16 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
           // under AV/indexer pressure (EPERM/EBUSY on a freshly-written file),
           // and every contender then waits on our (alive) pid until its whole
           // budget expires — observed as a lost RMW under full-suite load.
-          await rm(lock, { force: true, maxRetries: 20, retryDelay: 100 }).catch(async () => {
-            const body = await readFile(lock, 'utf8').catch(() => '')
-            await recordPendingSelfCleanup(lock, body)
-          })
+          await rm(lock, { force: true, maxRetries: 20, retryDelay: 100 }).catch(() =>
+            // v43 audit (P1-1, io.ts:849-852): register the claim WE wrote.
+            // The old form read the body back and coerced a failed read to '',
+            // and the two failures share one cause (the same exclusive handle
+            // under AV/indexer pressure) — so the registration was EMPTY, the
+            // self-heal's byte-compare could never match the real body, the leak
+            // was never recycled and every writer in this process failed loud
+            // until it exited. A peer that re-created the name holds a DIFFERENT
+            // body, so the byte-compare still refuses to delete it.
+            recordPendingSelfCleanup(lock, myClaim))
         }
       }
     }

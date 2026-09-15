@@ -10,8 +10,12 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 // reads are faulted: armed per path and per 1-based read number, where #1 is the
 // commit-point assertOwned read and #2 the release read of the same write (a
 // successful O_EXCL create reads the lock nowhere else).
-const { faults } = vi.hoisted(() => ({
+const { faults, rmFaults } = vi.hoisted(() => ({
   faults: new Map<string, { nth: number; seen: number; left: number; fired: number }>(),
+  // v43 P1-1: the RELEASE rm is the other half of the self-heal registration —
+  // the two failures share one cause (the same exclusive handle under
+  // AV/indexer pressure), so the regression has to fault both.
+  rmFaults: new Set<string>(),
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -20,6 +24,12 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return {
     ...actual,
     default: actual,
+    rm: async (path: unknown, ...rest: unknown[]) => {
+      if (rmFaults.has(String(path))) {
+        throw Object.assign(new Error('EPERM: injected rm fault for ' + String(path)), { code: 'EPERM' })
+      }
+      return actual.rm(path as never, ...(rest as never[]))
+    },
     readFile: async (path: unknown, ...rest: unknown[]) => {
       const fault = faults.get(String(path))
       if (fault !== undefined && fault.left > 0) {
@@ -140,3 +150,44 @@ it('S1.3 (P2-27): a lock that stays unreadable aborts the write loudly, still wi
   await rm(lock, { force: true })
   pendingSelfCleanup.delete(lock)
 })
+
+it('v43 (P1-1): a failed release rm registers the claim we wrote, with no read-back of the unreadable name', async () => {
+  const root = await tempRoot('dsh-io-release-rm-')
+  const io = nodeEvolutionIo(4)
+  const target = join(root, 'rm-fail.txt')
+  const lock = target + '.lock'
+  pendingSelfCleanup.delete(lock)
+  try {
+    // The pair that bricks the path: the release rm fails under AV/indexer
+    // pressure AND the name is unreadable at that moment (the empty-string
+    // registration). armReadFault(lock, 99) installs the read COUNTER without
+    // throwing, so the assertion below can prove the fix needs no read at all.
+    rmFaults.add(lock)
+    armReadFault(lock, 99)
+    await io.writeText(target, 'first')
+    // Exactly two reads of the lock name: #1 the commit-point assertOwned and
+    // #2 the release read. The pre-fix code added a third (the read-back inside
+    // the failed-rm catch) whose failure registered ''. 
+    expect(faults.get(lock)?.seen).toBe(2)
+    expect(await readFile(target, 'utf8')).toBe('first')
+    // The rm failed, so our claim is still the lock body.
+    const body = await readFile(lock, 'utf8')
+    expect(body).toMatch(new RegExp('^' + String(process.pid) + ':[0-9a-f]+$'))
+    // THE regression: the registration must be the claim we WROTE, not the
+    // empty string a coerced read-back would produce. An empty token can never
+    // equal the real body, so the leak was unrecoverable for every writer in
+    // this process until it exited.
+    expect(pendingSelfCleanup.get(lock)).toBe(body)
+    rmFaults.delete(lock)
+    // The next write recycles the leftover instead of failing loud.
+    await io.writeText(target, 'second')
+    expect(await readFile(target, 'utf8')).toBe('second')
+    expect(await io.readText(lock)).toBeNull()
+    expect(pendingSelfCleanup.has(lock)).toBe(false)
+  } finally {
+    rmFaults.delete(lock)
+    faults.delete(lock)
+    pendingSelfCleanup.delete(lock)
+  }
+})
+
