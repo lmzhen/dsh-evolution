@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { INSTANCE_KEYS, PERSISTED_WRITE_SITES, instanceClaimedWriteSites, persistedWriteSite } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, instanceClaimedWriteSites, persistedWriteSite, persistedWriteSites } from '@deepseek-ai/dsh-evolution-core'
 import { claimInstance, releaseInstance } from '@deepseek-ai/dsh-evolution-core'
 
 const packagesRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
@@ -11,9 +11,9 @@ const packagesRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..', '.
  * unit gate: the table and the code it describes cannot drift apart silently. */
 describe('persisted write inventory (B3 / G4)', () => {
   it('declares a non-empty table whose writer + marker exist in the tree', () => {
-    expect(PERSISTED_WRITE_SITES.length).toBeGreaterThan(0)
+    expect(persistedWriteSites().length).toBeGreaterThan(0)
     const failures: string[] = []
-    for (const site of PERSISTED_WRITE_SITES) {
+    for (const site of persistedWriteSites()) {
       const source = readFileSync(join(packagesRoot, site.writer), 'utf8')
       if (!source.includes(site.marker)) failures.push(`${site.id}: ${site.writer} does not contain ${JSON.stringify(site.marker)}`)
     }
@@ -21,9 +21,9 @@ describe('persisted write inventory (B3 / G4)', () => {
   })
 
   it('gives every site a unique id and a serialization the family implements', () => {
-    const ids = PERSISTED_WRITE_SITES.map(site => site.id)
+    const ids = persistedWriteSites().map(site => site.id)
     expect(new Set(ids).size).toBe(ids.length)
-    for (const site of PERSISTED_WRITE_SITES) {
+    for (const site of persistedWriteSites()) {
       expect(['transact', 'write-lock', 'instance-claim']).toContain(site.serializedBy)
       expect(site.note.length).toBeGreaterThan(0)
     }
@@ -33,7 +33,7 @@ describe('persisted write inventory (B3 / G4)', () => {
     // The state keys are N12 registry keys (`<file> :: <binding>`); a row that
     // names a binding the file does not declare is a stale cross-reference.
     const failures: string[] = []
-    for (const site of PERSISTED_WRITE_SITES) {
+    for (const site of persistedWriteSites()) {
       for (const key of site.state) {
         const [file, binding] = key.split(' :: ')
         if (!file || !binding) { failures.push(`${site.id}: malformed state key ${key}`); continue }

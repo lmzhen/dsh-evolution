@@ -87,13 +87,36 @@ export const INSTANCE_KEYS = {
   curator: 'evolution-curator',
 } as const
 
-/** The declared persisted write sites, in file order. */
-export const PERSISTED_WRITE_SITES: readonly PersistedWriteSite[] =
-  parseSites(JSON.parse(readFileSync(fileURLToPath(SITES_URL), 'utf8')) as unknown)
+let cachedSites: PersistedWriteSite[] | undefined
+
+/**
+ * The declared persisted write sites, in file order.
+ *
+ * v43 audit (S2-3 / P1-10): this used to be a module-scope readFileSync plus
+ * parse, so an unshipped asset threw AT IMPORT — one absent file took the whole
+ * family's load down (0.3.79 shipped a tarball without this asset and every
+ * package failed to load). The read is lazy now: importing the package never
+ * fails on this asset, while the first caller still gets a loud, descriptive
+ * failure instead of an empty table ("no declared write sites" would silently
+ * disable rule N20).
+ * @returns the sites, in file order.
+ */
+export function persistedWriteSites(): readonly PersistedWriteSite[] {
+  if (cachedSites !== undefined) return cachedSites
+  let raw: string
+  try {
+    raw = readFileSync(fileURLToPath(SITES_URL), 'utf8')
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error)
+    throw new Error(`evolution-core: persisted-write-inventory.json is unreadable (${cause}) — the package asset is missing or was not shipped; the write-inventory rules cannot be evaluated without it`)
+  }
+  cachedSites = parseSites(JSON.parse(raw) as unknown)
+  return cachedSites
+}
 
 /** Sites serialized by the per-home instance claim, with their instance keys. */
 export function instanceClaimedWriteSites(): readonly (PersistedWriteSite & { readonly instance: string })[] {
-  return PERSISTED_WRITE_SITES.filter(
+  return persistedWriteSites().filter(
     (site): site is PersistedWriteSite & { readonly instance: string } => site.serializedBy === 'instance-claim',
   )
 }
@@ -101,7 +124,7 @@ export function instanceClaimedWriteSites(): readonly (PersistedWriteSite & { re
 /** One declared site by id. An undeclared id throws — a stale caller must fail
  * loud rather than read "nothing is declared". */
 export function persistedWriteSite(id: string): PersistedWriteSite {
-  const site = PERSISTED_WRITE_SITES.find(candidate => candidate.id === id)
+  const site = persistedWriteSites().find(candidate => candidate.id === id)
   if (site === undefined) throw new Error(`evolution-core: no persisted write site "${id}" in persisted-write-inventory.json`)
   return site
 }
