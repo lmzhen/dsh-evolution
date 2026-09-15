@@ -117,7 +117,10 @@ export class SkillUsageRegistry extends Service {
         // absent, `name` missing, or `name` not a string. None of these is a
         // read this listener can attribute, so the normalizer answers `null`
         // and the event is skipped instead of throwing.
-        reads.advance(event)
+        // v43 audit (FLOW4-4): this ledger is process-wide while its events are
+        // per-session — scope every key by the session so two sessions cannot
+        // share a call id.
+        reads.advance(event, session.id)
         // S2-P2-12: count at SETTLE, not at reveal — a failed load (typo'd
         // name, unreadable file) is not a view of the skill, and view_count
         // feeding the write-ghost/stale signals should not grow on failures.
@@ -125,7 +128,7 @@ export class SkillUsageRegistry extends Service {
         // the settle channel answers exactly once per dispatch, so a replayed
         // result event (or a PTC end event that itself reveals a sub-dispatch
         // whose start was dropped) cannot double-count.
-        const settled = reads.settledSignalOf(event)
+        const settled = reads.settledSignalOf(event, session.id)
         if (settled === null || settled.ok === false) return
         const settledName = skillReadNameOf(settled)
         if (settledName === undefined) return

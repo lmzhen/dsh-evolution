@@ -221,21 +221,35 @@ export class ToolDispatchNormalizer {
   }
 
   /**
+   * v43 audit (FLOW4-4): the ledger key. A normalizer shared by every session
+   * (skill-usage's live listener holds ONE process-wide instance) used the bare
+   * call id, so two sessions that produced the same id — PTC sub-call ids are
+   * short, and an id-less payload falls back to a type+payload key that is not
+   * unique by construction — collided: the second session's read was absorbed as
+   * "already seen" and never counted, and a settle in one session flipped the
+   * other's `ok`. Callers that span sessions pass the session id as `scope`.
+   */
+  private keyOf(callId: string, scope: string): string {
+    return scope === '' ? callId : `${scope}:${callId}`
+  }
+
+  /**
    * Absorb one session event.
    * @param event - the event to absorb; any non-dispatch event is ignored.
    * @returns the dispatch's signal when this event FIRST reveals the dispatch,
    * otherwise \`null\` (the paired event of an already-emitted dispatch, or a
    * non-dispatch event). A \`null\` return is never a dispatch to count again.
    */
-  advance(event: { type: string; data?: unknown }): ToolDispatchSignal | null {
+  advance(event: { type: string; data?: unknown }, scope = ''): ToolDispatchSignal | null {
     const record = readDispatchRecord(event)
     if (record === null) return null
+    const key = this.keyOf(record.callId, scope)
     if (record.name === '') {
-      const existing = this.records.get(record.callId)
+      const existing = this.records.get(key)
       if (existing !== undefined && record.outcome !== undefined) existing.ok = record.outcome.ok
       return null
     }
-    const existing = this.records.get(record.callId)
+    const existing = this.records.get(key)
     if (existing !== undefined) {
       if (record.outcome !== undefined) existing.ok = record.outcome.ok
       return null
@@ -248,7 +262,7 @@ export class ToolDispatchNormalizer {
       arguments: record.arguments,
       ok: record.outcome?.ok,
     }
-    this.records.set(record.callId, signal)
+    this.records.set(key, signal)
     this.evict()
     // S1-E6: a former 'program-root' upgrade lived here (a PTC sub-dispatch
     // proving its parent was a run_code root) — but the platform appends the
@@ -268,13 +282,14 @@ export class ToolDispatchNormalizer {
    * @param event - the event already absorbed by \`advance\`.
    * @returns the dispatch this event settled, or \`null\`.
    */
-  settledSignalOf(event: { type: string; data?: unknown }): ToolDispatchSignal | null {
+  settledSignalOf(event: { type: string; data?: unknown }, scope = ''): ToolDispatchSignal | null {
     const record = readDispatchRecord(event)
     if (record === null || record.outcome === undefined) return null
-    if (this.settledIds.has(record.callId)) return null
-    const signal = this.records.get(record.callId)
+    const key = this.keyOf(record.callId, scope)
+    if (this.settledIds.has(key)) return null
+    const signal = this.records.get(key)
     if (signal === undefined) return null
-    this.settledIds.add(record.callId)
+    this.settledIds.add(key)
     this.evict()
     return signal
   }

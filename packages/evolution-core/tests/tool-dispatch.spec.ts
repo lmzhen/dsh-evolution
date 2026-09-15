@@ -270,6 +270,26 @@ describe('S2-P2-14 / S2-P2-12: bounded ledger and the settle channel', () => {
     expect(normalizer.settledSignalOf(result)).toBeNull()
   })
 
+  it('v43 (FLOW4-4): the ledger key is session-scoped, so two sessions sharing a call id stay separate', () => {
+    const normalizer = new ToolDispatchNormalizer()
+    const call: LoggedEvent = { type: NATIVE_CALL_EVENT, data: { turn: 1, step: 0, callId: 'shared', name: 'skill', arguments: '{"name":"demo-skill"}' } }
+    const result: LoggedEvent = { type: NATIVE_RESULT_EVENT, data: { turn: 1, step: 0, message: { source: { callId: 'shared' }, content: [] } } }
+    // One process-wide ledger (skill-usage's live listener) absorbs events from
+    // every session. Pre-fix the second session's read was absorbed as
+    // already-seen (`advance` answered null) and never counted as a view, and
+    // the first session's settle flipped the second's `ok`.
+    expect(normalizer.advance(call, 'session-a')).not.toBeNull()
+    expect(normalizer.advance(call, 'session-b')).not.toBeNull()
+    expect(normalizer.signals).toHaveLength(2)
+    // Each session settles its OWN dispatch exactly once.
+    expect(normalizer.advance(result, 'session-a')).toBeNull()
+    expect(normalizer.settledSignalOf(result, 'session-a')?.callId).toBe('shared')
+    expect(normalizer.settledSignalOf(result, 'session-b')?.callId).toBe('shared')
+    // Replays stay deduplicated per session.
+    expect(normalizer.settledSignalOf(result, 'session-a')).toBeNull()
+    expect(normalizer.settledSignalOf(result, 'session-b')).toBeNull()
+  })
+
   it('maxTracked bounds the ledger (S2-P2-14): the oldest dispatch evicts first', () => {
     const normalizer = new ToolDispatchNormalizer({ maxTracked: 2 })
     const call = (n: string): LoggedEvent => ({ type: NATIVE_CALL_EVENT, data: { turn: 1, step: 0, callId: n, name: 'skill', arguments: '{"name":"demo-skill"}' } })
