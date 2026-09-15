@@ -20,7 +20,7 @@ it('every per-session collection in the plugin source is registered', () => {
   // The count is the tripwire: a new Map<SessionId, …> fails here until it is
   // registered (update the expectation together with the registration).
   expect(unregistered).toBe(0)
-  expect(registered).toHaveLength(8)
+  expect(registered).toHaveLength(9)
 })
 
 it('the dispose hook delegates to the registry instead of hand-listing clears', () => {

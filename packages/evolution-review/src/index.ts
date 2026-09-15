@@ -390,7 +390,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // not lost) but its cadence FIRE is suppressed once; the next real turn
   // re-arms normally. In-memory only: a restart clears the inbox queue, so
   // the loop cannot survive it.
-  const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, boolean>())
+  // S2-9 (FLOW1-5): the one-shot suppression belongs to the turn the delivery
+  // WOKE, not to "whatever turn ends next". The platform's `turn/start` payload
+  // is only `{ turn }` (no message identity), so the available identity is
+  // ordering: a turn whose END lands after the delivery but whose START predates
+  // it is a busy-period turn and must not consume the suppression.
+  const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, { afterTurn: number }>())
+  const lastTurnStart = sessionState.add('lastTurnStart', new Map<SessionId, number>())
   // V7-04 (0.3.42): the post-delivery counter reset may fail to persist (state
   // store IO failure) — delivery already happened, so warn once per session
   // about the repeat-review source instead of silently re-delivering forever.
@@ -467,7 +473,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // early-returns on `origin === 'subagent'` BEFORE the delete — so their
     // entries used to sit in the map until the 128-threshold sweep. Don't set
     // what no consumer can read.
-    if (event.type === 'turn/start' && session.header.origin !== 'subagent') turnStarts.set(session.id, session.seq - 1)
+    if (event.type === 'turn/start' && session.header.origin !== 'subagent') {
+      turnStarts.set(session.id, session.seq - 1)
+      lastTurnStart.set(session.id, event.data.turn)
+    }
     // S2.2 (v37): `{ kind: 'user' }` is the platform's attestation of human
     // input and ends the review window; plugin notices (our prompt included)
     // never do. `data` crosses the durable log, so the guard tolerates garbage.
@@ -558,7 +567,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // V7-02: a turn woken by our own followup still accumulates (any real
     // user content arriving with it stays in the window) but cannot fire —
     // its review prompt alone must not re-trigger cadence with interval=1.
-    const skipFire = skipNextCadenceFire.get(session.id) ?? false
+    // S2-9 (FLOW1-5): consume only when the ENDING turn started after the
+    // delivery. A turn that started earlier and merely finishes late is the
+    // busy-period case: consuming there left the woken turn unsuppressed (a
+    // second review prompt under interval=1). `afterTurn` stays -1 on a host
+    // that never emits turn/start, which keeps the previous behavior exactly.
+    const suppression = skipNextCadenceFire.get(session.id)
+    const skipFire = suppression !== undefined && event.data.turn > suppression.afterTurn
     if (skipFire) skipNextCadenceFire.delete(session.id)
     let state: ReviewState = { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     // V24-04 (v24): the advanceReview result lives in a holder so the
@@ -902,7 +917,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         wake.followup(message)
         // V7-02: the waking turn's cadence fire is suppressed once (its own
         // review prompt must not re-trigger a review with interval=1).
-        skipNextCadenceFire.set(agent.session.id, true)
+        skipNextCadenceFire.set(agent.session.id, { afterTurn: lastTurnStart.get(agent.session.id) ?? -1 })
       } else agent.inject(message)
       // S2.2 (v37): a review PROMPT makes this session the autonomous review
       // channel (a result notice does not — nothing acts on it); the mark is
