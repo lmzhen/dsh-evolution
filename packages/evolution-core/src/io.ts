@@ -112,6 +112,49 @@ export async function transactIo(
   }
 }
 
+/**
+ * V43 F-4 (S0-6): the shared "the transaction really invoked the task" guard.
+ * A backend that implements `transact` but never calls `task` resolves
+ * cleanly, so every caller that reads the outcome out of the task itself (a
+ * result slot filled inside it, a `Promise<void>` save path) reported success
+ * for a write that never happened — the silent-lost-write family the inline
+ * C-01 (memory-store) and V6-19 (skill-store) guards cover one call site at a
+ * time. Wrap the task handed to `transactIo`/`io.transact` and probe after
+ * the call: `invoked()` for a path that owns a structured refusal, or
+ * `assertInvoked()` for a void-returning path with no result channel (the
+ * family's fail-loud discipline, same wording as skill-store's guard).
+ *
+ * The wrapper is an identity pass-through — neither the backend nor the task
+ * sees a difference — and a task that IS invoked but skips the write (a
+ * dedupe no-op) counts as invoked: the probe answers "did the write path get
+ * to decide", not "did bytes change".
+ * @param what - the write being attempted, named in the thrown message
+ */
+export interface TransactTaskGuard {
+  /** Wrap the task handed to the transact backend, marking its invocation. */
+  wrap<A, R>(task: (current: A) => R): (current: A) => R
+  /** Did the backend invoke the wrapped task? */
+  invoked(): boolean
+  /** Throw when the backend never invoked it (nothing was written). */
+  assertInvoked(): void
+}
+
+/** Build a {@link TransactTaskGuard} for one write path. See its doc. */
+export function transactTaskGuard(what: string): TransactTaskGuard {
+  let invoked = false
+  return {
+    wrap: <A, R>(task: (current: A) => R): ((current: A) => R) => (current: A): R => {
+      invoked = true
+      return task(current)
+    },
+    invoked: () => invoked,
+    assertInvoked: () => {
+      if (invoked) return
+      throw new Error(`internal error: the write transaction for ${what} did not invoke the task; no write was performed`)
+    },
+  }
+}
+
 /** Lazy adapter over an IO provider registry, shared by every evolution consumer. */
 export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIoLike {
   return {

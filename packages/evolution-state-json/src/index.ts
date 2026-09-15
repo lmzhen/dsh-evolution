@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionHome, makeSerialQueue, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, makeSerialQueue, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   assertCloneable,
   canClaimPending,
@@ -876,9 +876,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async saveReviewState(sessionId, record) {
       await mutate(async () => {
+        // V43 F-4 (S0-6): the seam returns void, so a transact backend that
+        // never invokes the task used to resolve as a successful save with
+        // nothing on disk. The shared guard makes the non-write observable.
+        const guard = transactTaskGuard(`review state for session "${sessionId}" (${REVIEW_STATE_FILE})`)
         await jsonTransact<Record<string, ReviewStateRecord>>(
           ctx, io, root, REVIEW_STATE_FILE,
-          (current) => {
+          guard.wrap((current) => {
             // V24-08 (v24): stamp the save wall-clock and enforce the session
             // cap INSIDE the same transact. The review pipeline writes on
             // every turn/end and nothing pruned rows, so the map (and this
@@ -909,8 +913,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               if (!evict.has(id)) pruned[id] = row
             }
             return pruned
-          },
+          }),
         )
+        guard.assertInvoked()
       })
     },
 
@@ -923,10 +928,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async saveCuratorState(record) {
       await mutate(async () => {
+        // V43 F-4 (S0-6): same void-returning write path as saveReviewState —
+        // the guard is what makes "the transaction never ran the task" a
+        // failure instead of a silent no-op (the curator's callers catch and
+        // warn, so the write's absence stays observable there).
+        const guard = transactTaskGuard(`curator state (${CURATOR_STATE_FILE})`)
         await jsonTransact<Record<string, CuratorStateRecord>>(
           ctx, io, root, CURATOR_STATE_FILE,
-          current => ({ ...(current ?? {}), [CURATOR_STATE_KEY]: record }),
+          guard.wrap(current => ({ ...(current ?? {}), [CURATOR_STATE_KEY]: record })),
         )
+        guard.assertInvoked()
       })
     },
 
@@ -953,7 +964,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async savePending(record) {
       await mutate(async () => {
-        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
+        // V43 F-4 (S0-6): a staged write that never reaches the transaction is
+        // the worst silent no-op of the three — the caller reports "staged",
+        // the record is nowhere, and the later approve reports "not in the
+        // pending window". Fail loud instead (the approval surface already
+        // propagates save failures to its caller).
+        const guard = transactTaskGuard(`pending record "${record.id}" (${PENDING_STATE_FILE})`)
+        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           // P2-5: the merged basis is id-keyed (keyPendingById), so writing by
@@ -971,7 +988,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           if (liveCount <= PENDING_RESOLVED_CAP) warnedPendingCapacity = false
           return map
-        })
+        }))
+        guard.assertInvoked()
       })
     },
 
