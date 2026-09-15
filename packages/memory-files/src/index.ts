@@ -56,13 +56,46 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // counted quantity, so it is floored at the one point where it enters the store
   // (floor, not round: a limit must never grow past what the operator configured).
   const floorLimit = (value: number): number => Math.floor(value)
+  // S2-12③ (FLOW5-4): the memory budget has TWO configuration surfaces — this
+  // package's `memoryCharLimit`/`userCharLimit` (what the STORE enforces) and
+  // `evolution-policy`'s `memoryChars`/`userChars` (what the review pipeline
+  // PLANS against). They used to default independently, so moving one left the
+  // other behind: the reviewer planned ops for a budget the store then refused.
+  // Explicit config still wins (the operator said so); an UNSET limit follows the
+  // policy when that service is already mounted, and otherwise keeps the default
+  // (row order is not something this plugin can force — doctor compares the two
+  // surfaces again at run time and flags a disagreement, including the
+  // order-induced one).
+  const policyBudget = (): { memory: number | undefined; user: number | undefined } => {
+    const policy = ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number } } | undefined
+    const snapshot = policy?.get?.()
+    return { memory: snapshot?.memoryChars, user: snapshot?.userChars }
+  }
+  const budget = policyBudget()
+  // The loader fills SCHEMA DEFAULTS into the row config, so `undefined` never
+  // arrives here — "the operator set this" has to be read as "differs from the
+  // schema default", the same test the review row uses for shadowed fields. A
+  // row that pins the default value explicitly is therefore indistinguishable
+  // from one that leaves it unset, and follows the policy like the latter.
+  const schemaDefaults = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: Config } } })['~standard'].validate({}).value
+  const explicitLimit = (name: 'memoryCharLimit' | 'userCharLimit'): boolean =>
+    rawConfig[name] !== undefined && rawConfig[name] !== schemaDefaults[name]
   const config = Object.assign({}, rawConfig, {
-    memoryCharLimit: floorLimit(field('memoryCharLimit', rawConfig.memoryCharLimit, DEFAULT_MEMORY_CHAR_LIMIT)),
-    userCharLimit: floorLimit(field('userCharLimit', rawConfig.userCharLimit, DEFAULT_USER_CHAR_LIMIT)),
+    memoryCharLimit: floorLimit(field('memoryCharLimit', explicitLimit('memoryCharLimit') ? rawConfig.memoryCharLimit : budget.memory, DEFAULT_MEMORY_CHAR_LIMIT)),
+    userCharLimit: floorLimit(field('userCharLimit', explicitLimit('userCharLimit') ? rawConfig.userCharLimit : budget.user, DEFAULT_USER_CHAR_LIMIT)),
     maxConsolidationFailures: field('maxConsolidationFailures', rawConfig.maxConsolidationFailures, DEFAULT_CONSOLIDATION_FAILURES),
   }) as Required<Config>
   if (clamped.length > 0) {
     ctx.logger.warn(`memory-files: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
+  }
+  // The one disagreement this plugin can see at load: an EXPLICIT config value
+  // that contradicts the mounted policy. Doctor re-checks the same pair at run
+  // time (it can see the policy mount that happened after this row).
+  if (explicitLimit('memoryCharLimit') && budget.memory !== undefined && config.memoryCharLimit !== budget.memory) {
+    ctx.logger.warn(`memory-files: memoryCharLimit=${config.memoryCharLimit} contradicts evolution-policy memoryChars=${budget.memory} — the store enforces the row value while the review plans against the policy value; align them or leave the row unset`)
+  }
+  if (explicitLimit('userCharLimit') && budget.user !== undefined && config.userCharLimit !== budget.user) {
+    ctx.logger.warn(`memory-files: userCharLimit=${config.userCharLimit} contradicts evolution-policy userChars=${budget.user} — same divergence as memoryCharLimit`)
   }
   // The IO provider is resolved lazily so `memory-files` does not depend on
   // row order: the first write happens only after the preset has fully mounted.
@@ -116,6 +149,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // context. Queue both reads as one serialized step.
     renderContext: () => serializedWrite(() => store.renderContext()),
   }
+  // S2-12③: publish the EFFECTIVE budget so doctor can compare the two surfaces
+  // at run time (the same one-writer/one-reader contract as evolutionFeedback /
+  // evolutionReplay). `source` names which surface won at load.
+  ctx.provide('evolutionMemoryBudget', {
+    memoryCharLimit: config.memoryCharLimit,
+    userCharLimit: config.userCharLimit,
+    memorySource: explicitLimit('memoryCharLimit') ? 'config' : (budget.memory === undefined ? 'default' : 'policy'),
+    userSource: explicitLimit('userCharLimit') ? 'config' : (budget.user === undefined ? 'default' : 'policy'),
+    policyMemoryChars: budget.memory,
+    policyUserChars: budget.user,
+  })
   ctx.effect(() => ctx.memory.registerProvider(provider), 'memory-files.provider')
 }
 

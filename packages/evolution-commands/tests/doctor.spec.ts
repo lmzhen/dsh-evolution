@@ -535,3 +535,49 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 })
+
+describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surfaces', () => {
+  /** The runtime view doctor reads: memory-files\u2019 published budget + the policy. */
+  const runtime = (budget: unknown, policy: unknown) => ({
+    get: (name: string) => name === 'evolutionMemoryBudget' ? budget : name === 'evolutionPolicy' ? policy : undefined,
+  })
+
+  it('flags a store/policy disagreement as a doctor finding', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-budget-'))
+    try {
+      const report = await diagnose(runtime(
+        { memoryCharLimit: 5000, userCharLimit: 1375, memorySource: 'config', userSource: 'policy' },
+        { get: () => ({ memoryChars: 2200, userChars: 1375 }) },
+      ), { home })
+      // The review plans against memoryChars=2200 while the store enforces 5000:
+      // an explicit contradiction (or a row mounted before the policy existed).
+      expect(report.budgetIssues).toHaveLength(1)
+      expect(report.budgetIssues[0]).toContain('memoryCharLimit=5000')
+      expect(report.budgetIssues[0]).toContain('memoryChars=2200')
+      expect(report.actions.some(action => action.includes('Align the memory budget'))).toBe(true)
+      const text = renderDoctorText(report)
+      expect(text).toContain('memory budget:')
+      expect(text).toContain('source: config')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('says nothing when the surfaces agree, or when one of them is absent', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-budget-ok-'))
+    try {
+      const agree = await diagnose(runtime(
+        { memoryCharLimit: 2200, userCharLimit: 1375, memorySource: 'policy', userSource: 'policy' },
+        { get: () => ({ memoryChars: 2200, userChars: 1375 }) },
+      ), { home })
+      expect(agree.budgetIssues).toEqual([])
+      expect(renderDoctorText(agree)).not.toContain('memory budget:')
+      // No memory-files row mounted (the plain stub has no services at all):
+      // there is nothing to compare, so this is not a finding.
+      expect((await diagnose(stub, { home })).budgetIssues).toEqual([])
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+})
+

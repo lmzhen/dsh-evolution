@@ -85,6 +85,10 @@ export interface DoctorReport {
    * pre-step of every session under this home, and an operator may want to clean
    * the file regardless. */
   memoryIssues: string[]
+  /** S2-12③ (FLOW5-4): the memory budget's two configuration surfaces disagree —
+   * `memory-files`' store limit vs `evolution-policy`'s planning value. Empty
+   * when either surface is absent (nothing to compare) or they agree. */
+  budgetIssues: string[]
   services: { review: boolean; curator: boolean; approval: boolean; skillUsage: boolean; io: boolean }
   pendingCount: number | null
   /** v23 (AP-2): claimed-but-crashed records — the only state that needs an
@@ -548,6 +552,8 @@ export async function diagnose(
   // rejecting a live run (the F-204 divergence). Dual attribution, matching
   // the pending-view hint and the approve surface.
   const memoryIssues = memoryInterpolationIssues(home)
+  const budgetIssues = memoryBudgetIssues(ctx)
+  if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryCharLimit/userCharLimit UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
   // answers per session BY DESIGN, so an all-false process looks exactly like a
@@ -568,9 +574,40 @@ export async function diagnose(
   }
 
   return {
-    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, services,
+    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, services,
     pendingCount, executingCount, presetFreshness, scopedProbe, actions,
   }
+}
+
+/**
+ * S2-12③ (FLOW5-4): the memory budget is configured in TWO places —
+ * `memory-files`' `memoryCharLimit`/`userCharLimit` (what the STORE enforces)
+ * and `evolution-policy`'s `memoryChars`/`userChars` (what the review PLANS
+ * against; `memory-files` follows the policy only for an UNSET limit). A
+ * disagreement therefore means an explicit contradiction, or a `memory-files`
+ * row mounted before the policy existed — either way the reviewer budgets ops
+ * the store will refuse. Read-only, like every other doctor row.
+ *
+ * @param ctx - the runtime service view (`get(name)`).
+ * @returns one message per disagreeing surface; empty when not comparable.
+ */
+function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
+  const budget = ctx.get('evolutionMemoryBudget') as {
+    memoryCharLimit?: number
+    userCharLimit?: number
+    memorySource?: string
+    userSource?: string
+  } | undefined
+  const policy = (ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number } } | undefined)?.get?.()
+  if (budget === undefined || policy === undefined) return []
+  const issues: string[] = []
+  if (budget.memoryCharLimit !== undefined && policy.memoryChars !== undefined && budget.memoryCharLimit !== policy.memoryChars) {
+    issues.push(`store enforces memoryCharLimit=${budget.memoryCharLimit} (source: ${budget.memorySource ?? 'unknown'}) while evolution-policy declares memoryChars=${policy.memoryChars} — the review plans against the policy value and the store refuses what exceeds its own`)
+  }
+  if (budget.userCharLimit !== undefined && policy.userChars !== undefined && budget.userCharLimit !== policy.userChars) {
+    issues.push(`store enforces userCharLimit=${budget.userCharLimit} (source: ${budget.userSource ?? 'unknown'}) while evolution-policy declares userChars=${policy.userChars} — same divergence as the memory limit`)
+  }
+  return issues
 }
 
 /** S0-4 (v43 G-1 / J-1): the scoped-row reconciliation line. The verdict is the
@@ -627,6 +664,7 @@ export function renderDoctorText(report: DoctorReport): string {
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))
+  if (report.budgetIssues.length > 0) lines.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
   return lines.join('\n')
 }
