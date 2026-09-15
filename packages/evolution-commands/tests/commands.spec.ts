@@ -957,6 +957,42 @@ describe('evolution-commands', () => {
     expect(legacy.text).toContain('E-304')
   })
 
+  it('v43 (P1-2): a staging deployment is refused for the destructive writes the skill runner cannot replay', async () => {
+    const cases = [
+      { input: 'consolidate target src', what: 'consolidate' },
+      { input: 'restore', what: 'restore' },
+      { input: 'skill restore demo', what: 'skill restore' },
+    ]
+    for (const { input, what } of cases) {
+      const ctx = new Context()
+      let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+      ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+      // The deployment asked for foreground staging (the shipped default once
+      // the row is enabled). The skill runner has no consolidate/restore
+      // vocabulary, so these three used to write straight through the gate.
+      ctx.provide('evolutionApproval', { isEnabled: true, stageForeground: true, list: async () => [] })
+      await ctx.plugin(Commands)
+      const result = await captured!.handler({ rawInput: input })
+      expect(result.kind, input).toBe('error')
+      expect(result.text, input).toContain('E-306')
+      expect(result.text, input).toContain(what)
+    }
+  })
+
+  it('v43 (P1-2): the same commands are not refused when the deployment does not stage foreground writes', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionApproval', { isEnabled: true, stageForeground: false, list: async () => [] })
+    await ctx.plugin(Commands)
+    const result = await captured!.handler({ rawInput: 'consolidate target src' })
+    // No curator is mounted here, so the command must reach its own E-302
+    // service check — proof the refusal is policy-scoped, not a blanket ban.
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('E-302')
+    expect(result.text).not.toContain('E-306')
+  })
+
   it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined

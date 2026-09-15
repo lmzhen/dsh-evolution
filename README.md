@@ -150,6 +150,7 @@ compatibility flow, and profile override examples.
 | `E-301` | approval service not mounted | evolution-approval row ships with host/all; run doctor |
 | `E-302` | curator service not mounted | mount evolution-curator row; run doctor |
 | `E-303` | replay service not mounted | mount evolution-replay row; run doctor |
+| `E-306` | this deployment stages foreground writes, but `/evolution consolidate` \| `restore` \| `skill restore` is **not replayable** through the skill runner (its vocabulary is create/update/patch/delete/write_file/remove_file/restructure/pin/unpin), so nothing can be staged | run the command from a session whose approval policy is `never`, or set `stageForeground: false` on the evolution-approval row (then the write executes directly, deliberately) |
 | threat deny (memory/skill write) | strict scan hit an instruction-like phrase | rephrase; or exempt a known-innocent label via `threatExemptLabels` (dial reference) |
 | `/evolution doctor` reports `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
@@ -271,6 +272,10 @@ joins only when mounted (D-30):
   config:
     enabled: false
     stageForeground: true
+    # With `enabled: true`, the three writes the skill runner cannot replay
+    # (`/evolution consolidate`, `restore`, `skill restore`) are refused with
+    # E-306 instead of bypassing the gate; set `stageForeground: false` to
+    # execute them directly and deliberately.
 - id: evolution-threat
   name: '@lmzhen/dsh-evolution-threat'
 - id: evolution-review

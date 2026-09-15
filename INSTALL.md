@@ -156,6 +156,12 @@ Add these to `<home>/profiles/<profile>/cordis.patch.yml`.
     stageForeground: true
 ```
 
+With staging on, the three destructive curator writes that the skill runner
+cannot replay — `/evolution consolidate`, `/evolution restore` (whole tree) and
+`/evolution skill restore <name>` — answer `E-306` instead of writing straight
+through the gate. Set `stageForeground: false` (or use a session whose approval
+policy is `never`) to run them directly and deliberately.
+
 ### Override memory/skill roots
 
 The skill tree is read/written by EIGHT rows. Since 0.3.64 they all read the

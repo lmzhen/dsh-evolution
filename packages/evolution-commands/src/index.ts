@@ -146,6 +146,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const agentMissing = (need: string): CommandResult | undefined => invocationAgent === undefined
           ? err(`E-305: this invocation carries no agent — \`${need}\` needs a session-backed call (run it from a session in the GUI or the CLI).`)
           : undefined
+        // v43 audit (P1-2): consolidate, the whole-tree `restore` and `skill
+        // restore <name>` are destructive and had NO approval seam, while their
+        // sibling `restructure` did — in an approval-enabled deployment they
+        // wrote straight through the gate the operator configured. They are also
+        // NOT replayable through the skill runner (its vocabulary is create /
+        // update / patch / delete / write_file / remove_file / restructure /
+        // pin / unpin), so there is nothing to stage: the honest answer is to
+        // refuse and name the two ways out, never to bypass silently.
+        const unreplayableWriteRefusal = (what: string): CommandResult | undefined => {
+          if (approval === undefined) return undefined
+          const session = invocationAgent?.session
+          const sessionPolicy = effectiveSessionPolicy(ctx, session)
+          const wouldStage = approval.isEnabled !== false && sessionPolicy !== 'never' && approval.stageForeground !== false
+          if (!wouldStage) return undefined
+          return err(`E-306: this deployment stages foreground writes, but \`/evolution ${what}\` is not replayable through the skill runner — there is nothing to stage. Run it from a session whose approval policy is 'never', or set \`stageForeground: false\` on the evolution-approval row, then repeat the command.`)
+        }
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         const pendingMatch = /^pending(?: --detail)?$/.exec(input)
         if (pendingMatch) {
@@ -337,11 +353,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (tail !== '') {
             return err(`\`restore\` takes no arguments (got "${tail}"). Use \`restore\` for a whole-tree rollback, or \`skill restore <name>\` for one skill.`)
           }
+          const restoreRefusal = unreplayableWriteRefusal('restore')
+          if (restoreRefusal) return restoreRefusal
           const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('consolidate ')) {
+          const consolidateRefusal = unreplayableWriteRefusal('consolidate')
+          if (consolidateRefusal) return consolidateRefusal
           const planTail = /\s--plan\s+(\S+)\s*$/.exec(input) ?? null
           const planRunId = planTail?.[1] ?? undefined
           const rest = planTail ? input.slice(0, planTail.index) : input
@@ -356,6 +376,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input.startsWith('skill restore ')) {
           const name = input.slice(14).trim()
           if (!name) return err('Usage: /evolution skill restore <name>')
+          const skillRestoreRefusal = unreplayableWriteRefusal('skill restore')
+          if (skillRestoreRefusal) return skillRestoreRefusal
           const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.restore(name) : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
           return result.ok ? ok(result.message) : err(result.message)
