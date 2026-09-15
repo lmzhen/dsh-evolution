@@ -10,9 +10,13 @@
  * time and legitimately differ in value between the two claims, so they are
  * asserted only for presence/type (a string), never for equality — and
  * claimedAt is asserted to be cleared on release. Status filtering / release
- * rollback must agree.
+ * rollback must agree. S2-4 (v29): the two seam caps — the resolved pending
+ * tail (P2-4) and the review-state session rows (V24-08) — are exercised through
+ * the same public operations on both providers, so neither medium can keep the
+ * bound to itself.
  */
 import { expect } from 'vitest'
+import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { CuratorStateRecord, EvolutionStateStorage, PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 
 /** Build a fixture pending record, optionally carrying origin/sessionId. */
@@ -180,4 +184,40 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   await provider.savePending({ ...pendingOf('c-extra'), extraField: 'kept' } as unknown as PendingRecord)
   const extraBack = (await provider.listPending('pending')).find(record => record.id === 'c-extra') as unknown as { extraField?: string }
   expect(extraBack.extraField).toBe('kept')
+
+  // --- P2-4 (v15) / C-6 (v18): the RESOLVED pending tail is bounded by the
+  // seam constant on the resolve path, on BOTH providers. The vector seeds
+  // through the public seam (save then claim then resolve) because json's own
+  // cap spec reads its file and the domain medium has no file at all: a
+  // medium-specific seed would stop being a shared vector. ---
+  const capPrefix = 'c-cap-'
+  await provider.savePending(pendingOf('c-cap-live', 'skill'))
+  for (let index = 0; index <= PENDING_RESOLVED_CAP + 1; index += 1) {
+    const id = capPrefix + String(index).padStart(3, '0')
+    await provider.savePending(pendingOf(id))
+    await provider.claimPending(id, 'claim-cap')
+    await provider.tryResolvePending(id, 'approved')
+  }
+  const resolvedNow = (await provider.listPending('approved')).concat(await provider.listPending('rejected'))
+    .filter(record => record.kind !== 'capability')
+  expect(resolvedNow).toHaveLength(PENDING_RESOLVED_CAP)
+  const resolvedIds = resolvedNow.map(record => record.id)
+  expect(resolvedIds).not.toContain(capPrefix + '000')
+  expect(resolvedIds).not.toContain(capPrefix + '001')
+  expect(resolvedIds).toContain(capPrefix + String(PENDING_RESOLVED_CAP + 1).padStart(3, '0'))
+  expect((await provider.listPending('pending')).map(record => record.id)).toContain('c-cap-live')
+
+  // --- V24-08 (v24): review-state rows are bounded per session table, and the
+  // SAVING session is never the victim — one row is dropped per over-cap save,
+  // so re-saving the oldest session re-enters it and evicts the next oldest. ---
+  const sessionPrefix = 's-cap-'
+  const reviewStateOf = (turns: number) => ({ turnsSinceMemory: turns, turnsSinceSkill: 0, lastTurn: turns })
+  for (let index = 0; index <= REVIEW_STATE_SESSION_CAP; index += 1) {
+    await provider.saveReviewState(sessionPrefix + index, reviewStateOf(index))
+  }
+  expect(await provider.loadReviewState(sessionPrefix + '0')).toBeNull()
+  expect(await provider.loadReviewState(sessionPrefix + '1')).toEqual(reviewStateOf(1))
+  expect(await provider.loadReviewState(sessionPrefix + REVIEW_STATE_SESSION_CAP)).toEqual(reviewStateOf(REVIEW_STATE_SESSION_CAP))
+  await provider.saveReviewState(sessionPrefix + '0', reviewStateOf(999))
+  expect(await provider.loadReviewState(sessionPrefix + '0')).toEqual(reviewStateOf(999))
 }

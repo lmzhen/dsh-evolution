@@ -20,7 +20,7 @@ async function mount(home: string) {
 }
 
 describe('evolution-state-domain cross-provider consistency (G7.4)', () => {
-  it('matches the shared provider contract', async () => {
+  it('matches the shared provider contract', { timeout: 180_000 }, async () => {
     const home = await tempRoot('dsh-domain-consistent-')
     const ctx = await mount(home)
     await runStateProviderConsistency(ctx.evolutionStateStorage.provider('domain'))

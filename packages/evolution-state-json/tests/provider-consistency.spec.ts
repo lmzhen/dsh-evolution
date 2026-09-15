@@ -8,7 +8,7 @@ import { runStateProviderConsistency } from '../../test-support/state-provider-c
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-state-json cross-provider consistency (G7.4)', () => {
-  it('matches the shared provider contract', async () => {
+  it('matches the shared provider contract', { timeout: 180_000 }, async () => {
     const root = await tempRoot('dsh-json-consistent-')
     const ctx = new Context()
     await ctx.plugin(EvolutionStateStorageRegistry)
