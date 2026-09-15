@@ -363,6 +363,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const turnStarts = sessionState.add('turnStarts', new Map<SessionId, number>())
   // P3 (v15): per-mount one-shot for the stateless warn (was module-level).
   let statelessReviewStateWarned = false
+  // S2-8 (FLOW1-3): the mark was withheld because human input was queued ahead.
+  let channelMarkSuppressedWarned = false
   // Completion-channel state (E-59f): these two are deliberately NOT persisted
   // to ReviewState. A process restart resets the "session is proven-long"
   // counter and the "completion already injected" flag — which is ACCEPTED:
@@ -829,6 +831,34 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * prototype method), the caller's catch demoted that to a console warning,
    * and the cadence reset ran anyway — the segment's review was consumed with
    * nothing queued (silent no-delivery window: 2026-09-07 → 0.3.73). */
+  /**
+   * S2-8 (FLOW1-3): is a HUMAN message already queued ahead of ours? The
+   * review-channel mark is a session-level WINDOW, not a claim on one message:
+   * if a real user message is pending when the review prompt is delivered, the
+   * platform claims that human turn first and the mark would be in effect for
+   * the user's own writes — attributing them `background_review` (the pinned /
+   * hermes-managed protection would cover human edits). The platform exposes no
+   * claim identity to the plugin, so the pre-claim queue is the identity that is
+   * readable; this is the plan's documented fallback, and it only ever WITHHOLDS
+   * the mark (a host without `inbox` behaves exactly as before).
+   */
+  const humanQueuedAhead = (inbox: InboxLike | undefined): boolean =>
+    [...(inbox?.nextTurn ?? []), ...(inbox?.nextStep ?? [])].some(row => row.source?.kind === 'user')
+
+  /** Mark the delivered review prompt's session — unless human input is queued
+   * ahead of it (see humanQueuedAhead). Says so once per mount: an unmarked
+   * window silently downgrades that review's writes to foreground attribution. */
+  const markReviewChannelForDelivery = (agent: import('@deepseek-ai/dsh-agent').Agent, inbox: InboxLike | undefined): void => {
+    if (humanQueuedAhead(inbox)) {
+      if (!channelMarkSuppressedWarned) {
+        channelMarkSuppressedWarned = true
+        ctx.logger.warn('dsh-evolution-review: the review prompt was delivered BEHIND queued human input — the review-channel mark stays unset for this window, so this review\u2019s writes are attributed foreground and the .pinned/.hermes-managed protection does not cover them')
+      }
+      return
+    }
+    markReviewChannel(agent.session.id)
+  }
+
   const deliverMessage = (agent: import('@deepseek-ai/dsh-agent').Agent, text: string, summary: string, reviewPrompt = false): boolean => {
     const message = createUserMessage({
       content: [{ type: 'text', text }],
@@ -856,7 +886,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // prompt), so the caller's latch is consumed exactly as on the append
           // path — but no turn was woken, so the woken-turn cadence suppression
           // below is deliberately NOT set.
-          if (reviewPrompt) markReviewChannel(agent.session.id)
+          if (reviewPrompt) markReviewChannelForDelivery(agent, inbox)
           return true
         }
       } catch (error) {
@@ -877,7 +907,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // S2.2 (v37): a review PROMPT makes this session the autonomous review
       // channel (a result notice does not — nothing acts on it); the mark is
       // what tool-skill-manage reads for `.pinned`/`.hermes-managed`.
-      if (reviewPrompt) markReviewChannel(agent.session.id)
+      if (reviewPrompt) markReviewChannelForDelivery(agent, inbox)
       return true
     } catch (error) {
       ctx.logger.warn(`dsh-evolution-review: review delivery failed (${error instanceof Error ? error.message : String(error)}) — nothing was queued; the review is NOT consumed and retries at the next completed boundary`)

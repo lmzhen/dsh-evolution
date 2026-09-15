@@ -24,7 +24,12 @@ const SURFACE = [
   { role: 'assistant', content: [{ type: 'text', text: 'a'.repeat(520) }] },
 ]
 
-async function fixture(options: { reviewMode?: 'inject' | 'subagent'; onDelivery?: (message: unknown) => void } = {}) {
+async function fixture(options: {
+  reviewMode?: 'inject' | 'subagent'
+  onDelivery?: (message: unknown) => void
+  /** S2-8: the platform Inbox view the delivery reads before marking. */
+  inbox?: unknown
+} = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   const session = {
@@ -47,6 +52,7 @@ async function fixture(options: { reviewMode?: 'inject' | 'subagent'; onDelivery
     followup(message: unknown): void { this.forward(message) }
     forward(message: unknown): void { record(message) }
   })() as unknown as Agent
+  if (options.inbox !== undefined) (agent as { inbox?: unknown }).inbox = options.inbox
   ctx.agents.register(agent)
   await ctx.plugin(Review, {
     reviewEnabled: true,
@@ -126,6 +132,30 @@ describe('review channel mark (S2.2, v37 P1-2)', () => {
     // The parent never received a review prompt: it is not the review channel,
     // so the user's own subsequent writes keep foreground attribution.
     expect(isReviewChannelSession(session.id)).toBe(false)
+  })
+
+  it('S2-8 (FLOW1-3): human input queued AHEAD of the prompt keeps the mark unset, with one diagnostic', async () => {
+    const delivered: unknown[] = []
+    // A real user row waits in the inbox: the platform claims THAT turn first,
+    // so a session-level mark would cover the user's own writes. The row shape
+    // is the platform's UserMessage (source.kind === 'user' is its attestation).
+    const humanRow = { id: 'm-human', source: { kind: 'user' } }
+    const { ctx, session, emitEnd } = await fixture({
+      onDelivery: message => delivered.push(message),
+      inbox: { nextTurn: [humanRow], nextStep: [] },
+    })
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    emitEnd(1)
+    await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
+    expect(isReviewChannelSession(session.id)).toBe(false)
+    const diagnostics = warnSpy.mock.calls.filter(call => String(call[0]).includes('BEHIND queued human input'))
+    expect(diagnostics).toHaveLength(1)
+    // A later window repeats the decision but not the warning.
+    emitEnd(2)
+    emitEnd(3)
+    await vi.waitFor(() => { expect(delivered).toHaveLength(2) })
+    expect(isReviewChannelSession(session.id)).toBe(false)
+    expect(warnSpy.mock.calls.filter(call => String(call[0]).includes('BEHIND queued human input'))).toHaveLength(1)
   })
 
   it('a session that never received a prompt is never marked', async () => {
