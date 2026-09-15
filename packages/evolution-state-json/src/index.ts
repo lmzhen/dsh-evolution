@@ -71,6 +71,12 @@ const PENDING_RESOLVED_CAP = SEAM_PENDING_RESOLVED_CAP
  * `.bak` sidecar, so the file — and the full-array rewrite on every append —
  * never grows without bound. */
 const ARCHIVE_RESOLVED_CAP = 5000
+/** S2-12 (FLOW5-3): the staged table's byte budget for the args it carries.
+ * Lives here rather than on the seam because it bounds THIS medium: json
+ * rewrites the whole state file per pending mutation, so bytes — not just row
+ * count — decide the cost. The domain provider writes rows individually and
+ * needs no equivalent (declared asymmetry, not an oversight). */
+const PENDING_ARGS_BYTES_WARN = 1_000_000
 
 /** 0.3.27 (V4-01): an archive entry's dedupe identity. The same audit record
  * (id + status + resolvedAt) must never appear twice; the read-only legacy
@@ -467,6 +473,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // OPT-13: one-shot latch for the pending-capacity warn; re-armed when the
   // live count falls back under the cap.
   let warnedPendingCapacity = false
+  // S2-12 (FLOW5-3): the staged table grows in BYTES as well as rows — a single
+  // staged record can carry a whole skill body in its `args`, and every pending
+  // mutation rewrites this file in full. The record-count warn was the only
+  // signal, so one huge staged payload was invisible until it hurt.
+  let warnedPendingArgsBytes = false
 
   async function readJson<T>(file: string): Promise<T | null> {
     const raw = await io().readText(pathOf(file))
@@ -875,6 +886,33 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
   }
 
+  /**
+   * S2-12 (FLOW5-3/5-4): the staged table's two growth signals, evaluated on
+   * EVERY write path that can move it. Before this, only `savePending` warned
+   * about the record count, so a deployment whose approvals arrive through
+   * claim/resolve grew silently; and nothing measured the staged ARGS at all.
+   * Both warns flip once and re-arm when the table comes back under the bound.
+   *
+   * @param map - the post-write pending map.
+   * @param where - the path that wrote it, named in the warning.
+   */
+  const warnPendingGrowth = (map: Record<string, PendingRecord>, where: 'save' | 'claim' | 'resolve'): void => {
+    const live = Object.values(map).filter(entry => entry.status === 'pending' || entry.status === 'executing')
+    if (live.length > PENDING_RESOLVED_CAP) {
+      if (!warnedPendingCapacity) {
+        warnedPendingCapacity = true
+        ctx.logger.warn(`evolution-state-json: ${live.length} pending/executing staged records exceed the resolved cap (${PENDING_RESOLVED_CAP}) after ${where} — they are never trimmed by design; resolve or reject them (/evolution pending) or the file keeps growing`)
+      }
+    } else warnedPendingCapacity = false
+    const argsBytes = live.reduce((total, entry) => total + Buffer.byteLength(JSON.stringify(entry.args ?? null), 'utf8'), 0)
+    if (argsBytes > PENDING_ARGS_BYTES_WARN) {
+      if (!warnedPendingArgsBytes) {
+        warnedPendingArgsBytes = true
+        ctx.logger.warn(`evolution-state-json: ${argsBytes} bytes of staged args across ${live.length} pending/executing record(s) exceed ${PENDING_ARGS_BYTES_WARN} after ${where} — every pending mutation rewrites this file in full; resolve or drop the oversized records (/evolution pending)`)
+      }
+    } else warnedPendingArgsBytes = false
+  }
+
   const provider: EvolutionStateStorage = {
     name: PROVIDER_JSON,
 
@@ -998,12 +1036,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // growth signal. Without it, an absent approver plus a
           // cadence-driven review pipeline grew the file (and every
           // mutation's full rewrite) with no observable trace.
-          const liveCount = Object.values(map).filter(entry => entry.status === 'pending' || entry.status === 'executing').length
-          if (liveCount > PENDING_RESOLVED_CAP && !warnedPendingCapacity) {
-            warnedPendingCapacity = true
-            ctx.logger.warn(`evolution-state-json: ${liveCount} pending/executing staged records exceed the resolved cap (${PENDING_RESOLVED_CAP}) — they are never trimmed by design; resolve or reject them (/evolution pending) or the file keeps growing`)
-          }
-          if (liveCount <= PENDING_RESOLVED_CAP) warnedPendingCapacity = false
+          warnPendingGrowth(map, 'save')
           return map
         }))
         guard.assertInvoked()
@@ -1029,6 +1062,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           map[id] = slot.claimed
           return map
         })
+        // S2-12 (FLOW5-4): a claim moves a record into the live window without
+        // any save, so the growth signals are evaluated here too. One extra read
+        // per claim — claims are operator actions, not the per-write hot path.
+        warnPendingGrowth(await loadPendingMap(), 'claim')
         return slot.claimed ? { ...slot.claimed } : null
       })
     },
@@ -1060,6 +1097,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async tryResolvePending(id, status, expectedClaimId): Promise<PendingResolution> {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
+        // S2-12 (FLOW5-4): same growth signal on the resolve path (see claim).
         await pendingTransact(async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
@@ -1110,6 +1148,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           return pruned.map
         })
+        // S2-12 (FLOW5-4): a resolve is the third path that moves the table, and
+        // the one that can also EVICT (enforceResolvedCap) — evaluate the growth
+        // signals on the post-write map so a table that stays over the bound
+        // after a resolve still says so.
+        warnPendingGrowth(await loadPendingMap(), 'resolve')
         return result
       })
     },
