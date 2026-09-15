@@ -228,6 +228,39 @@ interface MemoryLike {
   applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
 }
 
+/**
+ * 0.3.81: the platform `Inbox` surface (public `Agent.inbox`,
+ * `core/agent/src/runtime-types.ts`) used by the delivery path to COALESCE a
+ * repeat of the same notice kind instead of queueing a second copy. A
+ * structural view like the `*Like` family above: the pinned tree's own type is
+ * not importable here, and every member stays optional so a host that lacks the
+ * surface degrades to the plain append instead of throwing.
+ */
+interface InboxLike {
+  readonly nextTurn?: readonly PendingMessageLike[]
+  readonly nextStep?: readonly PendingMessageLike[]
+  /** Synchronous answer: was that row still pending (replaced) or already claimed (false)? */
+  replace?(messageId: unknown, message: unknown): boolean
+}
+
+/** The parts of a pending `UserMessage` that identify OUR notice and its kind. */
+interface PendingMessageLike {
+  readonly id: unknown
+  readonly source?: { kind?: string; plugin?: string; form?: string; summary?: string }
+}
+
+/**
+ * Is this pending row our own notice of the SAME kind? `summary` is the kind
+ * discriminator, so distinct notices (cadence review vs completion review vs
+ * self-improvement) still queue side by side: a repeat of one kind replaces its
+ * pending copy instead of adding a second.
+ */
+function isSameKindPending(message: PendingMessageLike, summary: string): boolean {
+  const source = message.source
+  return source?.kind === 'plugin' && source.plugin === 'dsh-evolution-review'
+    && source.form === 'notice' && source.summary === summary
+}
+
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.
 
@@ -779,6 +812,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       content: [{ type: 'text', text }],
       source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary },
     })
+    // 0.3.81 (queue hygiene): a long queue can already hold OUR notice of this
+    // kind — a cadence prompt delivered while the session sits idle, then again
+    // on the next boundary, used to append a second identical request. The
+    // platform exposes the two pending lists and `replace(id, message)`, whose
+    // boolean answers "was that row still pending?" synchronously — so the
+    // repeat is swapped IN PLACE. The check-and-replace pair is synchronous (no
+    // await between), so a row cannot be claimed in between.
+    // The key is the KIND (plugin+form+summary): different notices still queue
+    // separately, and every unexpected shape — a host without `inbox`, a row
+    // already claimed by the loop, a throwing accessor — falls through to the
+    // delivery below. Coalescing can therefore only ever REPLACE a pending copy;
+    // it can never turn into a dropped delivery.
+    const inbox = (agent as { inbox?: InboxLike }).inbox
+    if (inbox !== undefined && typeof inbox.replace === 'function') {
+      try {
+        const pending = [...(inbox.nextTurn ?? []), ...(inbox.nextStep ?? [])]
+        const superseded = pending.find(row => isSameKindPending(row, summary))
+        if (superseded !== undefined && inbox.replace(superseded.id, message)) {
+          // The delivery DID happen (the queued row now carries the current
+          // prompt), so the caller's latch is consumed exactly as on the append
+          // path — but no turn was woken, so the woken-turn cadence suppression
+          // below is deliberately NOT set.
+          if (reviewPrompt) markReviewChannel(agent.session.id)
+          return true
+        }
+      } catch (error) {
+        ctx.logger.warn(`dsh-evolution-review: inbox coalescing failed (${error instanceof Error ? error.message : String(error)}) — delivering a fresh message instead`)
+      }
+    }
     // The wake primitive is called ON the agent: the platform Agent's
     // `followup` is a prototype method (`this.send(...)`), so a detached
     // reference loses its receiver. Bound arrow stubs in tests cannot show it.

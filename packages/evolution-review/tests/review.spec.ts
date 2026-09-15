@@ -500,6 +500,10 @@ async function mountReviewFixture(options: {
    * empty, which keeps the substantive gate (user/assistant chars) at zero; pass
    * role/content entries to exercise the DEFAULT thresholds without a policy. */
   surface?: Array<{ role: string; content: Array<{ type: string; text: string }> }>
+  /** 0.3.81: the platform `Agent.inbox` view. Supplying one exercises the
+   * coalescing step; the default agent has NO `inbox` at all (the older-host /
+   * degradation shape every other case in this suite already runs through). */
+  inbox?: unknown
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
@@ -558,6 +562,7 @@ async function mountReviewFixture(options: {
       else options.onInject?.(message)
     }
   }
+  if (options.inbox !== undefined) (agent as { inbox: unknown }).inbox = options.inbox
   ctx.agents.register(agent)
   const releaseStart: { current: (() => void) | undefined } = { current: undefined }
   const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
@@ -785,6 +790,87 @@ it('0.3.73: a refused wake delivery is not consumed — the review retries at th
   refuse = false
   emitEnd(2); await settle()
   expect(followed).toHaveLength(1)
+})
+
+/** 0.3.81: a pending row shaped the way the platform's Inbox holds one. */
+const pendingRow = (id: string, summary: string, plugin = 'dsh-evolution-review'): unknown => ({
+  id,
+  source: { kind: 'plugin', plugin, form: 'notice', summary },
+})
+
+it('0.3.81: a repeat of the same notice kind REPLACES the pending row instead of queueing a second', async () => {
+  const replaced: Array<{ id: unknown; text: string }> = []
+  const followed: unknown[] = []
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    onFollowup: message => followed.push(message),
+    inbox: {
+      nextTurn: [pendingRow('pending-1', 'auto-review')],
+      nextStep: [pendingRow('pending-2', 'auto-review')],
+      replace: (id: unknown, message: { content: Array<{ text?: string }> }) => {
+        replaced.push({ id, text: message.content.map(part => part.text ?? '').join('') })
+        return true
+      },
+    },
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(replaced).toHaveLength(1) })
+  // The FIRST pending row of our kind is the one swapped in place (nextTurn is
+  // read before nextStep) and the swapped body is this delivery's prompt.
+  const [swapped] = replaced
+  expect(swapped?.id).toBe('pending-1')
+  expect((swapped?.text ?? '').length).toBeGreaterThan(0)
+  // Nothing was appended on top of it — that is the whole point of the step.
+  expect(followed).toHaveLength(0)
+  // A coalesced delivery DID happen, so the caller's latch is consumed exactly
+  // as on the append path.
+  const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
+  expect(saved.turnsSinceMemory).toBe(0)
+  expect(saved.turnsSinceSkill).toBe(0)
+})
+
+it('0.3.81: only the SAME kind coalesces — another notice or another plugin still queues', async () => {
+  const replaced: unknown[] = []
+  const followed: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    stateful: true,
+    onFollowup: message => followed.push(message),
+    inbox: {
+      // Same plugin, DIFFERENT kind; and a foreign plugin with the SAME summary.
+      nextTurn: [pendingRow('pending-other-kind', 'completion-review')],
+      nextStep: [pendingRow('pending-foreign', 'auto-review', 'someone-else')],
+      replace: (id: unknown) => { replaced.push(id); return true },
+    },
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(followed).toHaveLength(1) })
+  expect(replaced).toHaveLength(0)
+})
+
+it('0.3.81: a refused coalesce (row already claimed) degrades to a fresh delivery', async () => {
+  const replaced: unknown[] = []
+  const followed: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({
+    stateful: true,
+    onFollowup: message => followed.push(message),
+    inbox: {
+      nextTurn: [pendingRow('pending-1', 'auto-review')],
+      nextStep: [],
+      // The platform answers false when the row is no longer pending (the loop
+      // claimed it between our read and the replace) — the delivery must NOT be
+      // dropped in that case.
+      replace: (id: unknown) => { replaced.push(id); return false },
+    },
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(followed).toHaveLength(1) })
+  expect(replaced).toEqual(['pending-1'])
 })
 
 it('0.3.45: the review output schema stays inside the raw JSON-Schema type whitelist (V8-01)', () => {
