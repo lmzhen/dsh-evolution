@@ -1979,7 +1979,23 @@ export class SkillLibrary {
     // on POSIX, vanishing after a git/WSL round-trip). Probe the listing for
     // a case-variant and refuse with the variant named, so the refusal reads
     // the same everywhere. Read paths stay platform-native (fail-closed).
-    for (const entry of await this.io.list(this.root).catch(() => [] as string[])) {
+    // v43 audit (FLOW3-2): a FAILED listing must not read as "no case-variant
+    // exists". The catch-all folded every error into an empty list, so a
+    // transient list failure skipped this guard on POSIX and created `my-tool/`
+    // beside `My-Tool/` — the very input win32 refuses — while the probe further
+    // down this file already draws the opposite line (its comment: a failed
+    // enumeration must not mask the error). Fail closed.
+    let rootEntries: readonly string[]
+    try {
+      rootEntries = await this.io.list(this.root)
+    } catch (error) {
+      const cause = error instanceof Error ? error.message : String(error)
+      return {
+        ok: false,
+        message: `Skill "${normalized}" could not be checked for a case-variant collision: listing ${this.root} failed (${cause}). Refusing the create — a second directory differing only in case cannot be undone across platforms.`,
+      }
+    }
+    for (const entry of rootEntries) {
       if (typeof entry === 'string' && entry !== normalized && entry.toLowerCase() === normalized.toLowerCase()) {
         return { ok: false, message: `Skill "${normalized}" collides with the existing case-variant directory "${entry}" (skill names are lowercase-only); rename one of them.` }
       }
