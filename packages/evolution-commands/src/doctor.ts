@@ -152,6 +152,9 @@ export function collectEvolutionBundles(home: string, onReadError?: (error: unkn
     } catch (error) {
       // ENOENT means "this directory is not a profile", not "a profile manifest
       // is torn" — only a REAL read failure (EACCES/EIO) is fail-closed.
+      // v43 S1-4: deliberately NARROWER than core/probe.ts's isMissingPath — in
+    // this walk ENOENT means "this directory is not a profile", not "the file I
+    // asked for is absent"; ENOTDIR/EACCES must keep failing loud. Do not merge.
       if ((error as { code?: string } | undefined)?.code === 'ENOENT') continue
       onReadError?.(error, 'profile-manifest')
       continue

@@ -1539,6 +1539,8 @@ export class SkillLibrary {
       // Any other failure (EACCES…) rethrows: the anchor must not silently
       // degrade to last-writer-wins.
       const code = (error as NodeJS.ErrnoException | undefined)?.code
+      // v43 S1-4: deliberately NOT core/probe.ts's isMissingPath — EISDIR is
+      // "wrong path shape", not "absent", and merging would swallow it here.
       if (code === 'ENOENT' || code === 'EISDIR') return null
       throw error
     }

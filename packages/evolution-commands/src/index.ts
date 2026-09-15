@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
@@ -917,7 +917,9 @@ const defaultFs: FsOps = {
   // rejects, so probeMtime() reports it as unknown instead of as absent.
   mtime: (path) => {
     try { return statSync(path).mtimeMs } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ENOTDIR') return null
+      // v43 S1-4: the canonical predicate (core/probe.ts) — one definition of
+      // "this read failure means it is not there" instead of a second copy.
+      if (isMissingPath(error)) return null
       throw error
     }
   },
