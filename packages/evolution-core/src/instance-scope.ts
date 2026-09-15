@@ -35,7 +35,7 @@
  */
 
 /** Outcome of a claim. `holder` is the current owner either way. */
-export interface InstanceClaimResult {
+interface InstanceClaimResult {
   readonly granted: boolean
   readonly key: string
   readonly holder: string

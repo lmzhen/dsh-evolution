@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 /** How concurrent writers of one site are kept apart. */
-export type WriteSerialization = 'transact' | 'write-lock' | 'instance-claim'
+type WriteSerialization = 'transact' | 'write-lock' | 'instance-claim'
 
 /** One declared persisted write site. */
 export interface PersistedWriteSite {

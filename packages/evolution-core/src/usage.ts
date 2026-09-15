@@ -6,7 +6,7 @@
 import { join } from 'node:path'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 
-export type SkillState = 'active' | 'stale' | 'archived'
+type SkillState = 'active' | 'stale' | 'archived'
 
 export interface UsageRecord {
   created_by: string | null

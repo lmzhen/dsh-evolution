@@ -460,10 +460,10 @@ export function isCommittedWarning(error: unknown): boolean {
 }
 
 /** V27 G1.1: the takeover branches, as a value. */
-export type TakeoverDecision = 'none' | 'dead' | 'empty' | 'corrupt'
+type TakeoverDecision = 'none' | 'dead' | 'empty' | 'corrupt'
 
 /** V27 G1.1: one lock observation, plus the liveness probe for its pid. */
-export interface TakeoverProbe {
+interface TakeoverProbe {
   /** Raw lock body. An empty string means the file exists with no content. */
   body: string
   /** Lock mtime in epoch ms. */

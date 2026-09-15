@@ -35,7 +35,7 @@ export interface DriftSkillSnapshot {
 }
 
 /** verdict=over means "relatively positioned above the threshold", never a violation. */
-export type DriftVerdict = 'pass' | 'over' | 'unknown'
+type DriftVerdict = 'pass' | 'over' | 'unknown'
 
 export interface DriftSignal {
   id: string
@@ -48,7 +48,7 @@ export interface DriftSignal {
   detail?: string | undefined
 }
 
-export interface DriftSkillAssessment {
+interface DriftSkillAssessment {
   name: string
   signals: ReadonlyArray<DriftSignal>
   /** Passthrough from the snapshot (0.3.11): protection marker, catalog loadability. */

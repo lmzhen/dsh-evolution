@@ -79,7 +79,7 @@ export interface EvolutionSkillMutatedEvent {
 /** 0.3.18 (E-6): a turn-end review pipeline failure was caught (never an
  * unhandled rejection); this event lets operators/observability see it. The
  * reason is already logged by the emitter — the event is a timestamped signal. */
-export interface EvolutionReviewErrorEvent {
+interface EvolutionReviewErrorEvent {
   sessionId: string
 }
 

@@ -16,9 +16,9 @@
 
 import { clampedNumber } from './numeric.ts'
 
-export type ThreatScope = 'all' | 'context' | 'strict'
+type ThreatScope = 'all' | 'context' | 'strict'
 
-export interface ThreatFinding {
+interface ThreatFinding {
   label: string
   category: string
   scope: ThreatScope

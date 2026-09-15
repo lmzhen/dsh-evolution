@@ -80,7 +80,7 @@ export interface EvolutionEvent {
 /** The durable-write shape of one event: `feedback` REQUIRES a `target` —
  * the fold key the aggregate is keyed by (P2-10). The other tags keep every
  * field optional, exactly as the runtime payload gate treats them. */
-export type EvolutionEventInput =
+type EvolutionEventInput =
   | (Omit<EvolutionEvent, 'seq' | 'at' | 'target'> & { type: 'feedback'; target: string })
   | (Omit<EvolutionEvent, 'seq' | 'at'> & { type: 'learn' | 'usage' | 'maintain' })
 
@@ -426,7 +426,7 @@ async function pruneCollideArchives(io: EvolutionIoLike, path: string): Promise<
   }
 }
 
-export interface EventLogRead {
+interface EventLogRead {
   events: EvolutionEvent[]
   /** True when THIS read DROPPED events the file may hold, so the result must
    * never be treated as the complete truth for that file. Three causes flag it:

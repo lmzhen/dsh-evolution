@@ -67,7 +67,7 @@ export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure'
  * and `snapshotFromLibrary` feed `read()` verbatim. The field names predate
  * that convention; the thresholds are calibrated against the whole file, so a
  * caller must not strip frontmatter before measuring. */
-export interface SkillHealthSnapshot {
+interface SkillHealthSnapshot {
   skillName: string
   bodyChars: number
   bodyText?: string | undefined
@@ -79,7 +79,7 @@ export interface SkillHealthSnapshot {
   readCount?: number | undefined
 }
 
-export interface SkillHealthDim {
+interface SkillHealthDim {
   bodyChars: number
   stampDensityPerKb: number | null
   supportGroups: number

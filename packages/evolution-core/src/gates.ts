@@ -14,9 +14,9 @@
 
 import { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
-export type GateReason = 'excluded' | 'referenced' | 'suppressed' | 'protected-builtin'
+type GateReason = 'excluded' | 'referenced' | 'suppressed' | 'protected-builtin'
 
-export interface GateSetInputs {
+interface GateSetInputs {
   exclude?: ReadonlySet<string> | undefined
   referenced?: ReadonlySet<string> | undefined
   suppressed?: ReadonlySet<string> | undefined
