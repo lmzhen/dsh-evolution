@@ -19,6 +19,10 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
+// v43 FLOW2-1: the orphan criterion reuses core's SINGLE liveness source
+// (`isProcessAlive`) and the io write-lock body parser (`parseLockBody`), so the
+// approval claim and the io lock cannot drift into two liveness rules.
+import { isProcessAlive, parseLockBody } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
@@ -92,7 +96,11 @@ export type ApprovalLike = {
   reject(id: string): Promise<{ ok: boolean; message: string }>
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record (an approve that
    * crashed mid-run) to the pending window, so it can be deliberately
-   * re-approved or rejected. Optional: only the real service implements it. */
+   * re-approved or rejected. v43 FLOW2-1: "orphaned" is DECIDED — from this
+   * process's in-flight set AND the holder pid the record's claim carries — so a
+   * claim naming a live foreign pid is REFUSED, and a claim without a pid is
+   * released only as an explicitly destructive operator action. Optional: only
+   * the real service implements it. */
   release?(id: string): Promise<{ ok: boolean; message: string }>
 }
 
@@ -267,14 +275,25 @@ export class EvolutionApproval extends Service {
   }
 
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record to the pending
-   * window. "Orphaned" = status `executing` with no approve running in THIS
-   * process (the family single-instance claim rules out any other live
-   * process, so a claim that is not in this service's in-flight dedupe map
-   * belongs to a dead one). The stored `claimedBy` rides along as the seam's
-   * release credential, so no state-seam expansion is needed. The operator is
-   * expected to verify the effect first: re-approving replays the write
-   * deliberately (duplicates possible if the effect already landed);
-   * rejecting closes the record. */
+   * window. "Orphaned" is DECIDED here, never assumed: the older rationale
+   * ("the family single-instance claim rules out any other live process") was
+   * wrong (v43 FLOW2-1) — that claim is a module-scope Map in
+   * core/instance-scope.ts, i.e. PER PROCESS, so a second process over one home
+   * is not excluded at all. Two checks stand in its place:
+   * 1. `inFlight` — an approve/reject running in THIS service instance;
+   * 2. the claim's holder pid. Claim ids are minted as `<pid>:<hex token>`, the
+   *    same body shape the io write lock uses, so `parseLockBody` + the core
+   *    `isProcessAlive` probe answer whether that holder can still be running: a
+   *    LIVE FOREIGN pid REFUSES the release; our own pid is this process's
+   *    leftover (a live in-process approve is what `inFlight` covers); a dead pid
+   *    is a crash. The last two are releasable, which is the S2-P2-22 case.
+   * A claim carrying no pid (the bare-UUID claims minted before this change)
+   * cannot be probed: the release then degrades to an explicitly DESTRUCTIVE
+   * operator action and says so — re-approving replays the write, and that
+   * replay is NOT idempotent if the effect already landed. The operator is
+   * expected to verify the effect first; rejecting closes the record instead
+   * (the stored `claimedBy` rides along as the seam's release credential, so no
+   * state-seam expansion is needed). */
   async release(id: string): Promise<{ ok: boolean; message: string }> {
     const executing = (await this.state().listPending('executing')).find(item => item.id === id)
     if (!executing) {
@@ -283,8 +302,8 @@ export class EvolutionApproval extends Service {
       return { ok: false, message: `Pending write "${id}" is not in the executing window — nothing to release.` }
     }
     // The dedupe map keys in-flight work as `approve:${id}` / `reject:${id}`;
-    // either running means the record is NOT an orphan. The family
-    // single-instance claim rules out any other live process holding it.
+    // either running means the record is NOT an orphan in THIS process. It says
+    // nothing about another process (v43 FLOW2-1) — the pid check below does.
     if (this.inFlight.has(`approve:${id}`) || this.inFlight.has(`reject:${id}`)) {
       return { ok: false, message: `Pending write "${id}" has an approve/reject RUNNING in this process — do not release it. Verify the effect instead; a completed approve resolves its own record.` }
     }
@@ -292,10 +311,37 @@ export class EvolutionApproval extends Service {
     if (claimId === '') {
       return { ok: false, message: `Pending write "${id}" carries no claim to release (unexpected record shape) — reject it instead.` }
     }
-    await this.state().releasePendingClaim(id, claimId)
+    // v43 FLOW2-1: a claim naming a LIVE pid that is not ours means another
+    // process may be mid-approve right now — never roll that record back under
+    // a run that is still going.
+    const holderPid = parseLockBody(claimId)
+    if (holderPid !== null && holderPid !== process.pid && isProcessAlive(holderPid)) {
+      return { ok: false, message: `Pending write "${id}" is claimed by pid ${holderPid}, which is ALIVE — another process may be running this approve. Do not release it: verify the write effect instead and let that run finish (a completed approve resolves its own record).` }
+    }
+    let released = false
+    let failure = ''
+    try {
+      await this.state().releasePendingClaim(id, claimId)
+      // v43 FLOW2-1: a provider-side no-op (the claim no longer matches the
+      // record) must not read as success — the row would stay executing +
+      // claimed with no trace anywhere. Confirm against the pending window.
+      released = (await this.state().listPending('pending')).some(item => item.id === id)
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+      this.ctx.logger.warn(error)
+    }
+    if (!released) {
+      const cause = failure === '' ? 'the claim no longer matches the record — a concurrent writer moved it' : failure
+      return { ok: false, message: `Release of "${id}" did not take effect (${cause}) — it stays EXECUTING with its claim unless it resolved, and the write effect is still unverified. Retry, or reject it to close the record without replaying.` }
+    }
+    // The unverifiable branch is the honest degradation: the message is the
+    // operator's confirmation surface, and it must name the replay risk.
+    const unverifiable = holderPid === null
+      ? ' Its claim carries no pid, so liveness could NOT be verified: another process may still be running this approve.'
+      : ''
     return {
       ok: true,
-      message: `Released "${id}" back to the pending window. VERIFY the effect first: approve re-runs the write deliberately (duplicates possible if the effect already landed); reject closes the record.`,
+      message: `Released "${id}" back to the pending window.${unverifiable} VERIFY the effect before approving: approve re-runs the write, and a non-idempotent replay duplicates an effect that already landed; reject closes the record instead.`,
     }
   }
 
@@ -308,7 +354,7 @@ export class EvolutionApproval extends Service {
       // runner (the write may land after reject; the audit then reads
       // rejected). This is a documented best-effort operator cleanup, not a
       // second resolution gate.
-      const claimId = randomUUID()
+      const claimId = this.newClaimId()
       const record = await this.state().claimPending(id, claimId)
       if (!record) {
         // 0.3.17 (S3.3): operator cleanup for a crashed approve — rejecting an
@@ -372,6 +418,16 @@ export class EvolutionApproval extends Service {
     return (platformApproval as Partial<ApprovalPolicyLike>).config?.policy ?? 'ask'
   }
 
+  /** v43 FLOW2-1: a claim id that CARRIES its holder pid — `parseLockBody`
+   * reads it back and `isProcessAlive` turns it into `release()`'s verifiable
+   * orphan criterion. The `<pid>:<hex token>` body is the io write lock's own
+   * shape, so one set of core helpers reads both; the token stays unique per
+   * call, so two approves of one record can never share a claim (the token is a
+   * dashed UUID stripped to hex because `LOCK_BODY_RE` accepts only hex). */
+  private newClaimId(): string {
+    return `${process.pid}:${randomUUID().split('-').join('')}`
+  }
+
   private dedupe(id: string, task: () => Promise<{ ok: boolean; message: string }>): Promise<{ ok: boolean; message: string }> {
     const existing = this.inFlight.get(id)
     if (existing) return existing
@@ -381,7 +437,7 @@ export class EvolutionApproval extends Service {
   }
 
   private async doApprove(id: string): Promise<{ ok: boolean; message: string }> {
-    const claimId = randomUUID()
+    const claimId = this.newClaimId()
     const record = await this.state().claimPending(id, claimId)
     if (!record) {
       // 0.3.17 (S3.3, E-24): the claim was refused — either another writer is

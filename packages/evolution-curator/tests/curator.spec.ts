@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
+import type { EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 import { tempHome } from '../../test-support/temp-home.ts'
 
@@ -42,6 +43,17 @@ description: ${name} helper
 # ${name}
 Run the same generic workflow. Capture the standard result. Report the common outcome. Verify the shared conventions. Apply the usual tool patterns. Keep the canonical steps. Use the normal entry points. Follow the established procedure. Match the documented behavior. Maintain the expected shape. Preserve the original semantics. Document the known limits. Refresh the stale examples. Review the recent changes. Test the real world cases. Record the observed facts. Summarize the key findings. Reference the source material.
 `
+}
+
+/** v43 FLOW2-1 fixture: poll until `predicate` holds. A fixed sleep would race
+ * a loaded runner, and the sweep-lock case must not be timing-dependent. */
+async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await predicate()) return
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  throw new Error('waitFor: the condition never held before the deadline')
 }
 
 /** S5.5: curator-state mock record shape and its atomic RMW task signature. */
@@ -1025,6 +1037,59 @@ Body of ${name}.
 
     ctx.evolutionCurator.stop()
   })
+
+  it('v43 FLOW2-1: a foreign holder of the per-home sweep lock blocks the retention sweep', async () => {
+    // The instance claim is a module-scope Map: a second curator ROW of this
+    // process yields, but a second PROCESS over one home was never excluded —
+    // and the sweep is a multi-step list + delete over a DIRECTORY, so it needs
+    // the io write lock rather than a per-file one. This fixture holds that lock
+    // exactly as a second process would and proves the sweep yields to it.
+    const home = await tempHome('dsh-curator-sweeplock-')
+    const reportsRoot = join(home, 'evolution', 'reports')
+    await mkdir(reportsRoot, { recursive: true })
+    for (let i = 0; i < 25; i += 1) {
+      const startedAt = new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()
+      await writeFile(join(reportsRoot, `curator-seed-${i}.json`), JSON.stringify({
+        schemaVersion: 1, runId: `seed-${i}`, startedAt, finishedAt: startedAt,
+        staleCandidates: [], llmNominations: [], archiveCandidates: [], archived: [], failed: [],
+      }))
+    }
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    // A 2-attempt lock budget: a HELD lock must fail the sweep fast instead of
+    // burning the production ~2s budget. The refusal is the assertion.
+    const provider: EvolutionIo = { name: 'node-fast', ...nodeEvolutionIo(2) }
+    ctx.evolutionIo.registerProvider(provider, { default: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+
+    // The lock target the inventory row declares for this site
+    // (curator-reports): `<home>/reports/.retention` -> lock file `.retention.lock`.
+    const lockTarget = join(reportsRoot, '.retention')
+    const lockFile = `${lockTarget}.lock`
+    const holder = nodeEvolutionIo()
+    const holding = transactIo(holder, lockTarget, async () => {
+      await new Promise(resolve => setTimeout(resolve, 1_000))
+      return null
+    })
+    await waitFor(async () => (await readFile(lockFile, 'utf8').catch(() => null)) !== null)
+
+    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
+    const during = (await readdir(reportsRoot)).filter(name => name.startsWith('curator-seed-'))
+    // The sweep was refused: every seeded report survives while the lock is held
+    // (without the lock the run's own retention pass prunes seven of them).
+    expect(during).toHaveLength(25)
+    expect(warnSpy.mock.calls.map(call => String(call[0])).join(' | ')).toContain('failed to retain reports')
+
+    await holding
+    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
+    const after = (await readdir(reportsRoot)).filter(name => name.startsWith('curator-seed-'))
+    // With the holder gone the SAME sweep prunes its window: the refusal came
+    // from the lock, not from a broken sweep.
+    expect(after.length).toBeLessThan(25)
+    warnSpy.mockRestore()
+    ctx.evolutionCurator.stop()
+  }, 30_000)
 
   it('scopeView reports pinned skills as protected through the library view (N-1)', async () => {
     await tempHome('dsh-curator-scopeview-')

@@ -61,11 +61,10 @@
     "id": "curator-reports",
     "path": "<evolutionHome>/reports/curator-*.json",
     "writer": "evolution-curator/src/index.ts",
-    "serializedBy": "instance-claim",
-    "marker": "claimInstance(",
-    "instance": "evolution-curator",
+    "serializedBy": "transact",
+    "marker": "transactIo(this.io, reportsSweepLockTarget()",
     "state": [],
-    "note": "Curator run reports + their retention sweep. No per-file lock: the writer holds the per-home instance claim, so a second curator yields instead of racing the sweep."
+    "note": "Curator run reports + their retention sweep. The sweep is a multi-step list + delete-beyond-the-window over a DIRECTORY, so it has no per-file lock: v43 FLOW2-1 put it inside the IO backend's cross-process write lock (transactIo) on a per-home lock target, <evolutionHome>/reports/.retention (lock file <target>.lock, pid:token body). The former declaration here was instance-claim, which is in-process ONLY (instance-scope.ts is a module-scope Map). Two curator ROWS in one process still cannot sweep at once (the loser yields on that claim), and report writes are name-unique per runId. Trigger for the remaining gap: a second PROCESS sharing DSH_HOME now WAITS on the lock instead of sweeping concurrently, and on a backend without transact there is no lock at all, so the sweep degrades to best-effort idempotent deletes."
   },
   {
     "id": "skill-tree",

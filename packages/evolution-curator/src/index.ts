@@ -16,7 +16,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, isPresent, isUnknown, probeList, probeMtime, releaseInstance } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, isPresent, isUnknown, probeList, probeMtime, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
@@ -212,7 +212,9 @@ export class EvolutionCurator extends Service {
   /** P2-5 (v14): one-shot warning that the interval baseline is process-only. */
   private statelessStateWarned = false
   /** B3 / G4: the home this instance claimed, plus whether the claim was
-   * granted. A non-owning instance schedules nothing and runs nothing. */
+   * granted. A non-owning instance schedules nothing and runs nothing. The
+   * claim is PER PROCESS (v43 FLOW2-1): another process's holder is invisible
+   * here, so `holdsInstance` never proves this instance is alone on the home. */
   private instanceHome = ''
   private holdsInstance = false
   /** B3 / G4: this instance's identity in the claim — pid + short token, so the
@@ -234,14 +236,17 @@ export class EvolutionCurator extends Service {
     // to at least 1. Warn once when a user-supplied value had to be corrected.
     // B3 / G4 (0.3.78): the per-home single-instance contract
     // (core instance-scope.ts). The curator owns <home>/reports and its
-    // retention sweep; that sweep is not one locked file, so two instances
-    // would race it with no exclusion at all. The loser is not an error — it
-    // yields: no scheduler, no pass, and a log line naming the holder.
+    // retention sweep. The claim is a module-scope Map — PER PROCESS — so it
+    // keeps two ROWS of this process from running two gate sets and two
+    // lifecycle passes over one tree; it does NOT exclude another process.
+    // The sweep's cross-process exclusion is the IO write lock retainReports()
+    // takes (v43 FLOW2-1). The loser is not an error — it yields: no scheduler,
+    // no pass, and a log line naming the holder.
     this.instanceHome = evolutionHome()
     const claim = claimInstance(this.instanceHome, INSTANCE_KEYS.curator, this.instanceOwner)
     this.holdsInstance = claim.granted
     if (!claim.granted) {
-      this.ctx.logger.warn(`evolution-curator: this instance YIELDS — ${claim.key} is already held by ${claim.holder}; a second curator over one home would race the report retention sweep. It schedules nothing and every run() returns skipped "instance-held".`)
+      this.ctx.logger.warn(`evolution-curator: this instance YIELDS — ${claim.key} is already held by ${claim.holder} IN THIS PROCESS (the claim is a module-scope Map, so it does not exclude another process); a second curator ROW over one home would run a second gate set and a second lifecycle pass over the same tree. It schedules nothing and every run() returns skipped "instance-held"; the report sweep itself is cross-process locked (v43 FLOW2-1).`)
     }
     const clamped: string[] = []
     const field = (name: string, value: number | undefined, fallback: number, min: number, max?: number): number => {
@@ -303,7 +308,8 @@ export class EvolutionCurator extends Service {
   }
 
   start(): void {
-    // B3 / G4: a non-owning instance never schedules (the holder owns the home).
+    // B3 / G4: a non-owning instance never schedules (the holder ROW owns the
+    // home in this process — the claim is per process, v43 FLOW2-1).
     if (!this.holdsInstance) return
     if (this.isDisposed() || !this.enabled || this.timer) return
     // Catch-up check after the boot grace (restart with a due persisted state
@@ -608,8 +614,9 @@ export class EvolutionCurator extends Service {
     // mutexDepth is incremented SYNCHRONOUSLY inside acquireMutex, so this
     // check is atomic with respect to every other entrant's request.
     // B3 / G4: the non-owning instance refuses BOTH automatic and manual passes
-    // — mutating the shared tree from a loser is the two-instance collision the
-    // per-home claim exists to prevent. The report names the outcome.
+    // — mutating the shared tree from a loser ROW is the collision the per-home
+    // claim exists to prevent (it is a per-PROCESS claim, v43 FLOW2-1). The
+    // report names the outcome.
     if (!this.holdsInstance) {
       return {
         stale: [], archived: [], errors: [],
@@ -1449,8 +1456,29 @@ export class EvolutionCurator extends Service {
    * (`curator-error-*.json`) are BUDGETED INDEPENDENTLY. Before this they shared
    * one keep-20 window, so after 25 consecutive failures the next successful
    * run's window held only a few real reports alongside the errors.
+   *
+   * v43 FLOW2-1 (P1): the sweep runs inside the IO backend's cross-process write
+   * lock. The inventory used to declare this site as serialized by the per-home
+   * instance claim, which is a module-scope Map (core/instance-scope.ts): a
+   * second ROW of this process yields, but a second PROCESS over the same home
+   * was never excluded — and "list the directory, then delete beyond the window"
+   * is exactly the multi-step shape that needs a real lock. A backend without
+   * `transact` has no lock at all: the sweep then degrades to the previous
+   * best-effort pass, which is safe because every deletion is idempotent and
+   * each report name is unique per runId.
    */
   private async retainReports(keep = 20, errorKeep = 10): Promise<void> {
+    await transactIo(this.io, reportsSweepLockTarget(), async () => {
+      await this.sweepReports(keep, errorKeep)
+      // The lock target itself is never written — the task exists to hold the
+      // lock across the sweep, and `null` leaves the target absent.
+      return null
+    })
+  }
+
+  /** The sweep `retainReports` holds the per-home lock for. A caller MUST hold
+   * that lock: the listing and the deletions are not atomic on their own. */
+  private async sweepReports(keep: number, errorKeep: number): Promise<void> {
     const reportsRoot = join(evolutionHome(), 'reports')
     const listed = await probeList(this.io, reportsRoot)
     // N14: nothing to recycle when the directory is missing; an UNREADABLE one
@@ -1735,6 +1763,19 @@ export class EvolutionCurator extends Service {
     }
     return result
   }
+}
+
+/**
+ * v43 FLOW2-1: the per-home lock target for the report retention sweep.
+ * `transactIo` takes the IO write lock on THIS path (minting `<path>.lock` with
+ * the io protocol's `pid:token` body) and holds it for the whole task; nothing
+ * ever writes the target, because the sweep's exclusion is the point. It lives
+ * inside `<home>/reports` next to the directory it protects: the sweep's own
+ * name filter (`curator-*.json`) ignores it, and the lock file is removed on
+ * release.
+ */
+function reportsSweepLockTarget(): string {
+  return join(evolutionHome(), 'reports', '.retention')
 }
 
 export default EvolutionCurator

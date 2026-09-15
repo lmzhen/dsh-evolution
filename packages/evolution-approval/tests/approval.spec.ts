@@ -1,9 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { spawn } from 'node:child_process'
 import EvolutionApproval from '../src/index.ts'
 import { effectiveSessionPolicy } from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { mountStateStack } from '../../test-support/state-stack.ts'
+
+// v43 FLOW2-1: release's orphan criterion needs a claim whose holder is a LIVE
+// pid that is NOT this process — the only honest fixture for "another process
+// may be running this approve" (our own pid is the releasable leftover branch).
+// Same fixture shape as evolution-core/tests/io.spec.ts.
+const liveChildren = new Set<ReturnType<typeof spawn>>()
+function spawnLivePid(): number {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+  liveChildren.add(child)
+  return child.pid!
+}
+afterAll(() => {
+  for (const child of liveChildren) child.kill()
+  liveChildren.clear()
+})
 
 describe('evolution-approval', () => {
   it('ignores a self-reported "never" when the platform service is mounted without a never stance (S3.1, E-22)', async () => {
@@ -160,6 +176,11 @@ describe('evolution-approval', () => {
     const released = await ctx.evolutionApproval.release(id)
     expect(released.ok).toBe(true)
     expect(released.message).toContain('pending window')
+    // v43 FLOW2-1: 'dead-claim' carries no pid, so liveness CANNOT be probed.
+    // The release is then an explicitly destructive operator action, and the
+    // message has to name the replay cost instead of implying a verified orphan.
+    expect(released.message).toContain('liveness could NOT be verified')
+    expect(released.message).toContain('non-idempotent replay')
     const pendingAgain = await ctx.evolutionApproval.list('pending')
     expect(pendingAgain.find(item => item.id === id)).toBeDefined()
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
@@ -189,6 +210,72 @@ describe('evolution-approval', () => {
     const released = await ctx.evolutionApproval.release(decision.pendingId!)
     expect(released.ok).toBe(false)
     expect(released.message).toContain('already in the pending window')
+  })
+
+  it('v43 FLOW2-1: release REFUSES a claim held by another LIVE process', async () => {
+    // The claim release used to rely on was a module-scope Map (core
+    // instance-scope.ts) — per PROCESS. "Not running in this process" is
+    // therefore NOT evidence that nobody is: a live foreign holder may be an
+    // approve in flight, and rolling its record back lets a second approve
+    // replay a non-idempotent write over an effect that already landed.
+    const home = await tempRoot('dsh-approval-release-foreign-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'foreign', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    const foreignPid = spawnLivePid()
+    // The io write-lock body shape: `<pid>:<hex token>`.
+    const claimed = await ctx.evolutionState.claimPending(id, `${foreignPid}:deadbeef`)
+    expect(claimed?.status).toBe('executing')
+    const refused = await ctx.evolutionApproval.release(id)
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain(`pid ${foreignPid}`)
+    expect(refused.message).toContain('ALIVE')
+    // Untouched: still executing with its claim, and NOT back in the window.
+    expect((await ctx.evolutionApproval.list('executing')).map(row => row.id)).toContain(id)
+    expect((await ctx.evolutionApproval.list('pending')).map(row => row.id)).not.toContain(id)
+  })
+
+  it('v43 FLOW2-1: a claim naming a DEAD pid is a crash orphan and does release', async () => {
+    const home = await tempRoot('dsh-approval-release-deadpid-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'crashed elsewhere', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    const child = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' })
+    liveChildren.add(child)
+    const deadPid = child.pid!
+    await new Promise(resolve => child.once('exit', resolve))
+    await ctx.evolutionState.claimPending(id, `${deadPid}:cafebabe`)
+    const released = await ctx.evolutionApproval.release(id)
+    expect(released.ok).toBe(true)
+    expect(released.message).toContain('pending window')
+    // The pid WAS parsed, so this is a verified crash rather than the
+    // unverifiable-degradation branch.
+    expect(released.message).not.toContain('could NOT be verified')
+    expect(released.message).toContain('non-idempotent replay')
+    expect((await ctx.evolutionApproval.list('pending')).map(row => row.id)).toContain(id)
+  })
+
+  it('v43 FLOW2-1: a failing releasePendingClaim is reported and warned, never silent', async () => {
+    const home = await tempRoot('dsh-approval-release-throw-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'stuck', args: {}, origin: 'background_review' })
+    const id = decision.pendingId!
+    // This process's own leftover claim (the releasable branch), then the state
+    // RMW itself fails: lock budget, quarantine, closed domain.
+    await ctx.evolutionState.claimPending(id, `${process.pid}:feedface`)
+    const spy = vi.spyOn(ctx.evolutionState, 'releasePendingClaim').mockRejectedValue(new Error('lock budget exhausted'))
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    const failed = await ctx.evolutionApproval.release(id)
+    spy.mockRestore()
+    expect(failed.ok).toBe(false)
+    expect(failed.message).toContain('did not take effect')
+    expect(failed.message).toContain('EXECUTING')
+    expect(failed.message).toContain('lock budget exhausted')
+    // The trace requirement: the failure is logged, not only returned.
+    expect(warnSpy.mock.calls.map(call => String(call[0])).join(' | ')).toContain('lock budget exhausted')
+    warnSpy.mockRestore()
+    // Exactly the state the message describes: executing + still claimed.
+    expect((await ctx.evolutionApproval.list('executing')).map(row => row.id)).toContain(id)
   })
 
   it('runs the replay exactly once when approve is called concurrently', async () => {

@@ -210,8 +210,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // approve that crashed mid-run) — returns it to the pending window
           // so it can be deliberately re-approved or rejected. A record whose
           // approve is still running in this process is refused (the in-flight
-          // check lives in the approval service); the single-instance claim
-          // rules out any other live process holding it.
+          // check lives in the approval service). v43 FLOW2-1: the service does
+          // NOT assume it is the only live process — a claim naming a live
+          // FOREIGN pid is refused there, and a claim carrying no pid cannot be
+          // verified, so that release is a destructive operator action whose
+          // message states the replay risk.
           const id = input.slice(8).trim()
           if (!approval) return err('E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.')
           if (!approval.release) return err('E-304: the mounted approval service predates the release capability — reject the record instead.')
