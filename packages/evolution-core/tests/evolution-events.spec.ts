@@ -321,3 +321,108 @@ it('P2-10 (v37): a feedback event without a NON-EMPTY target is refused at the d
   // ... while a well-formed feedback still appends.
   expect(await appendEvolutionEvent(io, path, { type: 'feedback', target: 'x', kind: 'skill', rating: 'positive' })).toBe(1)
 })
+
+it('C-events-dispatch-1 (v43): an UNREADABLE archive flags the timeline, never "that band is empty"', async () => {
+  const root = await tempRoot('dsh-evo-events-unreadable-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  const archivePath = join(root, 'evolution', 'events-2.json')
+  const at = '2026-01-01T00:00:00.000Z'
+  const event = (seq: number, target: string) =>
+    ({ seq, at, type: 'feedback', target, kind: 'skill', rating: 'positive' })
+  await io.writeText(archivePath, JSON.stringify({ version: 1, events: [event(1, 'a'), event(2, 'b')] }, null, 2))
+  await io.writeText(path, JSON.stringify({ version: 1, events: [event(3, 'c')] }, null, 2))
+  // Fixture: the archive READ fails (EACCES/EIO shape). The node backend maps
+  // only a MISSING file to null, so this is "there, but unreadable".
+  const deadArchive: typeof io = {
+    ...io,
+    readText: async (target: string): Promise<string | null> => {
+      if (target === archivePath) throw new Error('EACCES: unreadable archive (fixture)')
+      return await io.readText(target)
+    },
+  }
+  expect(await readEvolutionEvents(deadArchive, archivePath)).toEqual({ events: [], malformed: true })
+  const timeline = await readEvolutionTimeline(deadArchive, path)
+  // The flagged segment is seq 1-2; only the active band survives, and the flag
+  // is the ONLY signal that anything left the timeline.
+  expect(timeline.malformed).toBe(true)
+  expect(timeline.events.map(entry => entry.seq)).toEqual([3])
+})
+
+it('C-events-dispatch-1 (v43): a FUTURE-VERSION archive is flagged too — its band leaves the timeline', async () => {
+  const root = await tempRoot('dsh-evo-events-future-archive-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  const archivePath = join(root, 'evolution', 'events-2.json')
+  const at = '2026-01-01T00:00:00.000Z'
+  const event = (seq: number, target: string) =>
+    ({ seq, at, type: 'feedback', target, kind: 'skill', rating: 'positive' })
+  // F-338 still holds (the body is never shaped as v1, never rewritten down) but
+  // the v2 records are DROPPED from the read, so the read is lossy.
+  await io.writeText(archivePath, JSON.stringify({ version: 2, events: [event(1, 'a'), event(2, 'b')] }, null, 2))
+  await io.writeText(path, JSON.stringify({ version: 1, events: [event(3, 'c')] }, null, 2))
+  expect(await readEvolutionEvents(io, archivePath)).toEqual({ events: [], malformed: true })
+  const timeline = await readEvolutionTimeline(io, path)
+  expect(timeline.malformed).toBe(true)
+  expect(timeline.events.map(entry => entry.seq)).toEqual([3])
+  // The v1 ACTIVE file is unaffected: the flag is per file, so the healthy read
+  // path keeps its exact prior shape.
+  expect(await readEvolutionEvents(io, path)).toEqual({ events: [event(3, 'c')], malformed: false })
+})
+
+it('C-events-dispatch-2 (v43): an unreadable collision archive REFUSES the rotation instead of overwriting it', async () => {
+  const root = await tempRoot('dsh-evo-events-collide-unreadable-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  const archivePath = join(root, 'evolution', 'events-2.json')
+  const at = '2026-01-01T00:00:00.000Z'
+  const event = (seq: number) =>
+    ({ seq, at, type: 'feedback', target: `t${seq}`, kind: 'skill', rating: 'positive' })
+  const active = JSON.stringify({ version: 1, events: [event(1), event(2), event(3), event(4)] }, null, 2)
+  const archived = JSON.stringify({ version: 1, events: [event(11), event(12)] }, null, 2)
+  await io.writeText(path, active)
+  await io.writeText(archivePath, archived)
+  // Fixture: the collision PROBE fails while the archive WRITE would succeed.
+  // The old `.catch(() => null)` read that failure as "the slot is free" and
+  // overwrote the 11-12 band with this rotation's head.
+  const deadProbe: typeof io = {
+    ...io,
+    readText: async (target: string): Promise<string | null> => {
+      if (target === archivePath) throw new Error('EACCES: unreadable collision probe (fixture)')
+      return await io.readText(target)
+    },
+  }
+  await expect(appendEvolutionEvent(deadProbe, path, {
+    type: 'feedback', target: 'x', kind: 'skill', rating: 'positive',
+  }, 4)).rejects.toThrow(/could not be read/)
+  // Nothing moved: both bands keep their bytes and no band left the timeline.
+  expect(await io.readText(archivePath)).toBe(archived)
+  expect(await io.readText(path)).toBe(active)
+})
+
+it('C-events-dispatch-3 (v43): an unknown-age .collide artifact is KEPT, never deleted as "old enough"', async () => {
+  const root = await tempRoot('dsh-evo-events-collide-age-')
+  const io = nodeEvolutionIo()
+  const path = eventsFile(root)
+  const dir = join(root, 'evolution')
+  const at = '2026-01-01T00:00:00.000Z'
+  const event = (seq: number) =>
+    ({ seq, at, type: 'feedback', target: `t${seq}`, kind: 'skill', rating: 'positive' })
+  // An unparsable collision archive forces the shift-aside path — the only
+  // caller of the collision sweep.
+  await io.writeText(join(dir, 'events-2.json'), 'not json')
+  // A foreign artifact in the sweep's namespace (events-*, .collide) with NO
+  // 13-digit stamp: its age is unknown on a backend whose mtime probe reports
+  // null, and the v33 F-2 contract keeps what it cannot date.
+  await io.writeText(join(dir, 'events-foreign.collide'), 'user bytes')
+  await io.writeText(path, JSON.stringify({ version: 1, events: [event(1), event(2), event(3), event(4)] }, null, 2))
+  const noMtime: typeof io = { ...io, mtime: async (): Promise<number | null> => null }
+  expect(await appendEvolutionEvent(noMtime, path, {
+    type: 'feedback', target: 'x', kind: 'skill', rating: 'positive',
+  }, 4)).toBe(5)
+  const collideNames = (await io.list(dir)).filter(name => name.endsWith('.collide'))
+  // The sweep ran (the family minted its own timestamped shift-aside) …
+  expect(collideNames.some(name => name !== 'events-foreign.collide')).toBe(true)
+  // … and the undatable foreign file survived it.
+  expect(await io.readText(join(dir, 'events-foreign.collide'))).toBe('user bytes')
+})

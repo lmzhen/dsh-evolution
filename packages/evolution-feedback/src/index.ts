@@ -55,6 +55,21 @@ const CACHE_VERSION = 2
  * is complete. Package-private tunable, not a config surface. */
 const CACHE_SNAP_EVERY = 1024
 
+/** C-events-dispatch-1 (v43 audit): the timeline read flags a DROPPED band — an
+ * unreadable archive (EISDIR/EACCES) or a body this v1 reader cannot interpret
+ * (damaged, or a future version). The boot cache stores the fold BASELINE
+ * (`lastSeq`), and `foldWithDelta` only folds `seq > lastSeq`, so folding a
+ * truncated read back into it would seal the dropped band against every later
+ * boot — the loss becomes unrecoverable without deleting the cache by hand.
+ * Both cache writers withhold the refresh when that flag is set (the cache is
+ * disposable by contract, so the last COMPLETE fold simply stays) and say so
+ * through this ONE message, deduped to a single warn per process (V5-32) because
+ * `refold()` re-runs `restore()` before every quality push. */
+const TRUNCATED_TIMELINE_WARN =
+  'evolution-feedback: the evolution event timeline is TRUNCATED - at least one segment (an unreadable archive, or a body this v1'
+  + ' reader cannot interpret, e.g. a future version) was dropped, so the folded counts are incomplete; the boot cache was NOT updated'
+  + ' (a truncated lastSeq would seal the missing band against every later boot)'
+
 export class EvolutionFeedback {
   private state: FeedbackState = { skills: {}, sessions: {} }
   private chain: Promise<unknown> = Promise.resolve()
@@ -101,6 +116,22 @@ export class EvolutionFeedback {
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
   attachIo(io: IoLike): void {
     this.io = io
+  }
+
+  /** V5-32 posture applied to the read side (C-events-dispatch-1, v43): an
+   * event a repeated read keeps reporting must not warn on each read —
+   * `refold()` calls `restore()` before every quality push. Shares the bounded
+   * `warnedMessages` set (and its FIFO eviction) with the append-failure warn.
+   * @param message - the warn text; identical text warns once per process.
+   */
+  private warnOnce(message: string): void {
+    if (this.warnedMessages.has(message)) return
+    if (this.warnedMessages.size >= this.WARNED_CAP) {
+      const oldest = this.warnedMessages.values().next().value
+      if (oldest !== undefined) this.warnedMessages.delete(oldest)
+    }
+    this.warnedMessages.add(message)
+    this.warn(message)
   }
 
   /** Durable-note map key (V4-41): a target shares one record per mode. */
@@ -159,9 +190,15 @@ export class EvolutionFeedback {
       const initial = await readEvolutionTimeline(io, eventsPath, archiveNames)
       // A repeated full read is idempotent: the merge dedupes by seq.
       const lateArchives = (await listEventArchives(io, eventsPath)).filter(name => !archiveNames.includes(name))
-      const events = lateArchives.length === 0
-        ? initial.events
-        : (await readEvolutionTimeline(io, eventsPath, [...archiveNames, ...lateArchives])).events
+      const later = lateArchives.length === 0
+        ? null
+        : await readEvolutionTimeline(io, eventsPath, [...archiveNames, ...lateArchives])
+      const events = later?.events ?? initial.events
+      // C-events-dispatch-1 (v43): EITHER read can drop a seq band (an unreadable
+      // archive, or a body this v1 reader cannot interpret) and the union is the
+      // honest answer — a dropped band is missing from `events` while `malformed`
+      // is the only signal that it ever existed.
+      const truncated = initial.malformed || later?.malformed === true
       const cache = parseCache(rawCache, this.warn)
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       const floor = events[0]?.seq ?? 0
@@ -204,7 +241,15 @@ export class EvolutionFeedback {
       // Refresh the boot cache from the TRUTH, never from the memory-merged
       // state — an optimistic record whose event is not yet on disk must not
       // double-count at the next boot.
-      if (maxSeq > 0 && (!cache || cache.lastSeq < maxSeq)) {
+      if (truncated) {
+        // C-events-dispatch-1 (v43): the folded view is incomplete, and `lastSeq`
+        // is the fold BASELINE for every later boot — writing it from a truncated
+        // read would stamp the dropped band as already folded and `foldWithDelta`
+        // would never revisit it (P1-3's unrecoverable loss). Withhold the write:
+        // the cache is disposable, so the last COMPLETE fold stays in place and a
+        // later boot with the archive repaired still folds the band it dropped.
+        this.warnOnce(TRUNCATED_TIMELINE_WARN)
+      } else if (maxSeq > 0 && (!cache || cache.lastSeq < maxSeq)) {
         try {
           await io.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...truth }, null, 2))
         } catch {
@@ -360,7 +405,15 @@ export class EvolutionFeedback {
     const recordIo = this.io
     if (!path || !eventsPath || !recordIo) return
     try {
-      const { events } = await readEvolutionTimeline(recordIo, eventsPath)
+      const { events, malformed } = await readEvolutionTimeline(recordIo, eventsPath)
+      // C-events-dispatch-1 (v43): this is the SECOND cache writer (cadence
+      // snapshot + the unload `persistCache`), and a truncated read here advanced
+      // `lastSeq` to the surviving max exactly like the restore write did — the
+      // same withhold applies, with the same warn.
+      if (malformed) {
+        this.warnOnce(TRUNCATED_TIMELINE_WARN)
+        return
+      }
       const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
       if (maxSeq === 0) return
       // P1-7 (v37): the read side accepts `lastSeq >= floor - 1` as "this cache

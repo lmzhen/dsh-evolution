@@ -777,4 +777,104 @@ describe('evolution-feedback', () => {
     expect(await io.readText(eventsPath)).toBe('{corrupt log')
     expect(warns.some(message => message.includes('unreadable'))).toBe(true)
   })
+
+  it('C-events-dispatch-1 (v43): an unreadable archive truncates the timeline, so the boot cache is not written', async () => {
+    const home = await tempHome('dsh-feedback-truncated-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const base = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    const archivePath = join(home, 'evolution', 'events-2.json')
+    // Archived band seq 1-2 (two negatives on x); the active holds seq 3-4.
+    await base.writeText(archivePath, eventLog([logEvent(1, 'x', 'negative'), logEvent(2, 'x', 'negative')]))
+    await base.writeText(eventsPath, eventLog([logEvent(3, 'x', 'positive'), logEvent(4, 'x', 'positive')]))
+    // Fixture: the archive READ fails (EACCES/EIO shape) — the node backend maps
+    // only a MISSING file to null, so "there, but unreadable" reaches the reader.
+    let archiveDead = true
+    const io: typeof base = {
+      ...base,
+      readText: async (target: string): Promise<string | null> => {
+        if (target === archivePath && archiveDead) throw new Error('EACCES: unreadable archive (fixture)')
+        return await base.readText(target)
+      },
+    }
+    const warns: string[] = []
+    const first = new Feedback.EvolutionFeedback(io, home, undefined, message => warns.push(message))
+    await first.restore(io)
+    await first.waitIdle()
+    // The visible fold is TRUNCATED: the archived negatives are missing …
+    expect(first.snapshot().skills['x']).toMatchObject({ positive: 2, negative: 0 })
+    // … and it must not become the new fold BASELINE. Writing lastSeq=4 here
+    // seals seq 1-2 against every later fold (foldWithDelta only folds
+    // seq > lastSeq) — the unrecoverable loss this finding reports.
+    expect(await base.readText(cachePath)).toBeNull()
+    expect(warns.filter(message => message.includes('TRUNCATED'))).toHaveLength(1)
+    expect(warns.some(message => message.includes('boot cache was NOT updated'))).toBe(true)
+    // The archive comes back: the next boot folds the band it had dropped.
+    archiveDead = false
+    const second = new Feedback.EvolutionFeedback(base, home)
+    await second.restore(base)
+    await second.waitIdle()
+    expect(second.snapshot().skills['x']).toMatchObject({ positive: 2, negative: 2 })
+  })
+
+  it('C-events-dispatch-1 (v43): a FUTURE-VERSION archive truncates the timeline too — no cache write, no silent drop', async () => {
+    const home = await tempHome('dsh-feedback-truncated-v2-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const base = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    const archivePath = join(home, 'evolution', 'events-2.json')
+    // A v2 archive (a downgraded deployment) holds the band; before v43 the
+    // reader reported it as "no events in that band" and the fold was sealed.
+    await base.writeText(archivePath, JSON.stringify({
+      version: 2, events: [logEvent(1, 'x', 'negative'), logEvent(2, 'x', 'negative')],
+    }, null, 2))
+    await base.writeText(eventsPath, eventLog([logEvent(3, 'x', 'positive'), logEvent(4, 'x', 'positive')]))
+    const warns: string[] = []
+    const first = new Feedback.EvolutionFeedback(base, home, undefined, message => warns.push(message))
+    await first.restore(base)
+    await first.waitIdle()
+    expect(first.snapshot().skills['x']).toMatchObject({ positive: 2, negative: 0 })
+    expect(await base.readText(cachePath)).toBeNull()
+    expect(warns.some(message => message.includes('TRUNCATED') && message.includes('NOT updated'))).toBe(true)
+    // Repair = the archive readable as v1 again: the band folds back in.
+    await base.writeText(archivePath, eventLog([logEvent(1, 'x', 'negative'), logEvent(2, 'x', 'negative')]))
+    const second = new Feedback.EvolutionFeedback(base, home)
+    await second.restore(base)
+    await second.waitIdle()
+    expect(second.snapshot().skills['x']).toMatchObject({ positive: 2, negative: 2 })
+  })
+
+  it('C-events-dispatch-1 (v43): the unload/cadence cache refresh is withheld for a truncated read as well', async () => {
+    const home = await tempHome('dsh-feedback-truncated-persist-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const base = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    const archivePath = join(home, 'evolution', 'events-2.json')
+    await base.writeText(archivePath, eventLog([logEvent(1, 'x', 'negative'), logEvent(2, 'x', 'negative')]))
+    await base.writeText(eventsPath, eventLog([logEvent(3, 'x', 'positive'), logEvent(4, 'x', 'positive')]))
+    const io: typeof base = {
+      ...base,
+      readText: async (target: string): Promise<string | null> => {
+        if (target === archivePath) throw new Error('EACCES: unreadable archive (fixture)')
+        return await base.readText(target)
+      },
+    }
+    const warns: string[] = []
+    const feedback = new Feedback.EvolutionFeedback(io, home, undefined, message => warns.push(message))
+    // writeCacheNow is the SECOND cache producer (cadence snapshot + the unload
+    // persistCache) and is reachable without restore: a truncated read there
+    // used to stamp lastSeq=4, sealing the dropped band exactly like restore.
+    await feedback.persistCache()
+    expect(await base.readText(cachePath)).toBeNull()
+    expect(warns.some(message => message.includes('TRUNCATED') && message.includes('NOT updated'))).toBe(true)
+  })
 })

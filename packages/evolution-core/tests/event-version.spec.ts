@@ -32,13 +32,19 @@ describe('event log version guard (F-338)', () => {
     expect(parseEvolutionEvents(raw)).toEqual([])
   })
 
-  it('readEvolutionEvents treats a future-version body as empty, not malformed (F-338)', async () => {
+  it('readEvolutionEvents treats a future-version body as empty AND flags it (F-338 + v43)', async () => {
     const root = await tempRoot('dsh-evo-events-ver-')
     const io = nodeEvolutionIo()
     const path = eventsFile(root)
     await io.writeText(path, JSON.stringify({ version: 999, events: v1Events }, null, 2))
     const read = await readEvolutionEvents(io, path)
-    expect(read).toEqual({ events: [], malformed: false })
+    // F-338 keeps both halves of its guarantee — the body is never shaped as v1
+    // and never rewritten down (see the append test below) — so the events stay
+    // empty. The v43 audit (C-events-dispatch-1) added the missing half: every
+    // record this reader cannot interpret is DROPPED from the read, so the flag
+    // must report the loss instead of letting a consumer fold a truncated
+    // timeline as if it were the truth.
+    expect(read).toEqual({ events: [], malformed: true })
   })
 
   it('appendEvolutionEvent rejects a future-version body and preserves the bytes (F-338)', async () => {

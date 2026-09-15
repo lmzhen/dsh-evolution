@@ -317,7 +317,21 @@ async function rotateIfDue(io: EvolutionIoLike, path: string, events: EvolutionE
   // history gone while every reader reported a coherent timeline). Merge the
   // two generations instead: both bands survive, overlapping seqs dedupe.
   let archived = head
-  const existing = await io.readText(archivePath).catch(() => null)
+  // C-events-dispatch-2 (v43 audit): only a readText of `null` means "that slot
+  // is free" — the node backend maps just ENOENT/ENOTDIR to null and lets every
+  // other failure (EACCES/EIO/EBUSY) propagate (io.ts readText contract). The
+  // old `.catch(() => null)` folded such a failure into "nothing to collide
+  // with", so the archive write below destroyed a band that WAS on disk. An
+  // unreadable collision archive now refuses the rotation exactly like an
+  // unmergeable one (P2-11): the active keeps its full band, the archive keeps
+  // its bytes, and no band leaves the logical timeline.
+  let existing: string | null
+  try {
+    existing = await io.readText(archivePath)
+  } catch (error: unknown) {
+    const cause = error instanceof Error ? error.message : String(error)
+    return { ok: false, reason: `evolution event archive collision at ${archivePath} could not be read (${cause}) and was not touched` }
+  }
   if (existing !== null) {
     let parsed: { version?: unknown; events?: unknown } | null = null
     try { parsed = JSON.parse(existing) as { version?: unknown; events?: unknown } } catch { parsed = null }
@@ -398,7 +412,12 @@ async function pruneCollideArchives(io: EvolutionIoLike, path: string): Promise<
       // cannot abort the event append.
       try {
         const mtime = await io.mtime?.(full)
-        if (typeof mtime === 'number' && now - mtime < COLLIDE_AGE_MS) continue
+        // C-events-dispatch-3 (v43 audit): only a NUMBER that is old enough may
+        // be deleted. `undefined` (a backend that omits the probe), `null` (a
+        // probe that cannot tell, io.ts) and a rejecting probe all mean "age
+        // unknown" and KEEP the artifact, exactly as the contract above states —
+        // the old branch fell through to `remove` on all three.
+        if (typeof mtime !== 'number' || now - mtime < COLLIDE_AGE_MS) continue
       } catch {
         continue
       }
@@ -409,20 +428,25 @@ async function pruneCollideArchives(io: EvolutionIoLike, path: string): Promise<
 
 export interface EventLogRead {
   events: EvolutionEvent[]
-  /** True when the body is not valid JSON (syntax-level damage): refused on
-   * append, bytes untouched. Well-formed JSON with a damaged `events` field
-   * is REPLACEABLE garbage — reads as empty and is rewritten at the next
-   * append (rc.70 F-1: read and append agree on the same boundary). A READ
-   * error (EISDIR etc.) also flags malformed — the file is unusable either
-   * way and is never overwritten (the append read would fail identically). */
+  /** True when THIS read DROPPED events the file may hold, so the result must
+   * never be treated as the complete truth for that file. Three causes flag it:
+   * syntax-level damage and a READ error (EISDIR/EACCES) — both refused on
+   * append with their bytes untouched — and, since C-events-dispatch-1 (v43
+   * audit), a body whose `version` this reader cannot interpret: F-338 keeps
+   * such a body un-reshaped and never rewritten down, but its records ARE
+   * missing from the read. A well-formed body with a damaged `events` field
+   * stays UNflagged — REPLACEABLE garbage that reads as empty and is rewritten
+   * at the next append (rc.70 F-1: read and append agree on the same boundary). */
   malformed: boolean
 }
 
-/** Read the event log; a missing/whitespace-only file reads as empty,
- * corrupt content is flagged (and refused on append). A well-formed future-
- * version body is v1-incompatible and reads as empty, NOT malformed (F-338:
- * the reader must never mis-shape a newer format; the append path refuses it
- * up front so the original bytes survive). */
+/** Read the event log; a missing/whitespace-only file reads as empty, corrupt
+ * content is flagged (and refused on append). A well-formed future-version body
+ * is v1-incompatible: it reads as EMPTY and is now flagged malformed as well
+ * (C-events-dispatch-1, v43). F-338's own guarantees are untouched — the reader
+ * never mis-shapes a newer format and the append path refuses it up front, so
+ * the original bytes survive — while the flag reports what the old reader hid:
+ * every record that body holds is dropped from this read. */
 export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Promise<EventLogRead> {
   let raw: string | null
   try {
@@ -434,9 +458,12 @@ export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Pr
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; events?: unknown }
     // v1-only reader (F-338): a non-current `version` is a future format that
-    // must not be shaped as v1. Reads as empty (replaceable in principle) but
-    // the append path rejects it before writing, so nothing is overwritten.
-    if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return { events: [], malformed: false }
+    // must not be shaped as v1. It still reads as empty (the append path
+    // rejects it before writing, so nothing is overwritten) but it is FLAGGED:
+    // the band that body holds leaves the timeline HERE, and a consumer that
+    // cannot see the drop folds a truncated history as if it were the truth
+    // (C-events-dispatch-1, v43 audit).
+    if (parsed.version !== undefined && parsed.version !== EVENT_LOG_VERSION) return { events: [], malformed: true }
     // Shape damage is replaceable garbage (read as empty, rebuilt on append);
     // only syntax-level damage is "malformed" (never overwritten).
     if (!Array.isArray(parsed.events)) return { events: [], malformed: false }
@@ -453,8 +480,11 @@ export async function readEvolutionEvents(io: EvolutionIoLike, path: string): Pr
  * Read the full timeline (rc.71): active log + all archives, merged by seq
  * (active copy wins, duplicates only arise from the rotation crash window),
  * sorted ascending. Per-file malformed flag as in `readEvolutionEvents`; a
- * malformed (or unreadable) ARCHIVE is skipped — it never bricks the boot and
- * it is still flagged.
+ * flagged ARCHIVE (unreadable, damaged, or a future-version body this reader
+ * cannot interpret) is SKIPPED — it never bricks the boot, the returned events
+ * simply LACK that seq band, and `malformed` is the only signal that they do
+ * (C-events-dispatch-1, v43: the flag is the consumer's contract; a truncated
+ * timeline must never be folded back as if it were complete).
  */
 export async function readEvolutionTimeline(
   io: EvolutionIoLike,
