@@ -150,8 +150,44 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
  * through this call). The single-writer rule is unchanged: `apply()`'s
  * transact listener remains the only WRITE path.
  */
+/**
+ * FLOW6-6 (v43, the read side of H-3): the sidecar's records PLUS whether the
+ * bytes could be read as THIS format. `parseActivityContent` answers `[]` for
+ * a future-version or unparsable file, so a read-only consumer could not tell
+ * "newer format" from "no history" and presented a partial/empty view as the
+ * recorded truth. The write side already quarantines those bytes
+ * ({@link isCorruptActivity}); this is the channel the readers were missing.
+ */
+export interface ActivityLoad {
+  records: EvolutionActivityRecord[]
+  /** Bytes exist but are not a readable current-version envelope. A MISSING
+   * file is not corruption — it is a first write. */
+  corrupt: boolean
+}
+
+/**
+ * H-06: the read barrier over the sidecar, with the corruption verdict.
+ *
+ * @param root - the evolution state root (the sidecar lives under it).
+ * @param io - the IO provider to read through.
+ * @returns the parsed records and whether the bytes were readable.
+ */
+export async function loadActivityState(root: string, io: EvolutionIoLike): Promise<ActivityLoad> {
+  const raw = await io.readText(activityFile(root))
+  return { records: parseActivityContent(raw), corrupt: isCorruptActivity(raw) }
+}
+
+/**
+ * H-06: the read barrier over the sidecar. V24-13 (v24): `loadActivity` now
+ * HAS a production consumer — `evolution-replay` backfills its `/evolution
+ * replay` leaderboard from this store at mount (the two packages'
+ * "persistence is the activity store's job" contract is actually wired
+ * through this call). The single-writer rule is unchanged: `apply()`'s
+ * transact listener remains the only WRITE path. Consumers that must not read
+ * an unreadable sidecar as "no history" use {@link loadActivityState}.
+ */
 export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
-  return parseActivityContent(await io.readText(activityFile(root)))
+  return (await loadActivityState(root, io)).records
 }
 
 /** True when bytes exist but are not a readable activity envelope: unparsable
@@ -166,10 +202,10 @@ export async function loadActivity(root: string, io: EvolutionIoLike): Promise<E
  * half of the pair: unknown version ⇒ the original bytes are quarantined (the
  * existing `.corrupt` path) before a current-version file replaces them, which
  * is the posture `evolution-events` already takes for the same shape.
- * Residual, stated rather than hidden: `parseActivityContent` still answers `[]`
- * for such a file (its signature has no "unreadable" channel), so a READ-only
- * consumer cannot distinguish "newer format" from "no history" — the guard
- * above is what stops the destructive half.
+ * Residual, closed by FLOW6-6: `parseActivityContent` still answers `[]` for
+ * such a file, but {@link loadActivityState} now carries the verdict beside the
+ * records, so a read-only consumer can distinguish "newer format" from "no
+ * history" instead of presenting a partial view as the recorded truth.
  * @internal Exported for this package's own tests (siblings `parseActivityContent`
  * and `serializeActivity` are exported for the same reason).
  */

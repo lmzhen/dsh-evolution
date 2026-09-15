@@ -22,7 +22,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { clampedNumber, evolutionHome, evolutionIoAdapter } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { loadActivity } from '@deepseek-ai/dsh-evolution-activity'
+import { loadActivityState } from '@deepseek-ai/dsh-evolution-activity'
 
 export interface ReplayPlan {
   policyId: string
@@ -49,6 +49,10 @@ export interface ReplayResult {
   margin: number | null
   plans: ReplayPlan[]
   report: string
+  /** FLOW6-6 (v43): the activity sidecar could not be read as the current
+   * format when this leaderboard was backfilled — `plans` is then NOT the
+   * recorded history, and the report says so. */
+  sourceCorrupt?: boolean | undefined
 }
 
 export interface ReplayWeights {
@@ -136,6 +140,10 @@ export class EvolutionReplayDriver {
   private readonly maxPlans: number
   /** V25-01 (v25): backfill-once latch — see {@link EvolutionReplayDriver.backfill}. */
   private backfilled = false
+  /** FLOW6-6 (v43): the backfill source was unreadable (newer format or corrupt
+   * bytes) — carried into every comparison so an empty leaderboard is never
+   * presented as "nothing was recorded". */
+  private sourceCorrupt = false
   /** V26-05 (v25): plan ids recorded live BEFORE the backfill settled. A
    * plan-applied landing inside the one-shot `loadActivity` read window is
    * recorded live AND persisted into the sidecar the backfill is reading —
@@ -306,6 +314,15 @@ export class EvolutionReplayDriver {
     return [...this.plans]
   }
 
+  /**
+   * FLOW6-6 (v43): mark the backfill source unreadable. Set by `apply()` when
+   * the activity sidecar carries bytes this build cannot read; the qualification
+   * then travels with every comparison.
+   */
+  markSourceUnreadable(): void {
+    this.sourceCorrupt = true
+  }
+
   compare(weights: ReplayWeights = this.weights): ReplayResult {
     // P3 (v15): sort on a COPY — `comparePlans` sorts its argument in place,
     // and `this.plans` used to be handed over by reference, so a consumer
@@ -314,7 +331,13 @@ export class EvolutionReplayDriver {
     // C-11 (v18): compare() is public; the constructor clamps its config,
     // but a caller-supplied weights object must be clamped here too (NaN/negative
     // weights would produce NaN scores/margins).
-    return comparePlans([...this.plans], clampReplayWeights(weights, this.weights))
+    const result = comparePlans([...this.plans], clampReplayWeights(weights, this.weights))
+    if (!this.sourceCorrupt) return { ...result, sourceCorrupt: false }
+    return {
+      ...result,
+      sourceCorrupt: true,
+      report: 'The activity sidecar could not be read as the current format (corrupt bytes or a newer writer) — this leaderboard is NOT the recorded history, and an empty list does not mean nothing happened.\n' + result.report,
+    }
   }
 }
 
@@ -340,12 +363,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(): import('@deepseek-ai/dsh-evolution-core').EvolutionIoLike } }).evolutionIo
     const io = evolutionIoAdapter(() => ioRegistry.provider())
     const root = evolutionHome()
-    void loadActivity(root, io)
-      .then((items) => {
+    void loadActivityState(root, io)
+      .then((loaded) => {
+        // FLOW6-6 (v43): an unreadable sidecar is not "no history". Say so once
+        // and qualify every comparison, instead of showing an empty leaderboard
+        // that reads as "nothing was ever recorded".
+        if (loaded.corrupt) {
+          ioCtx.logger.warn('evolution-replay: the activity sidecar could not be read as the current format (corrupt bytes or a newer writer) — the leaderboard backfilled from it is INCOMPLETE; the writer quarantines those bytes on its next append')
+          driver.markSourceUnreadable()
+        }
         // V25-01 (v25): backfill() is once-per-driver — this callback re-runs
         // on every evolutionIo dependency replacement while the driver
         // survives, so a plain record loop here would double the entries.
-        driver.backfill(items)
+        driver.backfill(loaded.records)
       })
       .catch((error: unknown) => {
         ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${error instanceof Error ? error.message : String(error)})`)

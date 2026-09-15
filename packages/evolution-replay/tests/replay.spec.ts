@@ -36,6 +36,21 @@ describe('evolution-replay', () => {
     expect(result.margin).toBeGreaterThan(0)
   })
 
+  it('FLOW6-6: an unreadable backfill source qualifies every comparison', () => {
+    const driver = new EvolutionReplayDriver()
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    // The clean case carries no qualification.
+    expect(driver.compare().sourceCorrupt).toBe(false)
+    expect(driver.compare().report).not.toContain('NOT the recorded history')
+    // apply() marks it when the activity sidecar holds bytes this build cannot
+    // read: an empty/partial leaderboard must not read as "nothing happened".
+    driver.markSourceUnreadable()
+    const qualified = driver.compare()
+    expect(qualified.sourceCorrupt).toBe(true)
+    expect(qualified.report.startsWith('The activity sidecar could not be read as the current format')).toBe(true)
+    expect(qualified.report).toContain('NOT the recorded history')
+  })
+
   it('clamps an invalid maxPlans to the default so the leaderboard still bounds (G3.1)', () => {
     const recordMany = (driver: EvolutionReplayDriver, count: number): void => {
       for (let i = 0; i < count; i += 1) {
