@@ -1004,16 +1004,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // exact concurrent-writer window this single-flight flag exists to
       // prevent. Queue the prompt; the `finally` below delivers it right after
       // the window closes (E-19's stated invariant now actually holds).
-      if (deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
-        deferredFallbackReviews.push({
+      // S2-7 (FLOW1-4): one entry per (session, kind) — last trigger wins, the
+      // same discipline the latch uses. Appending a second entry for the same
+      // window delivered TWO review prompts on drain, and the segment's own
+      // accounting (counters zeroed at the enqueue boundary) already said
+      // "one review for this segment".
+      const existing = deferredFallbackReviews.findIndex(entry => entry.sessionId === session.id && entry.kind === kind)
+      if (existing >= 0 || deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
+        const entry = {
           agent,
           sessionId: session.id,
           kind,
           prompt: reviewPrompt(kind),
           label: cadenceSummary(kind),
-          channel: 'inject',
+          channel: 'inject' as const,
           counts: signal as { toolCalls: number; userChars: number; assistantChars: number },
-        })
+        }
+        if (existing >= 0) deferredFallbackReviews[existing] = entry
+        else deferredFallbackReviews.push(entry)
         return 'deferred'
       }
       // V27 R-01: the queue is at cap, so the prompt was NOT queued. Reporting
@@ -1306,8 +1314,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // completionInjected flag back (V4-21 parity with the direct inject
         // path) — otherwise the flag blocks the only retry and the session's
         // one completion review is permanently lost in-process.
+        // S2-7 (FLOW1-2): the same for the inject channel. The entry was queued
+        // while a review was in flight, and its own boundary had already
+        // consumed the latch and zeroed the counters — without this rollback a
+        // failed drain delivery was ZERO reviews for that segment, silently.
+        // The latch (not the counters) is the retry vehicle: re-arming it makes
+        // the next completed boundary deliver the stashed kind, while rolling
+        // the counters back would re-fire the interval and double-review.
         if (!deliverMessage(waitingAgent, prompt, label, true)) {
           if (channel === 'completion') completionInjected.delete(entrySession)
+          else pendingCadenceReviews.set(entrySession, waitingKind)
           continue
         }
         try {
