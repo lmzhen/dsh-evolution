@@ -31,7 +31,7 @@
 ### 明确不做（防过度开发，见计划 §2.2 / §7）
 
 - 不建注释声明校验 DSL；不统一评审/工具两条写路径；不给 normalizer 加后台清理；
-- 不为孤儿 `executing` 审批记录新增 `/evolution release` 命令面（缓做清单）；
+- 孤儿 `executing` 审批记录的**自动**回收仍不做：本版只提供手动 `/evolution release <id>`（见上表 S2-P2-22），无人值守的自动退回列入缓做清单；
 - usage view 计数时点、normalizer 容量上限、catalog 事件驱动失效：列入缓做清单及重启条件。
 
 ### 验证
