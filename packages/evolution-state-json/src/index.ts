@@ -447,6 +447,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     gateDroppedCurrent.clear()
     for (const id of ids) gateDroppedCurrent.add(id)
   }
+  /**
+   * v43 audit (S1-9, F-2's deeper half): every pending-state mutation goes
+   * through jsonTransact, and only the RETIREMENT path used to hand the
+   * gate-drop reporter over. The other paths read `current` with their own
+   * field-gate pass, so a record dropped there stayed invisible to
+   * `gateDroppedCurrent` — and `mergedWithFilteredLegacy` then resurrected the
+   * legacy pending twin of a record whose fields went bad (an approve replays an
+   * already-landed write). Binding the reporter to the FILE here means no call
+   * site can forget it; jsonTransact reports the drops before the task runs, so
+   * the merged basis inside the task sees them.
+   * @param task - the read-modify-write body, exactly as jsonTransact takes it.
+   * @returns jsonTransact's own result.
+   */
+  const pendingTransact = (
+    task: (current: Record<string, PendingRecord> | null) => Promise<Record<string, PendingRecord>>,
+  ): Promise<void> =>
+    jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, task, { onGateDrop: noteGateDrop })
   // OPT-13: one-shot latch for the pending-capacity warn; re-armed when the
   // live count falls back under the cap.
   let warnedPendingCapacity = false
@@ -970,7 +987,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // pending window". Fail loud instead (the approval surface already
         // propagates save failures to its caller).
         const guard = transactTaskGuard(`pending record "${record.id}" (${PENDING_STATE_FILE})`)
-        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(async (current) => {
+        await pendingTransact(guard.wrap(async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           // P2-5: the merged basis is id-keyed (keyPendingById), so writing by
@@ -996,7 +1013,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async claimPending(id, claimId) {
       return await mutate(async () => {
         const slot = { claimed: null as PendingRecord | null }
-        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
+        await pendingTransact(async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
@@ -1018,7 +1035,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async releasePendingClaim(id, claimId) {
       await mutate(async () => {
-        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
+        await pendingTransact(async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
@@ -1043,7 +1060,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async tryResolvePending(id, status, expectedClaimId): Promise<PendingResolution> {
       return await mutate(async () => {
         let result: PendingResolution = { record: null, applied: false }
-        await jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, async (current) => {
+        await pendingTransact(async (current) => {
           const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
