@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.3.82 (patch) — 分层优化批：S0–S4 全量收口（鲁棒性 / 单源化 / 结构 / 交付）
+
+> 本版来自 `dsh-evolution-optimization-plan-v44.md` 的执行批：按「核查 → 设计 → 实现」逐步推进 S0–S4，每一步都在镜像提交并跑 16 步门禁。
+> 无接口破坏以外的兼容问题；**一处 API 收窄**（删 16 个零引用类型导出）与**一处新增导出**（发布出去的 provider 合规套件）已在下表点名。
+> 平台口径未变：`PLATFORM_VERSION=0.1.5-rc.2`、`UPSTREAM_SHA=fb2c4b9e…` 与本批取证树一致，无需迁移。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-commands` | `/evolution consolidate`、`restore`、`skill restore` 在**启用审批的部署**下改为 **E-306 拒绝**（它们无法被 skill runner 回放，原先静默直写）；`stageForeground: false` 或会话 `never` 策略仍可执行 |
+| `evolution-commands` | `/evolution doctor` 新增 **session-query 探针**（平台 P-1/P-2 的家族侧缓解）：列出失败即原文报出并附带隔离配方；挂载却答错类型单列一条；**探针设 5s 界**——探测「会让命令挂住」的病态时，超时本身成为发现项，而不再是命令挂死 |
+| `evolution-review` | cadence 通知的 summary 现在**带评审种类**（`auto-review:<kind>`）——同 kind 才合并，避免 memory/skill 提示互相替换 |
+| `evolution-review` | 直写路径对 **noop 写不再计 patch_count/last_patched_at**（低质量 warn 不再被无效写抑制） |
+| `evolution-review` | **有界 settle 等待 + 看门狗**：`run.result`/`run.dispose` 超预算即放弃该句柄（预算 `min(reviewTimeoutMs, 5s)`）并发出 `evolution/review-error`；平台不兑现 abort 时不再让单飞行标志永久为真、队列永不 drain |
+| `evolution-review` | **结清点移到投递确认处**：飞行期间到达的触发按 `(session, kind)` 合并（last-wins，cap 只约束不同会话）；drain 投递失败时**重新武装该会话的 cadence latch**（原先该段评审会无声消失） |
+| `evolution-review` | **评审通道标记不再落在用户轮**：投递前检查队列，若已有真人消息（`source.kind === 'user'`）则不落标记并诊断一次（平台不暴露 claim 身份时的既定退路） |
+| `evolution-review` | **cadence 抑制绑定被唤醒的那一轮**：抑制记录投递时最近一次 `turn/start` 的轮号，只有轮号更大者才消费它——忙期无关轮不再吃掉抑制 |
+| `evolution-review` | **截止后落地的 op 也会上报**：越过写腿截止的落地逐条通知模型（含迟到计数与截止前已落地数），不再只在日志里留一句 |
+| `evolution-approval` | release 的孤儿判据改为**可验证**（claim id 带 pid；活的外来 pid 硬拒绝；无 pid 的旧 claim 降级为显式破坏性动作）；`releasePendingClaim` 失败会留痕并回读确认 |
+| `evolution-curator` | 留存清扫进 `transactIo` 真跨进程锁；`persisted-write-inventory.json` 的 `curator-reports` 由 instance-claim 改为 **transact**（与实现相符） |
+| `evolution-state-json` | 三条 `save*` 在**transact 契约违约**时改为抛错（原先静默丢写）；pending 变更路径现在都上报 gate 丢弃集（legacy 孪生不再被复活） |
+| `evolution-state-json` | **staged 表的两条成长信号**：除记录条数外新增 **args 字节预算**（1 MB）告警；两条信号从 `savePending` 扩到 **claim / resolve** 路径，告警点名是哪条路径观察到的 |
+| `evolution-core` | 时间线读取：未来版本归档**置 malformed**、归档读失败拒绝轮转、未知年龄的 `.collide` 不删；`feedback` 的 malformed 读**不写 boot cache**（warn 一次） |
+| `evolution-core` | 写入清单资产改为**惰性读**（资产缺失不再导致全族加载失败；首次使用 fail loud） |
+| `evolution-core` | 派发账本键改为 `(session, callId)`（跨会话不再串键） |
+| `evolution-core` | **写路径的「读不到」不再裸奔**：目标不可读（EISDIR/EACCES…）时 update/patch/write_file 返回**结构化拒绝并点名原因**，不再把裸 errno 抛给模型；suppressed 边车读失败不再被覆盖；usage 边车的**版本冻结在没有回调时也会报告** |
+| `evolution-activity` / `evolution-replay` | **读侧判定通道**：`loadActivityState` 同时给出 records 与 `corrupt` 判定；replay 回填时若侧车不可读则 warn 并在每次比较结果上标注「这不是记录下来的历史」 |
+| `evolution-memory-files` | **记忆预算两处配置面收敛**：未显式设置的 `memoryCharLimit/userCharLimit` 跟随 `evolution-policy`（显式值仍优先，冲突 warn 一次），并把生效预算发布为 `evolutionMemoryBudget` |
+| `evolution-state-storage` | **发布 provider 合规套件**：新增导出 `runStateProviderConsistency(provider, assert)`（断言面注入，模块零测试运行器依赖）——第三方 provider 可自测整条 seam 契约 |
+| `evolution-state-storage` | **API 收窄**：删除 16 个零引用**类型**导出（仅 `.d.ts` 面变化，无运行时影响）；两个 seam cap 常量迁到 `constants.ts`（导出面不变） |
+| `evolution-skill-catalog` | 跨层 rank 语义成文并加**跨层 spec**：最近层直接赢同名、rank 只在同层内破平；`evolution-all`（global 层）与 `evolution-preset`（预设层）两处行注释写明各自何时管辖、开关设在哪里 |
+| `evolution-review` | 运行期文案不再指向被 gitignore 的 `packages/docs/`（改指本包 README 的 Known Limitations），并由 `guard-scripts.spec` 机械守卫 |
+| docs | `CONTRIBUTING.md` 点名被冻结的旧树与**两树漂移探针**（机器本地、仅告警），并说明为何不把它做成仓内守卫 |
+| `scripts`（不进包） | 新增门禁 `verify-package-discovery`、`verify-family-tool-names`、`verify-skill-roots`，并把 profile-bundles/doc-facts/platform-contract 接进批次门禁（10 → **16 步**）；`CONTRIBUTING.md` 门禁表与执行集逐行对齐 |
+
+### 验收与证据
+
+- 门禁：`run-baseline` **16/16 exit=0**（最终 HEAD；含 tsc-host / oxlint / 全量 vitest / 六个 verify-* 与 check-*）。
+- 结构度量：死导出 **80 → 64**（本批清 16 个类型）；`evolution-core` 导出面 **289** 名、`evolution-state-storage` **34** 名（含新增两个 conformance 导出）。
+- 复查（以源码为先）：两条真缺陷当场修复——诊断探针**无界**（命令会挂在它要报告的状态上）与探针**收 promise 而非 thunk**（同步抛错打崩命令）；两条都附判别性证据。
+
+### 明确不做 / 挂账
+
+- 迟到落地仍**无 `plan-applied` 审计条目**（活动/回放低报）——需「迟到补记」emit 设计；`claim` 身份平台不暴露 ⇒ 标记/抑制沿用顺序身份与队列前置检查。
+- 剩余 **64 个死导出**按「每次发布清 ≤20」的触发条件挂账；**97 个测试专用导出**登记为测试接缝。
+- 平台侧 6 条缺口（P-1…P-6）已成上报包（含每条的最小复现/期望/现状/影响面），平台修复前家族只做「让坏语料可见」的缓解。
 ## 0.3.81 (patch) — 会话面缺陷收口：无 agent 调用不再崩、评审投递就地合并
 
 > 本版来自 0.3.80 的安装后功能核查：一处命令面裸崩溃（脚本/无会话调用者）、一处注入队列堆积（长忙期同一条评审提示被重复入队）。
