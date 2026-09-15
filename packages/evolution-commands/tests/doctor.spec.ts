@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -564,6 +564,27 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       expect(text).toContain('memory budget:')
       expect(text).toContain('source: config')
     } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S4 review R-1: a WEDGED probe is a finding, not a hang', async () => {
+    // Source-first review finding: the probe awaited the very path a concurrent
+    // writer stalls, so /evolution doctor could hang on the state it reports.
+    vi.useFakeTimers()
+    const home = await mkdtemp(join(tmpdir(), 'doctor-wedged-'))
+    try {
+      const reportPromise = diagnose(runtime(undefined, undefined, () => new Promise(() => {})), { home })
+      // Let the probe register its bound, then fire it (fs IO resolves on the real
+      // event loop, so interleave the advances).
+      for (let step = 0; step < 3; step += 1) await vi.advanceTimersByTimeAsync(2_000)
+      const report = await reportPromise
+      expect(report.queryIssues).toHaveLength(2)
+      expect(report.queryIssues[0]).toContain('did not answer within 5000ms')
+      expect(report.queryIssues[1]).toContain('isolate the offending session')
+      expect(renderDoctorText(report)).toContain('session search:')
+    } finally {
+      vi.useRealTimers()
       await rm(home, { recursive: true, force: true })
     }
   })

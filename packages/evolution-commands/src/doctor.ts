@@ -496,13 +496,17 @@ export async function diagnose(
   const approvalService = ctx.get('evolutionApproval') as { list?: (status: string) => Promise<unknown[]> } | undefined
   if (approvalService?.list) {
     try {
-      const rows = await approvalService.list('pending')
+      // R-1 (same class as the session-query probe): a wedged approval service
+      // must render as "unknown", not hang the command.
+      const pendingProbe = await probeBounded(Promise.resolve(approvalService.list('pending')), 'approval pending listing')
+      const rows = pendingProbe.ok ? pendingProbe.value : undefined
       pendingCount = Array.isArray(rows) ? rows.length : null
       // v23 (AP-2): 'executing' is the one state that can NOT resolve itself —
       // a claimed-but-crashed approve is only ever cleared by an operator
       // reject. Hiding it made doctor report "pending: 0" while a stuck
       // record sat in the queue (visible only via /evolution pending).
-      const executing = await approvalService.list('executing')
+      const executingProbe = await probeBounded(Promise.resolve(approvalService.list('executing')), 'approval executing listing')
+      const executing = executingProbe.ok ? executingProbe.value : undefined
       executingCount = Array.isArray(executing) ? executing.length : null
     } catch {
       pendingCount = null
@@ -597,6 +601,36 @@ export async function diagnose(
  * @param ctx - the runtime service view (`get(name)`).
  * @returns one message per disagreeing surface; empty when not comparable.
  */
+/** S4 review (source-first pass) R-1: how long a diagnostic probe may wait.
+ * Doctor must ANSWER even when the thing it probes is blocked — the failure it
+ * reports (a concurrent writer stalling the corpus) is exactly the one that
+ * would otherwise hang the command forever. */
+const PROBE_TIMEOUT_MS = 5_000
+
+/**
+ * Bound a diagnostic probe. A never-settling service is a FINDING, not a hang:
+ * the probe reports it like any other failure.
+ *
+ * @param promise - the probe's work.
+ * @param label - the surface being probed (named in the finding).
+ * @returns the value, or a message describing the failure/timeout.
+ */
+async function probeBounded<T>(promise: Promise<T>, label: string): Promise<{ ok: true; value: T } | { ok: false; message: string }> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<{ ok: false; message: string }>((resolve) => {
+    timer = setTimeout(() => {
+      resolve({ ok: false, message: `${label} did not answer within ${PROBE_TIMEOUT_MS}ms — the corpus is blocked (a concurrent writer can stall the observation) or the service is wedged; isolate the most recently written session and re-run` })
+    }, PROBE_TIMEOUT_MS)
+  })
+  const settled = promise.then(
+    (value): { ok: true; value: T } => ({ ok: true, value }),
+    (error: unknown): { ok: false; message: string } => ({ ok: false, message: `${label} failed: ${error instanceof Error ? error.message : String(error)}` }),
+  )
+  const outcome = await Promise.race([settled, timeout])
+  if (timer !== undefined) clearTimeout(timer)
+  return outcome
+}
+
 /**
  * S4/P-1+P-2 (platform report P-1/P-2, family mitigation) — the session-query
  * index can fail AS A WHOLE: a concurrent writer leaves the persistence
@@ -613,17 +647,18 @@ export async function diagnose(
 async function sessionQueryIssues(ctx: { get(name: string): unknown }): Promise<string[]> {
   const service = ctx.get('sessionQuery') as { listSessions?: (signal?: AbortSignal) => Promise<unknown> } | undefined
   if (service?.listSessions === undefined) return []
-  try {
-    const sessions = await service.listSessions()
-    return Array.isArray(sessions)
-      ? []
-      : ['session-query answered a listing with a non-list value — the service is mounted but not honouring its read contract']
-  } catch (error) {
+  // R-1: bounded — the listing path is precisely what a concurrent writer stalls,
+  // so an unbounded await here would hang the command on the state it reports.
+  const outcome = await probeBounded(Promise.resolve(service.listSessions()), 'session-query listing')
+  if (!outcome.ok) {
     return [
-      `session-query listing failed: ${error instanceof Error ? error.message : String(error)}`,
-      'if that mentions an unstable observation or a conflicting session header, isolate the offending session — move it OUT of the corpus with a manifest (never delete it) and re-run; the platform already retries the observation once',
+      outcome.message,
+      'isolate the offending session — move it OUT of the corpus with a manifest (never delete it) and re-run; the platform already retries the observation once, so retrying first is not the answer',
     ]
   }
+  return Array.isArray(outcome.value)
+    ? []
+    : ['session-query answered a listing with a non-list value — the service is mounted but not honouring its read contract']
 }
 
 function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
