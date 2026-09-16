@@ -14,7 +14,7 @@ Memory→skill edges are word-level, not substring: the entry is tokenized on no
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — no prompt section and no tool schema; `/graph` is a human command, and consumers own the model-visible effects.
+- **Model-visible:** nothing of its own: no prompt section and no tool schema; `/graph` is a human command, and consumers own the model-visible effects.
 - **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-learning-graph` row, carried by the `evolution-host`, `evolution-all` and one-click `evolution-preset` bundles.
 
@@ -26,6 +26,6 @@ Memory→skill edges are word-level, not substring: the entry is tokenized on no
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 ## Notes and history
 
-- `graph edit`/`graph delete` route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent) — for BOTH skill nodes and memory nodes (P2-6, v15; memory staged args mirror the `memory` tool runner's replay shape).
+- `graph edit`/`graph delete` route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent): for BOTH skill nodes and memory nodes (P2-6, v15; memory staged args mirror the `memory` tool runner's replay shape).
 - Before staging, the seam's `hasRunner` is checked (P2-7, v15): with approval enabled, a session policy that is not `never`, and the write actually staging (foreground stages per approval `stageForeground`; subagent origins always stage), a missing replay runner's row (tool-skill-manage / tool-memory) refuses the write; allow-direct combinations execute unchanged instead of creating a pending record no approver could replay.
 - The command invocation's session rides the approval request (v12 N1), so a `never`-policy session stages nothing instead of deriving every graph write as foreground.

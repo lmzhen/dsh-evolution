@@ -7,7 +7,7 @@ library nor its lifecycle rules.
 ## Model surface
 
 - **Model-visible:** the `skill_manage` tool schema and its success/validation messages; result tokens scale with what is returned.
-- **Prompt prefix / KV cache:** the tool schema is prefix-stable, and skill writes do not alter the current request prompt — catalog invalidation affects the next request; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Prompt prefix / KV cache:** the tool schema is prefix-stable, and skill writes do not alter the current request prompt; catalog invalidation affects the next request; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `tool-skill-manage` row, carried by the `evolution-all` and one-click `evolution-preset` bundles and the Evolution agent preset delta.
 
 ## Safety model
@@ -18,7 +18,7 @@ Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) p
 
 ### pin/unpin: explicit exception
 
-`pin` and `unpin` are deliberately **outside** the approval seam. Pinning only lifts/restores the curator-lifecycle freeze — a lifecycle flag, never content — and is fully reversible by the same tool. Routing it through `policy:'ask'` would let a staged-but-never-approved request hold the library in a pinned state invisibly. Tradeoff accepted: no approval on a lifecycle-flag flip; if product policy changes, pin/unpin should be wired into the same staging path as `patch`.
+`pin` and `unpin` are deliberately **outside** the approval seam. Pinning only lifts/restores the curator-lifecycle freeze (a lifecycle flag, never content) and is fully reversible by the same tool. Routing it through `policy:'ask'` would let a staged-but-never-approved request hold the library in a pinned state invisibly. Tradeoff accepted: no approval on a lifecycle-flag flip; if product policy changes, pin/unpin should be wired into the same staging path as `patch`.
 
 ## Known limitations
 

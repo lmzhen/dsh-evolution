@@ -6,7 +6,7 @@ background behaviour of its own.
 
 ## Model surface
 
-- **Model-visible:** one direct token — the `/evolution learn` injection: the full learning guidance is injected as a user message in this session; everything else adds no tokens.
+- **Model-visible:** one direct token — the `/evolution learn` injection — the full learning guidance is injected as a user message in this session; everything else adds no tokens.
 - **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-commands` row, carried by the `evolution-host`, `evolution-all` and `evolution-preset` bundles.
 
@@ -24,5 +24,5 @@ The full `/evolution` subcommand table is single-sourced in the family README's 
 ## Notes and history
 
 - P2-22 (v11) correction: this package's **only** direct model-visible token is the `/evolution learn` injection — the full learning guidance is injected as a user message in this session.
-- **① variant form: the `/evolution …` command face is visible in every session** (accepted, not fixed — 0.3.78).
+- **① variant form: the `/evolution …` command face is visible in every session** (accepted, not fixed: 0.3.78).
 - The injection goes through the agent's waking primitive (`followup`, falling back to `inject` when the host lacks it), **called on the agent instance**: the platform's `Agent.followup` is a prototype method (`this.send(...)`), so a detached reference throws and queues nothing (0.3.73 fix; the same shape is pinned by rule N13b in `packages/scripts/verify-arch-guards.mjs`, which masks comments and string literals before matching and self-tests its detector at startup).

@@ -5,8 +5,8 @@ their dials from, plus the `tools.guard` refusal of a control-plane key in a wri
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — the rows that read the snapshot own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Model-visible:** nothing of its own: the rows that read the snapshot own the injection.
+- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-policy` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`.
 
 ## Known limitations

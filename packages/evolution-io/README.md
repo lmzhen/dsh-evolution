@@ -5,8 +5,8 @@ IO seam for evolution providers: the registry the file-backed family stores (`me
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — the rows that write through this seam own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Model-visible:** nothing of its own: the rows that write through this seam own the injection.
+- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-io` row, `evolution-host`/`evolution-all`/`evolution-preset`; a seam backed by `evolution-io-node`.
 
 ## Known limitations

@@ -6,9 +6,9 @@ context)` entry point.
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — no prompt, no tool schema and no service; consumers own the model-visible effects.
+- **Model-visible:** nothing of its own: no prompt, no tool schema and no service; consumers own the model-visible effects.
 - **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** no — a library/seam consumed by the review pipeline.
+- **Mount it?** no: a library/seam consumed by the review pipeline.
 
 ## Known limitations
 

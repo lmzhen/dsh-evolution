@@ -16,7 +16,7 @@ Skeleton: `templates/base/bases-row.json.tmpl`.
 - [ ] If the platform composition needs a service the family does not mount, say
       so in the row: `requires: { service: '<platformService>' }`. If the base
       cannot work at all, register `unsupported: '<reason>'` instead of leaving
-      it out — a base the table omits is a base nobody refuses. — *both install
+      it out (a base the table omits is a base nobody refuses.) *both install
       paths must refuse it by name BEFORE any write: `install-layered.mjs` and
       `evolution-commands` share `baseUnavailableReason()` (the 0.3.78 TDZ
       incident: the refusal used to run before `profileDir` existed).*

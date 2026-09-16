@@ -20,7 +20,7 @@ Skeleton: `templates/event/producer-consumer.ts.tmpl`.
 - [ ] Platform **registry reads** pass the calling scope:
       `catalog.list({ scope: callingScope(ctx) })`. — *N16 fails a scope-less read;
       registered global reads live in `SCOPE_READ_REGISTER`.*
-- [ ] **Durable reads** distinguish three states — use `Probe<T>` from
+- [ ] **Durable reads** distinguish three states: use `Probe<T>` from
       `evolution-core/src/probe.ts` (present / absent / unknown). — *N14 fails a
       `catch` that serves a read failure as absent; `SWALLOW_CATCH` is the
       register.*

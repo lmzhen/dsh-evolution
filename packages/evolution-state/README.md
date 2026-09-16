@@ -5,13 +5,13 @@ Durable evolution state consumer: it owns no medium and performs no IO — a pro
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — the rows that read this state own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Model-visible:** nothing of its own: the rows that read this state own the injection.
+- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-state` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset` (all pin `provider: json`).
 
 ## Configuration
 
-- `provider` — `''` (default) | `json` | `domain` — pins the provider for every operation; empty = first registered wins.
+- `provider` (`''` default, or `json` / `domain`): pins the provider for every operation; empty = first registered wins.
 
 ## Known limitations
 

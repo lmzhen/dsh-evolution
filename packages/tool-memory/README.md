@@ -13,6 +13,6 @@ the memory files and their provider do.
 ## Known limitations
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
-- The pre-approval required-field pre-check and the store's own rejection text are hand-copied twins: the check runs on BOTH paths — every `operations[]` element and the normalized single operation — BEFORE the approval gate, so an approval-enabled deployment never stages a write the approved replay must then fail. Keeping the two texts in step is still manual; unifying them is deferred.
+- The pre-approval required-field pre-check and the store's own rejection text are hand-copied twins: the check runs on BOTH paths (every `operations[]` element and the normalized single operation) BEFORE the approval gate, so an approval-enabled deployment never stages a write the approved replay must then fail. Keeping the two texts in step is still manual; unifying them is deferred.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

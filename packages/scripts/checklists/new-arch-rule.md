@@ -14,13 +14,13 @@ ids, not the count.
 
 ## Checklist
 
-- [ ] The rule answers "which failure already happened?" — a rule without an
+- [ ] The rule answers "which failure already happened?": a rule without an
       incident goes to the not-doing list instead (the family's anti-overreach
       discipline). Write that incident into the docblock entry.
 - [ ] Docblock entry in the file header, same style as the others:
       ` *   N<id>. <one-line claim>` followed by the incident and the register
       name. The startup inventory check reads exactly this shape.
-- [ ] `RULES` registry entry `{ id, title }` — appended at the END of the array.
+- [ ] `RULES` registry entry `{ id, title }`: appended at the END of the array.
 - [ ] A **detector self-test** in the `detectors` list at startup: samples must be
       INCIDENT shapes (the spelling that actually shipped), plus one clean shape
       that must stay clean. A detector that matches nothing reports a pass. —

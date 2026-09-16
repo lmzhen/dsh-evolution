@@ -5,8 +5,8 @@ a medium — providers register here (`json` = IO-seam files, `domain` = storage
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — the consumer rows own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Model-visible:** nothing of its own: the consumer rows own the injection.
+- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-state-storage` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`; a seam consumed by `evolution-state`, `evolution-state-json`, `evolution-state-domain` and `evolution-approval`.
 
 ## Conformance suite

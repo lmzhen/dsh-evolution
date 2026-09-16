@@ -6,7 +6,7 @@ replay`.
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — no prompt section and no tool schema; `/evolution replay` is a human command; consumers own the model-visible effects.
+- **Model-visible:** nothing of its own: no prompt section and no tool schema; `/evolution replay` is a human command; consumers own the model-visible effects.
 - **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-replay` row, carried by the `evolution-host`, `evolution-all` and one-click `evolution-preset` bundles.
 

@@ -13,13 +13,13 @@
 - **Prompt prefix / KV cache:** <unchanged by this package | the exact effect>;
   the family-level rules are single-sourced in `packages/README.md`
   §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** <yes — the row this package contributes, and to which bundles |
+- **Mount it?** <yes: the row this package contributes, and to which bundles |
   no — a library/seam consumed by <consumers>>
 
 ## Configuration
 
 <!-- Only when the package declares config keys. One row or line per key:
-     key — values/default — what changes. Delete the section when it has none. -->
+     key (values/default) what changes. Delete the section when it has none. -->
 
 ## Known limitations
 

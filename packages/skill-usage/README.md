@@ -7,15 +7,15 @@ mints one.
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — the counter readers own it.
-- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Model-visible:** nothing of its own: the counter readers own it.
+- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `skill-usage` row (`sessionScoped: true`), `evolution-host`/`evolution-all`/one-click `evolution-preset`; consumed by `evolution-feedback` and `tool-skill-manage`.
 
 ## Configuration
 
-- `root` — `''` — skills-tree root.
-- `eventsHome` — `''` (default: `DSH_HOME` / `~/.dsh`) — the event timeline's home.
-- `sessionScoped` — `false` — act only on sessions carrying the family's model tools (the bundles set it).
+- `root` (default `''`): skills-tree root.
+- `eventsHome`: the event timeline's home; `''` means `DSH_HOME` / `~/.dsh`.
+- `sessionScoped` (default `false`): act only on sessions carrying the family's model tools (the bundles set it).
 
 ## Known limitations
 

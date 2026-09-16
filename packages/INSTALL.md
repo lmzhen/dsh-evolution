@@ -72,7 +72,7 @@ cells are the checklist for their own first real 0.1.5 install.
 > family registers its command once on the host plane, so it lands in the global
 > layer and every session's command list shows it. The surface is management-only
 > and read-only (`/evolution doctor`, `curator status`, `pending`, …), and the
-> AUTOMATIC paths — review cadence/injection, usage telemetry, curation — are
+> AUTOMATIC paths (review cadence/injection, usage telemetry, curation) are
 > already gated per session by `sessionAudited`, so an original-preset session
 > gets no family behaviour behind the commands. Hiding the command face per
 > session would mean registering inside each agent's scope with its own

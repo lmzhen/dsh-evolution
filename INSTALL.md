@@ -27,7 +27,7 @@ the cordis loader fails loud on duplicate ids.
 > guard (pinned by `packages/evolution-all/tests/all.spec.ts`), and the
 > layered installer refuses to combine the two forms regardless.
 
-The install-form semantics — what each form does to a session — and the
+The install-form semantics (what each form does to a session) and the
 per-form verification status against the validated platform line are
 single-sourced in `packages/INSTALL.md` ("Install forms"); this root copy
 owns the source-install commands and the scope details. The installer also
@@ -286,7 +286,7 @@ state, reports, and approval history remain under `$DSH_HOME`.
 ## Capability evolution (retired in 0.3.66)
 
 `evolution-capability` was removed from this repository. It staged a Creator-mode
-capability package — an object carrying `code.host` / `code.client` halves — into
+capability package (an object carrying `code.host` / `code.client` halves) into
 the same pending queue as memory and skills, without executing anything:
 approval recorded intent only, and activation stayed a manual Creator-mode step.
 

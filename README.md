@@ -117,12 +117,12 @@ under M1, never true for a host-only install (M3), which the plugin reports once
 
 ## Day to day
 
-- `/evolution doctor` — what is installed: form, scoped rows, services, pending count.
-- `/evolution pending` + `approve` / `reject` — the staged writes (M2).
-- `/evolution curator status` — last run and next due (the curator ticks hourly; a run is due every 168 h by
+- `/evolution doctor` reports what is installed: form, scoped rows, services, pending count.
+- `/evolution pending` + `approve` / `reject` handle the staged writes (M2).
+- `/evolution curator status` shows the last run and the next due time (the curator ticks hourly; a run is due every 168 h by
   default, so quiet weeks are normal).
-- `/evolution preset install [--base <name>[,<name>...]]` — generate the family agent preset (M4).
-- `/evolution mutations` — the write log; `/graph` — skills and memory as a graph.
+- `/evolution preset install [--base <name>[,<name>...]]` generates the family agent preset (M4).
+- `/evolution mutations` (the write log) and `/graph` (skills and memory as a graph).
 
 The full command surface is rendered once in `packages/README.md` (§Command reference); the complete
 environment-variable and field-level knob reference lives there too.
@@ -159,10 +159,10 @@ gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent charac
 
 ## Security & boundaries
 
-1. **The model writes memory and skills only** — everything else is control-plane data.
+1. **The model writes memory and skills only**. Everything else is control-plane data.
 2. **Every mutation is gated** by the `tools.guard` threat scan, and by staged approval when enabled;
    an approved write replays through the exact runner it registered with.
-3. **Nothing is destroyed silently** — skill archival moves to `.archive/`, and every curator run snapshots
+3. **Nothing is destroyed silently**. Skill archival moves to `.archive/`, and every curator run snapshots
    the skill tree first.
 4. **Text leaving the session for a model is redacted** (PEM blocks, URL credentials, inline assignments,
    camelCase credential keys).
@@ -227,15 +227,15 @@ The loops stop, your data does not: memory, skills, state, reports and approval 
 <details>
 <summary>For maintainers: upstream upgrade checklist</summary>
 
-1. **Skill-provider shadow rank** — our provider registers `EVOLUTION_SKILL_RANK = 390` and relies on the
+1. **Skill-provider shadow rank**. Our provider registers `EVOLUTION_SKILL_RANK = 390` and relies on the
    upstream `USER_DSH_RANK` (400 on `0.1.5-rc.2`) sorting above it; re-verify both sides.
-2. **`@deepseek-ai` name collisions** — the release tooling rewrites family names to `@lmzhen`; check each
+2. **`@deepseek-ai` name collisions**. The release tooling rewrites family names to `@lmzhen`; check each
    upstream release for names that collide with ours.
-3. **ToolRuntime argument freeze** — `tool.execute` gets a `deepFreeze`d snapshot: build a new object rather
+3. **ToolRuntime argument freeze**. `tool.execute` gets a `deepFreeze`d snapshot: build a new object rather
    than assigning onto `args`.
-4. **Per-skill invocation frontmatter** — our shadowing provider must keep parsing the same keys as upstream;
+4. **Per-skill invocation frontmatter**. Our shadowing provider must keep parsing the same keys as upstream;
    its legacy-key posture is single-sourced in `evolution-skill-catalog/README.md`.
-5. **Home-path semantics** — upstream `resolveDshHome` trims only as the adoption test, keeps the RAW env
+5. **Home-path semantics**. Upstream `resolveDshHome` trims only as the adoption test, keeps the RAW env
    value, expands `~ ` and always resolves; `evolutionRoot` and `install-layered.mjs` follow the same line.
 
 </details>

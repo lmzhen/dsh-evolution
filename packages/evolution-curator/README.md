@@ -4,7 +4,7 @@ Deterministic skill lifecycle and recovery
 
 ## Model surface
 
-- **Model-visible:** nothing of its own — it registers no prompt section and no tool schema; the packages that consume this service own the model-visible effects.
+- **Model-visible:** nothing of its own: it registers no prompt section and no tool schema; the packages that consume this service own the model-visible effects.
 - **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-curator` row, carried by the `evolution-host`, `evolution-all` and one-click `evolution-preset` bundles; it provides the `evolutionCurator` service the `/evolution curator …` commands and doctor read.
 

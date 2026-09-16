@@ -14,15 +14,15 @@ stale side must never be copied back over this one.
 
 1. **Edit in this mirror** (`packages/<pkg>/…`) — since 0.3.83 it is both the
    authoring and the publication tree, so nothing is copied over it.
-2. **Copy the change into the validation checkout** — type-checking and the
+2. **Copy the change into the validation checkout**. Type-checking and the
    suites run where the same sources live at `packages/evolution/<pkg>/…` (the
    CI overlay built from the platform tag). The machine-local
    `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
    a source to copy from.
-3. **Run the gate** — `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
+3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
    all sixteen steps and writes one log per step plus a summary (§The gate has
    the table and says which step runs in which tree).
-4. **Decide where your words live** — §Where a fact is allowed to live is the
+4. **Decide where your words live**. §Where a fact is allowed to live is the
    rule that fails a conclusion stated in two documents (N19).
 
 ## Where a fact is allowed to live (G5, 0.3.78)
