@@ -957,10 +957,12 @@ it('P2-5: unreadable skill bodies are excluded from review dedup grouping and co
   expect(review.isError).toBe(false)
   const message = (review.value as { message?: string } | undefined)?.message ?? ''
   // The real exact-duplicate group is still detected (normal path unchanged).
-  expect(message).toContain('- same-a ~ same-b')
-  // The two unreadable bodies no longer merge into a fake group ...
-  expect(message).not.toContain('Ghost_C ~ Ghost_D')
-  expect(message).not.toContain('~ Ghost')
+  // The pair's ORDER is the scan's first-seen name, which the directory listing
+  // decides — assert the pair, not a direction, or this flakes on name order.
+  expect(message).toMatch(/- same-a ~ same-b|- same-b ~ same-a/)
+  // The two unreadable bodies no longer merge into a fake group — in EITHER
+  // direction (an order-sensitive check would miss the reverse rendering).
+  expect(message).not.toMatch(/Ghost_[CD] ~|~ Ghost_[CD]/)
   // ... and the exclusion is visible instead of silent.
   expect(message).toContain('2 skill bodies were unreadable/empty and excluded from dedup grouping.')
   expect(message).toContain('Near-duplicate groups (1)')
