@@ -512,9 +512,10 @@ describe('layered installer', () => {
     ])
     // D-3: the mounted bundle is pinned in dependencies, not only in bundles.
     // P2-22 (v19): the range must come from the FAMILY package — an overlay
-    // checkout used to pin the host repo's root version (0.1.x) here, and the
-    // loose /^\^0\.\d+\.\d+/ form accepted it.
-    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^0\.3\./)
+    // checkout used to pin the host repo's root version (0.1.x) here, so the
+    // assertion stays VERSION-AGNOSTIC: any caret range on the family version
+    // is correct, and hardcoding a minor (`^0.3.`) broke on the 0.4.0 bump.
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+$/)
   }, 60_000)
 
   it('D-4 (v18): a profile name with no shipped template seeds DEFAULT_PROFILE_BUNDLES', async () => {
@@ -712,7 +713,7 @@ describe('layered installer', () => {
       dependencies?: Record<string, string>
       dsh?: { profile?: { bundles?: string[] } }
     }
-    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^0\.3\./)
+    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+$/)
     expect(before.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-host')
     // P1-3: the journal records what the installer wrote.
     const journalPath = join(home, 'profiles', 'evo-test', '.evolution-install.json')

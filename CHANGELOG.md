@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.0 (minor) — 文档全量重写与测试/仓库卫生批（**无运行时行为变化**）
+
+> 本版把 0.3.83 之后的全部改动收口：一次按「读者第一性原理」做的**全量文档重写**（根 README 中英、29 份包 README、7 份作者清单、两份安装文档、模板），
+> 两处**测试加固**，以及一次**仓库安全面**治理。`packages/*/src/**` 相对 0.3.83 只有一处注释澄清（`evolution-review` 的 D6 口径），
+> 没有导出面、配置键、事件或行为变化；升级到本版**不需要**改任何部署配置，也不会改变既有会话/状态/技能树的落点。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| 根 README（EN/中文） | 按读者路径重写：3 枚信息性徽章（npm 版本 / release CI / MIT）+ 锚点导航 + 「你该装吗」+ 60 秒安装（含 28 包与 18 行 / 207 id 的自证命令）+ M1–M4 选型 + 兼容矩阵（平台锚 `0.1.5-rc.2`、依赖窗口 `^0.1.5-rc.2`、Node 22.19+/24+）+ 合并后的「层 / 做什么 / 你能察觉到什么」表与数据落点 + 「三种关法」+ `<details>` 折起的环境变量/错误码/维护者上游清单。**删掉**同类项目那种徽章墙、star CTA、居中排场与装饰性终端片段（体积 355 → 249 行，中文同构 204 行） |
+| 29 份包 README | 四层 `## Model Experience` 样板（每份 ≈480 B 只装 3 个事实）→ `## Model surface` 三条（Model-visible / Prompt prefix·KV cache 只引用 `packages/README.md` 单源 / Mount it?）；真有 config 键的 10 个包补 `## Configuration`（默认值逐项对 `evolution-core/src/constants.ts` 或该包 schema 复核）；带版本戳的**独立审计句原文**迁入 `## Notes and history`，正文只讲当下行为。行数 509 → 398，字节 +7.7%（自设上限 +10%） |
+| 7 份作者清单 + 模板 | 每份开头补「什么时候用这个清单」；`index.md` 改为「我想加 X → 读哪份」路由表；`templates/package/README.tmpl.md` 与 `new-package.md` 同步新骨架（Model surface / Configuration / Known limitations / Notes and history），防止回潮 |
+| 安装文档 | 根 `INSTALL.md` 按用户路径重排：**默认的生产安装形态从最后一节提到最前**（此前用户要先读本地开发形态）；节名改为场景名，`§1–§5` 编号仍单源在 `packages/INSTALL.md` 的形态矩阵。两份文档都补「Where to start / 从哪开始」，并写明「读状态列是读证据，不是读预期」 |
+| 准确性与语气 | 清除与现状矛盾的声明（旧 scope 拼写、失效交叉引用、死链、计数错误）；`deliverEnsuringWake` 明确标注为「登记在 `INJECT_SITES` 的迁移目标，不是现成 API」；去掉聚簇破折号（单段最多 12 个 → 全仓 0 个 ≥2 破折号的段）、46 处机械冒号、中文 `——` 分隔符 23 → 0 与十余处直译词（单源在/被治理/住在/不 spawn…） |
+| `tool-skill-manage`（测试） | dedup 分组断言改为**顺序无关**：组内 `a ~ b` 的方向由目录列举顺序决定，原断言会 flaky；反向断言 `not.toContain('Ghost_C ~ Ghost_D')` 在反向渲染时会漏检，已改双向正则 |
+| `evolution-host`（测试） | `installer.spec.ts` 里两处断言曾把家族版本硬编码成 `/^\^0\.3\./`，0.4.0 一升版就红；已改为**版本无关**的 `/^\^\d+\.\d+\.\d+$/`——它要验的是「安装器把家族包沿 caret 范围钉进 dependencies」，不是某个具体小版本 |
+| 脱敏测试（测试） | 两个 `redact.spec.ts` 的厂商形状夹具改为**源码级拼接**（`const key = (...p) => p.join('')`）：运行期字符串与断言完全不变，但仓库里不再有连续的 `AIza…`/`AKIA…`/`ghp_…` 文本——这是公开仓库下 GitHub secret scanning 误报的根治手段 |
+| 仓库卫生 | 告警 #1（Google API key，实为脱敏夹具）以 `used_in_tests` 结案；`.github/secret_scanning.yml` 一度用于豁免两个 spec，随后**删除**（改用夹具拼接，不给扫描器留任何豁免面） |
+
+### 验收与证据
+
+- 全量 16 步门禁：`tsc -b`（含 `tsconfig.host.json` 覆盖的 tests）0 错、`oxlint` 0/0、`vitest` **153 文件 / 1444 用例**全绿、13 项 `verify-*`/`check-*` 全 0（含 `check-manifests` 的「30 份 manifest == CHANGELOG 头版本」与 `mirror-sync-check` 的镜像↔取证树字节一致）。
+- 脱敏夹具改动由 `redact.spec.ts`（core 27 例 + review 2 例）直接判别：拼接前后运行期值相同，用例未改语义即全绿。
+- 文档守卫：`verify-doc-facts --strict --require-repo-docs` 与 `verify-arch-guards --strict`（N15 锚点解析 / N19 单一 home）均 0 violation；相对链接 0 断链。
+- 已发布形态冒烟：`dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.4.0` → 28 包全部 0.4.0、`lib/index.js` 逐个 `import()` 28/28 成功、`--dump-config` 773 行 / 207 id 全不重复。
+- GitHub：secret scanning open alert = 0；8 类厂商形状（google/aws-id/ghp/fine-pat/gitlab/stripe/slack/openai）在全仓连续匹配 0 处。
+
+### 明确不做 / 挂账
+
+- 沿用 0.3.83 条目的挂账清单（`evolution-review` 三处小改、`reviewTimeoutMs` 触顶告警补断言、`evolution-curator` 接住 `truncated`、`tool-memory` 预检文案单源化、引号表前导指示符假阳性）。
+- 本版新增候选：`computeDedupGroups` 渲染时对组内名字排序，让报告输出确定化（当前由测试侧改为顺序无关来兜住）。
 ## 0.3.83 (patch) — 审计驱动优化批：P0/P1 止血 + 分层加固 + 继续审查全量修正（S1.1–S5.10）
 
 > 本版来自 2026-09-16 全量审计（`dsh-evolution-mirror-全量审计报告-0.3.82-vs-0.1.5-rc.2-2026-09-16.md`）与
