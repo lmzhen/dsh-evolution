@@ -1,12 +1,12 @@
 # New session-level consumer
 
-Skeleton: `templates/event/producer-consumer.ts.tmpl`.
+**When to use:** you are adding a consumer that subscribes to `session/event` — a
+consumer like this acts on sessions the family may never have been mounted into
+(the 0.3.77 C-axis incident: review injected prompts into original-preset sessions
+and skill-usage counted their reads). The rules below already existed; this is the
+one place that says "copy these when you add a consumer".
 
-A consumer that subscribes to `session/event` acts on sessions the family may
-never have been mounted into (the 0.3.77 C-axis incident: review injected prompts
-into original-preset sessions and skill-usage counted their reads). The five
-rules below already existed; this is the one place that says "copy these when you
-add a consumer".
+Skeleton: `templates/event/producer-consumer.ts.tmpl`.
 
 ## Checklist
 
@@ -24,11 +24,13 @@ add a consumer".
       `evolution-core/src/probe.ts` (present / absent / unknown). — *N14 fails a
       `catch` that serves a read failure as absent; `SWALLOW_CATCH` is the
       register.*
-- [ ] **Delivery** goes through the waking primitive on the receiver
-      (`agent.followup(...)` / `deliverEnsuringWake`), never a detached
-      reference. — *N13b fails a wake primitive read into a local (0.3.73: six
-      days of silently eaten review prompts); N13a fails `agent.inject` for a
-      must-execute payload.*
+- [ ] **Delivery** goes through the waking primitive, called ON the receiver
+      (`agent.followup(...)`), never a detached reference. — *N13b fails a wake
+      primitive read into a local (0.3.73: six days of eaten review prompts);
+      N13a fails `agent.inject` for a must-execute payload unless the site is
+      registered in `INJECT_SITES`.* The `deliverEnsuringWake` wrapper those
+      registers name is the tracked migration target, **not an available API** —
+      call `agent.followup` today.
 - [ ] **Module-scope state** (a `Set`/`Map` the file writes) is registered in
       `MUTABLE_STATE` with its platform gap, lifecycle owner, test anchor and
       validity domain. — *N12 fails an unregistered store.*

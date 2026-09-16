@@ -39,10 +39,12 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
 - [ ] `tests/<pkg>.spec.ts` using `test-support/temp-home.ts`; cleanup via
       `tempHome`/`tempRoot`, never the real `DSH_HOME`. — *the E-33 spec
       pollution incident: a test without `tempHome` reads the developer's own profile.*
-- [ ] Package `README.md` from the template (Model Experience, Known Limitations,
-      the runtime invariant line) and one row in the package map
-      (`packages/README.md` + root `README.md`). — *`verify-doc-facts.mjs`
-      (N19) fails a fact stated in two documents.*
+- [ ] Package `README.md` from the template (Model surface with its three
+      one-line facts, Configuration when it has keys, Known limitations, the
+      runtime invariant line) and one row in the package map
+      (`packages/README.md`). — *`verify-doc-facts.mjs`
+      (N19) fails a fact stated in two documents; the family-level prefix/cache
+      rules stay in `packages/README.md` and are cited, never copied.*
 - [ ] Run: `tsc -b`, `oxlint`, the package's vitest suite, then the in-repo
       `verify-*.mjs` rows of the gate table — *`CONTRIBUTING.md` §The gate owns
       that list, so the count lives there and not here.*

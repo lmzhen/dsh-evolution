@@ -1,34 +1,28 @@
 # @deepseek-ai/dsh-skill-usage
 
-Skill usage telemetry service
+Skill usage telemetry: the `use`/`view`/`patch` counters behind the skill tree's usage records.
+`record(name, kind)` is the write API; reads are observed from `session/event`
+`tool/call` records of the `skill` tool and bump `view` on EXISTING records only — a read never
+mints one.
 
-## Telemetry sources
+## Model surface
 
-`record(name, kind)` is the write API (`use` / `view` / `patch`). Reads are
-observed automatically: the service listens for `session/event` `tool/call`
-records of the read tool (`skill`) and bumps `view` on EXISTING records only —
-an arbitrary read never mints a usage record (records are authored by skill
-creation, patching, or curator seeding).
+- **Model-visible:** nothing of its own — the counter readers own it.
+- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** yes — the `skill-usage` row (`sessionScoped: true`), `evolution-host`/`evolution-all`/one-click `evolution-preset`; consumed by `evolution-feedback` and `tool-skill-manage`.
 
-## Model Experience
+## Configuration
 
-### Indirect model surface
+- `root` — `''` — skills-tree root.
+- `eventsHome` — `''` (default: `DSH_HOME` / `~/.dsh`) — the event timeline's home.
+- `sessionScoped` — `false` — act only on sessions carrying the family's model tools (the bundles set it).
 
-#### What the model sees
+## Known limitations
 
-`@deepseek-ai/dsh-skill-usage` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
-
-#### Token effect
-
-Zero direct token effect from this package; consumers add any model-visible tokens.
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
-
-## Known Limitations and Deferred Work
-
-
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+- No known durable consumer gaps; runtime contracts are covered by package and boundary tests.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+
+## Notes and history
+
+

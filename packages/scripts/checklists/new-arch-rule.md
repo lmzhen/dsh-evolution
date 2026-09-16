@@ -1,13 +1,16 @@
 # New architecture rule
 
+**When to use:** you are adding a rule to `packages/scripts/verify-arch-guards.mjs`
+— a new detector plus its `N<id>` registry entry.
+
 Skeleton: `templates/rule/rule-snippet.mjs.tmpl` (into
 `packages/scripts/verify-arch-guards.mjs`).
 
 Rule ids are append-only labels: **never reuse or renumber a landed id** — docs,
 registers and probe baselines cite them. Take the next free number after the
-LAST entry of the `RULES` registry (`--list-rules` prints it) — N20 as of
-0.3.83. One id is absent from the array, so its LENGTH is not the highest id:
-read the ids, not the count.
+LAST entry of the `RULES` registry (`--list-rules` prints it) — N20 as of 0.3.83.
+One id is absent from the array, so its LENGTH is not the highest id: read the
+ids, not the count.
 
 ## Checklist
 

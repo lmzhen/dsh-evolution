@@ -1,26 +1,20 @@
 # @deepseek-ai/dsh-evolution-io
 
-IO seam for evolution providers
+IO seam for evolution providers: the registry the file-backed family stores (`memory-files`,
+`skill-usage`, `evolution-activity`) write through.
 
-## Model Experience
+## Model surface
 
-### Indirect model surface
+- **Model-visible:** nothing of its own — the rows that write through this seam own the injection.
+- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** yes — the `evolution-io` row, `evolution-host`/`evolution-all`/`evolution-preset`; a seam backed by `evolution-io-node`.
 
-#### What the model sees
-
-`@deepseek-ai/dsh-evolution-io` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
-
-#### Token effect
-
-Zero direct token effect from this package; consumers add any model-visible tokens.
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
-
-## Known Limitations and Deferred Work
-
+## Known limitations
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+
+## Notes and history
+
+

@@ -34,6 +34,42 @@ owns the source-install commands and the scope details. The installer also
 accepts the product-form aliases `--mode variant` (= `layered`) and
 `--mode attach` (= `oneclick`).
 
+## Production install (published bundles)
+
+Community bundles under the personal scope `@lmzhen` — `all` is the DEFAULT
+form, `host` is the shrink path, and the one-click `preset` is the legacy
+compatibility path:
+
+```bash
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+dsh plugin --profile web add @lmzhen/dsh-evolution-host
+dsh plugin --profile web add @lmzhen/dsh-evolution-preset
+```
+
+> Community-published `@lmzhen/*` packages are not official DeepSeek
+> releases.
+
+Inside a source/overlay checkout the same bundles live under the `@deepseek-ai`
+scope (publishing rewrites the scope to `@lmzhen`); those names resolve only
+there, never from npm:
+
+```bash
+dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
+```
+
+The agent preset is assembled by the installer (`install-layered.mjs`) or the
+host-runner's preset generation — V6-03 (0.3.34): do NOT hand-copy
+`evolution-agent/agent.cordis.yml` into `$DSH_HOME/.agent-presets/evolution/`.
+That file is a DELTA (4 model-tool rows, see its own header) and the
+`.agent-presets` discovery mounts whichever `agent.cordis.yml` it finds as the
+COMPLETE composition — a hand-copied delta would mount an agent missing every
+standard row. Use `dsh plugin add` + the installer (or copy only a
+standard+delta SYNTHESIZED composition when a manual path is truly needed).
+The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
+which reads the same `evolution-agent/bases.json` table and generates one
+variant per named base in a single pass (each base's preset id and metadata
+file come from that table).
+
 ## Prerequisites
 
 - **Validated platform line: DSH `0.1.5-rc.2`.** The published
@@ -44,11 +80,11 @@ accepts the product-form aliases `--mode variant` (= `layered`) and
   and re-derived by `packages/scripts/verify-platform-ranges.mjs`.
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
   or the published community bundle `@lmzhen/dsh-evolution-host` available to
-  pnpm (see §5).
+  pnpm (see **Production install**).
 - For the local installer below: Node 22.19+ or 24+ (the repository's
   `engines` floor: `^22.19.0 || >=24.0.0`) and the source checkout.
 
-## 1. Layered install (local development)
+## Layered install (host + agent preset — local development)
 
 ```bash
 node packages/scripts/install-layered.mjs \
@@ -98,7 +134,7 @@ node packages/scripts/install-layered.mjs --profile web --mode layered --uninsta
 Only the profile rows, copied packages, and the agent preset directory are
 removed. Memory, skills, state, reports, and approval history remain.
 
-## 2. Host-only install
+## Host-only install
 
 ```bash
 node packages/scripts/install-layered.mjs \
@@ -108,7 +144,7 @@ node packages/scripts/install-layered.mjs \
 Sessions get background evolution automation, approval, review, curator, and
 observability, but no `memory`/`skill_manage` tools.
 
-## 3. Agent-only install
+## Agent-only install
 
 ```bash
 node packages/scripts/install-layered.mjs \
@@ -118,7 +154,7 @@ node packages/scripts/install-layered.mjs \
 Assumes the host bundle is already installed or the tool services resolve from
 another source.
 
-## 4. One-click compatibility install
+## One-click compatibility install (legacy)
 
 ```bash
 node packages/scripts/install-layered.mjs \
@@ -126,42 +162,6 @@ node packages/scripts/install-layered.mjs \
 ```
 
 Equivalent to the legacy `dsh-evolution-preset` profile bundle.
-
-## 5. Production install
-
-Family bundles in the overlay `@deepseek-ai` scope (community-maintained;
-publishing rewrites the scope to `@lmzhen`, and the `@deepseek-ai` names
-below resolve only from a source/overlay checkout, not from npm):
-
-```bash
-dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
-```
-
-Community bundles under the personal scope `@lmzhen` (`all` is the DEFAULT
-form; `host` is the shrink path and the one-click `preset` the legacy
-compatibility path):
-
-```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all
-dsh plugin --profile web add @lmzhen/dsh-evolution-host
-dsh plugin --profile web add @lmzhen/dsh-evolution-preset
-```
-
-> Community-published `@lmzhen/*` packages are not official DeepSeek
-> releases.
-
-The agent preset is assembled by the installer (`install-layered.mjs`) or the
-host-runner's preset generation — V6-03 (0.3.34): do NOT hand-copy
-`evolution-agent/agent.cordis.yml` into `$DSH_HOME/.agent-presets/evolution/`.
-That file is a DELTA (4 model-tool rows, see its own header) and the
-`.agent-presets` discovery mounts whichever `agent.cordis.yml` it finds as the
-COMPLETE composition — a hand-copied delta would mount an agent missing every
-standard row. Use `dsh plugin add` + the installer (or copy only a
-standard+delta SYNTHESIZED composition when a manual path is truly needed).
-The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
-which reads the same `evolution-agent/bases.json` table and generates one
-variant per named base in a single pass (each base's preset id and metadata
-file come from that table).
 
 ## Profile override examples
 
@@ -269,8 +269,9 @@ vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
 > type-checking and the suites run in the upstream checkout (the CI overlay
 > built from the platform tag), which hosts the same sources under
 > `packages/evolution/<pkg>/` and whose `tsconfig.base.json` /
-> `tsconfig.host.json` carry the alias lines those paths need (see README.md,
-> "Development: the two layouts and their tsconfigs"). This mirror ships no
+> `tsconfig.host.json` carry the alias lines those paths need (see
+> `packages/README.md`, "Development: the two layouts and their tsconfigs").
+> This mirror ships no
 > toolchain of its own. The mirror is the authoring AND publication tree since
 > 0.3.83 and the publish chain no longer copies a second tree over it; the
 > former dev tree `D:/dsh/deepseek-harness` is stale and carries an

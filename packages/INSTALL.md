@@ -16,6 +16,14 @@ The full `all` bundle is the new-install default; `host` is the shrink path
 (same automation, no memory/skill model tools — the read-only
 `maintenance_probe` diagnostic remains). Shrinking = uninstall `all`, install `host`.
 
+**Where to start.** The DEFAULT form — and the only one with a real-install
+verification on this platform line — is §5:
+`dsh plugin --profile web add @lmzhen/dsh-evolution-all`. The other forms exist
+for shrinking (`host`), per-session tools (the layered variant), or
+compatibility (the one-click preset). The matrix below says which of them have
+actually been exercised on `0.1.5-rc.2` — read the status column as evidence,
+not as expectation.
+
 ### Install-form status against the validated platform line (`0.1.5-rc.2`)
 
 Column 2 names the install mode; the M1–M4 vocabulary — what each number means —

@@ -2,28 +2,38 @@
 
 <One line: what this package owns, and what it deliberately does not.>
 
-## Model Experience
+## Model surface
 
-### Indirect model surface
+<!-- Three facts, one line each. Say "nothing of its own" when the package only
+     serves other rows — do not restate the family-level prefix/cache rules:
+     they are single-sourced in packages/README.md and cited here. -->
 
-#### What the model sees
+- **Model-visible:** <nothing of its own (consumers own the injection) | the exact
+  injection and what it is attached to>
+- **Prompt prefix / KV cache:** <unchanged by this package | the exact effect>;
+  the family-level rules are single-sourced in `packages/README.md`
+  §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** <yes — the row this package contributes, and to which bundles |
+  no — a library/seam consumed by <consumers>>
 
-`@deepseek-ai/dsh-<pkg>` registers no direct prompt or tool schema itself.
-Model-visible effects are owned by the packages that consume this service.
+## Configuration
 
-#### Token effect
+<!-- Only when the package declares config keys. One row or line per key:
+     key — values/default — what changes. Delete the section when it has none. -->
 
-<None, or the exact injection and its size.>
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the
-assembled prompt or tool list.
-
-## Known Limitations and Deferred Work
+## Known limitations
 
 - <A limitation a user must know, with its mechanism and its workaround.>
 
 **Runtime invariant:** No companion is published. The platform auto-assembles
 nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion
 here would never execute (v37 S2.1 / I-3).
+
+## Notes and history
+
+<!-- Optional. Only when the package's behaviour is explained by a version-stamped
+     decision or audit finding: move those sentences here VERBATIM (do not
+     rewrite them) so the sections above stay about today's behaviour. Delete the
+     section when there is nothing to move. -->
+
+- <version-stamped sentence, copied as-is>

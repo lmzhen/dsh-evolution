@@ -1,26 +1,23 @@
 # @deepseek-ai/dsh-memory
 
-Memory provider registry for self-evolution
+Memory provider registry: the `memory` service the memory tool and the loops use.
 
-## Model Experience
+## Model surface
 
-### Indirect model surface
+- **Model-visible:** nothing of its own — `tool-memory` owns the tool and the injection.
+- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** yes — the `memory` row, `evolution-host`/`evolution-all`/one-click `evolution-preset`; a seam whose shipped provider is `memory-files`.
 
-#### What the model sees
+## Configuration
 
-`@deepseek-ai/dsh-memory` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
+- `provider` — `''` (default) — pins one provider for all reads and writes; empty = first registered.
 
-#### Token effect
+## Known limitations
 
-Zero direct token effect from this package; consumers add any model-visible tokens.
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
-
-## Known Limitations and Deferred Work
-
-
-- `provider` pins the registry to one provider name (V27 G6.3); empty (the default) serves the FIRST registered provider, so with two providers mounted the choice is row order. A pin that no mounted provider satisfies warns when a differently-named provider registers and then fails the first read/write with the pin named — the registry and the registration API are one service, so there is no earlier point to check it.
+- A pin no mounted provider satisfies warns when a differently-named provider registers, then fails the first read/write with the pin named — there is no earlier check (registry and registration API are one service).
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+
+## Notes and history
+
+- `provider` pins the registry to one provider name (V27 G6.3); empty (the default) serves the FIRST registered provider, so with two providers mounted the choice is row order.

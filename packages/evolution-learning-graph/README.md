@@ -10,25 +10,22 @@ Memory node ids carry a trailing snapshot token (`memory:<source>:<index>:<snaps
 
 Memory→skill edges are word-level, not substring: the entry is tokenized on non-letter/digit/hyphen runs and a skill name links only when it is a whole token. This prevents a skill named `run` from linking the words `running`/`grunt`.
 
-`graph edit`/`graph delete` route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent) — for BOTH skill nodes and memory nodes (P2-6, v15; memory staged args mirror the `memory` tool runner's replay shape). Before staging, the seam's `hasRunner` is checked (P2-7, v15): with approval enabled, a session policy that is not `never`, and the write actually staging (foreground stages per approval `stageForeground`; subagent origins always stage), a missing replay runner's row (tool-skill-manage / tool-memory) refuses the write; allow-direct combinations execute unchanged instead of creating a pending record no approver could replay. Each approved/executed edit bumps the skill's patch counter and a delete archives it, matching `skill_manage` — including the no-op gate: an edit whose content is byte-equivalent to the current file (`noop`) writes nothing and does not bump the patch counter, exactly as `skill_manage` treats an unchanged update/patch. The command invocation's session rides the approval request (v12 N1), so a `never`-policy session stages nothing instead of deriving every graph write as foreground.
+**`graph edit`/`graph delete` route through the evolution approval seam** when mounted (soft-probed: the write executes directly when absent) — for BOTH skill nodes and memory nodes. Each approved/executed edit bumps the skill's patch counter and a delete archives it, matching `skill_manage` — including the no-op gate: an edit whose content is byte-equivalent to the current file (`noop`) writes nothing and does not bump the patch counter, exactly as `skill_manage` treats an unchanged update/patch.
 
-## Model Experience
+## Model surface
 
-### Indirect model surface
+- **Model-visible:** nothing of its own — no prompt section and no tool schema; `/graph` is a human command, and consumers own the model-visible effects.
+- **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** yes — the `evolution-learning-graph` row, carried by the `evolution-host`, `evolution-all` and one-click `evolution-preset` bundles.
 
-`@deepseek-ai/dsh-evolution-learning-graph` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
-
-#### Token effect
-
-Zero direct token effect from this package; consumers add any model-visible tokens.
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
-
-## Known Limitations and Deferred Work
+## Known limitations
 
 - The memory drift snapshot covers only the node label (first line, first 80 chars): a change confined to a later line of the same entry is not detected, because the rendered node label is the comparison anchor.
 - A hand-typed bare `memory:<source>:<index>` id has no snapshot and skips the drift check (legacy path; the rendered ids always carry the snapshot).
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## Notes and history
+
+- `graph edit`/`graph delete` route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent) — for BOTH skill nodes and memory nodes (P2-6, v15; memory staged args mirror the `memory` tool runner's replay shape).
+- Before staging, the seam's `hasRunner` is checked (P2-7, v15): with approval enabled, a session policy that is not `never`, and the write actually staging (foreground stages per approval `stageForeground`; subagent origins always stage), a missing replay runner's row (tool-skill-manage / tool-memory) refuses the write; allow-direct combinations execute unchanged instead of creating a pending record no approver could replay.
+- The command invocation's session rides the approval request (v12 N1), so a `never`-policy session stages nothing instead of deriving every graph write as foreground.

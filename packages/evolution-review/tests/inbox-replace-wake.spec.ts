@@ -11,7 +11,7 @@
  *   wake after the in-place replace, and the woken-turn cadence suppression
  *   mirrors the append path;
  * - (b) a superseded `next-step` (inject) row keeps the no-wake `true` — the
- *   documented inject bound (README, "Known Limitations and Deferred Work"):
+ *   documented inject bound (README, "Known limitations"):
  *   a pending prompt may wait for the next real user input while the latch
  *   stays consumed.
  */

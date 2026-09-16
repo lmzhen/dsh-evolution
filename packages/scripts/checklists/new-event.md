@@ -1,11 +1,12 @@
 # New family event
 
-Skeleton: `templates/event/producer-consumer.ts.tmpl`.
+**When to use:** you are adding an event to the family's `evolution/*` namespace on
+the platform's io/ctx buses (`evolution/plan-applied`, `evolution/skill-signal`, …)
+— the producer and its consumer are ONE change: an emit with no reader is a dead
+channel, and a reader with no producer never runs. Adding only a consumer is
+[new-consumer.md](./new-consumer.md).
 
-Family events are the `evolution/*` namespace on the platform's io/ctx buses
-(`evolution/plan-applied`, `evolution/skill-signal`, …). The producer and its
-consumer are ONE change: an emit with no reader is a dead channel, and a reader
-with no producer never runs.
+Skeleton: `templates/event/producer-consumer.ts.tmpl`.
 
 ## Checklist
 

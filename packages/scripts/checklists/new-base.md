@@ -1,10 +1,11 @@
 # New preset base (`--base`)
 
-Skeleton: `templates/base/bases-row.json.tmpl`.
+**When to use:** you are adding a `--base` value — a new row in the **one** table
+(`packages/evolution-agent/bases.json`) that the installer, the
+`/evolution preset install` command and the docs all read, so a base cannot be
+half-added.
 
-A base is a row in **one** table (`evolution-agent/bases.json`); the installer,
-the `/evolution preset install` command and the docs read that table, so a base
-cannot be half-added.
+Skeleton: `templates/base/bases-row.json.tmpl`.
 
 ## Checklist
 

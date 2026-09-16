@@ -2,22 +2,11 @@
 
 Agent preset exposing memory and skill evolution tools to a session
 
+## Model surface
 
-## Model Experience
-
-### Indirect model surface
-
-#### What the model sees
-
-`@deepseek-ai/dsh-evolution-agent-preset` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
-
-#### Token effect
-
-Zero direct token effect from this package; consumers add any model-visible tokens.
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
+- **Model-visible:** nothing of its own — the delta registers no prompt and no tool schema; it mounts the four model rows (`tool-memory`, `tool-skill-manage`, `tool-session-query`, `evolution-skill-catalog`), which own what the model sees.
+- **Prompt prefix / KV cache:** the composed preset is the platform's own base composition plus this delta; this package adds no prompt text of its own. Family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** yes — the agent preset DELTA (`agent.cordis.yml`), installed by `install-layered.mjs` (agent/layered modes) or `/evolution preset install`; not a profile row.
 
 ## Preset variants
 
@@ -59,17 +48,13 @@ Known limitations of this base:
 - **A deployment without a code runtime refuses the preset at mount**, naming
   `tool-presentation`; that row and its requirement come from the platform `ptc` preset and are
   not something this variant can soften.
-- **Both install paths produce this variant** (0.3.75): `/evolution preset install --base ptc`
-  (npm, `evolution-commands`) and `install-layered.mjs --base ptc` (source checkout) read the same
-  `bases.json` and write `.agent-presets/evolution-ptc/`. It still only composes a platform that
-  actually ships the `ptc` preset; a `standard`-only runtime is refused by name.
+- **Both install paths produce this variant** — the npm command and the source installer read the same `bases.json`.
 - **Tool-use observation under PTC** depends on the family reading dispatches through
   `evolution-core`'s dispatch normalizer rather than matching a platform event vocabulary; a
   consumer that matches `tool/call` directly goes blind in this mode (the arch guard rejects that
   form).
 
-## Known Limitations and Deferred Work
-
+## Known limitations
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
 
@@ -94,3 +79,7 @@ name when it is unmet — the preset is never composed from another base:
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 
+## Notes and history
+
+- **Both install paths produce this variant** (0.3.75): `/evolution preset install --base ptc` (npm, `evolution-commands`) and `install-layered.mjs --base ptc` (source checkout) read the same `bases.json` and write `.agent-presets/evolution-ptc/`. It still only composes a platform that actually ships the `ptc` preset; a `standard`-only runtime is refused by name.
+- The V10-14 `tool-skill` catalog-cap injection (`injectToolSkillCap`) runs on the composed output for every base, and the row-collision guard still fails loud when a delta row id appears in the platform composition.

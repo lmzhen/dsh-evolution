@@ -1,5 +1,8 @@
 # New `/evolution` subcommand
 
+**When to use:** you are adding a subcommand — a new row in
+`packages/evolution-commands/src/registry.ts` plus its handler branch.
+
 Skeleton: `templates/command/registry-row.ts.tmpl`.
 
 ## Checklist

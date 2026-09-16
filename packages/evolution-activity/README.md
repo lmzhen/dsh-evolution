@@ -1,34 +1,28 @@
 # @deepseek-ai/dsh-evolution-activity
 
-Durable activity store for self-evolution plan outcomes
+Durable activity store for self-evolution plan outcomes: it subscribes to the `evolution/plan-applied`
+process event (payload v2, with sessionId) and append-merges every outcome into
+`$DSH_HOME/evolution/activity.json` through the evolution IO seam — load → fold → save under an
+in-process queue, so records survive host restarts and are readable without a session. A
+session log carrying `evolution/*` types is refused wholesale at resume, so plan-outcome
+durability lives here; a storage-domain table is deferred until a consumer needs domain routing.
 
-## What it does
+## Model surface
 
-Subscribes to the process event `evolution/plan-applied` (payload v2, with sessionId) and persists every plan outcome to `$DSH_HOME/evolution/activity.json` through the evolution IO seam — the same best-effort sidecar posture as `feedback.json` and the curator reports. The sidecar is append-merge (load → fold → save under an in-process queue), so records survive host restarts and are readable without a session. The retired session projection is gone: a session log carrying `evolution/*` types is refused wholesale at resume, so plan-outcome durability lives here instead. A storage-domain table is deferred until a consumer needs domain routing.
-
-## Model Experience
-
-### Indirect model surface
-
-#### What the model sees
-
-`@deepseek-ai/dsh-evolution-activity` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
-
-#### Token effect
-
-Zero direct token effect from this package; consumers add any model-visible tokens.
-
-#### KV Cache effect
-
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
+- **Model-visible:** nothing of its own — the rows and commands that read the sidecar own the injection; it backs `/evolution replay` (`evolution-replay`).
+- **Prompt prefix / KV cache:** unchanged by this package — family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
+- **Mount it?** yes — the `evolution-activity` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`.
 
 ## Configuration
 
-- `maxItems`: bound on the retained activity sidecar (default `DEFAULT_MAX_ITEMS = 200`). A non-finite value (NaN/±Infinity) falls back to the default (0.3.19, S6.4 guard), while a non-positive value (0 or negative) fails loud at the schema — `z.number().min(1)` — because `slice(-0)` would keep everything and disable the retention window (G3.1, 0.3.23).
+- `maxItems` — `DEFAULT_MAX_ITEMS = 200` — bound on the retained sidecar; a non-finite value falls back to the default, a non-positive value fails loud at the schema.
 
-## Known Limitations and Deferred Work
-
+## Known limitations
 
 - Each event lands through `transactIo` (like `feedback.json`), so append cycles are cross-process atomic at the single-write granularity; the read-modify-write of one event is serialized in-process and atomic on disk. A multi-record batch is still one event at a time — no batch transaction exists.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+
+## Notes and history
+
+- A non-finite value (NaN/±Infinity) falls back to the default (0.3.19, S6.4 guard), while a non-positive value (0 or negative) fails loud at the schema — `z.number().min(1)` — because `slice(-0)` would keep everything and disable the retention window (G3.1, 0.3.23).
