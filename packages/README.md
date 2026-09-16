@@ -4,6 +4,18 @@ Hermes-style self-evolution for DeepSeek Harness, implemented as composable
 Cordis plugins. The model may only propose and write **memory** and **skills**;
 policy, prompts, routing, state, and audit history are control-plane data.
 
+This document is the **mechanism reference** for the `packages/` tree: the rendered
+`/evolution` command table, composition details, environment variables and the
+control-plane invariants. For the project overview, the install matrix and the FAQ,
+start at the [root README](../README.md); the install-FORM semantics and the
+per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
+
+**Contents:** [Package map](#package-map) · [Installation](#installation) ·
+[Command reference](#command-reference) · [Composition details](#composition-details) ·
+[Composition](#composition) · [Control-plane invariants](#control-plane-invariants) ·
+[Extension points](#extension-points) ·
+[Development: the two layouts](#development-the-two-layouts-and-their-tsconfigs)
+
 > Community-published packages under `@lmzhen` are maintained by the
 > dsh-evolution community and are not official DeepSeek releases.
 >

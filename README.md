@@ -1,81 +1,358 @@
-# Evolution plugin family
+# dsh-evolution · self-evolving memory & skills for DeepSeek Harness
 
-> **V9-03 (0.3.50), restated for the mirror-single-line workspace (0.3.83):**
-> this root file and `packages/README.md` are SIBLING documents with parallel
-> install sections, kept in sync BY HAND — neither is generated from the other.
-> The flat mirror is the authoring and publication tree; the former dev tree
-> (`D:/dsh/deepseek-harness`) is stale and carries an `AUTHORING-MOVED.md`
-> marker (CONTRIBUTING.md §The gate). The packages copy carries the same note.
+**English** · [中文](./README.zh.md)
 
-Hermes-style self-evolution for DeepSeek Harness, implemented as composable
-Cordis plugins. The model may only propose and write **memory** and **skills**;
-policy, prompts, routing, state, and audit history are control-plane data.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@lmzhen/dsh-evolution-all"><img src="https://img.shields.io/npm/v/@lmzhen/dsh-evolution-all?style=flat-square&label=npm&color=4c6ef5" alt="npm version"></a>
+  &nbsp;
+  <a href="https://www.npmjs.com/package/@lmzhen/dsh-evolution-all"><img src="https://img.shields.io/npm/dm/@lmzhen/dsh-evolution-all?style=flat-square&label=downloads%2Fmo" alt="npm downloads"></a>
+  &nbsp;
+  <a href="https://github.com/lmzhen/dsh-evolution/actions/workflows/release.yml"><img src="https://github.com/lmzhen/dsh-evolution/actions/workflows/release.yml/badge.svg?branch=main" alt="release CI"></a>
+  &nbsp;
+  <a href="https://github.com/lmzhen/dsh-evolution"><img src="https://img.shields.io/github/stars/lmzhen/dsh-evolution?style=flat-square&label=stars" alt="stars"></a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/DSH-0.1.5--rc.2-4c6ef5?style=flat-square" alt="validated platform line">
+  &nbsp;
+  <img src="https://img.shields.io/badge/node-22.19%2B%20%7C%2024%2B-339933?style=flat-square" alt="node">
+  &nbsp;
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT">
+</p>
 
-> Community-published packages under `@lmzhen` are maintained by the
-> dsh-evolution community and are not official DeepSeek releases.
+<p align="center">
+  <strong>Hermes-style self-evolution for DeepSeek Harness — one install, two loops.</strong><br>
+  <em>review · memory · skills · curator · approval gate · threat scan · audit trail</em>
+</p>
 
-## Concepts: the two evolution loops
+<p align="center">
+  <a href="#what-it-is">What it is</a> ·
+  <a href="#why-this-exists">Why</a> ·
+  <a href="#install-in-60-seconds">Install</a> ·
+  <a href="#choose-your-install-m1m4">Choose your install</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#observability--control">Observe</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#security--boundaries">Boundaries</a> ·
+  <a href="#known-limitations">Limitations</a> ·
+  <a href="#troubleshooting--faq">FAQ</a> ·
+  <a href="#documentation-index">Docs</a>
+</p>
 
-Evolution runs two loops. Both share the same engine — **Review** (watch the
-conversation and produce a change plan) + **Curator** (merge, demote, archive
-the skills over time) + **Governance** (threat scan, immutable policy,
-staged approval as the gate):
+> Community-published packages under `@lmzhen` are maintained by the dsh-evolution
+> community and are **not** official DeepSeek releases. `@deepseek-ai/*` package names
+> and DeepSeek branding are not used by these releases.
 
-**Memory Evolution** — observe conversations → review → memory plan →
-write (memory entries) → injected into new sessions. Carrier: `memory` /
-`memory-files` / `tool-memory` / review.
+## What it is
 
-**Skill Evolution** — observe conversations → review → skill plan →
-(when gated: approve) → write/patch the skill tree → catalog shows it to the
-model → the model extends/uses it → usage stats → curator merges/archives
-(metabolism). Carrier: `skill-store` / `tool-skill-manage` / `skill-catalog`
-/ `curator` / `skill-usage` / review.
+A family of **29 composable Cordis plugins** that give a DeepSeek Harness install a
+self-evolution layer: the agent reviews its own conversations, keeps **memory**, proposes
+and patches **skills**, and curates that skill library over time — with a
+policy/threat/approval control plane around every write.
 
-**Vocabulary (single source in code + docs):** `plan` — a review-proposed
-change set; `pending` — a staged write awaiting approval (approve replays it
-through its runner); `staged` — approval-stage writes; `snapshot` — point-in-time
-skill-tree backup (restore target); `consolidate` — merge sources into an
-umbrella skill; `nomination` — the curator's LLM proposal; `drift` —
-out-of-band file edits detected before write; `substantive` — review-trigger
-budget class; `catalog` — the model-visible skill index (60-char cap);
-`rank` — catalog provider priority; `review mode` — how a review decides
-(cadence / subagent plan).
+The model may only propose and write **memory** and **skills**. Policy, prompts, routing,
+state and audit history are control-plane data the model can never write.
 
-## Get started
+What it is **not**: not a model, not a hosted service, and not a GUI of its own — there
+is no browser panel to install. Everything it adds is model tools, slash commands, and
+files under your own `$DSH_HOME`.
 
-**First 10 minutes** (defaults as shipped): after the M1 install and restart,
-a review observes the first sessions — the FIRST automatic pass is deferred
-until the interval/usage window opens, so nothing writes on boot. The first
-memory entry arrives after a review decides a conversation fact is worth
-keeping; the first skill edit arrives after a review proposes a change the
-conversation supports. Everything is visible in `/evolution doctor` (form,
-services, pending) and every write shows in `/evolution mutations`. To gate
-the background writes, use M2 (human approval); M3 removes only the model
-tools — its automation keeps running.
+## Why this exists
 
-### Install modes (M1-M4)
+Coding agents forget. They re-learn the same project conventions every session, and the
+"skills" they accumulate never improve, never merge, and never retire. Hermes Agent
+solved this with two loops; this family ports that design to the DeepSeek Harness plugin
+model, keeping every write observable and reversible:
 
-The M numbers are defined HERE; the install FORMS and their per-platform
-verification status are single-sourced in `packages/INSTALL.md`.
+```text
+        conversation events
+                │
+   ┌────────────▼────────────┐        ┌───────────────────────┐
+   │  Review (gate + plan)   │───────▶│  Memory Evolution     │  <DSH_HOME>/memories
+   │  cadence / completion   │        │  durable facts        │  injected next session
+   └────────────┬────────────┘        └───────────────────────┘
+                │
+                │                     ┌───────────────────────┐
+                └────────────────────▶│  Skill Evolution      │  <DSH_HOME>/skills
+                                      │  write · patch · merge│  catalog shows them
+                                      └───────────┬───────────┘
+                                                  │ usage + feedback
+                                      ┌───────────▼───────────┐
+                                      │  Curator (metabolism) │  merge · demote · archive
+                                      └───────────────────────┘
+     every step passes: threat scan → immutable policy → (optional) approval gate
+```
 
-| Mode | One-liner | What you get |
+## Native DSH vs. + dsh-evolution
+
+| Capability | Native DeepSeek Harness | With this family |
 |---|---|---|
-| **M1 Full-auto (DEFAULT)** | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` | Both loops run and write automatically; model tools in every session |
-| **M2 Human gated** | M1 + `approval.enabled: true` | Evolution may propose; every write shows as `/evolution pending` for you to approve/reject |
-| **M3 Infrastructure only** | `dsh plugin --profile web add @lmzhen/dsh-evolution-host` | Automation runs but the model has no memory/skill tools — nothing gets written by the model |
-| **M4 Per-session (advanced)** | host + `/evolution preset install` | Tools only in sessions selecting the Evolution preset (exclusive with M1 and the one-click `evolution-preset` bundle) |
+| Memory across sessions | manual notes | review-written memory + user profile, injected into new sessions |
+| Skill library | files you write by hand | model-proposed writes/patches, validated plans, catalog with a 60-char cap |
+| Skill upkeep | none | curator: merge near-duplicates, demote, archive, snapshot before every run |
+| Write safety | none | ordered guard: threat scan → immutable policy → staged approval (opt-in) |
+| Audit trail | none | `/evolution mutations`, per-run curator reports, activity store |
+| Usage insight | none | per-skill use/view/patch counters; low-quality flags |
+| Conversation review | none | cadence/completion-triggered review in-session, or an opt-in subagent reviewer |
+| Self-improvement loop | none | feedback → quality → curator decisions → catalog ranking |
 
-**Fastest check — `/evolution doctor`:** after any install, run it once: it
-tells you the install form, flags conflicts (all/host/preset double mounts,
-all vs layered, one-click preset vs layered), checks `DSH_EVOLUTION_*` variables and the mounted services,
-and ends with suggested next steps. Install docs point here instead of
-repeating the same prose.
+## Install in 60 seconds
 
-## Development: package map (mechanism)
+```bash
+# 1. the default full bundle (infra + model tools in every session)
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+
+# 2. restart the host so the profile is re-composed
+# 3. ask any session:
+/evolution doctor
+```
+
+Gated writes instead of full-auto? Add `approval.enabled: true` to that row (mode M2
+below). Everything else has a sensible default: nothing writes on boot, and the first
+automatic review only fires once the interval/usage window opens.
+
+A real install looks like this (0.3.83, this project's own host):
+
+```text
+$ dsh plugin --profile web add @lmzhen/dsh-evolution-all
++ @lmzhen/dsh-evolution-all 0.3.83   … 28 packages, Done in 8.3s
+
+$ dsh --profile web --dump-config | wc -l
+773                      # composed lines; 207 distinct row ids, 0 duplicates
+```
+
+## Choose your install (M1–M4)
+
+The M numbers are defined HERE; the install **forms** and their per-platform verification
+status are single-sourced in `packages/INSTALL.md`, and the layered variant's
+session-level consequences are stated once in `packages/INSTALL.md` ("Install forms").
+
+| Mode | How | What you get |
+|---|---|---|
+| **M1 Full-auto (DEFAULT)** | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` | Both loops run and write; model tools in every session |
+| **M2 Human gated** | M1 + `approval.enabled: true` | Evolution may propose; every write appears as `/evolution pending` for you to approve or reject |
+| **M3 Infrastructure only** | `dsh plugin --profile web add @lmzhen/dsh-evolution-host` | Automation runs, the model gets **no** memory/skill tools |
+| **M4 Per-session (advanced)** | M3 + `/evolution preset install` | Tools only in sessions that select the Evolution preset (mutually exclusive with M1 and the legacy one-click preset) |
+
+The legacy one-click preset (`@lmzhen/dsh-evolution-preset`) is the compatibility
+spelling of M1. On M1/M3 the row that pins the state medium matters: the bundle pins
+`provider: json` so an unrelated overlay cannot silently move your state onto an empty
+domain.
+
+## Compatibility
+
+| | Value |
+|---|---|
+| Validated DSH platform line | **`0.1.5-rc.2`** (`PLATFORM_VERSION`; `UPSTREAM_SHA=fb2c4b9e…`) |
+| Declared dependency window | `^0.1.5-rc.2` on every `@deepseek-ai/dsh-*` peer/dependency |
+| Family version | `0.3.83` (`@lmzhen/dsh-evolution-all`, npm `latest`) |
+| Node | 22.19+ or 24+ (`engines`) |
+| Per-form status | `packages/INSTALL.md` — which forms were exercised on this platform line, and which are source-level judgements |
+
+A prerelease range admits **one** anchor, not a family of them: `^0.1.5-rc.2` rejects
+later prerelease successors while admitting stable `0.1.5`. Earlier prerelease lines
+(`0.1.1-rc.2` and older) fail at dependency resolution — that is the support window, not
+a bug. When in doubt run `/evolution doctor`: it reports the install form it detected
+and the rows it found.
+
+## How it works
+
+| Layer | What it does | Where it lives |
+|---|---|---|
+| Review | watches session events, applies the substantive gate, produces a validated plan | `evolution-review` (+ `evolution-plan-validator`) |
+| Memory loop | writes durable facts and a user profile; injects guidance into new sessions | `memory` / `memory-files` / `tool-memory` |
+| Skill loop | proposes/writes/patches skills through the `skill_manage` tool; the catalog shows them to the model | `tool-skill-manage` / `evolution-skill-catalog` |
+| Curator | deterministic lifecycle (stale/archive) + LLM nomination, snapshot before every run | `evolution-curator` |
+| Control plane | threat scan, immutable policy, optional staged approval with replay | `evolution-threat` / `evolution-policy` / `evolution-approval` |
+| Plumbing | IO seam, state providers (json/domain), events, activity, replay, learning graph | `evolution-io*` / `evolution-state*` / `evolution-activity` / `evolution-replay` |
+
+Where your data goes — all under your own home, no service in the middle:
+
+```text
+$DSH_HOME/evolution/events.json          append-only feedback/usage timeline
+$DSH_HOME/evolution/review-state.json    per-session review counters
+$DSH_HOME/evolution/activity.json        self-evolution plan outcomes
+$DSH_HOME/evolution/reports/             curator run reports (json + md)
+$DSH_HOME/skills/                        the skill tree (+ .usage.json counters)
+$DSH_HOME/memories/                      MEMORY.md + USER.md
+```
+
+**Review delivery.** `reviewMode` defaults to `inject` (since 0.3.74): the review runs
+inside the session at a conversation boundary, so nothing is spawned and no budget is
+spent on a second prefix. `subagent` is an explicit opt-in for deployments that want the
+review to read skills with a clean parent context or to use a dedicated model; that mode
+is the one the review watchdog and the review-model knobs apply to.
+
+**Session scoping.** Cross-session consumers (review, skill-usage) are declared
+`sessionScoped`: they act on a session only when that session can resolve the family's
+model tools. With the `all` bundle the model rows sit at profile root, so every session
+qualifies; a host-only install (M3) legitimately never matches, and the plugin logs one
+warning saying so instead of failing silently.
+
+## What you get
+
+| Capability | What it changes for you |
+|---|---|
+| **Memory that survives** | facts worth keeping are written during review and injected into later sessions — no more re-explaining your project each time |
+| **Skills that improve** | the agent patches its own skills from what actually happened, with plans validated before execution |
+| **Metabolism** | the curator merges near-duplicates, demotes unused skills and archives them — with a snapshot before each run so `restore` is always possible |
+| **A gate you control** | one config flag turns every write into a `/evolution pending` item you approve or reject; approvals replay through the exact registered runner |
+| **A threat guard with an exempt list** | instruction-like content in memory/skill writes is refused; known-innocent labels can be exempted per config site |
+| **An audit trail** | `/evolution mutations` and per-run curator reports answer "what changed my skills, and when" |
+| **Usage-driven decisions** | use/view/patch counters per skill, low-quality flags, and a catalog ranked so the model sees the good ones |
+| **Feedback without a producer** | `evolutionFeedback.record()` is a public seam for your own hosts/commands; the family ships no producer of its own |
+| **Replay and graph** | A/B replay scoring for skill changes, and a learning graph over skills and memory |
+
+## Observability & control
+
+Day one, four commands are enough — the full `/evolution` command table is rendered once
+in `packages/README.md` (§Command reference, generated from the registry and pinned
+byte-for-byte by its spec):
+
+- `/evolution doctor` — what is installed: form, scoped rows, services, pending count.
+- `/evolution pending` + `approve` / `reject` — the staged writes (M2).
+- `/evolution curator status` — background curation: last run, next due, counts.
+- `/evolution preset install [--base <name>[,<name>...]]` — generate the family agent
+  preset (M4); one variant per named base, in one pass.
+
+Then, when you want the paper trail: `/evolution mutations` (every write),
+`/evolution release <id>` (recover an orphaned `executing` record),
+`/evolution maintain --facts` (maintenance scan) and `/graph` (skills + memory view).
+
+**Verify an install without asking the model anything:** the composed profile must have no
+duplicate row ids, and the family rows must all be present.
+
+```bash
+dsh --profile web --dump-config | grep -c 'id: evolution-'   # 18 such rows
+dsh --profile web --dump-config | grep -c 'id:'              # 207 ids, all distinct
+```
+
+On Windows, replace `grep -c` with `Select-String -Pattern … | Measure-Object`
+
+## Configuration
+
+Five semantic dials; every underlying field is a normal row config, and the fine-grained
+knobs run into a three-level appendix (**daily** — review intervals, curator cadence;
+**tuning** — health thresholds, quality weights; **high-risk** — `maxOpsPerPlan`, char
+budgets, review/curator model choice).
+
+| Dial | Values | Underlying fields |
+|---|---|---|
+| autonomy | auto / reviewed / observe | `approval.enabled` (profile row), `reviewEnabled` (evolution-review), `/evolution pending\|approve\|reject` |
+| scope | global / per-session | package choice — evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
+| curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` (evolution-curator) |
+| memoryInjection | on / off | `memoryEnabled` (tool-memory: the whole row is a no-op when off — no `memory` tool registration and no guidance/snapshot injection) |
+| threatStrictness | strict / exempt-list | `threatExemptLabels` — declared per config site (guard rows, the command face, the store options); the owning list of declaring sites is single-sourced in `evolution-threat/README.md` |
+
+Defaults that surprise people, stated up front: `reviewEnabled: true`,
+`reviewMode: 'inject'`, `memoryInterval = skillInterval = 10` turns, substantive gate =
+"≥3 tool calls **or** ≥200 user characters **or** ≥500 agent characters", curator tick
+hourly with a due-ness interval of `168 h`.
+
+Environment variables:
+
+| Variable | Where read | Effect |
+|---|---|---|
+| `DSH_EVOLUTION_SESSION_QUERY` | profile config (`!!js` in bundle patch) | `startup` / `first-search` / `never` (SQLite index openAt); invalid values normalize to `startup` |
+| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile config (`!!js` in bundle patch) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
+| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code (core `env.ts`) | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
+| `EVOLUTION_SCOPE` | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. The plugin runtime never reads it |
+| `DSH_EVOLUTION_DELTA_PATH` | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment the layered installer composes from (default: the packaged `evolution-agent/agent.cordis.yml`); tests and one-off builds inject a fixture |
+| `DSH_EVOLUTION_ARCH_STRICT` | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`); the plugin runtime never reads it |
+| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | guard scripts only (`verify-declared-config.mjs`) | `1` makes the declared-config-reach guard fail loud instead of warn (same effect as `--strict`); the plugin runtime never reads it |
+
+## Security & boundaries
+
+1. **The model writes memory and skills only.** Policy, prompts, routing, state and audit
+   history are never model-writable; `evolution-policy` installs a monotonic
+   `ctx.tools.guard` and `evolution-plan-validator` rejects forbidden fields.
+2. **Every mutation is gated.** The `tools.guard` threat scan runs on the pre-execute
+   path, and with approval enabled a write is staged, reviewed by you, and replayed
+   through the exact runner it registered with.
+3. **Skill destruction is never a hard delete.** Archival moves to `.archive/`, and every
+   curator run snapshots the skill tree first (a skill held by a live writer's lock is
+   skipped, recorded, and reported as not-restored by a later restore).
+4. **Review plans need evidence.** A plan is bounded by the session's event sequence;
+   invalid ops are dropped while valid ones still apply.
+5. **Redaction at the boundary.** Text that leaves the session for a model passes the
+   family's secret-redaction pass (PEM blocks, URL credentials, inline assignments and
+   camelCase credential keys).
+6. **Nothing leaves your machine except the prompts you already send.** There is no
+   telemetry service: counters and reports are files under `$DSH_HOME`. The family
+   publishes no `./invariant` companion — the platform auto-assembles nothing, so a
+   companion would never execute.
+
+## Known limitations
+
+- **`reviewMode` defaults to `inject`.** Reviews run inside the session, and the
+  injected mode produces no `evolution/plan-applied` ledger — the activity store and
+  replay views stay empty until you opt into `subagent` reviews.
+- **Session-scoped consumers.** On M3 (host-only) review and usage telemetry never match
+  a session; on M4 only sessions on the Evolution preset match.
+- **No GUI panel.** The family adds slash commands and model tools, not a browser UI.
+- **The curator is deliberately slow.** Hourly tick, 168 h due-ness by default — quiet
+  weeks are normal; `/evolution curator status` says when the next run is due.
+- **One platform anchor.** The support window is exactly `0.1.5-rc.2`; a new platform
+  line needs a family migration (see the upstream checklist below).
+- **`npm dist-tags.next` is stale** at `0.3.18` (a historical residual); `latest` is
+  correct and is what `add` resolves.
+- **Maintainer-side only:** the publish chain compares `packages/scripts/**` against a
+  secondary checkout, so script changes are mirrored there before a release.
+
+## Troubleshooting & FAQ
+
+| Symptom / code | Meaning | Next step |
+|---|---|---|
+| startup: `invariants: package "…" is already registered` | two bundles or bundle+preset double-mount the same rows | keep ONE of evolution-all / evolution-host / evolution-preset |
+| `E-301` | approval service not mounted | the evolution-approval row ships with host/all; run `/evolution doctor` |
+| `E-302` | curator service not mounted | mount the evolution-curator row; run doctor |
+| `E-303` | replay service not mounted | mount the evolution-replay row; run doctor |
+| `E-306` | this deployment stages foreground writes, but `/evolution consolidate` / `restore` / `skill restore` (and, since 0.3.83, a session-less `restructure`) is not replayable through the skill runner | approve-and-execute directly, or set `stageForeground: false` deliberately |
+| threat deny (memory/skill write) | the strict scan hit an instruction-like phrase | rephrase; or exempt a known-innocent label via `threatExemptLabels` |
+| `/evolution doctor` reports `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
+
+**Why has nothing been written yet?** The first review waits for the interval window
+(`memoryInterval` / `skillInterval`, default 10 turns) and the substantive gate. A
+one-line session is deliberately not worth a review.
+
+**Why is `activity.json` empty?** Inject-mode reviews do not emit
+`evolution/plan-applied` records. Switch to `reviewMode: 'subagent'` if you want that
+ledger.
+
+**How do I stop it writing?** Set `reviewEnabled: false` (no reviews at all),
+`approval.enabled: true` (every write waits for you), or use M3 (no model tools).
+
+**How do I check which version is actually running?** Compare
+`profiles/<name>/pnpm-lock.yaml` with `npm view @lmzhen/dsh-evolution-all version`;
+the profile is re-composed when the host restarts.
+
+## Uninstall / rollback
+
+```bash
+dsh plugin --profile web remove @lmzhen/dsh-evolution-all
+```
+
+Removing the row stops the loops but keeps your data: memory, skills, state, reports and
+approval history stay under `$DSH_HOME` and are picked up again if you reinstall. The
+skill tree is archived, never hard-deleted, so a rollback is a re-install plus `restore`.
+
+## Documentation index
+
+| Document | What it holds |
+|---|---|
+| [`INSTALL.md`](./INSTALL.md) | install forms and scopes, profile override examples, per-form status |
+| [`packages/INSTALL.md`](./packages/INSTALL.md) | the install-FORM semantics and the per-platform verification matrix |
+| [`packages/README.md`](./packages/README.md) | the rendered `/evolution` command reference and package-level mechanism details |
+| [`CHANGELOG.md`](./CHANGELOG.md) | what changed in each version, with the reason and the evidence |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact is allowed to live, the 16-step gate, the house rules |
+
+## Development
+
+<details>
+<summary><strong>Package map (29 published packages)</strong></summary>
 
 | Package | Role |
 |---|---|
-| `evolution-core` | Shared pure stores/prompts/signals/constants; no main Cordis plugin entry and no `./invariant` companion (all 29 companions were removed in 0.3.75 — the platform mounts none, so an unmounted companion is a dead channel; each package README states its own reason) |
+| `evolution-core` | Shared pure stores/prompts/signals/constants; no main Cordis plugin entry and no `./invariant` companion |
 | `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
@@ -84,356 +361,85 @@ repeating the same prose.
 | `evolution-state-storage` / `-domain` / `-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
 | `evolution-approval` | Hermes-style staged/pending writes over `evolutionState` |
 | `evolution-threat` | `tools.guard` content threat guard |
-| `evolution-review` | Signal gate → one-shot subagent → validated plan execution |
+| `evolution-review` | Signal gate → one-shot reviewer → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
-| `evolution-activity` | Durable audit store for self-evolution plan outcomes (`evolution/plan-applied`) |
-| `evolution-feedback` | Durable feedback store; exposes `evolutionFeedback.record()` for hosts/custom commands — the family ships NO producer (the upstream `/feedback` event is free text), so `feedback_score`/`feedback_warn` fire only when a deployment wires one (union-read with `quality_warn` in the curator) |
+| `evolution-activity` | Durable audit store for plan outcomes (`evolution/plan-applied`) |
+| `evolution-feedback` | Durable feedback store; exposes `evolutionFeedback.record()` |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
-| `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |
+| `evolution-commands` | The `/evolution` command surface |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
-| `evolution-host` | Host-plane infrastructure bundle (no memory/skill model tools; ships the read-only `maintenance_probe` diagnostic) |
-| `evolution-agent` | Agent preset: standard tools + the four model rows (`memory` / `skill_manage` / session search / skill catalog) |
-| `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
-| `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
+| `evolution-host` | Host-plane infrastructure bundle (read-only `maintenance_probe` diagnostic) |
+| `evolution-agent` | Agent preset: standard tools + the four model rows |
+| `evolution-preset` | Compatibility one-click bundle |
+| `evolution-all` | Full-functionality bundle — the DEFAULT install |
 
-## Reference
+</details>
 
-### Command surface (`/evolution`)
+<details>
+<summary><strong>The two layouts and their tsconfigs</strong></summary>
 
-Generated from the subcommand registry (`evolution-commands/src/registry.ts` —
-single source with the input hint and the emitted help/README text). **The full
-table is rendered once, in `packages/README.md` §Command reference, where
-`registry.spec.ts` pins it byte-for-byte against the registry** — do not copy it
-here (this table used to live in both files and had already drifted: it still
-offered `preset install [--base <name>]` after 0.3.77 added the multi-base
-form).
+Authoring happens in the flat mirror (`packages/evolution-*`), which is also the
+publication tree — the publish chain runs without its dev→mirror sync step, and nothing
+copies a second tree over this one. The upstream checkout used for type-checking and tests
+hosts the same sources under `packages/evolution/*` (CI builds that overlay from the
+platform tag; the machine-local former dev tree is stale and marked
+`AUTHORING-MOVED.md`). Those `packages/evolution/...` project references resolve only
+in that checkout — a standalone flat mirror cannot run them.
 
-On day one you need four of them: `/evolution doctor` (what is installed),
-`/evolution pending` + `approve`/`reject` (the staged writes),
-`/evolution curator status` (background curation) and
-`/evolution preset install [--base <name>[,<name>...]]` (generate the family
-agent preset).
+`packages/scripts/**` is the one cross-tree obligation left: the publish chain's guard
+compares it byte-for-byte against the secondary checkout's copy, so a script change is
+mirrored there before a release.
 
-### Configuration dials (5 knobs, underlying fields pinned by tests)
+</details>
 
-| Dial | Values | Underlying fields (all in package Config / profile rows) |
-|---|---|---|
-| autonomy | auto / reviewed / observe | `approval.enabled` (profile row), `reviewEnabled` (evolution-review), `/evolution pending\|approve\|reject` |
-| scope | global / per-session | package choice — evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
-| curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` (evolution-curator) |
-| memoryInjection | on / off | `memoryEnabled` (tool-memory: the whole row is a no-op when off — no `memory` tool registration and no guidance/snapshot injection) |
-| threatStrictness | strict / exempt-list | `threatExemptLabels` — declared per config site (guard rows, the command face, the store options); the owning list of declaring sites is single-sourced in `evolution-threat/README.md` (P2-18 + P2-4) |
+<details>
+<summary><strong>Upstream upgrade checklist (every platform bump)</strong></summary>
 
-Fine-grained knobs run into the three-level appendix: **daily** (review
-intervals, curator cadence), **tuning** (health thresholds, quality weights),
-**high-risk** (maxOpsPerPlan, char budgets, review/curator model choice —
-cost and behavior).
+1. **Skill-provider shadow rank**: our provider registers `EVOLUTION_SKILL_RANK = 390`
+   and relies on the upstream `USER_DSH_RANK` (400, re-verified on `0.1.5-rc.2`)
+   sorting above it — the lower rank wins the `user-dsh` source shadow. Re-verify both
+   sides on every bump.
+2. **`@deepseek-ai` package-name collision**: inside the upstream monorepo the family
+   occupies official-looking names, and the release tooling rewrites them to `@lmzhen` in
+   every manifest, YAML and built `.js`/`.d.ts`. Check each new upstream release for
+   names that collide with ours.
+3. **ToolRuntime argument freeze**: `tool.execute` receives a `deepFreeze`d argument
+   snapshot — build a NEW object instead of assigning onto `args`.
+4. **Per-skill invocation frontmatter**: upstream parses `disable-model-invocation` /
+   `user-invocable` per SKILL.md; our shadowing provider must keep parsing the same keys
+   (its legacy-key postures are single-sourced in `evolution-skill-catalog/README.md`).
+5. **Home-path semantics**: upstream `resolveDshHome` uses `trim()` only as the
+   ADOPTION test, keeps the RAW env value, expands `~ `, and always resolves to an
+   absolute path. `evolutionRoot` and `install-layered.mjs`'s `resolveHome` follow the
+   same line; re-diff all three on upgrade.
 
-### Environment variables
+</details>
 
-| Variable | Where read | Effect |
-|---|---|---|
-| `DSH_EVOLUTION_SESSION_QUERY` | profile config (`!!js` in bundle patch) | `startup` / `first-search` / `never` (SQLite index openAt); invalid values normalize to `startup` |
-| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile config (`!!js` in bundle patch) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
-| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code (core `env.ts`) | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
-| `EVOLUTION_SCOPE` | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. Plugin runtime never reads it |
-| `DSH_EVOLUTION_DELTA_PATH` | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment the layered installer composes from (default: the packaged `evolution-agent/agent.cordis.yml`); tests and one-off builds inject a fixture |
-| `DSH_EVOLUTION_ARCH_STRICT` | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`); the plugin runtime never reads it |
-| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | guard scripts only (`verify-declared-config.mjs`) | `1` makes the declared-config-reach guard fail loud instead of warn (same effect as `--strict`); the plugin runtime never reads it |
+<details>
+<summary><strong>The gate, and where it runs</strong></summary>
 
-## Installation
+Sixteen steps: type-check, lint and the full test suite run in the upstream checkout; the
+family's own `verify-*` guards, the manifest and tsconfig checks and the mirror-parity
+check run in the mirror. The executable table lives in `CONTRIBUTING.md` §The gate, and
+a release is not a release until all sixteen are green.
 
-See [INSTALL.md](./INSTALL.md) for the layered host/agent flow, the one-click
-compatibility flow, and profile override examples.
+</details>
 
-## Operate
+## Community & contributing
 
-### Troubleshooting
+- ⭐ **Like it?** Star the repo — it is the only signal this project gets:
+  <https://github.com/lmzhen/dsh-evolution>
+- 🧭 **Discover more plugins:** [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+  and the in-harness market (`dsh plugin --profile web add dshmarket`).
+- 🐛 **Feedback / bugs:** open an issue on the repository. The family ships no telemetry,
+  so a report with your `/evolution doctor` output is the fastest path.
+- 🤝 **Contributing:** read `CONTRIBUTING.md` first — it defines the single-home rule for
+  facts and the gate a change must pass.
+- 📜 **Attribution:** the design is inspired by [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+  (MIT); this is an independent implementation, not affiliated with or endorsed by Nous
+  Research or DeepSeek.
 
-| Symptom / code | Meaning | Next step |
-|---|---|---|
-| startup: `invariants: package "…" is already registered` | two bundles or bundle+preset double-mount the same rows | keep ONE of evolution-all / evolution-host / evolution-preset / layered — run `/evolution doctor` |
-| `E-301` | approval service not mounted | evolution-approval row ships with host/all; run doctor |
-| `E-302` | curator service not mounted | mount evolution-curator row; run doctor |
-| `E-303` | replay service not mounted | mount evolution-replay row; run doctor |
-| `E-306` | this deployment stages foreground writes, but `/evolution consolidate` \| `restore` \| `skill restore` is **not replayable** through the skill runner (its vocabulary is create/update/patch/delete/write_file/remove_file/restructure/pin/unpin), so nothing can be staged | run the command from a session whose approval policy is `never`, or set `stageForeground: false` on the evolution-approval row (then the write executes directly, deliberately) |
-| threat deny (memory/skill write) | strict scan hit an instruction-like phrase | rephrase; or exempt a known-innocent label via `threatExemptLabels` (dial reference) |
-| `/evolution doctor` reports `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
+## License
 
-### Migration (0.3.x → 0.3.56)
-
-| Current install | What changes on upgrade | Action |
-|---|---|---|
-| host (infra only) | nothing | stays M3 |
-| evolution-all (passive aggregate era) | becomes the FULL bundle — every session gains the model tools | keep (M1) or switch to host (M3) |
-| one-click preset | nothing | stays; new installs should use all |
-| layered (host + preset) | nothing | stays; don't add all (exclusive) |
-
-## Development: composition & bundles
-
-### Full bundle (DEFAULT, 0.3.54)
-
-Install everything at profile root in one step — no agent preset, no session
-choice:
-
-```yaml
-- id: dsh-evolution-all
-  name: '@lmzhen/dsh-evolution-all'
-```
-
-`all` mounts the host automation AND the four model tools
-(`memory` / `skill_manage` / `session_search` / skill catalog) with the
-SKILLS/MEMORY guidance injection in every session.
-
-### Layered install (host + preset, per-session tools)
-
-Install the host bundle into the profile:
-
-```yaml
-- id: dsh-evolution-host
-  name: '@lmzhen/dsh-evolution-host'
-```
-
-Then select the `Evolution` agent preset for sessions that should expose the
-`memory` / `skill_manage` tools. This is the **① variant** form: the model rows
-live only inside that preset, so a session on a platform original preset carries
-no family behaviour at all — review, curator, approval and observability
-included. The two forms' consequences are stated once, in
-`packages/INSTALL.md` ("Install forms"); **`all` and this layout are
-exclusive** — do not combine them.
-
-> **One-time step (V7-06, 0.3.43):** before a session can select the `Evolution`
-> preset, run `/evolution preset install` once in a session on any preset —
-> it writes `.agent-presets/evolution/` so the preset actually exists in the
-> profile. See the Chinese README ("Evolution 预设无需手动拷贝" note) for the
-> same flow; without this step a `dsh plugin add`-installed host is mounted but
-> the preset is absent.
-
-### One-click compatibility install
-
-Use the legacy preset overlay on a standard DSH host:
-
-```yaml
-- id: dsh-evolution
-  name: '@lmzhen/dsh-evolution-preset'
-```
-
-This one-click preset, the `all` bundle and the layered `evolution-host`
-layout are ALTERNATIVE installs (mutual exclusion, E-33) — install one, not
-two, or the shared infra rows mount twice and startup fails loud. The one-click
-preset carries its own `evolution-maintenance-tools` row, its own
-`session-query-sqlite` index override and the same root-level `tool-skill`
-60-char catalog cap override as the host bundle. **Where that override actually
-takes effect is single-sourced in `packages/README.md` (§② Attach install):** a
-profile-root override reaches headless/base installs only (the web profile
-disables the profile-root row), a composer-generated preset gets the cap
-injected onto its own row, and a preset the composer did not generate keeps the
-platform default until it is recomposed. The `verify-declared-config.mjs`
-guard prints this reach per profile and per declared key. The 60-char authoring
-bar enforced by tool-skill-manage applies regardless.
-
-Or compose manually — the rows below carry the PUBLISHED scope (the two scope
-forms and which one a checkout/overlay uses are single-sourced in `INSTALL.md`
-§5 Production install) — order matters because provider rows declare `inject`.
-This mirrors the row set shipped by the two bundles (evolution-host infra +
-evolution-agent model tools); in the OVERLAY the DSH profile HOST provides the storage facility
-(`storage`/`storage-json`/`storage-domain`), which this preset does not own;
-the standalone `evolution-preset` package declares those storage packages as
-dependencies and mounts them from its own `cordis.yml`. `evolution-state-domain`
-joins only when mounted (D-30):
-
-```yaml
-- id: evolution-policy
-  name: '@lmzhen/dsh-evolution-policy'
-- id: evolution-io
-  name: '@lmzhen/dsh-evolution-io'
-- id: evolution-io-node
-  name: '@lmzhen/dsh-evolution-io-node'
-- id: evolution-state-storage
-  name: '@lmzhen/dsh-evolution-state-storage'
-- id: evolution-state-domain
-  name: '@lmzhen/dsh-evolution-state-domain'
-  # Opt-in: joins the HOST storage-domain facility when mounted; disabled by
-  # default so evolution-state-json stays the portable backend.
-  disabled: true
-- id: evolution-state-json
-  name: '@lmzhen/dsh-evolution-state-json'
-- id: evolution-state
-  name: '@lmzhen/dsh-evolution-state'
-- id: memory
-  name: '@lmzhen/dsh-memory'
-- id: memory-files
-  name: '@lmzhen/dsh-memory-files'
-- id: skill-usage
-  name: '@lmzhen/dsh-skill-usage'
-# model-facing tools (evolution-agent preset layer)
-- id: tool-memory
-  name: '@lmzhen/dsh-tool-memory'
-- id: tool-skill-manage
-  name: '@lmzhen/dsh-tool-skill-manage'
-- id: tool-session-query
-  # Platform package, not a family one: it keeps the platform scope (the
-  # release rewrite touches family names only).
-  name: '@deepseek-ai/dsh-tool-session-query'
-- id: evolution-skill-catalog
-  name: '@lmzhen/dsh-evolution-skill-catalog'
-- id: evolution-approval
-  name: '@lmzhen/dsh-evolution-approval'
-  config:
-    enabled: false
-    stageForeground: true
-    # With `enabled: true`, the three writes the skill runner cannot replay
-    # (`/evolution consolidate`, `restore`, `skill restore`) are refused with
-    # E-306 instead of bypassing the gate; set `stageForeground: false` to
-    # execute them directly and deliberately.
-- id: evolution-threat
-  name: '@lmzhen/dsh-evolution-threat'
-- id: evolution-review
-  name: '@lmzhen/dsh-evolution-review'
-  config:
-    reviewToolAllow: [skill]
-- id: evolution-curator
-  name: '@lmzhen/dsh-evolution-curator'
-- id: evolution-commands
-  name: '@lmzhen/dsh-evolution-commands'
-- id: evolution-maintenance-tools
-  name: '@lmzhen/dsh-evolution-maintenance/tools'
-- id: evolution-activity
-  name: '@lmzhen/dsh-evolution-activity'
-- id: evolution-feedback
-  name: '@lmzhen/dsh-evolution-feedback'
-- id: evolution-learning-graph
-  name: '@lmzhen/dsh-evolution-learning-graph'
-- id: evolution-replay
-  name: '@lmzhen/dsh-evolution-replay'
-
-# Cross-session recall (base `session-query-sqlite` override) and the Hermes
-# 60-char catalog cap (base `tool-skill` override) — both also carried by the
-# evolution-host bundle.
-- id: session-query-sqlite
-  config:
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
-    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
-- id: tool-skill
-  config:
-    catalogDescriptionMaxLength: 60
-```
-
-## Development: extension points (OPT, 2026-09)
-
-Where to add a capability — and where NOT to:
-
-| You want to… | Touch | Do not touch |
-|---|---|---|
-| Add a state backend | `evolution-state-storage` — register a new provider next to the JSON/domain ones | `evolution-state-json` (stays the portable default) |
-| Serve a remote/alternate media location | `ctx.evolutionIo` — a new provider via `evolution-io`'s registry | any policy/store code |
-| Add a plan operation | the shared required-fields table (core `SKILL_ACTION_REQUIRED_FIELDS`) + the executor's dispatch + the validator's checks — one table, both consumers | control flow / guard chain |
-| Change per-skill visibility | per-skill frontmatter parsing in `evolution-skill-catalog` (OPT-10) or the row config | upstream registry semantics |
-| Feed feedback data | `evolutionFeedback.record()` from a host-side command/event | curator read logic |
-| Read plan outcomes | `evolution/plan-applied` process events, the activity store, or replay | the review pipeline |
-
-## Control-plane invariants
-
-1. Model writes only `memory` and `skills`; policy/prompts/routing/state are
-   never model-writable. `evolution-policy` installs a monotonic
-   `ctx.tools.guard` and `evolution-plan-validator` rejects forbidden fields.
-2. Every mutation is gated by the `tools.guard` threat scan (the pre-execute allow path) and, when
-   enabled, the staged approval service. Approved writes replay through the
-   exact runner they were registered with.
-3. Skill destruction is never a hard delete: archival moves to `.archive/`,
-   and every curator run snapshots the skill tree first (a skill held by a
-   live writer's lock is skipped, recorded in the snapshot manifest, and
-   reported as not-restored by a later restore).
-4. Review plans require event-sequence evidence bounded by the session seq;
-   invalid ops are dropped while valid ops still apply.
-5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media
-   decisions out of policy code; media providers perform no node:fs IO of
-   their own (commands' preset/doctor helpers are the explicit direct-fs exception).
-
-## Development: the two layouts and their tsconfigs
-
-Authoring happens HERE, in the flat mirror (`packages/evolution-*`), which is
-also the publication tree — the publish chain runs without its dev→mirror sync
-step and nothing copies a second tree over this one. The upstream checkout used
-for type-checking and tests hosts the same sources under `packages/evolution/*`
-(the CI overlay builds it from the platform tag; the machine-local
-`D:/dsh/deepseek-harness` checkout is the STALE former dev tree). The repo `tsconfig.base.json` /
-`tsconfig.host.json` carry the `@deepseek-ai/dsh-evolution*` alias (the publish chain rewrites the scope; no `@lmzhen` alias exists in tsconfig)
-lines and project references as `./packages/evolution/<pkg>` paths. Those
-`packages/evolution/...` paths resolve ONLY in that upstream checkout — they
-are not resolvable as a
-standalone flat mirror, where the packages live as `packages/evolution-*`.
-When a config in the published repo is copied into the flat tree for a
-stand-alone build, its project references therefore remain
-CI-overlay-only and must not be expected to resolve independently (G5.5).
-The same is true of the per-package `tsconfig.json` files: they keep the dev
-tree's `"extends": "../../../tsconfig.base.json"` depth and reference
-`../../core/session` and `../../../vendor/cordis`, neither of which exists in
-the flat mirror; `tsconfig.base.json`'s `paths` likewise point at `./packages/evolution/*`
-and `vendor/*`, and `tsconfig.host.json` includes `apps/web/tests/**` and
-`packages/evolution/test-support/**`. Type-checking therefore runs in the CI
-overlay tree, never in the mirror checkout itself.
-The same layout rule applies to the setup commands: in the flat mirror run
-`node packages/scripts/install-layered.mjs` (there is no
-`packages/evolution/scripts` directory here), while the upstream checkout
-uses `packages/evolution/scripts/install-layered.mjs`.
-
-`packages/scripts/**` is the one cross-tree obligation left: the publish chain's
-version guard compares it byte-for-byte against the stale checkout's copy, so a
-script change here is mirrored there before a release (0.3.83 reconciled 58
-drifted files, including a whole missing `checklists/**` tree).
-
-Tests rely on the same merged layout: the suites import ~30 `@deepseek-ai/*`
-modules that are intentionally NOT declared in the packages'
-`package.json`. Those imports resolve only in the merged upstream tree (the
-same G5.5 rule as the tsconfig paths above) — a known, accepted tradeoff, and
-devDependencies are deliberately NOT added for the tests (the merged tree is
-the only layout where they run; declaring them would just add a second
-surface to keep in sync).
-
-## Upstream upgrade checklist
-
-Walk through this list on every upstream bump (see `UPSTREAM_SHA`):
-
-1. **Skill-provider shadow rank** (`evolution-skill-catalog`): our provider
-   registers `EVOLUTION_SKILL_RANK = 390` and relies on the upstream
-   `USER_DSH_RANK` (400; re-verified unchanged on `0.1.5-rc.2`,
-   `packages/skill/skill-filesystem/src/index.ts:39`) sorting ABOVE it — lower rank wins the
-   `user-dsh` source shadow. Both constants are private to their owners: if
-   upstream changes either value or the comparison semantics, our provider
-   silently loses the shadow. Re-verify both sides on upgrade.
-2. **`@deepseek-ai` package-name collision**: inside the upstream monorepo the
-   family occupies the official `@deepseek-ai` names (`dsh-memory`,
-   `dsh-tool-memory`, `dsh-skill-usage`, `dsh-memory-files`,
-   `dsh-tool-skill-manage`, …) and `prepare-release --scope` rewrites them to
-   the publish scope (`@lmzhen`) in every manifest, `cordis*.yml`,
-   `agent.cordis.yml` and built `.js`/`.d.ts`. Before adopting an upstream
-   release, check its package list for new names that collide with ours — a
-   collision makes resolution ambiguous.
-3. **ToolRuntime argument freeze (OPT, 2026-09)**: `core/tools` passes a
-   `deepFreeze`d snapshot of the arguments to `tool.execute`
-   (`packages/core/tools/src/index.ts`, the `createExecution` path). Any tool
-   execute that wants to ADD data on the way to the approval service must
-   build a NEW object (`{ ...args, key }`), never assign onto `args` — a
-   frozen-object write throws `TypeError` in strict mode and turns the whole
-   action into a tool error. The OPT-01 test in `tool-skill-manage/tests`
-   pins this through the real runtime.
-4. **Per-skill invocation frontmatter**: upstream `skill-filesystem` parses
-   `disable-model-invocation` / `user-invocable` per SKILL.md (and throws on
-   legacy camelCase keys). Our shadowing provider must keep parsing the same
-   keys per skill (`evolution-skill-catalog`, OPT-10). The family's
-   legacy-key postures — `disableModelInvocation` disables the model row, and
-   the camelCase keys `modelInvocable`/`userInvocable` respect the author's
-   value when it parses (conservative `false` when it does not, 0.3.83 P2-9) —
-   are single-sourced in `evolution-skill-catalog/README.md`; re-verify the key
-   names and those postures on upgrade, or per-skill visibility controls
-   silently stop working under the shadow again.
-5. **Home-path semantics**: upstream `resolveDshHome` (`@deepseek-ai/dsh-home-paths`)
-   uses `trim()` only as the ADOPTION test (empty/whitespace-only falls back to
-   the default home), keeps the RAW env value, expands `~`, and always resolves
-   to an absolute path. `evolutionRoot` (core `state-store.ts`) has matched that
-   line for line since 0.3.83 (S2.2), and `install-layered.mjs`'s `resolveHome`
-   follows the same shape — the skill-catalog shadow, the preset installer and
-   the runtime must all land on the SAME directory the platform serves. Re-diff
-   all three implementations on upgrade.
+MIT — see [LICENSE](./LICENSE).

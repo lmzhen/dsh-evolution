@@ -1,394 +1,358 @@
-# dsh-evolution
+# dsh-evolution · 给 DeepSeek Harness 的自进化记忆与技能
 
-[English](README.md) | 中文
+[English](./README.md) · **中文**
 
-> 受 Hermes Agent 启发的 DeepSeek Harness 自进化插件，完全按照 DSH 的插件、
-> service、provider、session event 和 agent preset 架构重新实现，而不是
-> 简单移植 Python 模块。
+<p align="center">
+  <a href="https://www.npmjs.com/package/@lmzhen/dsh-evolution-all"><img src="https://img.shields.io/npm/v/@lmzhen/dsh-evolution-all?style=flat-square&label=npm&color=4c6ef5" alt="npm version"></a>
+  &nbsp;
+  <a href="https://www.npmjs.com/package/@lmzhen/dsh-evolution-all"><img src="https://img.shields.io/npm/dm/@lmzhen/dsh-evolution-all?style=flat-square&label=downloads%2Fmo" alt="npm downloads"></a>
+  &nbsp;
+  <a href="https://github.com/lmzhen/dsh-evolution/actions/workflows/release.yml"><img src="https://github.com/lmzhen/dsh-evolution/actions/workflows/release.yml/badge.svg?branch=main" alt="release CI"></a>
+  &nbsp;
+  <a href="https://github.com/lmzhen/dsh-evolution"><img src="https://img.shields.io/github/stars/lmzhen/dsh-evolution?style=flat-square&label=stars" alt="stars"></a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/DSH-0.1.5--rc.2-4c6ef5?style=flat-square" alt="已验证的平台线">
+  &nbsp;
+  <img src="https://img.shields.io/badge/node-22.19%2B%20%7C%2024%2B-339933?style=flat-square" alt="node">
+  &nbsp;
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>Hermes 风格的自进化，装进 DeepSeek Harness——一次安装，两条回路。</strong><br>
+  <em>review · memory · skills · curator · 审批闸门 · 威胁扫描 · 审计轨迹</em>
+</p>
 
-## 目录
+<p align="center">
+  <a href="#这是什么">这是什么</a> ·
+  <a href="#为什么会有它">为什么</a> ·
+  <a href="#60-秒装完">安装</a> ·
+  <a href="#选一种安装方式m1m4">选型</a> ·
+  <a href="#工作原理">工作原理</a> ·
+  <a href="#能力清单">能力清单</a> ·
+  <a href="#可观测与验证">可观测</a> ·
+  <a href="#配置">配置</a> ·
+  <a href="#安全与边界">安全边界</a> ·
+  <a href="#已知限制">已知限制</a> ·
+  <a href="#故障排查与-faq">故障排查</a> ·
+  <a href="#文档索引">文档索引</a>
+</p>
 
-- [这是什么](#这是什么)
-- [快速开始](#快速开始)
-- [命令面](#命令面)
-- [功能](#功能)
-- [安装方式](#安装方式)
-- [使用场景](#使用场景)
-- [工作原理](#工作原理)
-- [兼容性](#兼容性)
-- [配置](#配置)
-- [安全边界](#安全边界)
-- [常见问题](#常见问题)
-- [开发与测试](#开发与测试)
-
----
+> `@lmzhen` 下的社区发布包由 dsh-evolution 社区维护，**不是** DeepSeek 官方发布；
+> 这些发布不使用 `@deepseek-ai/*` 包名，也不使用 DeepSeek 品牌。
 
 ## 这是什么
 
-`dsh-evolution` 让 DeepSeek Harness 的 Agent 跨会话自我改进，边界明确：
+这是一个由 **29 个可组合的 Cordis 插件**组成的家族，给一套 DeepSeek Harness 装上自进化层：Agent 会回顾自己的对话，维护**记忆**、提出并修补**技能**，并让这个技能库随时间被治理——每一次写入都过策略/威胁/审批控制面。
+
+模型能做的只有「提出并写入」**记忆**和**技能**两类内容。策略、提示词、路由、状态和审计历史属于控制面数据，模型永远写不进去。
+
+它**不是**什么：不是模型，不是托管服务，也没有自带的 GUI——没有浏览器面板要装。它加进来的东西只有模型工具、斜杠命令，以及你自己 `$DSH_HOME` 下的文件。
+
+## 为什么会有它
+
+编程 Agent 会遗忘。每个新会话都在重新学同一套项目约定；它攒下的那些「技能」既不会变好，也不会合并，更不会退役。Hermes Agent 用两条回路解决了这件事；本家族把那套设计移植到 DeepSeek Harness 的插件模型上，并让每一次写入都可观测、可回滚：
 
 ```text
-模型可以写入的只有：
-
-  memory  持久事实、偏好和纠正
-  skills  可复用流程及其支持文件
-
-其他都是控制面：
-
-  policy、prompt、routing、approval、state、audit、snapshot
+            对话事件
+                │
+   ┌────────────▼────────────┐        ┌───────────────────────┐
+   │ 评审（闸门 + 计划）     │───────▶│ 记忆进化              │  <DSH_HOME>/memories
+   │ 节奏 / 完成触发         │        │ 持久事实 · 用户画像   │  注入下一个会话
+   └────────────┬────────────┘        └───────────────────────┘
+                │
+                │                     ┌───────────────────────┐
+                └────────────────────▶│ 技能进化              │  <DSH_HOME>/skills
+                                      │ 新建 · 修补 · 合并    │  目录对模型可见
+                                      └───────────┬───────────┘
+                                                  │ 用量 + 反馈
+                                      ┌───────────▼───────────┐
+                                      │ Curator（代谢）       │  合并 · 降级 · 归档
+                                      └───────────────────────┘
+    每一步都经过：威胁扫描 → 不可变策略 →（可选）审批闸门
 ```
 
-装上之前，每次新会话 Agent 都不记得你的纠正，已经走过的弯路还会再走一遍。装上之后：纠正会被记住，摸索出的流程会存成技能复用，技能库按计划被评审和治理——而这些变化，都走你配置的审批策略。
+## 原生 DSH 与本家族的差别
 
-默认是保守的：后台评审只改本会话读过的技能，pinned 技能它无法触碰；想让它"写完先问我"，一行配置就能打开分阶段审批。所有变更都有日志。
-
-## 快速开始
-
-> 社区 npm 包只发布在 `@lmzhen` scope 下。
-
-```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all
-```
-
-**0.3.54 起 `evolution-all` 是默认全量包**（无需第二步骤）：安装并重启后，
-所有会话自动拥有两条进化回路 + 模型工具（memory / skill_manage /
-session_search / 技能目录）+ SKILLS/MEMORY 指引注入。
-
-安装完成后运行一次内置自检确认形态：
-
-```bash
-/evolution doctor [--json] # 人类可读自检（安装形态/冲突〔all、host、preset、layered 两两双挂载〕/env/服务清单 + 建议动作）；--json 供脚本消费
-/evolution doctor --json   # 脚本友好
-```
-
-两条进化回路（共享引擎：**Review** 审阅出计划 + **Curator** 整并/降级/归档 +
-**Governance** 威胁/策略/审批闸门）：
-
-- **记忆进化**：观察对话 → 后台审阅 → 记忆计划 → 写入沉淀 → 新会话注入；
-- **技能进化**：观察对话 → 后台审阅 → 技能计划 →（受闸门时）批准 → 写入/修补技能树
-  → 目录对模型可见 → 模型自主增改 → 使用统计 → 整并/归档（代谢）。
-
-安装模式（M1-M4）：
-
-| 模式 | 一句话 | 构成 |
+| 能力 | 原生 DeepSeek Harness | 装上本家族之后 |
 |---|---|---|
-| M1 全自动（默认） | 后台自己积累记忆与技能 | `add @lmzhen/dsh-evolution-all` |
-| M2 人审把关 | 进化可以，每步先给我看 | M1 + `approval.enabled: true`（`/evolution pending\|approve\|reject`） |
-| M3 只装底座 | 去掉模型工具；后台自动化照常运行（把关写盘用 M2） | `add @lmzhen/dsh-evolution-host` |
-| M4 按会话启用（进阶） | 只在指定会话生效 | host + `/evolution preset install`（与 M1、`preset` 兼容包互斥） |
+| 跨会话记忆 | 手动记笔记 | 由评审写入的记忆 + 用户画像，注入新会话 |
+| 技能库 | 自己手写的文件 | 模型提出写入/修补，计划先验证，目录带 60 字符上限 |
+| 技能维护 | 无 | curator：合并近重复、降级、归档，每次运行前先快照 |
+| 写入安全 | 无 | 有序守卫：威胁扫描 → 不可变策略 → 分阶段审批（可选开启） |
+| 审计轨迹 | 无 | `/evolution mutations`、每次 curator 运行报告、activity 存储 |
+| 用量洞察 | 无 | 每个技能的使用/查看/修补计数；低质量标记 |
+| 对话评审 | 无 | 会话内按节奏/完成触发，或显式启用的 subagent 评审器 |
+| 自我改进闭环 | 无 | 反馈 → 质量 → curator 决策 → 目录排序 |
+
+## 60 秒装完
+
+```bash
+# 1. 默认全量包（基础设施 + 每个会话都有的模型工具）
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+
+# 2. 重启宿主，让 profile 重新组合
+# 3. 然后在任意会话里问一句：
+/evolution doctor
+```
+
+想要「写完先问我」而不是全自动？给那一行加上 `approval.enabled: true`（下面的 M2 形态）。其余都有合理默认：启动时不写任何东西，第一次自动评审要等间隔/用量窗口打开。
+
+一次真实安装长这样（0.3.83，本项目自己的宿主）：
+
+```text
+$ dsh plugin --profile web add @lmzhen/dsh-evolution-all
++ @lmzhen/dsh-evolution-all 0.3.83   … 28 packages, Done in 8.3s
+
+$ dsh --profile web --dump-config | wc -l
+773                      # composed lines; 207 distinct row ids, 0 duplicates
+```
 
 > [!WARNING]
-> 插件会在你的本地权限下运行第三方代码。安装前请阅读源码，建议先在
-> 不含生产凭据的 profile 中试用。
+> 插件和别的 DSH 插件一样，在你的本地权限下运行第三方代码。安装前先翻一遍源码，第一次试建议放在不含生产凭据的 profile 里。
 
-## 命令面
+## 选一种安装方式（M1–M4）
 
-以 `/evolution` 内建 help 为准（最权威——升级后先跑一次裸 `/evolution` 对照）。命令面由
-`packages/evolution-commands/src/registry.ts` 单源渲染（输入 hint、help 正文与 README 表格同源，
-`registry.spec.ts` 逐字节钉住），**全量表只渲染一次、住在 `packages/README.md` §Command reference**，
-这里不复制——旧的手抄副本已经落后（少了 0.3.77 的多 base 写法）。
+M 编号在**本文件**定义；安装**形态**及各形态在平台线上的验证状态单源在 `packages/INSTALL.md`，layered 变体对会话层面的实际后果也在同一份文件（"Install forms" 一节）里只讲一次。
 
-日常最常用的四条：`/evolution doctor`（装了什么）、`/evolution pending` +
-`approve`/`reject`（分阶段写入）、`/evolution curator status`（后台整并）、
-`/evolution preset install [--base <name>[,<name>...]]`（按 `evolution-agent/bases.json`
-每个 base 生成一份预设）。
+| 形态 | 怎么做 | 你得到什么 |
+|---|---|---|
+| **M1 全自动（默认）** | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` | 两条回路都跑、都写盘；每个会话都有模型工具 |
+| **M2 人审把关** | M1 + `approval.enabled: true` | 进化可以提出，但每次写入都变成 `/evolution pending`，由你批准或拒绝 |
+| **M3 只装底座** | `dsh plugin --profile web add @lmzhen/dsh-evolution-host` | 自动化照常跑，模型**拿不到**记忆/技能工具 |
+| **M4 按会话启用（进阶）** | M3 + `/evolution preset install` | 只有选了 Evolution 预设的会话才有工具（与 M1、旧 one-click 预设互斥） |
 
-## 功能
-
-| 能力 | 说明 |
-|---|---|
-| 持久记忆 | 带预算、去重、歧义保护和威胁过滤的 `MEMORY.md` / `USER.md` |
-| 技能沉淀 | 创建、修改、patch、归档技能和支持文件，保护标记，快照恢复 |
-| 后台 review | 信号门控的评审；默认 `reviewMode: 'inject'`（0.3.74 起，在本会话内执行）——需要证据要求的 one-shot subagent 计划时显式 opt-in |
-| Skill curator | 确定性的 active → stale → archived 生命周期 + 可选 LLM 建议 |
-| 分阶段审批 | 后台写入可 stage / approve / reject，保留审计历史 |
-| 威胁扫描 | 写入前检测 prompt injection、泄露、密钥和混淆 |
-| 使用遥测 | 每个技能的 use / view / patch sidecar |
-| 可观测性 | activity 审计、replay/A-B、feedback 质量分、learning graph |
-
-## 安装方式
-
-按交付通道分两种：安装发布包，或从源码 checkout 用安装器。**发布安装是最终用户推荐路径。**
-安装形态（bundle / preset 的组合，共四种，以及每种形态对会话的实际影响）单源在
-`packages/INSTALL.md`；根 `INSTALL.md` 负责源码安装命令与 scope 细节。
-
-### 1. 发布安装（推荐）
-
-```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all
-```
-
-`dsh-evolution-all` 是**全量 bundle（默认安装，0.3.54）**：自带 `dsh.bundle.patch`
-（行集 = `dsh-evolution-host` 的基础设施行 ∪ 四个模型工具行
-`tool-memory` / `tool-skill-manage` / `tool-session-query` / `evolution-skill-catalog`），
-全部挂在 profile **root** 级。依赖闭包同时 pull 上述包与
-`dsh-evolution-agent-preset`（预设容器：layered 场景的 `/evolution preset install` 用它）。`plugin add`
-自动识别声明的 `dsh.bundle.patch` 清单并把整个依赖树带进来——无需任何额外 flags。
-
-安装效果（默认形态 = 最完善优先）：
-
-```text
-host 基础设施   review、curator、审批、审计、可观测性、威胁检查……
-                  profile 内所有会话共享
-模型工具        memory / skill_manage / session_search / 技能目录 +
-                  SKILLS/MEMORY 指引注入 —— 默认对 profile 内**每一**个会话可见（root 级）
-```
-
-- 版本：省略 `@<version>` 安装最新稳定版；预发布线需显式 `@<version>-rc.x`（发布在 `next` tag）。
-- 细粒度安装（仅 host、或按需挑选工具包）受支持——见下表。卸载：对同样包执行
-  `dsh plugin --profile web remove`（移除 rows 与包；记忆、技能、状态、报告和审批历史保留）。
-
-- 默认无第二步骤。若想按会话分级暴露模型工具，采用下面的 **layered** 形态：
-  先装 `host`，再运行 `/evolution preset install`（一次性；从 agent-preset 注册表读运行时
-  `standard` 组合，合并 `dsh-evolution-agent-preset` 携带的 delta，把组合后的
-  `agent.cordis.yml`/`preset.yml` 写入 `$DSH_HOME/.agent-presets/evolution/`），
-  再为需要自进化工具的会话选择 **Evolution** 预设。
-  这是 **① 变体形态**：模型行只存在于 Evolution 预设，平台原版预设的会话不携带任何家族行为。
-  两种形态的后果以 `packages/INSTALL.md`（单一数据源）为准。
-  **注意：`all`、`preset` 兼容包与 layered 形态互斥**（preset 兼容包与 all 同样全会话挂模型行，与 layered 双挂载冲突）。
-  **Evolution 预设无需手动拷贝**：预设由 `/evolution preset install`（或源码安装器）读
-  `evolution-agent/bases.json` 生成——默认 base 是 `standard`，写入
-  `$DSH_HOME/.agent-presets/evolution/`；`--base` 可指定该表里的其它 base（一次可给多个，
-  每个 base 一份预设）。直接把 `evolution-agent/agent.cordis.yml` 拷进去是错的：它是
-  DELTA（只有四个模型工具行），而 `.agent-presets` 会把找到的 `agent.cordis.yml` 当作
-  **完整**组合挂载，手抄的结果是预设缺少全部标准行。生成流程与手工回退见 `INSTALL.md` §5。
-
-#### 选择安装方式（场景 → 操作 → 你得到什么）
-
-| 想要 | 发布操作 | 你得到 | 注意 |
-|---|---|---|---|
-| **全量（默认）** | `add @lmzhen/dsh-evolution-all`（推荐） | review/curator/审批/审计/威胁检查 + memory/`skill_manage`/`session_search`/技能目录 + 指引注入（**全会话 root 级**） | 无需预设、无需会话选择；升级后旧 all 用户即全量 |
-| **仅 host（精简）** | `add @lmzhen/dsh-evolution-host` | 后台自动化 + 审批 + 审计 + 威胁检查 | **模型无法自主写记忆/技能**——删减=从 all 换装 host |
-| **按会话分级（layered）** | `add @lmzhen/dsh-evolution-host` + 生成/选择 Evolution 预设 | 后台全会话 + 模型工具仅 Evolution 预设会话 | 与 `all`、`preset` 兼容包互斥，三选一 |
-| **兼容旧包** | `add @lmzhen/dsh-evolution-preset` | 与旧单体 facade 等价的兼容包（会全会话暴露模型工具） | **仅 legacy 兼容**；新部署用第一行；与 layered 预设目录互斥 |
-
-业务视角的另一面见 [使用场景](#使用场景)。
-
-### 2. 源码安装（仅开发）
-
-适用于 DeepSeek Harness 源码 checkout 或本仓库的扁平源码树——该安装器把本地包
-拷贝进 profile，**不是**发布版 npm 安装：
-
-```bash
-node packages/scripts/install-layered.mjs \
-  --profile web \
-  --mode layered
-```
-
-模式：`oneclick`（兼容 `dsh-evolution-preset` bundle）、`layered`（host bundle +
-Evolution agent preset，推荐）、`host`（仅基础设施，无记忆/技能模型工具，自带只读
-`maintenance_probe` 诊断）、`agent`（仅预设）。（0.3.77 起产品形态别名同样可用：
-`variant` = `layered`、`attach` = `oneclick`。）
-`--mode layered --uninstall` 移除安装器添加的所有内容但保留记忆、技能、状态、报告和
-审批历史。`EVOLUTION_SCOPE` 选择包 scope（源码树默认 `@deepseek-ai`；`@lmzhen` 需要
-`prepare-release` 产出的 `.release-staging`）。
-
-### 3. 配置
-
-默认部署零配置即可运行。生产建议三件事：打开分阶段审批（后台写入先审后写）、调整
-curator 节奏（`interval` / `minIdleHours`）、决定哪些会话选 Evolution 预设。完整
-配置面见 [配置](#配置)。
-
-完整说明见 [packages/INSTALL.md](packages/INSTALL.md)。
-
-## 使用场景
-
-| 场景 | 推荐安装 |
-|---|---|
-| 单 Agent 完整自进化 | `add @lmzhen/dsh-evolution-all`（默认全量） |
-| 多会话共享自进化基础设施 | host bundle + Evolution preset |
-| 只要自动化，不要记忆/技能模型工具（后台自动化照常运行） | host-only |
-| Standard preset | host bundle；模型工具保持隐藏 |
-| Anchored Standard preset | host bundle + `dev_tool_search` 解锁工具 |
-| 旧版 one-click 兼容装法 | `add @lmzhen/dsh-evolution-preset`（legacy 兼容包；新部署用上面的全量 `all`） |
-| Minimal preset | 不可用——该预设只挂 persona 与 shell/terminal 行，没有技能面落点（见 [兼容性](#兼容性)） |
-| Creator mode | host bundle（能力包走平台 Creator 模式，见 0.3.66 退役说明） |
-
-**典型用途：**
-
-- **长期个人助手。** 你纠正一次——"路径写绝对路径""装软件前先问我"——之后的会话它会照做；它摸索出的流程（备份命令、你项目的坑）会存成技能，下次直接用，不用重新摸索。
-- **多个会话共享一个技能库。** 大家一起用同一个 evolution host：谁把可复用工作流做成了技能，评审通过后进共享库，大家的会话都能找到。
-- **无人值守的自动化任务。** 定时任务不挂模型工具；后台的用量统计和 curator 负责维持技能库健康，日常会话保持轻量。
-- **审计与治理。** 能看它学了什么、打算改什么；分阶段写入可以批可以拒，可以回滚快照，全程有记录。
-
-## 工作原理
-
-### 记忆
-
-模型通过 `memory` 工具进行 add / replace / remove 或一个原子 operations
-batch。条目有字符预算，以 runtime snapshot 注入；稳定提示保持在
-system-prompt section。
-
-### 技能
-
-`skill_manage` 支持 create / edit / update / patch / delete / write_file /
-remove_file / list。delete 只归档到 `.archive/`，不会硬删除。curator
-运行前会快照（被写锁占用的技能会跳过并记录在快照清单中，恢复时不回填），支持恢复。`evolution-skill-catalog` 通过原生 `ctx.skills`
-发布技能并在写入后立即失效缓存。
-
-### 后台 review
-
-```text
-turn/end
-  -> 确定性信号门控
-  -> one-shot subagent 输出结构化计划
-  -> validator 检查证据和禁止字段
-  -> trusted executor 应用合法操作
-  -> process 事件 + activity 审计记录结果
-```
-
-默认 `reviewMode: 'inject'`（0.3.74 起）：评审在**本会话内**执行，不产生
-`evolution/plan-applied` 账本条目——该模式下 activity 与 replay 保持为空。上面的 subagent
-流水线是显式 opt-in（`reviewMode: 'subagent'`，可设在 evolution-review 或 evolution-policy 行），
-需要可审计的计划路径时用它。
-
-### Curator
-
-```text
-usage telemetry
-  -> 确定性的 30/90 天状态迁移
-  -> 可选 LLM 建议
-  -> 快照 + 归档
-  -> JSON run report
-```
-
-### 治理
-
-```text
-tools.guard   威胁扫描
-tools.guard         不可变策略拒绝
-evolution-approval  stage -> approve/reject -> 审计
-```
+0.3.54 起 `evolution-all` 就是默认全量包；旧的 one-click 预设（`@lmzhen/dsh-evolution-preset`）则是 M1 的兼容写法。在 M1/M3 上，钉住状态介质的那一行很关键：bundle 钉了 `provider: json`，这样无关的 overlay 不会悄悄把你的状态挪到一个空域上。
 
 ## 兼容性
 
-- 基于 DeepSeek Harness `0.1.5-rc.2` 兼容验证（CI 发布锚点双锚检查）。
-- 发布清单里的 `@deepseek-ai/dsh-*` 依赖范围由 `.github/workflows/release.yml` 的
-  `PLATFORM_VERSION` 派生为 `^0.1.5-rc.2`（`prepare-release` 改写、`verify-platform-ranges.mjs`
-  断言）；更早的预发布线（`0.1.1-rc.2` 及以前）在依赖解析阶段即失败，不在支持窗口内。
-  各安装形态对该线的实测状态表见 `packages/INSTALL.md`。
-- 与 `standard` / `ptc` / `cordis` 预设服务级兼容；`minimal` 不适用——该预设只挂 persona 与 shell/terminal 行，家族工具仍会挂载但技能面没有落点（见 `packages/INSTALL.md` §Platform mode × self-evolution 的平台预设表）。
-- 使用 Anchored Standard 真实插件代码测试：
-  - bootstrap 阶段隐藏 evolution 工具；
-  - promoted 阶段仍隐藏；
-  - 只有 `dev_tool_search` 解锁后出现。
-- review 子代理默认允许 `skill`（V6-07 修正：DSH 平台目录只存在 plain `skill`，`skill_search`/`skill_load` 不存在）。
+| | 取值 |
+|---|---|
+| 已验证的 DSH 平台线 | **`0.1.5-rc.2`**（`PLATFORM_VERSION`；`UPSTREAM_SHA=fb2c4b9e…`） |
+| 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` peer/依赖上都是 `^0.1.5-rc.2` |
+| 家族版本 | `0.3.83`（`@lmzhen/dsh-evolution-all`，npm `latest`） |
+| Node | 22.19+ 或 24+（`engines`） |
+| 各形态状态 | `packages/INSTALL.md`——哪些形态在这条平台线上实测过，哪些只是源码级判定 |
+
+预发布 range 只认**一个**锚点，而不是一族：`^0.1.5-rc.2` 会拒绝更晚的预发布后继版，但接受稳定版 `0.1.5`。更早的预发布线（`0.1.1-rc.2` 及以前）在依赖解析阶段就失败——这是支持窗口，不是 bug。拿不准就跑 `/evolution doctor`：它会报告检测到的安装形态和找到的行。
+
+平台预设的兼容面（`standard` / `ptc` / `cordis` / `minimal`）与 `--base` 变体各自的前置条件，分别单源在 `packages/INSTALL.md`（§Platform mode × self-evolution）和 `evolution-agent/README.md`（§Preset variants）。
+
+## 工作原理
+
+| 层 | 做什么 | 住在哪 |
+|---|---|---|
+| Review | 观察会话事件，过 substantive 门，产出经过验证的计划 | `evolution-review`（+ `evolution-plan-validator`） |
+| 记忆回路 | 写持久事实与用户画像；把指引注入新会话 | `memory` / `memory-files` / `tool-memory` |
+| 技能回路 | 通过 `skill_manage` 工具提出/写入/修补技能；目录把它们展示给模型 | `tool-skill-manage` / `evolution-skill-catalog` |
+| Curator | 确定性生命周期（stale/archive）+ LLM 提名，每次运行前先快照 | `evolution-curator` |
+| 控制面 | 威胁扫描、不可变策略、可选带重放的分阶段审批 | `evolution-threat` / `evolution-policy` / `evolution-approval` |
+| 管道 | IO 接缝、状态 provider（json/domain）、事件、activity、replay、学习图谱 | `evolution-io*` / `evolution-state*` / `evolution-activity` / `evolution-replay` |
+
+你的数据落在哪——全部在你自己的 home 下，中间没有任何服务：
+
+```text
+$DSH_HOME/evolution/events.json          追加式的反馈/用量时间线
+$DSH_HOME/evolution/review-state.json    每个会话的评审计数
+$DSH_HOME/evolution/activity.json        自进化计划的执行结果
+$DSH_HOME/evolution/reports/             curator 运行报告（json + md）
+$DSH_HOME/skills/                        技能树（+ .usage.json 计数）
+$DSH_HOME/memories/                      MEMORY.md + USER.md
+```
+
+**评审怎么投递。** `reviewMode` 从 0.3.74 起默认是 `inject`：评审在会话内、于对话边界执行，因此不会 spawn 任何东西，也不为第二个前缀花预算。`subagent` 是显式 opt-in，适合想让评审在干净的父上下文里读技能、或想用专用模型的部署；review watchdog 与 review-model 旋钮作用的正是这一模式。
+
+**会话作用域。** 跨会话消费者（review、skill-usage）声明为 `sessionScoped`：只有某个会话能解析出本家族的模型工具时，它们才作用于该会话。用 `all` 包时模型行位于 profile root，所以每个会话都满足；host-only 安装（M3）则天然永远匹配不上——插件会为此打一条警告，而不是静默失败。
+
+## 能力清单
+
+| 能力 | 它为你改变什么 |
+|---|---|
+| **记得住的记忆** | 值得留下的事实由评审写入，并在之后的会话里注入——不用每次重新解释你的项目 |
+| **会变好的技能** | Agent 从真实发生过的事里修补自己的技能，计划先验证再执行 |
+| **代谢** | curator 合并近重复、降级没人用的技能并归档——每次运行前先快照，所以 `restore` 永远可行 |
+| **你能控制的闸门** | 一个配置开关把每次写入变成 `/evolution pending` 条目，由你批准或拒绝；批准后经它注册时的同一个 runner 重放 |
+| **带豁免清单的威胁守卫** | 写入记忆/技能时，指令式内容会被拒绝；已知无害的 label 可按配置点豁免 |
+| **审计轨迹** | `/evolution mutations` 与每次 curator 运行报告，回答「是谁、什么时候改了我的技能」 |
+| **用量驱动的决策** | 每个技能的使用/查看/修补计数、低质量标记，以及排好序的目录，让模型先看到好的 |
+| **没有生产者的反馈通道** | `evolutionFeedback.record()` 是给自家宿主/命令用的公开接缝；家族自身不提供生产者 |
+| **重放与图谱** | 针对技能改动的 A/B 重放打分，以及覆盖技能与记忆的学习图谱 |
+
+## 可观测与验证
+
+上手第一天，四条命令就够——完整的 `/evolution` 命令表只渲染一次、住在 `packages/README.md`（§Command reference，由注册表渲染，并被它的 spec 逐字节钉住）：
+
+- `/evolution doctor` —— 装了什么：形态、作用域内的行、服务、待办数量。
+- `/evolution pending` + `approve` / `reject` —— 分阶段写入（M2）。
+- `/evolution curator status` —— 后台治理：上次运行、下次到期、计数。
+- `/evolution preset install [--base <name>[,<name>...]]` —— 生成家族 agent 预设（M4）；每个指定的 base 一份变体，一次生成。
+
+之后想要留痕的时候：`/evolution mutations`（每一次写入）、`/evolution release <id>`（回收一条僵死的 `executing` 记录）、`/evolution maintain --facts`（维护扫描）与 `/graph`（技能 + 记忆视图）。
+
+**不用问模型就能验证一次安装：** 组合出来的 profile 不能有重复的行 id，家族的行必须都在。
+
+```bash
+dsh --profile web --dump-config | grep -c 'id: evolution-'   # 18 行
+dsh --profile web --dump-config | grep -c 'id:'              # 207 个 id，全部互不相同
+```
 
 ## 配置
 
-### 拨盘层（5 个语义拨盘——背后字段与 README(en) `Configuration dials` 一致，测试钉住）
+五个语义拨盘；底层的每个字段都是普通的行配置，细粒度旋钮归入一个三级附录（**daily**——评审间隔、curator 节奏；**tuning**——健康阈值、质量权重；**high-risk**——`maxOpsPerPlan`、字符预算、评审/curator 的模型选择）。
 
 | 拨盘 | 取值 | 背后字段 |
 |---|---|---|
 | autonomy | auto / reviewed / observe | `approval.enabled`（profile 行）、`reviewEnabled`（evolution-review）、`/evolution pending\|approve\|reject` |
-| scope | global / per-session | 包选择：evolution-all（全局，默认）vs host + Evolution 预设（按会话） |
+| scope | global / per-session | 包选择——evolution-all（全局，默认）vs host + Evolution 预设（按会话） |
 | curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours`（evolution-curator） |
-| memoryInjection | on / off | `memoryEnabled`（tool-memory：关闭时整行为 no-op——不注册 `memory` 工具，也不注入指引/快照） |
-| threatStrictness | strict / 豁免清单 | `threatExemptLabels`——声明该字段的行（`evolution-threat`、`evolution-commands`、`tool-skill-manage`、`memory-files`、`evolution-learning-graph`）与 core 的 `SkillLibrary`/`MemoryStore` 选项 |
+| memoryInjection | on / off | `memoryEnabled`（tool-memory：关掉时整行是 no-op——既不注册 `memory` 工具，也不注入指引/快照） |
+| threatStrictness | strict / 豁免清单 | `threatExemptLabels`——按配置点声明（守卫行、命令面、store 选项）；声明点的清单单源在 `evolution-threat/README.md` |
 
-细粒度旋钮分三档（日常 / 调优 / 高危——如 maxOpsPerPlan、chars 上限、review/curator 模型选择：直接影响花费与行为），见英文 README `Configuration dials` 下说明。
+先说几个容易让人意外的默认值：`reviewEnabled: true`、`reviewMode: 'inject'`、`memoryInterval = skillInterval = 10` 轮，substantive 门 =「≥3 次工具调用 **或** ≥200 个用户字符 **或** ≥500 个 agent 字符」，curator 每小时 tick、到期判定间隔 `168 h`。
 
-### 环境变量（DSH_EVOLUTION_*）
+环境变量：
 
-| 变量 | 读取层 | 作用 |
+| 变量 | 在哪读 | 作用 |
 |---|---|---|
-| `DSH_EVOLUTION_SESSION_QUERY` | profile 配置（bundle patch `!!js`） | `startup` / `first-search` / `never`；非法值归一为 `startup` |
-| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile 配置（`!!js`） | 索引路径；空串回退 `$DSH_HOME/evolution/session-query.db` |
-| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | 插件代码（core `env.ts`） | `1` 将预设 delta 行冲突从 fail-loud 降为 warn+双行保留 |
-| `EVOLUTION_SCOPE` | 仅源码安装器（`install-layered.mjs`、`test-support/row-contract.ts`） | 写入生成的 profile/preset 行的 scope；默认取包自身 scope。插件运行时不读取 |
-| `DSH_EVOLUTION_DELTA_PATH` | 仅源码安装器（`install-layered.mjs`） | 覆盖 layered 安装器合成预设时读取的 delta 片段路径；缺省仍是随包发布的 `evolution-agent/agent.cordis.yml`。插件运行时不读取 |
-| `DSH_EVOLUTION_ARCH_STRICT` | 仅守卫脚本（`verify-arch-guards.mjs`） | `1` 让架构重复守卫从 warn 转为 fail-loud（等同 `--strict`）。插件运行时不读取 |
-| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | 仅守卫脚本（`verify-declared-config.mjs`） | `1` 让声明配置触达守卫从 warn 转为 fail-loud（等同 `--strict`）。插件运行时不读取 |
+| `DSH_EVOLUTION_SESSION_QUERY` | profile 配置（bundle patch 里的 `!!js`） | `startup` / `first-search` / `never`（SQLite 的 openAt）；非法值归一为 `startup` |
+| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile 配置（bundle patch 里的 `!!js`） | 持久索引路径；空串回退到 `$DSH_HOME/evolution/session-query.db` |
+| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | 插件代码（core `env.ts`） | `1` 把预设 delta 行冲突从 fail-loud 降为 warn + 双行保留 |
+| `EVOLUTION_SCOPE` | 仅源码安装器（`install-layered.mjs`、`test-support/row-contract.ts`） | 写进生成的 profile/preset 行的 scope；默认取包自身 scope。插件运行时不读它 |
+| `DSH_EVOLUTION_DELTA_PATH` | 仅源码安装器（`install-layered.mjs`） | 覆盖 layered 安装器合成时读取的 agent-preset delta 片段（缺省是随包发布的 `evolution-agent/agent.cordis.yml`）；测试和一次性构建用它注入 fixture |
+| `DSH_EVOLUTION_ARCH_STRICT` | 仅守卫脚本（`verify-arch-guards.mjs`） | `1` 让架构重复守卫从 warn 变为 fail-loud（等同 `--strict`）；插件运行时不读它 |
+| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | 仅守卫脚本（`verify-declared-config.mjs`） | `1` 让声明配置触达守卫从 warn 变为 fail-loud（等同 `--strict`）；插件运行时不读它 |
 
-所有稳定 row id 都可通过 profile 覆盖：
+## 安全与边界
 
-```yaml
-# 禁用后台 review
-- id: evolution-review
-  disabled: true
+1. **模型只能写记忆和技能。** 策略、提示词、路由、状态和审计历史永远不是模型可写的；`evolution-policy` 装上一个单调的 `ctx.tools.guard`，`evolution-plan-validator` 拒绝禁止字段。
+2. **每一次变更都过闸门。** `tools.guard` 的威胁扫描跑在 pre-execute 路径上；打开审批后，一次写入会先被 stage、由你复核，再经它注册时的同一个 runner 重放。
+3. **技能销毁从来不是硬删除。** 归档会移进 `.archive/`，而且每次 curator 运行前都会先给技能树做快照（被活跃写锁占着的技能会跳过、记录在案，之后的 restore 会把它标为未回填）。
+4. **评审计划需要证据。** 计划被会话的事件序列限界；非法的 op 会被丢掉，合法的照常应用。
+5. **在边界上脱敏。** 任何离开会话、交给模型的文本都要过家族的密钥脱敏（PEM 块、URL 里的凭据、内联赋值和 camelCase 凭据键）。
+6. **除了你本来就在发的提示词，什么都不离开你的机器。** 没有遥测服务：计数和报告都是 `$DSH_HOME` 下的文件。本家族不发布 `./invariant` 伴生包——平台不会自动装配任何东西，发了也永远不会被执行。
 
-# 启用分阶段审批
-- id: evolution-approval
-  config:
-    enabled: true
-    stageForeground: true
+## 已知限制
 
-# 强制使用 JSON state
-- id: evolution-state
-  config:
-    provider: json
-```
+- **`reviewMode` 默认是 `inject`。** 评审在会话内运行，而注入模式不产生 `evolution/plan-applied` 账本——activity 存储和 replay 视图会一直空着，直到你显式选择 `subagent` 评审。
+- **会话作用域消费者。** 在 M3（host-only）下，review 与用量遥测永远匹配不上任何会话；在 M4 下，只有选了 Evolution 预设的会话才匹配。
+- **没有 GUI 面板。** 家族加的是斜杠命令和模型工具，不是浏览器 UI。
+- **curator 故意很慢。** 每小时 tick、默认 168 h 才到期——安静几周是正常的；`/evolution curator status` 会告诉你下次什么时候到期。
+- **只有一个平台锚点。** 支持窗口正好是 `0.1.5-rc.2`；换一条新平台线需要一次家族迁移（见下面的上游升级对照清单）。
+- **`npm dist-tags.next` 是陈旧的**，停在 `0.3.18`（历史残留）；`latest` 是正确的，`add` 解析的也是它。
+- **仅维护者侧：** 发布链会把 `packages/scripts/**` 与第二份 checkout 比对，所以脚本改动要在发布前同步过去。
+- **能力包（动态插件）不在家族的写入面内。** 创建、审批与激活归平台 Creator 模式；0.3.66 起本家族的 capability 适配器已移除——见 `packages/INSTALL.md` §Capability evolution (retired in 0.3.66)。
 
-## 运行影响
-
-- **会多出模型工具和提示内容。** 四个模型工具（`memory`、`skill_manage`、会话检索、技能目录）加一小段引导文字：默认的 `all` 形态把它们挂在 profile root，profile 内每个会话都有；layered 形态下它们只存在于 Evolution 预设。工具说明与系统章节位于提示前缀：**安装或升级插件会改变前缀——每次变更一次冷启动**。动态内容（记忆快照、技能目录、评审通知）由平台以消息尾部追加——未变不注入，变了追加一条，**不会使前缀失效**。
-- **以本地用户权限运行。** 和其他 DSH 插件一样，evolution 的代码跑在宿主进程里——安装前先看一遍仓库；第一次试，建议用隔离 profile。
-- **只写 memory 和 skills。** 循环写入只针对 `~/.dsh/`（可配置）下的 memory 与 skills；写入会过保护标记（pinned、预装技能后台改不了）、分阶段审批、快照和审计；它不会动平台的沙箱或权限模型。
-- **默认保守。** 后台评审只改本会话读过的技能；curator 按你定的周期跑；分阶段审批默认关（和上游 Hermes 一致），一行配置可开。
-
-## 常见问题
+## 故障排查与 FAQ
 
 | 症状 / 编号 | 含义 | 下一步 |
 |---|---|---|
-| 启动报 `invariants: package "…" is already registered` | 两个 bundle 或 bundle+预设双挂相同行 | 只保留一个（evolution-all / evolution-host / evolution-preset / layered）；跑 `/evolution doctor` |
-| `E-301` | approval 服务未挂载 | evolution-approval 行随 host/all 提供；跑 doctor |
-| `E-302` | curator 服务未挂载 | 挂 evolution-curator 行；跑 doctor |
-| `E-303` | replay 服务未挂载 | 挂 evolution-replay 行；跑 doctor |
-| `E-306` | 该部署开启了前台分阶段写入，而 `/evolution consolidate` \| `restore` \| `skill restore` 不能通过技能 runner 重放（runner 的动作词表是 create/update/patch/delete/write_file/remove_file/restructure/pin/unpin），没有可暂存的东西 | 在审批策略为 `never` 的会话里执行，或把 `stageForeground` 设为 `false`（则直接写入，需有意为之）；0.3.83 起无会话归因的 `/evolution restructure` 也按 E-306 拒绝 |
-| 威胁扫描拒绝（memory/skill 写入） | strict 命中指令式短语 | 改写；或经 `threatExemptLabels` 豁免已知无害 label（见拨盘表） |
-| doctor 报 `install form: none` | 未装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
+| 启动报 `invariants: package "…" is already registered` | 两个 bundle，或 bundle + 预设，把同一批行挂了两次 | `evolution-all` / `evolution-host` / `evolution-preset` 只留一个 |
+| `E-301` | approval 服务未挂载 | evolution-approval 行随 host/all 提供；跑 `/evolution doctor` |
+| `E-302` | curator 服务未挂载 | 挂上 evolution-curator 行；跑 doctor |
+| `E-303` | replay 服务未挂载 | 挂上 evolution-replay 行；跑 doctor |
+| `E-306` | 该部署对前台写入也做 stage，但 `/evolution consolidate` / `restore` / `skill restore`（以及 0.3.83 起无会话归因的 `restructure`）没法通过技能 runner 重放 | 直接 approve-and-execute，或有意把 `stageForeground: false` |
+| 威胁扫描拒绝（记忆/技能写入） | strict 扫描命中了指令式短语 | 改写；或经 `threatExemptLabels` 豁免已知无害的 label |
+| `/evolution doctor` 报 `install form: none` | 没有装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
-## 安全边界
+**为什么到现在还什么都没写？** 第一次评审要等间隔窗口（`memoryInterval` / `skillInterval`，默认 10 轮）和 substantive 门。一行字的会话，故意不值得评审。
 
-1. 模型只能修改 memory 和 skills。
-2. policy、prompt、routing、approval、state 不是模型可写数据。
-3. 动态插件（能力包）不在本家族的写入面内：创建、审批与激活归平台 Creator 模式；0.3.66 起本家族的 capability 适配器已移除。
-4. 技能删除是归档；curator 先快照（被写锁占用的技能会跳过并记录在快照清单中，恢复时明示不回填）；审批写入通过精确 runner 重放。
-5. 依赖缺失时优雅降级，例如没有 storage-domain 时使用 JSON provider。
+**为什么 `activity.json` 是空的？** 注入模式的评审不产生 `evolution/plan-applied` 记录。想要这本账，就切到 `reviewMode: 'subagent'`。
 
-## 开发与测试
+**怎么让它别写了？** 设 `reviewEnabled: false`（完全不评审）、`approval.enabled: true`（每次写入都等你），或者用 M3（不给模型工具）。
 
-**本镜像（扁平 `packages/evolution-*`）自 0.3.83 起是撰写与发布树**：改码、提交、打 tag 都在这里，
-发布链不再跑 dev→mirror 的同步步。它没有合并布局，也不带自己的工具链（镜像里没有 vitest/tsc），
-且每包 `tsconfig.json` 的 `extends`/`references` 只在合并树可解析（见英文 README
-「Development: the two layouts and their tsconfigs」一节）。因此以下命令在**合并/上游树**
-（同一批源码住在 `packages/evolution/<pkg>`，CI overlay 由平台 tag 构建）里运行：
+**怎么确认实际在跑哪个版本？** 拿 `profiles/<name>/pnpm-lock.yaml` 和 `npm view @lmzhen/dsh-evolution-all version` 对一下；宿主重启时 profile 才会重新组合。
+
+## 卸载与回滚
 
 ```bash
-tsc -b tsconfig.host.json --force
-vitest run packages/evolution
+dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 ```
 
-`D:/dsh/deepseek-harness` 是**陈旧的前 dev 树**（根有 `AUTHORING-MOVED.md` 标记，指向本镜像）：
-不要在那边改码，也不要把它的内容拷回本树。唯一保留的跨树义务是 `packages/scripts/**`——
-发布链 step 2 的版本守卫把它与陈旧树那份逐字节比对，漂移即中止发布（0.3.83 实测回灌 58 处，
-含一整棵缺失的 `checklists/**`）。
+移除这一行会停掉回路，但保留你的数据：记忆、技能、状态、报告和审批历史都留在 `$DSH_HOME` 下，重装即被再次接管。技能树只归档、从不硬删，所以回滚 = 重装 + `restore`。
 
-当前状态：持续由 CI 校验（baseline 锚点 + 已发布上游兼容检查）；测试/检查数字以 CI 日志为准，不在此固定。
+## 文档索引
 
-**测试导入取舍（I-03）**：tests 中约 30 组 `@deepseek-ai/*` 导入**有意未**在 package.json
-声明——这些导入只在上游合并布局下可解析（与 tsconfig paths 的 G5.5 双布局规则同理，
-详见英文 README"Development"一节），属已知取舍；**不为测试补 devDependencies**（合并树
-是测试唯一可运行路径，补声明只会增加一块需持续同步的漂移面）。
+| 文档 | 里面有什么 |
+|---|---|
+| [`INSTALL.md`](./INSTALL.md) | 安装形态与 scope、profile 覆盖示例、各形态状态 |
+| [`packages/INSTALL.md`](./packages/INSTALL.md) | 安装**形态**的语义，以及逐平台的验证矩阵 |
+| [`packages/README.md`](./packages/README.md) | 渲染出来的 `/evolution` 命令参考与包级机制细节 |
+| [`CHANGELOG.md`](./CHANGELOG.md) | 每个版本改了什么，连同原因和证据 |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | 一个事实允许住在哪、十六步门禁、家规 |
 
-**上游升级对照清单（I-02，每次升级过一遍）**：
+## 开发
 
-1. **技能 provider 影子 rank**：本插件 `evolution-skill-catalog` 以
-   `EVOLUTION_SKILL_RANK=390` shadow 上游 `USER_DSH_RANK`（`0.1.5-rc.2` 复核仍为 400，低 rank
-   胜出、抢占 `user-dsh` source）。两侧常量互为私有：上游改动任一数值或比较语义，本侧
-   会**静默**失去 shadow——升级时两侧复核。
-2. **`@deepseek-ai` 包名撞名检查**：本家族在官方 `@deepseek-ai` scope 下发布自有包名
-   （`dsh-memory`、`dsh-tool-memory`、`dsh-skill-usage`、`dsh-memory-files`、
-   `dsh-tool-skill-manage` 等）。采纳上游版本前对照其包清单，新包名与本侧撞名即解析歧义。
+<details>
+<summary><strong>包地图（29 个已发布包）</strong></summary>
 
-## Attribution
+| 包 | 角色 |
+|---|---|
+| `evolution-core` | 共享的纯 stores/prompts/signals/constants；没有主 Cordis 插件入口，也没有 `./invariant` 伴生包 |
+| `evolution-io` / `evolution-io-node` | 文件树 IO 接缝注册表 + 原子 node:fs provider |
+| `memory` / `memory-files` / `tool-memory` | 记忆接缝：注册表、provider、模型工具 |
+| `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | 用量遥测 + `skill_manage` + 原生 `ctx.skills` provider |
+| `evolution-policy` | 不可变策略快照 + 原生 `tools.guard` 拒绝 |
+| `evolution-plan-validator` | 对模型产出的计划做确定性验证 |
+| `evolution-state-storage` / `-domain` / `-json` / `evolution-state` | 状态接缝：provider 注册表、storage-domain KV、JSON 兜底、消费者 |
+| `evolution-approval` | 基于 `evolutionState` 的 Hermes 风格分阶段/待批写入 |
+| `evolution-threat` | `tools.guard` 内容威胁守卫 |
+| `evolution-review` | 信号门 → one-shot 评审器 → 已验证计划的执行 |
+| `evolution-curator` | 确定性生命周期 + LLM 提名 + 运行报告 + min-idle 门 |
+| `evolution-activity` | 计划结果的持久审计存储（`evolution/plan-applied`） |
+| `evolution-feedback` | 持久反馈存储；暴露 `evolutionFeedback.record()` |
+| `evolution-learning-graph` | 覆盖技能 + 记忆的图谱命令 |
+| `evolution-replay` | A/B 重放打分 + 会话事件驱动 |
+| `evolution-commands` | `/evolution` 命令面 |
+| `evolution-maintenance` | 确定性维护扫描面（快照 / 漂移信号 / facts） |
+| `evolution-host` | 宿主面基础设施 bundle（只读 `maintenance_probe` 诊断） |
+| `evolution-agent` | Agent 预设：标准工具 + 四个模型行 |
+| `evolution-preset` | 兼容性 one-click bundle |
+| `evolution-all` | 全功能 bundle —— 默认安装 |
 
-灵感来自 [Hermes Agent](https://github.com/NousResearch/hermes-agent)。
-Anchored Standard 兼容测试 fixture 来自
-[xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)。
+</details>
 
-## License
+<details>
+<summary><strong>两套布局与它们的 tsconfig</strong></summary>
 
-MIT
+撰写发生在扁平镜像（`packages/evolution-*`）里，它同时就是发布树——发布链不再跑它的 dev→mirror 同步步，也不会有第二棵树覆盖它。用于类型检查和测试的上游 checkout 把同一批源码放在 `packages/evolution/*` 下（CI 从平台 tag 构建那层 overlay；本机那棵旧 dev 树已经陈旧，根上有 `AUTHORING-MOVED.md` 标记）。那些 `packages/evolution/...` 项目引用只在那个 checkout 里解析得开——扁平的镜像单独跑不了它们。
+
+`packages/scripts/**` 是唯一剩下的跨树义务：发布链的守卫把它和第二份 checkout 的副本逐字节比对，所以脚本改动要在发布前同步过去。
+
+**保留的历史口径：**本镜像自 0.3.83 起才是撰写与发布树；那次守卫实测回灌 58 处（含一整棵缺失的 `checklists/**`），漂移会中止发布。tests 里约 30 组 `@deepseek-ai/*` 导入（I-03）**有意**未在 package.json 声明——它们只在上游合并布局下可解析，属已知取舍，不为测试补 devDependencies。
+
+</details>
+
+<details>
+<summary><strong>上游升级对照清单（每次平台升级过一遍）</strong></summary>
+
+1. **技能 provider 的影子 rank**：本家族注册 `EVOLUTION_SKILL_RANK = 390`，并依赖上游的 `USER_DSH_RANK`（400，在 `0.1.5-rc.2` 上复核过）排在它上面——更低的 rank 赢得 `user-dsh` source 的影子。每次升级都要复核两边。
+2. **`@deepseek-ai` 包名撞名**：在上游 monorepo 内部，家族占用着看起来像官方的包名，发布工具会把每个 manifest、YAML 和构建产物 `.js`/`.d.ts` 里的名字改写成 `@lmzhen`。每个上游新版本都要检查有没有和我们撞名的包。
+3. **ToolRuntime 参数冻结**：`tool.execute` 拿到的是 `deepFreeze` 过的参数快照——要新建一个对象，不要往 `args` 上赋值。
+4. **逐技能调用的 frontmatter**：上游按 SKILL.md 解析 `disable-model-invocation` / `user-invocable`；我们的影子 provider 必须继续解析同样的键（旧键的处理口径单源在 `evolution-skill-catalog/README.md`）。
+5. **Home 路径语义**：上游 `resolveDshHome` 只用 `trim()` 做 ADOPTION 判定、保留原始 env 值、展开 `~ `，并且总是解析成绝对路径。`evolutionRoot` 与 `install-layered.mjs` 的 `resolveHome` 走的是同一条线；升级时三处一起重新 diff。
+
+</details>
+
+<details>
+<summary><strong>门禁，以及它在哪儿跑</strong></summary>
+
+十六步：类型检查、lint 和完整测试套件在上游 checkout 里跑；家族自己的 `verify-*` 守卫、manifest 与 tsconfig 检查、镜像一致性检查在镜像里跑。可执行的表格住在 `CONTRIBUTING.md` §The gate；十六步全绿之前，发布不算发布。
+
+</details>
+
+## 社区与贡献
+
+- ⭐ **觉得有用？** 给仓库点个 Star——这是本项目唯一能拿到的信号：
+  <https://github.com/lmzhen/dsh-evolution>
+- 🧭 **想找更多插件：** [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+  和宿主内的插件市场（`dsh plugin --profile web add dshmarket`）。
+- 🐛 **反馈 / 报 bug：** 到仓库开 issue。本家族不带遥测，所以附上你的 `/evolution doctor` 输出是最快的路径。
+- 🤝 **贡献：** 先读 `CONTRIBUTING.md`——它规定了一个事实的单一 home 规则，以及一次改动必须过的门禁。
+- 📜 **归属：** 设计灵感来自 [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+  （MIT）；这是独立实现，与 Nous Research、DeepSeek 均无隶属或背书关系。
+- 🧪 **兼容测试 fixture：** Anchored Standard 兼容 fixture 取自
+  [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT）。
+
+## 许可
+
+MIT——见 [LICENSE](./LICENSE)。
