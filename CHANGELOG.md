@@ -81,6 +81,8 @@
 - `loadActivity` 为已发布导出面，本期仅更正声明，下个大版本删除。
 - 定版前复查新增挂账（下版）：`evolution-curator` 的近重复候选池消费 `computeDedupGroups` 时丢弃 `truncated`（截断阈值 ≈708 技能，报告里无提示）；`reviewTimeoutMs` 触顶告警的「只发一次」无断言；coalescing 路径未看 `reviewWakeInject`（本插件自身投递路径下不可达）；`tool-memory` 的审批前预检与 store 拒绝文案是手抄副本（建议单源化）。
 - 定版前复查另记（**既有**，非本批引入）：`yamlPlainScalarNeedsQuotes` 的前导指示符分支把 `-foo`/`?x`/`:x` 判为需引号，而两个解析器都读作普通字符串 ⇒ 对平台正常加载的文件报 `catalog=yaml-invalid`（`render-facts.ts`）；按 YAML 1.2 `ns-plain-first` 应只在 `-/?/:` **后接空格**时判指示符，但该谓词同时服务审计判决与写路径引号（frontmatter.ts:114-118 的同一性设计），放宽需先拆分两用。
+- 0.3.83 发布后复查挂账（复查 A 组，均 P2）：`evolution-review` 的 `subagents.start` 仍是评审腿唯一无界 `await`（provider 不 resolve 则 `reviewInFlight` 永久为真、延迟队列向 cap 16 逼近且无 `review-error`）；replace 补唤醒未过 `reviewWakeInject` 门（本插件投递路径下不可达）；cadence 抑制是每 session **单槽**（append 会把 `turns:2` 覆盖成单发，重复 replace 重置计数并再堆不可合并的 stub 行）；触顶告警「每 mount 只发一次」无断言（删掉守卫仍全绿）；看门狗定时器不 `unref`（对照 curator 纪律）。
+- 文档口径更正（复查 D6）：增补表 P2-2 行与 `evolution-review/src/index.ts` 的「原顺带放大到 timeout+grace、挂死 dispose 占单飞链 ~125s」指**本批 S1.1 中间态**，不是 0.3.82——已发布基线的 dispose 预算本就是 `min(5s, reviewTimeoutMs)`，相对基线 P2-2 只改日志文案；`settle-watchdog.spec` 头部已注明该用例对已发布基线恒绿。
 - 已知代价（保留）：`yaml` 的解析成本高于 js-yaml（多键 62k 实测 226ms vs 10.5ms、anchor 100k 256ms vs 19.5ms），单文件受 `MAX_SKILL_CONTENT_CHARS=100_000` 约束（≤~0.26s），全库扫描时是乘数——这是「与平台同解析器」换来的确定性，不改为分叉解析。
 
 ## 0.3.82 (patch) — 分层优化批：S0–S4 全量收口（鲁棒性 / 单源化 / 结构 / 交付）

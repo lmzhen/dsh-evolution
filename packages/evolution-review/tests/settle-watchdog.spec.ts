@@ -331,8 +331,10 @@ it('PLAN-R2 P2-2 (2026-09-16): a hung dispose is abandoned after the settle marg
   const warns: string[] = []
   const originalWarn = ctx.logger.warn.bind(ctx.logger)
   ctx.logger.warn = ((message: string) => { warns.push(message); originalWarn(message) }) as typeof ctx.logger.warn
-  // Default-scale budget: the old shared dispose bound was 120s + 5s; the new
-  // one is the 5s margin alone.
+  // Default-scale budget: this case pins review P2-2 against the FIRST S1.1
+  // revision, whose shared bound was 120s + 5s. 0.3.82's released form already
+  // used the 5s margin alone, so the case is green on that baseline too (review
+  // D6) — the regression it catches is the batch-internal one.
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'subagent', reviewTimeoutMs: 120_000 })
 
   vi.useFakeTimers()

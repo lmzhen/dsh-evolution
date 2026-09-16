@@ -1031,9 +1031,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // PLAN-R2 P2-2 (2026-09-16): the two arm points no longer share one budget.
   // `run.dispose` arms AFTER the result settled — the review timeout is
   // already behind it — so its budget is the grace ALONE
-  // (min(REVIEW_SETTLE_MARGIN_MS, reviewTimeoutMs)). The old shared budget
-  // re-armed a fresh timeout+grace window at dispose time, and a hung dispose
-  // held the single-flight flag for ~two minutes under the default timeout;
+  // (min(REVIEW_SETTLE_MARGIN_MS, reviewTimeoutMs)). The SHARED budget of this
+  // batch's FIRST S1.1 revision re-armed a fresh timeout+grace window at dispose
+  // time, and a hung dispose held the single-flight flag for ~two minutes under
+  // the default timeout. That intermediate form never shipped: 0.3.82's
+  // released form was already the 5s margin alone, so relative to the published
+  // baseline this branch only corrects the error message (review D6);
   // its error message also dropped the "after the review timeout" anchor,
   // which is false at that arm point.
   // PLAN-R2 P2-1 (2026-09-16): the result budget is capped at Node's 32-bit
