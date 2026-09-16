@@ -48,3 +48,37 @@ describe('evolution-state-json transactCuratorState null semantics (G2.1, F-202)
     expect((await provider.loadCuratorState())?.runCount).toBe(6)
   })
 })
+
+describe('evolution-state-json transactCuratorState copy hand-off (V27 S4, PLAN S1.3 2026-09-16)', () => {
+  it('a task that mutates the record in place and returns null leaves the persisted record unchanged', async () => {
+    const root = await tempRoot('dsh-json-tc5-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await provider.saveCuratorState({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
+    await provider.transactCuratorState((current) => {
+      // The task owns its argument (V27 S4): mutating it in place and then
+      // refusing the write (null = keep) must not reach the medium — the
+      // provider used to hand out the same graph its null path wrote back,
+      // so the mutated record was serialized on the "unchanged" path.
+      current!.runCount = 999
+      current!.paused = true
+      return null
+    })
+    expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
+    const raw = JSON.parse((await io.readText(join(root, 'curator-state.json')))!) as { primary: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } }
+    expect(raw.primary).toEqual({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
+  })
+
+  it('control: a task returning a fresh object still persists it', async () => {
+    const root = await tempRoot('dsh-json-tc6-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await provider.saveCuratorState({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: false })
+    await provider.transactCuratorState(current => ({ ...current!, paused: true }))
+    expect(await provider.loadCuratorState()).toEqual({ lastRunAt: 1, runCount: 5, lastSummary: 'orig', paused: true })
+    const raw = JSON.parse((await io.readText(join(root, 'curator-state.json')))!) as { primary: { paused: boolean } }
+    expect(raw.primary.paused).toBe(true)
+  })
+})

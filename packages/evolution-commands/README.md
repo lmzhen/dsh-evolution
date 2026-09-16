@@ -2,6 +2,18 @@
 
 Human commands for the evolution family
 
+## Command reference
+
+The full `/evolution` subcommand table is single-sourced in the family
+README's **Command reference** section (`packages/README.md` in the source
+repository; it is named here instead of linked because a repo-relative
+markdown link out of this package would be dead inside the npm published
+tree). It is rendered from the subcommand registry (`src/registry.ts`, the same
+single source as the `/evolution` input-declaration hint and the
+bare-command help output), and `tests/registry.spec.ts` (T-WD2) pins that
+rendered table byte-for-byte. This package README cites that home instead
+of restating the table (doc-facts rule N19: never copy a fact across docs).
+
 ## Model Experience
 
 ### Indirect model surface

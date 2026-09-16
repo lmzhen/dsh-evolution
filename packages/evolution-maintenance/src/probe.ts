@@ -63,10 +63,14 @@ export function computeProbe(
   }
 
   if (signal === 'dedup_group') {
-    const groups = computeDedupGroups({
+    const dedup = computeDedupGroups({
       contents: new Map(snapshots.map(snapshot => [snapshot.name, snapshot.body])),
     })
-    return result(signal, groups.map(group => group.join(' ~ ')))
+    // PLAN-R2 P2-8 (2026-09-16): surface scan truncation so a budget-capped
+    // sweep is never read as a complete one.
+    const details = dedup.groups.map(group => group.join(' ~ '))
+    if (dedup.truncated) details.push('note: dedup scan truncated at the pair-comparison budget; groups may be incomplete')
+    return result(signal, details)
   }
 
   if (signal === 'prefix_cluster') {

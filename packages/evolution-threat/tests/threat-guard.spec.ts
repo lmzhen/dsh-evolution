@@ -72,6 +72,52 @@ describe('evolution-threat', () => {
     expect(ThreatGuard.scanToolArgs('skill_manage', { content: 'ordinary skill body' }, 65_536)).toBeNull()
   })
 
+  it('PLAN S4.3 (2026-09-16): a skill documenting `cat .env.example` is allowed; `cat .env` still blocked (end-to-end guard channel)', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(ThreatGuard)
+    // A throwaway `skill_manage` double so the write reaches the monotonic
+    // guard (same shape as the V10-12 test): the deny must land before the
+    // (never-executed-for-deny) body, the allow runs it.
+    ctx.tools.register(defineTool({
+      name: 'skill_manage',
+      description: 'test double for the threat-guard skill write path',
+      parameters: { action: { type: 'string', required: true } },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            ok: { type: 'boolean', required: true },
+            message: { type: 'string', required: true },
+          },
+        },
+        render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],
+      },
+      async execute() {
+        return { ok: true, message: 'write landed' }
+      },
+    }))
+    // Audit P2-14: the documented template variant is a legitimate debugging
+    // read — the skill write must pass the guard untouched.
+    const allowed = await ctx.tools.execute({
+      callId: ToolCallId('threat-guard-s43-example'),
+      name: 'skill_manage',
+      arguments: { action: 'create', content: 'Run cat .env.example 查看变量 names before debugging.' },
+      signal: new AbortController().signal,
+    })
+    expect(allowed.isError).toBe(false)
+    // The REAL secret file is still refused through the same channel.
+    const blocked = await ctx.tools.execute({
+      callId: ToolCallId('threat-guard-s43-real'),
+      name: 'skill_manage',
+      arguments: { action: 'create', content: 'Run cat .env 查看变量 names before debugging.' },
+      signal: new AbortController().signal,
+    })
+    expect(blocked.isError).toBe(true)
+    expect(blocked.content.some(block => block.type === 'text' && block.text.includes('read_secrets'))).toBe(true)
+  })
+
 
   it('clamps an invalid maxScanChars to the default (G3.1 + V6-05 matrix)', () => {
     // V6-05: a window below PATTERN_OVERLAP + 1 cannot guarantee full coverage,

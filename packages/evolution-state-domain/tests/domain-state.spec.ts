@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
-import EvolutionStateStorageRegistry, { REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionStateStorageRegistry, { PENDING_TABLE, REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
@@ -326,5 +326,44 @@ describe('V15 pending-table bound and claim-scoped resolve', () => {
     expect(deleted).not.toContain('p0')
     // …while the next-oldest resolved record still gets evicted (the loop ran).
     expect(deleted).toContain('p1')
+  })
+})
+
+describe('PLAN S3.1 (2026-09-16): pending drift repair — canonical slot wins (matches json keyPendingById)', () => {
+  it('a resolved record at the canonical slot survives repair over its drifted pending twin; the drift key is deleted and the twin is not claimable', async () => {
+    const home = await tempRoot('dsh-domain-s31-')
+    // Seed the medium directly: a hand-edited/hand-mounted domain table can
+    // hold the SAME record.id under two keys — the canonical slot resolved
+    // (approved) and a drifted key carrying a `pending` twin of that id.
+    const inner = new JsonStorageBackend(home)
+    const seeding = await inner.kv.open(DomainFacility.descriptorOf(DomainState.EVOLUTION_DOMAIN))
+    await seeding.putRecord(PENDING_TABLE, 'shared-id', {
+      id: 'shared-id', kind: 'memory', summary: 'canonical', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z',
+    })
+    await seeding.putRecord(PENDING_TABLE, 'odd-key', {
+      id: 'shared-id', kind: 'memory', summary: 'twin', args: {}, createdAt: 'now', status: 'pending',
+    })
+    await seeding.close()
+    await inner.close()
+    const ctx = await mount(home)
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    // The read repairs the drift. Pre-fix the repair put the drifted twin over
+    // the canonical slot UNCONDITIONALLY — a stale `pending` twin silently
+    // replaced the resolved record and became claimable again. Canonical wins.
+    await provider.listPending()
+    expect((await provider.listPending('pending')).map(record => record.id)).not.toContain('shared-id')
+    const approved = await provider.listPending('approved')
+    expect(approved.map(record => record.summary)).toEqual(['canonical'])
+    // The id resolves to the surviving canonical record — nothing to claim.
+    expect(await provider.claimPending('shared-id', 'c1')).toBeNull()
+    // The medium keeps exactly ONE row, under the canonical key, holding the
+    // canonical record (the drifted key was deleted, not merged over it).
+    const check = new JsonStorageBackend(home)
+    const unit = await check.kv.open(DomainFacility.descriptorOf(DomainState.EVOLUTION_DOMAIN))
+    const after = await unit.loadAll()
+    expect(Object.keys(after.tables[PENDING_TABLE] ?? {})).toEqual(['shared-id'])
+    expect(after.tables[PENDING_TABLE]?.['shared-id']).toMatchObject({ summary: 'canonical', status: 'approved' })
+    await unit.close()
+    await check.close()
   })
 })

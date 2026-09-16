@@ -824,8 +824,16 @@ it('0.3.81: a repeat of the same notice kind REPLACES the pending row instead of
   const [swapped] = replaced
   expect(swapped?.id).toBe('pending-1')
   expect((swapped?.text ?? '').length).toBeGreaterThan(0)
-  // Nothing was appended on top of it — that is the whole point of the step.
-  expect(followed).toHaveLength(0)
+  // PLAN S4.1 (2026-09-16, P2-11): nothing PROMPT-shaped was appended — the
+  // repeat is still swapped in place, not queued twice — but the superseded
+  // row entered through the WAKING (next-turn) channel, so the swap is
+  // followed by exactly one fresh followup wake referencing the in-place
+  // prompt. The stub's summary is suffixed so it never becomes a coalescing
+  // target, and its body is not a second review request.
+  expect(followed).toHaveLength(1)
+  const stub = followed[0] as { source?: { summary?: string }; content?: Array<{ text?: string }> }
+  expect(stub.source?.summary).toBe('auto-review:combined (wake)')
+  expect(stub.content?.[0]?.text ?? '').toContain('refreshed in place')
   // A coalesced delivery DID happen, so the caller's latch is consumed exactly
   // as on the append path.
   const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
@@ -1214,4 +1222,33 @@ it('V25-03: a FAILED deferred completion delivery rolls completionInjected back 
   await new Promise(resolve => setTimeout(resolve, 30))
   // The re-armed completion review actually delivers on the next turn.
   expect(x.injected).toContain('x-completion')
+})
+
+it('PLAN S4.1 (2026-09-16, P2-12): a persisted content block of null skips instead of breaking buildReviewRequest', () => {
+  // A2-7 style: content crosses the durable session-log boundary, so the
+  // runtime shape is `unknown` even where the static type promises
+  // `{ type, text }`. The unguarded `.map(block => block.type ...)` threw a
+  // TypeError on `content: [null]` and the caller's catch dropped the whole
+  // subagent review leg; the guarded render skips the block and keeps the
+  // rest of the digest usable.
+  const session = {
+    deriveMessages: (): Array<{ role: string; content: unknown[] }> => [
+      { role: 'user', content: [null] },
+      { role: 'assistant', content: [null, { type: 'text', text: 'patched the memory skill' }] },
+      { role: 'user', content: [{ type: 'text', text: 'please remember the preference' }] },
+    ],
+    snapshotEvents: (): unknown[] => [],
+  } as unknown as Session
+  const request = Review.buildReviewRequest(
+    session,
+    'memory',
+    { toolCalls: 1, userChars: 30, assistantChars: 24 },
+    20,
+    4000,
+  )
+  expect(request).toContain('Review kind: memory')
+  expect(request).toContain('ASSISTANT: patched the memory skill')
+  expect(request).toContain('USER: please remember the preference')
+  // The null block contributed no text and no separator noise.
+  expect(request).not.toContain('null')
 })

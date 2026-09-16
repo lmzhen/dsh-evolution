@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { load as loadStrictYaml } from 'js-yaml'
+// S2.1 (PLAN 2026-09-16): the oracle is the `yaml` package — the dependency
+// the platform's skill-filesystem catalog actually parses with (YAML 1.2 core).
+import { parse as loadStrictYaml } from 'yaml'
 import { frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
 
 describe('yamlPlainScalarNeedsQuotes (0.3.11)', () => {
@@ -192,7 +194,7 @@ describe('V27 G2.1: one frontmatter read — values come from the strict parser'
     const end = lines.indexOf('---', 1)
     return lines.slice(1, end).join('\n')
   }
-  // js-yaml is the parser the platform catalog and normalizeFrontmatter's
+  // `yaml` (parse) is the parser the platform catalog and normalizeFrontmatter's
   // rewrite verification use, so the assertion is against the platform's own
   // reading of the same bytes — not against a second implementation of mine.
   const strictValue = (content: string, key: string): unknown =>

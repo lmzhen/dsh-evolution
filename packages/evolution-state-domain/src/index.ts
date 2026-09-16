@@ -334,7 +334,9 @@ export function apply(ctx: Context): void {
       // up by id) — and, being `pending`, it was never evicted: a permanent
       // zombie in the approval view. Parity with the json provider's P2-5
       // re-key: the read repairs the drift (canonical slot re-put, drifted key
-      // deleted) and warns once.
+      // deleted) and warns once. PLAN S3.1 (2026-09-16): on a same-id twin the
+      // tie-break is the json keyPendingById rule — canonical slot wins, else
+      // the first entry in file order; a drifted row never overwrites it.
       const entries = [...table.entries()]
       const drifted: Array<{ key: string; record: (typeof entries)[number][1] }> = []
       for (const [key, record] of entries) {
@@ -347,6 +349,18 @@ export function apply(ctx: Context): void {
         }
         for (const { key, record } of drifted) {
           try {
+            // PLAN S3.1 (2026-09-16): canonical slot wins on drift repair —
+            // matches json keyPendingById ("the canonical slot wins, else the
+            // first entry in file order"). When a canonical entry for this id
+            // already exists (a pre-existing resolved row, or a drifted
+            // sibling repaired earlier in this same loop), the drifted row is
+            // residue: delete it, never overwrite the canonical record (the
+            // unconditional put used to let a stale `pending` twin silently
+            // replace a resolved record under the shared id).
+            if (table.get(record.id) !== undefined) {
+              await table.delete(key)
+              continue
+            }
             await table.put(record.id, structuredClone(record))
             await table.delete(key)
           } catch (error: unknown) {

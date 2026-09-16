@@ -14,6 +14,7 @@ import {
   DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS,
   DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
   FORBIDDEN_CONTROL_KEYS,
+  PROTECTED_BUILTIN_SKILLS,
   DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
   DEFAULT_MAX_OPS_PER_PLAN,
   DEFAULT_CURATOR_INTERVAL_HOURS,
@@ -161,7 +162,10 @@ export class EvolutionPolicy extends Service {
       curatorIntervalHours: field('curatorIntervalHours', config.curatorIntervalHours, DEFAULT_CURATOR_INTERVAL_HOURS),
       staleAfterDays: field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS),
       archiveAfterDays: field('archiveAfterDays', config.archiveAfterDays, DEFAULT_ARCHIVE_AFTER_DAYS),
-      protectedSkillNames: Object.freeze([...new Set(['plan', ...(config.protectedSkillNames ?? [])])]),
+      // PLAN S4.2 (2026-09-16): the builtin protected face is the core single
+      // source (PROTECTED_BUILTIN_SKILLS — the same set the curator enforces);
+      // the inline 'plan' literal here was a second copy that could drift.
+      protectedSkillNames: Object.freeze([...new Set([...PROTECTED_BUILTIN_SKILLS, ...(config.protectedSkillNames ?? [])])]),
     })
     if (clamped.length > 0) {
       ctx.logger.warn(`evolution-policy: ${clamped.join(', ')} provided an invalid value; falling back to the default`)

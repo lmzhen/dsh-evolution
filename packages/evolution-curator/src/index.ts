@@ -557,6 +557,10 @@ export class EvolutionCurator extends Service {
     // curator-state write must never interleave with an in-flight run.
     const release = await this.acquireMutex()
     try {
+      // PLAN S4.5 (2026-09-16) (audit P2-16): the same instance-claim gate
+      // run() applies — a yielding row must not roll the shared tree back
+      // under the holder row's in-flight control plane.
+      if (!this.holdsInstance) return this.instanceHeldRefusal('restoreSnapshot')
       return await this.restoreSnapshotCore()
     } finally {
       release()
@@ -694,6 +698,28 @@ export class EvolutionCurator extends Service {
     return prev.then(() => release)
   }
 
+  /**
+   * PLAN S4.5 (2026-09-16) (audit P2-16): the manual control-plane entries
+   * (restore/consolidate/restoreSnapshot) honor the same per-home instance
+   * claim `run()` checks before every pass. The claim is taken at MOUNT and
+   * released at DISPOSE (core/instance-scope.ts), so `holdsInstance` is
+   * stable for this instance's lifetime: a single-instance deployment always
+   * holds it and every manual entry behaves exactly as before. The refusal
+   * fires only on a YIELDING second row of one process, whose manual mutation
+   * would otherwise race the holder row's in-flight run over the same tree —
+   * this instance's control-plane mutex cannot see the holder's chain. The
+   * shape is the plain `SkillActionResult` failure the command face already
+   * renders through `err(result.message)` — no new error type — and the
+   * leading `instance-held` token names the same outcome run() reports via
+   * its `skipped` field.
+   */
+  private instanceHeldRefusal(operation: string): SkillActionResult {
+    return {
+      ok: false,
+      message: `instance-held: this curator row yielded the per-home claim to another curator row of this process — ${operation} is refused alongside run() so the holder row stays the only control-plane writer (run it on the holder row)`,
+    }
+  }
+
   private async runCore(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
     const { ignoreGates = false, dryRun = false } = options
     const startedAt = new Date().toISOString()
@@ -744,14 +770,24 @@ export class EvolutionCurator extends Service {
         // state-storage failure must not turn the first-run DEFER into a
         // thrown run. Nothing advanced here, so the next tick simply re-enters
         // this branch and retries the seed.
+        // PLAN S4.5 (2026-09-16) (audit P2-17): seed through the SAME atomic
+        // transactCuratorState the final bookkeeping uses (the E-16/S5.5
+        // rationale). The old whole-record saveCuratorState wrote a full
+        // record built from a "no record" snapshot, so a setPaused(true) that
+        // landed between our load and our write was silently flattened back
+        // to paused:false. Write only when the record is STILL absent — a
+        // task returning null keeps the current record (both state providers'
+        // contract) — so a concurrent operator pause survives the defer.
         try {
-          await stateService.saveCuratorState({
-            schemaVersion: 1,
-            lastRunAt: Date.now(),
-            runCount: 0,
-            lastSummary: 'first-run-deferred',
-            paused: false,
-          })
+          await stateService.transactCuratorState(current => current === null
+            ? {
+              schemaVersion: 1,
+              lastRunAt: Date.now(),
+              runCount: 0,
+              lastSummary: 'first-run-deferred',
+              paused: false,
+            }
+            : null)
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the first-run baseline: ${error instanceof Error ? error.message : String(error)}`)
         }
@@ -816,7 +852,9 @@ export class EvolutionCurator extends Service {
     // counterpart.
     const protectedNames = await this.protectedNameMap()
     const dedupMembers = [...new Set(
-      computeDedupGroups({ contents }).filter(group => group.length >= 2).flat(),
+      // PLAN-R2 P2-8 (2026-09-16): the scan result now carries a truncation
+      // flag; the candidate pool consumes the same `groups`.
+      computeDedupGroups({ contents }).groups.filter(group => group.length >= 2).flat(),
     )].filter(name => !protectedNames.has(name))
     // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
     // engine reads `quality_warn` to apply the shorter quality-warn stale
@@ -1670,6 +1708,9 @@ export class EvolutionCurator extends Service {
     // start during the mutation gets the clean `already-running` skip.
     const release = await this.acquireMutex()
     try {
+      // PLAN S4.5 (2026-09-16) (audit P2-16): the instance-claim gate run()
+      // applies — see instanceHeldRefusal.
+      if (!this.holdsInstance) return this.instanceHeldRefusal('consolidate')
       return await this.consolidateMutate(target, sources)
     } finally {
       release()
@@ -1724,6 +1765,9 @@ export class EvolutionCurator extends Service {
     // as consolidate).
     const release = await this.acquireMutex()
     try {
+      // PLAN S4.5 (2026-09-16) (audit P2-16): the instance-claim gate run()
+      // applies — see instanceHeldRefusal.
+      if (!this.holdsInstance) return this.instanceHeldRefusal('restore')
       return await this.restoreMutate(name)
     } finally {
       release()

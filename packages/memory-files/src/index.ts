@@ -5,6 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
@@ -108,7 +109,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // V5-11 (0.3.32): a whitespace-only `root` was truthy and resolved to a
   // CWD-relative path — trim like resolveSkillsRoot/state-json (V4-09 third
   // occurrence); empty/whitespace both fall through to the default root.
-  const resolvedRoot = (config.root || '').trim()
+  // PLAN S2.2-adjacent P2-31 (2026-09-16): an EXPLICIT non-empty root is now
+  // run through resolve() — the same standard as core's evolutionRoot
+  // (state-store.ts) — so the store root is pinned to an absolute path at
+  // mount instead of staying CWD-relative and letting every io call land
+  // wherever the process CWD points at that moment. Empty/whitespace keeps
+  // the memoryRoot() default unchanged.
+  const trimmedRoot = (config.root || '').trim()
+  const resolvedRoot = trimmedRoot === '' ? '' : resolve(trimmedRoot)
   const store = new MemoryStore({
     memoryCharLimit: config.memoryCharLimit,
     userCharLimit: config.userCharLimit,

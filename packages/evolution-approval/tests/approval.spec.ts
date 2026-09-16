@@ -162,6 +162,42 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
   })
 
+  it('PLAN S4.4 (2026-09-16): a deterministic path-traversal replay failure carries the REV-07 reject guidance', async () => {
+    const home = await tempRoot('dsh-approval-traversal-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    // Exactly the core skill-store refusal for a staged record whose target
+    // carries a traversal path — it fails every approve the same way, so the
+    // record must get the "reject instead of re-approving" guidance too.
+    ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'Path traversal is not allowed.' }))
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'traverse', args: {}, origin: 'background_review' })
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    expect(failed.ok).toBe(false)
+    expect(failed.message).toContain('Path traversal is not allowed.')
+    expect(failed.message).toContain('Reject this record')
+    // The record stays pending, so the guided reject can actually act on it.
+    expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
+  })
+
+  it('PLAN S4.4 (2026-09-16): the pre-existing deterministic vocabulary keeps the reject guidance', async () => {
+    const home = await tempRoot('dsh-approval-detvocab-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'entry "x" not found' }))
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'stale', args: {}, origin: 'background_review' })
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    expect(failed.ok).toBe(false)
+    expect(failed.message).toContain('Reject this record')
+  })
+
+  it('PLAN S4.4 (2026-09-16): a non-deterministic replay failure stays verbatim without reject guidance', async () => {
+    const home = await tempRoot('dsh-approval-verbatim-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'replay failed' }))
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'fail', args: {}, origin: 'background_review' })
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    expect(failed.ok).toBe(false)
+    expect(failed.message).toBe('replay failed')
+  })
+
   it('S2-P2-22: release returns an orphaned executing record to the pending window', async () => {
     // An approve that crashed mid-run leaves `executing` + a dead claimId.
     // Simulate exactly that: stage, then claim with a claim id nobody will

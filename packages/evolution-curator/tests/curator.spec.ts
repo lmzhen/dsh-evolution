@@ -880,6 +880,55 @@ Ancient body.
     ctx.evolutionCurator.stop()
   })
 
+  it('PLAN S4.5 (P2-17): a setPaused landing inside the first-run defer window survives the seed', async () => {
+    await tempHome('dsh-curator-s45-defer-race-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved: StateRecord | null = null
+    // The concurrent-write window, made deterministic: loadCuratorState
+    // answers null (so run() enters the first-run defer), but by the time the
+    // defer's transactCuratorState reaches its queue slot a setPaused(true)
+    // has already committed its record. The seed must not flatten it.
+    let pausedWonRace = false
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: StateRecord) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => {
+        if (pausedWonRace) saved = { lastRunAt: Date.now(), runCount: 0, lastSummary: 'paused', paused: true }
+        saved = task(saved) ?? saved
+      },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    pausedWonRace = true
+    const result = await ctx.evolutionCurator.run()
+    expect(result.skipped).toBe('first-run-deferred')
+    // The operator pause survives the defer seed — the former whole-record
+    // saveCuratorState wrote paused:false over it.
+    expect(saved).toMatchObject({ paused: true, lastSummary: 'paused' })
+    ctx.evolutionCurator.stop()
+  })
+
+  it('PLAN S4.5 (P2-17): with no competing writer the first-run defer still seeds the baseline', async () => {
+    await tempHome('dsh-curator-s45-defer-seed-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let saved: StateRecord | null = null
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => saved,
+      saveCuratorState: async (record: StateRecord) => { saved = record },
+      transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false })
+    const startedAt = Date.now()
+    const result = await ctx.evolutionCurator.run()
+    expect(result.skipped).toBe('first-run-deferred')
+    expect(saved).toMatchObject({ runCount: 0, lastSummary: 'first-run-deferred', paused: false })
+    expect(saved!.lastRunAt).toBeGreaterThanOrEqual(startedAt)
+    ctx.evolutionCurator.stop()
+  })
+
   it('E-51: a fresh-install manual run anchors the baseline at run time (S5.6)', async () => {
     await tempHome('dsh-curator-e51-')
     const ctx = new Context()
@@ -1262,7 +1311,7 @@ Body of ${name}.
     const near = nearBody
     await skills.create('dup-a', near('dup-a'), 'foreground')
     await skills.create('dup-b', near('dup-b'), 'foreground')
-    expect(computeDedupGroups({ contents: new Map([['dup-a', near('dup-a')], ['dup-b', near('dup-b')]]) })).toEqual([['dup-a', 'dup-b']])
+    expect(computeDedupGroups({ contents: new Map([['dup-a', near('dup-a')], ['dup-b', near('dup-b')]]) }).groups).toEqual([['dup-a', 'dup-b']])
     await ctx.evolutionCurator.run({ ignoreGates: true })
     expect(seen[0]).toContain('- dup-a')
     expect(seen[0]).toContain('- dup-b')

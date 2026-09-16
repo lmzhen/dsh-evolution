@@ -14,6 +14,7 @@ import {
   assertCloneable,
   canClaimPending,
   canResolvePending,
+  cloneRecord,
   recordIssue,
   releasedStatus,
   CURATOR_STATE_FILE,
@@ -625,6 +626,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // KEY drifted from it answered listPending yet was unreachable — and, being
   // `pending`, never evicted. Every read re-keys by record.id: the canonical
   // slot wins, else the first entry in file order.
+  // PLAN S3.1 (2026-09-16): canonical slot wins on drift repair — matches the
+  // domain provider's listPending re-key, which enforces the same tie-break.
   let pendingKeyWarned = false
   function keyPendingById(map: Record<string, PendingRecord> | null): Record<string, PendingRecord> {
     const keyed: Record<string, PendingRecord> = {}
@@ -998,15 +1001,33 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     async transactCuratorState(task) {
       await mutate(async () => {
-        await jsonTransact<Record<string, CuratorStateRecord>>(ctx, io, root, CURATOR_STATE_FILE, (current) => {
+        // PLAN S3.2 (2026-09-16): V43 F-4 parity with the three sibling void
+        // write paths (saveReviewState/saveCuratorState/savePending) — a
+        // backend that implements `transact` but never invokes the task used
+        // to resolve as a successful transact with nothing applied. The task
+        // runs INSIDE the jsonTransact callback, so the guard wraps that
+        // callback (same begin/ack points as the siblings) and the probe
+        // turns the fake write into an explicit failure.
+        const guard = transactTaskGuard(`curator state transact (${CURATOR_STATE_FILE})`)
+        await jsonTransact<Record<string, CuratorStateRecord>>(ctx, io, root, CURATOR_STATE_FILE, guard.wrap((current) => {
           // 0.3.22 (F-202): null = keep the current record unchanged (the
           // domain update primitive cannot delete; json aligns). The record
           // is ADD-only via the seam — a truly deletable empty is expressed
           // by `current` being null, which jsonTransact turns into "no file".
-          const next = task(current?.[CURATOR_STATE_KEY] ?? null)
+          // PLAN S1.3 (2026-09-16): V27 S4 — the record handed to the task is
+          // the task's OWN copy. jsonTransact hands out the freshly parsed
+          // `current` graph itself, so a task that mutated the record in place
+          // and then returned null serialized that mutation back to the medium
+          // on the null path ("keep unchanged" wrote a changed record). Deep
+          // -clone the hand-off (the domain's `task(cloneRecord(current))`
+          // discipline, seam's cloneRecord); a missing key still maps
+          // undefined → a null argument exactly as before.
+          const stored = current?.[CURATOR_STATE_KEY] ?? null
+          const next = task(stored === null ? null : cloneRecord(stored))
           if (next === null) return current
           return { ...(current ?? {}), [CURATOR_STATE_KEY]: next }
-        })
+        }))
+        guard.assertInvoked()
       })
     },
 

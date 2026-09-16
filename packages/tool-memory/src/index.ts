@@ -222,6 +222,34 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     }
   }
 
+  // PLAN-R2 P2-7 (2026-09-16): the store's per-action required-field contract,
+  // mirrored field-for-field so this pre-check and the store's own rejection
+  // cannot diverge. The effective judgment (memory-files normalizes
+  // `facts ?? content`, then evolution-core's applyBatchCore enforces):
+  // add needs non-blank facts; remove/replace need non-blank old_text;
+  // replace additionally needs non-blank facts; an out-of-enum action is
+  // rejected loud (V6-25). Rejections below reuse the store's exact message
+  // text minus the on-disk entry preview (unknowable before the write).
+  const requiredFieldRejection = (
+    op: { action?: MemoryAction | undefined; facts?: string | undefined; content?: string | undefined; old_text?: string | undefined },
+    position: number,
+  ): string | null => {
+    const body = (op.facts ?? op.content ?? '').trim()
+    if (op.action === 'add') {
+      return body ? null : `Operation ${position} (add): facts is required. No operations were applied.`
+    }
+    if (op.action !== 'remove' && op.action !== 'replace') {
+      return `Operation ${position}: unknown action "${String(op.action)}" (expected add/remove/replace). No operations were applied.`
+    }
+    if (!(op.old_text ?? '').trim()) {
+      return `Operation ${position} (${op.action}): old_text is required. No operations were applied.`
+    }
+    if (op.action === 'replace' && !body) {
+      return `Operation ${position} (replace): facts is required.`
+    }
+    return null
+  }
+
   // S1-B3: gated on memoryDisabled — a disabled tool must not appear in the
   // catalog. (The approval runner below registers in both modes.)
   if (!memoryDisabled) {
@@ -309,6 +337,23 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
         const normalized: MemoryWriteArgs = Array.isArray(args.operations)
           ? { target, operations: args.operations }
           : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
+        // PLAN-R2 P2-7 (2026-09-16): existence pre-check of the per-action
+        // required fields BEFORE the approval gate, on BOTH paths — each
+        // operations[] element (store position = index + 1) and the normalized
+        // single operation (position 1). The store's required-field rejection
+        // (see requiredFieldRejection above) used to run only at EXECUTION, so
+        // an approval-enabled deployment staged such a write first and the
+        // approved replay then failed hard — V7-07 fixed the empty-operations
+        // sibling of this; this closes the per-operation gap the same way.
+        if (normalized.operations) {
+          for (const [index, op] of normalized.operations.entries()) {
+            const rejection = requiredFieldRejection(op, index + 1)
+            if (rejection) return { ok: false, message: rejection, entries: [], chars: 0, limit: 0 }
+          }
+        } else {
+          const rejection = requiredFieldRejection(normalized, 1)
+          if (rejection) return { ok: false, message: rejection, entries: [], chars: 0, limit: 0 }
+        }
         // F-329 parity for single operations (V4-15): only qualify the summary's
         // target when it differs from the default 'memory', so a lone add to the
         // default target reads "memory add" instead of the redundant "memory

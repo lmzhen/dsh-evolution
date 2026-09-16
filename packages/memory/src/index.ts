@@ -19,6 +19,9 @@ export interface Config {
 export interface MemoryOperation {
   action: 'add' | 'replace' | 'remove'
   facts?: string | undefined
+  /** PLAN-R2 P2-6 (2026-09-16): content is an accepted alias honored by the
+   * reference store (applyBatchCore reads `facts ?? content`); third-party
+   * providers may normalize it to their own field. */
   content?: string | undefined
   old_text?: string | undefined
 }

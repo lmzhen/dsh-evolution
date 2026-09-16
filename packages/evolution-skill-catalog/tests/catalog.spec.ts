@@ -204,6 +204,60 @@ describe('evolution-skill-catalog', () => {
     expect(bad?.invocation).toEqual({ modelInvocable: false, userInvocable: true })
   })
 
+  it('P2-30/P2-9: legacy disableModelInvocation forces false; legacy modelInvocable/userInvocable honor a parseable value, else conservative false', async () => {
+    // Upstream THROWS on any legacy invocation key and drops the whole file
+    // from directory discovery (both invocation surfaces); this rank-390
+    // shadow of the same `user-dsh` source makes its publish decision final.
+    // P2-30: the old row-default fallback for `disableModelInvocation`
+    // (`modelInvocable: true`) inverted the author's "disable" intent, so that
+    // fallback is now conservative false — whether or not the value parses.
+    // PLAN-R2 P2-9 (2026-09-16): the OTHER legacy keys had the same inversion
+    // pinned here as expected behavior (`modelInvocable: false` publishing as
+    // the row default, "never disable") — a `modelInvocable: false` author's
+    // opt-out was erased. A parseable legacy `modelInvocable`/`userInvocable`
+    // value is now honored verbatim; an unparseable one falls back
+    // conservatively to false (upstream's drop direction). The published
+    // surface carries userInvocable too, so the legacy user key is symmetric.
+    const root = await tempRoot('dsh-skill-catalog-legacy-inv-')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    // Row default stays `true` (the config default) so the fallback direction
+    // is actually observable.
+    await ctx.plugin(Catalog, { root })
+    const io = ctx.evolutionIo.provider('node')
+    await io.writeText(join(root, 'legacy-disable', 'SKILL.md'), '---\nname: legacy-disable\ndescription: Legacy disable key.\ndisableModelInvocation: true\n---\n\n# L1\n')
+    await io.writeText(join(root, 'legacy-typo', 'SKILL.md'), '---\nname: legacy-typo\ndescription: Unparseable legacy value.\ndisableModelInvocation: ture\n---\n\n# L2\n')
+    await io.writeText(join(root, 'canonical-off', 'SKILL.md'), '---\nname: canonical-off\ndescription: Canonical key, published to the model.\ndisable-model-invocation: false\n---\n\n# C1\n')
+    ctx.emit('evolution/skills-refresh')
+    const skills = (await ctx.skills.snapshot()).skills
+    expect(skills.find(skill => skill.name === 'legacy-disable')?.invocation.modelInvocable).toBe(false)
+    expect(skills.find(skill => skill.name === 'legacy-typo')?.invocation.modelInvocable).toBe(false)
+    // The canonical key is unaffected (no regression).
+    expect(skills.find(skill => skill.name === 'canonical-off')?.invocation.modelInvocable).toBe(true)
+    // P2-9: a legacy `modelInvocable` key is honored verbatim when the value
+    // parses (reverses the old "warn + row default, never disable" pin).
+    await io.writeText(join(root, 'legacy-rowkey', 'SKILL.md'), '---\nname: legacy-rowkey\ndescription: Non-disable legacy key.\nmodelInvocable: false\n---\n\n# L3\n')
+    await io.writeText(join(root, 'legacy-rowkey-true', 'SKILL.md'), '---\nname: legacy-rowkey-true\ndescription: Legacy key opting back in.\nmodelInvocable: true\n---\n\n# L4\n')
+    await io.writeText(join(root, 'legacy-rowkey-typo', 'SKILL.md'), '---\nname: legacy-rowkey-typo\ndescription: Unparseable legacy value.\nmodelInvocable: ture\n---\n\n# L5\n')
+    // The published surface has a userInvocable field, so the legacy user key
+    // gets the same treatment (parsed value honored, bad value conservative).
+    await io.writeText(join(root, 'legacy-user-key', 'SKILL.md'), '---\nname: legacy-user-key\ndescription: Legacy user key.\nuserInvocable: false\n---\n\n# L6\n')
+    await io.writeText(join(root, 'legacy-user-typo', 'SKILL.md'), '---\nname: legacy-user-typo\ndescription: Unparseable legacy user value.\nuserInvocable: oops\n---\n\n# L7\n')
+    ctx.emit('evolution/skills-refresh')
+    const after = (await ctx.skills.snapshot()).skills
+    expect(after.find(skill => skill.name === 'legacy-rowkey')?.invocation.modelInvocable).toBe(false)
+    expect(after.find(skill => skill.name === 'legacy-rowkey-true')?.invocation.modelInvocable).toBe(true)
+    // Unparseable legacy value → conservative false (the upstream drop
+    // direction), not the row default.
+    expect(after.find(skill => skill.name === 'legacy-rowkey-typo')?.invocation.modelInvocable).toBe(false)
+    expect(after.find(skill => skill.name === 'legacy-user-key')?.invocation.userInvocable).toBe(false)
+    // The legacy user key does not touch the model surface: row default still.
+    expect(after.find(skill => skill.name === 'legacy-user-key')?.invocation.modelInvocable).toBe(true)
+    expect(after.find(skill => skill.name === 'legacy-user-typo')?.invocation.userInvocable).toBe(false)
+  })
+
   it('§9 I-2: a degraded scan is an incomplete observation, so the registry re-consults', async () => {
     const root = await tempRoot('dsh-skill-catalog-degraded-')
     const ctx = new Context()

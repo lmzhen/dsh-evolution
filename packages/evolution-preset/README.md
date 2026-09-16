@@ -20,15 +20,29 @@ Compatibility one-click bundle for the dsh-evolution plugin family
 
 #### What the model sees
 
-`@deepseek-ai/dsh-evolution-preset` registers no direct prompt or tool schema itself. Model-visible effects are owned by the packages that consume this service.
+**S5.7 correction (2026-09-16, audit P2-25)**: earlier revisions claimed this
+bundle "registers no direct prompt or tool schema itself" / "Zero direct token
+effect" / "does not alter the assembled prompt or tool list" — that was
+inaccurate (the same error class the host README corrected at v20). This is
+the one-click FULL bundle: its `cordis.patch.yml` mounts the model-visible
+rows directly — the `memory` tool (`tool-memory`), the `skill_manage` tool
+(`tool-skill-manage`), the session-search tool row (`tool-session-query`),
+the `ctx.skills` catalog provider (`evolution-skill-catalog`, which feeds the
+`skill` tool's catalog section) and the read-only `maintenance_probe` tool
+(`evolution-maintenance/tools`).
 
 #### Token effect
 
-Zero direct token effect from this package; consumers add any model-visible tokens.
+Non-zero: the mounted tools add their schemas to every session under this
+bundle, and the skill catalog adds its prompt section (populated from the
+library). The guidance sections injected by the family's model rows are owned
+by those rows, not re-declared here.
 
 #### KV Cache effect
 
-Independent of request-prefix construction. This package does not alter the assembled prompt or tool list.
+Same shape as the installed rows: tool schemas and the skill-catalog section
+enter the request prefix; this patch file itself adds no additional prompt
+beyond what those rows register.
 
 ## Known Limitations and Deferred Work
 

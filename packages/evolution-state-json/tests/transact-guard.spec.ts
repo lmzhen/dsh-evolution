@@ -102,3 +102,35 @@ describe('evolution-state-json save* transact-task guard (V43 F-4 / S0-6)', () =
     await expect(provider.saveCuratorState({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })).resolves.toBeUndefined()
   })
 })
+
+describe('evolution-state-json transactCuratorState transact-task guard (PLAN S3.2, 2026-09-16)', () => {
+  it('a transaction that never runs the task fails loud and writes nothing', async () => {
+    const root = await tempRoot('dsh-json-tc-guard-')
+    const { provider, io } = await mountOverViolatingTransact(root)
+    // PLAN S3.2: the fourth void write path joins the guard family — the task
+    // runs INSIDE the jsonTransact callback, so a backend that implements
+    // `transact` but skips the task used to resolve as a successful transact
+    // with nothing applied (same silent-lost-write shape as V43 F-4).
+    await expect(provider.transactCuratorState(() => ({ lastRunAt: 1, runCount: 0, lastSummary: 'transacted', paused: false })))
+      .rejects.toThrow(/did not invoke the task; no write was performed/)
+    // Same observability discipline as the three sibling saves: the failed
+    // write is loud and the medium is exactly as it was.
+    expect(await io.readText(join(root, 'curator-state.json'))).toBeNull()
+    expect(await io.list(root)).toEqual([])
+  })
+
+  it('still lands through a working transaction, and a null task return stays silent (no false positive)', async () => {
+    const root = await tempRoot('dsh-json-tc-guard-ok-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    await expect(provider.transactCuratorState(current => ({ ...(current ?? { lastRunAt: 0, runCount: 0, lastSummary: '', paused: false }), runCount: (current?.runCount ?? 0) + 1 })))
+      .resolves.toBeUndefined()
+    const curator = JSON.parse((await io.readText(join(root, 'curator-state.json')))!) as Record<string, { runCount: number }>
+    expect(curator['primary']?.runCount).toBe(1)
+    // A null-returning task ("keep unchanged") DID run — the guard must stay
+    // silent (it answers "did the write path get to decide", not "did the
+    // record change"), exactly like the siblings' dedupe no-op.
+    await expect(provider.transactCuratorState(() => null)).resolves.toBeUndefined()
+  })
+})

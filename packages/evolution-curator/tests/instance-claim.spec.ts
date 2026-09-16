@@ -63,4 +63,36 @@ describe('evolution-curator single-instance contract', () => {
     await ctx.fiber.dispose()
     await other.fiber.dispose()
   }, 30_000)
+
+  it('the yielding row refuses the MANUAL control-plane entries too (PLAN S4.5, audit P2-16)', async () => {
+    await tempHome('dsh-curator-instance-manual-')
+    const first = await mount()
+    const ctxB = new Context()
+    await ctxB.plugin(EvolutionIoRegistry)
+    await ctxB.plugin(NodeIo)
+    await ctxB.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    const yielded = ctxB.evolutionCurator
+    // run() refuses (the existing contract)...
+    expect((await yielded.run({ ignoreGates: true })).skipped).toBe('instance-held')
+    // ...and the three manual entries refuse with the same outcome named, so a
+    // yielding row can no longer race the holder row's in-flight control plane
+    // over the shared tree (restore/consolidate/restoreSnapshot used to slip
+    // past the claim because only run() checked it).
+    const restored = await yielded.restore('some-skill')
+    expect(restored.ok).toBe(false)
+    expect(restored.message).toContain('instance-held')
+    const consolidated = await yielded.consolidate('target-skill', ['source-skill'])
+    expect(consolidated.ok).toBe(false)
+    expect(consolidated.message).toContain('instance-held')
+    const rolledBack = await yielded.restoreSnapshot()
+    expect(rolledBack.ok).toBe(false)
+    expect(rolledBack.message).toContain('instance-held')
+    // The holder row is unaffected: its own control plane never sees the claim
+    // refusal (this restore fails for the ordinary missing-skill reason).
+    const holderRestore = await first.evolutionCurator.restore('missing-skill')
+    expect(holderRestore.ok).toBe(false)
+    expect(holderRestore.message).not.toContain('instance-held')
+    await first.fiber.dispose()
+    await ctxB.fiber.dispose()
+  }, 30_000)
 })

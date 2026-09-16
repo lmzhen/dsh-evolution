@@ -100,10 +100,35 @@ it('dedup clusters exact copies and token-neighbors, skipping size-ratio outlier
     ['b', 'Run tests with pytest -q'],
     ['huge', `${'a '.repeat(200)}zzz`],
   ])
-  const groups = computeDedupGroups({ contents })
+  const { groups } = computeDedupGroups({ contents })
   const cluster = groups.find(group => group.includes('a'))
   expect(cluster).toContain('b')
   expect(groups.some(group => group.includes('huge'))).toBe(false)
+})
+
+it('PLAN-R2 P2-8 (2026-09-16): a tiny pair budget truncates the scan, reports it, and keeps completed groups', () => {
+  const contents = new Map<string, string>([
+    ['a', 'Run tests with pytest -q.'],
+    ['b', 'Run tests with pytest -q'],
+    ['c', 'Deploy the service with docker compose up -d.'],
+    ['d', 'Deploy the service with docker compose up -d'],
+    ['e', 'Unrelated body about gardening tools and seasons'],
+    ['f', 'Another unrelated body about kitchen remodels'],
+    ['g', 'Identical shared body text here'],
+    ['h', 'Identical shared body text here'],
+  ])
+  // Default budget: this library is far below it, so nothing truncates and
+  // the grouping is exactly what the unbounded scan always produced.
+  const full = computeDedupGroups({ contents })
+  expect(full.truncated).toBe(false)
+  expect(full.groups).toEqual([['a', 'b'], ['c', 'd'], ['g', 'h']])
+  // Budget 2: only pairs (a,b) and (a,c) are compared before the scan stops.
+  // (a,b) was compared in time and still clusters; (c,d) sits beyond the
+  // budget and is never examined; the exact-hash pair (g,h) is pre-united
+  // outside the budgeted loop, so it survives truncation.
+  const capped = computeDedupGroups({ contents, maxPairComparisons: 2 })
+  expect(capped.truncated).toBe(true)
+  expect(capped.groups).toEqual([['a', 'b'], ['g', 'h']])
 })
 
 it('prefix clusters group by the first alphanumeric run, size-descending (rc.67 merge heuristic)', () => {

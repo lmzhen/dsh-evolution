@@ -164,10 +164,23 @@ function applyOneOverride(lines: string[], override: RowOverride): string[] {
   return lines
 }
 
+/**
+ * Row ids of a composition fragment (line scan, no YAML library).
+ *
+ * PLAN S5.9 (2026-09-16, audit P2-27): the id extraction accepts INDENTED
+ * `- id:` rows too, so a collision hidden in a nested group is still caught —
+ * the old `^- id:` anchored at column 0 and was blind to exactly the rows an
+ * upstream group nesting would produce. Twin of `rowIds` in
+ * `scripts/install-layered.mjs` (installer.spec pins detection parity).
+ * Boundary (current, deliberate): DETECTION covers nested rows, while the
+ * override INJECTION anchors (`applyOneOverride` below) still match top-level
+ * rows only — the injection indent contract (`^ {2}key:`) is defined against a
+ * column-0 row.
+ */
 function compositionRowIds(composition: string): Set<string> {
   const ids = new Set<string>()
   for (const line of composition.split('\n')) {
-    const match = /^- id:\s*(\S+)/.exec(line)
+    const match = /^\s*- id:\s*(\S+)/.exec(line)
     // C-25 (v10 audit): the old `match[1] ?? ''` was a dead expression (the
     // regex guarantees group 1 exists), and an empty id would have poisoned
     // the collision set anyway. Delta-INTERNAL duplicate ids remain

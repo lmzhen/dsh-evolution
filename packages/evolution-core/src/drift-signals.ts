@@ -163,10 +163,13 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
   const dedup = computeDedupGroups({
     contents: new Map(snapshots.map(s => [s.name, s.body])),
   })
+  // PLAN-R2 P2-8 (2026-09-16): the scan is budget-bounded; a truncated sweep
+  // must say so instead of reading as a clean pass.
+  const dedupTruncation = dedup.truncated ? ' (dedup scan truncated at the pair-comparison budget)' : ''
   library.push(
-    dedup.length === 0
-      ? sig('dedup_group', 'pass', 'none', 'size >= 2')
-      : sig('dedup_group', 'over', dedup.map(group => group.join(', ')).join(' | '), 'size >= 2', `members=${dedup.map(group => group.join('|')).join(';')}`),
+    dedup.groups.length === 0
+      ? sig('dedup_group', 'pass', `none${dedupTruncation}`, 'size >= 2')
+      : sig('dedup_group', 'over', `${dedup.groups.map(group => group.join(', ')).join(' | ')}${dedupTruncation}`, 'size >= 2', `members=${dedup.groups.map(group => group.join('|')).join(';')}`),
   )
 
   const clusters = computePrefixClusters(names)

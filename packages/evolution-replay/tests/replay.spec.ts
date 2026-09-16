@@ -51,6 +51,33 @@ describe('evolution-replay', () => {
     expect(qualified.report).toContain('NOT the recorded history')
   })
 
+  it('PLAN S5.1 (P2-18): the sourceCorrupt qualification follows the CURRENT read — a repaired sidecar plus io reload stops qualifying compare()', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    // Corrupt read: the qualification travels with every comparison, and the
+    // corrupt sidecar parses as [] so the backfill latch stays open (P2-15).
+    driver.markSourceUnreadable()
+    driver.backfill([])
+    const qualified = driver.compare()
+    expect(qualified.sourceCorrupt).toBe(true)
+    expect(qualified.report).toContain('NOT the recorded history')
+    // Repair + io reload: the clean read clears the flag and the latch-open
+    // backfill lands the full history — the report must stop asserting
+    // "NOT the recorded history" against a now-complete leaderboard.
+    driver.markSourceReadable()
+    driver.backfill([item])
+    const healed = driver.compare()
+    expect(healed.sourceCorrupt).toBe(false)
+    expect(healed.report).not.toContain('NOT the recorded history')
+    expect(driver.plansSnapshot()).toHaveLength(1)
+    // Corrupt again (a newer writer lands after the repair): the qualifier
+    // returns with the new read.
+    driver.markSourceUnreadable()
+    const requalified = driver.compare()
+    expect(requalified.sourceCorrupt).toBe(true)
+    expect(requalified.report).toContain('NOT the recorded history')
+  })
+
   it('clamps an invalid maxPlans to the default so the leaderboard still bounds (G3.1)', () => {
     const recordMany = (driver: EvolutionReplayDriver, count: number): void => {
       for (let i = 0; i < count; i += 1) {

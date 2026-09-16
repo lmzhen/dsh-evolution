@@ -10,7 +10,9 @@
  *   re-arms that session's cadence latch; the completion channel's flag rollback
  *   (V25-03) stays as it was.
  * Both cases bound the in-flight window with the S2-6 watchdog (a handle that
- * never settles), so the drain runs deterministically ~50ms after the start.
+ * never settles), so the drain runs deterministically ~100ms after the start
+ * (the 50ms review timeout plus the grace margin PLAN S1.1 caps at the
+ * timeout for short budgets).
  */
 import { expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'

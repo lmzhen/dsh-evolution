@@ -33,7 +33,7 @@
  * (OPT-07); the movers' probe→rename window is owned by the io.ts protocol.
  */
 
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
@@ -291,9 +291,19 @@ export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
  * (and the graph ignored config entirely). Empty/whitespace config falls
  * through to the default; callers pass their raw Config. The optional field is
  * declared `| undefined` so a config object whose root field is explicitly
- * `string | undefined` still assignable under exactOptionalPropertyTypes. */
+ * `string | undefined` still assignable under exactOptionalPropertyTypes.
+ * P2-31 core half (S2.2 batch, PLAN 2026-09-16): an explicit non-empty root
+ * is `resolve()`d — the same normalization `evolutionRoot` applies and the
+ * same one upstream skill-filesystem applies to `customSkillDirs`
+ * (`(config.customSkillDirs ?? []).map(root => resolve(root))`). The former
+ * verbatim return left a RELATIVE config root CWD-relative, so the family's
+ * skill tree moved with the host process's launch directory while every
+ * absolute consumer (watchers, the platform catalog) resolved it — a
+ * split-brain tree; a trailing slash or `..` segment likewise landed
+ * unnormalized. A clean absolute root is byte-identical (resolve is a no-op). */
 export function resolveSkillsRoot(config: { root?: string | undefined } = {}): string {
-  return (config.root ?? '').trim() || skillsRoot()
+  const explicit = (config.root ?? '').trim()
+  return explicit ? resolve(explicit) : skillsRoot()
 }
 
 /** E-7 (v18) → V27 G2.4 (M-08): every family row reads ONE root key. `root` is

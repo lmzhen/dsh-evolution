@@ -143,14 +143,6 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
 }
 
 /**
- * H-06: the read barrier over the sidecar. V24-13 (v24): `loadActivity` now
- * HAS a production consumer — `evolution-replay` backfills its `/evolution
- * replay` leaderboard from this store at mount (the two packages'
- * "persistence is the activity store's job" contract is actually wired
- * through this call). The single-writer rule is unchanged: `apply()`'s
- * transact listener remains the only WRITE path.
- */
-/**
  * FLOW6-6 (v43, the read side of H-3): the sidecar's records PLUS whether the
  * bytes could be read as THIS format. `parseActivityContent` answers `[]` for
  * a future-version or unparsable file, so a read-only consumer could not tell
@@ -178,13 +170,14 @@ export async function loadActivityState(root: string, io: EvolutionIoLike): Prom
 }
 
 /**
- * H-06: the read barrier over the sidecar. V24-13 (v24): `loadActivity` now
- * HAS a production consumer — `evolution-replay` backfills its `/evolution
- * replay` leaderboard from this store at mount (the two packages'
- * "persistence is the activity store's job" contract is actually wired
- * through this call). The single-writer rule is unchanged: `apply()`'s
- * transact listener remains the only WRITE path. Consumers that must not read
- * an unreadable sidecar as "no history" use {@link loadActivityState}.
+ * H-06: the read barrier over the sidecar — records only, no corruption
+ * verdict. @internal Test-only: no production caller (verified by grep
+ * 2026-09-16); replay consumes {@link loadActivityState} — the V24-13 claim
+ * that `loadActivity` "HAS a production consumer — evolution-replay" was
+ * inaccurate (PLAN S5.2). Kept exported so the published surface does not
+ * break. The single-writer rule is unchanged: `apply()`'s transact listener
+ * remains the only WRITE path. Consumers that must not read an unreadable
+ * sidecar as "no history" use {@link loadActivityState}.
  */
 export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
   return (await loadActivityState(root, io)).records

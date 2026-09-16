@@ -69,7 +69,40 @@ const PATTERNS: ThreatPattern[] = [
   // v22 (SEC-2): same cross-line gap as send_to_url.
   { label: 'exfil_curl', category: 'exfiltration', scope: 'all', regex: /\bcurl\s+[\s\S]{0,512}?\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
   { label: 'exfil_wget', category: 'exfiltration', scope: 'all', regex: /\bwget\s+[\s\S]{0,512}?\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i },
-  { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env(?!\w)|(?:\bcredentials\b)|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
+  // PLAN S4.3 (2026-09-16), audit P2-14: `.env` keeps its P3-22 `(?!\w)` guard
+  // (`.envrc` must not trigger — `r` is a word char) and gains a second guard
+  // so the DOCUMENTED template variants pass. Their next char after `.env` is
+  // a `.` — which the first lookahead never excluded — so the legitimate
+  // debugging read `cat .env.example 查看变量` was hard-refused. PLAN-R2 P2-3
+  // (2026-09-16): the suffix's old trailing `\b` only demanded a non-word
+  // char, so CONTINUATIONS of the template name inherited the exemption —
+  // `.env.example.local` (a real-world conventional name that may hold real
+  // values), `.env.sample-x`, `.env.example/…`. The terminator is now
+  // `(?=$|[\s"'])`: the example/sample suffix must END the path segment,
+  // closed by end-of-line, whitespace or a quote. Per-variant behavior:
+  //   `cat .env`               → blocked   (tail is EOL/space: the second
+  //                                         guard's `\.` never starts)
+  //   `cat .env.local`         → blocked   (`.local` is real per-machine config:
+  //                                         no example/sample suffix at a
+  //                                         terminator)
+  //   `cat .env.example`       → passes    (dotted `example` suffix closed by
+  //                                         EOL/space/quote)
+  //   `cat .env.sample`        → passes    (dotted `sample` suffix, same rule)
+  //   `cat .env.local.example` → passes    (`local.` middle segment, `example`
+  //                                         at a terminator)
+  //   `cat .env.example.local` → blocked   (`example` is not at a terminator
+  //                                         and `local` is no example/sample)
+  //   `cat .env.sample-x`      → blocked   (`-` continues the segment)
+  //   `cat .env.example/notes` → blocked   (`/` continues into another path)
+  //   `cat .env.example..`     → blocked   (a dangling dot is no terminator)
+  //   `cat .env.exampleX`      → blocked   (unknown suffix spelling, like
+  //                                         `.samples`; `X` is a word char so
+  //                                         even the first guard trips)
+  //   `cat .envrc`             → no match  (first guard, plus the `\b` on `cat`)
+  // (A bare `(?![\w.])` would be WRONG here: it frees `.env.local`, whose next
+  // char is a dot — hence the suffix-spelled exemption instead. The `[\w-]`
+  // segments cannot eat the trailing dot, so no nested-quantifier blowup.)
+  { label: 'read_secrets', category: 'exfiltration', scope: 'all', regex: /\bcat\s+[^\n]{0,512}(?:\.env(?!\w)(?!\.(?:[\w-]+\.)*(?:example|sample)(?=$|[\s"']))|(?:\bcredentials\b)|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i },
 
   // Persistence / backdoor / harness-config tampering. V9-10 (0.3.51):
   // `\b` word boundaries — the bare `authorized_keys` substring matched inside

@@ -4,10 +4,10 @@ import MemoryRegistry from '@deepseek-ai/dsh-memory'
 import EvolutionIoRegistry, { type EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as MemoryFiles from '../src/index.ts'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { memoryRoot, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tempRoot } from '../../test-support/temp-home.ts'
+import { tempHome, tempRoot } from '../../test-support/temp-home.ts'
 
 describe('memory-files', () => {
   it('registers a provider on ctx.memory', async () => {
@@ -125,6 +125,53 @@ describe('memory-files', () => {
     const entries = await ctx.memory.read('memory')
     expect(entries.some(entry => /^## \d{4}-\d{2}-\d{2}\nprefixed fact$/.test(entry))).toBe(true)
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+
+  it('P2-31: an explicit relative root is resolved to an absolute path at mount', async () => {
+    // Pre-fix the store kept the RELATIVE root, so every io call received a
+    // CWD-dependent relative path and the landing spot moved with the process
+    // CWD at call time; now the root is resolve()d once at mount (the same
+    // standard as core's evolutionRoot).
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    const seen: string[] = []
+    // The probe is the ONLY registered provider, so the nameless provider()
+    // resolution (the V4-12 mounting shape) serves it to the store.
+    ctx.evolutionIo.registerProvider({
+      name: 'p2-31-probe',
+      ...base,
+      readText: async (path: string) => {
+        seen.push(path)
+        return base.readText(path)
+      },
+    })
+    await ctx.plugin(MemoryFiles, { root: 'evolution-memories' })
+    await ctx.memory.read('memory')
+    expect(seen).toContain(join(process.cwd(), 'evolution-memories', 'MEMORY.md'))
+    expect(seen.some(path => path === join('evolution-memories', 'MEMORY.md'))).toBe(false)
+  })
+
+  it('P2-31: the default (empty) root stays memoryRoot() unchanged', async () => {
+    const home = await tempHome('dsh-memory-files-default-root-')
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    const seen: string[] = []
+    ctx.evolutionIo.registerProvider({
+      name: 'p2-31-default-probe',
+      ...base,
+      readText: async (path: string) => {
+        seen.push(path)
+        return base.readText(path)
+      },
+    })
+    await ctx.plugin(MemoryFiles)
+    await ctx.memory.read('memory')
+    expect(seen).toContain(join(memoryRoot(), 'MEMORY.md'))
+    expect(home).toBeDefined()
   })
 })
 

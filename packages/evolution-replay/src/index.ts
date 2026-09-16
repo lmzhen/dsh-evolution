@@ -50,8 +50,11 @@ export interface ReplayResult {
   plans: ReplayPlan[]
   report: string
   /** FLOW6-6 (v43): the activity sidecar could not be read as the current
-   * format when this leaderboard was backfilled — `plans` is then NOT the
-   * recorded history, and the report says so. */
+   * format at the most recent backfill read — `plans` is then NOT the
+   * recorded history, and the report says so. PLAN S5.1 (2026-09-16): the
+   * flag tracks the CURRENT read state, so a later clean read (the sidecar
+   * was repaired and an io reload re-read it) clears the qualification —
+   * it never outlives the condition it describes. */
   sourceCorrupt?: boolean | undefined
 }
 
@@ -142,10 +145,13 @@ export class EvolutionReplayDriver {
   private backfilled = false
   /** FLOW6-6 (v43): the backfill source was unreadable (newer format or corrupt
    * bytes) — carried into every comparison so an empty leaderboard is never
-   * presented as "nothing was recorded". */
+   * presented as "nothing was recorded". PLAN S5.1 (2026-09-16): this holds the
+   * most recent READ's verdict, not the first one — {@link EvolutionReplayDriver.markSourceReadable}
+   * clears it on a later clean read, so the qualification reflects the present
+   * instead of latching for the driver lifetime. */
   private sourceCorrupt = false
   /** V26-05 (v25): plan ids recorded live BEFORE the backfill settled. A
-   * plan-applied landing inside the one-shot `loadActivity` read window is
+   * plan-applied landing inside the one-shot `loadActivityState` read window is
    * recorded live AND persisted into the sidecar the backfill is reading —
    * `backfill()` drops those ids so the event is not counted twice.
    *
@@ -317,10 +323,27 @@ export class EvolutionReplayDriver {
   /**
    * FLOW6-6 (v43): mark the backfill source unreadable. Set by `apply()` when
    * the activity sidecar carries bytes this build cannot read; the qualification
-   * then travels with every comparison.
+   * then travels with every comparison — until a later read says otherwise
+   * (see {@link EvolutionReplayDriver.markSourceReadable}).
    */
   markSourceUnreadable(): void {
     this.sourceCorrupt = true
+  }
+
+  /**
+   * PLAN S5.1 (2026-09-16, audit P2-18): the counterpart clear — `apply()` calls
+   * this on every successful read whose bytes ARE the current format
+   * (`loadActivityState` answered `corrupt: false`), so the
+   * {@link ReplayResult.sourceCorrupt} qualification follows the CURRENT read
+   * state. Before this the flag latched for the driver lifetime: a repaired
+   * sidecar plus an io reload (HMR / plugin restart) backfilled the full
+   * history while `compare()` kept asserting "NOT the recorded history" — a
+   * permanent report claim contrary to fact. The corruption verdict is
+   * per-read; the past corruption itself stays observable through the warn
+   * `apply()` emits at mark time.
+   */
+  markSourceReadable(): void {
+    this.sourceCorrupt = false
   }
 
   compare(weights: ReplayWeights = this.weights): ReplayResult {
@@ -371,6 +394,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (loaded.corrupt) {
           ioCtx.logger.warn('evolution-replay: the activity sidecar could not be read as the current format (corrupt bytes or a newer writer) — the leaderboard backfilled from it is INCOMPLETE; the writer quarantines those bytes on its next append')
           driver.markSourceUnreadable()
+        } else {
+          // PLAN S5.1 (2026-09-16, audit P2-18): a clean read is also a verdict —
+          // clear a stale flag so the compare() qualification follows the current
+          // read (a repaired sidecar reaching us through an io reload must stop
+          // qualifying the report as "NOT the recorded history"). A read that
+          // THREW skips both branches: no verdict, no state change.
+          driver.markSourceReadable()
         }
         // V25-01 (v25): backfill() is once-per-driver — this callback re-runs
         // on every evolutionIo dependency replacement while the driver

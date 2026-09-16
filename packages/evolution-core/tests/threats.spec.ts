@@ -162,6 +162,45 @@ it('P3-22 (v14): read_secrets stops matching .envrc and word-internal credential
   expect(evaluateThreat('cat ~/.aws/credentials').blocked).toBe(true)
 })
 
+it('PLAN S4.3 (2026-09-16): read_secrets passes documented .env template variants, real .env/.env.local stay blocked', () => {
+  // Audit P2-14: `\.env(?!\w)` also matched `.env.example` — the char after
+  // `.env` there is a `.` (not a word char) — so the legitimate debugging
+  // read `cat .env.example 查看变量` was hard-refused. Per-variant expectations:
+  expect(evaluateThreat('cat .env').blocked).toBe(true) // real env file → block
+  expect(evaluateThreat('cat .env.local').blocked).toBe(true) // .local is real per-machine config → block
+  expect(evaluateThreat('cat .env.example').blocked).toBe(false) // documented template → pass
+  expect(evaluateThreat('cat .env.sample').blocked).toBe(false) // documented template → pass
+  expect(evaluateThreat('cat .env.local.example').blocked).toBe(false) // documented template → pass
+  expect(evaluateThreat('cat .envrc').blocked).toBe(false) // word char after .env → no match (P3-22)
+  // The exempt suffix is exact: `.samples`/`.example2` are unknown variants
+  // and keep the default-block posture.
+  expect(evaluateThreat('cat .env.samples').blocked).toBe(true)
+})
+
+it('PLAN-R2 P2-3 (2026-09-16): the template-suffix exemption ends at EOL/space/quote — continuations re-block', () => {
+  // The old trailing `\b` only demanded a non-word char after example/sample,
+  // so CONTINUATIONS of the template name inherited the exemption:
+  // `.env.example.local` (a real-world conventional name that may hold real
+  // values), `.env.sample-x`, and path continuations like `.env.example/…`.
+  expect(evaluateThreat('cat .env.example.local').blocked).toBe(true)
+  expect(evaluateThreat('cat .env.sample-x').blocked).toBe(true)
+  expect(evaluateThreat('cat .env.example/notes').blocked).toBe(true)
+  expect(evaluateThreat('cat .env.example..').blocked).toBe(true)
+  // A COMPLETE template name still passes when closed by EOL, whitespace or a
+  // quote, and the documented variants keep their posture.
+  expect(evaluateThreat('cat .env.example').blocked).toBe(false)
+  expect(evaluateThreat('cat .env.sample').blocked).toBe(false)
+  expect(evaluateThreat('cat .env.local.example').blocked).toBe(false)
+  expect(evaluateThreat('cat .env.example"').blocked).toBe(false)
+  expect(evaluateThreat('cat .env.example 查看变量').blocked).toBe(false)
+  // Unknown suffix spellings and real config stay blocked.
+  expect(evaluateThreat('cat .env.exampleX').blocked).toBe(true)
+  expect(evaluateThreat('cat .env.samples').blocked).toBe(true)
+  expect(evaluateThreat('cat .env').blocked).toBe(true)
+  expect(evaluateThreat('cat .env.local').blocked).toBe(true)
+  expect(evaluateThreat('cat ~/.aws/credentials').blocked).toBe(true)
+})
+
 it('P3-22 (v14): a JWT-shaped secret is reported even though it is dot-separated', () => {
   const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'
   const findings = scanThreats(`token = "${jwt}"`)

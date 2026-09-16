@@ -101,6 +101,115 @@ describe('evolution-feedback', () => {
     await feedback.waitIdle()
   })
 
+  it('S1.4 (audit P1-3): a settled record refolds from the truth, so another process feedback for the same target counts', async () => {
+    const home = await tempHome('dsh-feedback-s14-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    const feedback = new Feedback.EvolutionFeedback(io, home)
+    await feedback.restore(io)
+    await feedback.waitIdle()
+    // Process A records both tables and lets the appends SETTLE.
+    feedback.record('shared-skill', 'positive', undefined, 'skill')
+    feedback.record('shared-session', 'negative', undefined, 'session')
+    await feedback.waitIdle()
+    // Process B appends to the shared log BYPASSING A's instance — exactly
+    // what a second process sharing DSH_HOME does.
+    await appendEvolutionEvent(io, eventsPath, { type: 'feedback', target: 'shared-skill', kind: 'skill', rating: 'negative' })
+    await appendEvolutionEvent(io, eventsPath, { type: 'feedback', target: 'shared-session', kind: 'session', rating: 'positive' })
+    // A refolds (pushQuality does this before every quality push): the
+    // in-memory records are settled, so the truth must win and B's
+    // contributions must count. Pre-fix, A's stale record replaced the whole
+    // truth per target and the wrong absolute pair flowed into the usage side.
+    await feedback.refold()
+    expect(feedback.snapshot().skills['shared-skill']).toMatchObject({ positive: 1, negative: 1 })
+    expect(feedback.snapshot().sessions['shared-session']).toMatchObject({ positive: 1, negative: 1 })
+    expect(feedback.score('shared-skill', 'skill')).toBe(0)
+    expect(feedback.score('shared-session', 'session')).toBe(0)
+  })
+
+  it('S1.4 control: a record whose append is still in flight keeps its memory value through a concurrent refold (rc.66)', async () => {
+    const home = await tempHome('dsh-feedback-s14-flight-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    // The fold truth carries t=1 positive.
+    await io.writeText(eventsPath, eventLog([logEvent(1, 't', 'positive')]))
+    const feedback = new Feedback.EvolutionFeedback(io, home)
+    await feedback.restore(io)
+    await feedback.waitIdle()
+    expect(feedback.score('t', 'skill')).toBe(1)
+    // Hold the refold's timeline read so its merge runs while the record below
+    // is still IN FLIGHT: appends serialize behind the restore on the mutate
+    // chain, so gating the read is the deterministic way to hit the window the
+    // pending set protects (the append has not settled when the merge runs).
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let gated = false
+    const gatedIo: typeof io = {
+      ...io,
+      readText: async (path: string): Promise<string | null> => {
+        if (path === eventsPath && !gated) {
+          gated = true
+          await gate
+        }
+        return await io.readText(path)
+      },
+    }
+    feedback.attachIo(gatedIo)
+    const refolding = feedback.refold()
+    // Lands optimistically while the merge is pending; its append queues
+    // BEHIND the refold and has not settled when the merge runs.
+    feedback.record('t', 'negative', undefined, 'skill')
+    release()
+    await refolding
+    // rc.66's protected window: the optimistic negative survives the merge
+    // even though the truth holds only the seeded positive.
+    expect(feedback.snapshot().skills['t']).toMatchObject({ positive: 1, negative: 1 })
+    expect(feedback.score('t', 'skill')).toBe(0)
+    // The append lands after the merge; a later boot folds both events.
+    await feedback.waitIdle()
+    const second = new Feedback.EvolutionFeedback(io, home)
+    await second.restore(io)
+    await second.waitIdle()
+    expect(second.snapshot().skills['t']).toMatchObject({ positive: 1, negative: 1 })
+  })
+
+  it('S1.4 (review C-P2-1): TWO appends in flight for the same target both stay protected', async () => {
+    const home = await tempHome('dsh-feedback-s14-double-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const feedback = new Feedback.EvolutionFeedback(io, home)
+    await feedback.restore(io)
+    await feedback.waitIdle()
+    // Two records for the SAME target with a refold queued BETWEEN them on the
+    // mutate chain: [#1 append] → [refold] → [#2 append]. #1 settles first, so
+    // its `finally` runs while #2 is still in flight — a per-target BOOLEAN
+    // marker is cleared there and the merge then folds #2's optimistic
+    // increment away (score 1 where the log is about to hold 2).
+    feedback.record('t', 'positive', undefined, 'skill')
+    const refolding = feedback.refold()
+    feedback.record('t', 'positive', undefined, 'skill')
+    await refolding
+    await feedback.waitIdle()
+    // The discriminator: #2's increment survives the merge that ran between the
+    // two appends (the append itself landed only after that merge).
+    expect(feedback.snapshot().skills['t']).toMatchObject({ positive: 2 })
+    // score is normalized (positive - negative) / total: 2/2 = +1.
+    expect(feedback.score('t', 'skill')).toBe(1)
+    // Both events land in the log either way — the loss was memory-only.
+    const rebooted = new Feedback.EvolutionFeedback(io, home)
+    await rebooted.restore(io)
+    await rebooted.waitIdle()
+    expect(rebooted.snapshot().skills['t']).toMatchObject({ positive: 2 })
+  })
+
   it('ignores a malformed aggregate and still records into the event log', async () => {
     const home = await tempHome('dsh-feedback-bad-')
     const ctx = new Context()
@@ -538,7 +647,14 @@ describe('evolution-feedback', () => {
   })
 
   it('V6-40: re-wires quality pushes to a REPLACED skillUsage service (0.3.35)', async () => {
+    // S4.6 (2026-09-16): the quality push now requires a mounted io (a push
+    // without one would write an unverifiable optimistic score into the
+    // durable usage sidecar), so the re-wire scenario mounts the real io
+    // backend over a temp home.
+    await tempHome('dsh-feedback-v6-40-')
     const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
     const callsA: string[] = []
     const callsB: string[] = []
     const stubA = { setFeedbackQuality: async (name: string) => { callsA.push(name) } }
@@ -565,6 +681,55 @@ describe('evolution-feedback', () => {
     }
     expect(callsB.length).toBeGreaterThan(0)
     await fiberB.dispose()
+  })
+
+  it('S4.6 (audit P2-20): without a mounted io, record never pushes the optimistic score into the usage sidecar', async () => {
+    // skillUsage present, evolutionIo ABSENT: the real registry needs the io
+    // service to mount, so the stub-plugin provide from V6-40 stands in —
+    // its setFeedbackQuality IS the durable usage-sidecar write we observe.
+    const ctx = new Context()
+    const sidecar: Record<string, { feedback_score?: number; feedback_warn?: boolean }> = {}
+    const stub = {
+      setFeedbackQuality: async (name: string, score: number, warn: boolean) => {
+        sidecar[name] = { feedback_score: score, feedback_warn: warn }
+      },
+    }
+    await ctx.plugin({ name: 'stub-skill-usage', apply: (c) => { c.provide('skillUsage', stub) } })
+    await ctx.plugin(Feedback)
+    // The skillUsage inject wiring activates on a fiber tick; let it settle so
+    // record() runs through the WRAPPED path (a vacuous pass would prove nothing).
+    await new Promise(resolve => setTimeout(resolve, 20))
+    ctx.evolutionFeedback.record('t', 'negative', undefined, 'skill')
+    await ctx.evolutionFeedback.waitIdle()
+    await new Promise(resolve => setTimeout(resolve, 20))
+    // Pre-fix: the push ran without io and wrote the optimistic -1 into the
+    // durable sidecar — a field no event log confirmed and no restart folds back.
+    expect(sidecar['t']?.feedback_score).toBeUndefined()
+    expect(sidecar['t']?.feedback_warn).toBeUndefined()
+  })
+
+  it('S4.6 contrast: with io mounted the quality push lands in the usage sidecar as before', async () => {
+    await tempHome('dsh-feedback-s46-io-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const sidecar: Record<string, { feedback_score?: number; feedback_warn?: boolean }> = {}
+    const stub = {
+      setFeedbackQuality: async (name: string, score: number, warn: boolean) => {
+        sidecar[name] = { feedback_score: score, feedback_warn: warn }
+      },
+    }
+    await ctx.plugin({ name: 'stub-skill-usage', apply: (c) => { c.provide('skillUsage', stub) } })
+    await ctx.plugin(Feedback)
+    ctx.evolutionFeedback.record('t', 'negative', undefined, 'skill')
+    // The push rides refold()'s async restore — poll instead of a fixed sleep.
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline && sidecar['t'] === undefined) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    expect(sidecar['t']).toBeDefined()
+    expect(sidecar['t']).toEqual({ feedback_score: -1, feedback_warn: true })
+    await ctx.evolutionFeedback.waitIdle()
   })
 
   it('V6-39: a whitespace-only path falls back to the default feedback path (0.3.35)', async () => {

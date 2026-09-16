@@ -90,9 +90,16 @@ describe('validateAndNormalizeMaintainPlan', () => {
     const result = validateAndNormalizeMaintainPlan(validPlan([item]), dualReport, SIGNALS)
     expect(result.ok).toBe(false)
     expect(result.errors?.some(e => e.includes('exact spelling'))).toBe(true)
-    // A distinct single-spelling name still anchors fine.
+    // A distinct single-spelling name still anchors fine. PLAN-R2 P2-4
+    // (2026-09-16): the dual-spelling fixture reports stamp_density=over on
+    // BOTH skills, so the complete plan explains the id in a note (one note
+    // covers every instance of the id).
     item.names = ['Foo']
-    expect(validateAndNormalizeMaintainPlan(validPlan([item]), dualReport, SIGNALS).ok).toBe(true)
+    expect(validateAndNormalizeMaintainPlan(
+      { ...validPlan([item]), notes: ['stamp_density: 双拼写夹具两实例均已审，无条款对应，不动作'] },
+      dualReport,
+      SIGNALS,
+    ).ok).toBe(true)
   })
 
   it('accepts no_issues with an empty plan and rejects a non-empty one', () => {
@@ -330,6 +337,75 @@ describe('validateAndNormalizeMaintainPlan', () => {
     const badResult = validateAndNormalizeMaintainPlan(validPlan([bad]), report, SIGNALS)
     expect(badResult.ok).toBe(false)
     expect(badResult.errors.some(e => e.includes('not in the facts report'))).toBe(true)
+  })
+})
+
+// PLAN-R2 P2-4 (2026-09-16): the facts block renders one line per skill, so
+// the SAME signal id can be over on SEVERAL skills. §3 coverage is
+// instance-granular (skill::id): an item's evidence covers only its target
+// skills' instances, while a note naming the id explains away every instance
+// of it.
+describe('P2-4: multi-skill same-id over coverage is instance-granular', () => {
+  const dual: DriftReport = {
+    library: [{ id: 'usage_observed', verdict: 'pass', value: 'observed' }],
+    skills: [
+      { name: 'skill-a', signals: [{ id: 'narrow_name', verdict: 'over', value: 'task-only-a' }] },
+      { name: 'skill-b', signals: [{ id: 'narrow_name', verdict: 'over', value: 'task-only-b' }] },
+    ],
+  }
+  const dualSignals = new Set([...SIGNALS, 'narrow_name'])
+
+  function narrowItem(names: string[]): Record<string, unknown> {
+    return validItem({
+      names,
+      rule: 'A2',
+      evidence: [{ signal: 'narrow_name', value: 'task-only' }],
+    })
+  }
+
+  it('(a) a plan advising only skill A leaves skill B silently omitted — refused, naming B', () => {
+    // Under the former id-level coverage set the shared narrow_name evidence
+    // zeroed BOTH instances and this plan passed — the exact silent omission
+    // (E1/V24-19 defect class) this gate closes.
+    const result = validateAndNormalizeMaintainPlan(validPlan([narrowItem(['skill-a'])]), dual, dualSignals)
+    expect(result.ok).toBe(false)
+    expect(result.errors.some(e => e.includes('completeness'))).toBe(true)
+    expect(result.errors.some(e => e.includes('skill-b::narrow_name'))).toBe(true)
+    // Skill A's own instance IS covered — only B is named as omitted.
+    expect(result.errors.some(e => e.includes('skill-a::narrow_name'))).toBe(false)
+  })
+
+  it('(b) a note naming the id explains away every instance of it', () => {
+    const explained = validateAndNormalizeMaintainPlan(
+      { ...validPlan([narrowItem(['skill-a'])]), notes: ['narrow_name: 内部代号，格式合规语义窄，已审不动作'] },
+      dual,
+      dualSignals,
+    )
+    expect(explained.ok).toBe(true)
+  })
+
+  it('(c) per-skill items each citing the id cover every instance', () => {
+    const result = validateAndNormalizeMaintainPlan(
+      validPlan([narrowItem(['skill-a']), narrowItem(['skill-b'])]),
+      dual,
+      dualSignals,
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  it('single-skill behavior is unchanged: instance granularity equals id granularity there', () => {
+    const single: DriftReport = {
+      library: [{ id: 'usage_observed', verdict: 'pass', value: 'observed' }],
+      skills: [{ name: 'skill-a', signals: [{ id: 'narrow_name', verdict: 'over', value: 'task-only-a' }] }],
+    }
+    expect(validateAndNormalizeMaintainPlan(validPlan([narrowItem(['skill-a'])]), single, dualSignals).ok).toBe(true)
+    const uncovered = validateAndNormalizeMaintainPlan(
+      validPlan([{ ...narrowItem(['skill-a']), evidence: [{ signal: 'usage_observed', value: 'observed' }] }]),
+      single,
+      dualSignals,
+    )
+    expect(uncovered.ok).toBe(false)
+    expect(uncovered.errors.some(e => e.includes('skill-a::narrow_name'))).toBe(true)
   })
 })
 

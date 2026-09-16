@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, cp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, cp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,6 +15,41 @@ const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', imp
 
 async function runInstaller(home: string, mode: string, profile = 'evo-test', extra: string[] = [], env: Record<string, string> = {}) {
   return run(process.execPath, [installer, '--mode', mode, '--profile', profile, '--home', home, ...extra], { env: { ...process.env, ...env } })
+}
+
+/** PLAN S5.8 (2026-09-16, audit P2-26): the packages root the installer
+ * resolves its staging against (`<pkg>/tests/../../` = the overlay root in the
+ * dev tree and `packages/evolution/` in the mirror layout — the same
+ * PACKAGES_DIR `install-layered.mjs` derives from its own URL). */
+const stagingDir = fileURLToPath(new URL('../../.release-staging', import.meta.url))
+
+/** The freshness baseline the installer compares the staging version against
+ * (P2-22/V24-17: the FAMILY version from the family source tree). */
+async function familyVersion(): Promise<string> {
+  const manifest = JSON.parse(await readFile(fileURLToPath(new URL('../../evolution-host/package.json', import.meta.url)), 'utf8')) as { version?: string }
+  return manifest.version ?? ''
+}
+
+/** Run one scoped-install scenario against a MINIMAL `.release-staging` (the
+ * agent mode reads only the freshness manifest and the delta from it, so the
+ * real `packageSourceRoot()` code path is exercised without a full pack). Any
+ * pre-existing staging is moved aside and restored, never destroyed. */
+async function withStaging<T>(manifest: Record<string, unknown>, fn: () => Promise<T>): Promise<T> {
+  const backup = `${stagingDir}.spec-backup`
+  const hadStaging = existsSync(stagingDir)
+  if (hadStaging) await rename(stagingDir, backup)
+  await mkdir(join(stagingDir, 'evolution-agent'), { recursive: true })
+  await writeFile(join(stagingDir, '.staging-manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
+  // The delta lives INSIDE the staging on a real scoped install; keeping
+  // DSH_EVOLUTION_DELTA_PATH unset is what puts packageSourceRoot() on the
+  // code path the scope check guards.
+  await writeFile(join(stagingDir, 'evolution-agent', 'agent.cordis.yml'), '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n')
+  try {
+    return await fn()
+  } finally {
+    await rm(stagingDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    if (hadStaging) await rename(backup, stagingDir)
+  }
 }
 
 describe('layered installer', () => {
@@ -197,6 +232,119 @@ describe('layered installer', () => {
     // The shared fixture row must actually exercise the injection on both sides.
     expect(composed).toContain('catalogDescriptionMaxLength: 60')
   })
+
+  it('PLAN S5.9 (2026-09-16): indented `- id:` rows keep the byte-parity pin (nested rows compose identically)', async () => {
+    // Audit P2-27: both composers used to extract collision ids with a
+    // column-0 `^- id:` anchor, so an upstream that nests model rows inside a
+    // group would desync the detection the moment one side was taught about
+    // indentation. The standard fragment carries an INDENTED row: both sides
+    // must see the same id set, pass the nested lines through verbatim, keep
+    // the top-level tool-skill injection parity, and stay byte-identical.
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const standard = '# runtime standard\ngroups:\n  - id: persona\n    name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const script = [
+      `import { generateAgentPreset } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,
+      `const out = generateAgentPreset(${JSON.stringify(standard)}, ${JSON.stringify(delta)})`,
+      'process.stdout.write(Buffer.from(out, "utf8").toString("base64"))',
+    ].join('\n')
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
+    const installed = Buffer.from(stdout, 'base64').toString('utf8')
+    const composed = composePresetComposition(standard, delta)
+    expect(installed).toBe(composed)
+    expect(composed).toContain('  - id: persona')
+    expect(composed).toContain('catalogDescriptionMaxLength: 60')
+  }, 20_000)
+
+  it('PLAN S5.9 (2026-09-16): an indented standard row collides with a top-level delta row on BOTH composers', async () => {
+    // The detection half of the S5.9 fix: a collision hidden in a nested
+    // group must be caught by the installer AND the core composer alike —
+    // before the fix both were blind to the indented row and the duplicate
+    // mounted twice with every guard green.
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const standard = '# runtime standard\ngroups:\n  - id: tool-session-query\n    name: "@deepseek-ai/dsh-tool-session-query"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n- id: tool-session-query\n'
+    expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-session-query/)
+    const script = [
+      `import { generateAgentPreset } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,
+      `const standard = ${JSON.stringify(standard)}`,
+      `const delta = ${JSON.stringify(delta)}`,
+      'try { generateAgentPreset(standard, delta); process.stdout.write("uncaught:no-collision") }',
+      'catch (error) { process.stdout.write(Buffer.from(String(error.message), "utf8").toString("base64")) }',
+    ].join('\n')
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
+    const installerError = Buffer.from(stdout, 'base64').toString('utf8')
+    expect(installerError).not.toBe('uncaught:no-collision')
+    expect(installerError).toContain('tool-session-query')
+  }, 20_000)
+
+  // PLAN S5.8 (2026-09-16, audit P2-26): the staging freshness credential now
+  // records the --scope the staged package names were rewritten to, and the
+  // scoped installer refuses a staging whose scope disagrees with
+  // EVOLUTION_SCOPE (or a pre-S5.8 manifest without the field) with the same
+  // strength as a stale version. The minimal staging keeps the REAL
+  // packageSourceRoot() on the code path (the delta is read from the staging).
+  it('P2-26 (S5.8): a scoped install refuses a staging built for another scope', async () => {
+    const home = await tempRoot('dsh-installer-scope-a-')
+    const presetRoot = join(home, 'preset', 'standard')
+    await mkdir(presetRoot, { recursive: true })
+    await writeFile(join(presetRoot, 'agent.cordis.yml'), '- id: persona\n')
+    await withStaging({ version: await familyVersion(), scope: '@deepseek-ai', createdAt: 'fixture', gitSha: '' }, async () => {
+      await expect(runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
+        EVOLUTION_SCOPE: '@lmzhen',
+        DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      })).rejects.toThrow(/was built under scope "@deepseek-ai" but EVOLUTION_SCOPE is "@lmzhen"/)
+      // The refusal names BOTH remediations: rebuild for this scope, or
+      // install under the staging's scope.
+      await expect(runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
+        EVOLUTION_SCOPE: '@lmzhen',
+        DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      })).rejects.toThrow(/prepare-release\.mjs --scope @lmzhen/)
+      await expect(runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
+        EVOLUTION_SCOPE: '@lmzhen',
+        DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      })).rejects.toThrow(/EVOLUTION_SCOPE=@deepseek-ai/)
+    })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('P2-26 (S5.8): a scoped install refuses a pre-S5.8 staging manifest without a scope field', async () => {
+    const home = await tempRoot('dsh-installer-scope-b-')
+    const presetRoot = join(home, 'preset', 'standard')
+    await mkdir(presetRoot, { recursive: true })
+    await writeFile(join(presetRoot, 'agent.cordis.yml'), '- id: persona\n')
+    // Missing field = unverifiable scope: refused fail-loud (same strength as
+    // the F-213 stale-version refusal), never installed on faith.
+    await withStaging({ version: await familyVersion(), createdAt: 'fixture', gitSha: '' }, async () => {
+      await expect(runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
+        EVOLUTION_SCOPE: '@lmzhen',
+        DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      })).rejects.toThrow(/has no "scope" field/)
+      await expect(runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
+        EVOLUTION_SCOPE: '@lmzhen',
+        DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      })).rejects.toThrow(/prepare-release\.mjs --scope @lmzhen to rebuild/)
+    })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
+
+  it('P2-26 (S5.8): a staging whose scope matches EVOLUTION_SCOPE installs', async () => {
+    const home = await tempRoot('dsh-installer-scope-c-')
+    const presetRoot = join(home, 'preset', 'standard')
+    await mkdir(presetRoot, { recursive: true })
+    await writeFile(join(presetRoot, 'agent.cordis.yml'), '- id: persona\n')
+    await withStaging({ version: await familyVersion(), scope: '@lmzhen', createdAt: 'fixture', gitSha: '' }, async () => {
+      // The scope check passes and the install proceeds down the real path:
+      // the delta is read from the staging and the preset is generated.
+      const { stdout } = await runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
+        EVOLUTION_SCOPE: '@lmzhen',
+        DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
+      })
+      expect(stdout).toContain('dry-run:  no files were written')
+      expect(stdout).toContain('preset:')
+    })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 30_000)
 
   it('core composePresetComposition honors the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (0.3.25 collision-path pin)', async () => {
     const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')

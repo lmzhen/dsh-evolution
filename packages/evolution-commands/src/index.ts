@@ -463,17 +463,52 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input === 'maintain --facts') {
           // 0-token deterministic preview (011 §12-1 v12): facts block only,
           // no subagent call, no cooldown (the cooldown guards LLM calls).
+          // PLAN S5.4 (2026-09-16, audit P2-22): the preview skipped the M-02
+          // failure discrimination `runMaintain` runs (evolution-maintenance
+          // orchestrate.ts), so a misconfigured or wholly unreadable root
+          // rendered a CLEAN facts block and returned success while the full
+          // scan reported an error. Collect the same read-failure evidence,
+          // run the same rootExists probe (wired exactly like the scan
+          // runtime's, including the v30 LIST-02 empty-root rule), and give
+          // orchestrate's three-cause conclusion — the preview must never
+          // disagree with the scan it previews.
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
           const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
           const enrichment = await buildEnrichment(ctx, library)
+          const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
             descriptions: enrichment.descriptions,
             supportFiles: enrichment.supportFiles,
             quality: enrichment.quality,
             protected: enrichment.protected,
             catalogInvalid: enrichment.catalogInvalid,
+            // V27 M-02 evidence, same as runMaintain's onReadError.
+            onReadError: (name, error) => {
+              readFailures.push(name)
+              ctx.logger.warn(`evolution-maintenance: skipping unreadable skill "${name}": ${error instanceof Error ? error.message : String(error)}`)
+            },
           })
+          // orchestrate.ts's three-cause discrimination for an empty snapshot
+          // set, inlined (not exported there); messages kept verbatim so both
+          // surfaces read identically.
+          if (snapshots.length === 0 && readFailures.length > 0) {
+            return err(`maintenance scan could not read ${readFailures.length} listed skill(s) (${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}) and read no skill at all — the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again`)
+          }
+          if (snapshots.length === 0 && skillsRootValue !== ''
+            && !(await ioRegistry.provider().exists(skillsRootValue))) {
+            return err(`maintenance scan found an empty skill library, but the configured skill root does not exist (${skillsRootValue}) — point the skillsRoot config at a real directory (a literal \`~\` is not expanded) and run the scan again`)
+          }
+          // PLAN-R2 P2-10 (2026-09-16): cause 3 — no read failures and the
+          // root probe confirmed the root exists, so the library is genuinely
+          // empty. The full scan answers this with plain text and NO facts
+          // block (orchestrate.ts: "Genuinely empty: no facts to review — do
+          // not spend a model call"), so the preview returns the same verbatim
+          // message instead of rendering an empty facts block that would
+          // disagree with the scan it previews.
+          if (snapshots.length === 0) {
+            return ok('Maintenance scan: empty skill library. Nothing to do.')
+          }
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
           return ok(`Maintenance facts (0-token preview):\n${facts}`)
         }
@@ -773,16 +808,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // own contract returns undefined when the session is missing — so
             // a session/deployment `'never'` policy never reached this write
             // face and the staged record carried no sessionId attribution.
-            // 0.3.80 functional check: a caller without an agent has no session,
-            // so this dereference threw. Requiring the session to exist keeps
-            // V24-10's attribution rule (a staged record always names its
-            // session) and refuses to stage without one instead of crashing.
             const session = invocationAgent?.session
             const sessionPolicy = effectiveSessionPolicy(ctx, session)
-            const willStage = session !== undefined
-              && approval.isEnabled !== false
+            const stagesForeground = approval.isEnabled !== false
               && sessionPolicy !== 'never'
               && approval.stageForeground !== false
+            // PLAN S5.5 (2026-09-16, audit P2-23): in a staging deployment a
+            // session-less invocation (the E-305 shape) slipped past `willStage`
+            // — which gated only the hasRunner pre-check — into the
+            // unconditional `approval.request` below WITHOUT a session: the
+            // record landed with no session attribution, the exact V24-10
+            // violation, while consolidate/restore refuse through the E-306
+            // helper. Same structured refusal here; with a session present the
+            // behavior is unchanged.
+            if (stagesForeground && session === undefined) {
+              return err('E-306: this deployment stages foreground writes, but this invocation carries no agent session — `/evolution restructure` would stage a record with no session attribution. Run it from a session in the GUI or the CLI, or set `stageForeground: false` on the evolution-approval row, then repeat the command.')
+            }
+            const willStage = stagesForeground
             if (willStage && !approval.hasRunner('skill')) {
               return err('Restructure cannot be staged: no skill replay runner is registered — mount the tool-skill-manage row (evolution-agent preset, or evolution-all) or disable evolution-approval.')
             }
@@ -791,9 +833,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
               args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
-              // 0.3.80 functional check: a session-less caller carries no
-              // session, so it rides the staged record only when present — and
-              // `willStage` above already refuses to stage without one.
+              // A session-less caller only reaches this request when staging
+              // is OFF (the refusal above covers the staging deployment), so
+              // a staged record still never lands without attribution.
               ...session !== undefined ? { sessionId: session.id, session } : {},
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},
             })

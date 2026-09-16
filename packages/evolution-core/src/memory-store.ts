@@ -55,6 +55,10 @@ export type MemoryTarget = 'memory' | 'user'
 export interface MemoryOperation {
   action: 'add' | 'replace' | 'remove'
   facts?: string | undefined
+  /** PLAN-R2 P2-6 (2026-09-16): the dsh-memory contract's alias. applyBatchCore
+   * reads `facts ?? content`, so a provider reusing this store directly can
+   * write the tool-memory schema shape without a normalization shim. */
+  content?: string | undefined
   old_text?: string | undefined
 }
 
@@ -549,7 +553,9 @@ export class MemoryStore {
     for (const [index, op] of operations.entries()) {
       const position = index + 1
       if (op.action === 'add') {
-        const body = (op.facts ?? '').trim()
+        // PLAN-R2 P2-6 (2026-09-16): `content` is the schema alias for the new
+        // body; `facts` keeps precedence when both are present.
+        const body = ((op.facts ?? op.content) ?? '').trim()
         if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = this.memoryThreatBlock(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
@@ -585,7 +591,9 @@ export class MemoryStore {
       if (op.action === 'remove') {
         working.splice(matchIndex, 1)
       } else {
-        const body = (op.facts ?? '').trim()
+        // PLAN-R2 P2-6 (2026-09-16): same `content` alias as the add branch —
+        // this is the replacement body slot, not a facts-only field.
+        const body = ((op.facts ?? op.content) ?? '').trim()
         if (!body) return { result: { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = this.memoryThreatBlock(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }

@@ -131,7 +131,14 @@ const CREDENTIAL_KEY_RE = /(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]asswd|[Aa]pi[_-
 // P2-2 (v37): the candidate key carried the same defect class in `{1,80}` form —
 // a longer camelCase key (this pass is the ONLY layer that can reach one) was
 // skipped wholesale. The cap is gone; the scan stays linear (see A2-6 above).
-const CANDIDATE_ASSIGNMENT_PATTERN = /(^|[^\w-])([\w-]+)(["']?[\t ]*[:=][\t ]*)([^\r\n]+)/g
+// Review B-P1 (2026-09-16): the former fourth group was a CONSUMING
+// `([^\r\n]+)` value. Every match then cost O(distance to end of line), so one
+// long single-line input (minified JSON / a dense assignment chain) went
+// quadratic in the line length — 2.1s for 160k chars and 7.0s for 320k against
+// ~0.1ms for the replace form this loop replaced. The zero-width lookahead
+// keeps the old "a value must exist" requirement (an empty `token=` still does
+// not match) and the loop locates the value end by hand, which stays linear.
+const CANDIDATE_ASSIGNMENT_PATTERN = /(^|[^\w-])([\w-]+)(["']?[\t ]*[:=][\t ]*)(?=[^\r\n])/g
 
 /**
  * Mask credential-shaped text before it crosses a session boundary.
@@ -157,10 +164,43 @@ export function redactSecrets(text: string): string {
   out = out.replace(INLINE_ASSIGNMENT_PATTERN, (_match, lead?: string, prefix?: string, key?: string, separator?: string) =>
     `${lead ?? ''}${prefix ?? ''}${key ?? ''}${separator ?? ''}<redacted>`)
   // S0.3: camelCase keys ride this second, case-aware pass (see CREDENTIAL_KEY_RE).
-  out = out.replace(CANDIDATE_ASSIGNMENT_PATTERN, (match, lead?: string, key?: string, separator?: string) => {
-    if (typeof key !== 'string' || !CREDENTIAL_KEY_RE.test(key)) return match
-    return `${lead ?? ''}${key}${separator ?? ''}<redacted>`
-  })
+  // PLAN S1.2 (2026-09-16): exec loop instead of String.replace. The replace
+  // callback returned a rejected (non-credential-key) match untouched, but the
+  // greedy value group had already consumed the rest of the line, so every
+  // LATER key on that line was never scanned and leaked
+  // (`{"name": "x", "clientSecret": "supersecret123"}` — the candidate pass is
+  // the ONLY layer that reaches a camelCase key, see the comment on the
+  // pattern above). A rejected match now advances only past lead+key+separator
+  // so the line remainder — including later credential keys — stays scannable.
+  // Termination: key is >= 1 char and the separator always carries `[:=]`, so
+  // lastIndex strictly grows every round. Trade-off: the resume point sits
+  // inside the rejected value, so a value-shaped `k=v` tail can be re-matched
+  // too — same over-mask-don't-leak policy as P2-7 (a rejected value's
+  // non-credential `a:b` shapes, e.g. `http://…`, still pass: their "key"
+  // fails the same predicate). A fresh `g` instance per call keeps the shared
+  // const's lastIndex state out of the loop.
+  const candidatePattern = new RegExp(CANDIDATE_ASSIGNMENT_PATTERN.source, 'g')
+  let candidateOut = ''
+  let consumed = 0
+  for (let m = candidatePattern.exec(out); m !== null; m = candidatePattern.exec(out)) {
+    const lead = m[1] ?? ''
+    const key = m[2] ?? ''
+    const separator = m[3] ?? ''
+    if (!CREDENTIAL_KEY_RE.test(key)) continue
+    // Same output shape as the previous replace callback: the value (the rest
+    // of the line) is masked wholesale. Its END is located by hand instead of
+    // by a consuming group, so neither the accepted nor the rejected path ever
+    // re-scans the line remainder (review B-P1, see the pattern note). A
+    // rejection resumes exactly where it used to — just past the separator,
+    // inside the value — which keeps the documented over-mask-don't-leak
+    // trade-off unchanged.
+    let valueEnd = m.index + m[0].length
+    while (valueEnd < out.length && out[valueEnd] !== '\n' && out[valueEnd] !== '\r') valueEnd += 1
+    candidateOut += out.slice(consumed, m.index) + lead + key + separator + '<redacted>'
+    consumed = valueEnd
+    candidatePattern.lastIndex = valueEnd
+  }
+  out = candidateOut + out.slice(consumed)
   // Line-paired passes on the split lines. Order matters: the block-style pass
   // runs first so the `<redacted>` it plants still enables the AWS residual
   // pass below (a 40-char secret on the block value line is already gone, but
@@ -173,8 +213,23 @@ export function redactSecrets(text: string): string {
     // with its indented value through the same case-aware predicate as the inline pass.
     const camelKey = /^([\w-]+)\s*:(?:\r)?$/.exec(line)?.[1]
     if (!(BLOCK_KEY_ONLY_LINE.test(line) || (camelKey !== undefined && CREDENTIAL_KEY_RE.test(camelKey)))) continue
-    const next = lines[i + 1] ?? ''
-    // The value is the first non-empty indented line after the bare key.
+    // PLAN S2.3 (2026-09-16): the value is the first NON-EMPTY line after the
+    // bare key. The pass used to look at `lines[i + 1]` ONLY, so one blank
+    // line between the key and its value (a wrapped YAML entry, a paste with
+    // a stray newline — `api_key:\n\n  wJalr…`) abandoned the pairing and the
+    // secret crossed verbatim. Blank lines are skipped; the first non-empty
+    // line decides: indented → it is the value (mask, with the existing
+    // already-`<redacted>` skip and the CRLF-tolerant anchors); dedented → it
+    // is the NEXT frontmatter key, not a value (stop, never mask it).
+    let valueLine = -1
+    for (let j = i + 1; j < lines.length; j++) {
+      const candidate = lines[j] ?? ''
+      if (candidate.trim() === '') continue
+      valueLine = j
+      break
+    }
+    if (valueLine < 0) continue
+    const next = lines[valueLine] ?? ''
     // Over-masking an indented line under a credential key is acceptable for a
     // redactor (same policy as P2-7); an unindented line is NOT the value.
     // OPT-03: `(?:\r)?$` — see BLOCK_KEY_ONLY_LINE above; without it a CRLF
@@ -182,7 +237,7 @@ export function redactSecrets(text: string): string {
     const [, indent, value, tail] = /^([ \t]+)(\S.*?)([ \t]*)(?:\r)?$/.exec(next) ?? []
     if (indent === undefined || value === undefined) continue
     if (value.includes('<redacted>')) continue
-    lines[i + 1] = `${indent}<redacted>${tail ?? ''}`
+    lines[valueLine] = `${indent}<redacted>${tail ?? ''}`
   }
   out = lines.join('\n')
   // v22 (SEC-4): an AWS SECRET access key is a bare 40-char base64ish run —

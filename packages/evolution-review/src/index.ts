@@ -25,9 +25,13 @@ import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 import { SessionScopedState } from './session-state.ts'
 
-/** S2-6 (FLOW1-1): how long a subagent handle may keep the in-flight window
- * open AFTER its own review timeout, before the review abandons it. Caps the
- * wait at the review timeout itself so a short (test) budget stays short. */
+/** S2-6 (FLOW1-1): the settle-grace margin a subagent handle gets beyond its
+ * own deadline before the review abandons it. As the dispose watchdog's WHOLE
+ * budget it is capped by the review timeout so a short (test) budget stays
+ * short; the result watchdog adds it AFTER the full timeout (PLAN S1.1,
+ * 2026-09-16) and caps the sum at the timer ceiling (PLAN-R2 P2-1). The
+ * `run.dispose` arm point counts this margin ALONE — its clock starts after
+ * the result settled, not at the review timeout (PLAN-R2 P2-2, 2026-09-16). */
 const REVIEW_SETTLE_MARGIN_MS = 5_000
 /** Error name marking the S2-6 watchdog expiry (see the catch in trySubagentReview). */
 const REVIEW_SETTLE_TIMEOUT = 'ReviewSettleTimeout'
@@ -387,15 +391,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // only substantive input is our own review prompt — with interval=1 that
   // turn fires cadence again and re-delivers, an unbounded review loop. The
   // delivered turn still accumulates (real user content arriving with it is
-  // not lost) but its cadence FIRE is suppressed once; the next real turn
+  // not lost) but its cadence FIRE is suppressed; the next real turn
   // re-arms normally. In-memory only: a restart clears the inbox queue, so
   // the loop cannot survive it.
-  // S2-9 (FLOW1-5): the one-shot suppression belongs to the turn the delivery
+  // S2-9 (FLOW1-5): the suppression belongs to the turn(s) the delivery
   // WOKE, not to "whatever turn ends next". The platform's `turn/start` payload
   // is only `{ turn }` (no message identity), so the available identity is
   // ordering: a turn whose END lands after the delivery but whose START predates
   // it is a busy-period turn and must not consume the suppression.
-  const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, { afterTurn: number }>())
+  // PLAN-R2 P1-1 (2026-09-16): the value carries a `turns` counter — undefined
+  // keeps the historical single shot (the append path below), and the inbox-
+  // replace wake stub arms `turns: 2` because the platform claims ONE next-turn
+  // per driver round (agent-loop/src/inbox.ts:113), so the re-armed wake can
+  // produce TWO turns: the refreshed-prompt turn, then the stub turn appended
+  // behind it. The single entry used to be consumed by the first, leaving the
+  // stub's own 200+-char notice free to fire a whole extra review once the
+  // cadence came due.
+  const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, { afterTurn: number; turns?: number }>())
   const lastTurnStart = sessionState.add('lastTurnStart', new Map<SessionId, number>())
   // V7-04 (0.3.42): the post-delivery counter reset may fail to persist (state
   // store IO failure) — delivery already happened, so warn once per session
@@ -492,15 +504,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // in-process session-end hook to prune against (skill §15). Under size
     // pressure, drop entries whose agent is gone — they can never be read
     // again; live sessions keep their counters.
+    // PLAN S4.1 (2026-09-16, audit P2-10): `lastTurnStart` grows with every
+    // turn/start just like `turnStarts` (the two are set together at the top
+    // of this listener), so it joins both the trigger and the sweep list —
+    // without it the map grew unbounded while every sibling was pruned.
     const sweepDue = turnStarts.size >= COUNTER_SWEEP_THRESHOLD
       || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
       || skipNextCadenceFire.size >= COUNTER_SWEEP_THRESHOLD
       || cadenceResetWarned.size >= COUNTER_SWEEP_THRESHOLD
+      || lastTurnStart.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
       sweepDeadSessionEntries(turnStarts, isAlive)
+      sweepDeadSessionEntries(lastTurnStart, isAlive)
       sweepDeadSessionEntries(cumulativeToolCalls, isAlive)
       sweepDeadSessionEntries(completionInjected, isAlive)
       sweepDeadSessionEntries(pendingCadenceReviews, isAlive)
@@ -572,9 +590,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // busy-period case: consuming there left the woken turn unsuppressed (a
     // second review prompt under interval=1). `afterTurn` stays -1 on a host
     // that never emits turn/start, which keeps the previous behavior exactly.
+    // PLAN-R2 P1-1 (2026-09-16): a hit decrements the `turns` counter instead
+    // of deleting outright — undefined (append path) still deletes on the
+    // FIRST hit, `turns: 2` (replace wake) survives it so the second woken
+    // turn (the stub) is suppressed too; the entry is deleted once the
+    // counter runs out.
     const suppression = skipNextCadenceFire.get(session.id)
     const skipFire = suppression !== undefined && event.data.turn > suppression.afterTurn
-    if (skipFire) skipNextCadenceFire.delete(session.id)
+    if (skipFire) {
+      if (suppression.turns === undefined || suppression.turns <= 1) skipNextCadenceFire.delete(session.id)
+      else skipNextCadenceFire.set(session.id, { afterTurn: suppression.afterTurn, turns: suppression.turns - 1 })
+    }
     let state: ReviewState = { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     // V24-04 (v24): the advanceReview result lives in a holder so the
     // control-flow analysis (which cannot see the lock-callback's assignment,
@@ -891,17 +917,59 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // already claimed by the loop, a throwing accessor — falls through to the
     // delivery below. Coalescing can therefore only ever REPLACE a pending copy;
     // it can never turn into a dropped delivery.
+    // PLAN S4.1 (2026-09-16, audit P2-11): the queue a row sits in IS the
+    // record of its original delivery channel — `followup` queues `next-turn`
+    // and wakes the driver, `inject` queues `next-step` and never wakes
+    // (agent-loop `send`/`followup`/`inject`). A wake is part of the delivery
+    // semantics, so a `true` return from THIS path must keep the CHANNEL
+    // contract of the row it replaces; that is the invariant the callers'
+    // latch/cadence-reset consumption is written against:
+    // - a superseded `next-turn` (waking) row is re-armed with a fresh minimal
+    //   followup wake referencing the in-place prompt — the wake is idempotent
+    //   while the original is still outstanding, and it RESCUES a row orphaned
+    //   without its wake (e.g. by a keepInbox cancel). The stub is a NEW
+    //   message because re-queuing the replaced object would collide with the
+    //   row the platform just swapped in (duplicate pending ids are rejected);
+    //   the two turns this wake can produce (the refreshed prompt claimed
+    //   first, then the stub) have their cadence fires suppressed via
+    //   `turns: 2` (PLAN-R2 P1-1, 2026-09-16), while the append path below
+    //   keeps its single one-shot. The stub's summary is suffixed so it never
+    //   becomes a coalescing target itself.
+    // - a superseded `next-step` (inject) row keeps the no-wake return: that
+    //   is exactly the documented inject bound (README, "Known Limitations" —
+    //   a pending prompt may wait for the next real user input), so the
+    //   caller's latch consumption stays truthful for that channel.
+    // With this, every `true` this function returns means "the queue holds a
+    // prompt as consumable as the channel that originally queued it", and a
+    // wake that cannot be re-armed never silently downgrades a waking delivery.
+    const wake = agent as { followup?: (message: unknown) => void }
     const inbox = (agent as { inbox?: InboxLike }).inbox
     if (inbox !== undefined && typeof inbox.replace === 'function') {
       try {
-        const pending = [...(inbox.nextTurn ?? []), ...(inbox.nextStep ?? [])]
-        const superseded = pending.find(row => isSameKindPending(row, summary))
+        const supersededTurnRow = (inbox.nextTurn ?? []).find(row => isSameKindPending(row, summary))
+        const superseded = supersededTurnRow
+          ?? (inbox.nextStep ?? []).find(row => isSameKindPending(row, summary))
         if (superseded !== undefined && inbox.replace(superseded.id, message)) {
           // The delivery DID happen (the queued row now carries the current
           // prompt), so the caller's latch is consumed exactly as on the append
-          // path — but no turn was woken, so the woken-turn cadence suppression
-          // below is deliberately NOT set.
+          // path.
           if (reviewPrompt) markReviewChannelForDelivery(agent, inbox)
+          if (supersededTurnRow !== undefined && typeof wake.followup === 'function') {
+            // P2-11: the replaced row entered through the WAKING channel —
+            // re-arm the wake (see the channel contract above).
+            wake.followup(createUserMessage({
+              content: [{ type: 'text', text: `[${summary}] the queued prompt ahead of this notice was refreshed in place; that copy is the current request. If this notice reaches a turn on its own, the review turn already ran — no action is needed.` }],
+              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: `${summary} (wake)` },
+            }))
+            // V7-02: the two turns this wake can produce (the refreshed
+            // prompt claimed first, then the stub appended behind it) must
+            // not re-trigger the cadence they were woken by.
+            // PLAN-R2 P1-1 (2026-09-16): `turns: 2` — the single entry the
+            // append path arms was consumed by the refreshed-prompt turn
+            // (one next-turn claim per driver round), leaving the stub turn
+            // free to fire a whole extra review when the cadence came due.
+            skipNextCadenceFire.set(agent.session.id, { afterTurn: lastTurnStart.get(agent.session.id) ?? -1, turns: 2 })
+          }
           return true
         }
       } catch (error) {
@@ -911,7 +979,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // The wake primitive is called ON the agent: the platform Agent's
     // `followup` is a prototype method (`this.send(...)`), so a detached
     // reference loses its receiver. Bound arrow stubs in tests cannot show it.
-    const wake = agent as { followup?: (message: unknown) => void }
     try {
       if (config.reviewWakeInject && typeof wake.followup === 'function') {
         wake.followup(message)
@@ -952,15 +1019,47 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // handle one more margin — capped by the review timeout, so a short test
   // budget stays short — and its rejection carries REVIEW_SETTLE_TIMEOUT so the
   // catch below can emit review-error for exactly this case.
-  const settleBudgetMs = (): number => Math.min(config.reviewTimeoutMs, REVIEW_SETTLE_MARGIN_MS)
-  const withSettleWatchdog = <T>(promise: Promise<T>, label: string): Promise<T> =>
+  // PLAN S1.1 (2026-09-16): the budget used to be min(reviewTimeoutMs,
+  // REVIEW_SETTLE_MARGIN_MS) armed AT the watchdog call — the grace began
+  // immediately, so under the default 120s timeout every real review slower
+  // than 5s was killed as unsettled and the whole subagent channel degraded to
+  // inject. The run's deadline is the `AbortSignal.timeout(reviewTimeoutMs)`
+  // handed to `subagents.start` below, which starts counting at that call —
+  // the same anchor the `run.result` watchdog arms at (right after start()
+  // resolves) — so the result budget must cover the full timeout FIRST and
+  // only then the grace.
+  // PLAN-R2 P2-2 (2026-09-16): the two arm points no longer share one budget.
+  // `run.dispose` arms AFTER the result settled — the review timeout is
+  // already behind it — so its budget is the grace ALONE
+  // (min(REVIEW_SETTLE_MARGIN_MS, reviewTimeoutMs)). The old shared budget
+  // re-armed a fresh timeout+grace window at dispose time, and a hung dispose
+  // held the single-flight flag for ~two minutes under the default timeout;
+  // its error message also dropped the "after the review timeout" anchor,
+  // which is false at that arm point.
+  // PLAN-R2 P2-1 (2026-09-16): the result budget is capped at Node's 32-bit
+  // timer ceiling — a reviewTimeoutMs in (MAX_TIMER_DELAY_MS - margin,
+  // MAX_TIMER_DELAY_MS] passes both the schema and the assembly clamp, and
+  // the uncapped sum folds setTimeout to 1ms, killing EVERY review as
+  // unsettled the moment the watchdog armed. The cap arms at the ceiling and
+  // warns once per mount.
+  let settleBudgetCapWarned = false
+  const resultSettleBudgetMs = (): number => {
+    const budget = config.reviewTimeoutMs + Math.min(REVIEW_SETTLE_MARGIN_MS, config.reviewTimeoutMs)
+    if (budget <= MAX_TIMER_DELAY_MS) return budget
+    if (!settleBudgetCapWarned) {
+      settleBudgetCapWarned = true
+      ctx.logger.warn(`dsh-evolution-review: reviewTimeoutMs ${config.reviewTimeoutMs}ms plus the settle margin exceeds the 32-bit timer delay ceiling (${MAX_TIMER_DELAY_MS}ms) — the settle watchdog arms at the ceiling`)
+    }
+    return MAX_TIMER_DELAY_MS
+  }
+  const disposeSettleBudgetMs = (): number => Math.min(REVIEW_SETTLE_MARGIN_MS, config.reviewTimeoutMs)
+  const withSettleWatchdog = <T>(promise: Promise<T>, label: string, budgetMs: number, overdue: (totalMs: number) => string): Promise<T> =>
     new Promise<T>((resolve, reject) => {
-      const ms = settleBudgetMs()
       const timer = setTimeout(() => {
-        const error = new Error(`dsh-evolution-review: ${label} did not settle within ${ms}ms of the review timeout — abandoning the handle`)
+        const error = new Error(`dsh-evolution-review: ${label} ${overdue(budgetMs)} — abandoning the handle`)
         error.name = REVIEW_SETTLE_TIMEOUT
         reject(error)
-      }, ms)
+      }, budgetMs)
       promise.then(
         (value) => { clearTimeout(timer); resolve(value) },
         (error: unknown) => { clearTimeout(timer); reject(error instanceof Error ? error : new Error(String(error))) },
@@ -1159,7 +1258,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // Everything after start() sits in a try/finally so the child run is
       // disposed on every exit path (success, timeout, validation throw).
       try {
-        const result = await withSettleWatchdog(run.result, 'subagent review result')
+        const result = await withSettleWatchdog(run.result, 'subagent review result', resultSettleBudgetMs(), total =>
+          `did not settle within ${Math.max(0, total - config.reviewTimeoutMs)}ms after the review timeout (watchdog total ${total}ms)`)
         if (!result.structured) {
           // E-59c: a started subagent that produced no structured plan is NOT a
           // success — the review never happened, so surface review-error and
@@ -1333,7 +1433,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         try {
           // S2-6: bounded too — a dispose that never settles would hang the
           // finally itself and leave reviewInFlight set.
-          await withSettleWatchdog(run.dispose(), 'subagent dispose')
+          // PLAN-R2 P2-2 (2026-09-16): grace-ONLY budget — this arm point
+          // starts after the result settled, so the review timeout is already
+          // behind it and the result budget would re-arm a fresh
+          // timeout+grace window here (~two minutes held at the default).
+          await withSettleWatchdog(run.dispose(), 'subagent dispose', disposeSettleBudgetMs(), total =>
+            `did not settle within ${total}ms`)
         } catch (disposeError) {
           ctx.logger.warn(`dsh-evolution-review: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
         }
@@ -1984,7 +2089,24 @@ export function renderToolResultLine(data: unknown): string {
   return `[result]${failure} ${output.slice(0, 500)}`
 }
 
-function buildReviewRequest(
+/**
+ * PLAN S4.1 (2026-09-16, audit P2-12): text of one persisted content block,
+ * or `''` for any other shape. Content blocks cross the durable session-log
+ * boundary, so their runtime shape is `unknown` even where the static type
+ * promises `{ type, text }` — a persisted `content: [null]` (the A2-7 shape)
+ * used to TypeError in buildReviewRequest and the caller's catch dropped the
+ * whole subagent review leg. This mirrors evolution-core signals.ts's private
+ * `textOfBlock` (same guard, same rationale); it is not imported because core
+ * keeps that helper module-private, and this file's other block renderer
+ * (renderToolResultLine) guards its own inner-block shapes inline.
+ */
+function textOfPersistedBlock(block: unknown): string {
+  if (block === null || typeof block !== 'object') return ''
+  const candidate = block as { type?: unknown; text?: unknown }
+  return candidate.type === 'text' && typeof candidate.text === 'string' ? candidate.text : ''
+}
+
+export function buildReviewRequest(
   session: Session,
   kind: ReviewKind,
   signal: { toolCalls: number; userChars: number; assistantChars: number },
@@ -1995,7 +2117,9 @@ function buildReviewRequest(
   const surface = session.deriveMessages()
   for (const message of surface.slice(-maxMessages)) {
     if (message.role === 'user' || message.role === 'assistant') {
-      const text = message.content.map(block => block.type === 'text' ? block.text : '').join(' ').trim()
+      // PLAN S4.1 (2026-09-16, audit P2-12): textOfPersistedBlock — a
+      // persisted `content: [null]` must skip, not break the review leg.
+      const text = message.content.map(textOfPersistedBlock).join(' ').trim()
       if (text) messages.push(`${message.role.toUpperCase()}: ${text.slice(0, maxMessageChars)}`)
     }
   }

@@ -126,6 +126,27 @@ it('v28 G5.1 (REDACT-01): a block-style credential key masks the following inden
   expect(redactSecrets('notes:\n  plain prose line')).toBe('notes:\n  plain prose line')
 })
 
+it('S2.3 (PLAN 2026-09-16): a blank line between the block key and its value no longer abandons the pairing', () => {
+  // The value is the first NON-EMPTY line after the key — the pass used to
+  // look only at lines[i+1] and gave up when a blank line sat between them,
+  // leaking the secret verbatim.
+  const blankBetween = redactSecrets('api_key:\n\n  wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')
+  expect(blankBetween).toContain('api_key:')
+  expect(blankBetween).toContain('<redacted>')
+  expect(blankBetween).not.toContain('wJalrXUtnFEMI')
+  // Multiple blank lines are skipped too, and the CRLF form pairs as well.
+  expect(redactSecrets('password:\n\n\n    hunter2secretvalue')).toContain('<redacted>')
+  expect(redactSecrets('api_key:\r\n\r\n  wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')).not.toContain('wJalrXUtnFEMI')
+})
+
+it('S2.3: a DEDENTED line after the blank gap is the next key, not the value — it is never masked', () => {
+  // `next: keep` is unindented: the scan stops there and leaves it alone.
+  const next = redactSecrets('api_key:\n\nnext: keep')
+  expect(next).toContain('api_key:')
+  expect(next).toContain('next: keep')
+  expect(next).not.toContain('<redacted>')
+})
+
 it('v28 G5.1 (REDACT-02): PEM private key blocks are masked whole', () => {
   const pem = [
     '-----BEGIN RSA PRIVATE KEY-----',
@@ -211,6 +232,49 @@ it('S0.3 (v37 P0-2): the relaxation does not over-mask unrelated words', () => {
   expect(redactSecrets('The TokenBudget was fine.')).toBe('The TokenBudget was fine.')
 })
 
+// PLAN S1.2 (2026-09-16): the candidate pass ran as String.replace, and for a
+// key that failed CREDENTIAL_KEY_RE the callback returned the match untouched —
+// but the greedy value group had already consumed the rest of the line, so
+// every LATER key on that line was skipped by the g-flagged scan. The pass is
+// the only layer that reaches a camelCase key, so `clientSecret` after a
+// rejected `"name": ` (JSON) or `foo=bar ` (inline) crossed verbatim. It is
+// now an exec loop that resumes a rejected match after lead+key+separator.
+describe('PLAN S1.2: the candidate pass scans past a rejected key on the same line', () => {
+  it('masks a camelCase credential key that FOLLOWS a rejected key (JSON and inline)', () => {
+    expect(redactSecrets('{"name": "x", "clientSecret": "supersecret123"}'))
+      .toBe('{"name": "x", "clientSecret": <redacted>')
+    expect(redactSecrets('foo=bar clientSecret=supersecret123'))
+      .toBe('foo=bar clientSecret=<redacted>')
+    // A rejected value's non-credential `a:b` shape (a URL inside a JSON
+    // value) still passes untouched — the resume point re-tests the value but
+    // its "key" fails the same predicate (over-mask-don't-leak, not wholesale).
+    expect(redactSecrets('{"url": "http://x", "clientSecret": "s3cr3t"}'))
+      .toBe('{"url": "http://x", "clientSecret": <redacted>')
+  })
+
+  it('keeps the solo-key form and the S0.3 negative semantics unchanged', () => {
+    // The solo form was already correct before the fix — it must not regress.
+    expect(redactSecrets('{"clientSecret": "supersecret123"}')).toBe('{"clientSecret": <redacted>')
+    // The `(?![a-z])` guard survives the rewritten pass: a lowercase
+    // continuation after the keyword is still not a key.
+    expect(redactSecrets('tokenizer=abc')).toBe('tokenizer=abc')
+    expect(redactSecrets('secretary: abc')).toBe('secretary: abc')
+    expect(redactSecrets('passwordless: abc')).toBe('passwordless: abc')
+    // The earlier INLINE pass is untouched.
+    expect(redactSecrets('password: hunter2')).toBe('password: <redacted>')
+  })
+
+  it('keeps processing later lines after a same-line repair (no cross-line state)', () => {
+    const doc = '{"name": "x", "clientSecret": "supersecret123"}\npassword:\n    hunter2\nnext: keep'
+    const out = redactSecrets(doc)
+    expect(out).not.toContain('supersecret123')
+    expect(out).not.toContain('hunter2')
+    expect(out).toContain('clientSecret": <redacted>')
+    expect(out).toContain('password:')
+    expect(out).toContain('next: keep')
+  })
+})
+
 it('P2-2 (v37): a key prefix past the old 64-char cap is still masked (64/65 boundary)', () => {
   // The A2-6 prefix bound leaked every longer key: 'A'*64+'_PASSWORD=hunter2'
   // was masked, the 65-char form crossed verbatim.
@@ -244,6 +308,20 @@ it('P2-2 (v37): the removed caps do not mask unrelated long keys and do not stal
   const big = `${'_'.repeat(200_000)}PASSWORD=hunter2`
   expect(redactSecrets(big)).toBe(`${'_'.repeat(200_000)}PASSWORD=<redacted>`)
   expect(Date.now() - started).toBeLessThan(2000)
+})
+// PLAN S1.2 review B-P1 (2026-09-16): the candidate pass carried a consuming
+// value group, so every rejected key re-scanned the rest of the line — one
+// 160k-char single-line assignment chain cost ~2.1s (7.0s at 320k) against
+// ~0.1ms for the replace form it replaced. The value end is now located by
+// hand and the scan is linear.
+describe('redact: candidate pass stays linear on one long line (S1.2 / B-P1)', () => {
+  it('does not rescan the line remainder per rejected key', () => {
+    const line = 'a:1 '.repeat(40_000)
+    const started = Date.now()
+    // No credential-shaped key here: the chain must come through untouched.
+    expect(redactSecrets(line)).toBe(line)
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
 })
 // P2-28 (v39): the URL-credentials pass used an unbounded scheme run, so a
 // scheme-free blob (base64, minified JS, long token) retried the run at every

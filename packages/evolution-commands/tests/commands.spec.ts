@@ -718,6 +718,47 @@ describe('evolution-commands', () => {
     expect(second.text).toContain('MECHANICAL_FACTS')
   })
 
+  it('maintain --facts reports a misconfigured root like the full scan instead of clean facts (S5.4 audit P2-22)', async () => {
+    // The io seam lists a MISSING root as an empty directory, so the preview
+    // used to render the clean empty-library facts block and return success
+    // while the full scan answered M-02 ("the configured skill root does not
+    // exist"). The preview must reach the SAME conclusion, not a fake clean
+    // bill.
+    const dir = await tempRoot('evo-commands-facts-missing-root-')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // `skills` is deliberately never created: root points at a directory that
+    // does not exist.
+    await ctx.plugin(Commands, { root: join(dir, 'skills') })
+    const result = await captured!.handler({ rawInput: 'maintain --facts' })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('the configured skill root does not exist')
+    expect(result.text).toContain(join(dir, 'skills'))
+    expect(result.text).not.toContain('MECHANICAL_FACTS')
+  })
+
+  it('maintain --facts answers a healthy but empty library exactly like the full scan (PLAN-R2 P2-10)', async () => {
+    // Cause 3 of orchestrate's empty-snapshot discrimination: the root exists
+    // and lists nothing. The full scan short-circuits with the plain text
+    // "Maintenance scan: empty skill library. Nothing to do." and no facts
+    // block; the preview used to render an empty MECHANICAL_FACTS block
+    // instead — disagreeing with the very scan it previews.
+    const dir = await tempRoot('evo-commands-facts-empty-')
+    const root = join(dir, 'skills')
+    await mkdir(root, { recursive: true })
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await ctx.plugin(Commands, { root })
+    const result = await captured!.handler({ rawInput: 'maintain --facts' })
+    expect(result.kind).toBe('success')
+    expect(result.text).toBe('Maintenance scan: empty skill library. Nothing to do.')
+    expect(result.text).not.toContain('MECHANICAL_FACTS')
+  })
+
   it('maintain cooldown blocks rapid repeat triggers (single model call)', async () => {
     // Self-contained library (temp root) — a clean CI HOME has no skills and
     // the empty-library short-circuit would skip the subagent, breaking the
@@ -991,6 +1032,35 @@ describe('evolution-commands', () => {
     expect(result.kind).toBe('error')
     expect(result.text).toContain('E-302')
     expect(result.text).not.toContain('E-306')
+  })
+
+  it('S5.5 (audit P2-23): a staging deployment refuses a session-less restructure with the E-306 shape instead of staging unattributed', async () => {
+    // The E-305 invocation shape (no agent → no session) used to slip past
+    // `willStage` into an unconditional approval.request WITHOUT a session,
+    // landing a staged record with no session attribution while
+    // consolidate/restore answered E-306 for the same shape.
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let requested = 0
+    ctx.provide('evolutionApproval', {
+      isEnabled: true,
+      stageForeground: true,
+      hasRunner: () => true,
+      list: async () => [],
+      request: async () => {
+        requested += 1
+        return { action: 'staged', message: 'staged restructure' }
+      },
+    } as never)
+    await ctx.plugin(Commands)
+    const result = await captured!.handler({ rawInput: 'restructure demo "## Heading" references/heading.md' })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('E-306')
+    expect(result.text).toContain('restructure')
+    // The refusal replaces the staging call entirely — nothing is staged.
+    expect(requested).toBe(0)
   })
 
   it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {

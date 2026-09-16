@@ -83,6 +83,21 @@ export class EvolutionFeedback {
    * unpersisted note there, and reverting to it resurrects a value the log
    * never held). Seeded from the fold truth, updated on successful appends. */
   private readonly durableNote = new Map<string, string | undefined>
+  /** PLAN S1.4 (2026-09-16): targets with a feedback append still IN FLIGHT,
+   * split by table, as a COUNT per target. record() increments before queueing
+   * the append and the append task decrements when it settles (landed or rolled
+   * back, finally), dropping the entry only at ZERO — the count covers exactly
+   * the optimistic window rc.66 meant to protect, including two appends for the
+   * same target in flight at once (review C-P2-1: a per-target boolean marker
+   * was cleared by the first settle, so a merge between the two appends folded
+   * the second append's increment away). restore() lets memory win ONLY for these targets — a settled
+   * target folds from the log truth, so another process's feedback for the
+   * same target (audit P1-3) is never overwritten by this process's stale
+   * record. */
+  private readonly pendingAppends: Readonly<Record<'skills' | 'sessions', Map<string, number>>> = {
+    skills: new Map(),
+    sessions: new Map(),
+  }
   /** P2-32 (v11): process-level bound — every feedbacked session would
    * otherwise keep one entry for the whole process lifetime (a name + note
    * string per session); cap this map and drop the earliest-INSERTED entry on
@@ -116,6 +131,15 @@ export class EvolutionFeedback {
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
   attachIo(io: IoLike): void {
     this.io = io
+  }
+
+  /** PLAN S4.6 (2026-09-16): whether a durable backend is attached — the
+   * plugin's quality push (`apply`) consults this before writing the
+   * feedback pair into the skill-usage sidecar. Same no-io posture as
+   * `record`/`refold`: without `ctx.evolutionIo` (when mounted) nothing may
+   * turn the optimistic in-memory aggregate into a durable side effect. */
+  get durable(): boolean {
+    return this.io !== undefined && !!this.eventsPath
   }
 
   /** V5-32 posture applied to the read side (C-events-dispatch-1, v43): an
@@ -208,11 +232,27 @@ export class EvolutionFeedback {
       // but the result is never WRONG).
       const usableCache = cache && cache.lastSeq >= floor - 1 ? cache : null
       const truth = usableCache ? foldWithDelta(usableCache, events, this.warn) : foldFeedbackState(events, this.warn)
-      // Memory wins per record (rc.66 semantics): a record() that landed
-      // optimistically before this restore settled must survive.
+      // PLAN S1.4 (2026-09-16), narrowing the rc.66 "memory wins per record"
+      // rule: memory wins ONLY for targets whose append is still in flight —
+      // the rc.66 intent ("a record() that landed optimistically before this
+      // restore settled must survive") covers that window, not the target
+      // forever. A settled target folds from the log truth, so another
+      // process's feedback for the same target survives this refold instead of
+      // being replaced by this process's stale record (audit P1-3: the stale
+      // absolute pair used to be pushed into the usage sidecar by
+      // setFeedbackQuality and read back by the curator).
+      const pickPending = (mode: 'skills' | 'sessions'): Record<string, FeedbackRecord> => {
+        const picked: Record<string, FeedbackRecord> = {}
+        for (const [target, inFlight] of this.pendingAppends[mode]) {
+          if (inFlight <= 0) continue
+          const record = this.state[mode][target]
+          if (record) picked[target] = record
+        }
+        return picked
+      }
       this.state = {
-        skills: { ...truth.skills, ...this.state.skills },
-        sessions: { ...truth.sessions, ...this.state.sessions },
+        skills: { ...truth.skills, ...pickPending('skills') },
+        sessions: { ...truth.sessions, ...pickPending('sessions') },
       }
       // V4-41: seed the durable-note map from the persisted fold (the TRUTH),
       // so a later failed append rolls back to what the log actually holds.
@@ -295,6 +335,12 @@ export class EvolutionFeedback {
     const recordIo = this.io
     const eventsPath = this.eventsPath
     if (!recordIo || !eventsPath) return
+    // PLAN S1.4: mark the target in flight BEFORE queueing the append — a
+    // restore merging before the append settles must keep this optimistic
+    // record (the rc.66 window). The early return above is the no-io path:
+    // no append is ever queued, so nothing stays pending.
+    const pending = this.pendingAppends[mode]
+    pending.set(target, (pending.get(target) ?? 0) + 1)
     // rc.68: the increment is an EVENT APPEND under the write lock — the log
     // is the truth, the aggregate is derived. A malformed log refuses the
     // append (rc.65 posture). S6.4 E-8: a failed append reclaims the optimistic
@@ -329,9 +375,11 @@ export class EvolutionFeedback {
             // `previousNote`: the old code captured the pre-call in-memory note,
             // and after an A/B double failure that value was itself an
             // unpersisted optimistic note ('A'), so it resurrected a note the
-            // log never held. The log is the truth; the in-process restore uses
-            // memory-wins merge, so it does NOT self-heal this (only a restart
-            // does) — the rollback must be correct on its own.
+            // log never held. The log is the truth; since PLAN S1.4 a later
+            // restore folds a settled target from the truth, so a stale
+            // optimistic note self-heals there — but the rollback must still be
+            // correct on its own (score()/quality read the live state before
+            // any restore runs).
             if (rollback.lastNote === note) {
               const durable = this.durableNote.get(this.noteKey(mode, target))
               if (durable === undefined) delete rollback.lastNote
@@ -360,6 +408,15 @@ export class EvolutionFeedback {
         // skill-usage quality channel) must be re-pushed, else it keeps the
         // optimistic value indefinitely.
         if (rollback) this.onRollback?.(target, kind)
+      } finally {
+        // PLAN S1.4: THIS append has settled (landed, or rolled back to the
+        // durable values). The protection ends only when the LAST in-flight
+        // append for the target settles (review C-P2-1) — a merge between two
+        // appends must still see the target pending. Later merges fold a settled
+        // target from the truth, which is consistent with either outcome.
+        const remaining = (pending.get(target) ?? 1) - 1
+        if (remaining > 0) pending.set(target, remaining)
+        else pending.delete(target)
       }
     })
   }
@@ -810,6 +867,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const skillUsage = (skillCtx as unknown as { skillUsage: SkillUsageLike }).skillUsage
     const pushQuality = (target: string, kind: 'skill' | 'session'): void => {
       if (kind !== 'skill') return
+      // PLAN S4.6 (2026-09-16, audit P2-20): no mounted io → no durable push.
+      // Without this gate the optimistic in-memory score flowed into the
+      // PERSISTENT usage sidecar (`setFeedbackQuality`) even though no event
+      // append could ever confirm it, and nothing reconciled the sidecar
+      // field after a restart — against the file-header contract "Feedback is
+      // durable through ctx.evolutionIo (when mounted)". The onRollback
+      // re-push below rides the same gate harmlessly: without io no append
+      // can happen, so a rollback never fires.
+      if (!feedback.durable) return
       // v30 FB-01: refold the shared log first so the absolute pair is
       // computed from the CURRENT truth, not this process's mount-time
       // aggregate (multi-process DSH_HOME overwrote a live warn with a stale

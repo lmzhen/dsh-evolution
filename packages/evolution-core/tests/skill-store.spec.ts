@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { authoringFeedback, contentHash, frontmatterCatalogInvalid, parseFrontmatter, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
@@ -217,7 +217,12 @@ it('consolidate rollback reports sources it could not restore instead of silentl
 })
 
 it('resolveSkillsRoot: config wins, empty falls through to the default (S4.1, E-30 — 0.3.18)', () => {
-  expect(resolveSkillsRoot({ root: '/custom/skills' })).toBe('/custom/skills')
+  // P2-31 core half (S2.2 batch): an explicit root is resolve()d like
+  // evolutionRoot and like upstream skill-filesystem resolves customSkillDirs —
+  // a RELATIVE config root is anchored to the process CWD instead of staying
+  // CWD-relative, and a trailing slash / dot segment normalizes.
+  expect(resolveSkillsRoot({ root: '/custom/skills' })).toBe(resolve('/custom/skills'))
+  expect(resolveSkillsRoot({ root: 'rel-skills/root/' })).toBe(resolve('rel-skills/root/'))
   expect(resolveSkillsRoot({ root: '   ' })).toBe(skillsRoot())
   expect(resolveSkillsRoot({})).toBe(skillsRoot())
 })

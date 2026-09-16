@@ -285,12 +285,31 @@ export function validateAndNormalizeMaintainPlan(
   // over signal) used to pass as a legitimate scan; now it fails like the
   // existing verdict=no_issues-with-plan symmetry check. Semantic correctness
   // of a note stays out of scope (template §3 leaves that to the reviewer).
-  const overSignals = new Set<string>()
-  for (const signal of report.library) if (signal.verdict === 'over') overSignals.add(signal.id)
+  // PLAN-R2 P2-4 (2026-09-16): the facts block renders one line per skill
+  // (render-facts), so ONE signal id can be over on SEVERAL skills. The
+  // original id-level Set let a plan advising only skill A (evidence citing
+  // the id) zero every other skill's identical over signal — the exact silent
+  // omission §3 forbids. Collection and evidence coverage are therefore
+  // INSTANCE-granular, keyed `skill::id` (library signals render once, so the
+  // bare id stays their instance): an evidence entry covers the signal
+  // instance of the ITEM'S target skills only. The notes channel remains
+  // id-level — a note is the operator's free-text explain-away, and one
+  // mention of the id explains all of its instances (template §3 "或在 notes
+  // 中说明").
+  const overInstances = new Map<string, string>()
+  for (const signal of report.library) if (signal.verdict === 'over') overInstances.set(signal.id, signal.id)
   for (const skill of report.skills) {
-    for (const signal of skill.signals) if (signal.verdict === 'over') overSignals.add(signal.id)
+    for (const signal of skill.signals) {
+      if (signal.verdict === 'over') overInstances.set(`${skill.name.trim()}::${signal.id}`, signal.id)
+    }
   }
-  const covered = new Set(plan.flatMap(item => item.evidence.map(ev => ev.signal)))
+  const covered = new Set<string>()
+  for (const item of plan) {
+    for (const ev of item.evidence) {
+      covered.add(ev.signal)
+      for (const name of item.names) covered.add(`${name}::${ev.signal}`)
+    }
+  }
   const notesText = notes.join('\n')
   // V24-19 (v24): the coverage check covers the `no_issues` verdict too.
   // `no_issues` remains a legitimate no-action output (§7), but a no_issues
@@ -301,21 +320,25 @@ export function validateAndNormalizeMaintainPlan(
   // name (explain away) each signal; a no_issues on a clean facts block is
   // untouched.
   if (verdict === 'issues') {
-    if (plan.length === 0 && notes.length === 0 && overSignals.size > 0) {
+    if (plan.length === 0 && notes.length === 0 && overInstances.size > 0) {
       errors.push('completeness: verdict=issues with an empty plan AND no notes — every over signal must be covered by evidence or named in a note (§3)')
     } else {
-      const uncovered = [...overSignals].filter(id => !covered.has(id) && !notesText.includes(id))
+      const uncovered = [...overInstances]
+        .filter(([instance, id]) => !covered.has(instance) && !notesText.includes(id))
+        .map(([instance]) => instance)
       if (uncovered.length > 0) {
         errors.push(`completeness: over signal(s) not covered by any plan evidence nor named in a note (${uncovered.join(', ')}) — §3 requires each over signal to be addressed or explicitly explained away`)
       }
     }
-  } else if (verdict === 'no_issues' && overSignals.size > 0) {
+  } else if (verdict === 'no_issues' && overInstances.size > 0) {
     // V25-04 (v25): the notes check is PER-SIGNAL (same notesText.includes
     // discipline as the issues branch above) — the first cut only required
     // notes to be NON-EMPTY, so one unrelated boilerplate note zero-explained
     // every over signal while the error message claimed "explain each
     // signal".
-    const uncovered = [...overSignals].filter(id => !notesText.includes(id))
+    const uncovered = [...overInstances]
+      .filter(([, id]) => !notesText.includes(id))
+      .map(([instance]) => instance)
     if (uncovered.length > 0) {
       errors.push(`completeness: verdict=no_issues while the facts block carries over signal(s) not named in any note (${uncovered.join(', ')}) — each signal must be explicitly explained away in notes (§3/§7)`)
     }

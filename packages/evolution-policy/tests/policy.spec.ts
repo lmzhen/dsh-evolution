@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionPolicy, { Config } from '../src/index.ts'
-import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, PROTECTED_BUILTIN_SKILLS } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-policy', () => {
   it('is immutable to model-shaped mutation fields (P2-11: the ghost policy.json defense is gone)', async () => {
@@ -157,5 +157,13 @@ describe('evolution-policy', () => {
     const again = new Context()
     await again.plugin(EvolutionPolicy, { protectedSkillNames: ['house-skill', 'house-skill'] })
     expect(again.evolutionPolicy.get().protectedSkillNames.filter(name => name === 'house-skill')).toHaveLength(1)
+  })
+
+  it('PLAN S4.2 (2026-09-16): the default protected face equals the PROTECTED_BUILTIN_SKILLS contents (single source, not a local literal)', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EvolutionPolicy)
+    // The default face is exactly the core set's contents — the same names the
+    // curator enforces — with config merge behavior unchanged (F-14 above).
+    expect([...ctx.evolutionPolicy.get().protectedSkillNames]).toEqual([...PROTECTED_BUILTIN_SKILLS])
   })
 })

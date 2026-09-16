@@ -177,13 +177,55 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     for (const legacy of ['disableModelInvocation', 'modelInvocable', 'userInvocable'] as const) {
       if (Object.hasOwn(data, legacy)) warnFrontmatterOnce(name, legacy, `field "${legacy}" is not accepted by the upstream registry; use the canonical kebab key`)
     }
+    // PLAN S2.1-adjacent P2-30 (2026-09-16): a legacy `disableModelInvocation`
+    // key means the author asked for DISABLE — upstream (skill-filesystem)
+    // throws on the key and drops the whole file from directory discovery,
+    // while this provider's rank-390 shadow of the same `user-dsh` source
+    // makes its publish decision final. The old row-default fallback
+    // (`modelInvocable: true`) therefore INVERTED the author's intent
+    // ("disable" became "advertise to the model"), so the fallback for a file
+    // carrying the legacy disable key is `false` — regardless of whether
+    // the key's value parses (conservative: rather not hand the skill to the
+    // model directory).
+    // PLAN-R2 P2-9 (2026-09-16): the same inversion applies to the other two
+    // legacy keys — upstream's throw drops the file from BOTH invocation
+    // surfaces, so a `modelInvocable: false` author publishing as the row
+    // default (true) had their opt-out erased too. A parseable legacy
+    // `modelInvocable` / `userInvocable` value is now honored verbatim
+    // (false→false, true→true); an unparseable one falls back conservatively
+    // to `false`, the direction of upstream's whole-file drop. The published
+    // surface carries BOTH fields (the SkillInvocationPolicy on every
+    // candidate/definition), so `userInvocable` gets the symmetric treatment
+    // instead of warn+ignore. Canonical keys keep priority and
+    // `disableModelInvocation` keeps its P2-30 handling.
+    const legacyDisable = Object.hasOwn(data, 'disableModelInvocation')
+    const hasLegacyModel = Object.hasOwn(data, 'modelInvocable')
+    const hasLegacyUser = Object.hasOwn(data, 'userInvocable')
     const disableModel = frontmatterBool(name, data, 'disable-model-invocation')
     const user = frontmatterBool(name, data, 'user-invocable')
+    // frontmatterBool returns undefined BOTH for an absent key and for a value
+    // that fails the boolean parse — the hasLegacy* guards separate "the
+    // author did not use the legacy key" (row default) from "used it with a
+    // bad value" (conservative false). For a legacy key the loop's warn above
+    // owns the warn-once slot, so frontmatterBool's own parse warn stays
+    // silent (one warn per file+key, as before).
+    const legacyModel = hasLegacyModel ? frontmatterBool(name, data, 'modelInvocable') : undefined
+    const legacyUser = hasLegacyUser ? frontmatterBool(name, data, 'userInvocable') : undefined
     // Per-FIELD override: a frontmatter key the file does not set falls back
     // to the ROW-level default (which upstream models as its constant `true`).
     return {
-      modelInvocable: disableModel !== undefined ? !disableModel : invocation.modelInvocable,
-      userInvocable: user !== undefined ? user : invocation.userInvocable,
+      modelInvocable: disableModel !== undefined
+        ? !disableModel
+        : legacyDisable
+          ? false
+          : hasLegacyModel
+            ? legacyModel ?? false
+            : invocation.modelInvocable,
+      userInvocable: user !== undefined
+        ? user
+        : hasLegacyUser
+          ? legacyUser ?? false
+          : invocation.userInvocable,
     }
   }
   // §9 I-2: the scan reports its own completeness — a degraded read must

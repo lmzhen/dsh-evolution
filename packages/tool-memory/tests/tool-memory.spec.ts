@@ -349,6 +349,49 @@ describe('tool-memory', () => {
     expect(approvals).toBe(0)
   })
 
+  it('P2-7: writes missing a required field are rejected BEFORE the approval gate', async () => {
+    // PLAN-R2 P2-7 (2026-09-16): the store's required-field rejection ran only
+    // at execution, so an approval-enabled deployment staged `add` without
+    // facts (or `replace`/`remove` without old_text) and the APPROVED replay
+    // then failed hard. The pre-check mirrors the store's per-action judgment
+    // (memory-files' `facts ?? content` merge, then applyBatchCore) so a
+    // never-executable write is refused at the stage boundary — the same
+    // posture as the V7-07 empty-operations rejection above.
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    let approvals = 0
+    ctx.provide('evolutionApproval', {
+      request: async () => { approvals += 1; return { action: 'staged', message: 'staged' } },
+      registerRunner: () => () => {},
+    })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: { session: { header: { version: 0, id: 'p2-7', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    // Batch path: an add element with neither facts nor content.
+    const batch = await tool.execute({ target: 'memory', operations: [{ action: 'add' }] }, execArg) as MemoryToolResult
+    expect(batch.ok).toBe(false)
+    expect(batch.message).toContain('Operation 1 (add): facts is required')
+    expect(approvals).toBe(0)
+    // Single path: a replace carrying the new text but no old_text.
+    const single = await tool.execute({ target: 'memory', action: 'replace', facts: 'new text' }, execArg) as MemoryToolResult
+    expect(single.ok).toBe(false)
+    expect(single.message).toContain('Operation 1 (replace): old_text is required')
+    expect(approvals).toBe(0)
+    // A blank (whitespace-only) body is the store's "required" too.
+    const blank = await tool.execute({ target: 'memory', action: 'add', content: '   ' }, execArg) as MemoryToolResult
+    expect(blank.ok).toBe(false)
+    expect(blank.message).toContain('facts is required')
+    expect(approvals).toBe(0)
+    // No over-rejection: a well-formed batch still reaches the gate and stages.
+    const valid = await tool.execute({ target: 'memory', operations: [{ action: 'add', facts: 'valid fact' }] }, execArg) as MemoryToolResult
+    expect(valid.ok).toBe(true)
+    expect(approvals).toBe(1)
+  })
+
   it('F-14 (v18): memoryEnabled:false makes the whole row a no-op (no memory tool)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)

@@ -6,7 +6,22 @@
  * so the package export surface is unchanged.
  */
 
-import { load as loadYaml } from 'js-yaml'
+// S2.1 (PLAN 2026-09-16, audit P2-1): the `yaml` package — the SAME dependency
+// the upstream platform catalog uses (skill-filesystem: `import { parse as
+// parseYaml } from 'yaml'`, `yaml: ^2.4.2`) — replaces js-yaml. js-yaml speaks
+// YAML 1.1 full schema while the platform speaks YAML 1.2 core, so the family
+// and the platform read different values out of the SAME bytes: a plain
+// `description: 2026-09-16` was a Date here (rejected by the string-contract
+// plumbing) and the literal string there; the reverse split (`+.inf` written
+// unquoted) made the platform read a float and ignore a whole file the family
+// listed. Verified against js-yaml 4 by the PLAN S2.1 (2026-09-16)
+// pair-compare: the value-level differences are
+// confined to dates/timestamps and the 1.1 binary-int form (`0b101`); 1.1
+// bool words (yes/no/on/off), hex/octal/leading-zero ints, exponent floats
+// and .inf/.nan already read identically, and both parsers throw on the
+// same unloadable blocks (duplicate keys included), so the lenient fallback
+// verdicts are unchanged.
+import { parse as parseYaml } from 'yaml'
 import { AUTHORING_DESCRIPTION_BAR, SKILL_NAME_RE } from './constants.ts'
 import { DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
@@ -142,10 +157,12 @@ interface StrictFrontmatterValues {
 }
 
 /**
- * Frontmatter values as the STRICT platform catalog reads them — js-yaml, the
- * parser `normalizeFrontmatter` also verifies rewrites with — or `null` when
- * the block is not loadable as a YAML mapping. Also reports the platform string
- * fields whose value is not a string ({@link PlatformStringSplit}).
+ * Frontmatter values as the STRICT platform catalog reads them — the `yaml`
+ * package (YAML 1.2 core schema, the same dependency the platform's
+ * skill-filesystem parses with — see the import note above),
+ * the parser `normalizeFrontmatter` also verifies rewrites with — or `null`
+ * when the block is not loadable as a YAML mapping. Also reports the platform
+ * string fields whose value is not a string ({@link PlatformStringSplit}).
  *
  * Scalars publish their text (`name`, `description`, `whenToUse` are strings by
  * contract; a number/boolean-shaped value keeps the text the family always
@@ -163,7 +180,7 @@ function strictFrontmatterValues(block: string): StrictFrontmatterValues | null 
   if (block.trim() === '') return { values: new Map(), split: [] }
   let loaded: unknown
   try {
-    loaded = loadYaml(block)
+    loaded = parseYaml(block)
   } catch {
     return null
   }
@@ -360,11 +377,25 @@ export function yamlPlainScalarNeedsQuotes(value: string): boolean {
   // pass the fast path unquoted, so the platform catalog read a NUMBER while
   // the family published the string `31` (the E-47 split-brain this guard
   // exists for) and no self-heal ever fired.
+  // S2.1 (PLAN 2026-09-16): this branch carries the SIGNED infinity forms
+  // (`+.inf`/`-.inf`) — under the platform's `yaml` parser (and js-yaml
+  // alike, per the pair-compare) they coerce to ±Infinity, so an unquoted
+  // `description: +.inf` made the catalog read a float and drop the file while
+  // the family listed it. Quoted, both sides read the string.
+  // NaN is UNSIGNED in both parsers (review B-P2): `+.nan`/`-.nan` are plain
+  // strings, so flagging them quoted a correct value and raised a false
+  // catalog-invalid verdict — only bare `.nan` belongs in this table.
+  // The 1.1 bool words (yes/no/on/off) deliberately stay OUT of the table:
+  // under YAML 1.2 core — and under js-yaml 4 too, per the对拍 — they are
+  // plain strings on both sides, so quoting them would be redundant churn.
+  // The null/true/false/~ entries remain for parser-fallback safety: any
+  // YAML 1.1 full parser reintroduced here WOULD coerce those, and the table
+  // keeps the write path honest if that ever happens.
   if (/^(?:null|true|false|~)$/i.test(value)) return true
   if (/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(value)) return true
   if (/^0x[0-9a-f]+$/i.test(value)) return true
   if (/^0o[0-7]+$/.test(value)) return true
-  if (/^\.(?:inf|nan)$/i.test(value)) return true
+  if (/^(?:[-+]?\.inf|\.nan)$/i.test(value)) return true
   if (/^[-?:,[\]{}#&*!|>'\"%@`\s]/.test(value)) return true
   return false
 }
@@ -388,7 +419,10 @@ export interface FrontmatterNormalizeResult {
  * unescaped inside single-quoted YAML). Idempotent; only single-line
  * `key: value` entries are touched; body text is never modified; line-ending
  * style is preserved. **Every rewrite is re-verified with the real YAML
- * parser** (js-yaml — the same parser the platform catalog uses): if the
+ * parser** (`yaml` — the package the platform's skill-filesystem catalog parses
+ * with, YAML 1.2 core schema; PLAN S2.1, 2026-09-16 — the former "js-yaml, the
+ * same parser" claim was false: js-yaml speaks YAML 1.1 full and diverged on
+ * dates, timestamps and 1.1 int forms): if the
  * rewritten block no longer parses, or a rewritten value's parsed content
  * differs from the original, the rewrite is rolled back and reported in
  * `issues` (fail-loud, never a silent value corruption — P3-4).
@@ -456,7 +490,7 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
   // roll back, never ship a value mutation.
   const rewrittenBlock = lines.slice(1, end).join('\n')
   try {
-    const parsed = loadYaml(rewrittenBlock) as Record<string, unknown>
+    const parsed = parseYaml(rewrittenBlock) as Record<string, unknown>
     for (const key of fields) {
       if (String(parsed[key]) !== originalValues.get(key)) {
         throw new Error(`rewritten value for ${key} differs from the original`)

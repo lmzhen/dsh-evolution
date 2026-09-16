@@ -26,6 +26,36 @@ describe('composePresetComposition (0.3.15)', () => {
     expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-memory/)
   })
 
+  it('PLAN S5.9 (2026-09-16): collision detection sees an INDENTED `- id:` row (nested group)', () => {
+    // Audit P2-27: the id extraction used to anchor at column 0 (`^- id:`), so
+    // an upstream that nests model rows inside a group hid the duplicate from
+    // this guard while every other check stayed green. The extractor is
+    // indent-agnostic now (twin of `rowIds` in scripts/install-layered.mjs;
+    // installer.spec pins the cross-side parity).
+    const standard = 'groups:\n  - id: tool-session-query\n    name: "@deepseek-ai/dsh-tool-session-query"\n'
+    const delta = '- id: tool-session-query\n'
+    expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-session-query/)
+  })
+
+  it('PLAN S5.9 (2026-09-16): boundary pin — detection covers nested rows, injection anchoring is still top-level only', () => {
+    // Current, documented boundary: a NESTED `- id: tool-skill` row is seen by
+    // the collision detector, but the V10-14 cap injection does NOT land on it
+    // (applyOneOverride anchors the row at column 0 and its child keys at two
+    // spaces). This pins the boundary so lifting it later is a decision, not
+    // an accident; the missed cap stays observable through the warn.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const standard = 'groups:\n  - id: tool-skill\n    name: "@deepseek-ai/dsh-tool-skill"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    try {
+      const composed = composePresetComposition(standard, delta)
+      expect(composed).toContain('  - id: tool-skill')
+      expect(composed).not.toContain('catalogDescriptionMaxLength: 60')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('tool-skill'))
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   it('warns and keeps both rows under DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1 (0.3.25)', () => {
     const previous = process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
     process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = '1'

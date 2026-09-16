@@ -489,7 +489,13 @@ export class EvolutionApproval extends Service {
         // changed the target) — the record would deterministically fail every
         // retry. Name that, and point at reject as the way out, instead of
         // leaving a permanently un-approvable pending row.
-        const deterministic = /changed since this plan|no entry matching|not found|no longer exists/i.test(result.message)
+        // PLAN S4.4 (2026-09-16): the vocabulary also covers the skill-store's
+        // deterministic "Path traversal is not allowed." refusal — a staged
+        // record with a traversal target fails every approve the same way.
+        // Long-term option: the store layer could surface structured errors
+        // with a machine-readable code (deferred this cycle; see the plan's
+        // non-goals list).
+        const deterministic = /changed since this plan|no entry matching|not found|no longer exists|path traversal/i.test(result.message)
         return {
           ok: false,
           message: deterministic

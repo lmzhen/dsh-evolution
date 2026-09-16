@@ -333,7 +333,20 @@ for (const dir of sourceDirs) {
   // would let the first file's rewrite consume every name and leave all
   // later files unrewritten (0.3.0 bug: tools.js kept @deepseek-ai/dsh-*).
   // A materialized array stays re-iterable for each file.
-  rewriteScopedJs(staged, [...names.keys()])
+  const familyNames = [...names.keys()]
+  rewriteScopedJs(staged, familyNames)
+  // PLAN S5.6 (2026-09-16, audit P2-24): npm pack ALWAYS ships the package
+  // root's README.md, but the rewrite face only covered manifests, YAML and
+  // lib/**.{js,d.ts} — a published @lmzhen package kept advertising its
+  // `@deepseek-ai/dsh-*` family/seam names (evolution-host's README even mixed
+  // both scopes). README.md joins the SAME rewriteScopedText face: the matcher
+  // replaces exact family package names only, so platform references
+  // (`@deepseek-ai/dsh-storage`, `@deepseek-ai/dsh-tool-session-query`) pass
+  // through untouched.
+  const readmePath = join(staged, 'README.md')
+  if (existsSync(readmePath)) {
+    writeFileSync(readmePath, rewriteScopedText(readFileSync(readmePath, 'utf8'), familyNames))
+  }
   // R-05: fail fast BEFORE packing when the staged package carries no
   // built bundle — a missing lib/ used to surface as a raw readdirSync ENOENT
   // in the validation loop, after every package had already packed. (The
@@ -476,6 +489,19 @@ for (const item of tarballs) {
       }
     }
   }
+  // PLAN S5.6 (2026-09-16): the README rewrite above gets the same backstop
+  // scan the shipped YAML gets — a future file-layout change that moves
+  // README.md out of the rewrite's reach must fail here, not publish a
+  // tarball advertising @deepseek-ai/dsh-* under the @lmzhen scope.
+  for (const rel of item.shipped) {
+    if (rel.replace(/^\.\//, '') !== 'README.md') continue
+    const text = readFileSync(join(staged, ...rel.split('/')), 'utf8')
+    for (const originalName of names.keys()) {
+      if (text.includes(originalName)) {
+        failures.push(`${item.name}: ${rel} still references ${originalName} (unrewritten scope in the shipped README)`)
+      }
+    }
+  }
 }
 if (failures.length > 0) {
   console.error(failures.join('\n'))
@@ -486,8 +512,14 @@ if (failures.length > 0) {
 // for, so install-layered can refuse a stale `.release-staging` — the
 // persistent dir has historically leaked old package code (0.3.1-test) into a
 // new install. `.version` is the guard; `createdAt`/`gitSha` are provenance.
+// PLAN S5.8 (2026-09-16, audit P2-26): `scope` records the --scope this
+// staging's package names were rewritten to, so the scoped installer can
+// refuse a staging whose names do not match the EVOLUTION_SCOPE it is being
+// installed under (the version check alone accepted a @deepseek-ai-named
+// staging for an @lmzhen install).
 writeFileSync(join(stagingNext, '.staging-manifest.json'), JSON.stringify({
   version: releaseVersion,
+  scope,
   createdAt: new Date().toISOString(),
   gitSha: currentGitSha(),
 }, null, 2) + '\n')

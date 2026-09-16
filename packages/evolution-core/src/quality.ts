@@ -118,16 +118,44 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return intersection / (a.size + b.size - intersection)
 }
 
+/** PLAN-R2 P2-8 (2026-09-16): default cap on two-name comparisons in
+ * {@link computeDedupGroups}. A 2000-skill library is ~2M pairs; the old
+ * unbounded two-two Jaccard ran seconds to tens of seconds per
+ * review/`dedup_group` probe. 250k comparisons bounds that to well under a
+ * second while staying far above every real library's pair count. Only
+ * pairwise comparisons are budgeted — materializing a name's token set
+ * (memoized, once per name) and the exact-hash pre-union phase are not. */
+export const DEDUP_MAX_PAIR_COMPARISONS = 250_000
+
+/** PLAN-R2 P2-8 (2026-09-16): result of the near-duplicate scan. `truncated`
+ * reports that the pairwise scan stopped at the comparison budget: groups
+ * already found are valid, but pairs beyond the budget were never examined. */
+export interface DedupScanResult {
+  groups: string[][]
+  truncated: boolean
+}
+
 /**
  * Two-phase near-duplicate clustering: exact normalized-hash groups first,
  * then token-Jaccard edges at {@link DEDUP_SIMILARITY_THRESHOLD} with a token
  * ratio guard, union-find across the whole set.
+ *
+ * PLAN-R2 P2-8 (2026-09-16): each name's token set is materialized once
+ * (memoized map), each pair takes an O(1) size-ratio short-circuit before the
+ * intersection, and the pairwise loop is bounded by
+ * `maxPairComparisons` (default {@link DEDUP_MAX_PAIR_COMPARISONS}); hitting
+ * the budget stops the scan and `truncated: true` says so. Small libraries
+ * (below the budget) behave exactly as the unbounded scan did.
  */
 export function computeDedupGroups(input: {
   contents: ReadonlyMap<string, string>
   threshold?: number
-}): string[][] {
+  /** Pair-comparison budget (PLAN-R2 P2-8). Defaults to
+   * {@link DEDUP_MAX_PAIR_COMPARISONS}; a smaller value truncates earlier. */
+  maxPairComparisons?: number
+}): DedupScanResult {
   const threshold = input.threshold ?? 0.95
+  const maxPairComparisons = input.maxPairComparisons ?? DEDUP_MAX_PAIR_COMPARISONS
   const names = [...input.contents.keys()]
   const hashes = new Map<string, string[]>()
   for (const name of names) {
@@ -164,12 +192,21 @@ export function computeDedupGroups(input: {
     }
     return set
   }
-  for (let index = 0; index < names.length; index += 1) {
+  // PLAN-R2 P2-8: the memoized tokenSet materializes each name's set at most
+  // once; only the two-name comparisons below count against the budget.
+  let compared = 0
+  let truncated = false
+  for (let index = 0; index < names.length && !truncated; index += 1) {
     const a = names[index]
     if (a === undefined) continue
     for (let other = index + 1; other < names.length; other += 1) {
       const b = names[other]
       if (b === undefined) continue
+      if (compared >= maxPairComparisons) {
+        truncated = true
+        break
+      }
+      compared += 1
       const [ta, tb] = [tokenSet(a), tokenSet(b)]
       if (Math.max(ta.size, tb.size) / Math.max(1, Math.min(ta.size, tb.size)) > 5) continue
       if (jaccard(ta, tb) >= threshold) union(a, b)
@@ -182,7 +219,7 @@ export function computeDedupGroups(input: {
     if (group) group.push(name)
     else groups.set(root, [name])
   }
-  return [...groups.values()].filter(group => group.length > 1)
+  return { groups: [...groups.values()].filter(group => group.length > 1), truncated }
 }
 
 /**

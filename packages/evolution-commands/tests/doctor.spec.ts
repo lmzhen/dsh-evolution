@@ -185,6 +185,32 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
+  it('S5.10 (audit P2-28): the all/standalone × layered-preset warn names the double-instance and shadowing semantics explicitly', async () => {
+    // Previously only INSTALL.md carried this warning: the four model rows AND
+    // the systemPrompt sections double-instance across the profile and preset
+    // layers, and the preset loader fails SOFT (shadowing semantics take the
+    // nearest layer) — so the doctor row must say what actually happens, not
+    // just "double-mount".
+    const makeCase = async (bundle: string): Promise<void> => {
+      const home = await mkdtemp(join(tmpdir(), 'doctor-shadow-warn-'))
+      try {
+        await makeProfile(home, 'web', [bundle])
+        await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+        await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+        const report = await diagnose(stub, { home })
+        const row = report.conflicts.find(conflict => conflict.includes('layered Evolution preset'))
+        expect(row, bundle).toBeDefined()
+        expect(row, bundle).toContain('systemPrompt sections')
+        expect(row, bundle).toContain('shadowing semantics take the nearest layer')
+        expect(row, bundle).toContain('Keep ONE')
+      } finally {
+        await rm(home, { recursive: true, force: true })
+      }
+    }
+    await makeCase('@lmzhen/dsh-evolution-all')
+    await makeCase('@lmzhen/dsh-evolution-preset')
+  })
+
   it('T-WB2: all+host double install is flagged with a choose-one action', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-conflict-'))
     try {

@@ -9,7 +9,7 @@ import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
@@ -866,6 +866,104 @@ it('v32 TEST-05: the tool channel refuses autonomous (subagent-origin) writes on
   const updatedMessage = (updated.value as { message?: string } | undefined)?.message ?? JSON.stringify(updated.value)
   expect(updatedMessage).toContain('protectedSkillNames')
   expect(updatedMessage).toContain('guarded-skill')
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+// PLAN-R2 P2-7 (2026-09-16): on an approval-enabled deployment a write missing
+// a required argument used to be STAGED — an operator approved it and the
+// replay then failed inside executeCore (the same defect class GRAPH-03 /
+// OPT-05 / V7-07 closed on their surfaces). The stage boundary must refuse
+// first, with executeCore's own structured message.
+it('P2-7: a patch missing new_string is refused before the approval seam — approval.request never fires', async () => {
+  const { ctx, root, previousHome } = await setup()
+  const pending: Array<unknown> = []
+  ctx.provide('evolutionState', {
+    listPending: async () => pending,
+    savePending: async (record: unknown) => { pending.push(record) },
+    tryResolvePending: async () => ({ record: null, applied: false }),
+    claimPending: async () => null,
+    releasePendingClaim: async () => {},
+    loadReviewState: async () => null,
+    saveReviewState: async () => {},
+  })
+  await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+  // Count the approval asks without changing the service's decisions (the
+  // prototype method must be bound — an unbound `this` rejects mid-request).
+  let requests = 0
+  const approvalBox = ctx.evolutionApproval as unknown as Record<string, unknown>
+  const realRequest = (approvalBox.request as (this: unknown, input: unknown) => Promise<unknown>).bind(ctx.evolutionApproval)
+  approvalBox.request = async (input: unknown) => {
+    requests += 1
+    return realRequest(input)
+  }
+  const session = { id: 'p27', header: { origin: undefined }, snapshotEvents: () => [] }
+  const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    callId: ToolCallId(`p27-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: args,
+    agent: { session } as unknown as Agent,
+    signal: new AbortController().signal,
+  })
+  // The defect shape: patch without new_string — the old code asked for
+  // approval and staged it (requests 1, ok:true, pending record saved).
+  const missing = await execute({ action: 'patch', name: 'p27-skill', old_string: 'Body.' })
+  const missingValue = missing.value as { ok?: boolean; message?: string; pending_id?: string }
+  expect(requests).toBe(0)
+  expect(missingValue.ok).toBe(false)
+  expect(missingValue.message).toContain('skill_manage patch requires new_string')
+  expect(missingValue.pending_id).toBeUndefined()
+  expect(pending).toHaveLength(0)
+  // Positive control on the SAME harness: a complete patch still reaches the
+  // approval seam and stages — proving the zero above is the pre-check and
+  // not a dead approval block (the old code fails here too: it asked twice).
+  const complete = await execute({ action: 'patch', name: 'p27-skill', old_string: 'Body.', new_string: 'Patched body.' })
+  const completeValue = complete.value as { ok?: boolean; pending_id?: string; message?: string }
+  expect(requests).toBe(1)
+  expect(completeValue.ok, completeValue.message).toBe(true)
+  expect(completeValue.pending_id).toBeTruthy()
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+// PLAN-R2 P2-5 (2026-09-16): bodies the library cannot produce are not
+// content — two of them must not hash-collide into a fake near-duplicate
+// group that invites a merge. The ghost dirs use names SKILL_NAME_RE refuses:
+// list() (tree-sourced names, unvalidated on purpose) still reports them but
+// read() returns null — the exact no-body shape the old `body ?? ''` turned
+// into '' (a caught read error feeds the same null through .catch).
+it('P2-5: unreadable skill bodies are excluded from review dedup grouping and counted in the output', async () => {
+  const { ctx, root, previousHome } = await setup()
+  // A real exact-duplicate pair pins the normal path: genuine groups survive.
+  const shared = '---\nname: shared-body\ndescription: real near-duplicate pair.\n---\n\nShared body for the dedup pin.\n'
+  for (const name of ['same-a', 'same-b']) {
+    await mkdir(join(root, 'skills', name), { recursive: true })
+    await writeFile(join(root, 'skills', name, 'SKILL.md'), shared)
+  }
+  // Two no-body skills: tree-visible, but the library yields no body.
+  for (const name of ['Ghost_C', 'Ghost_D']) {
+    await mkdir(join(root, 'skills', name), { recursive: true })
+    await writeFile(join(root, 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: unreadable body probe.\n---\n\nBody.\n`)
+  }
+  const review = await ctx.tools.execute({
+    callId: ToolCallId(`p25-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: { action: 'review' },
+    agent: fakeAgent(undefined),
+    signal: new AbortController().signal,
+  })
+  expect(review.isError).toBe(false)
+  const message = (review.value as { message?: string } | undefined)?.message ?? ''
+  // The real exact-duplicate group is still detected (normal path unchanged).
+  expect(message).toContain('- same-a ~ same-b')
+  // The two unreadable bodies no longer merge into a fake group ...
+  expect(message).not.toContain('Ghost_C ~ Ghost_D')
+  expect(message).not.toContain('~ Ghost')
+  // ... and the exclusion is visible instead of silent.
+  expect(message).toContain('2 skill bodies were unreadable/empty and excluded from dedup grouping.')
+  expect(message).toContain('Near-duplicate groups (1)')
   if (previousHome === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = previousHome
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

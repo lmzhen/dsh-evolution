@@ -409,32 +409,51 @@ function parseSuppressed(raw: string | null): Set<string> {
   }
 }
 
+/**
+ * Plain wholesale write of the suppression sidecar (tests and fixture seeding).
+ * @internal S2.4 (PLAN 2026-09-16, audit P2-31): NO production consumer
+ * (verified by grep; production suppressions go through
+ * {@link updateSuppressedNames}) — exported for the family's tests only. Do
+ * not use it to write the sidecar in new code.
+ *
+ * The write rides the {@link transactIo} channel (the same lock the RMW
+ * writer uses), not the former naked read → `io.writeText`: that form was an
+ * unserialized read-modify-write — the last `saveSuppressedNames` in this file
+ * with no lock, while its sibling `saveUsage` already carried the `@internal`
+ * test-only note. Version discipline is unchanged (V24-09 / S2-14): a read
+ * failure surfaces (an unreadable sidecar is never written over), a newer
+ * on-disk schema is warned about and preserved byte-for-byte (the
+ * byte-identical result short-circuits the write), and a malformed sidecar is
+ * still overwritten with the v1 shape (the historical plain-writer posture).
+ */
 export async function saveSuppressedNames(
   root: string,
   names: ReadonlySet<string>,
   io: EvolutionIoLike = nodeEvolutionIo(),
 ): Promise<void> {
-  // V24-09 (v24): same future-version discipline as the RMW path below and
-  // the mutations/usage/events writers (A2-11 / L-1 / F-338) — a newer
-  // on-disk schema is never downgraded by this writer.
-  // S2-14 (root cause B): and neither is one this writer could not READ. The
-  // former `.catch(() => null)` folded a read failure (EACCES/EIO/EISDIR —
-  // `readText` answers null only for a MISSING path) into "no sidecar", skipped
-  // the version guard and overwrote it: the one fold in this file that permitted
-  // a downgrade. The failure now surfaces to the caller.
-  const current = await io.readText(suppressedFile(root))
-  if (current !== null) {
-    try {
-      const parsed = JSON.parse(current) as { version?: unknown } | null
-      if (parsed !== null && typeof parsed.version === 'number' && parsed.version > SUPPRESSED_FILE_VERSION) {
-        console.warn(`suppression sidecar ${suppressedFile(root)} declares version ${String(parsed.version)} (newer than ${SUPPRESSED_FILE_VERSION}); not overwritten`)
-        return
+  await transactIo(io, suppressedFile(root), (current) => {
+    // V24-09 (v24): same future-version discipline as the RMW path below and
+    // the mutations/usage/events writers (A2-11 / L-1 / F-338) — a newer
+    // on-disk schema is never downgraded by this writer.
+    // S2-14 (root cause B): and neither is one this writer could not READ. The
+    // former `.catch(() => null)` folded a read failure (EACCES/EIO/EISDIR —
+    // `readText` answers null only for a MISSING path) into "no sidecar", skipped
+    // the version guard and overwrote it: the one fold in this file that permitted
+    // a downgrade. The failure now surfaces to the caller.
+    if (current !== null) {
+      try {
+        const parsed = JSON.parse(current) as { version?: unknown } | null
+        if (parsed !== null && typeof parsed.version === 'number' && parsed.version > SUPPRESSED_FILE_VERSION) {
+          console.warn(`suppression sidecar ${suppressedFile(root)} declares version ${String(parsed.version)} (newer than ${SUPPRESSED_FILE_VERSION}); not overwritten`)
+          // Byte-identical result → transactIo/io.transact skip the write.
+          return current
+        }
+      } catch {
+        // Malformed — the plain write below matches the historical behavior.
       }
-    } catch {
-      // Malformed — the plain write below matches the historical behavior.
     }
-  }
-  await io.writeText(suppressedFile(root), JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2))
+    return JSON.stringify({ version: SUPPRESSED_FILE_VERSION, names: [...names].sort() }, null, 2)
+  })
 }
 
 /**

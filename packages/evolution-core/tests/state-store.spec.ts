@@ -34,15 +34,24 @@ describe('evolutionRoot / evolutionHome (0.3.22 G3.2, F-207)', () => {
     expect(evolutionHome(env)).toBe(join(homedir(), '.dsh', 'evolution'))
   })
 
-  it('C-11: the accepted value and the RETURNED value are the SAME trimmed source', () => {
-    // The old form tested `DSH_HOME?.trim()` but returned the RAW value, so a
-    // padded-but-real home was accepted AND persisted with literal spaces
-    // (" /x " became a path with spaces on every sidecar). An ABSOLUTE value
-    // survives OPT-27 resolve() byte-identical (it is already absolute).
-    expect(evolutionRoot({ DSH_HOME: '  /d/x  ' })).toBe('/d/x')
-    expect(evolutionHome({ DSH_HOME: '  /d/x  ' })).toBe(join('/d/x', 'evolution'))
-    // An untrimmed real value is returned unchanged (trim only fixes padding).
-    expect(evolutionRoot({ DSH_HOME: '/d/plain' })).toBe('/d/plain')
+  it('S2.2 (PLAN 2026-09-16): the adoption test trims, but the VALUE is the raw env text (upstream resolveDshHome)', () => {
+    // Upstream resolveDshHome: `fromEnv.trim().length > 0` is only the
+    // ADOPTION test; the selected value is the RAW env text. The former
+    // "same trimmed source" form here returned the trimmed text, so a padded
+    // home landed at a different path than the platform resolves.
+    expect(evolutionRoot({ DSH_HOME: ' /x ' })).toBe(resolve(' /x '))
+    expect(evolutionRoot({ DSH_HOME: '  /d/x  ' })).toBe(resolve('  /d/x  '))
+    // An untrimmed-clean real value resolves to itself.
+    expect(evolutionRoot({ DSH_HOME: '/d/plain' })).toBe(resolve('/d/plain'))
+  })
+
+  it('S2.2: every value is resolve()d — trailing slashes and dot segments normalize like upstream', () => {
+    // The former form returned an already-absolute value verbatim; upstream
+    // resolve()s unconditionally, so `/d/x/` and `/d/x/../y` normalize.
+    expect(evolutionRoot({ DSH_HOME: '/d/x/' })).toBe(resolve('/d/x/'))
+    expect(evolutionRoot({ DSH_HOME: '/d/x/../y' })).toBe(resolve('/d/x/../y'))
+    // An unset DSH_HOME still falls back to the default home.
+    expect(evolutionRoot({})).toBe(join(homedir(), '.dsh'))
   })
 
   it('OPT-27: `~` IS expanded — the documented v10 divergence from upstream resolveDshHome is retired', () => {

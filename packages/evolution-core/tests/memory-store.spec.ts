@@ -24,6 +24,25 @@ it('memory add and batch (replace/remove semantics via applyBatch)', async () =>
   expect(await store.read('memory')).toEqual(['Run tests with pnpm test.'])
 })
 
+it('PLAN-R2 P2-6 (2026-09-16): the core store honors the schema `content` alias in add and replace', async () => {
+  // The dsh-memory contract and the tool-memory schema both accept `content`,
+  // but applyBatchCore used to read `op.facts` only — a third-party provider
+  // reusing the core store directly with the schema-legal `content` field hit
+  // "facts is required". (tool-memory/memory-files keep their own shims.)
+  const root = await tempRoot('dsh-evo-memory-content-')
+  const store = new MemoryStore({ root })
+  const add = await store.applyBatch('memory', [{ action: 'add', content: 'Project uses pnpm.' }])
+  expect(add.ok).toBe(true)
+  expect(await store.read('memory')).toEqual(['Project uses pnpm.'])
+  const replace = await store.applyBatch('memory', [{ action: 'replace', old_text: 'pnpm', content: 'Project uses npm workspaces.' }])
+  expect(replace.ok).toBe(true)
+  expect(await store.read('memory')).toEqual(['Project uses npm workspaces.'])
+  // Explicit `facts` keeps precedence when both fields are present.
+  const both = await store.applyBatch('memory', [{ action: 'add', facts: 'Facts wins.', content: 'Content loses.' }])
+  expect(both.ok).toBe(true)
+  expect(await store.read('memory')).toEqual(['Project uses npm workspaces.', 'Facts wins.'])
+})
+
 it('V6-25: an enum-outside action fails loud instead of silently executing a replace (0.3.37)', async () => {
   const root = await tempRoot('dsh-evo-memory-enum-')
   const store = new MemoryStore({ root })

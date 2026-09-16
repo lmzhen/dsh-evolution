@@ -105,6 +105,20 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false })
   await provider.transactCuratorState(current => ({ ...(current as CuratorStateRecord), lastSummary: 'updated' }))
   assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'updated', paused: false })
+  // --- V27 S4 (PLAN S1.3, 2026-09-16): the record handed to the task is the
+  // task's COPY — a task that mutates it in place and then refuses the write
+  // (null = keep the current record) must not leak the mutation into the
+  // medium. json used to hand out the very object its null path wrote back,
+  // so the mutated graph was serialized on the "unchanged" path; this vector
+  // pins the hand-off discipline for EVERY provider (json, domain, custom). ---
+  await provider.transactCuratorState((current) => {
+    if (current !== null) {
+      current.runCount = 999
+      current.paused = true
+    }
+    return null
+  })
+  assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'updated', paused: false })
 
   // --- claim → resolve (pending → executing → approved) ---
   const live = pendingOf('c-live')

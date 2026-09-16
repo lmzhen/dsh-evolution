@@ -469,15 +469,22 @@ export async function diagnose(
   // profile root, so `all` + a preset directory double-mounts them even when
   // the host bundle is absent (the old `full && layered` condition required
   // host and stayed silent for exactly that combination).
-  if (full && presetDirInstalled) conflicts.push(`evolution-all and the layered Evolution preset (${layeredArtifactLabel}) are both present — the model rows double-mount. Keep ONE (use layered without all, or drop the preset).`)
+  // PLAN S5.10 (2026-09-16, audit P2-28 closing half): the warn spells out the
+  // MECHANISM that until now only INSTALL.md documented — the four model rows
+  // AND the systemPrompt sections exist twice across the profile and preset
+  // layers, and the preset loader does not fail on it: shadowing semantics
+  // hand the session to the nearest layer, so the duplication is swallowed
+  // silently instead of failing loud like the bundle×bundle infra rows above.
+  if (full && presetDirInstalled) conflicts.push(`evolution-all and the layered Evolution preset (${layeredArtifactLabel}) are both present — the four model rows AND the systemPrompt sections double-instance across the profile and preset layers; the preset loader does not fail on it, shadowing semantics take the nearest layer, so an Evolution-preset session silently runs the preset's copies of everything. Keep ONE (use layered without all, or drop the preset).`)
   // V24-11 (v24): the preset BUNDLE mounts the same four model rows as `all`
   // (tool-memory / tool-skill-manage / tool-session-query / skill-catalog),
   // so bundle × layered preset dir is the same double-mount as all × layered
   // — but `layered` requires `host`, so this combination used to pass the
   // matrix silently (installForm even reports the healthy 'preset') and a
   // user following the M4 steps on top of the one-click bundle got no
-  // conflict at all.
-  if (preset && presetDirInstalled) conflicts.push(`evolution-preset and the layered Evolution preset (${layeredArtifactLabel}) are both present — the model rows double-mount (the preset bundle carries the same model rows as all). Keep ONE (drop the preset bundle, or remove the layered preset).`)
+  // conflict at all. Same explicit S5.10 mechanism wording as the all ×
+  // layered row above.
+  if (preset && presetDirInstalled) conflicts.push(`evolution-preset and the layered Evolution preset (${layeredArtifactLabel}) are both present — the preset bundle carries the same model rows as all, so the four model rows AND the systemPrompt sections double-instance and shadowing semantics take the nearest layer (the preset loader does not fail on it). Keep ONE (drop the preset bundle, or remove the layered preset).`)
 
   // P0-1 fix (v11): `evolutionReview` is NOT a provided service — review only
   // registers session-event hooks. Infer its presence from the install form

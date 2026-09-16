@@ -101,7 +101,8 @@ function packageSourceRoot() {
     if (!existsSync(manifestPath)) {
       throw new Error(`scoped installer: ${STAGING_DIR} is not a fresh prepare-release staging — missing .staging-manifest.json; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
     }
-    const stagingVersion = JSON.parse(readFileSync(manifestPath, 'utf8')).version
+    const stagingManifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const stagingVersion = stagingManifest.version
     // V24-17 (v24): the freshness baseline is the FAMILY version read from
     // the FAMILY SOURCE tree (PACKAGES_DIR), the same authority the
     // dependency pin's `familyVersion()` uses. The old `rootPackageVersion()`
@@ -116,20 +117,43 @@ function packageSourceRoot() {
     if (!expected || stagingVersion !== expected) {
       throw new Error(`scoped installer: ${STAGING_DIR} was built for ${stagingVersion || '(unknown)'} but this tree is ${expected || '(unknown)'} — the staging is stale; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
     }
+    // PLAN S5.8 (2026-09-16, audit P2-26): the staging scope must equal the
+    // scope this install resolves names under. The version check alone passed
+    // a staging whose package names were rewritten for @deepseek-ai to an
+    // EVOLUTION_SCOPE=@lmzhen install (and vice versa) — every copied
+    // manifest/dependency then names a package the profile never mounted.
+    // Missing field = pre-S5.8 staging: refused with the same strength as a
+    // stale version (a scope we cannot verify is a scope we cannot install).
+    const stagingScope = stagingManifest.scope
+    if (typeof stagingScope !== 'string' || stagingScope === '') {
+      throw new Error(`scoped installer: ${manifestPath} has no "scope" field — this staging predates scope recording and cannot be scope-verified; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
+    }
+    if (stagingScope !== EVOLUTION_SCOPE) {
+      throw new Error(`scoped installer: ${STAGING_DIR} was built under scope "${stagingScope}" but EVOLUTION_SCOPE is "${EVOLUTION_SCOPE}" — the staged package names do not match this install's scope. Re-run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild the staging, or set EVOLUTION_SCOPE=${stagingScope} to install the existing one`)
+    }
     return STAGING_DIR
   }
   throw new Error(`scoped installer requires ${STAGING_DIR}; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} first`)
 }
 
 export function resolveHome(env = process.env) {
-  // v21 (D-5): trim the value we RESOLVE — the old form tested `trim()` but
-  // returned the raw value (core fixed the identical V8-06/C-11 shape in
-  // state-store.ts), so `DSH_HOME=" /x "` persisted with literal spaces, and
-  // the extra resolve() expanded relative paths against the INSTALLER's CWD
-  // instead of the runtime's — packages landed in a home tree the plugins
-  // never read.
-  const home = env.DSH_HOME?.trim()
-  return home ? resolve(home) : join(homedir(), '.dsh')
+  // v21 (D-5): the installer must land packages in the SAME tree the runtime
+  // reads. PLAN S2.2 (2026-09-16, review B-P2): `trim()` is the ADOPTION test
+  // only, the VALUE is the raw env text, and the result is ALWAYS resolved with
+  // `~` expansion — the line-for-line shape of core's `evolutionRoot`
+  // (evolution-core/src/state-store.ts) and the platform's `resolveDshHome`.
+  // The earlier "trim the value we RESOLVE" form sent `DSH_HOME=" /x "` to
+  // resolve('/x') while the runtime resolved resolve(' /x ') — a tree the
+  // plugins never read, the very failure this function exists to prevent — and
+  // it left `~` unexpanded where the runtime expands it.
+  const fromEnv = env.DSH_HOME
+  const selected = fromEnv !== undefined && fromEnv.trim().length > 0 ? fromEnv : join(homedir(), '.dsh')
+  const expanded = selected === '~'
+    ? homedir()
+    : selected.startsWith('~/') || selected.startsWith('~\\')
+      ? join(homedir(), selected.slice(2))
+      : selected
+  return resolve(expanded)
 }
 
 export function profileDirectory(home, profile) {
@@ -665,11 +689,19 @@ async function resolveRuntimeComposition(base) {
  * Row id set of a composition fragment — lightweight line parse, no YAML
  * library (v2 §10 scope control). Only `- id:` rows count; a row whose id
  * appears in BOTH fragments would mount twice in the generated composition.
+ *
+ * PLAN S5.9 (2026-09-16, audit P2-27): the id extraction accepts INDENTED
+ * `- id:` rows too, so a collision hidden in a nested group is still caught —
+ * the old `^- id:` anchored at column 0 and was blind to exactly the rows an
+ * upstream group nesting would produce. Boundary (current, deliberate):
+ * DETECTION covers nested rows, while the override INJECTION anchors
+ * (`applyRowOverride` below) still match top-level rows only — the injection
+ * indent contract (`^ {2}key:`) is defined against a column-0 row.
  */
 function rowIds(composition) {
   const ids = new Set()
   for (const line of composition.split('\n')) {
-    const match = /^- id:\s*(\S+)/.exec(line)
+    const match = /^\s*- id:\s*(\S+)/.exec(line)
     if (match) ids.add(match[1])
   }
   return ids

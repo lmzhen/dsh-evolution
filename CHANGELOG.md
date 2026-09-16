@@ -1,5 +1,88 @@
 # Changelog
 
+## 0.3.83 (patch) — 审计驱动优化批：P0/P1 止血 + 分层加固 + 继续审查全量修正（S1.1–S5.10）
+
+> 本版来自 2026-09-16 全量审计（`dsh-evolution-mirror-全量审计报告-0.3.82-vs-0.1.5-rc.2-2026-09-16.md`）与
+> `dsh-evolution-mirror-分层分步优化计划-基于0.3.82审计-2026-09-16.md` 的执行批。每步独立 commit 粒度实施、
+> 全部带红/绿验证（先在未修复副本上确认新用例红，再恢复绿）。**四处部署可见的行为变化**：① review subagent 评审看门狗时序、
+> ② `DSH_HOME` 原文值 + 恒 `resolve()`、③ frontmatter 解析器换 `yaml`、④ 无 `evolutionIo` 的部署不再写
+> `feedback_score/feedback_warn` 侧车字段（S4.6 契约如实化）。**一处依赖替换**（js-yaml → yaml）与**导出面变动**
+> （`computeDedupGroups` 返回型 `string[][]` → `{ groups, truncated }`、删零引用 `isGlobalRead`）在下表点名；
+> 两条新告警通道（`reviewTimeoutMs` 触顶、dedup 对数预算截断）见增补小节。定版前对两批合并态重跑 16 步门禁，
+> 首轮暴露的 5 处 `tsc` 严格错误 + 11 处 `oxlint` 违规（全在测试面与 1 处 lint 形态，无生产语义变化）已在本批内修复。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-review` | **S1.1（P0-1）**：subagent 评审 settle 看门狗改为**自 abort 期限起算**（总等待 = `reviewTimeoutMs + min(5s, reviewTimeoutMs)`）——旧实现在调用即刻起算 `min(reviewTimeoutMs, 5s)`，默认 `reviewTimeoutMs=120000` 下任何超过 5 秒的真实评审都被 `ReviewSettleTimeout` 杀死并静默退回 inject，opt-in 的 subagent 通道整体不可用；新增默认配置回归用例（旧实现必红） |
+| `evolution-review` | **S4.1**：`lastTurnStart` 并入死会话清扫（长驻 host 不再泄漏）；`buildReviewRequest` 复用块形状守卫（持久化 `content:[null]` 不再打断评审腿）；inbox `replace` 分支补齐投递契约——被换行在 `next-turn`（唤醒）通道时补发一次 `(wake)` stub 唤醒（含 V7-02 单次抑制），**任何返回 true 的路径都与"调用方清 latch"的实际可消费性一致** |
+| `evolution-core` | **S1.2（P1-1）**：redact 的 CANDIDATE 遍改 `exec` 循环——键名被拒时只跳过 lead+key+separator，不再整行消费；同行多键布局（JSON 常态）下的 camelCase 凭据（`clientSecret` 等）不再明文泄漏出会话边界（已实测复现并钉住）；S0.3 的 `tokenizer/secretary` 负向语义保持 |
+| `evolution-core` | **S2.1（P2-1）**：frontmatter 解析器从 js-yaml（YAML 1.1）**替换为上游同款 `yaml` 包**（1.2 core schema，`^2.4.2`），"与平台目录同判"声明首次为真——`description: 2026-13-45` 等**非法日期不再被 js-yaml 静默溢出**、`2026-09-16` 按字符串接受（平台一致）；快速路径补 `±.inf/±.nan` 引号识别（写入平台安全的字符串形态，未加引号直写时按平台语义 fail-closed 拒绝）；对拍确认差异面仅日期/二进制字面量/错误文案三类 |
+| `evolution-core` | **S2.2（P2-3，行为变化）**：`evolutionRoot` 与上游 `resolveDshHome` 逐行对齐——`DSH_HOME` 采纳测试用 trim、**值用原文**、恒 `resolve()` 绝对化。空白填充值（如 `" /x "`）与未规范化绝对路径（尾斜杠/`..`）下的部署根路径将变化；依赖旧行为的部署需修正环境变量值本身 |
+| `evolution-core` | **S2.3（P2-6）**：redact 块式配对跳过键值之间的空行（`api_key:` 与缩进值行之间有空行时值原样出边界的漏脱敏修复）；**P2-31（core 半）**：`resolveSkillsRoot` 显式相对 root 补 `resolve()`（不再落在进程 CWD） |
+| `evolution-core` | **S2.4（P2-4/P2-5）**：删除零消费者导出 `isGlobalRead`；`saveSuppressedNames` 改走 `transactIo` 通道消除无锁 RMW 并如实标 `@internal`；`write-inventory` 三个测试专用 getter 补如实 `@internal` docblock |
+| `evolution-core` | **S4.3（P2-14）**：`read_secrets` 对 `.env.example/.env.sample/.env.local.example` 等文档化模板变体豁免；真 `.env`/`.env.local` 保持拦截、`.envrc` 不触发、`.env.samples`（非精确后缀）保守拦截（逐 variant 实测钉住） |
+| `evolution-core` | **S5.9（P2-27）**：`compositionRowIds` 碰撞检测的 `- id:` 提取支持缩进行（注入锚定仍限顶层，边界以 spec 固化）；与 `install-layered.mjs` 同步修，byte-parity fixtures 扩展嵌套行样本 |
+| `evolution-state-json` | **S1.3（P1-2）**：`transactCuratorState` 以 `cloneRecord` 克隆交递 task——task 原地变异后返回 null 不再把变异持久化（对齐 domain 与 seam 契约 "null = record unchanged"）；**S3.2（P2-8）**：补 `transactTaskGuard`（后端不调 task 的假写显式失败，与三条兄弟 save* 路径纪律一致） |
+| `evolution-state-storage` | **S1.3**：conformance 套件新增"task 收到副本、变异不可达存储"向量（第三方 provider 同受约束） |
+| `evolution-state-domain` | **S3.1（P2-7）**：漂移键修复统一为 **canonical 记录胜出**（漂移记录不再覆盖 canonical 槽；与 json `keyPendingById` 同一 tie-break），跨介质修复结果一致 |
+| `evolution-feedback` | **S1.4（P1-3）**：restore 合并的"内存获胜"收窄到 **in-flight 追加窗口**（pending 集，finally 清除）——多进程共享 DSH_HOME 时，本进程触摸过的 target 不再永久覆盖 refold 真值，过期的 `feedback_score/feedback_warn` 不再写进 usage 侧车；rc.66 启动竞态保护保持 |
+| `evolution-feedback` | **S4.6（P2-20）**：无 `evolutionIo` 时 `pushQuality` 直接返回——乐观内存分不再写进持久 usage 侧车（"durable through ctx.evolutionIo (when mounted)"契约首次完全为真） |
+| `evolution-curator` | **S4.5（P2-16）**：非持有实例的手动 `restore/consolidate/restoreSnapshot` 补 instance-claim 门（与 `run()` 同词 `instance-held` 拒绝，`SkillActionResult` 形状，命令面零改动）；**（P2-17）**：first-run defer 播种改 `transactCuratorState`（并发 `setPaused` 不再被 `paused:false` 整记录覆盖） |
+| `evolution-policy` | **S4.2（P2-13）**：默认保护名单引用 core `PROTECTED_BUILTIN_SKILLS` 单源（哨兵 mock 测试证明字面量删除） |
+| `evolution-approval` | **S4.4（P2-15）**：REV-07 确定性失败词表补 `path traversal`——穿越路径 staged 记录 approve 失败一次即获"改用 reject"指引，不再是永久反复失败的 pending 行 |
+| `evolution-replay` | **S5.1（P2-18）**：`sourceCorrupt` 限定语跟随**当次读取状态**（io 重载且非 corrupt 读取即复位；再损坏复现；历史损坏仍 warn 一次可观测） |
+| `evolution-activity` | **S5.2（P2-19）**：`loadActivity` docstring 的 V24-13 失实生产消费者声明更正为如实 `@internal`（导出面不破坏） |
+| `evolution-commands` | **S5.4（P2-22）**：`maintain --facts` 预览接 M-02 失败判别（onReadError + rootExists 探针）——配错 root/全树不可读时如实报错，不再渲染"干净 facts"误导；**S5.5（P2-23）**：restructure 无 session 时 E-306 结构化拒绝（不再落地无会话归因的 staged 记录，与 consolidate/restore 姿态一致）；**S5.10（P2-28）**：doctor 对 all/standalone preset 与分层 Evolution preset 并存补显式 warn（双模型行 + 双 systemPrompt section、loader 不报错靠遮蔽）；**S5.3（审计修正）**：T-WD2 实际锚定**家族级 README**（原有机制健康、`renderCommandTable` 非死代码——审计该条为误报），包内 README 改为引用单源并以 N19 规则消除重复事实，`registry.ts` 注释澄清 "README" 指代 |
+| `evolution-skill-catalog` | **P2-30**：legacy 禁用键 `disableModelInvocation`（含拼错值）存在时 `modelInvocable` 回退 **false**（disable 倾向）——此前回退行默认 true，作者"禁止模型调用"意图被反转为允许（上游对同文件是整体丢弃） |
+| `memory-files` | **P2-31（另一半）**：显式相对 `root` 挂载即 `resolve()` 绝对化（缺省 `memoryRoot()` 不变）——宿主换 CWD 重启不再"记忆凭空消失" |
+| `scripts`（不进包） | **S5.6（P2-24）**：`prepare-release.mjs` 把各包 `README.md` 纳入 `rewriteScopedText`（家族/seam 包名改写、平台名原样），并加 shipped-README 二次扫描（对齐 V24-18）；**S5.8（P2-26）**：`.staging-manifest.json` 记录 `scope`，`install-layered.mjs` freshness 加 scope 比对（错配/缺失 fail-loud，给出两条修复路径） |
+| workflow | **S5.10（P2-29，审计修正）**：核实 `verify-declared-config --strict --upstream` 发布门**已存在**（`.github/actions/evolution-validate`，compat-check 硬门 `publish`，0.3.70 起）——审计"守卫在发布链之外"的前提过时，未改 workflow；本地以 0.1.5-rc.2 树实测绿（54 reachable / 0 violation） |
+
+### 验收与证据
+
+- 全图类型检查：上游检出内 `tsc -b` 全部 29 个 overlay 包零错误（基于平台真实源码）。
+- 全量测试：`vitest run packages/evolution/*/tests` 全绿（新增约 40 个回归用例，全部先红后绿）。
+- 守卫脚本：`verify-arch-guards`（21 规则）、`verify-doc-facts`、`verify-event-pairing` 全部 0 violation。
+- 回滚快照：改动前完整备份于 `D:\dsh\_evo-pre-opt-backup-20260916\mirror-packages.tgz`。
+
+### 增补：继续审查修正（同一发布批的第二轮实施，依《继续审查报告-0.3.83本地批》P1-1 + P2-1…P2-11 全量修正）
+
+| 层 | 变更 |
+|---|---|
+| `evolution-review` | **P1-1**：replace 补唤醒的 cadence 抑制从单发扩展为**两轮**（`skipNextCadenceFire` 值形状加 `turns`，append 单轮路径行为不变）——stub 轮不再裸奔触发多余评审；注释与 README 的 "suppressed once" 措辞同步为两轮语义。**P2-1**：settle 预算按 `MAX_TIMER_DELAY_MS` **封顶**（新公式在 `reviewTimeoutMs` 接近 2^31-1 的合法配置下曾溢出 int32、看门狗退化为 1ms 误杀每次评审），触顶一次性告警。**P2-2**：`run.dispose` 看门狗改用**仅宽限**预算（原顺带放大到 timeout+grace，挂死的 dispose 占单飞链 ~125s），错误消息按武装点区分（dispose 消息去掉失实的 "after the review timeout" 锚点），文件头注释同步 |
+| `evolution-core` | **P2-3**：`read_secrets` 的 example/sample 豁免后缀由 `\b` 收紧为 `(?=$|[\s"'])`——`.env.example.local`、`.env.sample-x`、`.env.example/` 等续体形态恢复拦截，三类文档化模板变体仍放行。**P2-6**：参考实现 `MemoryStore.applyBatchCore` 承认 `content` 别名（`facts ?? content`，add/replace 两处内容位）——直连 core store 的第三方 provider 不再对 schema 合法的 content 写报错；四处适配垫片保留（继续为第三方 provider 归一化）。**P2-8**：`computeDedupGroups` 增加**对数预算**（`DEDUP_MAX_PAIR_COMPARISONS=250_000`，超限截断并带 `truncated` 指示，三个消费方（`drift-signals` / `maintenance probe` / `skill-manage review`）各补截断提示行（curator 的近重复候选池只消费 `groups`，截断仍会静默缩小该池——记下版处置）；默认预算下输出逐字节不变）——大库上 review/dedup_group 的 O(n²) 热路径获得上界 |
+| `evolution-maintenance` | **P2-4**：maintain 计划校验器的 §3 完备性门从信号 id 粒度改为**实例粒度**（`skill::id`）——同一 over 信号命中多技能时，未被计划建议覆盖且未被 notes 解释的实例（`skill-b::narrow_name` 形态）现在会被拒绝并点名；notes 通道保持 id 级（自由文本解释覆盖该 id 全部实例）；库级单次渲染信号保持裸 id 实例 |
+| `tool-skill-manage` | **P2-7（skill 侧）**：`SKILL_ACTION_REQUIRED_FIELDS` 缺参预检**上提到审批 stage 边界之前**（与 executeCore 共享同一 helper 与消息，判定不可能分叉）——审批启用的部署上缺参写不再先 stage、批准后必败。**P2-5**：review 的去重分组排除读取失败/空体的技能（不再产出 `a ~ b` 假"近重复组"），并追加排除数量说明行 |
+| `tool-memory` | **P2-7（memory 侧）**：按 store 的逐 action 必填契约（add 需 facts/content、remove/replace 需 old_text、replace 需新内容）在审批门前做**镜像预检**（字段级判定与 store 文本一致）——缺参写不再产生"批准后必败"的 pending 记录 |
+| `evolution-skill-catalog` | **P2-9**：P2-30 的意图反转修复扩展到兄弟 legacy 键——`modelInvocable`/`userInvocable` legacy 值解析成功则尊重作者意图（false→false）、解析失败保守 false（对齐上游整文件丢弃的方向）；修正被旧测试钉错的 `modelInvocable: false → 发布 true` 断言 |
+| `evolution-commands` | **P2-10**：`maintain --facts` 的空库第三因改为返回与全扫描**逐字相同**的消息（不再渲染空 facts 块与扫描结论相悖）。**P2-11**：包 README 对家族 README 的命令表引用从仓库相对链接改为纯文字（npm 发布产物内相对链接必为死链） |
+
+#### 增补批验收与证据
+
+- 全图类型检查：29 个 overlay 包 `tsc -b` 零错误；全量 `vitest` 153 个测试文件全部通过（较上一批新增约 25 个回归用例，全部先红后绿；其中 core 与 tool-skill-manage 两路在 dedup 调用面的并发改动经合并态复验共存全绿）。定版前合并态 16 步门禁复跑：`tsc -b`（含 `tsconfig.host.json` 覆盖的 tests 全量，`--force`）、`oxlint`、`vitest` 153 文件与 13 项 verify/check 全绿（首轮 5 tsc + 11 oxlint 的修复即本次）。
+- 守卫脚本：`verify-arch-guards`（21 规则）、`verify-doc-facts`、`verify-event-pairing --strict` 全部 0 violation（`verify-platform-ranges` 在 dev overlay 下按设计不可运行——它面向 @lmzhen 发布树，需 release staging，非本批回归）。
+- 说明：`reviewTimeoutMs` 触顶告警与 dedup 截断提示是仅有的两处新告警通道，均为 fail-可见方向；接口面只动了下表点名的两处（`computeDedupGroups` 签名收窄、删零引用 `isGlobalRead`），无新配置项（预算为内部常量）。
+
+#### 定版前复查修正（第三轮：合并态门禁 + 三路读码复查，2026-09-16）
+
+- **门禁首轮红→绿**：合并态首跑暴露 5 处 `tsc` 严格错误（`lifecycle.spec` 缺 `Session` 类型导入、`feedback.spec` 未用局部变量、`tool-skill-manage.spec` 收窄后的 `.message`）+ 11 处 `oxlint`（arrow-parens ×3、max-len、unbound-method ×2、no-unsafe-* ×3、no-unnecessary-type-conversion、no-unused-vars）——全在**测试面**与 1 处 lint 形态，无生产语义变化；修复后 16 步门禁复跑全绿。
+- **`evolution-feedback` 在飞标记改引用计数**（复查 C-P2-1）：`pendingAppends` 由「每 target 一个布尔标记」改为 **Map 计数**——同一 target 两次追加同时在飞时，先落地那次的 `finally` 不再提前清标记（旧形态下第二次追加的乐观增量会被中间那次 merge 用日志真值覆盖）。判别用例 `feedback.spec.ts`「TWO appends in flight for the same target…」在旧实现下**实测红**（`positive` 期望 2、实得 1）。
+- **`redact` 候选遍恢复线性**（复查 B-P1，性能回归）：模式第四组由**消费式** `([^\r\n]+)` 改为零宽前瞻 + 循环内手工定位值尾——160k 字符单行赋值链由实测 ~2.1s（320k 为 7.0s；被替换掉的 `.replace` 形态 ~0.1ms）回到毫秒级；新增文件内既有惯例的计时卫语句（<1s）。拒绝路径的续扫位置与「宁可过度遮挡」权衡不变。
+- **`frontmatter` `±.nan` 假阳性**（复查 B-P2）：两个解析器都把带符号 `.nan` 读作**字符串**，原引号表会把正确值改写并报 `catalog-invalid`；表收紧为 `^(?:[-+]?\.inf|\.nan)$`，spec 断言同步更正（`+.nan` → `false`；`-.nan` 仍为 `true`，但归因改为既有的**前导指示符**规则——引号本身安全，缺陷只在假阳性的 `catalog-invalid`）。
+- **`install-layered.resolveHome` 与运行时对齐**（复查 B-P2）：`trim()` 仅作采纳判据、值用原文、恒 `resolve()` 且展开 `~`——安装器、core `evolutionRoot` 与上游 `resolveDshHome` 三处同形；填充空白/相对 `DSH_HOME` 下不再装进插件永不读取的树。
+- 复查同时确认（未改动）：`DSH_HOME` 语义与宿主 `dsh-home-paths` 逐行一致；`yaml@^2.4.2` 与平台 `skill-filesystem` 同依赖且发布闭包可达；state-json 克隆/守卫的新用例均有判别力；`isGlobalRead` 全镜像零引用。
+
+### 明确不做 / 挂账（对应计划第 5 节）
+
+- 不做状态介质迁移工具；不统一 .mjs/.ts 行覆盖双实现为共享构建产物（保持 byte-parity 测试）；不把 `verify-profile-bundles` 接入宿主启动路径。
+- 不为库层错误建结构化错误码体系（S4.4 已在注释挂账）；不引入自动化死代码检测基建。
+- `loadActivity` 为已发布导出面，本期仅更正声明，下个大版本删除。
+- 定版前复查新增挂账（下版）：`evolution-curator` 的近重复候选池消费 `computeDedupGroups` 时丢弃 `truncated`（截断阈值 ≈708 技能，报告里无提示）；`reviewTimeoutMs` 触顶告警的「只发一次」无断言；coalescing 路径未看 `reviewWakeInject`（本插件自身投递路径下不可达）；`tool-memory` 的审批前预检与 store 拒绝文案是手抄副本（建议单源化）。
+- 定版前复查另记（**既有**，非本批引入）：`yamlPlainScalarNeedsQuotes` 的前导指示符分支把 `-foo`/`?x`/`:x` 判为需引号，而两个解析器都读作普通字符串 ⇒ 对平台正常加载的文件报 `catalog=yaml-invalid`（`render-facts.ts`）；按 YAML 1.2 `ns-plain-first` 应只在 `-/?/:` **后接空格**时判指示符，但该谓词同时服务审计判决与写路径引号（frontmatter.ts:114-118 的同一性设计），放宽需先拆分两用。
+- 已知代价（保留）：`yaml` 的解析成本高于 js-yaml（多键 62k 实测 226ms vs 10.5ms、anchor 100k 256ms vs 19.5ms），单文件受 `MAX_SKILL_CONTENT_CHARS=100_000` 约束（≤~0.26s），全库扫描时是乘数——这是「与平台同解析器」换来的确定性，不改为分叉解析。
+
 ## 0.3.82 (patch) — 分层优化批：S0–S4 全量收口（鲁棒性 / 单源化 / 结构 / 交付）
 
 > 本版来自 `dsh-evolution-optimization-plan-v44.md` 的执行批：按「核查 → 设计 → 实现」逐步推进 S0–S4，每一步都在镜像提交并跑 16 步门禁。

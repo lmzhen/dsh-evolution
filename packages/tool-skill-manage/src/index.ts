@@ -100,6 +100,34 @@ function policySnapshotOf(source: unknown): { protectedSkillNames?: readonly str
   return (source as { get?(): { protectedSkillNames?: readonly string[] } } | undefined)?.get?.()
 }
 
+// PLAN-R2 P2-7 (2026-09-16): the missing-required-argument check as ONE
+// function that both the approval stage boundary (execute's pre-check) and
+// executeCore read, so the pre-check and the execution check cannot diverge:
+// the same single-source table (core `SKILL_ACTION_REQUIRED_FIELDS`, OPT-05 —
+// the plan validator reads the same rows), the same OWN-property narrowing
+// (v29 TSM-01 — a plain-object index resolves inherited members
+// (`constructor`, `toString`, …) to truthy functions, reachable through the
+// approval replay runner, which executes STORED args with no schema in front
+// of it), and the same exists semantics (V27 G5.1): undefined/null is
+// missing; an EMPTY string is deliberately NOT — it still reaches the
+// library, whose branch messages carry the more specific remedy (e.g. an
+// empty patch anchor points at `update`).
+function missingRequiredArgs(args: SkillWriteArgs): readonly string[] {
+  const action = args.action
+  const scalarArgs = args as Record<string, unknown>
+  const requiredArgs: readonly string[] =
+    action === undefined || typeof action !== 'string' || !Object.hasOwn(SKILL_ACTION_REQUIRED_FIELDS, action)
+      ? []
+      : SKILL_ACTION_REQUIRED_FIELDS[action] ?? []
+  return requiredArgs.filter((field: string) => scalarArgs[field] === undefined || scalarArgs[field] === null)
+}
+
+// PLAN-R2 P2-7 (2026-09-16): one refusal builder so the stage-boundary
+// pre-check and executeCore emit the identical structured message.
+function missingArgsRefusal(action: string | undefined, missing: readonly string[]): { ok: false; message: string; skills: string[] } {
+  return { ok: false, message: `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`, skills: [] }
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   // Hermes SKILLS_GUIDANCE parity: when the system-prompt service is mounted,
   // register the skills guidance section exactly when THIS tool mounts (i.e.
@@ -259,31 +287,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return { ok: false, message: `skill_manage: "${name}" is protected by the current policy (protectedSkillNames); replayed/autonomous writes are refused.`, skills: [] }
       }
     }
-    // V27 G5.1 (v27 T-2): the tool schema can only require `action` (every other
-    // argument is action-specific), so an omitted argument used to surface as a
-    // downstream empty-string message. Name the missing arguments here, per
-    // action, before anything is read or written. An EMPTY string still reaches
-    // the library: its messages carry the more specific remedy (e.g. an empty
-    // patch anchor points at `update`).
-    // OPT-05 (2026-09): the table moved to core `SKILL_ACTION_REQUIRED_FIELDS` —
-    // the plan validator reads the same rows, so a plan can no longer pass
-    // validation for an op the tool would then refuse for missing arguments
-    // (write_file/remove_file lacked a file_path requirement validator-side).
-    const REQUIRED_ARGS = SKILL_ACTION_REQUIRED_FIELDS
-    // `action` is optional on the queued/staged args shape, so the index needs
-    // a narrowing first (an unknown action is refused by its own branch below).
-    // v29 TSM-01: the guard must be an OWN-property check — a plain-object
-    // index resolves inherited members (`constructor`, `toString`, …) to
-    // truthy functions, `?? []` never fired, and `.filter` threw a bare
-    // TypeError. Reachable through the approval replay runner, which executes
-    // STORED args with no schema in front of it.
-    const requiredArgs: readonly string[] =
-      action === undefined || typeof action !== 'string' || !Object.hasOwn(REQUIRED_ARGS, action)
-        ? []
-        : REQUIRED_ARGS[action] ?? []
-    const missing = requiredArgs.filter((field: string) => scalarArgs[field] === undefined || scalarArgs[field] === null)
+    // V27 G5.1 (v27 T-2) / OPT-05 (2026-09): name the missing per-action
+    // arguments before anything is read or written. PLAN-R2 P2-7 (2026-09-16):
+    // the table, the Object.hasOwn narrowing, the exists semantics and the
+    // refusal wording live in the shared helpers above, so this execution-time
+    // check and the execute() stage-boundary pre-check cannot diverge. The
+    // replay channel enters HERE (no schema, no approval seam in front), so
+    // this check must stay.
+    const missing = missingRequiredArgs(args)
     if (missing.length > 0) {
-      return { ok: false, message: `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`, skills: [] }
+      return missingArgsRefusal(action, missing)
     }
     let feedbackLines: string[] = []
     // v23 (AP-3) / v30 REV-03 → v35 C9: the stage-time anchor is no longer
@@ -428,15 +441,41 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // whole library hit EMFILE on large trees, and ONE unreadable SKILL.md
     // (read() re-throws everything but EISDIR) killed the whole `review`
     // action; an unreadable skill now contributes no content (no dedup edges).
+    // PLAN-R2 P2-5 (2026-09-16): "no content" means ABSENT from the grouping
+    // input, not an empty string — `body ?? ''` handed two read failures (or
+    // two 0-byte SKILL.md files, which read() returns as successful '') to
+    // computeDedupGroups, whose exact normalized-hash bucketing merged them
+    // into a fake near-duplicate group that invites merging skills whose
+    // bodies nobody has seen (the /graph INS-04 posture: unreadable skills
+    // are counted, never given content). A null body (caught error, missing
+    // file, or a tree-sourced name the library refuses to read) and a
+    // whitespace-only body are excluded here and counted for the review note
+    // below; computeDedupGroups itself is untouched.
     const contents = new Map<string, string>()
+    let excludedBodies = 0
     for (let offset = 0; offset < list.length; offset += 16) {
       await Promise.all(list.slice(offset, offset + 16).map(async (summary) => {
         const body = await library.read(summary.name).catch(() => null)
-        contents.set(summary.name, body ?? '')
+        if (body === null || body.trim() === '') {
+          excludedBodies += 1
+          return
+        }
+        contents.set(summary.name, body)
       }))
     }
-    const groups = computeDedupGroups({ contents })
+    // PLAN-R2 P2-8 (2026-09-16): the scan is budget-bounded; a truncated sweep
+    // renders an explicit note instead of reading as a clean pass.
+    const dedup = computeDedupGroups({ contents })
+    const groups = dedup.groups
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
+    if (dedup.truncated) dedupLines.push(`- note: dedup scan truncated at the pair-comparison budget (${groups.length} group(s) so far); groups may be incomplete`)
+    // PLAN-R2 P2-5 (2026-09-16): say so when bodies were left out of the
+    // grouping — a short group list must not read as "nothing similar was
+    // checked". Same leading-newline style as warningLine; spliced in only
+    // when non-empty so the no-exclusion output stays byte-identical.
+    const excludedLine = excludedBodies === 0
+      ? ''
+      : `\n${excludedBodies} skill bodies were unreadable/empty and excluded from dedup grouping.`
     const warned = list
       .filter(summary => warnedFlag(summary.name))
       .map(summary => summary.name)
@@ -449,7 +488,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
       : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
-    return [header, '', ...lines, ...dedupLines, warningLine].join('\n')
+    return [header, '', ...lines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), warningLine].join('\n')
   }
 
   ctx.tools.register(defineTool({
@@ -541,6 +580,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // S1-B2: the shared gate (same body the replay runner runs).
         const refusal = await crossSourceRefusal(args.name)
         if (refusal !== null) return { ok: false, message: refusal, skills: [] }
+      }
+      // PLAN-R2 P2-7 (2026-09-16): the missing-argument pre-check runs BEFORE
+      // the approval seam. On an approval-enabled deployment a write that
+      // cannot execute (e.g. patch without new_string) used to be STAGED,
+      // spend a human approval, and only then fail the replay inside
+      // executeCore — wasted operator attention for a guaranteed refusal
+      // (the defect class GRAPH-03/OPT-05/V7-07 closed on their surfaces).
+      // The stage boundary now refuses with the SAME structured message
+      // executeCore produces (one shared helper, so the two sites cannot
+      // diverge); direct writes get the identical refusal a moment earlier,
+      // and executeCore keeps its own check because the replay channel enters
+      // there directly.
+      const missing = missingRequiredArgs(args)
+      if (missing.length > 0) {
+        return missingArgsRefusal(args.action, missing)
       }
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {

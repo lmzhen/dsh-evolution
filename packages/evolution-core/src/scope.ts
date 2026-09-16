@@ -27,9 +27,3 @@ export function callingScope(ctx: Context, held?: OpaqueScopeKey): OpaqueScopeKe
   if (held !== undefined) return held
   return scopeOf(ctx)
 }
-
-/** True when a read is deliberately scope-less (global layer only). Callers
- * pass this to the register so the choice is reviewed, not accidental. */
-export function isGlobalRead(scope: OpaqueScopeKey | undefined): boolean {
-  return scope === undefined
-}
