@@ -1,10 +1,11 @@
 # Evolution plugin family
 
-> **V9-03 (0.3.50):** `packages/README.md` is synced from the dev-tree
-> `README.md` by the release robocopy (its canonical copy) — this root file
-> and the packages copy are SIBLING documents with parallel install sections;
-> keep them in sync manually (the packages copy carries the same note at its
-> top).
+> **V9-03 (0.3.50), restated for the mirror-single-line workspace (0.3.83):**
+> this root file and `packages/README.md` are SIBLING documents with parallel
+> install sections, kept in sync BY HAND — neither is generated from the other.
+> The flat mirror is the authoring and publication tree; the former dev tree
+> (`D:/dsh/deepseek-harness`) is stale and carries an `AUTHORING-MOVED.md`
+> marker (CONTRIBUTING.md §The gate). The packages copy carries the same note.
 
 Hermes-style self-evolution for DeepSeek Harness, implemented as composable
 Cordis plugins. The model may only propose and write **memory** and **skills**;
@@ -53,6 +54,9 @@ the background writes, use M2 (human approval); M3 removes only the model
 tools — its automation keeps running.
 
 ### Install modes (M1-M4)
+
+The M numbers are defined HERE; the install FORMS and their per-platform
+verification status are single-sourced in `packages/INSTALL.md`.
 
 | Mode | One-liner | What you get |
 |---|---|---|
@@ -119,7 +123,7 @@ agent preset).
 | scope | global / per-session | package choice — evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
 | curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` (evolution-curator) |
 | memoryInjection | on / off | `memoryEnabled` (tool-memory: the whole row is a no-op when off — no `memory` tool registration and no guidance/snapshot injection) |
-| threatStrictness | strict / exempt-list | `threatExemptLabels` — per config site: the evolution-threat row, the tool-skill-manage row, the evolution-commands row, and the SkillLibrary/MemoryStore store options (P2-18 + P2-4) |
+| threatStrictness | strict / exempt-list | `threatExemptLabels` — declared per config site (guard rows, the command face, the store options); the owning list of declaring sites is single-sourced in `evolution-threat/README.md` (P2-18 + P2-4) |
 
 Fine-grained knobs run into the three-level appendix: **daily** (review
 intervals, curator cadence), **tuning** (health thresholds, quality weights),
@@ -134,6 +138,9 @@ cost and behavior).
 | `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile config (`!!js` in bundle patch) | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
 | `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code (core `env.ts`) | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
 | `EVOLUTION_SCOPE` | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. Plugin runtime never reads it |
+| `DSH_EVOLUTION_DELTA_PATH` | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment the layered installer composes from (default: the packaged `evolution-agent/agent.cordis.yml`); tests and one-off builds inject a fixture |
+| `DSH_EVOLUTION_ARCH_STRICT` | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`); the plugin runtime never reads it |
+| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | guard scripts only (`verify-declared-config.mjs`) | `1` makes the declared-config-reach guard fail loud instead of warn (same effect as `--strict`); the plugin runtime never reads it |
 
 ## Installation
 
@@ -226,7 +233,9 @@ platform default until it is recomposed. The `verify-declared-config.mjs`
 guard prints this reach per profile and per declared key. The 60-char authoring
 bar enforced by tool-skill-manage applies regardless.
 
-Or compose manually — order matters because provider rows declare `inject`.
+Or compose manually — the rows below carry the PUBLISHED scope (the two scope
+forms and which one a checkout/overlay uses are single-sourced in `INSTALL.md`
+§5 Production install) — order matters because provider rows declare `inject`.
 This mirrors the row set shipped by the two bundles (evolution-host infra +
 evolution-agent model tools); in the OVERLAY the DSH profile HOST provides the storage facility
 (`storage`/`storage-json`/`storage-domain`), which this preset does not own;
@@ -264,7 +273,9 @@ joins only when mounted (D-30):
 - id: tool-skill-manage
   name: '@lmzhen/dsh-tool-skill-manage'
 - id: tool-session-query
-  name: '@lmzhen/dsh-tool-session-query'
+  # Platform package, not a family one: it keeps the platform scope (the
+  # release rewrite touches family names only).
+  name: '@deepseek-ai/dsh-tool-session-query'
 - id: evolution-skill-catalog
   name: '@lmzhen/dsh-evolution-skill-catalog'
 - id: evolution-approval
@@ -342,12 +353,16 @@ Where to add a capability — and where NOT to:
 
 ## Development: the two layouts and their tsconfigs
 
-Dev source lives at `packages/evolution/*`; the mirrored publication repo uses
-the flat form `packages/evolution-*`. The repo `tsconfig.base.json` /
+Authoring happens HERE, in the flat mirror (`packages/evolution-*`), which is
+also the publication tree — the publish chain runs without its dev→mirror sync
+step and nothing copies a second tree over this one. The upstream checkout used
+for type-checking and tests hosts the same sources under `packages/evolution/*`
+(the CI overlay builds it from the platform tag; the machine-local
+`D:/dsh/deepseek-harness` checkout is the STALE former dev tree). The repo `tsconfig.base.json` /
 `tsconfig.host.json` carry the `@deepseek-ai/dsh-evolution*` alias (the publish chain rewrites the scope; no `@lmzhen` alias exists in tsconfig)
 lines and project references as `./packages/evolution/<pkg>` paths. Those
-`packages/evolution/...` paths resolve ONLY in the full upstream checkout (the
-dev tree or the CI overlay built against it) — they are not resolvable as a
+`packages/evolution/...` paths resolve ONLY in that upstream checkout — they
+are not resolvable as a
 standalone flat mirror, where the packages live as `packages/evolution-*`.
 When a config in the published repo is copied into the flat tree for a
 stand-alone build, its project references therefore remain
@@ -363,6 +378,11 @@ The same layout rule applies to the setup commands: in the flat mirror run
 `node packages/scripts/install-layered.mjs` (there is no
 `packages/evolution/scripts` directory here), while the upstream checkout
 uses `packages/evolution/scripts/install-layered.mjs`.
+
+`packages/scripts/**` is the one cross-tree obligation left: the publish chain's
+version guard compares it byte-for-byte against the stale checkout's copy, so a
+script change here is mirrored there before a release (0.3.83 reconciled 58
+drifted files, including a whole missing `checklists/**` tree).
 
 Tests rely on the same merged layout: the suites import ~30 `@deepseek-ai/*`
 modules that are intentionally NOT declared in the packages'
@@ -402,11 +422,18 @@ Walk through this list on every upstream bump (see `UPSTREAM_SHA`):
 4. **Per-skill invocation frontmatter**: upstream `skill-filesystem` parses
    `disable-model-invocation` / `user-invocable` per SKILL.md (and throws on
    legacy camelCase keys). Our shadowing provider must keep parsing the same
-   keys per skill (`evolution-skill-catalog`, OPT-10) — re-verify the key
-   names and the legacy-key posture on upgrade, or per-skill visibility
-   controls silently stop working under the shadow again.
+   keys per skill (`evolution-skill-catalog`, OPT-10). The family's
+   legacy-key postures — `disableModelInvocation` disables the model row, and
+   the camelCase keys `modelInvocable`/`userInvocable` respect the author's
+   value when it parses (conservative `false` when it does not, 0.3.83 P2-9) —
+   are single-sourced in `evolution-skill-catalog/README.md`; re-verify the key
+   names and those postures on upgrade, or per-skill visibility controls
+   silently stop working under the shadow again.
 5. **Home-path semantics**: upstream `resolveDshHome` (`@deepseek-ai/dsh-home-paths`)
-   trims, expands `~`, and resolves to an absolute path. `evolutionRoot`
-   (core `state-store.ts`) mirrors this since OPT-27 — the skill-catalog
-   shadow and the preset installer both depend on landing on the SAME
-   directory the platform serves. Re-diff both implementations on upgrade.
+   uses `trim()` only as the ADOPTION test (empty/whitespace-only falls back to
+   the default home), keeps the RAW env value, expands `~`, and always resolves
+   to an absolute path. `evolutionRoot` (core `state-store.ts`) has matched that
+   line for line since 0.3.83 (S2.2), and `install-layered.mjs`'s `resolveHome`
+   follows the same shape — the skill-catalog shadow, the preset installer and
+   the runtime must all land on the SAME directory the platform serves. Re-diff
+   all three implementations on upgrade.

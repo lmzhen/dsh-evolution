@@ -204,7 +204,9 @@ recomposed or the upstream default changes. The `verify-declared-config.mjs`
 guard prints this reach per profile and per declared key. The 60-char authoring
 bar enforced by tool-skill-manage applies regardless.
 
-Or compose manually — order matters because provider rows declare `inject`.
+Or compose manually — the rows below carry the OVERLAY scope (both scope forms
+are single-sourced in `INSTALL.md` §5 Production install) — order matters
+because provider rows declare `inject`.
 This mirrors the row set shipped by the two bundles (evolution-host infra +
 evolution-agent model tools); in the OVERLAY the DSH profile HOST provides the storage facility
 (`storage`/`storage-json`/`storage-domain`), which this preset does not own;
@@ -319,12 +321,16 @@ being bypassed. (v14 audit §7.)
 
 ## Development: the two layouts and their tsconfigs
 
-Dev source lives at `packages/evolution/*`; the mirrored publication repo uses
-the flat form `packages/evolution-*`. The repo `tsconfig.base.json` /
+Authoring happens HERE, in the flat mirror (`packages/evolution-*`), which is
+also the publication tree — the publish chain runs without its dev→mirror sync
+step. The upstream checkout used for type-checking and tests hosts the same
+sources under `packages/evolution/*` (the CI overlay builds it from the platform
+tag; the machine-local `D:/dsh/deepseek-harness` checkout is the STALE former dev
+tree). The repo `tsconfig.base.json` /
 `tsconfig.host.json` carry the `@deepseek-ai/dsh-evolution*` alias (the publish chain rewrites the scope; no `@lmzhen` alias exists in tsconfig)
 lines and project references as `./packages/evolution/<pkg>` paths. Those
-`packages/evolution/...` paths resolve ONLY in the full upstream checkout (the
-dev tree or the CI overlay built against it) — they are not resolvable as a
+`packages/evolution/...` paths resolve ONLY in that upstream checkout — they
+are not resolvable as a
 standalone flat mirror, where the packages live as `packages/evolution-*`.
 When a config in the published repo is copied into the flat tree for a
 stand-alone build, its project references therefore remain
@@ -334,7 +340,13 @@ The same layout rule applies to the setup commands: in the flat mirror run
 `packages/evolution/scripts` directory here), while the upstream checkout
 uses `packages/evolution/scripts/install-layered.mjs`.
 
-> **V9-03 (0.3.50):** this file is the canonical copy — the mirrored
-> `packages/README.md` is synced from here on every release (robocopy);
-> the mirror-root `README.md` is a sibling document with its own install
-> sections, keep its notes in sync manually (see its top note).
+`packages/scripts/**` is the one cross-tree obligation left: the publish chain's
+version guard compares it byte-for-byte against the stale checkout's copy, so a
+script change here is mirrored there before a release (0.3.83 reconciled 58
+drifted files, including a whole missing `checklists/**` tree).
+
+> **V9-03 (0.3.50), restated for the mirror-single-line workspace (0.3.83):**
+> this file and the mirror-root `README.md` are SIBLING documents with parallel
+> install sections, kept in sync BY HAND — neither is generated from the other
+> and no robocopy step writes this file (the publish chain runs without its
+> dev→mirror sync step). The root copy carries the same note.

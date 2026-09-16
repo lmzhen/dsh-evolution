@@ -18,22 +18,26 @@ The full `all` bundle is the new-install default; `host` is the shrink path
 
 ### Install-form status against the validated platform line (`0.1.5-rc.2`)
 
-Column 3 says whether the form was EXERCISED on `0.1.5-rc.2` or only judged from
-the source diff — a form is "已验证" only when an install ran against that line.
+Column 2 names the install mode; the M1–M4 vocabulary — what each number means —
+is defined once in the root `README.md` §Install modes (M1-M4) and is cited here,
+not restated. Column 3 says whether the form was EXERCISED on `0.1.5-rc.2` or
+only judged from the source diff — a form is "已验证" only when an install ran
+against that line.
 
-| Form | Audit label | Status on `0.1.5-rc.2` | Basis |
+| Form | Install mode | Status on `0.1.5-rc.2` | Basis |
 |---|---|---|---|
 | §1 ① Variant — layered (`--mode variant` / `layered`, source checkout) | M4 | **部分已验证** | preset resolution now probes the 0.1.5 shipped location first and is covered by `installer.spec.ts` (G2.1); the profile write path itself is unchanged and still only exercised on the dev tree |
-| §2 Host-only (`--mode host`) | M2 (host half) | **未验证**（源码级判定） | the host bundle overrides two platform base rows whose text is byte-identical on both lines; no `0.1.5-rc.2` install has been run |
-| §3 Agent-only (`--mode agent`) | M4 (preset half) | **部分已验证** | same preset-resolution coverage as §1 |
-| §4 ② Attach — one-click (`--mode attach` / `oneclick`, `@lmzhen/dsh-evolution-preset`) | M3 | **未验证**（源码级判定） | no platform package is mounted by the bundle; the row set is the same one §2 uses |
-| §5 Production (`dsh plugin add @lmzhen/dsh-evolution-all`) | M1 | **未验证**（源码级判定） | the published ranges are `^0.1.5-rc.2` (see `scripts/verify-platform-ranges.mjs`); resolution against a real 0.1.5 profile has not been run |
+| §2 Host-only (`--mode host`) | M3 | **未验证**（源码级判定） | the host bundle inserts only family rows and overrides two platform base rows (`session-query-sqlite`, `tool-skill`), whose key sets `verify-declared-config.mjs --upstream` recomputes from the platform source; no `0.1.5-rc.2` install has been run |
+| §3 Agent-only (`--mode agent`) | M4 (preset half — the host side is §2) | **部分已验证** | same preset-resolution coverage as §1 |
+| §4 ② Attach — one-click (`--mode attach` / `oneclick`, `@lmzhen/dsh-evolution-preset`) | M1 (compatibility spelling of the same profile-root plane — NOT the host-only M3) | **未验证**（源码级判定） | the bundle's row set is §2's plus the four model rows, and the only platform row it inserts is `tool-session-query`; no `0.1.5-rc.2` install has been run |
+| §5 Production (`dsh plugin add @lmzhen/dsh-evolution-all`) | M1 | **已验证** | real installs on a `0.1.5-rc.2` host: `dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.3.70` (2026-09-12) and `…@0.3.83` → exit 0 (2026-09-16, pnpm 8.3s); the profile resolved the bundle's closure to 28 installed family packages, all `0.3.83`, and `dsh --profile web --dump-config` is exit 0 / 773 lines / 207 ids with no duplicate. Published ranges are `^0.1.5-rc.2` (see `scripts/verify-platform-ranges.mjs`) |
 
 Reading the matrix: "未验证" is a statement about evidence, not about expected
-behaviour — the source-level judgement for M1/M3 is that the family mounts no
-platform package and only overrides two base rows, so the 0.1.1→0.1.5 platform
-delta does not touch the install surface. Treat the cells as the checklist for
-the first real 0.1.5 install.
+behaviour — the source-level judgement for the still-open cells is that the
+family inserts no platform row of its own beyond `tool-session-query` and
+overrides only two base rows, so the 0.1.1→0.1.5 platform delta does not touch
+the install surface. §5 is the one cell a real install has closed; the remaining
+cells are the checklist for their own first real 0.1.5 install.
 
 > ⚠️ **`dsh-evolution-all`, `dsh-evolution-host` and `dsh-evolution-preset` are
 > mutually exclusive install targets — never add more than one of these bundles
@@ -116,7 +120,8 @@ skill rows, so the family has no foothold there either.
   anchor; `scripts/verify-platform-ranges.mjs` asserts it.
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
   or a published `@deepseek-ai/dsh-evolution-host` bundle available to pnpm.
-- For the local installer below: Node 22+ and the source checkout.
+- For the local installer below: Node 22.19+ or 24+ (the repository's
+  `engines` floor: `^22.19.0 || >=24.0.0`) and the source checkout.
 
 ## 1. Layered install (local development)
 
@@ -205,9 +210,15 @@ Community bundles under the personal scope `@lmzhen` (what npm actually
 serves today):
 
 ```bash
-pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-host
-pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-preset
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+dsh plugin --profile web add @lmzhen/dsh-evolution-host
+dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 ```
+
+`@lmzhen/dsh-evolution-all` is the default target (§5 above: M1, the form the
+status matrix records as verified) and depends on the host bundle, so it is the
+one to add on a fresh profile; `host` and `preset` are the alternatives and are
+mutually exclusive with it.
 
 > Community-published `@lmzhen/*` packages are not official DeepSeek
 > releases.
@@ -246,11 +257,20 @@ Add these to `<home>/profiles/<profile>/cordis.patch.yml`.
 
 ### Override memory/skill roots
 
+`memory-files.root` moves the memory files. The SKILL tree is read/written by a
+whole set of family rows that all take the same `root` key and must all point
+at the same path — the canonical list, and the story of the retired
+`skillsRoot` key, live in the root `INSTALL.md` §Override memory/skill roots.
+Setting `skill-usage.root` ALONE moves the `.usage.json` sidecar while the
+skill tree stays where it was, which is the trap the root document spells out:
+
 ```yaml
 - id: memory-files
   config:
     root: /srv/agent-data/memories
 
+# Repeat the SAME value on every row the root INSTALL.md lists under this
+# heading — one row (this one) is not enough.
 - id: skill-usage
   config:
     root: /srv/agent-data/skills
@@ -287,7 +307,8 @@ filter:
 /evolution doctor --json   # script-friendly
 ```
 
-It reports the install form (full / host / preset / layered / none), flags
+It reports the install form (full / host / preset / layered / preset-only /
+none — the `installForm` union in `evolution-commands/src/doctor.ts`), flags
 all/host/preset or all-vs-layered conflicts, checks the `DSH_EVOLUTION_*`
 environment variables, and ends with suggested next steps.
 

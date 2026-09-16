@@ -37,6 +37,8 @@ the Evolution agent preset, and pick it per session. **`all` and the layered
 preset are also exclusive** — mounting both double-mounts the model rows.
 
 For fine-grained control (e.g. a custom profile overlay), see the family
-[README](../README.md).
+README (`packages/README.md` in the source repository; it is named here instead
+of linked because a repo-relative link out of this package would be dead inside
+the npm published tree).
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

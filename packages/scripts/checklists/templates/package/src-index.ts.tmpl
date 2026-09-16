@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import z from 'schemastery'
-import { clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import z from '@deepseek-ai/schemastery'
 
 export const name = 'evolution-<pkg>'
 // Platform services this package reads. Keep it to what apply() really uses:
@@ -14,7 +13,11 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   // N3: every numeric field carries a clamp, or NaN/Infinity reaches the loop.
-  intervalHours: clampedNumber({ min: 0, max: 168, default: 6 }),
+  // The SCHEMA clamp is the shipped idiom (see evolution-review's Config); a
+  // number that reaches apply() outside the schema goes through core's
+  // `clampedNumber(value, fallback, { min, max })` — it takes a value and a
+  // fallback, never a `{ min, max, default }` object.
+  intervalHours: z.number().min(0).max(168).default(6),
 })
 
 export function apply(ctx: Context, config: Config): void {

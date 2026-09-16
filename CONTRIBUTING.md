@@ -4,9 +4,11 @@ This repository (the **flat mirror**) is the publication carrier: `packages/*`
 are the packages that ship, and the root documents — `README.md`,
 `README.zh.md`, `INSTALL.md`, `CHANGELOG.md`, this file — are the user-facing
 surface. The CI validation tree is the platform checkout's
-`packages/evolution/`, kept byte-identical to `packages/*` by the workspace's
-`sync-dev-to-mirror` / `sync-mirror-to-dev` helpers. Edit here, sync, then run
-the gate.
+`packages/evolution/`, kept byte-identical to `packages/*` before a release.
+Edit HERE (the mirror is the authoring tree since 0.3.83) and copy the result
+into that validation tree, then run the gate: the `sync-dev-to-mirror` /
+`sync-mirror-to-dev` helpers belong to the retired dual-line workflow and the
+stale side must never be copied back over this one.
 
 ## Where a fact is allowed to live (G5, 0.3.78)
 
@@ -36,7 +38,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  10-step gate runs it on every batch; a second copy fails and names both files.
+  16-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -95,11 +97,13 @@ have). They are part of the executed gate because no in-repo script covers those
 three checks today; a portable replacement belongs in `packages/scripts` if the
 workspace is ever used from another machine.
 
-`verify-layout-sync.mjs` is **retired from this table**: it compares a
-`dev`/`mirror` script pair, and this workspace is mirror-single-line (the former
-dev tree is stale — running the publish chain's first steps would robocopy that
-old tree over the mirror). Its remaining useful half, script-pair parity, has no
-referent here.
+`verify-layout-sync.mjs` is **retired from this table** but NOT from the
+release path: the publish chain still executes it as its step 2 version guard,
+comparing `packages/scripts/**` against the stale checkout's copy — a drifted
+script pair ABORTS the release before any commit or tag (0.3.83 hit exactly
+that: 58 drifted files, fixed by copying the mirror's scripts over the stale
+side). Its other half, the dev→mirror robocopy, is gone with the dual-line
+workflow (running it would overwrite this tree).
 
 The stale tree is `D:/dsh/deepseek-harness` (a platform checkout at `548aa30`
 whose `packages/evolution/*` predates this mirror). It carries an

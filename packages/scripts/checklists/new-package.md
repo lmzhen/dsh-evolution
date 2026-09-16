@@ -7,9 +7,11 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
 
 - [ ] `packages/<pkg>/package.json`: name `@deepseek-ai/dsh-<pkg>` (publishing
       rewrites the scope to `@lmzhen`), the family `version`, `type: module`,
-      `files` limited to what ships. — *`verify-layout-sync.mjs` fails when the
-      package's layout diverges from the family skeleton, and the release
-      script fails when one manifest's version drifts from the other 30.*
+      the `repository` block every other manifest carries, `files` limited to
+      what ships. — *`normalize-mirror.mjs` aligns all 30 manifests (29
+      packages + the root) to the CHANGELOG head, and `verify-layout-sync.mjs`
+      fails any manifest that disagrees with it; that guard's other half
+      compares the two `scripts/` trees and runs only in the release chain.*
 - [ ] Every import has a declared dependency (`workspace:^` for family packages,
       `peerDependencies` for platform packages), and every declared dependency is
       imported. — *`verify-dependency-closure.mjs packages --strict` fails in both
@@ -41,5 +43,6 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
       the runtime invariant line) and one row in the package map
       (`packages/README.md` + root `README.md`). — *`verify-doc-facts.mjs`
       (N19) fails a fact stated in two documents.*
-- [ ] Run: `tsc -b`, `oxlint`, the package's vitest suite, then all four
-      `verify-*.mjs` guards.
+- [ ] Run: `tsc -b`, `oxlint`, the package's vitest suite, then the in-repo
+      `verify-*.mjs` rows of the gate table — *`CONTRIBUTING.md` §The gate owns
+      that list, so the count lives there and not here.*

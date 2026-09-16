@@ -32,9 +32,12 @@ Independent of request-prefix construction. This package does not alter the asse
   gates (`SkillLibrary`/`MemoryStore` options) — but the exemption surface is
   per config site: this guard row, the tool-skill-manage row, the
   evolution-commands row (its own SkillLibrary for the command write paths),
-  and the memory store options each carry their OWN list and must be set
-  separately. A label exempted only on the store side still blocks here.
-  (v17 audit: the evolution-commands site was missing from this enumeration.)
+  the evolution-learning-graph row (its own SkillLibrary for the graph
+  edit/delete write channel) and the memory store options each carry their OWN
+  list and must be set separately. A label exempted only on the store side
+  still blocks here. (v17 audit: the evolution-commands site was missing from
+  this enumeration; the evolution-learning-graph site was missing from it as
+  well.)
 
 ## Known Limitations and Deferred Work
 

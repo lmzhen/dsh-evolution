@@ -22,7 +22,7 @@ Tool schema is prefix-stable. Skill writes do not alter the current request prom
 
 ### Approval seam
 
-Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) pass through the evolution approval seam when `evolution-approval` is mounted; approved/staged writes are replayed by the registered runner with the library origin preserved.
+Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) pass through the evolution approval seam when `evolution-approval` is mounted; approved/staged writes are replayed by the registered runner with the library origin preserved. The missing-required-argument pre-check runs BEFORE that boundary — one shared table and one refusal builder with `executeCore`, so the stage boundary and the execution check cannot diverge (P2-7, 0.3.83): a write that cannot execute is refused instead of staged, so an approval-enabled deployment never spends an approval on a replay that is guaranteed to fail.
 
 ### pin/unpin: explicit exception (0.3.18, E-70)
 

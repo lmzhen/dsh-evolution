@@ -22,5 +22,12 @@ Guidance text is prefix-stable. The runtime snapshot is replaced after successfu
 
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+- The pre-approval required-field pre-check and the store's own rejection text are
+  hand-copied twins (P2-7, 0.3.83): the check runs on BOTH paths — every `operations[]`
+  element and the normalized single operation — BEFORE the approval gate (add needs
+  `facts`/`content`, `remove`/`replace` need `old_text`, `replace` additionally needs a
+  new body), so an approval-enabled deployment never stages a write the approved replay
+  must then fail. Keeping the two texts in step is still manual; unifying them is
+  deferred.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

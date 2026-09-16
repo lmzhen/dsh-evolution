@@ -2,9 +2,10 @@
 // table renders the command table, the input hint and the help text, and
 // registry.spec.ts pins packages/README.md §Command reference to it.
 { usage: 'skill restore <name>', summary: 'restore one archived skill by name' },
-// handler (src/index.ts): keep refusals explicit and typed.
-case 'skill restore': {
-  const target = args[1]
-  if (target === undefined || target === '') return err('usage: /evolution skill restore <name>')
-  return runRestore(target)
+// handler (src/index.ts): dispatch is a PREFIX CHAIN returning ok()/err(), not
+// a switch — keep the refusal explicit and typed.
+if (input.startsWith('skill restore ')) {
+  const name = input.slice('skill restore '.length).trim()
+  if (!name) return err('Usage: /evolution skill restore <name>')
+  return runRestore(name)
 }

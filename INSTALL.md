@@ -27,12 +27,26 @@ the cordis loader fails loud on duplicate ids.
 > guard (pinned by `packages/evolution-all/tests/all.spec.ts`), and the
 > layered installer refuses to combine the two forms regardless.
 
+The install-form semantics — what each form does to a session — and the
+per-form verification status against the validated platform line are
+single-sourced in `packages/INSTALL.md` ("Install forms"); this root copy
+owns the source-install commands and the scope details. The installer also
+accepts the product-form aliases `--mode variant` (= `layered`) and
+`--mode attach` (= `oneclick`).
+
 ## Prerequisites
 
+- **Validated platform line: DSH `0.1.5-rc.2`.** The published
+  `@deepseek-ai/dsh-*` dependency ranges are `^0.1.5-rc.2`, and node-semver's
+  prerelease rule does not admit an earlier prerelease line, so an older
+  platform fails at dependency resolution rather than at runtime. The anchor
+  is defined once in `.github/workflows/release.yml` (`PLATFORM_VERSION`)
+  and re-derived by `packages/scripts/verify-platform-ranges.mjs`.
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
   or the published community bundle `@lmzhen/dsh-evolution-host` available to
   pnpm (see §5).
-- For the local installer below: Node 22+ and the source checkout.
+- For the local installer below: Node 22.19+ or 24+ (the repository's
+  `engines` floor: `^22.19.0 || >=24.0.0`) and the source checkout.
 
 ## 1. Layered install (local development)
 
@@ -56,6 +70,12 @@ This performs:
    `<home>/.agent-presets/evolution-ptc/` instead — the base names the runtime
    platform composition and the installed directory, and the table behind both
    is `evolution-agent/bases.json`).
+
+The copied scope comes from `EVOLUTION_SCOPE` (default `@deepseek-ai`, the
+overlay scope). With `EVOLUTION_SCOPE=@lmzhen` the installer reads the
+`prepare-release.mjs --scope @lmzhen` staging under
+`packages/.release-staging` and refuses a staging that is missing, stale, or
+built for another scope.
 
 The installer is source-layout aware: if a package's `lib/index.js` has not
 been built yet it prints an `unbuilt:` warning. Boot such a profile with the
@@ -109,17 +129,22 @@ Equivalent to the legacy `dsh-evolution-preset` profile bundle.
 
 ## 5. Production install
 
-Family bundles in the overlay `@deepseek-ai` scope (community-maintained; publishing rewrites the scope to `@lmzhen`):
+Family bundles in the overlay `@deepseek-ai` scope (community-maintained;
+publishing rewrites the scope to `@lmzhen`, and the `@deepseek-ai` names
+below resolve only from a source/overlay checkout, not from npm):
 
 ```bash
 dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
 ```
 
-Community bundles under the personal scope `@lmzhen`:
+Community bundles under the personal scope `@lmzhen` (`all` is the DEFAULT
+form; `host` is the shrink path and the one-click `preset` the legacy
+compatibility path):
 
 ```bash
-pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-host
-pnpm dsh plugin --profile web add @lmzhen/dsh-evolution-preset
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+dsh plugin --profile web add @lmzhen/dsh-evolution-host
+dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 ```
 
 > Community-published `@lmzhen/*` packages are not official DeepSeek
@@ -133,8 +158,10 @@ That file is a DELTA (4 model-tool rows, see its own header) and the
 COMPLETE composition — a hand-copied delta would mount an agent missing every
 standard row. Use `dsh plugin add` + the installer (or copy only a
 standard+delta SYNTHESIZED composition when a manual path is truly needed).
-The npm-only path is `/evolution preset install [--base <name>]`, which reads
-the same `evolution-agent/bases.json` table and writes that base's variant.
+The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
+which reads the same `evolution-agent/bases.json` table and generates one
+variant per named base in a single pass (each base's preset id and metadata
+file come from that table).
 
 ## Profile override examples
 
@@ -159,8 +186,10 @@ Add these to `<home>/profiles/<profile>/cordis.patch.yml`.
 With staging on, the three destructive curator writes that the skill runner
 cannot replay — `/evolution consolidate`, `/evolution restore` (whole tree) and
 `/evolution skill restore <name>` — answer `E-306` instead of writing straight
-through the gate. Set `stageForeground: false` (or use a session whose approval
-policy is `never`) to run them directly and deliberately.
+through the gate; since 0.3.83 `/evolution restructure` answers the same code
+when the invocation carries no session to attribute a staged record to. Set
+`stageForeground: false` (or use a session whose approval policy is `never`) to
+run them directly and deliberately.
 
 ### Override memory/skill roots
 
@@ -227,20 +256,28 @@ Composed profile tree:
 dsh --profile <profile> --dump-config
 ```
 
-Runtime tests:
+Runtime tests (run them in the merged upstream checkout, not in this mirror):
 
 ```bash
-vitest run packages/evolution-host/tests/installation-matrix.spec.ts
-vitest run packages/tool-memory/tests/anchored-compat.spec.ts
-vitest run packages/evolution-review/tests/anchored-smoke.spec.ts
+vitest run packages/evolution/evolution-host/tests/installation-matrix.spec.ts
+vitest run packages/evolution/tool-memory/tests/anchored-compat.spec.ts
+vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
 ```
 
-> Dual-layout note (G5.5): these vitest paths are written in the flat-mirror
-> layout (`packages/<pkg>/tests/...`). Like the tsconfig paths described in
-> README.md ("Development: the two layouts"), they resolve ONLY in the full
-> upstream checkout — the dev tree or the CI overlay built against it. A
-> standalone flat mirror has no standalone toolchain of its own, so the suites
-> run via that merged tree, not off the mirror alone.
+> Dual-layout note (G5.5): the installer commands above run HERE, in the flat
+> mirror (`packages/scripts/...`). The vitest paths are the merged-tree form:
+> type-checking and the suites run in the upstream checkout (the CI overlay
+> built from the platform tag), which hosts the same sources under
+> `packages/evolution/<pkg>/` and whose `tsconfig.base.json` /
+> `tsconfig.host.json` carry the alias lines those paths need (see README.md,
+> "Development: the two layouts and their tsconfigs"). This mirror ships no
+> toolchain of its own. The mirror is the authoring AND publication tree since
+> 0.3.83 and the publish chain no longer copies a second tree over it; the
+> former dev tree `D:/dsh/deepseek-harness` is stale and carries an
+> `AUTHORING-MOVED.md` marker. `packages/scripts/**` is the one cross-tree
+> obligation left: the publish chain's version guard compares it byte-for-byte
+> against that stale checkout's copy, so a script change here is mirrored
+> there before a release (0.3.83 reconciled 58 drifted files).
 
 Uninstalling only removes the profile row or preset directory; memory, skills,
 state, reports, and approval history remain under `$DSH_HOME`.

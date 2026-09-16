@@ -21,6 +21,6 @@ Independent of request-prefix construction. This package does not alter the asse
 ## Known Limitations and Deferred Work
 
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+- `provider` pins the registry to one provider name; a pinned name is checked at mount once any provider has registered (S-07). With the pin EMPTY and two providers mounted the effective one is REGISTRATION ORDER, warned once per ambiguous period — enabling the domain row in an overlay rebinds every `evolutionState` operation to an empty medium while the state already on disk under the other provider becomes invisible (`/evolution pending` shows nothing, approve misses). Pin config: `{ provider: json|domain }`.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

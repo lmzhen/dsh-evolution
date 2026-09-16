@@ -1,23 +1,28 @@
 {
   "name": "@deepseek-ai/dsh-<pkg>",
   "description": "<one line: what this package owns>",
-  "version": "0.3.78",
+  "version": "<the family version: every manifest AND the root package.json must equal the CHANGELOG head>",
   "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/evolution/<pkg>"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "exports": {
     ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
-    "./package.json": "./package.json",
-    "./tools": { "types": "./lib/types/tools.d.ts", "default": "./lib/tools.js" },
-    "./invariant": "./lib/invariant.js"
+    "./package.json": "./package.json"
   },
   "files": ["lib/*.js", "lib/types/**/*.d.ts"],
   "license": "MIT",
-  "dependencies": { "@deepseek-ai/dsh-evolution-core": "workspace:^" },
+  "dependencies": { "@deepseek-ai/dsh-evolution-core": "workspace:^", "@deepseek-ai/schemastery": "workspace:^" },
   "peerDependencies": { "@deepseek-ai/cordis": "workspace:^" },
   "devDependencies": { "@deepseek-ai/cordis": "workspace:^" }
 }
-// Drop the "./invariant" export and the "./tools" subpath unless they exist —
-// N8 fails a published ./invariant companion no cordis row mounts, and the
-// dependency-closure guard fails an export nothing imports.
+// The exports above are the shape all 29 shipping manifests carry. Add the
+// "./tools" subpath only when lib/tools.js really exists (evolution-maintenance
+// ships it) — NEVER a "./invariant" companion: N8 fails a published ./invariant
+// that no cordis row mounts, and the dependency-closure guard fails an export
+// nothing imports.
