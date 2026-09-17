@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, parseFrontmatter, SkillLibrary, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, isPresent, missingSupportPointers, parseFrontmatter, SkillLibrary, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = `---
@@ -255,6 +255,28 @@ it('never duplicates frontmatter on success or on repeated restructures (v7 audi
   expect(parsed2?.frontmatter.name).toBe('demo-skill')
   expect(md2 ?? '').toContain('> 详见 references/log.md')
   expect(md2 ?? '').toContain('> 详见 references/use.md')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+// V3: a moved section's citations travel one hop deeper, so the body keeps a pure
+// LINK LIST of them — otherwise `pointer_missing` (body-level) reports files that
+// are perfectly reachable through the new reference file. Measured on the live
+// skill: without this line, moving 验证手法 took missing 0 -> 8.
+it('V3: the pointer block carries the moved section citations so the body still points at them', async () => {
+  const { root, lib } = await makeLib()
+  await lib.writeSupportFile('demo-skill', 'references/known-limitations.md', '# limits', 'foreground')
+  await lib.writeSupportFile('demo-skill', 'scripts/probe.mjs', '// probe', 'foreground')
+  const withRefs = BODY.replace('Use it with care.', 'See references/known-limitations.md and scripts/probe.mjs, then references/guide.md.')
+  await lib.update('demo-skill', withRefs, 'foreground')
+  const moved = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/usage-playbook.md' }], 'foreground')
+  expect(moved.ok, moved.message).toBe(true)
+  const md = (await lib.read('demo-skill')) ?? ''
+  expect(md).toContain('> 详见 references/usage-playbook.md')
+  expect(md).toContain('> 本节引用：references/known-limitations.md · scripts/probe.mjs')
+  // The invariant the line buys: those files stay POINTED AT from the body.
+  const listed = await lib.listSupportFiles('demo-skill')
+  const files = isPresent(listed) ? listed.value : []
+  expect(missingSupportPointers(md, files)).toEqual([])
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

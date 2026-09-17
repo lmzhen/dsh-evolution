@@ -76,6 +76,14 @@ export const PROTECTED_BUILTIN_SKILLS: ReadonlySet<string> = new Set(['plan'])
 export const MAX_SKILL_NAME_LENGTH = 64
 export const MAX_DESCRIPTION_LENGTH = 1024
 export const MAX_SKILL_CONTENT_CHARS = 100_000
+
+/** The authoring DISCIPLINE band, taken from the upstream standard (archive §5):
+ * peer skills sit at 8-14k characters and a body pushing past 20k belongs in
+ * `references/*.md`. Deliberately separate from `MAX_SKILL_CONTENT_CHARS`: the
+ * hard ceiling is a deployment-tunable limit, this band is the authoring
+ * standard — deriving the band from the ceiling is exactly what let a 40k
+ * ceiling hide a 99k body without a single signal saying "split me" (V3). */
+export const AUTHORING_SPLIT_LINE_CHARS = 20_000
 export const MAX_SKILL_FILE_BYTES = 1_048_576
 
 // ── Cross-package shared tunable defaults ────────────────────────────────────

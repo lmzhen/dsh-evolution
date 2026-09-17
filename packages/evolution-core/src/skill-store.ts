@@ -56,6 +56,38 @@ import { CONTENT_SPLIT_HINT, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
  * append-mode consolidation emit the same discoverability line. */
 const POINTER_LINE_PREFIX = '> 详见 references/'
 
+/** V3: the pure LINK LIST that travels with a pointer line. A moved section's
+ * citations move one hop deeper, so without this line the body stops mentioning
+ * those files at all and `pointer_missing` (body-level by design) reports them as
+ * unpointed — measured on the live skill, moving 验证手法 took `missing` from 0 to
+ * 8 until the list was emitted. Design §2.3 explicitly allows link-list lines in
+ * the body, and a list of paths carries no content claim. */
+const POINTER_REFS_PREFIX = '> 本节引用：'
+/** Cap keeps the line readable; an ellipsis marks a truncated list (visible, never
+ * silently short). */
+const POINTER_REFS_CAP = 12
+
+/**
+ * The body lines one moved section collapses to: the pointer plus the link list of
+ * the support files it cited (excluding the file it moved into).
+ * @param rel - the support path the section moved into.
+ * @param sectionText - the moved section's text.
+ * @returns one or two body lines.
+ */
+function pointerBlock(rel: string, sectionText: string): string[] {
+  const cited = [...new Set(resolveCitations({ content: sectionText, file: 'SKILL.md', files: [] })
+    .refs.filter(ref => ref.kind === 'citation' && ref.target !== null)
+    .map(ref => ref.target as string))]
+    .filter(target => target !== rel)
+    .sort()
+  const lines = [`${POINTER_LINE_PREFIX}${rel.split('/').at(-1)}`]
+  if (cited.length > 0) {
+    const shown = cited.slice(0, POINTER_REFS_CAP)
+    lines.push(`${POINTER_REFS_PREFIX}${shown.join(' · ')}${cited.length > shown.length ? ' …' : ''}`)
+  }
+  return lines
+}
+
 /** Collision tail for the refusal plan note (empty when nothing collided). */
 function collisionsNote(collisions: readonly string[]): string {
   return collisions.length === 0 ? '' : ` collisions: ${collisions.slice(0, 5).join(', ')}`
@@ -619,7 +651,7 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
   for (let i = 0; i < lines.length; i += 1) {
     const span = byStart.get(i)
     if (span) {
-      rebuilt.push(`${POINTER_LINE_PREFIX}${span.rel.split('/').at(-1)}`)
+      rebuilt.push(...pointerBlock(span.rel, span.text))
       i = span.end - 1
     } else {
       rebuilt.push(lines[i] ?? '')
@@ -2040,6 +2072,8 @@ export class SkillLibrary {
       // V2 (design §16.7): support files copied into the target from an apply-mode
       // source, staged before any side effect and committed in the same tree change.
       const rehomed: { from: string; to: string; content: string }[] = []
+      // V3: one pointer block per demoted source (pointer line + link list).
+      const demotedPointers: string[][] = []
       const parts: string[] = []
       // S1-E5: the plan-time bytes per source, re-verified right before that
       // source is archived. The serial queue closes the read→merge window for
@@ -2095,6 +2129,9 @@ export class SkillLibrary {
           }
           const target = join(targetDir, 'references', `${source}.md`)
           referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${demotedBody.trim()}\n` })
+          // Same convention as restructure: the pointer carries the link list of
+          // what the demoted body cited, so the target body keeps mentioning them.
+          demotedPointers.push(pointerBlock(`references/${source}.md`, demotedBody))
           plannedSourceBytes.set(source, sourceMd)
         }
         // Discoverability: the umbrella's body gains one pointer per demoted
@@ -2174,7 +2211,7 @@ export class SkillLibrary {
           if (validation) throw new Error(`merge validation failed: ${validation}`)
           writes.push({ target: join(targetDir, 'SKILL.md'), content: merged, expected: freshTargetMd })
         } else {
-          const pointerLines = normalizedSources.map(source => `\n${POINTER_LINE_PREFIX}${source}.md`).join('')
+          const pointerLines = demotedPointers.map(lines => `\n${lines.join('\n')}`).join('')
           const extended = freshTargetMd.trimEnd() + pointerLines + '\n'
           const validation = validateFrontmatter(extended, targetName, this.limits)
           if (validation) throw new Error(`merge validation failed: ${validation}`)

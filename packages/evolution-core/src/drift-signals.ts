@@ -305,7 +305,10 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
         `${DEFAULT_HEALTH_THRESHOLDS.softBodyChars}`,
         cost === undefined
           ? undefined
-          : `tokens≈${cost.tokensLow}-${cost.tokensHigh} (estimate; cjk=${cost.cjk}; softCost=${DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits} units)`,
+          // V3: the band is the AUTHORING discipline band (upstream's 20k split
+          // line in weighted units), and the multiple is what makes it actionable —
+          // a bare ceiling says nothing about how far past it the body is.
+          : `tokens≈${cost.tokensLow}-${cost.tokensHigh} (estimate; cjk=${cost.cjk}; band=${DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits} units, body=${(cost.units / DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toFixed(1)}x)`,
       ),
     )
 

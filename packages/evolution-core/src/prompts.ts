@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 18
+export const PROMPT_BUNDLE_VERSION = 19
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -243,7 +243,7 @@ A. 域·碎片化
 - A3 {signal:prefix_cluster}=over：判簇内是否同伞；非同伞→notes 提域划分观察，不强制建伞。
 
 B. 层·分层错位
-- B1 {signal:stamp_density}（阈值 {signal:stamp_density.threshold}）或 {signal:body_size}（阈值 {signal:body_size.threshold}）=over：按**三问判据**判锚/残留——① 该编号/时间戳是否被库内其他文件引用？② 除"何时产生/为何存在"外是否还承载信息？③ 删除是否影响任何跨文档检索？（①是且③是→锚；否则→残留候选，人审）。锚→允许保留 + needs_human + semantic_reasoning 写三问结果；**锚不使用 is_override**（is_override 仅用于 §7 申诉；锚是 B1 的正常裁决路径）；残留→restructure 建议（movable headings 逐字引用）。**锚≠可读：单行 >4000 字符即使在锚类也必须拆分。**
+- B1 {signal:stamp_density}（阈值 {signal:stamp_density.threshold}）或 {signal:body_size}（阈值 {signal:body_size.threshold}）=over：按**三问判据**判锚/残留——① 该编号/时间戳是否被库内其他文件引用？② 除"何时产生/为何存在"外是否还承载信息？③ 删除是否影响任何跨文档检索？（①是且③是→锚；否则→残留候选，人审）。锚→允许保留 + needs_human + semantic_reasoning 写三问结果；**锚不使用 is_override**（is_override 仅用于 §7 申诉；锚是 B1 的正常裁决路径）；残留→restructure 建议（movable headings 逐字引用）。**锚≠可读：单行 >4000 字符即使在锚类也必须拆分。** **软带（authoring band）**：\`body_size\` 的 detail 里 \`band=\` 是上游「超 20k 字符就该拆」那条线换算出的加权单位、\`body=Nx\` 是当前倍数（全库目标带 8–14k 字符）——倍数越大越优先拆：用 restructure 把 log 状整节搬进 references/*.md 并留钩子；**不要靠删证据来降成本**。
 - B2 {signal:pointer_missing}=over：读支持文件后判性质——可复用模式→上移正文；会话专属实录→保留+补指针；形态=patch 指引。**未读内容仅凭文件名 → conf≤0.4 且措辞"先人工确认再执行"。** **缺失指针=支持文件存在、正文无引用（单向语义），finding 表述勿反向。** detail 里的 \`unhooked=N\` 是**被正文提及但不成钩子形态**的文件：它们不算缺失（verdict 不变），但搬迁后正文只剩裸文件名，注意力难以命中——指引是把该行改成 \`- <症状或问句> → references/x.md\`。
 - B3 {signal:dup_heading}=over：删除多余标题行（保留一份），patch 指引。
 - B4 {signal:overlong_line}=over：>1500 拆行；>4000 判定可读性危机（内容合法也拆）；patch 指引。**finding 必须给全量口径：共 N 行超限，其中 >4000 的逐行列出。**

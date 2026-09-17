@@ -59,9 +59,9 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(CURATOR_PROMPT).toContain('Return ONLY the YAML block')
   expect(CURATOR_PROMPT).not.toContain('Your toolset:')
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
-  // Step 7 (design §5.6): the maintain clauses gained the hook/retirement text,
-  // so the bundle identity moves with them (v17 pinned the step-5 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(18)
+  // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
+  // bundle identity moves with it (v18 pinned the step-7 wording).
+  expect(PROMPT_BUNDLE_VERSION).toBe(19)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {

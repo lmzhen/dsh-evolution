@@ -10,6 +10,7 @@
  * `computeQualityScores` (different dimension, different consumers).
  */
 
+import { AUTHORING_SPLIT_LINE_CHARS } from './constants.ts'
 import { softCostUnitsFor } from './cost.ts'
 
 export interface SkillHealthThresholds {
@@ -25,12 +26,13 @@ export interface SkillHealthThresholds {
   /** Patch count at/above this with zero reads -> 'warn' (write-ghost: the
    * skill is churned but nothing ever loads it). */
   churnMinPatches: number
-  /** Soft CONTEXT-COST ceiling of the body, in weighted units (design §5.2).
-   * Derived from `softBodyChars` at the ASCII weight, because the character
-   * limit itself was calibrated on prose where one character is cheap: a body
-   * that hits `softBodyChars` in CJK costs ~4x this ceiling. Advisory only in
-   * this release — nothing wires it to a verdict yet (that is the T2 that owns
-   * the cost criterion, with its own observation window). */
+  /** The AUTHORING discipline band in weighted units: the upstream split line
+   * (20k characters) at the ASCII weight, i.e. 5,000 units. NOT derived from
+   * `softBodyChars`: the ceiling is deployment-tunable, the band is the authoring
+   * standard, and tying them together is how a 40k ceiling let a 99k body pass
+   * without a signal asking for a split (V3, archive §6 发现 A). Advisory only —
+   * wiring it to a verdict is the T2 that owns the cost criterion and its own
+   * observation window. */
   softBodyCostUnits: number
 }
 
@@ -38,9 +40,9 @@ export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
   softBodyChars: 40_000,
   stampDensityPerKb: 2,
   churnMinPatches: 20,
-  // One source: the char ceiling converted at the ASCII weight. A literal here
-  // would drift the moment either weight or ceiling moves.
-  softBodyCostUnits: softCostUnitsFor(40_000),
+  // One conversion, one source: the authoring split line at the ASCII weight.
+  // A literal here would drift the moment either weight or the line moves.
+  softBodyCostUnits: softCostUnitsFor(AUTHORING_SPLIT_LINE_CHARS),
 }
 
 /**

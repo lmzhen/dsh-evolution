@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bodyCost, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW, COST_ASCII_WEIGHT, DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core'
+import { AUTHORING_SPLIT_LINE_CHARS, bodyCost, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW, COST_ASCII_WEIGHT, DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core'
 
 // Every expectation is stated on the ON-DISK form: the accounting basis appends
 // one trailing newline, the same measure `maxSkillContentChars` bounds.
@@ -27,11 +27,17 @@ describe('bodyCost (design §5.2)', () => {
     expect(bodyCost(base)).toEqual(bodyCost(base + '\n\n  '))
   })
 
-  it('derives the soft cost ceiling from the char ceiling instead of hardcoding it', () => {
-    expect(DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toBe(Math.round(DEFAULT_HEALTH_THRESHOLDS.softBodyChars * COST_ASCII_WEIGHT))
+  it('derives the authoring band from the upstream split line, NOT from the char ceiling (V3)', () => {
+    // One conversion, one source: the band is the authoring standard's split line
+    // (20k characters upstream) at the ASCII weight.
+    expect(DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toBe(Math.round(AUTHORING_SPLIT_LINE_CHARS * COST_ASCII_WEIGHT))
+    // The point of the change: a deployment-tunable ceiling must not move the
+    // discipline band with it — that coupling is how a 40k ceiling hid a 99k body.
+    const ceilingDerived = Math.round(DEFAULT_HEALTH_THRESHOLDS.softBodyChars * COST_ASCII_WEIGHT)
+    expect(DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toBeLessThan(ceilingDerived)
   })
 
-  it('shows a CJK body costing several times the soft ceiling at the same char count', () => {
+  it('shows a CJK body costing several times the authoring band at the same char count', () => {
     const cjk = bodyCost('中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars))
     expect(cjk.chars).toBeGreaterThanOrEqual(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
     expect(cjk.units).toBeGreaterThan(2 * DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits)
