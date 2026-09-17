@@ -463,6 +463,13 @@ export class EvolutionFeedback {
     if (!path || !eventsPath || !recordIo) return
     try {
       const { events, malformed } = await readEvolutionTimeline(recordIo, eventsPath)
+      // P2-13 (audit): with archives present but the ACTIVE log transiently
+      // absent (another process is inside its commitTmp rename on Windows),
+      // the fold above answered clean-empty for the active band and `maxSeq`
+      // below would advance past records this read never saw — the cache
+      // then seals the loss until the next full refold. Withhold the write
+      // for that window; the next tick refolds with the band back in place.
+      if (events.length > 0 && await recordIo.readText(eventsPath).catch(() => null) === null) return
       // C-events-dispatch-1 (v43): this is the SECOND cache writer (cadence
       // snapshot + the unload `persistCache`), and a truncated read here advanced
       // `lastSeq` to the surviving max exactly like the restore write did — the

@@ -9,7 +9,6 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
     ['review-state.json', [], 's1'],
     ['curator-state.json', 42, null],
     ['pending-state.json', 'str', null],
-    ['pending.json', [], null],
   ] as [string, unknown, string | null][])(
     'quarantines a valid-JSON but non-object %s as %s',
     async (file, value, sessionId) => {
@@ -37,6 +36,33 @@ describe('evolution-state-json state shape gate (G2.2, F-215)', () => {
       expect(await io.readText(join(root, file))).toBe(content)
     },
   )
+
+  it('A5 (audit P2-9): a corrupt LEGACY pending.json is moved aside and the view continues current-only', async () => {
+    // A5 behavior change: the legacy sidecar is read LENIENTLY. The live
+    // files above still fail loud (their quarantine throws), but the sidecar
+    // the family wants to RETIRE must not brick every pending read/mutation
+    // forever — the retirement that would remove it can never run past its
+    // own merge read. The unreadable original is renamed into the
+    // `.corrupt.<epoch>` vocabulary (nothing writes a `pending.json` prefix
+    // any more, so no sweep collects it — an operator deletes it after the
+    // rescue) and pending answers continue without legacy records.
+    const root = await tempRoot('dsh-json-shape-legacy-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const io = ctx.evolutionIo.provider('node')
+    const content = JSON.stringify([])
+    await io.writeText(join(root, 'pending.json'), content)
+    // Resolves (the old behavior rejected); the legacy ghost is not merged.
+    await expect(provider.listPending()).resolves.toBeDefined()
+    const entries = await io.list(root)
+    expect(entries.includes('pending.json')).toBe(false)
+    const moved = entries.filter(name => /^pending\.json\.corrupt\.\d+$/.test(name))
+    expect(moved).toHaveLength(1)
+    expect(await io.readText(join(root, moved[0]!))).toBe(content)
+    // The moved-aside copy is NOT re-read as state: a second load stays clean.
+    await expect(provider.listPending()).resolves.toBeDefined()
+    expect((await io.list(root)).filter(name => /^pending\.json\.corrupt\.\d+$/.test(name))).toHaveLength(1)
+  })
 
   it('a save into a wrong-shape record map rejects and leaves the file untouched', async () => {
     const root = await tempRoot('dsh-json-shape-save-')

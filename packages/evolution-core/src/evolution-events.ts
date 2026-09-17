@@ -227,6 +227,17 @@ export async function appendEvolutionEvent(
   // v1EventRecords — the body used to be JSON.parsed twice per append.
   let parsedBody: { version?: unknown; events?: unknown } | null = null
   await transactIo(io, path, async (current) => {
+    // A10 (audit P2-14): the lock layer is contractually allowed to re-invoke
+    // this task whole (a LostWriteLock converts into a full read-modify-write
+    // retry). Closure state captured during a PREVIOUS attempt must reset
+    // first, or a log that vanished/was emptied between attempts would skip
+    // the re-parse below and fold rotation from the stale previous parse.
+    // `assigned` belongs to the same discipline (R2 follow-up): without the
+    // reset, attempt 1's seq survives into a refusing attempt 2 and the
+    // caller reads a phantom success for an event that never landed.
+    parsedBody = null
+    refuseMessage = ''
+    assigned = 0
     // rc.69: a whitespace-only log (crash residue) is rebuildable — treat it
     // as missing; a genuinely corrupt body is still refused.
     if (current !== null && current.trim() !== '') {

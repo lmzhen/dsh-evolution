@@ -532,6 +532,42 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     return parsed
   }
 
+  /** A5 (audit P2-9): the LEGACY pending sidecar is read LENIENTLY — the
+   * deliberate opposite of the live state file's fail-loud posture. This
+   * file's whole purpose is to be retired, but the retirement merge reads
+   * it first, so one truncated pre-migration `pending.json` used to make
+   * EVERY pending read and mutation throw `EvolutionStateCorruptFile`
+   * forever (a permanent operator outage no warning can repair). A
+   * QUARANTINE-CLASS failure (unreadable/corrupt content) is renamed aside
+   * so every later load sees a clean absence; any OTHER failure (EACCES,
+   * EIO — a permission-locked but possibly VALID file) is left in place and
+   * only skips this read, so a transient hold never exiles real records.
+   * Either way the view continues current-only with one warn per process.
+   * Note the moved-aside copy is NOT auto-swept (the stale-copy sweep only
+   * inspects entries prefixed like the file being written, and nothing
+   * writes a `pending.json` prefix anymore) — it persists until an operator
+   * deletes it after rescue, at most one per corruption episode. */
+  let legacyQuarantineWarned = false
+  async function readLegacyPending(): Promise<Record<string, PendingRecord> | null> {
+    try {
+      return await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
+    } catch (error) {
+      if (error instanceof Error && error.name === QUARANTINE_ERROR_NAME) {
+        try {
+          await io().rename(pathOf(PENDING_LEGACY_FILE), `${pathOf(PENDING_LEGACY_FILE)}.corrupt.${Date.now()}`)
+        } catch {
+          // A concurrent load already moved it, or the rename itself failed —
+          // either way the next read re-throws and retries the move.
+        }
+      }
+      if (!legacyQuarantineWarned) {
+        legacyQuarantineWarned = true
+        ctx.logger.warn(`evolution-state-json: legacy ${PENDING_LEGACY_FILE} is unreadable and was set aside (${error instanceof Error ? error.message : String(error)}); continuing WITHOUT legacy records`)
+      }
+      return null
+    }
+  }
+
   // All JSON-file state mutations share one queue: each read-modify-write is
   // a single task, so concurrent review/curator/approval writers can never
   // overwrite each other's newest record in THIS process. The transact lock
@@ -712,7 +748,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function loadPendingMap(): Promise<Record<string, PendingRecord>> {
     const [current, legacy] = await Promise.all([
       readJson<Record<string, PendingRecord>>(PENDING_STATE_FILE),
-      readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE),
+      readLegacyPending(),
     ])
     const keyed = keyPendingById(current)
     if (legacy !== null) {
@@ -1047,7 +1083,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // propagates save failures to its caller).
         const guard = transactTaskGuard(`pending record "${record.id}" (${PENDING_STATE_FILE})`)
         await pendingTransact(guard.wrap(async (current) => {
-          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
+          const legacy = legacyMigrated ? null : await readLegacyPending()
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           // P2-5: the merged basis is id-keyed (keyPendingById), so writing by
           // `record.id` cannot leave an older entry under a drifted key behind.
@@ -1068,7 +1104,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       return await mutate(async () => {
         const slot = { claimed: null as PendingRecord | null }
         await pendingTransact(async (current) => {
-          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
+          const legacy = legacyMigrated ? null : await readLegacyPending()
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
           const record = map[id] ?? null
@@ -1094,7 +1130,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     async releasePendingClaim(id, claimId) {
       await mutate(async () => {
         await pendingTransact(async (current) => {
-          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
+          const legacy = legacyMigrated ? null : await readLegacyPending()
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
           const record = map[id]
@@ -1120,7 +1156,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         let result: PendingResolution = { record: null, applied: false }
         // S2-12 (FLOW5-4): same growth signal on the resolve path (see claim).
         await pendingTransact(async (current) => {
-          const legacy = legacyMigrated ? null : await readJson<Record<string, PendingRecord>>(PENDING_LEGACY_FILE)
+          const legacy = legacyMigrated ? null : await readLegacyPending()
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           const map = { ...(await mergedWithFilteredLegacy(legacy, current ?? {})) }
           const record = map[id] ?? null

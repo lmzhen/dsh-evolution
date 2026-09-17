@@ -11,7 +11,7 @@ vi.setConfig({ testTimeout: 30_000 })
 import { chmod, mkdir, readdir, rename, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
-import { decideTakeover, DEAD_LOCK_TAKEOVER_MS, EMPTY_LOCK_TAKEOVER_MS, LOCK_TEAR_TAKEOVER_MS, nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
+import { decideTakeover, ALIVE_LOCK_TAKEOVER_MS, DEAD_LOCK_TAKEOVER_MS, EMPTY_LOCK_TAKEOVER_MS, LOCK_TEAR_TAKEOVER_MS, nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 // A genuinely alive foreign pid: the tests below need a LIVE holder that is NOT
@@ -399,8 +399,15 @@ it('V27 G1.1: decideTakeover is the exhaustive decision table (branch x holder s
   expect(decideTakeover(probe('999:abc', 0))).toBe('none')
   expect(decideTakeover(probe('', 0))).toBe('none')
   expect(decideTakeover(probe('torn', 0))).toBe('none')
-  // A LIVE holder is never stolen, at any age.
+  // A LIVE holder is not stolen while the lock is plausibly held (well under
+  // the alive window).
   expect(decideTakeover(probe('42:abc', 10 * 3_600_000))).toBe('none')
+  // A2 (audit P1-2): an ALIVE holder is STILL reclaimed past the alive window —
+  // liveness-by-pid cannot tell the original holder from a recycled pid, and a
+  // day-old "live" lock is a recycled pid, not a live writer.
+  expect(decideTakeover(probe('42:abc', ALIVE_LOCK_TAKEOVER_MS))).toBe('none')
+  expect(decideTakeover(probe('42:abc', ALIVE_LOCK_TAKEOVER_MS + 1))).toBe('dead')
+  expect(decideTakeover({ ...probe('42:abc', 10 * 3_600_000), aliveAfterMs: 3_600_000 })).toBe('dead')
   // A dead named holder is reclaimed only past the dead window (boundary is
   // strict: age == threshold still waits).
   expect(decideTakeover(probe('999:abc', DEAD_LOCK_TAKEOVER_MS))).toBe('none')

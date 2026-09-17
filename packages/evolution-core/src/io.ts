@@ -401,7 +401,10 @@ export const LOCK_BODY_RE = /^(\d+):[0-9a-f]*$/
 /** Parse a writer-lock body into its holder pid. `null` when the body does
  * not have the `pid:token` shape at all (e.g. a user support file named
  * `*.lock`) — callers leave such files alone. A shape-matching body always
- * yields a number (possibly `0`, which `isProcessAlive` treats as dead). */
+ * yields a number, possibly `0` (state corruption / hand edit): there is no
+ * pid 0, so a `0` holder must be treated as DEAD by the caller —
+ * `isProcessAlive(0)` signals the caller's own process group on POSIX and
+ * answers true, so probe sites must guard `holder > 0` before probing. */
 export function parseLockBody(body: string): number | null {
   const match = LOCK_BODY_RE.exec(body.trim())
   return match === null ? null : Number(match[1])
@@ -441,6 +444,14 @@ export const EMPTY_LOCK_TAKEOVER_MS = 30_000
 /** A body with no parseable pid (crash mid-write): 1h, far above any legal hold
  * and far below "forever". */
 export const LOCK_TEAR_TAKEOVER_MS = 3_600_000
+/** A2 (audit P1-2): even a lock whose holder pid probes ALIVE is reclaimable
+ * past this age. Liveness-by-pid cannot distinguish the original holder from
+ * an unrelated process the OS later assigned the same pid, so the plain alive
+ * probe let one recycled pid brick every writer of one state file forever.
+ * No write in this family holds a lock for more than minutes (the longest is
+ * the ~120s review window), so a day-old "alive" lock is a recycled pid, not
+ * a live writer. */
+export const ALIVE_LOCK_TAKEOVER_MS = 86_400_000
 /** P2-27 (v37): the commit-point ownership re-read. A transient read failure
  * (EACCES/EMFILE/antivirus hold) must not abort a valid RMW, so the read is
  * retried in place; only a still-unreadable lock fails the attempt. */
@@ -476,14 +487,18 @@ interface TakeoverProbe {
   deadAfterMs?: number
   emptyAfterMs?: number
   corruptAfterMs?: number
+  aliveAfterMs?: number
 }
 
 /**
  * V27 G1.1: the lock-takeover decision as ONE pure function, so the protocol is
  * testable and exhaustive instead of being an inline expression inside the
  * acquisition loop:
- *   - `none`    the lock is fresh, or its holder is alive → wait, never steal;
- *   - `dead`    a named holder that is gone, past the dead threshold;
+ *   - `none`    the lock is fresh, or its holder is alive within the alive
+ *               window → wait, never steal;
+ *   - `dead`    a named holder that is gone past the dead threshold, OR whose
+ *               pid still probes alive but whose lock is older than the alive
+ *               window (A2: a recycled pid must not hold the file forever);
  *   - `empty`   no body at all: nothing attributes it to a holder, so only the
  *               wide `emptyAfterMs` window may reclaim it;
  *   - `corrupt` a body with no parseable pid (a crash mid-write), past the 1h
@@ -508,7 +523,7 @@ export function decideTakeover(probe: TakeoverProbe): TakeoverDecision {
   if (!namedHolder) {
     return age > (probe.corruptAfterMs ?? LOCK_TEAR_TAKEOVER_MS) ? 'corrupt' : 'none'
   }
-  if (probe.alive(holder)) return 'none'
+  if (probe.alive(holder)) return age > (probe.aliveAfterMs ?? ALIVE_LOCK_TAKEOVER_MS) ? 'dead' : 'none'
   return age > (probe.deadAfterMs ?? DEAD_LOCK_TAKEOVER_MS) ? 'dead' : 'none'
 }
 
