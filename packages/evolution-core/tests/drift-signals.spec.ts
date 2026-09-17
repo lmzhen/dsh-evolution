@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveCitations } from '../src/citations.ts'
+import { bodyCost } from '../src/cost.ts'
 import {
   computeDriftSignals,
   DRIFT_MAX_LINE_CHARS,
@@ -184,6 +185,23 @@ describe('S1.8 (v37 P1-14 / P2-3): LF and CRLF bodies agree', () => {
     const over = 'x'.repeat(DRIFT_MAX_LINE_CHARS + 1)
     expect(overlongLines(`${over}\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
     expect(overlongLines(`${over}\r\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
+  })
+})
+
+describe('support-file cap report (V4, design §16.6)', () => {
+  it('names oversize support files in the body_size detail, and claims nothing when unmeasured', () => {
+    const measured = computeDriftSignals([{
+      name: 's',
+      body: HEALTHY,
+      cost: bodyCost(HEALTHY),
+      supportChars: { 'references/release-log.md': 189_444, 'references/small.md': 500 },
+    }])
+    const signal = findDriftSignal(measured.skills[0]?.signals ?? [], 'body_size')
+    expect(signal?.detail).toContain('oversize support file(s): references/release-log.md(189444)')
+    expect(signal?.detail).not.toContain('small.md')
+    // No measurement -> no claim (unknown is not zero).
+    const unmeasured = computeDriftSignals([{ name: 's', body: HEALTHY, cost: bodyCost(HEALTHY) }])
+    expect(findDriftSignal(unmeasured.skills[0]?.signals ?? [], 'body_size')?.detail ?? '').not.toContain('oversize')
   })
 })
 

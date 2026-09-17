@@ -39,6 +39,8 @@ export interface SnapshotOptions {
   demand?: ReadonlyMap<string, Readonly<Record<string, number>>> | undefined
   /** Idle age per skill (design §5.6). */
   liveness?: ReadonlyMap<string, SkillLiveness> | undefined
+  /** Support-file char counts for files that can exceed the cap (design §16.6). */
+  supportChars?: ReadonlyMap<string, Readonly<Record<string, number>>> | undefined
 }
 
 /**
@@ -87,6 +89,7 @@ export async function snapshotFromLibrary(
       ...(options.usageObserved !== undefined ? { usageObserved: options.usageObserved } : {}),
       ...(options.demand?.get(entry.name) === undefined ? {} : { demand: options.demand.get(entry.name) }),
       ...(options.liveness?.get(entry.name) === undefined ? {} : { liveness: options.liveness.get(entry.name) }),
+      ...(options.supportChars?.get(entry.name) === undefined ? {} : { supportChars: options.supportChars.get(entry.name) }),
     })
   }
   return snapshots

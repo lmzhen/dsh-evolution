@@ -485,6 +485,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             catalogInvalid: enrichment.catalogInvalid,
             demand: enrichment.demand,
             liveness: enrichment.liveness,
+            supportChars: enrichment.supportChars,
             // V27 M-02 evidence, same as runMaintain's onReadError.
             onReadError: (name, error) => {
               readFailures.push(name)
@@ -627,6 +628,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 usageObserved: () => enrichment.usageObservedValue,
                 demand: () => enrichment.demand,
                 liveness: () => enrichment.liveness,
+                supportChars: () => enrichment.supportChars,
               },
             )
             // P2-21 (F3, v11): a FAILED scan must keep the previous successful

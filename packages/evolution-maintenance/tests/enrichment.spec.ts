@@ -17,6 +17,11 @@ function fakeLibrary(read: (name: string) => Promise<string | null | undefined>)
     async listSupportFiles() {
       return { kind: 'absent' } as const
     },
+    // V4: the enrichment also measures oversize support files through the store.
+    // No listing means "cannot answer", which is what this fake reports.
+    async supportFileChars() {
+      return null
+    },
   } as unknown as SkillLibrary
 }
 

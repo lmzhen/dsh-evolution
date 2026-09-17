@@ -117,6 +117,8 @@ export interface MaintainOptions {
   demand?: () => ReadonlyMap<string, Readonly<Record<string, number>>>
   /** Idle age per skill (design §5.6). */
   liveness?: () => ReadonlyMap<string, SkillLiveness>
+  /** Support-file char counts for files that can exceed the cap (design §16.6). */
+  supportChars?: () => ReadonlyMap<string, Readonly<Record<string, number>>>
 }
 
 export interface MaintainOutcome {
@@ -283,6 +285,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       usageObserved,
       ...(options.demand === undefined ? {} : { demand: options.demand() }),
       ...(options.liveness === undefined ? {} : { liveness: options.liveness() }),
+      ...(options.supportChars === undefined ? {} : { supportChars: options.supportChars() }),
       // E-9 (v18): a single unreadable SKILL.md is skipped with a trace.
       // V27 M-02: the trace is also the evidence that separates "empty library"
       // from "unreadable library" below.

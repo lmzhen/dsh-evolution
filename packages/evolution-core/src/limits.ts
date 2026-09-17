@@ -35,6 +35,17 @@ export type ArchiveRetentionPolicy = 'report' | 'prune'
 /** Default: report-only, because upstream's hard invariant is never to delete. */
 export const DEFAULT_ARCHIVE_RETENTION_POLICY: ArchiveRetentionPolicy = 'report'
 
+/** How the 100k-character cap treats SUPPORT files (design §16.6, V4). Upstream
+ * applies the cap to every written file; we land it in `report` mode first (the
+ * write goes through with an advisory) and `enforce` refuses — with the same
+ * net-shrink repair path SKILL.md already has, so an over-cap legacy file can
+ * always be brought back under the cap instead of becoming unmaintainable. */
+export type SupportFileCharPolicy = 'report' | 'enforce'
+
+/** Default: report, so the cap cannot brick an existing oversize file on upgrade
+ * (the live library carries a 189k-character release log today). */
+export const DEFAULT_SUPPORT_FILE_CHAR_POLICY: SupportFileCharPolicy = 'report'
+
 export interface SkillLimits {
   maxNameLength: number
   maxDescriptionLength: number
@@ -46,6 +57,8 @@ export interface SkillLimits {
   referenceRewrite?: ReferenceRewritePolicy | undefined
   /** See ArchiveRetentionPolicy; absent means the default (`report`). */
   archiveRetention?: ArchiveRetentionPolicy | undefined
+  /** See SupportFileCharPolicy; absent means the default (`report`). */
+  supportFileCharPolicy?: SupportFileCharPolicy | undefined
 }
 
 export const DEFAULT_SKILL_LIMITS: SkillLimits = {

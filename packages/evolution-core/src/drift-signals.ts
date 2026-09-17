@@ -13,7 +13,7 @@
 
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from './skill-health.ts'
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
-import { AUTHORING_DESCRIPTION_BAR, DEFAULT_STALE_AFTER_DAYS } from './constants.ts'
+import { AUTHORING_DESCRIPTION_BAR, DEFAULT_STALE_AFTER_DAYS, MAX_SKILL_CONTENT_CHARS } from './constants.ts'
 import { isFileShapedPath, scanBodyHooks, type CitationReport } from './citations.ts'
 import type { BodyCost } from './cost.ts'
 
@@ -42,6 +42,10 @@ export interface DriftSkillSnapshot {
   demand?: Readonly<Record<string, number>> | undefined
   /** Idle age of the owning skill (design §5.6); undefined = no record to age. */
   liveness?: SkillLiveness | undefined
+  /** Character counts of support files that can possibly exceed the content cap
+   * (design §16.6, V4); undefined = not measured. The assembler pre-filters by
+   * byte size, which is complete for the oversize question. */
+  supportChars?: Readonly<Record<string, number>> | undefined
 }
 
 /** Retirement-proposal input for one skill (design §5.6). */
@@ -308,7 +312,7 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
           // V3: the band is the AUTHORING discipline band (upstream's 20k split
           // line in weighted units), and the multiple is what makes it actionable —
           // a bare ceiling says nothing about how far past it the body is.
-          : `tokens≈${cost.tokensLow}-${cost.tokensHigh} (estimate; cjk=${cost.cjk}; band=${DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits} units, body=${(cost.units / DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toFixed(1)}x)`,
+          : `tokens≈${cost.tokensLow}-${cost.tokensHigh} (estimate; cjk=${cost.cjk}; band=${DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits} units, body=${(cost.units / DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toFixed(1)}x)${oversizeSupportNote(snapshot.supportChars)}`,
       ),
     )
 
@@ -395,6 +399,22 @@ function citationSignal(citations: CitationReport | undefined): DriftSignal {
     return sig('citation_resolution', 'over', `dangling=${citations.dangling.length}/${cited.length}`, 'dangling=0', `missing: ${missing}`)
   }
   return sig('citation_resolution', 'pass', `citations=${cited.length} foreign=${citations.foreign.length}${citations.unverified.length === 0 ? '' : ` unverified=${citations.unverified.length}`}`)
+}
+
+/** V4 (design §16.6): the report half of the support-file cap. Only files the
+ * assembler could PROVE large enough to be over the cap are namespaced here; an
+ * absent map claims nothing (unknown is not zero).
+ * @param supportChars - measured character counts, or undefined when unmeasured.
+ * @returns a detail suffix naming the oversize files, or an empty string.
+ */
+function oversizeSupportNote(supportChars: Readonly<Record<string, number>> | undefined): string {
+  if (supportChars === undefined) return ''
+  const oversize = Object.entries(supportChars)
+    .filter(([, chars]) => chars > MAX_SKILL_CONTENT_CHARS)
+    .sort((a, b) => b[1] - a[1])
+  if (oversize.length === 0) return ''
+  const shown = oversize.slice(0, 3).map(([path, chars]) => `${path}(${chars})`)
+  return `; oversize support file(s): ${shown.join(', ')}${oversize.length > shown.length ? ' …' : ''}`
 }
 
 /** Render-time reason for an empty retirement list (design §5.6). */

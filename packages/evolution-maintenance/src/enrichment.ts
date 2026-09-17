@@ -34,6 +34,10 @@ export interface Enrichment {
   /** Idle age per skill (design §5.6) — present only for skills with a usage
    * record, so a skill the sidecar never saw stays "no age evidence". */
   liveness: ReadonlyMap<string, SkillLiveness>
+  /** Support-file char counts for files big enough to possibly exceed the cap
+   * (design §16.6) — present only where at least one such file exists, so the
+   * common measured-and-clean case adds no field. */
+  supportChars: ReadonlyMap<string, Readonly<Record<string, number>>>
 }
 
 export async function buildEnrichment(ctx: Context, library: SkillLibrary): Promise<Enrichment> {
@@ -50,6 +54,7 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
   const catalogInvalid = new Map<string, boolean>()
   const demand = new Map<string, Readonly<Record<string, number>>>()
   const liveness = new Map<string, SkillLiveness>()
+  const supportChars = new Map<string, Readonly<Record<string, number>>>()
   // One clock per run: every skill's idle age is measured against one instant,
   // so two skills cannot be aged by runs a second apart.
   const now = new Date()
@@ -98,6 +103,11 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
     const reads = record?.support_reads
     if (reads !== undefined && Object.keys(reads).length > 0) demand.set(entry.name, reads)
     if (record !== undefined) liveness.set(entry.name, { idleDays: idleDays(record, now) })
+    const big = await library.supportFileChars(entry.name)
+    if (big !== null && Object.keys(big).length > 0) supportChars.set(entry.name, big)
   }
-  return { descriptions, supportFiles, quality, usageObservedValue, protected: protectedMap, catalogInvalid, demand, liveness }
+  return {
+    descriptions, supportFiles, quality, usageObservedValue,
+    protected: protectedMap, catalogInvalid, demand, liveness, supportChars,
+  }
 }

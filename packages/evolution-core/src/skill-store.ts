@@ -40,7 +40,7 @@ import { isReviewChannelSession } from './review-channel.ts'
 import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
-import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS } from './limits.ts'
+import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
 import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, planRehoming } from './reference-rewrite.ts'
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
@@ -1173,6 +1173,36 @@ export class SkillLibrary {
   }
 
   /**
+   * V4 (design §16.6): exact character counts of the support files that can
+   * POSSIBLY exceed the content cap. The pre-filter is BYTE size, and that is
+   * sound rather than approximate: a UTF-16 code unit never costs less than one
+   * UTF-8 byte, so a file whose bytes are within the cap provably cannot exceed
+   * the cap in characters. The returned map is therefore COMPLETE for the
+   * oversize question without reading the small files.
+   * @param rawName - the skill's name.
+   * @returns path -> character count (possibly empty), or null when the listing or
+   *   a size probe cannot answer — unknown is never an empty map.
+   */
+  async supportFileChars(rawName: string): Promise<Record<string, number> | null> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return null
+    const listed = await this.listSupportFiles(name)
+    if (!isPresent(listed)) return null
+    const dir = this.dirOf(name)
+    const chars: Record<string, number> = {}
+    for (const path of listed.value) {
+      const full = join(dir, ...path.split('/').filter(Boolean))
+      const bytes = this.io.size === undefined ? null : await this.io.size(full).catch(() => null)
+      if (bytes === null) return null
+      if (bytes <= this.limits.maxSkillContentChars) continue
+      const content = await this.io.readText(full).catch(() => null)
+      if (content === null) return null
+      chars[path] = content.length
+    }
+    return chars
+  }
+
+  /**
    * Structure-health facts for one skill (rc.73 A1, 008 design): body
    * chars/density from SKILL.md, support groups from countSupportDirs, plus
    * optional usage counts (A2 churn dimension) when the caller has them.
@@ -1615,6 +1645,15 @@ export class SkillLibrary {
       if (overLimit && target === skillMd && !repairing) {
         return { result: { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. ${CONTENT_SPLIT_HINT}` }, write: null }
       }
+      // V4: the same cap on a SUPPORT file. Report mode writes with an advisory;
+      // enforce refuses unless the patch makes an already-over file smaller.
+      const supportOverCap = overLimit && target !== skillMd && !repairing
+      const capAdvisory = supportOverCap
+        ? ` Warning: ${writeContent.length} characters is over the ${this.limits.maxSkillContentChars}-character cap upstream applies to every file; plan a split.`
+        : ''
+      if (supportOverCap && this.supportFileCharPolicy() === 'enforce') {
+        return { result: { ok: false, message: `Patched file content exceeds ${this.limits.maxSkillContentChars} characters. ${CONTENT_SPLIT_HINT}` }, write: null }
+      }
       const threat = this.contentThreatBlock(writeContent)
       if (threat) return { result: { ok: false, message: threat }, write: null }
       // 0.3.18 (E-68): old_string === replacement reaches fuzzyPatch's exact
@@ -1632,7 +1671,7 @@ export class SkillLibrary {
       // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
       const onDisk = writeContent.trimEnd() + '\n'
       return {
-        result: { ok: true, message: `Skill "${name}" patched (${patchLabel}).${patchNote}`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
+        result: { ok: true, message: `Skill "${name}" patched (${patchLabel}).${patchNote}${capAdvisory}`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
         write: onDisk,
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },
@@ -2679,11 +2718,23 @@ export class SkillLibrary {
       // is a no-op — no write, no audit, no mutation event — so a repeated
       // write_file cannot inflate the mutation-maturity counter or churn the
       // catalog (the update/patch/memory-add noop discipline, 0.3.29).
+      // V4 (design §16.6): upstream applies the 100k-character cap to EVERY written
+      // file. Landing it here in report mode first — the write goes through with an
+      // advisory; `enforce` refuses, and a NET SHRINK of an already-over file is the
+      // repair path in both modes (so a legacy 189k file can always be reduced).
+      const overCap = exceedsContentLimit(content, this.limits.maxSkillContentChars)
+      const repairing = shrinksOverLimit(content, current, this.limits.maxSkillContentChars)
+      const capAdvisory = overCap && !repairing
+        ? ` Warning: ${content.length} characters is over the ${this.limits.maxSkillContentChars}-character cap upstream applies to every file; plan a split.`
+        : ''
+      if (overCap && !repairing && this.supportFileCharPolicy() === 'enforce') {
+        return { result: { ok: false, message: `Support file "${filePath}" content exceeds ${this.limits.maxSkillContentChars} characters. ${CONTENT_SPLIT_HINT}` }, write: null }
+      }
       if (current !== null && content.trimEnd() === current.trimEnd()) {
         return { result: { ok: true, message: `Support file "${filePath}" unchanged: the supplied content already matches the current file; nothing written.`, noop: true, path: target }, write: null }
       }
       return {
-        result: { ok: true, message: `Support file "${filePath}" written to "${name}".`, path: target },
+        result: { ok: true, message: `Support file "${filePath}" written to "${name}".${capAdvisory}`, path: target },
         write: content,
         audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}` },
         event: { action: 'write_file', name, skillDir: dir, file: target },
@@ -2794,6 +2845,11 @@ export class SkillLibrary {
       expired.push(entry)
     }
     return expired
+  }
+
+  /** V4 (design §16.6): support-file char policy, resolved at the call site. */
+  supportFileCharPolicy(): 'report' | 'enforce' {
+    return this.limits.supportFileCharPolicy ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY
   }
 
   /** Retention policy resolved at the call site (absent limits object = report).
