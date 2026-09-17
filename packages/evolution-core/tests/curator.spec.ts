@@ -1,6 +1,33 @@
 import { expect, it } from 'vitest'
 import { buildCuratorRunReport, computeLifecycleTransitions, computeScopeView, CURATOR_PROMPT, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, renderCuratorReportMarkdown, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 
+// 0.5.0 V1 (design §16.6-④): the retention line has three states, and the middle
+// one is the whole point — a run whose archive listing could NOT be read must not
+// present itself as "nothing expired".
+it('V1: the retention line distinguishes measured counts from an unreadable listing', () => {
+  const base = {
+    runId: 'r-v1',
+    startedAt: '2026-09-17T00:00:00.000Z',
+    finishedAt: '2026-09-17T00:00:01.000Z',
+    staleCandidates: [],
+    llmNominations: [],
+    archiveCandidates: [],
+    archived: [],
+    failed: [],
+  }
+  const measured = renderCuratorReportMarkdown(buildCuratorRunReport({ ...base, wouldPrune: ['old-a', 'old-b'] }))
+  expect(measured).toContain('- **Would prune (archiveRetention=report)**: 2')
+  expect(measured).toContain('## Retention (kept, not deleted)')
+  expect(measured).toContain('- old-a')
+  const clean = renderCuratorReportMarkdown(buildCuratorRunReport({ ...base, wouldPrune: [] }))
+  expect(clean).toContain('- **Would prune (archiveRetention=report)**: 0')
+  const unknown = renderCuratorReportMarkdown(buildCuratorRunReport({ ...base, wouldPrune: null }))
+  expect(unknown).toContain('unknown (archive listing unreadable)')
+  // A run under the `prune` policy says nothing at all (the field is absent).
+  const pruned = renderCuratorReportMarkdown(buildCuratorRunReport(base))
+  expect(pruned).not.toContain('Would prune')
+})
+
 it('V27 CUR-2: a run that was cut short carries its abort reason into the report and digest', () => {
   const report = buildCuratorRunReport({
     runId: 'r-1',

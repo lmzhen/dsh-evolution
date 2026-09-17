@@ -135,6 +135,12 @@ export const EVOLUTION_WRITE_TOOLS = ['memory', 'skill_manage'] as const
  * can reference it without importing the skill-store module. */
 export const AUTHORING_DESCRIPTION_BAR = 60
 
+/** The split hint both size refusals share (0.5.0 V1). The same sentence used to
+ * be copied into validateFrontmatter AND the patch path, and neither copy named
+ * where the content should go — the upstream cap message names the destination
+ * directories, and that is the part a model actually acts on. */
+export const CONTENT_SPLIT_HINT = 'Consider splitting into a smaller SKILL.md with supporting files in references/ or templates.'
+
 /** V27 G2.4: the largest millisecond delay a timer accepts. `AbortSignal.timeout`
  * (and `setTimeout`) coerce anything larger to 1ms after a Node warning, so a
  * timeout configured above this ceiling silently collapses to "immediately

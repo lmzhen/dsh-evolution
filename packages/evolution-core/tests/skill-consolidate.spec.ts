@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 const body = (name: string) => `---
 name: ${name}
@@ -152,6 +152,47 @@ it('S1-E1: a merge that fails validation AFTER the sources were archived rolls e
   expect(await nodeExists(join(root, '.archive', 'narrow-b'))).toBe(false)
   // The umbrella itself is untouched.
   expect(await lib.read('umbrella')).toBe(body('umbrella'))
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V1: a source carrying support files is refused WITH the re-home plan (default policy plan)', async () => {
+  const { root, lib } = await make()
+  await lib.writeSupportFile('narrow-a', 'references/guide.md', '# guide\n', 'foreground')
+  await lib.update('narrow-a', `${body('narrow-a')}\nSee references/guide.md for the detail.\n`, 'foreground')
+  const refused = await lib.consolidate('umbrella', ['narrow-a'], 'foreground')
+  expect(refused.ok).toBe(false)
+  expect(refused.message).toContain('carries support files')
+  expect(refused.message).toContain('plan: re-home 1 file(s)')
+  expect(refused.message).toContain('rewrite 0 reference(s)')
+  expect(refused.message).toContain('residual dangling 0')
+  // A refusal writes and archives nothing.
+  expect(await lib.read('narrow-a')).not.toBeNull()
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V1: a colliding support path is renamed in the plan and its body edit is counted', async () => {
+  const { root, lib } = await make()
+  await lib.writeSupportFile('umbrella', 'references/guide.md', '# umbrella guide\n', 'foreground')
+  await lib.writeSupportFile('narrow-a', 'references/guide.md', '# narrow guide\n', 'foreground')
+  await lib.update('narrow-a', `${body('narrow-a')}\nSee references/guide.md for the detail.\n`, 'foreground')
+  const refused = await lib.consolidate('umbrella', ['narrow-a'], 'foreground')
+  expect(refused.ok).toBe(false)
+  expect(refused.message).toContain('references/narrow-a-guide.md')
+  expect(refused.message).toContain('rewrite 1 reference(s)')
+  expect(refused.message).toContain('collisions: references/guide.md')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V1: referenceRewrite=off keeps the refusal message exactly as it was', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-consolidate-off-'))
+  const lib = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, referenceRewrite: 'off' })
+  await lib.create('umbrella', body('umbrella'), 'foreground')
+  await lib.create('narrow-a', body('narrow-a'), 'foreground')
+  await lib.writeSupportFile('narrow-a', 'references/guide.md', '# guide\n', 'foreground')
+  const refused = await lib.consolidate('umbrella', ['narrow-a'], 'foreground')
+  expect(refused.ok).toBe(false)
+  expect(refused.message).toContain('carries support files')
+  expect(refused.message).not.toContain('plan:')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

@@ -27,6 +27,7 @@
  */
 
 export * from './citations.ts'
+export * from './reference-rewrite.ts'
 export * from './cost.ts'
 export * from './curator.ts'
 export * from './evolution-events.ts'

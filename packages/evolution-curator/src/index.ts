@@ -1001,10 +1001,17 @@ export class EvolutionCurator extends Service {
     const runAborted = errors.some(error => error.startsWith('run aborted'))
     if (!dryRun && !runAborted) this.lastRun = Date.now()
     const finishedAt = new Date().toISOString()
+    // 0.5.0 V1 (design §16.6-④): the retention policy decides whether the report
+    // may claim "nothing expired" — under `prune` the entries are gone by
+    // definition, so the field is passed only for the reporting policy.
+    const wouldPrune = this.skills.archiveRetentionPolicy() === 'report'
+      ? await this.skills.expiredArchives()
+      : undefined
     const report = buildCuratorRunReport({
       runId,
       startedAt,
       finishedAt,
+      ...(wouldPrune === undefined ? {} : { wouldPrune }),
       staleCandidates: result.markStale,
       llmNominations,
       archiveCandidates,

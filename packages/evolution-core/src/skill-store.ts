@@ -40,20 +40,26 @@ import { isReviewChannelSession } from './review-channel.ts'
 import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
-import { DEFAULT_CITATION_POLICY, DEFAULT_SKILL_LIMITS } from './limits.ts'
+import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
+import { describeReferenceRewrite, planReferenceRewrite, planRehoming } from './reference-rewrite.ts'
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
-import { SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+import { CONTENT_SPLIT_HINT, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 /** 0.3.16 (S1.13, T-6): the pointer-line prefix written into a body when a
  * section is moved to references/ — single literal, both restructure and
  * append-mode consolidation emit the same discoverability line. */
 const POINTER_LINE_PREFIX = '> 详见 references/'
+
+/** Collision tail for the refusal plan note (empty when nothing collided). */
+function collisionsNote(collisions: readonly string[]): string {
+  return collisions.length === 0 ? '' : ` collisions: ${collisions.slice(0, 5).join(', ')}`
+}
 import type { EvolutionSkillMutatedEvent } from './events.ts'
 
 export interface SkillSummary {
@@ -1575,7 +1581,7 @@ export class SkillLibrary {
       const overLimit = exceedsContentLimit(writeContent, this.limits.maxSkillContentChars)
       const repairing = shrinksOverLimit(writeContent, md, this.limits.maxSkillContentChars)
       if (overLimit && target === skillMd && !repairing) {
-        return { result: { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. Consider splitting into a smaller SKILL.md with supporting files.` }, write: null }
+        return { result: { ok: false, message: `Patched content exceeds ${this.limits.maxSkillContentChars} characters. ${CONTENT_SPLIT_HINT}` }, write: null }
       }
       const threat = this.contentThreatBlock(writeContent)
       if (threat) return { result: { ok: false, message: threat }, write: null }
@@ -1921,6 +1927,33 @@ export class SkillLibrary {
   }
 
   /**
+   * V1 (design §16.7): the re-home plan a refused consolidation WOULD follow.
+   * Report-only — the refusal stands, nothing is written, and `off` keeps the
+   * message exactly as it was. `apply` is the V2 batch.
+   * @param source - the moving skill's name.
+   * @param targetName - the destination skill's name.
+   * @param body - the moving body whose references are planned.
+   * @returns a sentence to append to the refusal, or an empty string.
+   */
+  private async referenceRewritePlanNote(source: string, targetName: string, body: string): Promise<string> {
+    if ((this.limits.referenceRewrite ?? DEFAULT_REFERENCE_REWRITE_POLICY) === 'off') return ''
+    const sourceFiles = await this.listSupportFiles(source)
+    const targetFiles = await this.listSupportFiles(targetName)
+    // An unknown listing is not an empty one: name the reason instead of
+    // planning against a file set nobody could read.
+    if (!isPresent(sourceFiles) || !isPresent(targetFiles)) return ' plan: unavailable (support-file listing unknown)'
+    const { moves, collisions } = planRehoming(sourceFiles.value, targetFiles.value, source)
+    const plan = planReferenceRewrite({
+      content: body,
+      files: sourceFiles.value,
+      moves,
+      targetFiles: [...targetFiles.value, ...moves.map(move => move.to)],
+    })
+    const collisionTail = collisionsNote(collisions)
+    return ` ${describeReferenceRewrite(plan)}${collisionTail}`
+  }
+
+  /**
    * Merge the bodies of `sources` into `target` and archive the sources with
    * an absorbed-into marker. Hermes-style consolidation: overlapping skills
    * collapse into one, and the originals stay recoverable under `.archive/`.
@@ -1996,11 +2029,13 @@ export class SkillLibrary {
           // Package integrity (009-I): an append must never leave dangling
           // support links — refuse before ANY side effect (no archive, no write).
           if (await this.countSupportDirs(source) > 0) {
-            return { ok: false, message: `Consolidation rejected: source "${source}" carries support files — use mode:'reference' or archive the whole package instead.` }
+            const note = await this.referenceRewritePlanNote(source, targetName, parsed.body)
+            return { ok: false, message: `Consolidation rejected: source "${source}" carries support files — use mode:'reference' or archive the whole package instead.${note}` }
           }
           const refs = supportRefs(parsed.body)
           if (refs.length > 0) {
-            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.` }
+            const note = await this.referenceRewritePlanNote(source, targetName, parsed.body)
+            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.${note}` }
           }
           parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
           plannedSourceBytes.set(source, sourceMd)
@@ -2015,7 +2050,8 @@ export class SkillLibrary {
           if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to demote.` }
           const refs = supportRefs(parsed.body)
           if (refs.length > 0) {
-            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.` }
+            const note = await this.referenceRewritePlanNote(source, targetName, parsed.body)
+            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.${note}` }
           }
           const target = join(targetDir, 'references', `${source}.md`)
           referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
@@ -2648,16 +2684,45 @@ export class SkillLibrary {
    * Backends without the mtime probe skip pruning (no false deletes on
    * unknown age).
    */
-  private async pruneExpiredArchives(): Promise<void> {
+  /**
+   * 0.5.0 V1 (design §16.6-④): the retention window's READ half. Names every
+   * archived entry past the window without touching it — the report path the
+   * default policy uses, and the input the curator's run report carries.
+   * @returns the expired entry names ([] when the backend has no mtime probe,
+   *   because an unknown age must never read as expired).
+   */
+  async expiredArchives(): Promise<string[] | null> {
     const archiveRoot = join(this.root, '.archive')
-    if (!this.io.mtime) return
-    let entries: string[] = []
-    try { entries = await this.io.list(archiveRoot) } catch { return }
+    // Three-state read (N14), the same helper every other listing uses: a
+    // version-control-free listing failure is UNKNOWN, and the report must say so
+    // rather than claim nothing expired.
+    const listed = await probeList(this.io, archiveRoot)
+    if (isUnknown(listed)) return null
+    if (!isPresent(listed)) return []
+    if (!this.io.mtime) return null
     const cutoff = Date.now() - ARCHIVE_RETENTION_DAYS * 86_400_000
-    for (const entry of entries) {
-      const entryPath = join(archiveRoot, entry)
-      const mtime = await this.io.mtime(entryPath).catch(() => null)
+    const expired: string[] = []
+    for (const entry of listed.value) {
+      const mtime = await this.io.mtime(join(archiveRoot, entry)).catch(() => null)
       if (mtime === null || mtime > cutoff) continue
+      expired.push(entry)
+    }
+    return expired
+  }
+
+  /** Retention policy resolved at the call site (absent limits object = report).
+   * Public so a run report can say WHICH policy produced its numbers. */
+  archiveRetentionPolicy(): 'report' | 'prune' {
+    return this.limits.archiveRetention ?? DEFAULT_ARCHIVE_RETENTION_POLICY
+  }
+
+  private async pruneExpiredArchives(): Promise<void> {
+    // ONE listing site for both halves of retention (expiredArchives decides what
+    // is expired; this only deletes what it named).
+    const expired = await this.expiredArchives()
+    if (expired === null) return
+    for (const entry of expired) {
+      const entryPath = join(this.root, '.archive', entry)
       await this.io.remove(entryPath).catch(() => {})
       console.warn(`skill-store: pruned archived skill "${entry}" (older than ${ARCHIVE_RETENTION_DAYS} days; recoverable from snapshots until they rotate)`)
     }
@@ -2672,7 +2737,20 @@ export class SkillLibrary {
   async snapshotAll(reason = 'pre-mutation', extras: SnapshotExtra[] = []): Promise<string> {
     // v23 (ML-1): retention runs BEFORE the copy, so the snapshot does not
     // enshrine entries that are about to be pruned.
-    await this.pruneExpiredArchives()
+    // 0.5.0 V1: only the `prune` policy deletes; the default `report` names the
+    // expired entries and leaves them alone (upstream's never-delete invariant,
+    // and §14's "no automatic deletion"). The report reaches the operator through
+    // the curator run report, not only through a warn line here.
+    if (this.archiveRetentionPolicy() === 'prune') {
+      await this.pruneExpiredArchives()
+    } else {
+      const expired = await this.expiredArchives()
+      if (expired === null) {
+        console.warn('skill-store: archive retention state UNKNOWN — the .archive listing could not be read (archiveRetention=report, nothing deleted)')
+      } else if (expired.length > 0) {
+        console.warn(`skill-store: ${expired.length} archived skill(s) past the ${ARCHIVE_RETENTION_DAYS}-day window kept (archiveRetention=report): ${expired.slice(0, 5).join(', ')}`)
+      }
+    }
     const backupRoot = join(this.root, '.backups')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     let dest = join(backupRoot, `skills-${stamp}`)

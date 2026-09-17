@@ -22,7 +22,7 @@
 // same unloadable blocks (duplicate keys included), so the lenient fallback
 // verdicts are unchanged.
 import { parse as parseYaml } from 'yaml'
-import { AUTHORING_DESCRIPTION_BAR, SKILL_NAME_RE } from './constants.ts'
+import { AUTHORING_DESCRIPTION_BAR, CONTENT_SPLIT_HINT, SKILL_NAME_RE } from './constants.ts'
 import { DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
 
@@ -595,8 +595,7 @@ export function validateFrontmatter(
   // S1.2: the limit is judged on the bytes that will land on disk, and a NET
   // SHRINK of an already-over-limit file is allowed (the repair path).
   if (exceedsContentLimit(content, limits.maxSkillContentChars) && !shrinksOverLimit(content, current, limits.maxSkillContentChars)) {
-    return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters. ` +
-      'Consider splitting into a smaller SKILL.md with supporting files.'
+    return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters. ${CONTENT_SPLIT_HINT}`
   }
   return null
 }

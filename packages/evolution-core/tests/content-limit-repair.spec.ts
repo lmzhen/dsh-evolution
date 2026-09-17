@@ -8,7 +8,7 @@
  * `skill_manage` with no way back.
  */
 import { expect, it } from 'vitest'
-import { DEFAULT_SKILL_LIMITS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_LIMITS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 const LIMIT = 300
@@ -56,3 +56,22 @@ it('S1.2: shrinking an over-limit file is allowed; growing it is not', async () 
   expect(grown.ok).toBe(false)
   expect(grown.message).toContain('exceeds')
 })
+
+// 0.5.0 V1 (design §16.2 ①): the two refusals shared a copied sentence that never
+// named WHERE the content should go. One constant now, and it names the dirs.
+it('V1: both size refusals share one split hint that names the destination dirs', async () => {
+  const io = fakeIo()
+  const lib = new SkillLibrary('/skills', io, LIMITS)
+  const created = await lib.create('lim-skill', documentOf(LIMIT + 40), 'foreground')
+  expect(created.ok).toBe(false)
+  expect(created.message).toContain(CONTENT_SPLIT_HINT)
+  // The upstream sentence names both destination directories ("in references/ or
+  // templates.") — the part a model actually acts on.
+  expect(CONTENT_SPLIT_HINT).toContain('references/')
+  expect(CONTENT_SPLIT_HINT).toContain('templates')
+  await lib.create('small-skill', documentOf(LIMIT - 50, 'small-skill'), 'foreground')
+  const patched = await lib.patch('small-skill', 'x'.repeat(20), 'x'.repeat(200))
+  expect(patched.ok).toBe(false)
+  expect(patched.message).toContain(CONTENT_SPLIT_HINT)
+})
+

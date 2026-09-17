@@ -17,6 +17,23 @@ export type CitationPolicy = 'verify' | 'refuse'
  * working (unknown policy never silently changes a write path). */
 export const DEFAULT_CITATION_POLICY: CitationPolicy = 'verify'
 
+/** How a consolidation treats the source's support files (design §16.7).
+ * `off` refuses as before, `plan` keeps refusing but reports what a re-home
+ * would have to rewrite. `apply` (the V2 batch) lands later — the union is
+ * widened with it rather than shipping a value nothing implements. */
+export type ReferenceRewritePolicy = 'off' | 'plan'
+
+/** Default: report the plan on refusal, never write (behaviour unchanged). */
+export const DEFAULT_REFERENCE_REWRITE_POLICY: ReferenceRewritePolicy = 'plan'
+
+/** What happens to `.archive` entries past the retention window (design §16.6-④).
+ * `report` (the default) names them and deletes nothing; `prune` restores the
+ * pre-0.5 deletion, which upstream never does. */
+export type ArchiveRetentionPolicy = 'report' | 'prune'
+
+/** Default: report-only, because upstream's hard invariant is never to delete. */
+export const DEFAULT_ARCHIVE_RETENTION_POLICY: ArchiveRetentionPolicy = 'report'
+
 export interface SkillLimits {
   maxNameLength: number
   maxDescriptionLength: number
@@ -24,6 +41,10 @@ export interface SkillLimits {
   maxSkillFileBytes: number
   /** See CitationPolicy. Optional so existing limits objects stay valid. */
   citationPolicy?: CitationPolicy | undefined
+  /** See ReferenceRewritePolicy; absent means the default (`plan`). */
+  referenceRewrite?: ReferenceRewritePolicy | undefined
+  /** See ArchiveRetentionPolicy; absent means the default (`report`). */
+  archiveRetention?: ArchiveRetentionPolicy | undefined
 }
 
 export const DEFAULT_SKILL_LIMITS: SkillLimits = {

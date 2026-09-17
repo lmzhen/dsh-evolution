@@ -91,6 +91,12 @@ export interface CuratorRunReport {
   llmReviewEnabled?: boolean
   /** V6-35 (0.3.36): lenient-parse shape notes from the LLM nomination block. */
   nominationsWarnings?: string[]
+  /** 0.5.0 V1 (design §16.6-④): archived entries past the retention window that
+   * the CURRENT policy keeps rather than deletes. Present (even empty) only when
+   * the retention policy was `report`, so a report cannot read as "nothing
+   * expired" for a run that pruned under a different policy. `null` means the
+   * listing could not be read — unknown, never "nothing expired". */
+  wouldPrune?: string[] | null
 }
 
 export interface CuratorReportInput {
@@ -110,6 +116,7 @@ export interface CuratorReportInput {
   snapshotPath?: string
   llmReviewEnabled?: boolean
   nominationsWarnings?: readonly string[]
+  wouldPrune?: readonly string[] | null
 }
 
 export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunReport {
@@ -129,6 +136,7 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
     ...input.snapshotPath === undefined ? {} : { snapshotPath: input.snapshotPath },
     ...input.llmReviewEnabled === undefined ? {} : { llmReviewEnabled: input.llmReviewEnabled },
     ...input.nominationsWarnings === undefined ? {} : { nominationsWarnings: [...input.nominationsWarnings] },
+    ...input.wouldPrune === undefined ? {} : { wouldPrune: input.wouldPrune === null ? null : [...input.wouldPrune] },
   }
 }
 
@@ -156,6 +164,9 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
       : [`- **Unattributed errors**: ${report.unattributed.length}`],
     ...report.snapshotPath === undefined ? [] : [`- **Snapshot**: ${report.snapshotPath}`],
     ...report.llmReviewEnabled === undefined ? [] : [`- **llmReview**: ${report.llmReviewEnabled}`],
+    ...report.wouldPrune === undefined ? [] : [report.wouldPrune === null
+      ? '- **Would prune (archiveRetention=report)**: unknown (archive listing unreadable)'
+      : `- **Would prune (archiveRetention=report)**: ${report.wouldPrune.length}`],
     ...report.nominationsWarnings === undefined || report.nominationsWarnings.length === 0 ? [] : [`- **Nomination warnings**: ${report.nominationsWarnings.join('; ')}`],
   ]
   const section = (title: string, items: string[]): string[] => items.length === 0 ? [] : ['', `## ${title}`, '', ...items.map(item => `- ${item}`)]
@@ -166,6 +177,7 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
     ...section('Unattributed', report.unattributed ?? []),
     ...section('Stale candidates', report.staleCandidates),
     ...section('LLM nominations', report.llmNominations),
+    ...section('Retention (kept, not deleted)', report.wouldPrune ?? []),
     '',
   ].join('\n')
 }
