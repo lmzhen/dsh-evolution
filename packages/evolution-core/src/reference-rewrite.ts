@@ -24,8 +24,13 @@ export interface ReferenceMove {
 export interface ReferenceRewriteEdit {
   /** 1-based line in the body being moved. */
   line: number
+  /** The resolved target before the move. */
   from: string
+  /** The resolved target after the move. */
   to: string
+  /** The verbatim token as it appears in the body (`raw`), so a rewrite replaces
+   * exactly what is there and leaves a trailing `#fragment` in place. */
+  raw: string
 }
 
 /** What one consolidation plan does to one body's references. */
@@ -36,7 +41,9 @@ export interface ReferenceRewritePlan {
   unresolved: readonly string[]
   /** Targets still absent from the target file list after the moves. */
   residualDangling: readonly string[]
-  /** Moves the plan actually relies on (paths the body cites or that must travel). */
+  /** The moves the body actually NEEDS: a support file the body never cites stays
+   * with the archived package instead of being copied into the target for
+   * nothing (upstream's wording is "every needed support file"). */
   moves: readonly ReferenceMove[]
 }
 
@@ -107,7 +114,7 @@ export function planReferenceRewrite(input: {
     const to = move ?? ref.target
     if (move !== undefined) {
       used.add(ref.target)
-      if (move !== ref.target) edits.push({ line: ref.line, from: ref.target, to: move })
+      if (move !== ref.target) edits.push({ line: ref.line, from: ref.target, to: move, raw: ref.raw })
     } else if (!report.dangling.some(entry => entry.target === ref.target)) {
       // Already resolvable in the MOVING skill: it only stays valid if the
       // destination happens to carry the same path, which the caller proves by
@@ -120,8 +127,41 @@ export function planReferenceRewrite(input: {
     edits,
     unresolved: [...new Set(unresolved)],
     residualDangling: [...residual],
-    moves: input.moves.filter(move => used.has(move.from) || move.from !== move.to),
+    moves: input.moves.filter(move => used.has(move.from)),
   }
+}
+
+/**
+ * Apply a plan's edits to the body (V2). Line-wise and literal: line N gets its
+ * FIRST occurrence of the recorded token replaced, everything else is copied
+ * byte for byte — no regex, so a token that happens to contain regex
+ * metacharacters cannot rewrite more than it matched.
+ * @param content - the body the plan was computed against.
+ * @param edits - the plan's edits.
+ * @returns the rewritten body (identical to the input when there is nothing to do).
+ */
+export function applyReferenceRewrite(content: string, edits: readonly ReferenceRewriteEdit[]): string {
+  if (edits.length === 0) return content
+  const byLine = new Map<number, ReferenceRewriteEdit[]>()
+  for (const edit of edits) {
+    const list = byLine.get(edit.line)
+    if (list === undefined) byLine.set(edit.line, [edit])
+    else list.push(edit)
+  }
+  const lines = content.split('\n')
+  for (const [lineNo, lineEdits] of byLine) {
+    const index = lineNo - 1
+    const original = lines[index]
+    if (original === undefined) continue
+    let next = original
+    for (const edit of lineEdits) {
+      const at = next.indexOf(edit.raw)
+      if (at < 0) continue
+      next = next.slice(0, at) + edit.to + next.slice(at + edit.raw.length)
+    }
+    lines[index] = next
+  }
+  return lines.join('\n')
 }
 
 /**

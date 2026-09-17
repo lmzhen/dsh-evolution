@@ -6,7 +6,42 @@
  * destination is named instead of being silently dropped.
  */
 import { describe, expect, it } from 'vitest'
-import { describeReferenceRewrite, planReferenceRewrite, planRehoming } from '@deepseek-ai/dsh-evolution-core'
+import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, planRehoming } from '@deepseek-ai/dsh-evolution-core'
+
+describe('applyReferenceRewrite (V2)', () => {
+  it('replaces only the recorded token on its own line and keeps a fragment tail', () => {
+    const content = [
+      '# narrow',
+      '',
+      'See references/guide.md#section-2 and references/guide.md again.',
+      '',
+      'Untouched: references/guide.md',
+      '',
+    ].join('\n')
+    const rewritten = applyReferenceRewrite(content, [
+      { line: 3, from: 'references/guide.md', to: 'references/narrow-guide.md', raw: 'references/guide.md' },
+    ])
+    const lines = rewritten.split('\n')
+    // First occurrence on the edited line only; the duplicate stays put.
+    expect(lines[2]).toBe('See references/narrow-guide.md#section-2 and references/guide.md again.')
+    expect(lines[4]).toBe('Untouched: references/guide.md')
+    expect(rewritten.replace('narrow-guide.md', 'guide.md')).toBe(content)
+  })
+
+  it('is a no-op without edits', () => {
+    expect(applyReferenceRewrite('references/guide.md\n', [])).toBe('references/guide.md\n')
+  })
+
+  it('leaves a move out of plan.moves when the body never cites that file', () => {
+    const plan = planReferenceRewrite({
+      content: 'No citations here.\n',
+      files: ['references/uncited.md'],
+      moves: [{ from: 'references/uncited.md', to: 'references/uncited.md' }],
+      targetFiles: ['references/uncited.md'],
+    })
+    expect(plan.moves).toEqual([])
+  })
+})
 
 describe('planRehoming (design §16.7)', () => {
   it('keeps paths that are free and prefixes only what collides', () => {
@@ -61,7 +96,7 @@ describe('planReferenceRewrite (design §16.7)', () => {
       moves: [{ from: 'references/guide.md', to: 'references/narrow-guide.md' }],
       targetFiles: ['references/narrow-guide.md'],
     })
-    expect(plan.edits).toEqual([{ line: 3, from: 'references/guide.md', to: 'references/narrow-guide.md' }])
+    expect(plan.edits).toEqual([{ line: 3, from: 'references/guide.md', to: 'references/narrow-guide.md', raw: 'references/guide.md' }])
     expect(plan.residualDangling).toEqual([])
   })
 

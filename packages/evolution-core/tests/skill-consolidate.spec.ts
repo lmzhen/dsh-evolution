@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, isPresent, nodeEvolutionIo, resolveCitations, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 const body = (name: string) => `---
 name: ${name}
@@ -196,6 +196,76 @@ it('V1: referenceRewrite=off keeps the refusal message exactly as it was', async
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+/** V2 (design §16.7): with referenceRewrite:'apply' the merge that used to be
+ * refused now lands — its NEEDED support files are copied into the target and the
+ * body's references are rewritten in the same commit, so nothing dangles. */
+async function makeApply(): Promise<{ root: string; lib: SkillLibrary }> {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-consolidate-apply-'))
+  const lib = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, referenceRewrite: 'apply' })
+  await lib.create('umbrella', body('umbrella'), 'foreground')
+  await lib.create('narrow-a', body('narrow-a'), 'foreground')
+  await lib.create('narrow-b', body('narrow-b'), 'foreground')
+  return { root, lib }
+}
+
+async function danglingIn(lib: SkillLibrary, name: string): Promise<string[]> {
+  const listed = await lib.listSupportFiles(name)
+  const content = (await lib.read(name)) ?? ''
+  return resolveCitations({ content, file: 'SKILL.md', files: isPresent(listed) ? listed.value : [] }).dangling.map(ref => ref.target ?? ref.raw)
+}
+
+it('V2: apply re-homes a cited support file and rewrites nothing when the path is free', async () => {
+  const { root, lib } = await makeApply()
+  await lib.writeSupportFile('narrow-a', 'references/guide.md', '# narrow guide\n', 'foreground')
+  await lib.update('narrow-a', `${body('narrow-a')}\nSee references/guide.md for the detail.\n`, 'foreground')
+  const merged = await lib.consolidate('umbrella', ['narrow-a'], 'foreground')
+  expect(merged.ok, merged.message).toBe(true)
+  expect(await readFile(join(root, 'umbrella', 'references', 'guide.md'), 'utf8')).toBe('# narrow guide\n')
+  expect(await lib.read('narrow-a')).toBeNull()
+  expect(await danglingIn(lib, 'umbrella')).toEqual([])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V2: apply renames a colliding path, rewrites the citation, and leaves the original untouched', async () => {
+  const { root, lib } = await makeApply()
+  await lib.writeSupportFile('umbrella', 'references/guide.md', '# umbrella guide\n', 'foreground')
+  await lib.writeSupportFile('narrow-a', 'references/guide.md', '# narrow guide\n', 'foreground')
+  await lib.update('narrow-a', `${body('narrow-a')}\nSee references/guide.md for the detail.\n`, 'foreground')
+  const merged = await lib.consolidate('umbrella', ['narrow-a'], 'foreground')
+  expect(merged.ok, merged.message).toBe(true)
+  expect(await readFile(join(root, 'umbrella', 'references', 'guide.md'), 'utf8')).toBe('# umbrella guide\n')
+  expect(await readFile(join(root, 'umbrella', 'references', 'narrow-a-guide.md'), 'utf8')).toBe('# narrow guide\n')
+  expect(await lib.read('umbrella')).toContain('references/narrow-a-guide.md')
+  expect(await danglingIn(lib, 'umbrella')).toEqual([])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V2: apply still refuses when the plan cannot place a cited file, and touches nothing', async () => {
+  const { root, lib } = await makeApply()
+  await lib.update('narrow-a', `${body('narrow-a')}\nSee references/ghost.md for the detail.\n`, 'foreground')
+  const refused = await lib.consolidate('umbrella', ['narrow-a'], 'foreground')
+  expect(refused.ok).toBe(false)
+  expect(refused.message).toContain('cannot apply')
+  expect(refused.message).toContain('references/ghost.md')
+  expect(await lib.read('narrow-a')).not.toBeNull()
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('V2: apply works in reference mode too — the demoted body keeps working references', async () => {
+  const { root, lib } = await makeApply()
+  await lib.writeSupportFile('narrow-a', 'references/guide.md', '# narrow guide\n', 'foreground')
+  await lib.update('narrow-a', `${body('narrow-a')}\nSee references/guide.md for the detail.\n`, 'foreground')
+  const demoted = await lib.consolidate('umbrella', ['narrow-a'], 'foreground', { mode: 'reference' })
+  expect(demoted.ok, demoted.message).toBe(true)
+  const demotedFiles = await lib.listSupportFiles('umbrella')
+  const names = isPresent(demotedFiles) ? demotedFiles.value : []
+  expect(names).toContain('references/narrow-a.md')
+  expect(names).toContain('references/guide.md')
+  const demotedBody = await readFile(join(root, 'umbrella', 'references', 'narrow-a.md'), 'utf8')
+  expect(demotedBody).toContain('references/guide.md')
+  expect(await danglingIn(lib, 'umbrella')).toEqual([])
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
 async function nodeExists(path: string): Promise<boolean> {
   const { access } = await import('node:fs/promises')
   return access(path).then(() => true, () => false)

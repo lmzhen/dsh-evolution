@@ -18,10 +18,11 @@ export type CitationPolicy = 'verify' | 'refuse'
 export const DEFAULT_CITATION_POLICY: CitationPolicy = 'verify'
 
 /** How a consolidation treats the source's support files (design §16.7).
- * `off` refuses as before, `plan` keeps refusing but reports what a re-home
- * would have to rewrite. `apply` (the V2 batch) lands later — the union is
- * widened with it rather than shipping a value nothing implements. */
-export type ReferenceRewritePolicy = 'off' | 'plan'
+ * `off` refuses as before; `plan` keeps refusing but reports what a re-home
+ * would have to rewrite; `apply` (V2) performs the re-home and the rewrites, but
+ * only when the plan proves it leaves NOTHING dangling — otherwise it refuses
+ * exactly like `plan`. */
+export type ReferenceRewritePolicy = 'off' | 'plan' | 'apply'
 
 /** Default: report the plan on refusal, never write (behaviour unchanged). */
 export const DEFAULT_REFERENCE_REWRITE_POLICY: ReferenceRewritePolicy = 'plan'

@@ -42,7 +42,7 @@ import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe 
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
-import { describeReferenceRewrite, planReferenceRewrite, planRehoming } from './reference-rewrite.ts'
+import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, planRehoming } from './reference-rewrite.ts'
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
@@ -1927,30 +1927,49 @@ export class SkillLibrary {
   }
 
   /**
-   * V1 (design §16.7): the re-home plan a refused consolidation WOULD follow.
-   * Report-only — the refusal stands, nothing is written, and `off` keeps the
-   * message exactly as it was. `apply` is the V2 batch.
+   * V2 (design §16.7): what an apply-mode consolidation would do for ONE source,
+   * computed BEFORE any side effect. `blocked` means behaviour is exactly the
+   * plan-mode refusal (with the reason named); `apply` carries the rewritten body
+   * and the support files that must be copied into the target.
    * @param source - the moving skill's name.
    * @param targetName - the destination skill's name.
-   * @param body - the moving body whose references are planned.
-   * @returns a sentence to append to the refusal, or an empty string.
+   * @param body - the moving body (frontmatter stripped).
+   * @returns the decision plus the note to append to a refusal.
    */
-  private async referenceRewritePlanNote(source: string, targetName: string, body: string): Promise<string> {
-    if ((this.limits.referenceRewrite ?? DEFAULT_REFERENCE_REWRITE_POLICY) === 'off') return ''
+  private async planSourceRehoming(source: string, targetName: string, body: string, extraTargetFiles: readonly string[] = []): Promise<
+    | { kind: 'blocked'; note: string }
+    | { kind: 'apply'; note: string; rewritten: string; files: { from: string; to: string; content: string }[] }
+  > {
+    const policy = this.limits.referenceRewrite ?? DEFAULT_REFERENCE_REWRITE_POLICY
+    if (policy === 'off') return { kind: 'blocked', note: '' }
     const sourceFiles = await this.listSupportFiles(source)
     const targetFiles = await this.listSupportFiles(targetName)
-    // An unknown listing is not an empty one: name the reason instead of
-    // planning against a file set nobody could read.
-    if (!isPresent(sourceFiles) || !isPresent(targetFiles)) return ' plan: unavailable (support-file listing unknown)'
-    const { moves, collisions } = planRehoming(sourceFiles.value, targetFiles.value, source)
+    if (!isPresent(sourceFiles) || !isPresent(targetFiles)) return { kind: 'blocked', note: ' plan: unavailable (support-file listing unknown)' }
+    // Already-planned destinations count as taken, so two sources cannot both
+    // claim the same re-homed path inside one run.
+    const { moves, collisions } = planRehoming(sourceFiles.value, [...targetFiles.value, ...extraTargetFiles], source)
     const plan = planReferenceRewrite({
       content: body,
       files: sourceFiles.value,
       moves,
-      targetFiles: [...targetFiles.value, ...moves.map(move => move.to)],
+      targetFiles: [...targetFiles.value, ...extraTargetFiles, ...moves.map(move => move.to)],
     })
-    const collisionTail = collisionsNote(collisions)
-    return ` ${describeReferenceRewrite(plan)}${collisionTail}`
+    const described = ` ${describeReferenceRewrite(plan)}${collisionsNote(collisions)}`
+    if (policy === 'plan') return { kind: 'blocked', note: described }
+    // apply: the plan must PROVE it leaves nothing dangling, otherwise the merge
+    // is refused exactly like `plan` (the refusal names what is in the way).
+    if (plan.residualDangling.length > 0 || plan.unresolved.length > 0) {
+      return { kind: 'blocked', note: `${described} (cannot apply)` }
+    }
+    const files: { from: string; to: string; content: string }[] = []
+    for (const move of plan.moves) {
+      const bytes = await this.io.readText(join(this.dirOf(source), ...move.from.split('/')))
+      // An unreadable source file is a hard stop: copying nothing would leave the
+      // rewritten reference dangling.
+      if (bytes === null) return { kind: 'blocked', note: ` plan: unavailable (cannot read ${move.from})` }
+      files.push({ from: move.from, to: move.to, content: bytes })
+    }
+    return { kind: 'apply', note: described, rewritten: applyReferenceRewrite(body, plan.edits), files }
   }
 
   /**
@@ -1970,6 +1989,14 @@ export class SkillLibrary {
    * `target/references/<source>.md` and archives the source — the demote path
    * (009-II). A source body with support-directory links is refused there too
    * (the references file would carry links whose files were archived).
+   *
+   * V2 (design §16.7) lifts that refusal when `referenceRewrite:'apply'` and the
+   * plan proves the move is safe: the support files the body NEEDS are copied into
+   * the target under their own paths (renamed only on a collision) and the body's
+   * references are rewritten to match, in the same commit. Anything the plan
+   * cannot place — a cited file the source no longer has, an unreadable listing —
+   * still refuses, and the refusal names it. The archived source keeps whatever
+   * the body did not need.
    */
   async consolidate(
     target: string,
@@ -2010,6 +2037,9 @@ export class SkillLibrary {
     // semantics are unchanged.
     return await this.serial(async (): Promise<SkillActionResult> => {
       const referenceWrites: TreeChangeWrite[] = []
+      // V2 (design §16.7): support files copied into the target from an apply-mode
+      // source, staged before any side effect and committed in the same tree change.
+      const rehomed: { from: string; to: string; content: string }[] = []
       const parts: string[] = []
       // S1-E5: the plan-time bytes per source, re-verified right before that
       // source is archived. The serial queue closes the read→merge window for
@@ -2028,16 +2058,21 @@ export class SkillLibrary {
           if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to merge.` }
           // Package integrity (009-I): an append must never leave dangling
           // support links — refuse before ANY side effect (no archive, no write).
-          if (await this.countSupportDirs(source) > 0) {
-            const note = await this.referenceRewritePlanNote(source, targetName, parsed.body)
-            return { ok: false, message: `Consolidation rejected: source "${source}" carries support files — use mode:'reference' or archive the whole package instead.${note}` }
-          }
+          const carriesSupport = await this.countSupportDirs(source) > 0
           const refs = supportRefs(parsed.body)
-          if (refs.length > 0) {
-            const note = await this.referenceRewritePlanNote(source, targetName, parsed.body)
-            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — use mode:'reference' or archive the whole package instead.${note}` }
+          let appendedBody = parsed.body
+          if (carriesSupport || refs.length > 0) {
+            const decision = await this.planSourceRehoming(source, targetName, parsed.body, rehomed.map(file => file.to))
+            if (decision.kind === 'blocked') {
+              const reason = carriesSupport
+                ? `source "${source}" carries support files`
+                : `source "${source}" body references support files (${refs.join(', ')})`
+              return { ok: false, message: `Consolidation rejected: ${reason} that would be left behind — use mode:'reference' or archive the whole package instead.${decision.note}` }
+            }
+            rehomed.push(...decision.files)
+            appendedBody = decision.rewritten
           }
-          parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}`)
+          parts.push(`\n<!-- consolidated from ${source} at ${new Date().toISOString()} -->\n${appendedBody.trim()}`)
           plannedSourceBytes.set(source, sourceMd)
         }
       } else {
@@ -2049,12 +2084,17 @@ export class SkillLibrary {
           const parsed = parseFrontmatter(sourceMd)
           if (!parsed) return { ok: false, message: `Skill "${source}" has no valid frontmatter; refusing to demote.` }
           const refs = supportRefs(parsed.body)
+          let demotedBody = parsed.body
           if (refs.length > 0) {
-            const note = await this.referenceRewritePlanNote(source, targetName, parsed.body)
-            return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.${note}` }
+            const decision = await this.planSourceRehoming(source, targetName, parsed.body, rehomed.map(file => file.to))
+            if (decision.kind === 'blocked') {
+              return { ok: false, message: `Consolidation rejected: source "${source}" body references support files (${refs.join(', ')}) that would be left behind — archive the whole package instead.${decision.note}` }
+            }
+            rehomed.push(...decision.files)
+            demotedBody = decision.rewritten
           }
           const target = join(targetDir, 'references', `${source}.md`)
-          referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${parsed.body.trim()}\n` })
+          referenceWrites.push({ target, content: `<!-- demoted from ${source} at ${new Date().toISOString()} -->\n${demotedBody.trim()}\n` })
           plannedSourceBytes.set(source, sourceMd)
         }
         // Discoverability: the umbrella's body gains one pointer per demoted
@@ -2120,6 +2160,14 @@ export class SkillLibrary {
           // existing file then counts as drift).
           writes.push({ target: reference.target, content: base === '' ? reference.content : `${base}\n\n${reference.content}`, expected: previous })
         }
+        // V2 (design §16.7): the re-homed support files ride the SAME commit as the
+        // merged body — one tree change, one rollback domain, and the body's
+        // rewritten references can never be committed without their targets.
+        for (const file of rehomed) {
+          const target = join(targetDir, ...file.to.split('/'))
+          const previous = await this.io.readText(target).catch(() => null)
+          writes.push({ target, content: file.content, expected: previous })
+        }
         if (mode === 'append') {
           const merged = freshTargetMd.trimEnd() + parts.join('\n') + '\n'
           const validation = validateFrontmatter(merged, targetName, this.limits)
@@ -2138,7 +2186,8 @@ export class SkillLibrary {
           protection: 'write',
           writes,
           auditAction: 'consolidate',
-          auditSummary: `consolidated ${normalizedSources.join(', ')} (${mode}) into ${targetName}`,
+          auditSummary: `consolidated ${normalizedSources.join(', ')} (${mode}) into ${targetName}`
+            + (rehomed.length === 0 ? '' : `; re-homed ${rehomed.map(file => `${file.from}->${file.to}`).join(', ')}`),
           eventAction: 'consolidate',
         })
         if (!result.ok) throw new Error(result.message)
