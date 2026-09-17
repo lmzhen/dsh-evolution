@@ -97,6 +97,22 @@ describe('redactSecrets (E-1, 0.3.16)', () => {
     // The real shape still redacts.
     expect(redactSecrets('use sk-abcdefghij123456 tomorrow')).toBe('use <redacted> tomorrow')
   })
+
+  it('R3 (round-2 audit): masks HTTP Basic credentials — value shape and header keyword', () => {
+    // Value shape: `Basic <base64>` is a user:password blob. No row carried a
+    // Basic shape before this, so the blob crossed every model boundary
+    // verbatim while the README claimed credential masking.
+    expect(redactSecrets('Authorization: Basic ' + key('dXNlcjpwYXNz', 'd29yZA=='))).toBe('Authorization: <redacted>')
+    expect(redactSecrets('proxy says Basic ' + key('YWxpY2U6', 'c2VjcmV0'))).toBe('proxy says <redacted>')
+    // The left anchor is `\b` (nothing consumed): the words around the
+    // credential keep their spacing, unlike a boundary character match.
+    expect(redactSecrets('basic ' + key('ZGVtbzpz', 'ZWNyZXQ='))).toBe('<redacted>')
+    // Keyword plane: a header whose value carries no `Basic` keyword.
+    expect(redactSecrets('authorization: ' + key('dXNlcjpwYXNz', 'd29yZA=='))).toBe('authorization: <redacted>')
+    // A word that merely STARTS with Basic is not a credential.
+    expect(redactSecrets('The Basic authentication scheme is described in RFC 7617'))
+      .toBe('The Basic authentication scheme is described in RFC 7617')
+  })
 })
 
 describe('v22 (SEC-4): provider token shapes the original set missed', () => {

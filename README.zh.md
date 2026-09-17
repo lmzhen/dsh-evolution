@@ -127,6 +127,7 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 | `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | 插件代码 | `1` 把预设 delta 行冲突从 fail-loud 降为 warn + 双行保留 |
 | `EVOLUTION_SCOPE` | 仅源码安装器 | 写进生成的 profile/preset 行的 scope；插件运行时不读它 |
 | `DSH_EVOLUTION_DELTA_PATH` | 仅源码安装器 | 覆盖 layered 安装器合成时读取的 agent-preset delta 片段 |
+| `DSH_AGENT_PRESET_ROOT` | 仅源码安装器 | 覆盖预设变体安装到的 `.agent-presets` 根目录；设置后该目录必须已存在 |
 | `DSH_EVOLUTION_ARCH_STRICT` | 仅守卫脚本 | `1` 让架构重复守卫 fail-loud（等同 `--strict`） |
 | `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | 仅守卫脚本 | `1` 让声明配置触达守卫 fail-loud（等同 `--strict`） |
 
@@ -166,6 +167,8 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 | 启动报 `invariants: package "…" is already registered` | 两个 bundle 把同一批行挂了两次 | `evolution-all` / `evolution-host` / `evolution-preset` 只留一个 |
 | `E-301` / `E-302` / `E-303` | approval / curator / replay 服务未挂载 | 挂上对应的行（它们随 host/all 提供），然后跑 doctor |
 | `E-306` | 该部署对前台写入做 stage，但这条命令没法通过技能 runner 重放 | 直接 approve-and-execute，或者明确设成 `stageForeground: false` |
+| `E-304` | 挂载的 approval 服务早于 release 能力（升级不完整/错位） | 改用 `reject` 处理该 pending 记录，不要 `release` |
+| `E-305` | 本次调用没有携带 agent（脚本/headless 调用方走到了需要会话的分支） | 在 GUI 或 CLI 的会话里运行该命令 |
 | doctor 报 `install form: none` | 没有装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
 </details>

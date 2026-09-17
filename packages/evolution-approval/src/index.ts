@@ -315,7 +315,10 @@ export class EvolutionApproval extends Service {
     // process may be mid-approve right now — never roll that record back under
     // a run that is still going.
     const holderPid = parseLockBody(claimId)
-    if (holderPid !== null && holderPid !== process.pid && isProcessAlive(holderPid)) {
+    // R2 (round-2 audit): `0` is not a pid — `isProcessAlive(0)` probes the
+    // caller's own process group on POSIX and would report a corrupt `0:<hex>`
+    // claim as a live foreign holder forever. Treat pid 0 as no holder.
+    if (holderPid !== null && holderPid > 0 && holderPid !== process.pid && isProcessAlive(holderPid)) {
       return { ok: false, message: `Pending write "${id}" is claimed by pid ${holderPid}, which is ALIVE — another process may be running this approve. Do not release it: verify the write effect instead and let that run finish (a completed approve resolves its own record).` }
     }
     let released = false

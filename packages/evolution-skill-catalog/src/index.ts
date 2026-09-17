@@ -253,7 +253,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function summaries(): Promise<{ summaries: SkillSummary[]; complete: boolean }> {
     const stamp = await libraryStamp()
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) {
-      return { summaries: summariesCache, complete: true }
+      // A9 (audit P2 low): `stamp === null` means the root LISTING failed, not
+      // that the cache is current — serving that cache with `complete: true`
+      // let the platform registry cache a stale observation as authoritative
+      // until the next invalidation. Report it the way a scan-body failure is
+      // reported (`complete: false`), so the registry re-consults instead of
+      // caching; serving the stale names themselves keeps the catalog
+      // available through the transient failure.
+      return { summaries: summariesCache, complete: stamp !== null }
     }
     if (summariesCache !== null && stamp !== null) control?.invalidate()
     const epochAtScanStart = summariesEpoch

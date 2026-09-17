@@ -383,11 +383,16 @@ describe('runMaintain', () => {
     // Root contract: the validator requires verdict/plan/notes.
     expect(capturedOutputSchema?.required).toEqual(['verdict', 'plan', 'notes'])
     const planRequired = capturedOutputSchema?.properties?.plan?.items?.required
-    // The plan-item set follows validate-plan.ts's validation set.
+    // The plan-item set follows validate-plan.ts's validation set. R3 (audit):
+    // undo_path is DELIBERATELY not required — E-56 lets irreversible items
+    // omit it and the validator normalizes 'n/a'; the schema used to demand
+    // it unconditionally, so a legal no-undo plan died at the generic schema
+    // gate before the validator could speak.
     expect(planRequired).toEqual(expect.arrayContaining([
       'kind', 'names', 'rule', 'evidence', 'finding', 'recommendation', 'semantic_reasoning',
-      'impact', 'impact_reason', 'reversibility', 'undo_path', 'confidence', 'needs_human', 'is_override',
+      'impact', 'impact_reason', 'reversibility', 'confidence', 'needs_human', 'is_override',
     ]))
+    expect(planRequired).not.toContain('undo_path')
     // override_reason is conditionally required (only when is_override), so it
     // stays OUT of the static schema list while the validator enforces it.
     expect(planRequired).not.toContain('override_reason')

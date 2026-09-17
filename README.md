@@ -152,6 +152,7 @@ gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent charac
 | `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
 | `EVOLUTION_SCOPE` | source installers only | scope written into generated profile/preset rows; the plugin runtime never reads it |
 | `DSH_EVOLUTION_DELTA_PATH` | source installers only | overrides the agent-preset delta fragment the layered installer composes from |
+| `DSH_AGENT_PRESET_ROOT` | source installers only | overrides the `.agent-presets` root the preset variants install into; must exist when set |
 | `DSH_EVOLUTION_ARCH_STRICT` | guard scripts only | `1` makes the architecture-duplication guard fail loud (same as `--strict`) |
 | `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | guard scripts only | `1` makes the declared-config-reach guard fail loud (same as `--strict`) |
 
@@ -201,6 +202,8 @@ review.
 | startup `invariants: package "…" is already registered` | two bundles double-mount the same rows | keep ONE of evolution-all / evolution-host / evolution-preset |
 | `E-301` / `E-302` / `E-303` | approval / curator / replay service not mounted | mount the row (they ship with host/all), then run doctor |
 | `E-306` | this deployment stages foreground writes, but the named command is not replayable through the skill runner | approve-and-execute it directly, or set `stageForeground: false` deliberately |
+| `E-304` | the mounted approval service predates the release capability (a skewed/partial upgrade) | `reject` the pending record instead of `release` |
+| `E-305` | the invocation carries no agent (a script/headless caller reached a session-backed branch) | run the command from a session in the GUI or the CLI |
 | doctor says `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
 </details>

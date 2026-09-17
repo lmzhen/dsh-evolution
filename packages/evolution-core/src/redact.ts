@@ -32,6 +32,11 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
   // F-335 (0.3.23): case-insensitive (`bearer`), and `\s+` so a tab or run of
   // spaces between `Bearer` and the token is still masked (`Bearer\t...`).
   ['bearer credential', /Bearer[\s]+[a-z0-9._~+/=\-]{16,}/gi],
+  // R3 (round-2 audit): HTTP Basic — `Authorization: Basic <base64>` crossed
+  // every model boundary: `Basic` was in no value-shape row and
+  // `authorization` in no keyword set, so the base64 user:password blob
+  // shipped verbatim while the README claimed credential masking.
+  ['basic credential', /\bBasic[\s]+[a-z0-9._~+/=]{16,}/gi],
 ]
 
 // F-335 (0.3.23): the older `\b(?:token|...)\b` missed connected keys such as
@@ -69,7 +74,7 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 // well-known token prefixes; an arbitrary passphrase like `hunter2` had no
 // layer left to catch it.
 const INLINE_ASSIGNMENT_PATTERN = new RegExp(
-  '(^|[^\\w-])([\\w-]*[_\\-])?((?:token|api[_-]?key|secret|password|passwd)' +
+  '(^|[^\\w-])([\\w-]*[_\\-])?((?:token|api[_-]?key|secret|password|passwd|authorization)' +
   '(?:[_\\-][\\w-]*)?)\\b(["\\\']?[\\t ]*[:=][\\t ]*)' +
   '([^\\r\\n]+)',
   'gi',

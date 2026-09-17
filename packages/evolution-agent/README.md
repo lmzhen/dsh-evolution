@@ -23,6 +23,13 @@ vendored — the preset follows whichever platform the user actually has.
 | `cordis` (`requires: dynamicCordisRunner`) | `<platform>/cordis/agent.cordis.yml` | `evolution-cordis` | `preset.cordis.yml` |
 | `minimal` (unsupported) | — | `evolution-minimal` | `preset.minimal.yml` |
 
+The `Metadata file` column names the per-variant metadata SOURCE in THIS
+package (`bases.json` `metadata`). Both install paths write that file's
+CONTENT as the platform's own `preset.yml` inside the installed preset
+directory — `preset.yml` is the ONLY metadata filename the picker reads
+(agent-presets `METADATA_FILE`), so a variant installed as `preset.ptc.yml`
+would show a bare id with no description/order.
+
 `bases.json` in this package is the single table behind all four columns: the installer
 (`AGENT_PRESET_BASES`) and the host command (`/evolution preset install --base <name>`) both
 read THIS file, so a base cannot be half-added (a directory one consumer knows about and

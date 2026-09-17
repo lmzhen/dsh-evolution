@@ -114,15 +114,18 @@ export interface FrontmatterRead {
  * strict catalog cannot load". `frontmatterCatalogInvalid` publishes it and
  * `normalizeFrontmatter` decides each rewrite with the same predicate
  * (`yamlPlainScalarNeedsQuotes`), so the audit verdict and the write path can
- * never disagree. Only single-line `key: value` entries are judged; a line with
- * embedded breaks is skipped.
+ * never disagree. A9 (audit P2-12): the scan is ENDING-AGNOSTIC — lines are
+ * split on `\n` with the per-line CR stripped, exactly the iteration the
+ * rewrite path uses. The former split on the block's FIRST-LINE ending turned
+ * a mixed-ending block (first line CRLF, entries LF) into one unsplit chunk
+ * whose entries were all skipped, so an unquoted ` #` value read as CLEAN
+ * while the catalog silently dropped it and the next edit would have quoted
+ * it. Only single-line `key: value` entries are judged.
  */
-function unsafeFrontmatterEntries(block: string, nl: string): Array<{ key: string; value: string }> {
+function unsafeFrontmatterEntries(block: string): Array<{ key: string; value: string }> {
   const found: Array<{ key: string; value: string }> = []
-  for (const line of block.split(nl)) {
-    const clean = withoutCr(line)
-    if (clean.includes('\n') || clean.includes('\r')) continue
-    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(clean)
+  for (const rawLine of block.split('\n')) {
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(withoutCr(rawLine))
     if (!match) continue
     const key = match[1]
     if (key === undefined) continue
@@ -285,7 +288,7 @@ function readFrontmatterBlock(content: string): FrontmatterBlockRead | null {
   return {
     frontmatter,
     body,
-    unsafeValues: unsafeFrontmatterEntries(found.block, found.nl),
+    unsafeValues: unsafeFrontmatterEntries(found.block),
     strictFailed: strict === null,
     platformStringSplit: strict?.split ?? [],
   }

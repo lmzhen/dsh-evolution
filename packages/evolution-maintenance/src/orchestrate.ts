@@ -400,7 +400,13 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['kind', 'names', 'rule', 'evidence', 'finding', 'recommendation', 'semantic_reasoning', 'impact', 'impact_reason', 'reversibility', 'undo_path', 'confidence', 'needs_human', 'is_override'],
+              // R3 (round-2 audit): undo_path is OPTIONAL here, exactly as
+              // validate-plan.ts treats it (E-56: irreversible items may omit
+              // it and normalize to 'n/a'). The schema used to require it
+              // unconditionally, so a legal no-undo plan was rejected
+              // upstream by the generic schema gate before the validator
+              // could speak.
+              required: ['kind', 'names', 'rule', 'evidence', 'finding', 'recommendation', 'semantic_reasoning', 'impact', 'impact_reason', 'reversibility', 'confidence', 'needs_human', 'is_override'],
               properties: {
                 kind: { type: 'string' },
                 names: { type: 'array', items: { type: 'string' } },
