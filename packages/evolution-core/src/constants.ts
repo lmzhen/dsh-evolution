@@ -84,6 +84,21 @@ export const MAX_SKILL_CONTENT_CHARS = 100_000
  * standard — deriving the band from the ceiling is exactly what let a 40k
  * ceiling hide a 99k body without a single signal saying "split me" (V3). */
 export const AUTHORING_SPLIT_LINE_CHARS = 20_000
+
+/** Upstream's conversion basis for CHARACTER LIMITS: 2.75 chars/token, labelled
+ * model-independent in the config template (\`cli-config.yaml.example:538\`), and the
+ * basis behind every quoted token figure there — memory 2200 chars ≈ 800 tokens,
+ * user 1375 ≈ 500, SKILL.md 100_000 ≈ 36k (\`tools/skill_manager_tool.py:455\`).
+ * Limits are deliberately conservative, so this is the basis a BORROWED LIMIT must
+ * be converted with. */
+export const UPSTREAM_LIMIT_CHARS_PER_TOKEN = 2.75
+
+/** The platform's own estimate basis: \`CHARS_PER_TOKEN = 4\` in
+ * \`@deepseek-ai/dsh-token-meter/estimate.ts\` (its comment reads "used until exact
+ * tokenization is needed"), matching upstream's ESTIMATE-side heuristic — "~4
+ * chars/token is the usual English heuristic" (\`agent/prompt_builder.py:1179\`).
+ * Estimates use this; limits use the constant above. */
+export const PLATFORM_ESTIMATE_CHARS_PER_TOKEN = 4
 export const MAX_SKILL_FILE_BYTES = 1_048_576
 
 // ── Cross-package shared tunable defaults ────────────────────────────────────

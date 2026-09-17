@@ -15,7 +15,7 @@ import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deeps
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, softCostUnitsFor, AUTHORING_SPLIT_LINE_CHARS, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import { INSTANCE_KEYS, claimInstance, isPresent, isUnknown, probeList, probeMtime, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -1693,11 +1693,6 @@ export class EvolutionCurator extends Service {
       softBodyChars: this.healthSoftBodyChars,
       stampDensityPerKb: this.healthStampDensityPerKb,
       churnMinPatches: this.healthChurnMinPatches,
-      // V3 (design §16.2): ONE conversion, but from the AUTHORING band (the
-      // upstream split line), not from the configured char ceiling — a deployment
-      // that raises its ceiling must not raise the discipline band with it. That
-      // coupling is what let a 40k ceiling hide a 99k body.
-      softBodyCostUnits: softCostUnitsFor(AUTHORING_SPLIT_LINE_CHARS),
     }
     const usage = await loadUsage(this.skills.root, this.io)
     // C observation window: before ANY observed read exists in the library,

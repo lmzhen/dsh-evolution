@@ -10,8 +10,8 @@
  * `computeQualityScores` (different dimension, different consumers).
  */
 
-import { AUTHORING_SPLIT_LINE_CHARS } from './constants.ts'
-import { softCostUnitsFor } from './cost.ts'
+import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN } from './constants.ts'
+import { bodyCost, tokenLineFor } from './cost.ts'
 
 export interface SkillHealthThresholds {
   /** Soft body limit: a body of `softBodyChars` or MORE -> 'warn'; >= 2x ->
@@ -26,23 +26,19 @@ export interface SkillHealthThresholds {
   /** Patch count at/above this with zero reads -> 'warn' (write-ghost: the
    * skill is churned but nothing ever loads it). */
   churnMinPatches: number
-  /** The AUTHORING discipline band in weighted units: the upstream split line
-   * (20k characters) at the ASCII weight, i.e. 5,000 units. NOT derived from
-   * `softBodyChars`: the ceiling is deployment-tunable, the band is the authoring
-   * standard, and tying them together is how a 40k ceiling let a 99k body pass
-   * without a signal asking for a split (V3, archive §6 发现 A). Advisory only —
-   * wiring it to a verdict is the T2 that owns the cost criterion and its own
-   * observation window. */
-  softBodyCostUnits: number
 }
 
 export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
-  softBodyChars: 40_000,
+  // V6: the number is the UPSTREAM line itself (20k characters — "if you're
+  // pushing past 20k, split into references/*.md"). The previous 40k was twice
+  // that line, which is why a body could sit at 2x the authoring discipline and
+  // still read as merely "warn". The JUDGMENT happens in tokens (see
+  // assessStructureHealth): the line is converted per body composition, so the
+  // textual trigger stays exactly "20k characters" while every reported number is
+  // a token count.
+  softBodyChars: AUTHORING_SPLIT_LINE_CHARS,
   stampDensityPerKb: 2,
   churnMinPatches: 20,
-  // One conversion, one source: the authoring split line at the ASCII weight.
-  // A literal here would drift the moment either weight or the line moves.
-  softBodyCostUnits: softCostUnitsFor(AUTHORING_SPLIT_LINE_CHARS),
 }
 
 /**
@@ -95,6 +91,8 @@ interface SkillHealthSnapshot {
 
 interface SkillHealthDim {
   bodyChars: number
+  /** The same body on the token scale (limit basis) — the judged quantity. */
+  bodyTokens: number
   stampDensityPerKb: number | null
   supportGroups: number
   /** Usage churn facts; null when the caller supplied no counts. */
@@ -115,17 +113,43 @@ export function assessStructureHealth(
   const reasons: string[] = []
   const dims: SkillHealthDim = {
     bodyChars: snapshot.bodyChars,
+    bodyTokens: Math.round(snapshot.bodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN),
     stampDensityPerKb: null,
     supportGroups: snapshot.supportGroups,
     churnPatches: null,
     churnReads: null,
   }
-  const needs = snapshot.bodyChars >= thresholds.softBodyChars * 2
-  if (needs) {
-    reasons.push(`body ${snapshot.bodyChars} chars is >= 2x the soft limit (${thresholds.softBodyChars}) — consider splitting or offloading`)
-  } else if (snapshot.bodyChars >= thresholds.softBodyChars) {
+  // V6: the JUDGMENT runs on the token scale. The configured number stays the
+  // borrowed UPSTREAM character line, converted per body composition, so the
+  // textual trigger is unchanged while every reported number is a token count.
+  // Without body text the token scale is unavailable — the character line then
+  // decides, because an absent measurement must never read as a pass.
+  const text = snapshot.bodyText
+  const hasText = typeof text === 'string' && text.length > 0
+  const cost = hasText ? bodyCost(text) : null
+  const lineTokens = cost === null ? null : tokenLineFor(thresholds.softBodyChars, cost)
+  dims.bodyTokens = cost === null
+    // No text: no composition to weigh, so the LIMIT basis is the only honest
+    // conversion — the estimate range would need a CJK/ASCII split we do not have.
+    ? Math.round(snapshot.bodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+    : cost.tokens
+  const overLine = cost === null || lineTokens === null
+    ? snapshot.bodyChars >= thresholds.softBodyChars
+    : cost.tokens >= lineTokens
+  const overTwice = cost === null || lineTokens === null
+    ? snapshot.bodyChars >= thresholds.softBodyChars * 2
+    : cost.tokens >= lineTokens * 2
+  const scale = cost === null || lineTokens === null
+    ? `${snapshot.bodyChars} chars`
+    : `${cost.tokens} tokens (${snapshot.bodyChars} chars)`
+  const lineText = cost === null || lineTokens === null
+    ? `${thresholds.softBodyChars} chars`
+    : `${thresholds.softBodyChars} chars = ${lineTokens} tokens`
+  if (overTwice) {
+    reasons.push(`body ${scale} is >= 2x the soft line (${lineText}) — consider splitting or offloading`)
+  } else if (overLine) {
     // V7-19 (0.3.43): "at or above" — the branch fires at == too, "above" alone was off by one at the exact threshold.
-    reasons.push(`body ${snapshot.bodyChars} chars at or above the soft limit (${thresholds.softBodyChars})`)
+    reasons.push(`body ${scale} at or above the soft line (${lineText})`)
   }
   if (snapshot.bodyText && snapshot.bodyChars >= MIN_STAMP_BODY_CHARS) {
     const kb = Math.max(1, snapshot.bodyChars / 1024)
@@ -146,7 +170,7 @@ export function assessStructureHealth(
     }
   }
   return {
-    verdict: needs ? 'needs-restructure' : reasons.length > 0 ? 'warn' : 'healthy',
+    verdict: overTwice ? 'needs-restructure' : reasons.length > 0 ? 'warn' : 'healthy',
     dims,
     reasons,
   }

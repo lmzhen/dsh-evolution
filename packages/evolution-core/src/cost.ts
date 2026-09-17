@@ -12,27 +12,34 @@
  * over-limit here and pass there (the v37 P2-1 deadlock class).
  */
 
+import { UPSTREAM_LIMIT_CHARS_PER_TOKEN } from './constants.ts'
 import { skillMdOnDisk } from './frontmatter.ts'
 
-/** Weight of one CJK / kana / full-width code unit, in cost units. */
-export const COST_CJK_WEIGHT = 1
-/** Weight of one code unit that is not CJK (latin, digits, syntax), in cost units. */
-export const COST_ASCII_WEIGHT = 0.25
+/** Token weight of one CJK / kana / full-width code unit on the LIMIT basis —
+ * upstream's model-independent conversion is 2.75 chars/token for prose, and CJK
+ * prose is ~1 token per character (the conservative end of the 0.6–1.0 range the
+ * estimate side reports). Thresholds are compared on THIS basis so a borrowed
+ * character line keeps its meaning; the estimate range below reports the spread. */
+export const TOKEN_CJK_WEIGHT = 1
+/** Token weight of one non-CJK code unit on the LIMIT basis (1 / 2.75 ≈ 0.364). */
+export const TOKEN_ASCII_WEIGHT = 1 / UPSTREAM_LIMIT_CHARS_PER_TOKEN
 /** Token-per-unit bounds of the estimate range (CJK: 0.6–1.0, non-CJK: 1/4–1/3). */
 export const COST_CJK_TOKEN_LOW = 0.6
 export const COST_CJK_TOKEN_HIGH = 1
 export const COST_ASCII_TOKEN_LOW = 0.25
 export const COST_ASCII_TOKEN_HIGH = 1 / 3
 
-/** Weighted unit ceiling derived from a character ceiling: the ONE conversion
- * used by every threshold that pairs a char budget with a cost budget, so the
- * two can never drift apart (the character limit is calibrated on prose where
- * one character is cheap; CJK prose reaches the same char count for ~4x the
- * cost).
- * @param softBodyChars - the character ceiling to convert.
- * @returns the equivalent cost-unit ceiling, rounded. */
-export function softCostUnitsFor(softBodyChars: number): number {
-  return Math.round(softBodyChars * COST_ASCII_WEIGHT)
+/** The token line a borrowed CHARACTER threshold draws for ONE body: 20k characters
+ * of THIS composition, expressed in the same tokens `bodyCost` counts. Comparing
+ * `tokens` against this line is deliberately equivalent to "chars >= line" — that
+ * equivalence is what keeps a borrowed line's textual effect identical — while the
+ * judgment itself, and every number reported, stays on the token scale.
+ * @param lineChars - the borrowed character line (whole-body characters).
+ * @param cost - the body's own cost breakdown.
+ * @returns the equivalent token line (0 when the body is empty). */
+export function tokenLineFor(lineChars: number, cost: BodyCost): number {
+  if (cost.chars === 0) return 0
+  return Math.round((lineChars * cost.tokens) / cost.chars)
 }
 
 /** Cost of one body: raw counts, the weighted total, and the estimate range. */
@@ -43,8 +50,10 @@ export interface BodyCost {
   cjk: number
   /** Code units that are not CJK (includes surrogate halves and syntax). */
   ascii: number
-  /** `cjk * COST_CJK_WEIGHT + ascii * COST_ASCII_WEIGHT`, rounded. */
-  units: number
+  /** Single token count on the LIMIT basis: `cjk * TOKEN_CJK_WEIGHT + ascii *
+   * TOKEN_ASCII_WEIGHT`, rounded. This is the number every threshold compares
+   * against, so a threshold borrowed as a character line converts faithfully. */
+  tokens: number
   /** Lower bound of the token estimate. */
   tokensLow: number
   /** Upper bound of the token estimate. */
@@ -69,7 +78,7 @@ export function bodyCost(content: string): BodyCost {
     chars,
     cjk,
     ascii,
-    units: Math.round(cjk * COST_CJK_WEIGHT + ascii * COST_ASCII_WEIGHT),
+    tokens: Math.round(cjk * TOKEN_CJK_WEIGHT + ascii * TOKEN_ASCII_WEIGHT),
     tokensLow: Math.round(cjk * COST_CJK_TOKEN_LOW + ascii * COST_ASCII_TOKEN_LOW),
     tokensHigh: Math.round(cjk * COST_CJK_TOKEN_HIGH + ascii * COST_ASCII_TOKEN_HIGH),
   }

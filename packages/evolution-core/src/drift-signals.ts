@@ -15,7 +15,7 @@ import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from './skill-health
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
 import { AUTHORING_DESCRIPTION_BAR, DEFAULT_STALE_AFTER_DAYS, MAX_SKILL_CONTENT_CHARS } from './constants.ts'
 import { isFileShapedPath, scanBodyHooks, type CitationReport } from './citations.ts'
-import type { BodyCost } from './cost.ts'
+import { tokenLineFor, type BodyCost } from './cost.ts'
 
 /** One skill's library state; the assembler (not this module) reads IO. */
 export interface DriftSkillSnapshot {
@@ -297,22 +297,29 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
           `${DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb}/KB`,
         ),
     )
-    // Cost rides the EXISTING signal as a value dimension (design §5.2): the
-    // verdict still follows the character threshold, so adding the metric cannot
-    // flip a skill's verdict. The token range is an estimate and says so.
+    // V6: judged on the TOKEN scale. The threshold is the borrowed upstream
+    // character line, converted per body composition (tokenLineFor), so the textual
+    // trigger stays "20k characters" while value/threshold/detail all speak tokens.
+    // Without a cost breakdown the character line decides (never a silent pass).
     const cost = snapshot.cost
+    const lineTokens = cost === undefined ? null : tokenLineFor(DEFAULT_HEALTH_THRESHOLDS.softBodyChars, cost)
+    const overLine = cost === undefined || lineTokens === null
+      ? body.length >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars
+      : cost.tokens >= lineTokens
     signals.push(
       sig(
         'body_size',
-        body.length >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars ? 'over' : 'pass',
-        cost === undefined ? `${body.length}` : `${body.length} chars / ${cost.units} units`,
-        `${DEFAULT_HEALTH_THRESHOLDS.softBodyChars}`,
+        overLine ? 'over' : 'pass',
+        cost === undefined ? `${body.length}` : `${cost.tokens} tokens / ${body.length} chars`,
+        cost === undefined || lineTokens === null
+          ? `${DEFAULT_HEALTH_THRESHOLDS.softBodyChars}`
+          : `line=${lineTokens} tokens (${DEFAULT_HEALTH_THRESHOLDS.softBodyChars} chars)`,
         cost === undefined
           ? undefined
           // V3: the band is the AUTHORING discipline band (upstream's 20k split
-          // line in weighted units), and the multiple is what makes it actionable —
-          // a bare ceiling says nothing about how far past it the body is.
-          : `tokens≈${cost.tokensLow}-${cost.tokensHigh} (estimate; cjk=${cost.cjk}; band=${DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits} units, body=${(cost.units / DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toFixed(1)}x)${oversizeSupportNote(snapshot.supportChars)}`,
+          // line, drawn on this body's token scale), and the multiple is what makes
+          // it actionable — a bare ceiling says nothing about how far past it is.
+          : `estimate range ${cost.tokensLow}-${cost.tokensHigh} tokens; cjk=${cost.cjk}${lineTokens === null ? '' : `; line=${lineTokens}, body=${(cost.tokens / lineTokens).toFixed(1)}x`}${oversizeSupportNote(snapshot.supportChars)}`,
       ),
     )
 

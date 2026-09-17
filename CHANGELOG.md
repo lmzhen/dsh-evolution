@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0 (minor) — 技能库维护能力批：引用解析 / 成本口径（判定统一 token 尺）/ 需求观测 / 钩子与退役建议 + 四个档位开关
+
+> 依据 `references/design-skill-library-maintenance.md` 的七步方案与 §16 的架构分层批次（V1–V6）落地。
+> **行为变化集中在四处**（见下表 B1–B4）：`restructure` 默认放行更宽、归档保留不再自动删除、合并拒绝消息会附重挂计划、
+> 支持文件也受 10 万字符上限约束（默认只警告）。磁盘布局、导出面与既有事件不变；
+> 新增两个漂移信号（`citation_resolution`、`demand`，`DRIFT_SIGNALS_VERSION` 2 → 3）与四个可部署切档的策略字段。
+
+### 新能力（用户可感）
+
+| # | 能力 | 位置 |
+|---|---|---|
+| N1 | **引用解析器**：正文里的支持目录路径按技能根解析，区分「悬空 / 不可判定 / 方言（URL、围栏、命令行）」；误报归零有实测 | `evolution-core/citations.ts` |
+| N2 | **成本口径**：判定与报告统一到 **token 尺**（限额基准 CJK 1.0 / ASCII 1÷2.75，ASCII 侧与平台 `CHARS_PER_TOKEN=4` 的旧口径区分开），另给 4 一侧的估算区间 `tokensLow/High`；`body_size` 的值与详情给出软带倍数 | `evolution-core/cost.ts`、`drift-signals.ts` |
+| N3 | **按文件需求观测**：`read` 工具落到具体支持文件即计数（`support_reads`），由此产出 `demand` 信号（窗未开报 unknown） | `skill-usage`、`drift-signals.ts` |
+| N4 | **钩子语法 + 退役建议**：`- 症状 → references/x.md` 为规范钩子；`unhooked` 进 `pointer_missing` 详情；退役候选 propose-only，`<!-- keep: 路径 原因 -->` 为逃生门 | `citations.ts`、`drift-signals.ts` |
+| N5 | **指针块带链接表**：`restructure` 搬走整节后，正文保留指针行 + 「本节引用」纯路径表，搬迁不再制造指针缺口 | `skill-store.ts` |
+| N6 | **合并重挂 + 改写**：`apply` 档下把源正文真正引用的支持文件搬进目标、改写其引用、校验 `dangling=0` 后才归档源 | `reference-rewrite.ts`、`skill-store.ts` |
+| N7 | **档位开关可在 `cordis.yml` 切换**：`citationPolicy` / `referenceRewrite` / `archiveRetention` / `supportFileCharPolicy` 成为 evolution-policy 的闭合枚举字段 | `evolution-policy`、`limits.ts` |
+
+### 行为变化（升级前必读）
+
+| # | 变化 | 对既有的影响与回退 |
+|---|---|---|
+| B1 | `restructure` 的引用守卫从「含引用即拒」改为**存在性校验** | 以前被拒的搬迁现在可执行；要旧行为设 `citationPolicy: 'refuse'` |
+| B2 | 归档保留默认改为**只报告、不删除** | 365 天窗口不再自动清 `.archive`；`wouldPrune` 进 curator 运行报告（读不到列表写 unknown）；要旧行为设 `archiveRetention: 'prune'` |
+| B3 | 合并被拒时会附**重挂/改写计划**（`referenceRewrite` 默认 `plan`） | 拒绝语义不变、消息变长；`apply` 才真的合并并改写引用 |
+| B4 | 支持文件同受 **100,000 字符上限**（默认只警告不拒写） | 超限写入仍成功、消息带咨询；`supportFileCharPolicy: 'enforce'` 才拒写，且两档都保留净缩减豁免 |
+| B5 | 软带＝上游拆线（20,000 字符）并**在判定时按本正文成分折成 token 线**（CJK 正文 20k 字符＝20k token 线；全 ASCII 同字符数＝7,273 token 线） | `body_size` 与健康视图的 **verdict 改按 token 判定**（数学上与「字符 ≥ 20,000」等价，故与上游文本效果同点）、value/threshold/detail 文本改成 token；老快照无 `bodyText` 时退回字符判定 |
+| B6 | 维护提示词条款扩展（钩子/退役/软带），bundle 版本 18 → 19 | 模型可见文本变化，随包发布 |
 ## 0.4.1 (patch) — 鲁棒性修复批：审计 P1×5 + P2×10 落地（**行为修复，无导出面/配置键/事件/数据格式变化**）
 
 > 依据全量审计（对照 `0.1.5-rc.2` 平台源码）落地十项行为修复与二轮复审的收敛，每项均为最小 diff，

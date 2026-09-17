@@ -12,13 +12,23 @@ it('a small dense body with support files is healthy', () => {
   expect(assessment.reasons).toEqual([])
 })
 
-it('body above the soft limit warns, at 2x it demands restructure (rc.73 A1)', () => {
-  const warn = assessStructureHealth({ skillName: 'w', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars + 1, supportGroups: 1 })
-  expect(warn.verdict).toBe('warn')
-  expect(warn.reasons[0]).toContain('above the soft limit')
-  const needs = assessStructureHealth({ skillName: 'n', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars * 2, supportGroups: 1 })
-  expect(needs.verdict).toBe('needs-restructure')
-  expect(needs.reasons[0]).toContain('2x the soft limit')
+it('judges the borrowed char line on the token scale (V6)', () => {
+  // No body text: the character line decides (an absent measurement is never a pass).
+  const blind = assessStructureHealth({ skillName: 'b', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars + 1, supportGroups: 1 })
+  expect(blind.verdict).toBe('warn')
+  expect(blind.reasons[0]).toContain('soft line')
+  const blindNeeds = assessStructureHealth({ skillName: 'bn', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars * 2, supportGroups: 1 })
+  expect(blindNeeds.verdict).toBe('needs-restructure')
+  expect(blindNeeds.reasons[0]).toContain('2x the soft line')
+  // With body text the judgment runs in tokens against the per-body line; the two
+  // scripts sit on their OWN line at 20k characters, which is the upstream trigger.
+  const cjkAt = '中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
+  const cjkUnder = '中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars - 10)
+  const asciiAt = 'a'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
+  const atCjk = assessStructureHealth({ skillName: 'c', bodyChars: cjkAt.length, bodyText: cjkAt, supportGroups: 1 })
+  expect(atCjk.reasons.some(reason => reason.includes('tokens'))).toBe(true)
+  expect(assessStructureHealth({ skillName: 'cu', bodyChars: cjkUnder.length, bodyText: cjkUnder, supportGroups: 1 }).verdict).toBe('healthy')
+  expect(assessStructureHealth({ skillName: 'a', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 }).reasons.some(reason => reason.includes('tokens'))).toBe(true)
 })
 
 it('stamp density flags log-like content in a large body', () => {
