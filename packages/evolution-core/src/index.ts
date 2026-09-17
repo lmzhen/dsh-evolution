@@ -26,6 +26,8 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 
+export * from './citations.ts'
+export * from './cost.ts'
 export * from './curator.ts'
 export * from './evolution-events.ts'
 export * from './gates.ts'

@@ -24,6 +24,7 @@ import {
   verifyPromptBundle,
   type DriftReport,
   type DriftSkillSnapshot,
+  type SkillLiveness,
 } from '@deepseek-ai/dsh-evolution-core'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
@@ -112,6 +113,10 @@ export interface MaintainOptions {
   protected?: () => ReadonlyMap<string, string>
   catalogInvalid?: () => ReadonlyMap<string, boolean>
   usageObserved?: () => boolean | undefined
+  /** Per-support-file read counts per skill (design §5.5). */
+  demand?: () => ReadonlyMap<string, Readonly<Record<string, number>>>
+  /** Idle age per skill (design §5.6). */
+  liveness?: () => ReadonlyMap<string, SkillLiveness>
 }
 
 export interface MaintainOutcome {
@@ -276,6 +281,8 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       protected: options.protected ? options.protected() : undefined,
       catalogInvalid: options.catalogInvalid ? options.catalogInvalid() : undefined,
       usageObserved,
+      ...(options.demand === undefined ? {} : { demand: options.demand() }),
+      ...(options.liveness === undefined ? {} : { liveness: options.liveness() }),
       // E-9 (v18): a single unreadable SKILL.md is skipped with a trace.
       // V27 M-02: the trace is also the evidence that separates "empty library"
       // from "unreadable library" below.

@@ -10,8 +10,8 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
 import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
-import { ToolDispatchNormalizer, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
-import { bumpPatch, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
+import { bumpPatch, bumpSupportRead, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
 /** S2-P2-14 (0.3.80): bound for the live listener's dispatch ledger — it is
@@ -55,6 +55,10 @@ export interface Config {
   /** Act only on sessions that carry the family's model tools (evolution-core's
    * per-session probe). The shipped bundles set it; false observes every session. */
   sessionScoped?: boolean
+  /** Tool names whose dispatch reads one FILE (design §5.5). Demand for a
+   * support file is attributed from these; a deployment whose file tool has a
+   * different name configures it here instead of being mis-detected. */
+  supportReadToolNames?: string[]
 }
 
 export class SkillUsageRegistry extends Service {
@@ -63,11 +67,13 @@ export class SkillUsageRegistry extends Service {
     root: z.string().default(''),
     eventsHome: z.string().default(''),
     sessionScoped: z.boolean().default(false),
+    supportReadToolNames: z.array(z.string()).default([...DEFAULT_SUPPORT_READ_TOOL_NAMES]),
   })
 
   readonly root: string
   private readonly eventsHome: string
   private readonly io: EvolutionIoLike
+  private readonly supportReadToolNames: readonly string[]
   /** Process-local RMW queue (v34 B14 / v35 R6: the same factory the other sidecars use). */
   private readonly serial = makeSerialQueue()
 
@@ -78,6 +84,9 @@ export class SkillUsageRegistry extends Service {
     // 0.3.18 (S4.1, E-30): single root resolution shared with the other three
     // members that read the skills tree.
     this.root = resolveSkillsRoot(config)
+    // Configured, never guessed: a deployment whose file tool has another name
+    // declares it, and the schema default covers the direct-construction path.
+    this.supportReadToolNames = config.supportReadToolNames ?? DEFAULT_SUPPORT_READ_TOOL_NAMES
     // 0.3.23 (G7.1 N1): DSH_HOME resolution routes through core's single
     // source (evolutionRoot, `||` empty-string fallback) — a raw probe here
     // would let an empty DSH_HOME mint a CWD-relative events home.
@@ -131,10 +140,21 @@ export class SkillUsageRegistry extends Service {
         const settled = reads.settledSignalOf(event, session.id)
         if (settled === null || settled.ok === false) return
         const settledName = skillReadNameOf(settled)
-        if (settledName === undefined) return
-        void this.observeRead(settledName).catch(() => {
-          // Best-effort, as above.
-        })
+        if (settledName !== undefined) {
+          void this.observeRead(settledName).catch(() => {
+            // Best-effort, as above.
+          })
+        }
+        // Design §5.5: a read of one support FILE is demand evidence for that
+        // file, the way a `skill` load is demand for the whole body. Review-leg
+        // sessions are excluded — that leg reads skills to JUDGE them, which is
+        // not a user's demand.
+        const supportHit = supportFileReadOf(settled, { toolNames: this.supportReadToolNames, root: this.root })
+        if (supportHit !== null && !isReviewChannelSession(session.id)) {
+          void this.recordSupportRead(supportHit.skill, supportHit.rel).catch(() => {
+            // Best-effort, as above.
+          })
+        }
       })
       return dispose
     }, 'skill-usage.telemetry')
@@ -169,6 +189,19 @@ export class SkillUsageRegistry extends Service {
       if (windowOpening) {
         await this.appendUsageWindowEvent(map)
       }
+    })
+  }
+
+  /**
+   * Demand telemetry (design §5.5): count one observed support-file read on an
+   * EXISTING record only — the same creation-free discipline as `observeRead`,
+   * so a read can never mint a usage record.
+   */
+  private recordSupportRead(name: string, rel: string): Promise<void> {
+    const normalized = name.trim()
+    return this.mutate((map) => {
+      if (!map.has(normalized)) return
+      bumpSupportRead(map, normalized, rel, new Date())
     })
   }
 

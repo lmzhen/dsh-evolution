@@ -10,10 +10,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import {
   frontmatterCatalogInvalid,
+  idleDays,
   isPresent,
   parseFrontmatter,
   usageObserved,
   type SkillLibrary,
+  type SkillLiveness,
   type UsageMap,
 } from '@deepseek-ai/dsh-evolution-core'
 
@@ -26,6 +28,12 @@ export interface Enrichment {
   protected: ReadonlyMap<string, string>
   /** Skills whose frontmatter the strict-YAML platform catalog cannot load. */
   catalogInvalid: ReadonlyMap<string, boolean>
+  /** Per-support-file read counts (design §5.5) — present only where the usage
+   * sidecar recorded at least one read, so absence stays "no evidence". */
+  demand: ReadonlyMap<string, Readonly<Record<string, number>>>
+  /** Idle age per skill (design §5.6) — present only for skills with a usage
+   * record, so a skill the sidecar never saw stays "no age evidence". */
+  liveness: ReadonlyMap<string, SkillLiveness>
 }
 
 export async function buildEnrichment(ctx: Context, library: SkillLibrary): Promise<Enrichment> {
@@ -40,6 +48,11 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
   const quality = new Map<string, number>()
   const protectedMap = new Map<string, string>()
   const catalogInvalid = new Map<string, boolean>()
+  const demand = new Map<string, Readonly<Record<string, number>>>()
+  const liveness = new Map<string, SkillLiveness>()
+  // One clock per run: every skill's idle age is measured against one instant,
+  // so two skills cannot be aged by runs a second apart.
+  const now = new Date()
   for (const entry of await library.list()) {
     // A1-17 (v18): an unknown marker probe is treated as protected, not as
     // unprotected (see SkillSummary.protectionUnknown).
@@ -82,6 +95,9 @@ export async function buildEnrichment(ctx: Context, library: SkillLibrary): Prom
     if (isPresent(files) && files.value.length > 0) supportFiles.set(entry.name, files.value)
     const record = usageMap?.get(entry.name)
     if (typeof record?.quality_score === 'number') quality.set(entry.name, record.quality_score)
+    const reads = record?.support_reads
+    if (reads !== undefined && Object.keys(reads).length > 0) demand.set(entry.name, reads)
+    if (record !== undefined) liveness.set(entry.name, { idleDays: idleDays(record, now) })
   }
-  return { descriptions, supportFiles, quality, usageObservedValue, protected: protectedMap, catalogInvalid }
+  return { descriptions, supportFiles, quality, usageObservedValue, protected: protectedMap, catalogInvalid, demand, liveness }
 }

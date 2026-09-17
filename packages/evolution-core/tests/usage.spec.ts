@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { emptyRecord, foldCuratorFields, getRecord, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
+import { bumpSupportRead, emptyRecord, foldCuratorFields, getRecord, idleDays, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+describe('support-file demand (design §5.5)', () => {
+  it('bumps a per-path counter, creates the map on first evidence only, and moves the read clock', () => {
+    const map = new Map([['demo', emptyRecord()]])
+    expect(map.get('demo')?.support_reads).toBeUndefined()
+    bumpSupportRead(map, 'demo', 'references/a.md', new Date('2026-09-17T00:00:00.000Z'))
+    bumpSupportRead(map, 'demo', 'references/a.md', new Date('2026-09-17T01:00:00.000Z'))
+    expect(map.get('demo')?.support_reads).toEqual({ 'references/a.md': 2 })
+    expect(map.get('demo')?.last_viewed_at).toBe('2026-09-17T01:00:00.000Z')
+  })
+
+  it('sanitizes the map: bad counts and traversal keys drop, an unusable value vanishes', () => {
+    const cleaned = normalizeUsageRecord({ ...emptyRecord(), support_reads: { 'references/a.md': 2, bad: -1, 'x/../y': 5 } })
+    expect(cleaned.support_reads).toEqual({ 'references/a.md': 2 })
+    expect(normalizeUsageRecord({ ...emptyRecord(), support_reads: 'nope' }).support_reads).toBeUndefined()
+    expect(normalizeUsageRecord({ ...emptyRecord(), support_reads: { 'a/b': Number.NaN } }).support_reads).toBeUndefined()
+  })
+})
+
 describe('usage sidecar field normalization (P2-3)', () => {
   it('A2-4 (v18): the lifecycle fold is compare-and-set on the run-start state', () => {
     const make = (state: 'active' | 'stale' | 'archived') => ({ ...emptyRecord(), state, archived_at: state === 'archived' ? '2026-01-01T00:00:00.000Z' : null })
@@ -350,3 +368,25 @@ it('v28 G5.2 (USAGE-01): unknown per-record fields survive normalize + a write-s
   expect(raw['hub-skill']?.view_count).toBe(2)
   expect(raw['hub-skill']?.use_count).toBe(2)
 })
+
+describe('idleDays (design §5.6)', () => {
+  const now = new Date('2026-09-17T00:00:00.000Z')
+
+  it('anchors on the latest activity, falling back to creation', () => {
+    const active = { ...emptyRecord(), created_at: '2026-09-01T00:00:00.000Z', last_viewed_at: '2026-09-15T00:00:00.000Z' }
+    expect(Math.round(idleDays(active, now))).toBe(2)
+    const neverUsed = { ...emptyRecord(), created_at: '2026-09-07T00:00:00.000Z' }
+    expect(Math.round(idleDays(neverUsed, now))).toBe(10)
+  })
+
+  it('prefers the newest of the three activity stamps', () => {
+    const record = { ...emptyRecord(), created_at: '2026-01-01T00:00:00.000Z', last_viewed_at: '2026-09-10T00:00:00.000Z', last_patched_at: '2026-09-16T00:00:00.000Z' }
+    expect(Math.round(idleDays(record, now))).toBe(1)
+  })
+
+  it('counts an unparseable anchor as zero days instead of NaN', () => {
+    const broken = { ...emptyRecord(), created_at: 'not-a-date' }
+    expect(idleDays(broken, now)).toBe(0)
+  })
+})
+

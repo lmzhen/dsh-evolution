@@ -13,7 +13,9 @@
 
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS } from './skill-health.ts'
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
-import { AUTHORING_DESCRIPTION_BAR } from './constants.ts'
+import { AUTHORING_DESCRIPTION_BAR, DEFAULT_STALE_AFTER_DAYS } from './constants.ts'
+import { isFileShapedPath, scanBodyHooks, type CitationReport } from './citations.ts'
+import type { BodyCost } from './cost.ts'
 
 /** One skill's library state; the assembler (not this module) reads IO. */
 export interface DriftSkillSnapshot {
@@ -32,6 +34,20 @@ export interface DriftSkillSnapshot {
   protected?: string | null | undefined
   /** Frontmatter values the strict-YAML platform catalog cannot load (0.3.11). */
   catalogInvalid?: boolean | undefined
+  /** Weighted context cost of the body (design §5.2); undefined = not measured. */
+  cost?: BodyCost | undefined
+  /** Citation scan of the body (design §5.2); undefined = not scanned. */
+  citations?: CitationReport | undefined
+  /** Per-support-file read counts (design §5.5); undefined = no evidence. */
+  demand?: Readonly<Record<string, number>> | undefined
+  /** Idle age of the owning skill (design §5.6); undefined = no record to age. */
+  liveness?: SkillLiveness | undefined
+}
+
+/** Retirement-proposal input for one skill (design §5.6). */
+export interface SkillLiveness {
+  /** Idle days since the lifecycle age anchor (`last activity ?? created_at`). */
+  idleDays: number
 }
 
 /** verdict=over means "relatively positioned above the threshold", never a violation. */
@@ -67,7 +83,7 @@ export interface DriftReport {
 export const DRIFT_MAX_LINE_CHARS = 1_500
 
 /** Signal-set version: bump whenever ids/thresholds change (011 §7 version coupling). */
-export const DRIFT_SIGNALS_VERSION = '1'
+export const DRIFT_SIGNALS_VERSION = '3'
 
 /** Render-time nouns for the MAINTAIN_PROMPT placeholders (single vocabulary with the facts block). */
 export const DRIFT_SIGNAL_NOUNS: Readonly<Record<string, string>> = {
@@ -78,6 +94,8 @@ export const DRIFT_SIGNAL_NOUNS: Readonly<Record<string, string>> = {
   dup_heading: '重复标题',
   overlong_line: '超长行',
   pointer_missing: '缺失指针',
+  citation_resolution: '引用解析',
+  demand: '需求证据',
   description_chars: '描述长度',
   narrow_name: '窄名',
   usage_observed: '使用观察',
@@ -97,6 +115,64 @@ export function missingSupportPointers(body: string, supportFiles: readonly stri
     const base = path.split('/').pop() ?? path
     return base.length > 0 && !body.includes(base) && !body.includes(path)
   })
+}
+
+/** Support files the body mentions WITHOUT the sanctioned hook form (design
+ * §5.6). Such a mention still counts as a pointer for `pointer_missing`, but
+ * only the hook form keeps the file discoverable after a move — detail only.
+ * A file carrying a `keep` marker is exempt: its mention IS the marker. */
+export function unhookedSupportPointers(body: string, supportFiles: readonly string[]): string[] {
+  const { targets, kept } = scanBodyHooks(body)
+  const hooked = new Set(targets)
+  return supportFiles.filter((path) => {
+    if (!isFileShapedPath(path)) return false
+    const base = path.split('/').pop() ?? path
+    if (kept.has(path) || (base.length > 0 && kept.has(base))) return false
+    const mentioned = (base.length > 0 && body.includes(base)) || body.includes(path)
+    return mentioned && !hooked.has(path) && !hooked.has(base)
+  })
+}
+
+/** Why a retirement report lists nothing (design §5.6). */
+export type RetirementStatus = 'listed' | 'none' | 'no-age' | 'unscanned'
+
+/** One support file proposed for retirement review. */
+export interface RetirementCandidate {
+  path: string
+  /** Whole idle days of the owning skill at scan time. */
+  idleDays: number
+}
+
+/** Retirement proposal for one skill: candidates plus the reason when empty. */
+export interface RetirementReport {
+  candidates: readonly RetirementCandidate[]
+  status: RetirementStatus
+}
+
+/** Support files with no readers, no citations and no `keep` marker whose owning
+ * skill has been idle for at least the lifecycle stale window. PROPOSAL INPUT
+ * only — nothing retires a file on its own — and an unmeasurable input (no age
+ * evidence, no citation scan) yields an empty list WITH its reason, never a
+ * silent "nothing qualifies".
+ * @param snapshot - the skill's drift snapshot.
+ * @param supportFiles - its enumerated support files, in listing order.
+ * @returns the candidates plus the status that explains an empty list.
+ */
+export function retirementReport(snapshot: DriftSkillSnapshot, supportFiles: readonly string[]): RetirementReport {
+  const idle = snapshot.liveness?.idleDays
+  if (idle === undefined) return { candidates: [], status: 'no-age' }
+  if (snapshot.citations === undefined) return { candidates: [], status: 'unscanned' }
+  if (idle < DEFAULT_STALE_AFTER_DAYS) return { candidates: [], status: 'none' }
+  const cited = new Set<string>()
+  for (const ref of snapshot.citations.refs) {
+    if (ref.kind === 'citation' && ref.target !== null) cited.add(ref.target)
+  }
+  const { kept } = scanBodyHooks(snapshot.body)
+  const demand = snapshot.demand ?? {}
+  const candidates = supportFiles
+    .filter(path => isFileShapedPath(path) && (demand[path] ?? 0) === 0 && !cited.has(path) && !kept.has(path))
+    .map(path => ({ path, idleDays: Math.floor(idle) }))
+  return { candidates, status: candidates.length === 0 ? 'none' : 'listed' }
 }
 
 /** Duplicate `## heading` occurrences: singleton results default to head of the file. */
@@ -217,12 +293,19 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
           `${DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb}/KB`,
         ),
     )
+    // Cost rides the EXISTING signal as a value dimension (design §5.2): the
+    // verdict still follows the character threshold, so adding the metric cannot
+    // flip a skill's verdict. The token range is an estimate and says so.
+    const cost = snapshot.cost
     signals.push(
       sig(
         'body_size',
         body.length >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars ? 'over' : 'pass',
-        `${body.length}`,
+        cost === undefined ? `${body.length}` : `${body.length} chars / ${cost.units} units`,
         `${DEFAULT_HEALTH_THRESHOLDS.softBodyChars}`,
+        cost === undefined
+          ? undefined
+          : `tokens≈${cost.tokensLow}-${cost.tokensHigh} (estimate; cjk=${cost.cjk}; softCost=${DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits} units)`,
       ),
     )
 
@@ -241,13 +324,23 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
     )
 
     const missing = supportEnumerated ? missingSupportPointers(body, supportFiles) : undefined
+    // Hook coverage rides the EXISTING signal as detail (design §5.6): a file
+    // mentioned without the sanctioned hook form is still pointed at, so the
+    // verdict stays with `missingSupportPointers`.
+    const unhooked = supportEnumerated ? unhookedSupportPointers(body, supportFiles) : []
+    const unhookedDetail = unhooked.length === 0
+      ? undefined
+      : `unhooked=${unhooked.length}: ${unhooked.slice(0, 5).join(', ')}`
     signals.push(
       !supportEnumerated
         ? sig('pointer_missing', 'unknown', 'not-enumerated', undefined, 'support files not enumerated')
         : (missing ?? []).length === 0
-          ? sig('pointer_missing', 'pass', 'none')
-          : sig('pointer_missing', 'over', missing?.join(', ') ?? ''),
+          ? sig('pointer_missing', 'pass', 'none', undefined, unhookedDetail)
+          : sig('pointer_missing', 'over', missing?.join(', ') ?? '', undefined, unhookedDetail),
     )
+
+    signals.push(citationSignal(snapshot.citations))
+    signals.push(demandSignal(snapshot, supportFiles, supportEnumerated))
 
     const narrow = narrowNameMatches(snapshot.name)
     signals.push(
@@ -287,6 +380,52 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
   })
 
   return { library, skills }
+}
+
+/** Dangling-citation verdict: a partial scan is `unknown`, never a clean pass. */
+function citationSignal(citations: CitationReport | undefined): DriftSignal {
+  if (citations === undefined) return sig('citation_resolution', 'unknown', 'not-scanned', undefined, 'support-file list missing')
+  if (citations.truncated) return sig('citation_resolution', 'unknown', `truncated at ${citations.refs.length} refs`, undefined, 'partial scan — not a clean verdict')
+  const cited = citations.refs.filter(ref => ref.kind === 'citation')
+  if (citations.dangling.length > 0) {
+    const missing = citations.dangling.slice(0, 5).map(ref => ref.target ?? ref.raw).join(', ')
+    return sig('citation_resolution', 'over', `dangling=${citations.dangling.length}/${cited.length}`, 'dangling=0', `missing: ${missing}`)
+  }
+  return sig('citation_resolution', 'pass', `citations=${cited.length} foreign=${citations.foreign.length}${citations.unverified.length === 0 ? '' : ` unverified=${citations.unverified.length}`}`)
+}
+
+/** Render-time reason for an empty retirement list (design §5.6). */
+const RETIREMENT_STATUS_TEXT: Readonly<Record<RetirementStatus, string>> = {
+  listed: 'listed',
+  none: 'none',
+  'no-age': 'age unknown',
+  unscanned: 'citations unscanned',
+}
+
+/** Cold-support-file verdict (design §5.5): zero reads are evidence only while
+ * the observation window is open and the file list is known. */
+function demandSignal(
+  snapshot: DriftSkillSnapshot,
+  supportFiles: readonly string[],
+  supportEnumerated: boolean,
+): DriftSignal {
+  if (!supportEnumerated || supportFiles.length === 0) {
+    return sig('demand', 'unknown', 'not-enumerated', undefined, 'support files not enumerated')
+  }
+  if (snapshot.usageObserved !== true) {
+    return sig('demand', 'unknown', 'window-closed', undefined, 'no observed reads yet: zero is not evidence')
+  }
+  const demand = snapshot.demand ?? {}
+  const cold = supportFiles.filter(path => (demand[path] ?? 0) === 0)
+  // Retirement evidence rides the SAME signal as detail: it narrows "cold" to
+  // "cold AND uncited AND old enough AND not kept" without moving the verdict.
+  const retire = retirementReport(snapshot, supportFiles)
+  const retireDetail = retire.candidates.length === 0
+    ? `retire: ${RETIREMENT_STATUS_TEXT[retire.status]}`
+    : `retire≥${DEFAULT_STALE_AFTER_DAYS}d: ${retire.candidates.slice(0, 5).map(c => `${c.path}(${c.idleDays}d)`).join(', ')}`
+  if (cold.length === 0) return sig('demand', 'pass', `${supportFiles.length} warm`, 'cold=0', retireDetail)
+  const sample = cold.slice(0, 5).join(', ')
+  return sig('demand', 'over', `cold=${cold.length}/${supportFiles.length}`, 'cold=0', `never read: ${sample} · ${retireDetail}`)
 }
 
 /** Convenience: fetch one signal from an assessment or library list. */

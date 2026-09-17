@@ -35,6 +35,8 @@
  * @module
  */
 
+import { CITATION_SUPPORT_DIRS } from './citations.ts'
+
 /** How the platform delivered one dispatch. */
 export type ToolDispatchKind =
   /** A model-authored call, logged as \`tool/call\` and settled by \`tool/result\`. */
@@ -376,22 +378,92 @@ const PROGRAM_TOOL_NAMES = new Set(['run_code'])
  * counts as a read: the platform settles every started sub-dispatch, so pending
  * is a live-window state, not a failure.
  */
-export function skillReadNameOf(signal: ToolDispatchSignal): string | undefined {
-  if (!SKILL_READ_TOOL_NAMES.has(signal.name)) return undefined
-  if (signal.ok === false) return undefined
-  // The arguments are a JSON string in native mode and an already-parsed object
-  // in PTC mode (core/tools/src/types.ts:11-23), so re-parse defensively rather
-  // than trust one modality's encoding.
+/** Tool names whose dispatch reads one FILE — the deployment's file tool
+ * (default `read`). A differently named tool is configured, not guessed. */
+export const DEFAULT_SUPPORT_READ_TOOL_NAMES: readonly string[] = ['read']
+
+/** One support-file read attributed to a skill (design §5.5). */
+export interface SupportReadHit {
+  skill: string
+  /** Skill-root-relative path, e.g. `references/design-x.md`. */
+  rel: string
+}
+
+/** Dispatch arguments: a JSON string in native mode and an already-parsed
+ * object in PTC mode (core/tools/src/types.ts:11-23) — parsed defensively so no
+ * consumer has to trust one modality's encoding. */
+function parsedArguments(signal: ToolDispatchSignal): Record<string, unknown> | null {
   let parsed: unknown = signal.arguments
   if (typeof parsed === 'string') {
     try {
       parsed = JSON.parse(parsed) as unknown
     } catch {
-      return undefined
+      return null
     }
   }
-  if (parsed === null || typeof parsed !== 'object') return undefined
-  const candidate = parsed as Record<string, unknown>
+  if (parsed === null || typeof parsed !== 'object') return null
+  return parsed as Record<string, unknown>
+}
+
+/** The path-shaped argument of a file tool, when it carries one. */
+function readPathArgument(signal: ToolDispatchSignal): string | null {
+  const record = parsedArguments(signal)
+  if (record === null) return null
+  for (const key of ['file_path', 'path', 'file', 'target']) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim() !== '') return value
+  }
+  return null
+}
+
+/**
+ * Read one dispatch as a SUPPORT-FILE read attributed to a skill: a read of
+ * `<root>/<skill>/<support dir>/…` is demand evidence for that one file, the
+ * way `skillReadNameOf` is demand evidence for a whole body.
+ * @param signal - a settled dispatch.
+ * @param options - the deployment's file-tool names and its skills root; an
+ *   empty root falls back to the `/skills/` marker in the path.
+ * @returns the skill name and the skill-root-relative path, or `null` when the
+ *   dispatch is not a support-file read. Pure: no IO, no service lookup.
+ */
+export function supportFileReadOf(
+  signal: ToolDispatchSignal,
+  options: { toolNames: readonly string[]; root: string },
+): SupportReadHit | null {
+  if (!options.toolNames.includes(signal.name)) return null
+  if (signal.ok === false) return null
+  const raw = readPathArgument(signal)
+  if (raw === null) return null
+  const normalized = raw.replace(/\\/g, '/').trim()
+  if (normalized === '' || normalized.split('/').includes('..')) return null
+  const root = options.root.replace(/\\/g, '/').replace(/\/+$/, '')
+  let relative: string | null = null
+  if (root !== '') {
+    const lower = normalized.toLowerCase()
+    const lowerRoot = root.toLowerCase()
+    if (lower.startsWith(lowerRoot + '/')) relative = normalized.slice(root.length + 1)
+  }
+  if (relative === null) {
+    const marker = '/skills/'
+    const at = normalized.toLowerCase().lastIndexOf(marker)
+    if (at === -1) return null
+    relative = normalized.slice(at + marker.length)
+  }
+  const parts = relative.split('/').filter(part => part !== '')
+  const skill = parts[0]
+  const dir = parts[1]
+  if (skill === undefined || dir === undefined || parts.length < 3) return null
+  if (!CITATION_SUPPORT_DIRS.includes(dir)) return null
+  return { skill: skill.trim(), rel: parts.slice(1).join('/') }
+}
+
+export function skillReadNameOf(signal: ToolDispatchSignal): string | undefined {
+  if (!SKILL_READ_TOOL_NAMES.has(signal.name)) return undefined
+  if (signal.ok === false) return undefined
+  // One defensive re-parse for both readers (parsedArguments): the encoding
+  // differs by runtime mode, so neither may trust the other's.
+  const candidate = parsedArguments(signal)
+  if (candidate === null) return undefined
   const name = typeof candidate.name === 'string' ? candidate.name : typeof candidate.skill === 'string' ? candidate.skill : ''
   return name === '' ? undefined : name
 }

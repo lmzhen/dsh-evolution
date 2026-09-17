@@ -1,0 +1,43 @@
+import { describe, expect, it } from 'vitest'
+import { bodyCost, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW, COST_ASCII_WEIGHT, DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core'
+
+// Every expectation is stated on the ON-DISK form: the accounting basis appends
+// one trailing newline, the same measure `maxSkillContentChars` bounds.
+describe('bodyCost (design §5.2)', () => {
+  it('weighs a CJK body one unit per code unit', () => {
+    const cost = bodyCost('中'.repeat(10))
+    expect(cost).toMatchObject({ chars: 11, cjk: 10, ascii: 1, units: 10 })
+    expect(cost.tokensLow).toBe(Math.round(10 * COST_CJK_TOKEN_LOW + COST_ASCII_TOKEN_LOW))
+    expect(cost.tokensHigh).toBe(Math.round(10 * COST_CJK_TOKEN_HIGH + COST_ASCII_TOKEN_HIGH))
+  })
+
+  it('weighs a latin body a quarter unit per code unit', () => {
+    const cost = bodyCost('a'.repeat(100))
+    expect(cost).toMatchObject({ chars: 101, cjk: 0, ascii: 101, units: 25 })
+    expect(cost.tokensLow).toBe(Math.round(101 * COST_ASCII_TOKEN_LOW))
+    expect(cost.tokensHigh).toBe(Math.round(101 * COST_ASCII_TOKEN_HIGH))
+  })
+
+  it('adds the two scripts for a mixed body', () => {
+    expect(bodyCost('中文abcd')).toMatchObject({ chars: 7, cjk: 2, ascii: 5, units: 3 })
+  })
+
+  it('accounts on the ON-DISK form, so trailing whitespace cannot change the number', () => {
+    const base = '中'.repeat(50) + 'a'.repeat(50)
+    expect(bodyCost(base)).toEqual(bodyCost(base + '\n\n  '))
+  })
+
+  it('derives the soft cost ceiling from the char ceiling instead of hardcoding it', () => {
+    expect(DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits).toBe(Math.round(DEFAULT_HEALTH_THRESHOLDS.softBodyChars * COST_ASCII_WEIGHT))
+  })
+
+  it('shows a CJK body costing several times the soft ceiling at the same char count', () => {
+    const cjk = bodyCost('中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars))
+    expect(cjk.chars).toBeGreaterThanOrEqual(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
+    expect(cjk.units).toBeGreaterThan(2 * DEFAULT_HEALTH_THRESHOLDS.softBodyCostUnits)
+  })
+
+  it('answers the normalized empty body as one code unit', () => {
+    expect(bodyCost('')).toEqual({ chars: 1, cjk: 0, ascii: 1, units: 0, tokensLow: 0, tokensHigh: 0 })
+  })
+})

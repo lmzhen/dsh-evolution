@@ -55,7 +55,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           'Read-only deep-dive into maintenance scan signals: library-level group/cluster membership or per-skill detail (line numbers, pointer gaps, narrow shapes, stamp samples). Machine-derived from the same calculators as the facts block — never introduces new evidence ids. Output is JSON detail.',
         parameters: {
           signal: { type: 'string', required: true, enum: PROBE_SIGNALS },
-          target: { type: 'string', description: 'Skill name for skill-level signals (required for stamp_density/body_size/dup_heading/overlong_line/pointer_missing/narrow_name/description_chars/quality_low).' },
+          target: { type: 'string', description: 'Skill name for skill-level signals (required for stamp_density/body_size/dup_heading/overlong_line/pointer_missing/citation_resolution/demand/narrow_name/description_chars/quality_low).' },
         },
         output: {
           schema: {
@@ -94,6 +94,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             protected: enrichment.protected,
             catalogInvalid: enrichment.catalogInvalid,
             usageObserved: enrichment.usageObservedValue,
+            demand: enrichment.demand,
           })
           // Probe output crosses the session boundary to the maintenance
           // subagent — same redaction policy as the facts block (011 §8).

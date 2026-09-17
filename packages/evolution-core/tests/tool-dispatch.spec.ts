@@ -32,6 +32,7 @@ import {
   isSkillToolName,
   readDispatchSignal,
   skillReadNameOf,
+  supportFileReadOf,
 } from '../src/tool-dispatch.ts'
 import { observeEvent, type TurnSignals } from '../src/signals.ts'
 
@@ -459,5 +460,31 @@ describe('modality parity: the same work reads the same in both runtime modes', 
     expect(nativeSignal.toolCalls).toBe(2)
   })
 })
+
+describe('supportFileReadOf (design §5.5)', () => {
+  const signal = (name: string, args: unknown) => ({ name, arguments: args }) as never
+  const opts = { toolNames: ['read'], root: 'C:/u/.dsh/skills' }
+
+  it('attributes a file read under a skill support dir to that one file', () => {
+    expect(supportFileReadOf(signal('read', { file_path: 'C:/u/.dsh/skills/demo/references/guide.md' }), opts))
+      .toEqual({ skill: 'demo', rel: 'references/guide.md' })
+    expect(supportFileReadOf(signal('read', { file_path: 'C:\\u\\.dsh\\skills\\demo\\templates\\a.tmpl' }), opts))
+      .toEqual({ skill: 'demo', rel: 'templates/a.tmpl' })
+  })
+
+  it('falls back to the /skills/ marker when no root is configured', () => {
+    expect(supportFileReadOf(signal('read', { path: '/home/u/.dsh/skills/demo/scripts/run.sh' }), { toolNames: ['read'], root: '' }))
+      .toEqual({ skill: 'demo', rel: 'scripts/run.sh' })
+  })
+
+  it('rejects another tool, a non-support path, a shallow path, a traversal and a foreign root', () => {
+    expect(supportFileReadOf(signal('skill', { file_path: 'C:/u/.dsh/skills/demo/references/guide.md' }), opts)).toBeNull()
+    expect(supportFileReadOf(signal('read', { file_path: 'C:/u/.dsh/skills/demo/src/x.ts' }), opts)).toBeNull()
+    expect(supportFileReadOf(signal('read', { file_path: 'C:/u/.dsh/skills/demo/references' }), opts)).toBeNull()
+    expect(supportFileReadOf(signal('read', { file_path: 'C:/u/.dsh/skills/demo/references/../../etc/passwd' }), opts)).toBeNull()
+    expect(supportFileReadOf(signal('read', { file_path: 'C:/elsewhere/demo/references/guide.md' }), opts)).toBeNull()
+  })
+})
+
 
 

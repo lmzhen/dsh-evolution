@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 17
+export const PROMPT_BUNDLE_VERSION = 18
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -228,7 +228,7 @@ export const MAINTAIN_PROMPT = `<<<MAINTAIN_PROMPT v={bundle_version} sig={joint
 - 两处 sig 不一致或任一缺失 → 只输出 MISMATCH + 两侧版本号，禁止输出计划。
 
 ## 2. 信号→条款映射（每条 over 必须落到条款；无一遗漏）
-{signal:dedup_group}→A1 · {signal:narrow_name}→A2 · {signal:prefix_cluster}→A3 · {signal:stamp_density}与{signal:body_size}→B1 · {signal:pointer_missing}→B2 · {signal:dup_heading}→B3 · {signal:overlong_line}→B4 · {signal:description_chars}→B5 · {signal:usage_observed}/{signal:quality_low}→门控（校验器对 quality_low=unknown 的技能强制 needs_human，模板侧不重复）
+{signal:dedup_group}→A1 · {signal:narrow_name}→A2 · {signal:prefix_cluster}→A3 · {signal:stamp_density}与{signal:body_size}→B1 · {signal:pointer_missing}→B2 · {signal:citation_resolution}→B6 · {signal:demand}→B7 · {signal:dup_heading}→B3 · {signal:overlong_line}→B4 · {signal:description_chars}→B5 · {signal:usage_observed}/{signal:quality_low}→门控（校验器对 quality_low=unknown 的技能强制 needs_human，模板侧不重复）
 
 ## 3. 完整性契约（校验器机械执行）
 事实块中每条 over 信号必须满足其一：成为某条建议的 evidence，或在 notes 中说明"已审·无条款对应·不动作"。禁止静默省略；先逐信号核对再输出。
@@ -244,10 +244,14 @@ A. 域·碎片化
 
 B. 层·分层错位
 - B1 {signal:stamp_density}（阈值 {signal:stamp_density.threshold}）或 {signal:body_size}（阈值 {signal:body_size.threshold}）=over：按**三问判据**判锚/残留——① 该编号/时间戳是否被库内其他文件引用？② 除"何时产生/为何存在"外是否还承载信息？③ 删除是否影响任何跨文档检索？（①是且③是→锚；否则→残留候选，人审）。锚→允许保留 + needs_human + semantic_reasoning 写三问结果；**锚不使用 is_override**（is_override 仅用于 §7 申诉；锚是 B1 的正常裁决路径）；残留→restructure 建议（movable headings 逐字引用）。**锚≠可读：单行 >4000 字符即使在锚类也必须拆分。**
-- B2 {signal:pointer_missing}=over：读支持文件后判性质——可复用模式→上移正文；会话专属实录→保留+补指针；形态=patch 指引。**未读内容仅凭文件名 → conf≤0.4 且措辞"先人工确认再执行"。** **缺失指针=支持文件存在、正文无引用（单向语义），finding 表述勿反向。**
+- B2 {signal:pointer_missing}=over：读支持文件后判性质——可复用模式→上移正文；会话专属实录→保留+补指针；形态=patch 指引。**未读内容仅凭文件名 → conf≤0.4 且措辞"先人工确认再执行"。** **缺失指针=支持文件存在、正文无引用（单向语义），finding 表述勿反向。** detail 里的 \`unhooked=N\` 是**被正文提及但不成钩子形态**的文件：它们不算缺失（verdict 不变），但搬迁后正文只剩裸文件名，注意力难以命中——指引是把该行改成 \`- <症状或问句> → references/x.md\`。
 - B3 {signal:dup_heading}=over：删除多余标题行（保留一份），patch 指引。
 - B4 {signal:overlong_line}=over：>1500 拆行；>4000 判定可读性危机（内容合法也拆）；patch 指引。**finding 必须给全量口径：共 N 行超限，其中 >4000 的逐行列出。**
 - B5 {signal:description_chars}=over：先判**性质**三分类——事件性承诺（单次故障/incident 写入元数据）→裁剪建议；叙事性自我描述→压缩建议；丰富但合规（完整用例边界）→保留 + is_override + override_reason="合法密度"。**分类特征**：含"恢复/修复某次事故、日期快照"类一次性措辞→事件性承诺；"动词+对象"式任务说明→叙事性；枚举完整用例边界且不可拆分→丰富合规。**第三类门槛（默认从严，半机械）**：先自行试写一个 ≤60 字压缩方案——能保留全部路由关键项（触发词+域）→ 不可判第三类（按压缩建议）；只有试写失败（在 semantic_reasoning 列出试写方案与具体失败点）才可判丰富合规。描述文本可见（probe desc-text 或正文 frontmatter）时仍须三分类；仅长度可见 → conf≤0.4。semantic_reasoning 必写三分类之一。
+
+- B6 {signal:citation_resolution}=over：正文引用了**不存在的**支持文件（悬空引用）。判性质：目标被改名/删除→patch 指引改引用；目标本应存在→补齐文件或把内容上移正文。**未知≠pass**：扫描未做或被截断时该信号为 unknown，按 §1 的门控处理。**finding 必须列出缺失目标与所在行号。**
+
+- B7 {signal:demand}=over：支持文件**从未被读过**（仅在观察窗已开时才有意义）。判性质：可复用模式→上移正文或补一行指针让人找得到；会话专属实录→冷是正常的，保留不动作；重复内容→合并。**window-closed（unknown）不得当作"没人读"**，按 §1 门控处理。**finding 必须列出从未读取的文件清单。** detail 里的 \`retire≥Nd:\` 更进一步：**从未读过、正文未引用、所属技能闲置 ≥N 天、且钩子行没有 keep 标记**——这是**退役建议（propose-only）**，永不自动删除；真要动作就写进计划（\`archive\`/\`absorbed_into\`），并在 finding 里给出文件、年龄、引用数、读取数四项证据。\`retire: no-age\` / \`retire: unscanned\` 是证据不足，同样不得读作“没有候选”。要长期保留一个冷文件，在正文里给它加一行 \`<!-- keep: references/x.md 原因 -->\`（路径与原因都必填，且该行必须单独成行）。
 
 D. 库·整合纪律（计划形态约束）
 - D1 同类问题多处出现→合成一条 relationship-level 建议，不逐项输出。

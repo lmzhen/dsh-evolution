@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeDriftSignals, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { computeDriftSignals, resolveCitations, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS } from '../src/index.ts'
 
 const snapshots: DriftSkillSnapshot[] = [
@@ -111,4 +111,25 @@ describe('computeProbe', () => {
     // credential-shaped text — so the redactor at the tools boundary is
     // conservative belt-and-suspenders, and no raw credential text can leak.
   })
+
+  it('demand detail lists never-read files and the retirement candidates beside them (design §5.6)', () => {
+    const files = ['references/read.md', 'references/hooked.md', 'references/dead.md']
+    const body = '# A\n\n## When to Use\n\n- 症状 → references/hooked.md\n'
+    const snapshot: DriftSkillSnapshot = {
+      name: 'demand-skill',
+      body,
+      supportFiles: files,
+      citations: resolveCitations({ content: body, file: 'SKILL.md', files }),
+      usageObserved: true,
+      demand: { 'references/read.md': 3 },
+      liveness: { idleDays: 61 },
+    }
+    const probe = computeProbe('demand', 'demand-skill', [snapshot])
+    expect(probe.detail).toContain('never read: references/hooked.md')
+    expect(probe.detail).toContain('never read: references/dead.md')
+    // The same calculator as the signal: only the uncited file is a candidate.
+    expect(probe.detail).toContain('retire candidate: references/dead.md (idle 61d)')
+    expect(probe.detail.some(line => line.includes('retire candidate: references/hooked.md'))).toBe(false)
+  })
 })
+

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { resolveCitations } from '../src/citations.ts'
 import {
   computeDriftSignals,
   DRIFT_MAX_LINE_CHARS,
@@ -7,6 +8,7 @@ import {
   missingSupportPointers,
   narrowNameMatches,
   overlongLines,
+  retirementReport,
   type DriftSkillSnapshot,
 } from '../src/drift-signals.ts'
 
@@ -41,6 +43,43 @@ describe('drift-signals pure checks', () => {
     expect(narrowNameMatches('align-test-ops')).toEqual([])
     expect(narrowNameMatches('python-3.12-tooling')).toEqual([])
     expect(narrowNameMatches('2026-09-02-summary')).toContain('dated')
+  })
+})
+
+describe('demand signal (design §5.5)', () => {
+  const files = ['references/a.md', 'references/b.md']
+
+  it('answers unknown until the support files are enumerated', () => {
+    const report = computeDriftSignals([{ name: 's', body: HEALTHY, usageObserved: true }])
+    const signal = findDriftSignal(report.skills[0]?.signals ?? [], 'demand')
+    expect(signal?.verdict).toBe('unknown')
+    expect(signal?.value).toBe('not-enumerated')
+  })
+
+  it('answers unknown while the observation window is closed — zero is not evidence', () => {
+    const report = computeDriftSignals([{ name: 's', body: HEALTHY, supportFiles: files, usageObserved: false }])
+    const signal = findDriftSignal(report.skills[0]?.signals ?? [], 'demand')
+    expect(signal?.verdict).toBe('unknown')
+    expect(signal?.value).toBe('window-closed')
+  })
+
+  it('flags the never-read files once the window is open', () => {
+    const report = computeDriftSignals([
+      { name: 's', body: HEALTHY, supportFiles: files, usageObserved: true, demand: { 'references/a.md': 3 } },
+    ])
+    const signal = findDriftSignal(report.skills[0]?.signals ?? [], 'demand')
+    expect(signal?.verdict).toBe('over')
+    expect(signal?.value).toBe('cold=1/2')
+    expect(signal?.detail ?? '').toContain('references/b.md')
+  })
+
+  it('passes when every enumerated file has been read', () => {
+    const report = computeDriftSignals([
+      { name: 's', body: HEALTHY, supportFiles: files, usageObserved: true, demand: { 'references/a.md': 1, 'references/b.md': 2 } },
+    ])
+    const signal = findDriftSignal(report.skills[0]?.signals ?? [], 'demand')
+    expect(signal?.verdict).toBe('pass')
+    expect(signal?.value).toBe('2 warm')
   })
 })
 
@@ -147,3 +186,76 @@ describe('S1.8 (v37 P1-14 / P2-3): LF and CRLF bodies agree', () => {
     expect(overlongLines(`${over}\r\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
   })
 })
+
+describe('support-file retirement evidence (design §5.6)', () => {
+  // dead.md is the retirement shape: mentioned nowhere, read never, unkept.
+  const files = ['references/a.md', 'references/b.md', 'references/kept.md', 'references/unhooked.md', 'references/dead.md']
+  const body = [
+    '# A',
+    '',
+    '## 何时用',
+    '',
+    '- 症状甲 → references/a.md',
+    '- 症状乙 → references/b.md',
+    '',
+    '<!-- keep: references/kept.md 会话实录，冷是正常的 -->',
+    '',
+    '见 references/unhooked.md',
+    '',
+  ].join('\n')
+  const citations = resolveCitations({ content: body, file: 'SKILL.md', files })
+
+  it('reports mentioned-but-unhooked files as detail without moving the verdict', () => {
+    const report = computeDriftSignals([{ name: 's', body, supportFiles: files, citations, usageObserved: true }])
+    const pointer = findDriftSignal(report.skills[0]?.signals ?? [], 'pointer_missing')
+    // The verdict still follows the missing file only; the hook gap rides detail,
+    // and a file whose mention IS its keep marker is exempt from both.
+    expect(pointer?.verdict).toBe('over')
+    expect(pointer?.value).toBe('references/dead.md')
+    expect(pointer?.detail).toBe('unhooked=1: references/unhooked.md')
+  })
+
+  it('never lists a directory entry as unhooked or as a retirement candidate', () => {
+    const withDir = [...files, 'references/archive']
+    const report = computeDriftSignals([{ name: 's', body, supportFiles: withDir, citations, usageObserved: true }])
+    const pointer = findDriftSignal(report.skills[0]?.signals ?? [], 'pointer_missing')
+    expect(pointer?.detail).toBe('unhooked=1: references/unhooked.md')
+    const retire = retirementReport({ name: 's', body, supportFiles: withDir, citations, liveness: { idleDays: 45 } }, withDir)
+    expect(retire.candidates.map(candidate => candidate.path)).toEqual(['references/dead.md'])
+  })
+
+  it('leaves a fully hooked body without hook detail', () => {
+    const hooked = '- 症状甲 → references/a.md\n'
+    const report = computeDriftSignals([{ name: 's', body: hooked, supportFiles: ['references/a.md'], usageObserved: true }])
+    expect(findDriftSignal(report.skills[0]?.signals ?? [], 'pointer_missing')?.detail).toBeUndefined()
+  })
+
+  it('proposes only cold, uncited, unkept files once the skill is idle past the stale window', () => {
+    const report = retirementReport({ name: 's', body, supportFiles: files, citations, liveness: { idleDays: 45 } }, files)
+    expect(report.status).toBe('listed')
+    // unhooked.md is cited in prose, so only the never-mentioned file qualifies.
+    expect(report.candidates).toEqual([{ path: 'references/dead.md', idleDays: 45 }])
+  })
+
+  it('keeps every file out of the list while the skill is inside the grace window', () => {
+    const report = retirementReport({ name: 's', body, supportFiles: files, citations, liveness: { idleDays: 3 } }, files)
+    expect(report.status).toBe('none')
+    expect(report.candidates).toEqual([])
+  })
+
+  it('never reads an unmeasurable input as "nothing qualifies"', () => {
+    expect(retirementReport({ name: 's', body, supportFiles: files, citations }, files).status).toBe('no-age')
+    expect(retirementReport({ name: 's', body, supportFiles: files, liveness: { idleDays: 45 } }, files).status).toBe('unscanned')
+  })
+
+  it('carries the retirement list on the demand signal without changing its verdict', () => {
+    const report = computeDriftSignals([
+      { name: 's', body, supportFiles: files, citations, usageObserved: true, liveness: { idleDays: 45 }, demand: { 'references/a.md': 2 } },
+    ])
+    const demand = findDriftSignal(report.skills[0]?.signals ?? [], 'demand')
+    expect(demand?.verdict).toBe('over')
+    expect(demand?.value).toBe('cold=4/5')
+    expect(demand?.detail).toContain('retire≥30d: references/dead.md(45d)')
+  })
+})
+

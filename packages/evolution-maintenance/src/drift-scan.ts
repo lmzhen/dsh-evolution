@@ -8,7 +8,7 @@
  * `unknown` (never a fabricated verdict).
  */
 
-import type { DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { bodyCost, resolveCitations, type DriftSkillSnapshot, type SkillLiveness } from '@deepseek-ai/dsh-evolution-core'
 
 /** Minimal SkillLibrary surface needed for snapshot assembly. */
 export interface SkillLibraryLike {
@@ -35,6 +35,10 @@ export interface SnapshotOptions {
    * the snapshot (E-36): without it the probe always answered 'unknown' while
    * the facts block reported the enrichment value. */
   usageObserved?: boolean | undefined
+  /** Per-support-file read counts per skill (design §5.5). */
+  demand?: ReadonlyMap<string, Readonly<Record<string, number>>> | undefined
+  /** Idle age per skill (design §5.6). */
+  liveness?: ReadonlyMap<string, SkillLiveness> | undefined
 }
 
 /**
@@ -66,15 +70,23 @@ export async function snapshotFromLibrary(
       options.onReadError?.(entry.name, new Error('no readable SKILL.md (missing file, or the directory name is not a valid skill name)'))
       continue
     }
+    const supportFiles = options.supportFiles?.get(entry.name)
     snapshots.push({
       name: entry.name,
       body,
       description: options.descriptions?.get(entry.name),
-      supportFiles: options.supportFiles?.get(entry.name),
+      supportFiles,
+      cost: bodyCost(body),
+      // A citation scan needs the file list to decide existence: without it the
+      // field stays absent and the signal answers `unknown` rather than a
+      // fabricated pass (design §5.2).
+      ...(supportFiles === undefined ? {} : { citations: resolveCitations({ content: body, file: 'SKILL.md', files: supportFiles }) }),
       quality: options.quality?.get(entry.name),
       ...(options.protected?.get(entry.name) !== undefined ? { protected: options.protected.get(entry.name) } : {}),
       ...(options.catalogInvalid?.get(entry.name) === true ? { catalogInvalid: true } : {}),
       ...(options.usageObserved !== undefined ? { usageObserved: options.usageObserved } : {}),
+      ...(options.demand?.get(entry.name) === undefined ? {} : { demand: options.demand.get(entry.name) }),
+      ...(options.liveness?.get(entry.name) === undefined ? {} : { liveness: options.liveness.get(entry.name) }),
     })
   }
   return snapshots

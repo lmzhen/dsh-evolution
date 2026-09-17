@@ -7,7 +7,7 @@
  */
 
 import type { UsageMap, UsageRecord } from './usage.ts'
-import { latestActivityAt } from './usage.ts'
+import { daysSinceIso, idleDays } from './usage.ts'
 import { EvolutionGateSet, createGateSet } from './gates.ts'
 import { PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE } from './constants.ts'
 
@@ -391,15 +391,6 @@ export function computeScopeView(
   }
 }
 
-function daysSince(iso: string | null, created: string, now: number): number {
-  const anchor = iso ?? created
-  // A2-9 (v18): an invalid date used to produce NaN and silently freeze the
-  // lifecycle comparison (every `idle >= threshold` was false).
-  const t = Date.parse(anchor)
-  if (!Number.isFinite(t)) return 0
-  return (now - t) / 86_400_000
-}
-
 export function computeLifecycleTransitions(
   usage: UsageMap,
   config: CuratorConfig,
@@ -419,7 +410,7 @@ export function computeLifecycleTransitions(
     const bundled = config.bundledNames?.has(name) === true
     if (!lifecycleCandidate(name, record, config, bundled, gateSet, protectedNames)) continue
 
-    const age = daysSince(null, record.created_at, now.getTime())
+    const age = daysSinceIso(null, record.created_at, now.getTime())
     // P1-1 (v15): the warn state is the UNION of the curator-owned six-factor
     // pair and the feedback-owned pair — negative feedback must shorten the
     // stale window (that is the feedback package's entire advertised purpose).
@@ -434,7 +425,7 @@ export function computeLifecycleTransitions(
     // the normal (short-window) decision; the scope view lists them as watched.
     if (record.use_count + record.view_count === 0 && !qualityWarn && age < config.staleAfterDays) continue
 
-    const idle = daysSince(latestActivityAt(record), record.created_at, now.getTime())
+    const idle = idleDays(record, now)
     const staleAfterDays = qualityWarn && config.qualityWarnStaleAfterDays !== undefined
       ? config.qualityWarnStaleAfterDays
       : config.staleAfterDays

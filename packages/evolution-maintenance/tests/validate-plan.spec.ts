@@ -247,7 +247,7 @@ describe('validateAndNormalizeMaintainPlan', () => {
   it('V27 D-3: rule must be a clause id the template defines, not any string', () => {
     // The template's §5 catalogue is the authority (parsed from MAINTAIN_PROMPT
     // at module load); a fabricated clause number used to pass the shape check.
-    expect([...MAINTAIN_RULE_IDS].sort()).toEqual(['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5', 'D1', 'D2'])
+    expect([...MAINTAIN_RULE_IDS].sort()).toEqual(['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'D1', 'D2'])
     const fabricated = validItem({ rule: 'Z9' })
     const rejected = validateAndNormalizeMaintainPlan(validPlan([fabricated]), report, SIGNALS)
     expect(rejected.ok).toBe(false)

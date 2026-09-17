@@ -544,7 +544,9 @@ export function relatedSkillNames(content: string, exclude?: string): string[] {
  * a 100_000-character body with no trailing newline land as 100_001 bytes — and
  * every later patch/update of that skill was then refused, which made it
  * unmaintainable through `skill_manage` with no repair path at all. */
-function skillMdOnDisk(content: string): string {
+/** The bytes that land on disk for a SKILL.md write — the ONE accounting basis
+ * shared by the content limit and the cost estimate (design §5.2). */
+export function skillMdOnDisk(content: string): string {
   return content.trimEnd() + '\n'
 }
 

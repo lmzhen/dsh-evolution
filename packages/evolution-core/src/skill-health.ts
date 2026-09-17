@@ -10,6 +10,8 @@
  * `computeQualityScores` (different dimension, different consumers).
  */
 
+import { softCostUnitsFor } from './cost.ts'
+
 export interface SkillHealthThresholds {
   /** Soft body limit: a body of `softBodyChars` or MORE -> 'warn'; >= 2x ->
    * 'needs-restructure'. V6-34 (0.3.37): the doc comment used to claim
@@ -23,12 +25,22 @@ export interface SkillHealthThresholds {
   /** Patch count at/above this with zero reads -> 'warn' (write-ghost: the
    * skill is churned but nothing ever loads it). */
   churnMinPatches: number
+  /** Soft CONTEXT-COST ceiling of the body, in weighted units (design §5.2).
+   * Derived from `softBodyChars` at the ASCII weight, because the character
+   * limit itself was calibrated on prose where one character is cheap: a body
+   * that hits `softBodyChars` in CJK costs ~4x this ceiling. Advisory only in
+   * this release — nothing wires it to a verdict yet (that is the T2 that owns
+   * the cost criterion, with its own observation window). */
+  softBodyCostUnits: number
 }
 
 export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
   softBodyChars: 40_000,
   stampDensityPerKb: 2,
   churnMinPatches: 20,
+  // One source: the char ceiling converted at the ASCII weight. A literal here
+  // would drift the moment either weight or ceiling moves.
+  softBodyCostUnits: softCostUnitsFor(40_000),
 }
 
 /**

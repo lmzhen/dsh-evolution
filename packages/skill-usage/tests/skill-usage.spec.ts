@@ -46,6 +46,31 @@ describe('skill-usage', () => {
     expect(map.has('spaced-create')).toBe(true)
   })
 
+  it('D axis (design §5.5): a read of one support file counts demand for that file, not a view', async () => {
+    const root = await tempRoot('dsh-usage-demand-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.record('demo', 'use')
+    const call = {
+      type: 'tool/call',
+      data: { turn: 1, step: 1, callId: 'r1', name: 'read', arguments: JSON.stringify({ file_path: root + '/demo/references/guide.md' }) },
+    }
+    ctx.emit('session/event', { id: 's1' } as never, call as never)
+    ctx.emit('session/event', { id: 's1' } as never, toolResult('r1'))
+    let record = (await ctx.skillUsage.report()).get('demo')
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline && record?.support_reads === undefined) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+      record = (await ctx.skillUsage.report()).get('demo')
+    }
+    expect(record?.support_reads).toEqual({ 'references/guide.md': 1 })
+    // A file read is demand for ONE file: it must not inflate the skill's view
+    // counter (that one belongs to the `skill` load path).
+    expect(record?.view_count ?? 0).toBe(0)
+  })
+
   it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {
     const root = await tempRoot('dsh-usage-dispose-')
     const ctx = new Context()

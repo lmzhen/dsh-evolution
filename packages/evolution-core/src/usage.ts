@@ -32,6 +32,11 @@ export interface UsageRecord {
    * relevant again. */
   feedback_score?: number | undefined
   feedback_warn?: boolean | undefined
+  /** Demand evidence per SUPPORT FILE (design §5.5): how many observed reads
+   * landed on each `references/…`-style path of this skill. Absent on every
+   * record written before this field existed, and on skills whose support
+   * files were never read — absence means "no evidence", never "zero demand". */
+  support_reads?: Record<string, number> | undefined
 }
 
 export type UsageMap = Map<string, UsageRecord>
@@ -112,7 +117,28 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
     quality_warn: typeof raw.quality_warn === 'boolean' ? raw.quality_warn : undefined,
     feedback_score: typeof raw.feedback_score === 'number' && Number.isFinite(raw.feedback_score) ? raw.feedback_score : undefined,
     feedback_warn: typeof raw.feedback_warn === 'boolean' ? raw.feedback_warn : undefined,
+    support_reads: normalizeSupportReads(raw.support_reads),
   }
+}
+
+/** Sidecar bound: a pathological path set must not grow the usage file forever. */
+export const MAX_SUPPORT_READ_PATHS = 200
+
+/** Sanitize the per-support-file read counts: non-negative finite numbers under
+ * non-empty, bounded, non-traversal path keys. An unusable value drops the whole
+ * map (absence over a poisoned count). */
+function normalizeSupportReads(value: unknown): Record<string, number> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const out: Record<string, number> = {}
+  let kept = 0
+  for (const [key, count] of Object.entries(value as Record<string, unknown>)) {
+    if (kept >= MAX_SUPPORT_READ_PATHS) break
+    if (key === '' || key.length > 200 || key.split('/').includes('..')) continue
+    if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) continue
+    out[key] = count
+    kept += 1
+  }
+  return kept === 0 ? undefined : out
 }
 
 /** Parse a raw usage sidecar; malformed content reads as empty (best-effort telemetry). */
@@ -349,6 +375,18 @@ export function bumpPatch(map: UsageMap, name: string, when = new Date()): void 
   record.last_patched_at = when.toISOString()
 }
 
+/** Count one observed support-file read (design §5.5). The map is created on
+ * first evidence only — a skill with no support reads keeps the field absent. */
+export function bumpSupportRead(map: UsageMap, name: string, rel: string, when = new Date()): void {
+  const record = getRecord(map, name)
+  const counts = record.support_reads ?? {}
+  counts[rel] = (counts[rel] ?? 0) + 1
+  record.support_reads = counts
+  // The newest read is the demand clock; reuse the view timestamp so no extra
+  // field has to be introduced (a support read IS a read of the skill).
+  record.last_viewed_at = when.toISOString()
+}
+
 export function markAgentCreated(map: UsageMap, name: string): void {
   getRecord(map, name).created_by = 'agent'
 }
@@ -361,6 +399,22 @@ export function latestActivityAt(record: UsageRecord): string | null {
     .filter((value): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value)))
   if (values.length === 0) return null
   return values.reduce((latest, value) => (Date.parse(value) > Date.parse(latest) ? value : latest))
+}
+
+/** Days between an ISO timestamp (falling back to `created`) and `now`. An
+ * unparseable date counts as 0 days: NaN silently froze every age comparison
+ * (A2-9). */
+export function daysSinceIso(iso: string | null, created: string, nowMs: number): number {
+  const t = Date.parse(iso ?? created)
+  if (!Number.isFinite(t)) return 0
+  return (nowMs - t) / 86_400_000
+}
+
+/** Idle days of one skill since its lifecycle age anchor (`last activity ??
+ * created_at`) — the SAME anchor the curator's transitions use, so the
+ * maintenance view and the lifecycle can never disagree about staleness. */
+export function idleDays(record: UsageRecord, now: Date = new Date()): number {
+  return daysSinceIso(latestActivityAt(record), record.created_at, now.getTime())
 }
 
 /**

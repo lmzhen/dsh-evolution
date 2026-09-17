@@ -16,6 +16,7 @@ import {
   missingSupportPointers,
   narrowNameMatches,
   overlongLines,
+  retirementReport,
   type DriftSkillSnapshot,
 } from '@deepseek-ai/dsh-evolution-core'
 
@@ -28,6 +29,8 @@ export const PROBE_SIGNALS: ReadonlyArray<string> = [
   'dup_heading',
   'overlong_line',
   'pointer_missing',
+  'citation_resolution',
+  'demand',
   'narrow_name',
   'description_chars',
   'quality_low',
@@ -128,6 +131,39 @@ export function computeProbe(
     case 'pointer_missing': {
       const missing = missingSupportPointers(body, snapshot.supportFiles ?? [])
       return result(signal, missing.map(path => `no body reference: ${path}`), target)
+    }
+    case 'citation_resolution': {
+      // Reads the assembled scan (single source: drift-scan). A missing scan is
+      // `unknown`, never a fabricated clean pass (design §5.2).
+      const citations = snapshot.citations
+      if (citations === undefined) return result(signal, ['not-scanned (support files not enumerated)'], target)
+      if (citations.truncated) return result(signal, [`scan truncated at ${citations.refs.length} refs`], target)
+      const cited = citations.refs.filter(ref => ref.kind === 'citation')
+      const dangling = citations.dangling.map(ref => `${ref.target ?? ref.raw}:${ref.line}`)
+      const unverified = citations.unverified.map(ref => `${ref.target ?? ref.raw}:${ref.line}`)
+      return result(
+        signal,
+        dangling.length > 0
+          ? dangling.map(entry => `dangling ${entry}`)
+          : [`dangling=0 of ${cited.length} (foreign=${citations.foreign.length}${unverified.length === 0 ? '' : `, unverified=${unverified.length}: ${unverified.slice(0, 3).join(', ')}`})`],
+        target,
+      )
+    }
+    case 'demand': {
+      if (!snapshot.supportFiles || snapshot.supportFiles.length === 0) return result(signal, ['not-enumerated (support files unknown)'], target)
+      if (snapshot.usageObserved !== true) return result(signal, ['window-closed (no observed reads yet)'], target)
+      const demand = snapshot.demand ?? {}
+      const cold = snapshot.supportFiles.filter(path => (demand[path] ?? 0) === 0)
+      // Same calculator as the signal detail (design §5.6): the probe must never
+      // disagree with the facts block about which files are retirement candidates.
+      const retire = retirementReport(snapshot, snapshot.supportFiles)
+      const coldLines = cold.length === 0
+        ? [`cold=0 of ${snapshot.supportFiles.length}`]
+        : cold.map(path => `never read: ${path}`)
+      const retireLines = retire.candidates.length === 0
+        ? [`retire: ${retire.status}`]
+        : retire.candidates.map(candidate => `retire candidate: ${candidate.path} (idle ${candidate.idleDays}d)`)
+      return result(signal, [...coldLines, ...retireLines], target)
     }
     case 'narrow_name': {
       const matches = narrowNameMatches(snapshot.name)
