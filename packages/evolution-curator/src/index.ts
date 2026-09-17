@@ -300,10 +300,21 @@ export class EvolutionCurator extends Service {
       get(): { curatorIntervalHours: number; staleAfterDays: number; archiveAfterDays: number } | undefined
     } | undefined
     const snapshot = policy?.get()
+    // A7 (audit P2-15): the constructor clamps the CONFIG pair, but a
+    // policy-supplied pair bypassed that clamp — and with the engine's
+    // archive-bound-first ordering, `archiveAfterDays < staleAfterDays`
+    // silently skipped the stale stage and archived every idle skill at the
+    // short threshold. Same rule, same warn, on this path too.
+    const staleAfterDays = snapshot?.staleAfterDays ?? this.staleAfterDays
+    let archiveAfterDays = snapshot?.archiveAfterDays ?? this.archiveAfterDays
+    if (archiveAfterDays < staleAfterDays) {
+      this.ctx.logger.warn(`evolution-curator: policy archiveAfterDays (${archiveAfterDays}) < policy staleAfterDays (${staleAfterDays}); using the stale threshold as the archive threshold`)
+      archiveAfterDays = staleAfterDays
+    }
     return {
       intervalHours: snapshot?.curatorIntervalHours ?? this.intervalHours,
-      staleAfterDays: snapshot?.staleAfterDays ?? this.staleAfterDays,
-      archiveAfterDays: snapshot?.archiveAfterDays ?? this.archiveAfterDays,
+      staleAfterDays,
+      archiveAfterDays,
     }
   }
 
@@ -1069,10 +1080,15 @@ export class EvolutionCurator extends Service {
           // (`this.lastRun`); take Date.now() at the save point. A dry-run is a
           // preview: it must not push the next scheduled pass out.
           // v28 G4.1 (CUR-01): an aborted run anchors at the PREVIOUS pass
-          // (or construction time) and does not tick runCount — the skipped
-          // work must be re-runnable at the next check, not a full interval later.
-          lastRunAt: dryRun || runAborted ? (persisted?.lastRunAt ?? this.lastRun) : Date.now(),
-          runCount: dryRun || runAborted ? (persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
+          // and does not tick runCount — the skipped work must be re-runnable
+          // at the next check, not a full interval later.
+          // A7 (audit P2-16): "previous pass" is the TRANSACT baseline
+          // (`current`), falling back to the run-start read (`persisted`) —
+          // the run-start read alone let an aborted run in one process rewind
+          // the anchor another process had already advanced on the shared
+          // home, scheduling one duplicate (idempotent) pass.
+          lastRunAt: dryRun || runAborted ? (current?.lastRunAt ?? persisted?.lastRunAt ?? this.lastRun) : Date.now(),
+          runCount: dryRun || runAborted ? (current?.runCount ?? persisted?.runCount ?? 0) : (current?.runCount ?? 0) + 1,
           lastSummary: summary,
           paused: pausedNow,
         }

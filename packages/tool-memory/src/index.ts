@@ -165,6 +165,28 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       }
     }
     ctx.effect(() => ctx.on('evolution/memory-applied', () => { void refreshSnapshot() }), 'tool-memory.snapshot-refresh')
+    // P2-07 (audit): cordis `inject` does not order sibling fibers — if the
+    // memory PROVIDER row applies after this row, the mount-time render threw
+    // (`memory: no provider registered`) and, with the write-sink listener as
+    // the only refresher, the snapshot stayed EMPTY for the whole process
+    // lifetime: pre-existing MEMORY.md/USER.md content never reached any
+    // session until someone performed a memory write. Retry on a short
+    // bounded interval until the first success, then stop; the effect
+    // disposal clears the timer on plugin unload.
+    if (snapshotText === '') {
+      const retryTimer = setInterval(() => {
+        void (async () => {
+          try {
+            snapshotText = await ctx.memory.renderContext()
+            if (snapshotText !== '') clearInterval(retryTimer)
+          } catch {
+            // Provider still not registered — keep waiting within the bound.
+          }
+        })()
+      }, 500)
+      ctx.effect(() => () => { clearInterval(retryTimer) }, 'tool-memory.snapshot-retry')
+      setTimeout(() => { clearInterval(retryTimer) }, 60_000).unref()
+    }
   } else if (!memoryDisabled) {
     ctx.logger.warn('tool-memory: systemPrompt service not mounted; memory guidance and snapshot are not injected (the write tool still works)')
   }

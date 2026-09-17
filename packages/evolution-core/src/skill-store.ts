@@ -36,7 +36,7 @@
 import { basename, dirname, join, resolve } from 'node:path'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
-import { LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
+import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_SKILL_LIMITS } from './limits.ts'
@@ -1137,23 +1137,31 @@ export class SkillLibrary {
    * Structure-health facts for one skill (rc.73 A1, 008 design): body
    * chars/density from SKILL.md, support groups from countSupportDirs, plus
    * optional usage counts (A2 churn dimension) when the caller has them.
-   * Derived, never persisted; null when the skill is unreadable.
+   * Derived, never persisted. CONTRACT: `null` whenever the skill cannot be
+   * read — a missing file AND any read failure (EACCES/EIO/…) both answer
+   * null, so a whole health view degrades one ROW instead of throwing out of
+   * its per-skill loop (A6, audit P2-10: the former code absorbed only
+   * missing/EISDIR and let a transient win32 hold kill the entire view).
    */
   async assessHealth(    rawName: string,
     thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
     counts?: { patchCount?: number; readCount?: number },
   ): Promise<SkillHealthAssessment | null> {
-    const name = rawName.trim()
-    const content = await this.read(name)
-    if (content === null) return null
-    return assessStructureHealth({
-      skillName: name,
-      bodyChars: content.length,
-      bodyText: content,
-      supportGroups: await this.countSupportDirs(name),
-      patchCount: counts?.patchCount,
-      readCount: counts?.readCount,
-    }, thresholds)
+    try {
+      const name = rawName.trim()
+      const content = await this.read(name)
+      if (content === null) return null
+      return assessStructureHealth({
+        skillName: name,
+        bodyChars: content.length,
+        bodyText: content,
+        supportGroups: await this.countSupportDirs(name),
+        patchCount: counts?.patchCount,
+        readCount: counts?.readCount,
+      }, thresholds)
+    } catch {
+      return null
+    }
   }
 
   /** Best-effort audit trail entry; never blocks the mutation. */
@@ -1368,18 +1376,33 @@ export class SkillLibrary {
     // still on disk — a concurrent archive moving the fresh directory away
     // would otherwise let writeText's mkdir resurrect the old path as a
     // SKILL.md-less ghost (same compensating cleanup as setPinnedCore).
+    // R3 (audit of A6): the marker warning keeps its OWN variable and its own
+    // sentence — the former fold into createDurabilityWarning re-framed "the
+    // marker never landed" inside the fsync/durability wrapper, producing a
+    // self-contradicting operator-facing message.
+    let markerWarning = ''
     if (origin !== 'foreground') {
       // v29 SK-05: the marker write gets the same committed-only tolerance as
       // every other write in this file (A1-15) — a post-rename dir-fsync
       // failure means the MARKER landed; rejecting the create as a plain
       // failure made the model retry into "already exists" for a skill that
       // IS on disk and managed.
-      let markerDurabilityWarning = ''
       try {
         await this.io.writeText(markerPath(dir, 'hermes-managed'), '')
       } catch (error) {
-        if (!isCommittedOnly(error)) throw error
-        markerDurabilityWarning = error instanceof Error ? error.message : String(error)
+        // A6 (audit P2-11): the body HAS landed at this point, so a failed
+        // marker write must not rethrow — the former rethrow skipped the
+        // audit/event accounting AND made every retry hit "already exists"
+        // with no repair path, leaving the skill permanently un-managed.
+        // Both failure kinds now ride the normal success path: a
+        // committed-only failure means the marker LANDED (durability
+        // unconfirmed); any other failure means the skill stays un-managed,
+        // which the result text says out loud.
+        if (isCommittedOnly(error)) {
+          markerWarning = `the hermes-managed marker landed but its directory fsync failed — durability unconfirmed: ${error instanceof Error ? error.message : String(error)}`
+        } else {
+          markerWarning = `hermes-managed marker write failed (${error instanceof Error ? error.message : String(error)}); the skill landed but is NOT lifecycle-managed — recreate or pin it manually`
+        }
       }
       if (!(await this.io.exists(createPath))) {
         await this.io.remove(markerPath(dir, 'hermes-managed')).catch(() => {})
@@ -1389,19 +1412,18 @@ export class SkillLibrary {
         await this.cleanupGhostDir(createPath)
         return { ok: false, message: `Skill "${normalized}" was archived concurrently while being created; the partial marker was removed — retry once the mover settles.` }
       }
-      // Both warnings ride the normal success path (audit/event included) —
-      // a durability warning must never skip the accounting.
-      if (markerDurabilityWarning !== '') {
-        createDurabilityWarning = createDurabilityWarning === ''
-          ? markerDurabilityWarning
-          : `${createDurabilityWarning}; marker: ${markerDurabilityWarning}`
-      }
     }
     await this.audit(normalized, 'create', null, onDisk, 'created')
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
+    // Both warnings ride the normal success path (audit/event included) — a
+    // durability warning must never skip the accounting.
+    const warnings = [
+      createDurabilityWarning !== '' ? `the write landed but the directory fsync failed — durability unconfirmed: ${createDurabilityWarning}` : '',
+      markerWarning,
+    ].filter(warning => warning !== '')
     return {
       ok: true,
-      message: `Skill "${normalized}" created.${createDurabilityWarning === '' ? '' : ` (warning: the write landed but the directory fsync failed — durability unconfirmed: ${createDurabilityWarning})`}`,
+      message: `Skill "${normalized}" created.${warnings.length === 0 ? '' : ` (warning: ${warnings.join('; ')})`}`,
       path: dir,
       ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}),
     }
@@ -1721,9 +1743,23 @@ export class SkillLibrary {
     }
   }
 
+  /** R2 follow-up (audit of A2): the recycled-pid window from io's
+   * `ALIVE_LOCK_TAKEOVER_MS`, applied to the stranded-lock sweepers. A lock
+   * whose holder pid probes alive but whose mtime is older than the alive
+   * window is a recycled pid, not a live writer (no write in this family
+   * holds a lock for more than minutes) — without this, one recycled pid
+   * blocked whole-tree snapshot recovery forever with a "retry once the
+   * write completes" message that could never become true. A backend without
+   * `mtime` keeps the conservative refuse-on-alive posture. */
+  private async lockHolderAgedOut(lockPath: string): Promise<boolean> {
+    const mtime = await this.io.mtime?.(lockPath).catch(() => null)
+    return typeof mtime === 'number' && Date.now() - mtime > ALIVE_LOCK_TAKEOVER_MS
+  }
+
   /** Remove `lockPath` only when its body has the writer-lock `pid:token`
-   * shape AND the holder pid is not alive; anything else (a user support file
-   * or a live writer's lock) is left untouched. */
+   * shape AND the holder pid is not alive (or is an aged-out recycled pid —
+   * R2 follow-up); anything else (a user support file or a live writer's
+   * lock) is left untouched. */
   private async sweepLockIfStranded(lockPath: string): Promise<void> {
     const body = await this.io.readText(lockPath).catch(() => null)
     if (body === null) return
@@ -1731,7 +1767,7 @@ export class SkillLibrary {
     // inlined third copy of the lock-body regex (F-17 single-source contract).
     const pid = parseLockBody(body)
     if (pid === null) return
-    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) return
+    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid) && !(await this.lockHolderAgedOut(lockPath))) return
     await this.io.remove(lockPath).catch(() => {})
   }
 
@@ -1766,7 +1802,7 @@ export class SkillLibrary {
     // rule as `sweepLockIfStranded` above.
     const pid = parseLockBody(body)
     if (pid === null) return
-    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) {
+    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid) && !(await this.lockHolderAgedOut(lockPath))) {
       throw new Error(`snapshot restore refused: ${label} is being written (write lock present); retry once the write completes`)
     }
     await this.io.remove(lockPath).catch(() => {})

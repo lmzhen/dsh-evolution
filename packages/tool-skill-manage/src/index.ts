@@ -3,8 +3,11 @@
  *
  * Mutations pass through the evolution approval seam when it is mounted;
  * approved/staged background writes are replayed by the registered runner.
- * The skill library itself never hard-deletes: archive is the maximum
- * destructive action and every curator mutation is snapshot-reversible.
+ * On LIVE skills, archive is the maximum destructive action and every
+ * curator mutation is snapshot-reversible. Two retention hard-deletes exist
+ * by design, both mtime-gated and logged: expired ARCHIVES are pruned after
+ * 365 days (skill-store `pruneExpiredArchives`), and pre-run snapshots are
+ * capped at the newest 5 — restore-ability holds inside those windows.
  *
  * 0.3.18 (E-70) — pin/unpin are deliberately OUTSIDE the approval seam:
  * pinning only lifts/restores the curator-lifecycle freeze and is fully
@@ -606,16 +609,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // YET — same as the support-file anchor below. Unanchored staging let a
         // foreground create between staging and approval be overwritten silently.
         if ((args.action === 'update' || args.action === 'edit') && typeof args.name === 'string' && args.name !== '') {
-          const stageCurrent = await library.read(args.name).catch(() => undefined)
-          if (stageCurrent !== undefined) operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }
+          // P2-04 (round-2 audit): an UNREADABLE target now anchors as
+          // 'absent' (fail-closed, the same posture as the /graph staging)
+          // instead of staying unanchored — an unanchored staging let a
+          // concurrent change between staging and approval be overwritten
+          // silently. A truly absent target anchors 'absent' identically.
+          const stageCurrent = await library.read(args.name).catch(() => null)
+          operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }
         }
         // v30 REV-03: the anchor extends to support-file writes/removes —
         // the staged sha covers the file's current bytes, or the sentinel
-        // 'absent' when the file does not exist yet (create-on-write). An
-        // unreadable target stays unanchored (documented residual).
+        // 'absent' when the file does not exist yet (create-on-write), and
+        // likewise when the target is unreadable (P2-04: fail-closed, the
+        // same posture as the skill anchor above).
         if ((args.action === 'write_file' || args.action === 'remove_file') && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
-          const stageFile = await library.readSupportFile(args.name, args.file_path).catch(() => undefined)
-          if (stageFile !== undefined) operation = { ...args, staged_from_sha256: stageFile === null ? 'absent' : contentHash(stageFile) }
+          const stageFile = await library.readSupportFile(args.name, args.file_path).catch(() => null)
+          operation = { ...args, staged_from_sha256: stageFile === null ? 'absent' : contentHash(stageFile) }
         }
         const decision = await approval.request({
           kind: 'skill',
