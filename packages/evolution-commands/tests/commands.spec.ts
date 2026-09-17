@@ -592,9 +592,14 @@ describe('evolution-commands', () => {
     expect(reads).toEqual(['ptc'])
     const target = join(home, '.agent-presets', 'evolution-ptc')
     expect(readFileSync(join(target, 'agent.cordis.yml'), 'utf8')).toContain(platformFixture.trim())
-    expect(readFileSync(join(target, 'preset.ptc.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.ptc.yml', import.meta.url), 'utf8'))
-    // The variant dir carries its OWN metadata file, never the standard one.
-    expect(existsSync(join(target, 'preset.yml'))).toBe(false)
+    // A3 (audit P1-3): the variant's metadata is written under the platform's
+    // OWN metadata filename (`preset.yml` — agent-presets metadata.ts
+    // METADATA_FILE), with the variant's CONTENT. The former behavior wrote
+    // `preset.ptc.yml`, a name the platform never reads, so the picker showed
+    // the bare id with no description/order. The installer path has always
+    // renamed to preset.yml; both surfaces must agree.
+    expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.ptc.yml', import.meta.url), 'utf8'))
+    expect(existsSync(join(target, 'preset.ptc.yml'))).toBe(false)
     const unknown = await handler!.handler({ rawInput: 'preset install --base nonsense' })
     expect(unknown.kind).toBe('error')
     expect(unknown.text).toContain('bases.json')
@@ -631,9 +636,12 @@ describe('evolution-commands', () => {
     expect(readFileSync(join(standardDir, 'agent.cordis.yml'), 'utf8')).toContain(fixtures.standard!.trim())
     expect(readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')).toContain(fixtures.ptc!.trim())
     expect(readFileSync(join(standardDir, 'agent.cordis.yml'), 'utf8')).not.toContain('mode: ptc')
-    // The variant keeps its own metadata file, the standard base its own.
-    expect(existsSync(join(ptcDir, 'preset.ptc.yml'))).toBe(true)
-    expect(existsSync(join(ptcDir, 'preset.yml'))).toBe(false)
+    // A3: each variant's metadata lands under the platform's `preset.yml`
+    // name (the only filename the picker reads), carrying the variant's OWN
+    // content — the ptc dir must NOT keep a `preset.ptc.yml` the platform
+    // would never read.
+    expect(readFileSync(join(ptcDir, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.ptc.yml', import.meta.url), 'utf8'))
+    expect(existsSync(join(ptcDir, 'preset.ptc.yml'))).toBe(false)
 
     // Every name is resolved before anything is written: the typo aborts the
     // whole request and the two healthy variants stay exactly as they were.

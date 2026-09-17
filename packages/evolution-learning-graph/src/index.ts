@@ -14,7 +14,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveExecOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -342,14 +342,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const usage = usageService
         const memory = memoryService
         const io = ioService
-        // V27 G5.2: `CommandInvocation` (the platform's own type) declares both
-        // fields non-optional, so the defensive chains went with the local view.
-        const session = invocation.agent.session
+        // A4 (audit P1-5): the platform type declares `invocation.agent`
+        // non-optional, but the family's own 0.3.80 record
+        // (evolution-commands/src/index.ts) documents real session-less
+        // callers (scripts, headless probes). Read-only branches answer
+        // without a session; write branches refuse with the SAME E-305 the
+        // /evolution command family answers, instead of a raw TypeError.
+        const invocationAgent = invocation.agent as unknown as
+          | { session?: { id?: string; header?: { origin?: string } } }
+          | undefined
+        const session = invocationAgent?.session
+        const sessionMissing = (need: string): CommandResult | undefined => session === undefined
+          ? err(`E-305: this invocation carries no agent — \`${need}\` needs a session-backed call (run it from a session in the GUI or the CLI).`)
+          : undefined
         const input = invocation.rawInput.trim()
         const detail = /^detail\s+(\S+)$/.exec(input)
         if (detail && detail[1]) return await nodeDetail(detail[1])
         const edit = /^edit\s+(\S+)\s+([\s\S]+)$/.exec(input)
         if (edit && edit[1] && edit[2] !== undefined) {
+          const gated = sessionMissing('/graph edit')
+          if (gated) return gated
           // v30 GRAPH-03: refuse BEFORE staging — a nonexistent (or archived/
           // delisted) SKILL produced an approval record whose replay could
           // never succeed ("Skill not found"), wasting an operator approval.
@@ -370,6 +382,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         const remove = /^delete\s+(\S+)$/.exec(input)
         if (remove && remove[1]) {
+          const gated = sessionMissing('/graph delete')
+          if (gated) return gated
           if (!remove[1].startsWith('memory:')) {
             const stageRead = await probeSkillForStaging(remove[1])
             if (stageRead !== null) return err(stageRead)
@@ -497,9 +511,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // P3-38 (v14): the write origin is derived ONCE — the direct path
             // used to hardcode 'foreground' while the staged path sent
             // `origins.library` (which is 'subagent' for a subagent invocation).
-            // V27 G5.2: `agent.session` is non-optional on the platform's
-            // CommandInvocation, so the session always rides the request.
-            const origins = resolveOrigins(session.header.origin)
+            // A4 (audit P1-4): origins resolve through the core SINGLE source
+            // (`resolveExecOrigins`), which also reads the v37 review-channel
+            // session mark — a one-arg `resolveOrigins(header)` call skipped
+            // that mark, so a graph write inside a review-marked window
+            // resolved `foreground` and bypassed staging while the same write
+            // through skill_manage/memory staged.
+            const origins = resolveExecOrigins(invocationAgent && { agent: invocationAgent })
             if (approval) {
               // P2-7 (v15)/P3 (v16): staging pre-check — the skill runner lives
               // in tool-skill-manage, an AGENT-preset row, while this command is
@@ -549,7 +567,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   libraryOrigin: origins.library,
                 },
                 origin: origins.approval,
-                ...session.id ? { sessionId: session.id } : {},
+                ...session?.id ? { sessionId: session.id } : {},
                 session,
                 ...sessionPolicy !== undefined ? { sessionPolicy } : {},
               })
@@ -586,7 +604,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // refinement as the skill branch) and carry the entry INDEX in the
             // summary — `graph edit memory:user` on index 0 and 3 used to
             // produce identical audit lines.
-            const originsM = resolveOrigins(session.header.origin)
+            const originsM = resolveExecOrigins(invocationAgent && { agent: invocationAgent })
             const sessionPolicyM = effectiveSessionPolicy(ctx, session)
             const willStage = memoryApproval.isEnabled !== false
               && sessionPolicyM !== 'never'
@@ -604,7 +622,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `graph edit memory:${parsed.source}:${parsed.index}`,
               args: { target: parsed.source, operations: [{ action: 'replace', old_text: check.entry ?? '', facts: content }] },
               origin: originsM.approval,
-              ...session.id ? { sessionId: session.id } : {},
+              ...session?.id ? { sessionId: session.id } : {},
               session,
               ...sessionPolicyM !== undefined ? { sessionPolicy: sessionPolicyM } : {},
             })
@@ -629,7 +647,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // P3 (v16): the refusal fires only when staging will actually
               // happen (approval enabled, session policy not 'never',
               // foreground writes stage).
-              const origins = resolveOrigins(session.header.origin)
+              const origins = resolveExecOrigins(invocationAgent && { agent: invocationAgent })
               const sessionPolicy = effectiveSessionPolicy(ctx, session)
               const willStage = approval.isEnabled !== false
                 && sessionPolicy !== 'never'
@@ -642,7 +660,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 summary: `graph delete ${parsed.name}`,
                 args: { operation: { action: 'delete', name: parsed.name }, origin: origins.approval, libraryOrigin: origins.library },
                 origin: origins.approval,
-                ...session.id ? { sessionId: session.id } : {},
+                ...session?.id ? { sessionId: session.id } : {},
                 session,
                 ...sessionPolicy !== undefined ? { sessionPolicy } : {},
               })
@@ -664,7 +682,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (memoryApproval) {
             // P3 (v16): see the edit branch — stage-only refusal + index in
             // the summary.
-            const origins = resolveOrigins(session.header.origin)
+            const origins = resolveExecOrigins(invocationAgent && { agent: invocationAgent })
             const sessionPolicy = effectiveSessionPolicy(ctx, session)
             const willStage = memoryApproval.isEnabled !== false
               && sessionPolicy !== 'never'
@@ -679,7 +697,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               summary: `graph delete memory:${parsed.source}:${parsed.index}`,
               args: { target: parsed.source, operations: [{ action: 'remove', old_text: check.entry ?? '' }] },
               origin: origins.approval,
-              ...session.id ? { sessionId: session.id } : {},
+              ...session?.id ? { sessionId: session.id } : {},
               session,
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},
             })

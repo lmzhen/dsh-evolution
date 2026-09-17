@@ -764,7 +764,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // file, one old) is impossible.
               atomicWriteFiles(target, [
                 { name: 'agent.cordis.yml', content: composition },
-                { name: base.metadata, content: readFileSync(presetPath) },
+                // A3 (audit P1-3): the platform preset discovery reads EXACTLY
+                // `preset.yml` for metadata (agent-presets/src/metadata.ts
+                // `METADATA_FILE`); `base.metadata` names the variant SOURCE
+                // file (`preset.<variant>.yml` in the package), but the WRITTEN
+                // name must be the platform's, or the picker shows the bare id
+                // with no description/order. Same rename the install-layered
+                // path has always done — the two install surfaces now agree.
+                { name: 'preset.yml', content: readFileSync(presetPath) },
               ], undefined, (message) => { ctx.logger.warn(message) })
               written.push(`${base.name} → ${target}`)
             }
