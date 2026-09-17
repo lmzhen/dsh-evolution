@@ -319,7 +319,7 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
           // V3: the band is the AUTHORING discipline band (upstream's 20k split
           // line, drawn on this body's token scale), and the multiple is what makes
           // it actionable — a bare ceiling says nothing about how far past it is.
-          : `estimate range ${cost.tokensLow}-${cost.tokensHigh} tokens; cjk=${cost.cjk}${lineTokens === null ? '' : `; line=${lineTokens}, body=${(cost.tokens / lineTokens).toFixed(1)}x`}${oversizeSupportNote(snapshot.supportChars)}`,
+          : `estimate range ${cost.tokensLow}-${cost.tokensHigh} tokens (4 chars/token basis); cjk=${cost.cjk}${lineTokens === null ? '' : `; line=${lineTokens}, body=${(cost.tokens / lineTokens).toFixed(1)}x`}${oversizeSupportNote(snapshot.supportChars)}`,
       ),
     )
 

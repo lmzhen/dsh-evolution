@@ -23,7 +23,10 @@ import { skillMdOnDisk } from './frontmatter.ts'
 export const TOKEN_CJK_WEIGHT = 1
 /** Token weight of one non-CJK code unit on the LIMIT basis (1 / 2.75 ≈ 0.364). */
 export const TOKEN_ASCII_WEIGHT = 1 / UPSTREAM_LIMIT_CHARS_PER_TOKEN
-/** Token-per-unit bounds of the estimate range (CJK: 0.6–1.0, non-CJK: 1/4–1/3). */
+/** Token-per-unit bounds of the estimate range (CJK: 0.6–1.0, non-CJK: 1/4–1/3).
+ * The range is the 4-chars/token estimate family, so on ASCII-heavy bodies the
+ * LIMIT-basis `tokens` point can sit above `tokensHigh` (1/2.75 > 1/3): the two
+ * answer different questions and are never nested by construction. */
 export const COST_CJK_TOKEN_LOW = 0.6
 export const COST_CJK_TOKEN_HIGH = 1
 export const COST_ASCII_TOKEN_LOW = 0.25
