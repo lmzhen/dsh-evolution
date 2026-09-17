@@ -11,7 +11,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, evolutionIoAdapter, foldTurn, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, foldTurn, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
@@ -347,8 +347,10 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
 /** v30 REV-04/REV-02: read the policy snapshot off the (optional) policy
  * service through an `unknown` boundary — the Context augmentation types the
  * getter non-optionally, but at runtime the row can be absent. */
-function policySnapshotOf(source: unknown): { skillContentChars?: number; protectedSkillNames?: readonly string[] } | undefined {
-  return (source as { get?(): { skillContentChars?: number; protectedSkillNames?: readonly string[] } } | undefined)?.get?.()
+type PolicySnapshotFields = { skillContentChars?: number; protectedSkillNames?: readonly string[] } & PolicyStageFields
+
+function policySnapshotOf(source: unknown): PolicySnapshotFields | undefined {
+  return (source as { get?(): PolicySnapshotFields } | undefined)?.get?.()
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -1771,6 +1773,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         io: evolutionIoAdapter(() => io.provider()),
         limits: {
           ...DEFAULT_SKILL_LIMITS,
+          // 0.5.0 (§16.7): stage selectors ride the policy snapshot.
+          ...policyStageLimits(policySnapshot),
           maxSkillContentChars: policySnapshot?.skillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
         },
         ctx,

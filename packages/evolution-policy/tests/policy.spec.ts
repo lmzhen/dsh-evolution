@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionPolicy, { Config } from '../src/index.ts'
+import { POLICY_STAGE_DEFAULTS } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, PROTECTED_BUILTIN_SKILLS } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-policy', () => {
@@ -48,6 +49,33 @@ describe('evolution-policy', () => {
     expect(s.memoryChars).toBe(DEFAULT_MEMORY_CHAR_LIMIT)
     expect(s.userChars).toBe(DEFAULT_USER_CHAR_LIMIT)
     expect(s.skillContentChars).toBe(DEFAULT_SKILL_CONTENT_CHARS)
+    // 0.5.0 (§16.7): the four write-behaviour stages default to the confirmed
+    // landing values, and the schema's z.default() reads the SAME object the store
+    // falls back to (POLICY_STAGE_DEFAULTS) — a second literal here would drift.
+    expect(s.citationPolicy).toBe(POLICY_STAGE_DEFAULTS.citationPolicy)
+    expect(s.referenceRewrite).toBe(POLICY_STAGE_DEFAULTS.referenceRewrite)
+    expect(s.archiveRetention).toBe(POLICY_STAGE_DEFAULTS.archiveRetention)
+    expect(s.supportFileCharPolicy).toBe(POLICY_STAGE_DEFAULTS.supportFileCharPolicy)
+  })
+
+  it('carries a deployment-selected stage through to the snapshot, and falls back on an unknown one', () => {
+    // Deployment path: cordis.yml sets the stage.
+    const selected = new EvolutionPolicy(new Context(), {
+      supportFileCharPolicy: 'enforce',
+      referenceRewrite: 'apply',
+      archiveRetention: 'prune',
+      citationPolicy: 'refuse',
+    }).get()
+    expect(selected.supportFileCharPolicy).toBe('enforce')
+    expect(selected.referenceRewrite).toBe('apply')
+    expect(selected.archiveRetention).toBe('prune')
+    expect(selected.citationPolicy).toBe('refuse')
+    // Direct construction bypasses the loader schema, so the assembly fallback is
+    // what protects a legacy/invalid read (V5-33 posture).
+    const junk = new EvolutionPolicy(new Context(), {
+      supportFileCharPolicy: 'nonsense',
+    } as unknown as Config).get()
+    expect(junk.supportFileCharPolicy).toBe(POLICY_STAGE_DEFAULTS.supportFileCharPolicy)
   })
 
   it('clamps every invalid numeric config value to its default (G3.1 matrix: 0/neg/NaN/Inf → default)', () => {

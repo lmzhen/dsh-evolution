@@ -27,7 +27,16 @@ import {
   DEFAULT_MEMORY_REVIEW_MODEL,
   DEFAULT_SKILL_REVIEW_MODEL,
   DEFAULT_CURATOR_MODEL,
+  DEFAULT_CITATION_POLICY,
+  DEFAULT_REFERENCE_REWRITE_POLICY,
+  DEFAULT_ARCHIVE_RETENTION_POLICY,
+  DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+  POLICY_STAGE_DEFAULTS,
   clampedNumber,
+  type ArchiveRetentionPolicy,
+  type CitationPolicy,
+  type ReferenceRewritePolicy,
+  type SupportFileCharPolicy,
 } from '@deepseek-ai/dsh-evolution-core'
 
 declare module '@deepseek-ai/cordis' {
@@ -53,6 +62,11 @@ export interface PolicySnapshot {
   maxOpsPerPlan: number
   curatorIntervalHours: number
   staleAfterDays: number
+  /** Write-behaviour stages (0.5.0, design §16.7) — see the Config schema. */
+  citationPolicy: CitationPolicy
+  referenceRewrite: ReferenceRewritePolicy
+  archiveRetention: ArchiveRetentionPolicy
+  supportFileCharPolicy: SupportFileCharPolicy
   archiveAfterDays: number
   protectedSkillNames: readonly string[]
 }
@@ -75,6 +89,10 @@ export interface Config {
   staleAfterDays?: number
   archiveAfterDays?: number
   protectedSkillNames?: string[]
+  citationPolicy?: CitationPolicy
+  referenceRewrite?: ReferenceRewritePolicy
+  archiveRetention?: ArchiveRetentionPolicy
+  supportFileCharPolicy?: SupportFileCharPolicy
 }
 
 export const Config: Schema<Config> = z.object({
@@ -104,6 +122,14 @@ export const Config: Schema<Config> = z.object({
   staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
   archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS),
   protectedSkillNames: z.array(z.string()).default([]),
+  // 0.5.0 (§16.7): the four write-behaviour STAGES become deployment policy, so a
+  // stage can be switched in cordis.yml instead of by editing a default constant.
+  // Closed unions: the cordis loader rejects an unknown value at load, which is the
+  // same posture `reviewMode` takes.
+  citationPolicy: z.union([z.const('verify'), z.const('refuse')]).default(POLICY_STAGE_DEFAULTS.citationPolicy),
+  referenceRewrite: z.union([z.const('off'), z.const('plan'), z.const('apply')]).default(POLICY_STAGE_DEFAULTS.referenceRewrite),
+  archiveRetention: z.union([z.const('report'), z.const('prune')]).default(POLICY_STAGE_DEFAULTS.archiveRetention),
+  supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).default(POLICY_STAGE_DEFAULTS.supportFileCharPolicy),
 })
 
 export class EvolutionPolicy extends Service {
@@ -161,6 +187,15 @@ export class EvolutionPolicy extends Service {
       maxOpsPerPlan: field('maxOpsPerPlan', config.maxOpsPerPlan, DEFAULT_MAX_OPS_PER_PLAN),
       curatorIntervalHours: field('curatorIntervalHours', config.curatorIntervalHours, DEFAULT_CURATOR_INTERVAL_HOURS),
       staleAfterDays: field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS),
+      // V5-33 posture applied to the stage unions: the loader already rejects an
+      // unknown value, so these branches only serve direct construction / legacy
+      // reads that bypass the schema.
+      citationPolicy: config.citationPolicy === 'refuse' ? 'refuse' : DEFAULT_CITATION_POLICY,
+      referenceRewrite: config.referenceRewrite === 'off' || config.referenceRewrite === 'apply'
+        ? config.referenceRewrite
+        : DEFAULT_REFERENCE_REWRITE_POLICY,
+      archiveRetention: config.archiveRetention === 'prune' ? 'prune' : DEFAULT_ARCHIVE_RETENTION_POLICY,
+      supportFileCharPolicy: config.supportFileCharPolicy === 'enforce' ? 'enforce' : DEFAULT_SUPPORT_FILE_CHAR_POLICY,
       archiveAfterDays: field('archiveAfterDays', config.archiveAfterDays, DEFAULT_ARCHIVE_AFTER_DAYS),
       // PLAN S4.2 (2026-09-16): the builtin protected face is the core single
       // source (PROTECTED_BUILTIN_SKILLS — the same set the curator enforces);

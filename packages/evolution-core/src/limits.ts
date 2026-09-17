@@ -46,6 +46,47 @@ export type SupportFileCharPolicy = 'report' | 'enforce'
  * (the live library carries a 189k-character release log today). */
 export const DEFAULT_SUPPORT_FILE_CHAR_POLICY: SupportFileCharPolicy = 'report'
 
+/** The four stage defaults in ONE object, so the policy schema's `z.default(...)`
+ * calls and the store's fallbacks cannot drift apart. */
+export const POLICY_STAGE_DEFAULTS = Object.freeze({
+  citationPolicy: DEFAULT_CITATION_POLICY,
+  referenceRewrite: DEFAULT_REFERENCE_REWRITE_POLICY,
+  archiveRetention: DEFAULT_ARCHIVE_RETENTION_POLICY,
+  supportFileCharPolicy: DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+})
+
+/** The policy-snapshot fields that select a write-behaviour STAGE (design §16).
+ * Structural, not imported from evolution-policy, so core stays a leaf. */
+export interface PolicyStageFields {
+  citationPolicy?: CitationPolicy | undefined
+  referenceRewrite?: ReferenceRewritePolicy | undefined
+  archiveRetention?: ArchiveRetentionPolicy | undefined
+  supportFileCharPolicy?: SupportFileCharPolicy | undefined
+}
+
+/**
+ * The ONE conversion from the deployment policy snapshot to library limits
+ * (design §16.7): every plugin that owns a writable SkillLibrary spreads this into
+ * its limits, so a stage selected in cordis.yml reaches every write path. A
+ * per-plugin copy would be the third home for the same threshold.
+ *
+ * Only PRESENT fields are copied: an absent policy field must fall through to the
+ * library default rather than pinning `undefined` onto an optional limit (which
+ * `exactOptionalPropertyTypes` forbids and which would defeat the `?? DEFAULT`
+ * resolution inside the store).
+ * @param snapshot - the evolutionPolicy snapshot, or undefined when unmounted.
+ * @returns the stage fields the snapshot actually carries.
+ */
+export function policyStageLimits(snapshot: PolicyStageFields | undefined): PolicyStageFields {
+  if (snapshot === undefined) return {}
+  const stages: PolicyStageFields = {}
+  if (snapshot.citationPolicy !== undefined) stages.citationPolicy = snapshot.citationPolicy
+  if (snapshot.referenceRewrite !== undefined) stages.referenceRewrite = snapshot.referenceRewrite
+  if (snapshot.archiveRetention !== undefined) stages.archiveRetention = snapshot.archiveRetention
+  if (snapshot.supportFileCharPolicy !== undefined) stages.supportFileCharPolicy = snapshot.supportFileCharPolicy
+  return stages
+}
+
 export interface SkillLimits {
   maxNameLength: number
   maxDescriptionLength: number

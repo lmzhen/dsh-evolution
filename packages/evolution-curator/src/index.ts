@@ -10,7 +10,7 @@ import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
+import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -224,7 +224,17 @@ export class EvolutionCurator extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    this.skills = newSkillLibrary({ config, io: this.io, ctx: this.ctx })
+    // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
+    // honour the same deployment-selected stages as every other writer.
+    this.skills = newSkillLibrary({
+      config,
+      io: this.io,
+      ctx: this.ctx,
+      limits: {
+        ...DEFAULT_SKILL_LIMITS,
+        ...policyStageLimits((this.ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+      },
+    })
     this.enabled = config.enabled ?? true
     // G3.1 (0.3.23): numeric config is clamped at assembly so a 0/negative/NaN/
     // ±Infinity value falls back to the package default instead of folding as a

@@ -6,15 +6,16 @@ import { fileURLToPath } from 'node:url'
 /**
  * v35 A6 guard: every SkillLibrary construction is a DECISION about limits.
  *
- * Ten of the eleven production constructions take the library defaults. Six of
- * those are read-only (a listing or a hash walk validates nothing, so the
- * defaults are inert there). Three are writers, and a writer with defaults
- * silently validates against DEFAULT caps instead of the deployment's — the
- * exact drift REV-04 recorded when the review could write 10× the configured
- * cap. Fixing those three means threading a policy snapshot into packages that
- * may not read one; this guard pins the reviewed set instead, so a NEW
- * construction (or a new write call in a previously read-only module) fails
- * here and forces the decision, while the register below stays the to-do list.
+ * The production constructions that take the library defaults are listed below;
+ * they are read-only (a listing or a hash walk validates nothing, so the defaults
+ * are inert there). A writer with defaults silently validates against DEFAULT caps
+ * instead of the deployment's — the exact drift REV-04 recorded when the review
+ * could write 10× the configured cap. **0.5.0 (§16.7) closed the two writer gaps
+ * this register used to carry**: the commands write-side library and the curator's
+ * now receive the policy stage fields, so a deployment-selected stage reaches
+ * every writer. This guard still pins the reviewed set, so a NEW construction (or
+ * a new write call in a previously read-only module) fails here and forces the
+ * decision.
  *
  * v41 P2-26 (0.3.75) moved the construction itself into core's
  * `newSkillLibrary()` (arch rule N7 owns "no direct `new SkillLibrary`"), so
@@ -24,8 +25,6 @@ import { fileURLToPath } from 'node:url'
 const REGISTERED_DEFAULTS: Record<string, string> = {
   'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider() }': 'read-only: the commands listing walks the tree, no write goes through this instance',
   'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider() } #2': 'read-only: as above',
-  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider(), ctx, threatExemptLabels: config.threatExemptLabels }': 'KNOWN GAP (v35 A6): library.restructure validates with DEFAULT caps; only diverges when the deployment configures non-default limits',
-  'evolution-curator/src/index.ts :: { config, io: this.io, ctx: this.ctx }': 'KNOWN GAP (v35 A6): archive/consolidate validate with DEFAULT caps; the curator reads its own config, not the policy snapshot',
   'evolution-learning-graph/src/index.ts :: { config: rawConfig, io: evolutionIoAdapter(() => io.provider()), ctx, threatExemptLabels: rawConfig.threatExemptLabels }': 'read-only: withSkills() serves reads and the graph read path',
   'evolution-maintenance/src/tools.ts :: { config: rootConfig, io: ioRegistry.provider() }': 'read-only: the maintenance probe walks the tree',
   'evolution-review/src/index.ts :: { config: rootConfig, io: evolutionIoAdapter(() => io.provider()) }': 'read-only: the pre-run hash snapshot',

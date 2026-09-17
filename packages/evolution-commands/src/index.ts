@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { renderHelpText, renderHint } from './registry.ts'
@@ -869,6 +869,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             io: ioRegistry.provider(),
             ctx,
             threatExemptLabels: config.threatExemptLabels,
+            // 0.5.0 (§16.7): the write-behind stages are deployment policy, so the
+            // command's restructure honours exactly what skill_manage honours.
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
           })
           const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
           if (!result.ok) return err(result.message)

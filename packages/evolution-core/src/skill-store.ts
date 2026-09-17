@@ -3442,7 +3442,22 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   )
 }
 
-export { DEFAULT_SKILL_LIMITS } from './limits.ts'
-export type { SkillLimits } from './limits.ts'
+export {
+  DEFAULT_SKILL_LIMITS,
+  DEFAULT_CITATION_POLICY,
+  DEFAULT_REFERENCE_REWRITE_POLICY,
+  DEFAULT_ARCHIVE_RETENTION_POLICY,
+  DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+  POLICY_STAGE_DEFAULTS,
+  policyStageLimits,
+} from './limits.ts'
+export type {
+  SkillLimits,
+  CitationPolicy,
+  ReferenceRewritePolicy,
+  ArchiveRetentionPolicy,
+  SupportFileCharPolicy,
+  PolicyStageFields,
+} from './limits.ts'
 export { authoringFeedback, frontmatterBlock, frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, validateFrontmatter, yamlPlainScalarNeedsQuotes } from './frontmatter.ts'
 export type { AuthoringFeedback, Frontmatter, FrontmatterNormalizeResult, FrontmatterRead, PlatformStringSplit } from './frontmatter.ts'

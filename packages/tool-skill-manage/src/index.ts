@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -99,8 +99,8 @@ interface SkillWriteArgs {
 /** v30 REV-02: read the protected-skill list off the (optional) policy
  * snapshot through an `unknown` boundary — the Context augmentation types the
  * getter non-optionally, but at runtime the row can be absent. */
-function policySnapshotOf(source: unknown): { protectedSkillNames?: readonly string[] } | undefined {
-  return (source as { get?(): { protectedSkillNames?: readonly string[] } } | undefined)?.get?.()
+function policySnapshotOf(source: unknown): ({ protectedSkillNames?: readonly string[] } & PolicyStageFields) | undefined {
+  return (source as { get?(): { protectedSkillNames?: readonly string[] } & PolicyStageFields } | undefined)?.get?.()
 }
 
 // PLAN-R2 P2-7 (2026-09-16): the missing-required-argument check as ONE
@@ -163,6 +163,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // `ScanOptions.excludeLabels`). No behavioral fork: absent config stays
   // `[]` (strict scan).
   const libraryOptions: SkillLimits = {
+    // 0.5.0 (§16.7): the write-behaviour STAGES come from the deployment policy
+    // snapshot, so cordis.yml can select a stage without a code change.
+    ...policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy'))),
     maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
     maxSkillContentChars: limit('maxSkillContentChars', rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
