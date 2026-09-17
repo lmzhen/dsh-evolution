@@ -83,7 +83,7 @@ state onto an empty domain.
 |---|---|
 | Validated DSH platform line | **`0.1.5-rc.2`** (`PLATFORM_VERSION`; `UPSTREAM_SHA=fb2c4b9e…`) |
 | Declared dependency window | `^0.1.5-rc.2` on every `@deepseek-ai/dsh-*` dependency/peer |
-| Family version | `0.4.0` (npm `latest`; per-form status in `packages/INSTALL.md`) |
+| Family version | `0.4.1` (npm `latest`; per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 
 A prerelease range admits **one** anchor, not a family of them: `^0.1.5-rc.2` rejects later prerelease

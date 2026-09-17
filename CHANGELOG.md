@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.4.1 (patch) — 鲁棒性修复批：审计 P1×5 + P2×10 落地（**行为修复，无导出面/配置键/事件/数据格式变化**）
+
+> 依据全量审计（对照 `0.1.5-rc.2` 平台源码）落地十项行为修复与二轮复审的收敛，每项均为最小 diff，
+> 每处行为变更都以回归测试钉住新契约（或修正钉住旧错误行为的断言）。A5/A6/A9/A10 是用户可感语义变化（见下表），
+> `$DSH_HOME` 数据布局与落点原样，未迁移任何磁盘格式。全量 16 步门禁在「行为修复态」与「0.4.1 定版态」各复跑一次，
+> 两轮均 16/16 绿，数字与冒烟见「验收与证据」。
+
+### 行为修复（用户可感）
+
+| # | 修复 | 位置 |
+|---|---|---|
+| A1 | **PTC 会话评审证据块不再为空**：`renderToolResultLine` 覆盖 `tool/ptc-dispatch` 结算载荷（顶层 `content`/`isError`，无 `message` 包装），结果行携带被派发工具的名字与参数（此前 PTC 会话在"证据强制"提示下拿到零工具证据） | `evolution-review` |
+| A2 | **PID 重用不再永久锁死状态文件**：写锁接管对"持有者 pid 仍存活"的锁加 24h 年龄上限（本家族没有任何写入持锁超过分钟级；一天旧的"存活"锁是被 OS 重用的 pid） | `evolution-core/io.ts` |
+| A3 | **`/evolution preset install` 变体元数据落到平台唯一可读的 `preset.yml`**（此前写 `preset.ptc.yml` 等源文件名，选择器显示裸 id、无描述与排序）；与 `install-layered.mjs` 路径行为对齐 | `evolution-commands` |
+| A4 | **`/graph` 对无会话调用方回 E-305**（此前 TypeError），且四个写分支的来源解析改用 core 单源 `resolveExecOrigins`（补回 review-channel 标记，评审标记窗口内与工具路径的 staging 决策一致） | `evolution-learning-graph` |
+| A5 | **遗留 `pending.json` 损坏不再永久砖化审批面**：quarantine 类失败改移除旁置（`.corrupt.<epoch>`）+ 一次性告警，视图继续 current-only；非损坏类失败（EACCES 等）保留原文件仅跳过本次读 | `evolution-state-json` |
+| A6 | `assessHealth` 兑现"不可读返回 null"契约（真实读错误不再中断整个健康视图）；`create` 的 hermes-managed 标记写失败不再跳过审计/事件，改为成功 + 明确警告（重试不再撞 "already exists" 死路） | `evolution-core/skill-store.ts` |
+| A7 | curator 策略路径补 `archiveAfterDays ≥ staleAfterDays` 钳制 + 告警（此前坏策略静默跳过 stale 阶段）；中止回写优先用 transact 基线，多进程不再回拨调度锚 | `evolution-curator` |
+| A8 | 安装器对"存在但不可解析"的 profile manifest 由静默 fail-open 改为告警（6 处调用点）；profile 种子文件（`cordis.patch.yml`/`pnpm-workspace.yaml`）改 tmp+rename 原子写入 | `packages/scripts/install-layered.mjs` |
+| A9 | frontmatter 审计扫描改为与重写路径一致的换行无关迭代（混合换行块不再漏报 `catalogInvalid`）；skill 目录根列表失败时 catalog 观察改报 `complete: false`（不再让陈旧目录被平台缓存为权威） | `evolution-core`、`evolution-skill-catalog` |
+| A10 | 事件追加的 transact 任务在锁层重试时完整复位闭包状态（`parsedBody`/`refuseMessage`/`assigned`——含二轮复审补上的 `assigned`，杜绝"拒绝路径报告幻影成功 seq"） | `evolution-core/evolution-events.ts` |
+
+### 二轮复审收敛（对上表的自我审计）
+
+- A2 的"存活即拒绝"残面收敛：`skill-store` 的 `sweepLockIfStranded` / `refuseLiveLockOrSweep` 同步采用 24h 年龄窗口（无 `mtime` 的后端保持保守拒绝），整树快照恢复不再被重用 pid 的残留锁永久阻塞；approval `release()` 因记录无 claim 时间戳维持原状（`reject` 仍为逃生门）。
+- A6 警告文案拆分：marker 失败不再被包进 fsync/durability 措辞，操作者看到的是自洽的两句话。
+- 文档同步：`evolution-agent/README.md` 的元数据列澄清（列= 包内源文件，安装时一律写平台 `preset.yml`）；根 README（中英）与 `packages/README.md` 的错误码表补 `E-304`/`E-305`、环境变量表补 `DSH_AGENT_PRESET_ROOT`。
+
+### 第二批：遗留 P2 收敛（同轮复审驱动）
+
+| # | 修复 | 位置 |
+|---|---|---|
+| P2-07 | **记忆注入快照不再因挂载顺序整进程为空**：provider 晚于本行应用时按 500ms 有界重试（60s 上限，卸载即清），首个成功渲染即停 | `tool-memory` |
+| P2-13 | **反馈缓存不再在 Windows rename 不可见窗口固化丢带**：活动日志缺席而档案在场时跳过本次缓存写入 | `evolution-feedback` |
+| P2-04 | `skill_manage` 的 stage 期锚点对不可读目标改 fail-closed（锚为 `'absent'`，与 `/graph` 姿态一致），不再留无锚静默覆盖残留 | `tool-skill-manage` |
+| P2-08 | 模块文档兑现事实：写明 365 天归档清理与 5 份快照保留这两处**有意的**保留期硬删（原"永不硬删"表述过度承诺） | `tool-skill-manage` |
+| P2-20 | 安装目标尾部清单（all/host/preset）单源化到 `lib-family-packages.mjs`；`doctor.ts` 保留 TS 侧副本并由守卫用例互相钉死（此前三处手工复制无互检） | `scripts`、`evolution-commands` |
+| P2-22a | 安装器包拷贝改 `.staging-<pid>` 暂存 + rm/rename 换入：中断/EPERM 不再撕裂已挂载 profile 的活包树（旧树保持完整，残留下次运行清除） | `packages/scripts/install-layered.mjs` |
+| R2/R3 | 二轮复审收敛：`release()` 与 `parseLockBody` 文档对 pid 0 的真实语义（`isProcessAlive(0)` 在 POSIX 探测的是调用方进程组）+ approval 侧 `holder > 0` 防护；review 的 `pendingCadenceWarned` 纳入清扫触发集；评审身份前向扫描加 2000 事件尾窗界；`Authorization: Basic <b64>` 纳入脱敏（值形 + `authorization` 关键字，原先零覆盖直达模型边界）；maintenance 输出 schema 的 `undo_path` 与校验器 E-56 语义对齐（不可逆项可省略） | 多包 |
+
+### 测试
+
+- 新增：PTC 证据 4 例（`evidence-mutex.spec.ts`）、遗留 pending 新契约 1 例（`shape-gate.spec.ts`）、decideTakeover 存活窗口边界断言（`io.spec.ts`）、doctor↔lib 尾清单互钉 1 例（`guard-scripts.spec.ts`）；修正 2 处钉住旧错误行为的断言（`commands.spec.ts` 元数据文件名、`shape-gate.spec.ts` 遗留 fail-loud 行）。
+
+### 验收与证据
+
+- 全量 16 步门禁（`node D:/dsh/audit-v42/run-baseline.mjs v041b`，本批修复态）**16/16 exit=0**：
+  `tsc -b tsconfig.host.json`（含 tests）0 错、`oxlint packages/evolution` **0 warning / 0 error**、
+  `vitest` **153 文件 / 1450 用例全绿**（112s）、13 项 `verify-*`/`check-*` 全 0 —— 含
+  `check-tsconfigs` 29 份 tsconfig 无重复引用、`check-manifests` 29 份包 manifest 合法、
+  `mirror-sync-check` 镜像↔取证树 405 文件逐字节一致、`verify-arch-guards --strict` 21 条规则、
+  `verify-doc-facts --strict --require-repo-docs` 5 条事实 0 violation、`verify-platform-contract` 174 条平台引用 0 断链。
+- 用例账：0.4.0 基线 1444 → 本版 **1450**（新增 PTC 证据 4 例、遗留 pending 新契约 1 例、
+  doctor↔lib 尾清单互钉 1 例、Basic 脱敏 1 例；`decideTakeover` 存活窗口 3 条边界断言加在既有用例内）；
+  另修正 2 处钉住旧错误行为的断言（`commands.spec.ts` 元数据文件名、`shape-gate.spec.ts` 遗留 fail-loud 行）。
+- 发布前评审补记：本批交付时的门禁曾红在 `oxlint`（22 处，全部是类型/风格规则；同轮 `tsc` 与 `vitest` 已绿），
+  逐条修净并复跑；脱敏新增用例按仓库既有的源码级拼接写法（`key(...)`）落地，仓库内仍无真实密钥字面量。
+- 已发布形态冒烟（发布后执行，结果记入 `packages/INSTALL.md` §5 与发布记录）：
+  `dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.4.1` → 28 包全部 0.4.1、`lib/index.js` 逐个
+  `import()` 通过、`--dump-config` 的 id 数与不重复性核对。
+
+### 明确不做 / 挂账
+
+- 沿用 0.4.0 的挂账清单：`evolution-review` 三处小改（`subagents.start` 无界、replace 唤醒与
+  `reviewWakeInject` 的关系、单槽节奏抑制）、`reviewTimeoutMs` 触顶告警补断言、`evolution-curator` 接住
+  `truncated`、`tool-memory` 预检文案单源化、引号表前导指示符假阳性、`computeDedupGroups` 渲染定序。
+- **本版撤出（发布前评审）**：原第三批的 P2-19「删除镜像根 `tsconfig.base.json` / `tsconfig.host.json`」不成立 ——
+  发布 CI 的基线作业以它们为来源（`.github/actions/evolution-validate/action.yml` 在 `copy_host_tsconfig: 'true'`
+  时执行 `cp tsconfig.base.json upstream/`），删除会让 `validate (baseline)` 直接红，而本地 16 步门禁看不到这一步。
+  两文件已恢复，本版不含该项；要与 CI 改造同批再评估。
+- 组 B（P2-01/02/03/05 结构重构）、组 C（休眠子系统出树等删除项）、组 D（包合并 29→15–18、安装面 `.next` 发布）
+  按优化计划留给 0.5.0。本版只有行为修复，不含结构重构，也不新增导出面、配置键、事件或磁盘格式。
+
 ## 0.4.0 (minor) — 文档全量重写与测试/仓库卫生批（**无运行时行为变化**）
 
 > 本版把 0.3.83 之后的全部改动收口：一次按「读者第一性原理」做的**全量文档重写**（根 README 中英、29 份包 README、7 份作者清单、两份安装文档、模板），
