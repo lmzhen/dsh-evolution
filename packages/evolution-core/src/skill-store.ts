@@ -34,12 +34,13 @@
  */
 
 import { basename, dirname, join, resolve } from 'node:path'
+import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
-import { DEFAULT_SKILL_LIMITS } from './limits.ts'
+import { DEFAULT_CITATION_POLICY, DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
@@ -2200,10 +2201,27 @@ export class SkillLibrary {
     const finalMd = block.nl === '\r\n' ? newMd.replace(/\n/g, '\r\n') : newMd
     const newMdCheck = validateFrontmatter(finalMd, name, this.limits)
     if (newMdCheck) return { ok: false, message: `Restructure rejected: ${newMdCheck}` }
+    // Design §2.2: the refusal is scoped to the case it exists for. A section
+    // carrying citations used to be refused outright — which blocked the ONLY
+    // non-destructive way to shrink a citation-dense body (measured: 10/10
+    // sections of the family's own maintenance skill). Nothing LEAVES the skill
+    // on a restructure, so the failure mode is not "dangling" but "a citation
+    // whose target does not exist": that is what is checked here. An
+    // unavailable file listing keeps the conservative token scan — unknown never
+    // passes on a write path.
+    const policy = this.limits.citationPolicy ?? DEFAULT_CITATION_POLICY
+    const listing = policy === 'refuse' ? null : await this.listSupportFiles(name)
+    const files = listing !== null && isPresent(listing) ? listing.value : null
     for (const section of plan.sections) {
       const refs = supportRefs(section.text)
-      if (refs.length > 0) {
+      if (refs.length === 0) continue
+      if (files === null) {
         return { ok: false, message: `Restructure rejected: section "## ${section.heading}" references support files (${refs.join(', ')}) that stay behind — split the section or move it with its files.` }
+      }
+      const report = resolveCitations({ content: section.text, file: 'SKILL.md', files })
+      if (report.dangling.length > 0) {
+        const missing = report.dangling.map(ref => ref.target ?? ref.raw).join(', ')
+        return { ok: false, message: `Restructure rejected: section "## ${section.heading}" cites support file(s) that do not exist (${missing}) — fix the citation or create the file first.` }
       }
     }
     // Aggregate by destination: two moves into one file append in move order.

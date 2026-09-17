@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseFrontmatter, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, parseFrontmatter, SkillLibrary, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = `---
@@ -44,6 +44,42 @@ it('moves a body section to references/ and replaces it with a pointer line (B)'
   const moved = await readFile(join(root, 'demo-skill', 'references', 'release-log.md'), 'utf8').catch(() => '')
   expect(moved.includes('## Details log')).toBe(true)
   expect(moved.includes('rc.67')).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+const withCitation = (target: string): string => BODY.replace('Use it with care.', 'See ' + target + ' for the details.')
+
+it('A3 (design §2.2): a section citing an EXISTING support file moves under the default policy', async () => {
+  const { root, lib } = await makeLib()
+  await lib.writeSupportFile('demo-skill', 'references/guide.md', '# guide', 'foreground')
+  await lib.update('demo-skill', withCitation('references/guide.md'), 'foreground')
+  const result = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/usage.md' }], 'background_review')
+  expect(result.ok).toBe(true)
+  const moved = await readFile(join(root, 'demo-skill', 'references', 'usage.md'), 'utf8').catch(() => '')
+  expect(moved).toContain('references/guide.md')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('A3: a section citing a MISSING support file is refused, with the target named', async () => {
+  const { root, lib } = await makeLib()
+  await lib.writeSupportFile('demo-skill', 'references/other.md', '# other', 'foreground')
+  await lib.update('demo-skill', withCitation('references/absent.md'), 'foreground')
+  const result = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/usage.md' }], 'background_review')
+  expect(result.ok).toBe(false)
+  const message = (result as { message?: string }).message ?? ''
+  expect(message).toContain('do not exist')
+  expect(message).toContain('references/absent.md')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('A3: citationPolicy refuse restores the conservative refusal', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-evo-restructure-'))
+  const lib = new SkillLibrary(root, undefined, { ...DEFAULT_SKILL_LIMITS, citationPolicy: 'refuse' })
+  await lib.create('demo-skill', withCitation('references/guide.md'), 'foreground')
+  await lib.writeSupportFile('demo-skill', 'references/guide.md', '# guide', 'foreground')
+  const result = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/usage.md' }], 'background_review')
+  expect(result.ok).toBe(false)
+  expect(((result as { message?: string }).message ?? '')).toContain('that stay behind')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
@@ -221,3 +257,36 @@ it('never duplicates frontmatter on success or on repeated restructures (v7 audi
   expect(md2 ?? '').toContain('> 详见 references/use.md')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
+
+// Step 5's naming rule (design §2.7) closed as a MEASURED property instead of an
+// invented style rule: a 190-case corpus over the real library
+// (audit-v42/naming-rule-corpus.mjs) found ZERO targets that restructure accepts
+// and the write path refuses, so a moved section can never create a support file
+// that the later write/patch/remove paths would reject as an orphan (the A1-6
+// rationale). 55 targets go the other way — restructure is deliberately stricter
+// (references/*.md only) — which this test leaves untouched.
+it('the restructure target rule is at least as strict as the write path (no orphans)', async () => {
+  const { root, lib } = await makeLib()
+  const targets = [
+    'references/ok.md',
+    'references/a/b.md',
+    'references/x.txt',
+    'references/x',
+    'references//x.md',
+    'references/x.lock',
+    'references/x.corrupt',
+    'references/x.tmp',
+    'references/nul.md',
+    'references/../evil.md',
+    'references/Sub.md',
+    'templates/x.tmpl',
+    'references/.hidden.md',
+  ]
+  for (const target of targets) {
+    if (validateRestructureTarget(target) !== null) continue
+    const written = await lib.writeSupportFile('demo-skill', target, '# probe', 'foreground')
+    expect(written.ok, target + ' is accepted by restructure but refused by the write path').toBe(true)
+  }
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
