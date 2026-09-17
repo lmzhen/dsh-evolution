@@ -508,7 +508,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // turn/start just like `turnStarts` (the two are set together at the top
     // of this listener), so it joins both the trigger and the sweep list —
     // without it the map grew unbounded while every sibling was pruned.
+    // R2 (round-2 audit): pendingCadenceWarned is swept below but was not in
+    // the trigger set — its entries lingered until another map crossed the
+    // threshold.
     const sweepDue = turnStarts.size >= COUNTER_SWEEP_THRESHOLD
+      || pendingCadenceWarned.size >= COUNTER_SWEEP_THRESHOLD
       || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
@@ -2063,33 +2067,72 @@ function resultCallIdOf(event: { type?: string; data?: unknown } | undefined): s
 }
 
 /**
- * V10-10 (P2-11): render one `[result]` evidence line from a tool-result
- * event payload. The former read (`data.output`) targeted a field that does
- * not exist on the upstream rc.2 payload, so EVERY result line rendered an
- * empty payload and the review subagent never saw tool output — the evidence
- * chain silently starved while still spending its line budget. The payload
- * text now comes from `data.message.content` tool-result blocks (inner text
- * blocks joined, mirroring the user/assistant rendering above). A failure is
- * marked by the payload-level `error` OR a block-level `isError`. The legacy
- * pre-rc.2 shape (no `message`) is tolerated as an empty payload — it never
- * throws. Budget: 500 chars per line (the 12-line cap lives in
- * buildReviewRequest and is unchanged).
+ * V10-10 (P2-11) / A1 (audit P1-1): render one `[result]` evidence line from
+ * a tool-result event payload. The former read (`data.output`) targeted a
+ * field that does not exist on the rc.2 payload; the current contract covers
+ * BOTH rc.2 result shapes:
+ *   - native `tool/result`: the outcome lives in `message.content`
+ *     tool-result blocks (inner text blocks joined); a failure is marked by
+ *     the payload-level `error` OR a block-level `isError`;
+ *   - PTC `tool/ptc-dispatch` settle: the outcome lives at the TOP level —
+ *     `content` is the logged ContentBlock list and `isError` the flag; there
+ *     is no `message` wrapper. (Before A1 this shape rendered an empty line,
+ *     so every PTC session's evidence block starved while its plan prompt
+ *     still demanded evidence.)
+ * The legacy pre-rc.2 shape (neither `message` nor a PTC settle marker) is
+ * tolerated as an empty payload — it never throws. `identity`, when given, is
+ * the dispatched tool's name + raw arguments, prepended so a settled dispatch
+ * keeps the call identity its `[call]` line would have had. Budget: 500 chars
+ * per line (the 12-line cap lives in buildReviewRequest and is unchanged).
  */
-export function renderToolResultLine(data: unknown): string {
-  const shape = data as ToolResultEventDataLike | undefined
-  const content = shape?.message?.content
-  const blocks = Array.isArray(content) ? content : []
-  const resultBlocks = blocks.filter(block => block.type === 'tool-result')
-  const output = resultBlocks
-    .map(block => Array.isArray(block.content)
-      ? block.content
-        .map(inner => inner.type === 'text' && typeof inner.text === 'string' ? inner.text : '')
-        .join(' ')
-      : (typeof block.text === 'string' ? block.text : ''))
+export function renderToolResultLine(data: unknown, identity?: { name: string; argsRaw: string }): string {
+  const shape = data as (ToolResultEventDataLike & {
+    subCallId?: unknown
+    isError?: unknown
+    content?: unknown
+  }) | undefined
+  const nativeContent = shape?.message?.content
+  const resultBlocks = Array.isArray(nativeContent) ? nativeContent.filter(block => block.type === 'tool-result') : []
+  let output: string
+  let failed: boolean
+  if (shape?.message !== undefined) {
+    output = resultBlocks
+      .map(block => Array.isArray(block.content)
+        ? block.content
+          .map(inner => inner.type === 'text' && typeof inner.text === 'string' ? inner.text : '')
+          .join(' ')
+        : (typeof block.text === 'string' ? block.text : ''))
+      .join(' ')
+      .trim()
+    failed = Boolean(shape.error) || resultBlocks.some(block => block.isError === true)
+  } else if (typeof shape?.subCallId === 'string' && typeof shape.isError === 'boolean') {
+    output = textOfLoggedContent(shape.content)
+    failed = shape.isError
+  } else {
+    output = ''
+    failed = false
+  }
+  const head = identity === undefined ? '' : `${identity.name} ${identity.argsRaw.slice(0, 200)} → `
+  const failure = failed ? ' [ERROR]' : ''
+  return `[result]${failure} ${head}${output.slice(0, 500)}`
+}
+
+/** Text of a PTC settle `content` payload (the logged ContentBlock list):
+ * text blocks and plain strings joined, anything else skipped. */
+function textOfLoggedContent(content: unknown): string {
+  if (typeof content === 'string') return content.trim()
+  if (!Array.isArray(content)) return ''
+  return content
+    .map((block) => {
+      if (typeof block === 'string') return block
+      if (block !== null && typeof block === 'object') {
+        const candidate = block as { type?: unknown; text?: unknown }
+        if (candidate.type === 'text' && typeof candidate.text === 'string') return candidate.text
+      }
+      return ''
+    })
     .join(' ')
     .trim()
-  const failure = shape?.error || resultBlocks.some(block => block.isError === true) ? ' [ERROR]' : ''
-  return `[result]${failure} ${output.slice(0, 500)}`
 }
 
 /**
@@ -2130,14 +2173,30 @@ export function buildReviewRequest(
   // output it never saw, so append recent tool calls and results as structured
   // lines (budgeted: truncated per event, and capped to the last 12 events).
   //
-  // v37 P7a: the call lines come from evolution-core's dispatch fold, not from
-  // a `tool/call` match here. In a PTC session the log carries
-  // `tool/ptc-dispatch*` instead, so this evidence block used to be EMPTY for
-  // every PTC session — the review was asked for evidence-backed ops with no
-  // evidence, and the budgeted 12 lines hid the loss. The fold emits one line
-  // per dispatch, so a start/settle pair is one line, not two.
+  // The call lines come from evolution-core's dispatch vocabulary
+  // (`readDispatchSignal`), not from a `tool/call` match here, so native and
+  // PTC sessions both work. ONE line per dispatch: a settled call renders its
+  // result line with the call's identity (from the forward identity map, or —
+  // for a PTC settle, which carries its own name/arguments — from the payload
+  // itself), and the corresponding call event is skipped.
   const toolLines: string[] = []
   const events = session.snapshotEvents()
+  const callIdentity = new Map<string, { name: string; argsRaw: string }>()
+  // R3 note (round-2 audit): the scan is bounded to a tail window — identity
+  // only matters for results the 12-line backward loop renders, and an
+  // unbounded full-log scan per review build cost O(all events) plus a
+  // stringify per dispatch on very long sessions. A result whose call lies
+  // OLDER than the window renders headless (same as an orphan result).
+  const identityWindowStart = Math.max(0, events.length - 2_000)
+  for (let index = events.length - 1; index >= identityWindowStart; index -= 1) {
+    const event = events[index] as { type?: string; data?: unknown } | undefined
+    const opened = readDispatchSignal(event)
+    if (opened === null || callIdentity.has(opened.callId)) continue
+    callIdentity.set(opened.callId, {
+      name: opened.name,
+      argsRaw: typeof opened.arguments === 'string' ? opened.arguments : JSON.stringify(opened.arguments ?? {}),
+    })
+  }
   const openedCallIds = new Set<string>()
   for (let index = events.length - 1; index >= 0 && toolLines.length < 12; index -= 1) {
     const event = events[index] as { type?: string; data?: unknown } | undefined
@@ -2145,7 +2204,21 @@ export function buildReviewRequest(
     if (answeredCallId !== null) {
       if (openedCallIds.has(answeredCallId)) continue
       openedCallIds.add(answeredCallId)
-      toolLines.push(renderToolResultLine(event?.data))
+      // `event.data` crosses the durable session-log boundary, so the shape is
+      // guarded at runtime rather than asserted: anything that is not a plain
+      // object (or an object without a string `name`) falls back to the
+      // identity map, exactly like a native result without its call event.
+      const rawSettle = event?.data
+      const settleData = rawSettle !== null && typeof rawSettle === 'object'
+        ? rawSettle as { name?: unknown; arguments?: unknown }
+        : undefined
+      const identity = settleData !== undefined && typeof settleData.name === 'string' && settleData.name !== ''
+        ? {
+          name: settleData.name,
+          argsRaw: typeof settleData.arguments === 'string' ? settleData.arguments : JSON.stringify(settleData.arguments ?? {}),
+        }
+        : callIdentity.get(answeredCallId)
+      toolLines.push(renderToolResultLine(event?.data, identity))
       continue
     }
     // `readDispatchSignal` is the pure half of the fold: it names the call one

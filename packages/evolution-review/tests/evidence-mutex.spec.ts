@@ -79,6 +79,64 @@ describe('V10-10 (P2-11): tool/result evidence extraction', () => {
   })
 })
 
+describe('A1 (audit P1-1): PTC settle evidence extraction', () => {
+  // Upstream PTC settle payload (core/tools/src/ptc.ts): the outcome lives at
+  // the TOP level — `content` is the logged ContentBlock list, `isError` the
+  // flag — with NO `message` wrapper. Before A1 this shape rendered an empty
+  // line, so every PTC session's evidence block starved.
+  it('renders a non-empty [result] line from the PTC settle payload', () => {
+    const line = Review.renderToolResultLine({
+      rootCallId: 'root1',
+      parentCallId: 'c-root',
+      subCallId: 'sub1',
+      name: 'bash',
+      arguments: { command: 'ls' },
+      isError: false,
+      content: [{ type: 'text', text: 'file-a.txt\nfile-b.txt' }],
+    })
+    expect(line.startsWith('[result]')).toBe(true)
+    expect(line).toContain('file-a.txt')
+    expect(line).not.toContain('[ERROR]')
+  })
+
+  it('marks [ERROR] from the PTC top-level isError flag', () => {
+    const line = Review.renderToolResultLine({
+      rootCallId: 'root1',
+      parentCallId: 'c-root',
+      subCallId: 'sub2',
+      name: 'bash',
+      arguments: { command: 'nope' },
+      isError: true,
+      content: [{ type: 'text', text: 'command not found' }],
+    })
+    expect(line).toContain('[ERROR]')
+    expect(line).toContain('command not found')
+  })
+
+  it('prepends the dispatched identity (name + arguments) when given', () => {
+    const line = Review.renderToolResultLine({
+      subCallId: 'sub3',
+      name: 'bash',
+      arguments: { command: 'ls' },
+      isError: false,
+      content: [{ type: 'text', text: 'ok' }],
+    }, { name: 'bash', argsRaw: '{"command":"ls"}' })
+    expect(line).toContain('bash {"command":"ls"} →')
+    expect(line).toContain('ok')
+  })
+
+  it('tolerates a PTC payload with non-text content blocks (empty output, never throws)', () => {
+    const line = Review.renderToolResultLine({
+      subCallId: 'sub4',
+      name: 'run_code',
+      arguments: {},
+      isError: false,
+      content: [{ type: 'image', data: '...' }],
+    })
+    expect(line).toBe('[result] ')
+  })
+})
+
 describe('V10-13 (P2-9): skillReviewTrigger both — one review per completed turn', () => {
   it('a completed turn served by the cadence flush does not ALSO inject the completion review', async () => {
     const delivered: string[] = []
