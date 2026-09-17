@@ -40,7 +40,7 @@ function deploymentFormOf(mode) {
 // v43 audit (S1-2): the allowlist moved to lib-family-packages.mjs so this
 // installer and verify-package-discovery.mjs read ONE array. A local copy here
 // let a new package be published while the installer silently ignored it.
-import { EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
+import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
 const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
 const BUNDLES = {
@@ -358,7 +358,15 @@ async function writeManifestAtomic(manifestPath, contents) {
 
 async function copyPackage(source, destination) {
   await mkdir(dirname(destination), { recursive: true })
-  await cp(source, destination, {
+  // P2-22a (audit): stage the copy into a sibling `.staging-<pid>` directory
+  // FIRST, then swap. The former in-place `cp(force)` over a LIVE mounted
+  // package tree left a torn/mixed package set behind any mid-copy crash or
+  // Windows EPERM/EBUSY while the manifest still mounted the bundle. The
+  // swap window is one rm+rename per package; a crash before it leaves the
+  // PREVIOUS tree intact plus a `.staging-*` residue the next run removes.
+  const staging = `${destination}.staging-${process.pid}`
+  await rm(staging, { recursive: true, force: true })
+  await cp(source, staging, {
     recursive: true,
     force: true,
     filter(sourcePath) {
@@ -377,6 +385,8 @@ async function copyPackage(source, destination) {
         && !base.endsWith('.tgz')
     },
   })
+  await rm(destination, { recursive: true, force: true })
+  await rename(staging, destination)
 }
 
 /** D-4 (v18): upstream `initProfile` seeds a named profile with its template
@@ -432,12 +442,23 @@ async function ensureProfile(home, profile) {
     }, null, 2) + '\n')
   }
   const patchPath = join(dir, 'cordis.patch.yml')
-  if (!existsSync(patchPath)) await writeFile(patchPath, '[]\n')
+  if (!existsSync(patchPath)) await atomicSeedWrite(patchPath, '[]\n')
   const workspacePath = join(dir, 'pnpm-workspace.yaml')
   if (!existsSync(workspacePath)) {
-    await writeFile(workspacePath, 'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n')
+    await atomicSeedWrite(workspacePath, 'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n')
   }
   return dir
+}
+
+/** A8 (audit P2-22b): seed files are written tmp+rename ATOMIC, like every
+ * other profile write. The former in-place `writeFile` meant one crash inside
+ * the tiny seed window left a zero/partial-byte `cordis.patch.yml` that every
+ * later run sees as present and never heals — and the platform aborts boot on
+ * an unparsable patch file, permanently. */
+async function atomicSeedWrite(file, contents) {
+  const tmp = `${file}.tmp-${process.pid}-${Date.now().toString(36)}`
+  await writeFile(tmp, contents)
+  await rename(tmp, file)
 }
 
 async function installBundlePackage(profileDir, bundleName) {
@@ -879,7 +900,7 @@ export async function checkAgentPresetFreshness(options = {}) {
   // this deployment cannot install has no fresh install to compare against, so
   // it is SKIPPED rather than reported stale.
   const profileDir = profileDirectory(home, profile)
-  const bundles = existsSync(profileDir) ? detectInstalledBundles(profileDir) : []
+  const bundles = existsSync(profileDir) ? detectInstalledBundles(profileDir, warnManifest) : []
   const bases = []
   for (const name of Object.keys(AGENT_PRESET_BASES)) {
     if (baseUnavailableReason({ name, ...AGENT_PRESET_BASES[name] }, bundles) !== undefined) continue
@@ -934,8 +955,8 @@ export async function uninstall(options = {}) {
     const tailOf = (name) => String(name).slice(String(name).lastIndexOf('/') + 1)
     const removedTails = new Set([tailOf(bundleName), 'dsh-evolution-all'])
     const remaining = dryRun
-      ? detectInstalledBundles(profileDir).filter(name => !removedTails.has(tailOf(name)))
-      : detectInstalledBundles(profileDir)
+      ? detectInstalledBundles(profileDir, warnManifest).filter(name => !removedTails.has(tailOf(name)))
+      : detectInstalledBundles(profileDir, warnManifest)
     if (remaining.length > 0) {
       result.packagesKeptFor = remaining
       // v22 (R-2): a full uninstall did NOT complete (another bundle row still
@@ -1046,11 +1067,20 @@ export async function uninstall(options = {}) {
  * refuse up front with the choose-one guidance instead of the user reaching
  * the startup double-mount error.
  */
-const EVOLUTION_BUNDLE_TAILS = ['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset']
 
 /** D-1 (v18): every evolution bundle row in the profile, scope-agnostic
  * (exact-segment tail). Used by the three-way mutual-exclusion checks and by
  * uninstall to decide whether any bundle row would be left behind. */
+/** A8 (audit P2-21): install-path callers of `detectInstalledBundles` used the
+ * silent default `warn`, so a PRESENT-but-unparsable profile manifest — the
+ * corruption state this function exists to report — reached every exclusion
+ * sweep as a silent empty list and the install proceeded on top of it. All
+ * install-path sites pass this printer (the uninstall other-profile sweep
+ * keeps its own callback). */
+function warnManifest(message) {
+  console.warn(`install-layered: warning — ${message}`)
+}
+
 export function detectInstalledBundles(profileDir, warn = () => {}) {
   try {
     const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
@@ -1076,7 +1106,7 @@ export function detectInstalledBundles(profileDir, warn = () => {}) {
 export function detectInstalledAllBundle(profileDir) {
   // P3 (v15/v16): exact-segment tail match — a loose substring would
   // false-positive on `dsh-evolution-allowlist`.
-  return detectInstalledBundles(profileDir).filter(name => /(?:^|\/)dsh-evolution-all$/.test(String(name).trim()))
+  return detectInstalledBundles(profileDir, warnManifest).filter(name => /(?:^|\/)dsh-evolution-all$/.test(String(name).trim()))
 }
 
 /** N11 (v12): does this profile's manifest carry the given bundle row?
@@ -1113,7 +1143,7 @@ export async function install(options = {}) {
     // not-yet-created profile has no bundle rows to read — that is "no web-app",
     // not a crash.
     const bundleDir = profileDirectory(home, profile)
-    const bundles = existsSync(bundleDir) ? detectInstalledBundles(bundleDir) : []
+    const bundles = existsSync(bundleDir) ? detectInstalledBundles(bundleDir, warnManifest) : []
     const reason = baseUnavailableReason({ name: entry.base, ...AGENT_PRESET_BASES[entry.base] }, bundles)
     if (reason !== undefined) throw new Error(`install-layered: ${reason}`)
   }
@@ -1190,7 +1220,7 @@ export async function install(options = {}) {
     // already mounts the four model rows at profile root, so generating the
     // agent preset on top double-mounts them (the documented three-way
     // mutual exclusion). Refuse with the same choose-one guidance.
-    const oneclickBundles = detectInstalledBundles(profileDir)
+    const oneclickBundles = detectInstalledBundles(profileDir, warnManifest)
       .filter(name => /(?:^|\/)dsh-evolution-preset$/.test(String(name).trim()))
     if (oneclickBundles.length > 0) {
       throw new Error(
@@ -1213,7 +1243,7 @@ export async function install(options = {}) {
         if (!entry.isDirectory()) continue
         const dir = profileDirectory(home, entry.name)
         if (dir === profileDir) continue
-        for (const name of detectInstalledBundles(dir)) {
+        for (const name of detectInstalledBundles(dir, warnManifest)) {
           if (/(?:^|\/)dsh-evolution-(all|preset)$/.test(String(name).trim())) {
             conflictingProfiles.push(`${entry.name}: ${name}`)
           }

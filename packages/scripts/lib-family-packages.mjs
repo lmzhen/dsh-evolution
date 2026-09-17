@@ -25,6 +25,19 @@ export const EVOLUTION_PREFIXES = [
   'dsh-tool-skill-manage',
 ]
 
+/** The evolution INSTALL-TARGET bundle tails (all / host / preset), in ONE
+ * place (P2-20, audit): the installer's exclusion sweeps, the profile
+ * verifier and doctor's install-form classification all key on this exact
+ * set — a fourth target added in one copy but not the others silently
+ * desynced doctor from the installer. Consumers: install-layered.mjs,
+ * verify-profile-bundles.mjs (scripts side); evolution-commands/src/doctor.ts
+ * keeps the TS-side Set, pinned to this list by guard-scripts.spec.ts. */
+export const EVOLUTION_BUNDLE_TAILS = [
+  'dsh-evolution-all',
+  'dsh-evolution-host',
+  'dsh-evolution-preset',
+]
+
 /** Directories under packages/ that are not publishable packages. */
 export const NON_PACKAGE_DIRS = new Set(['scripts', 'docs', 'node_modules', '.release-staging', 'dist.next'])
 

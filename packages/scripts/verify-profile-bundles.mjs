@@ -35,7 +35,7 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/
 const bundles = Array.isArray(manifest?.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
 const dependencies = manifest?.dependencies ?? {}
 
-const EVOLUTION_BUNDLES = ['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset']
+import { EVOLUTION_BUNDLE_TAILS as EVOLUTION_BUNDLES } from './lib-family-packages.mjs'
 const tail = (name) => name.slice(name.lastIndexOf('/') + 1)
 
 // R1: mutual exclusion — at most ONE evolution bundle row.

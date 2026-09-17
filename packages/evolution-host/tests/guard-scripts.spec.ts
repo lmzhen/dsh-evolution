@@ -8,11 +8,21 @@ import { promisify } from 'node:util'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const run = promisify(execFile)
 const scripts = fileURLToPath(new URL('../../scripts', import.meta.url))
+// P2-20 (audit): doctor's install-form classification and the installer's
+// exclusion sweeps must key on the SAME tail set. The script side
+// single-sources it in lib-family-packages.mjs; this pin fails when the
+// TS-side copy in doctor.ts drifts. Both imports are dynamic (a `.mjs` and a
+// source `.ts`), so each side is typed by its declared export.
+it('doctor.ts EVOLUTION_BUNDLE_TAILS matches lib-family-packages EVOLUTION_BUNDLE_TAILS', async () => {
+  const lib = await import(pathToFileURL(join(scripts, 'lib-family-packages.mjs')).href) as { EVOLUTION_BUNDLE_TAILS: string[] }
+  const doctorSource = await import(new URL('../../evolution-commands/src/doctor.ts', import.meta.url).href) as { EVOLUTION_BUNDLE_TAILS: Set<string> }
+  expect([...doctorSource.EVOLUTION_BUNDLE_TAILS].sort()).toEqual([...lib.EVOLUTION_BUNDLE_TAILS].sort())
+})
 const closure = join(scripts, 'verify-dependency-closure.mjs')
 const archGuards = join(scripts, 'verify-arch-guards.mjs')
 const eventPairing = join(scripts, 'verify-event-pairing.mjs')
