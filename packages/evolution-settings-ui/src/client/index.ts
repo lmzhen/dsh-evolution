@@ -39,17 +39,29 @@ export function apply(ctx: ClientContext): void {
   // it, and an unstyled pass would flash before a later injection.
   injectStyles()
   const seam = ctx as unknown as ClientSeam
-  try {
-    seam.locale.register(NS, { zh, en })
-  } catch {
-    // The locale seat is optional: without it the bundle falls back to its own copy.
-  }
-  const t = (key: MessageKey): string => {
+  // The dictionary registration is an EFFECT, not a bare call: cordis disposes it
+  // when this bundle unloads (a hot reload or the row being switched off), which is
+  // the same shape the platform's own client plugins use. A seat that refuses the
+  // registration (an older shell) leaves the bundle on its own copy instead.
+  ctx.effect(() => {
     try {
-      return seam.locale.bind(NS)(key)
+      return seam.locale.register(NS, { zh, en })
     } catch {
-      return message(key)
+      return () => {}
     }
+  }, NS + ': dictionaries')
+  // Bind once per apply: `bind` allocates a translator, and the card calls `t` on
+  // every render.
+  let bound: ((key: string) => string) | null = null
+  const t = (key: MessageKey): string => {
+    if (bound === null) {
+      try {
+        bound = seam.locale.bind(NS)
+      } catch {
+        return message(key)
+      }
+    }
+    return bound(key)
   }
 
   seam.slots.inject('settings.section', function* () {

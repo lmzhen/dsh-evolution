@@ -115,7 +115,13 @@ function FieldControl(props: FieldBlockProps): ReactNode {
       className: 'evolution-param-select',
       value: text,
       onChange: (event: { target: { value: string } }) => { props.onChange(field.id, event.target.value) },
-    }, field.values.map(value => createElement('option', { key: value, value }, value)))
+    }, [
+      // A value the registry no longer lists (an older override, or a deployment
+      // value outside the current enum) still gets an option: without it the select
+      // renders blank and the operator cannot see what is actually configured.
+      field.values.includes(text) || text === '' ? null : createElement('option', { key: text, value: text }, text),
+      ...field.values.map(value => createElement('option', { key: value, value }, value)),
+    ])
   }
   return createElement('input', {
     ...common,
