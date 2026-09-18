@@ -4,9 +4,10 @@
  * The package is distributed OUTSIDE the platform repository, so it declares the
  * two seams it consumes instead of importing another plugin's values (forbidden
  * by the client bundle-purity rule) or its types (which would drag the platform
- * sources into this project). The shapes are the renderer's contract: a keyed
- * `settings.plugin.item` registration, the inject face it hands back, and the
- * per-namespace settings scope the write path fences with the revision it read.
+ * sources into this project). The shapes are the shell's contract: a
+ * `settings.section` registration hosting a keyed card slot, the inject faces
+ * both hand back, the per-namespace settings scope the write path fences with the
+ * revision it read, and the locale seat the section's copy resolves through.
  * @module @deepseek-ai/dsh-evolution-settings-ui/client
  */
 
