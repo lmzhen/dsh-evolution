@@ -12,7 +12,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { composePresetComposition, evolutionRoot, scopedProbeReport, type ScopedProbeReport } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetComposition, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, PARAM_NAMESPACES, resolveParamId, scopedProbeReport, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 
 /** D-6 (v18): exact-segment tail match (the loose substring form matched a
  * hypothetical `dsh-evolution-allowlist`). */
@@ -60,6 +60,55 @@ export interface ScopedProbeCheck {
   misses: number
 }
 
+/**
+ * S4.3: the parameter-surface divergences a RUNNING deployment can show and the
+ * build-time guards cannot. Three classes, each with its own move:
+ *  - a user override (the effective value is no longer the deployment's),
+ *  - a deprecated alias still written in a user section (writes refuse it),
+ *  - a declared user-writable parameter whose owner publishes no user layer in
+ *    this composition (the registry promises a face this deployment never mounts).
+ * An unreadable settings surface is reported AS SUCH: silence would read as "no
+ * divergences", which is the one claim this section exists to check.
+ * @param ctx - the plugin context; the settings service is read optionally.
+ * @returns one readable line per divergence, empty when there is nothing to compare.
+ */
+function paramDivergences(ctx: { get(name: string): unknown }): string[] {
+  const provider = ctx.get('settings') as SettingsProviderLike | undefined
+  if (provider?.describe === undefined) return []
+  let descriptors: { ns: string; user?: Record<string, unknown> }[]
+  try {
+    descriptors = provider.describe({ redactSecrets: false })
+  } catch (error) {
+    return [`settings surface unreadable (${error instanceof Error ? error.message : String(error)}) — parameter divergences were NOT checked`]
+  }
+  const issues: string[] = []
+  const registered = new Map(descriptors.map(descriptor => [descriptor.ns, descriptor.user ?? {}]))
+  for (const [namespace, user] of registered) {
+    const keys = Object.keys(user)
+    if (keys.length > 0) {
+      const shown = keys.slice(0, 5).map(key => `${key}=${JSON.stringify(user[key])}`)
+      const more = keys.length > shown.length ? ` and ${keys.length - shown.length} more` : ''
+      issues.push(`user override: ${namespace} sets ${keys.length} parameter(s) — ${shown.join(', ')}${more}`)
+    }
+    for (const key of keys) {
+      if (!isDeprecatedParamId(key)) continue
+      issues.push(`deprecated name: ${namespace} still writes "${key}" — write "${resolveParamId(key)}" instead (writes refuse the alias; it is removed in 0.7.0)`)
+    }
+  }
+  const unreachable = PARAM_EXPOSURE.filter(entry => entry.tier === 'E3')
+    .filter((entry) => {
+      const namespace = PARAM_NAMESPACES[entry.owner]
+      return namespace === undefined || !registered.has(namespace)
+    })
+    .map(entry => entry.id)
+  if (unreachable.length > 0) {
+    const shown = unreachable.slice(0, 6).join(', ')
+    const more = unreachable.length > 6 ? ` (+${unreachable.length - 6} more)` : ''
+    issues.push(`declared user-writable but unreachable here: ${shown}${more} — the owning package publishes no user layer in this composition`)
+  }
+  return issues
+}
+
 export interface DoctorReport {
   /** OPT-23 (2026-09): `preset-only` — the delivered Evolution preset
    * artifact exists but NO profile carries an evolution bundle (e.g. the
@@ -97,6 +146,10 @@ export interface DoctorReport {
    * `memory-files`' store limit vs `evolution-policy`'s planning value. Empty
    * when either surface is absent (nothing to compare) or they agree. */
   budgetIssues: string[]
+  /** S4.3: parameter-surface divergences — user overrides, deprecated aliases
+   * still written, and E3 rows whose owner publishes no user layer here. Empty
+   * when the settings service is absent (nothing to compare). */
+  paramIssues: string[]
   services: { review: boolean; curator: boolean; approval: boolean; skillUsage: boolean; io: boolean }
   pendingCount: number | null
   /** v23 (AP-2): claimed-but-crashed records — the only state that needs an
@@ -573,8 +626,10 @@ export async function diagnose(
   // the pending-view hint and the approve surface.
   const memoryIssues = memoryInterpolationIssues(home)
   const budgetIssues = memoryBudgetIssues(ctx)
+  const paramIssues = paramDivergences(ctx)
   const queryIssues = await sessionQueryIssues(ctx)
   if (queryIssues.length > 0) actions.push('Session search is degraded: isolate the session named above (or wait for the platform fix described in the family maintenance notes) before retrying the same query')
+  if (paramIssues.length > 0) actions.push('Review the parameter divergences above: /evolution params shows every row with its source, /evolution policy set writes a user value, and a declared-but-unreachable row needs its owning plugin row mounted in this profile.')
   if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryCharLimit/userCharLimit UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
   if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
@@ -596,7 +651,7 @@ export async function diagnose(
   }
 
   return {
-    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, queryIssues, services,
+    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, paramIssues, queryIssues, services,
     pendingCount, executingCount, presetFreshness, scopedProbe, actions,
   }
 }
@@ -761,6 +816,7 @@ export function renderDoctorText(report: DoctorReport): string {
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))
   if (report.budgetIssues.length > 0) lines.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
+  if (report.paramIssues.length > 0) lines.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
   if (report.queryIssues.length > 0) lines.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
   return lines.join('\n')

@@ -679,5 +679,43 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       await rm(home, { recursive: true, force: true })
     }
   })
+
+  it('S4.3: reports the three parameter-surface divergences', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-params-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      const settings = {
+        describe: () => [{ ns: 'evolution-review', user: { reviewSkillInterval: 30, skillInterval: 5 }, value: {} }],
+      }
+      const report = await diagnose({ get: (name: string) => name === 'settings' ? settings : undefined }, { home })
+      expect(report.paramIssues.some(line => line.startsWith('user override: evolution-review sets 2 parameter(s)'))).toBe(true)
+      expect(report.paramIssues.some(line => line.includes('deprecated name: evolution-review still writes "skillInterval" — write "reviewSkillInterval"'))).toBe(true)
+      expect(report.paramIssues.some(line => line.includes('declared user-writable but unreachable here:'))).toBe(true)
+      expect(report.actions.some(action => action.includes('/evolution params shows every row'))).toBe(true)
+      const text = renderDoctorText(report)
+      expect(text).toContain('parameters:')
+      expect(text).toContain('! user override: evolution-review')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S4.3: an unreadable settings surface is a finding, an absent one is not', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-params-none-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
+      // Absent service: nothing to compare, so no section and no action.
+      const absent = await diagnose(stub, { home })
+      expect(absent.paramIssues).toEqual([])
+      expect(renderDoctorText(absent)).not.toContain('parameters:')
+      // Present but throwing: silence would read as "no divergences".
+      const broken = await diagnose({ get: () => ({ describe: () => { throw new Error('describe unavailable') } }) }, { home })
+      expect(broken.paramIssues).toHaveLength(1)
+      expect(broken.paramIssues[0]).toContain('settings surface unreadable')
+      expect(broken.paramIssues[0]).toContain('NOT checked')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
 })
 
