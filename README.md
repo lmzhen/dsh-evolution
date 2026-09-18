@@ -127,6 +127,21 @@ under M1, never true for a host-only install (M3), which the plugin reports once
 The full command surface is rendered once in `packages/README.md` (§Command reference); the complete
 environment-variable and field-level knob reference lives there too.
 
+### Changing parameters from the GUI
+
+The family ships exactly one browser surface: a settings section named **自进化**. It lists the
+user-writable parameters of the review, memory, curation and skill namespaces as collapsible cards —
+each field carries its unit, where the current value comes from (`部署` deployment / `用户` your
+override), a control typed from the parameter registry (switch, dropdown, number, text) and the
+registry's own explanation. Edit and press 保存; 放弃修改 drops the draft, and 恢复部署默认 removes
+your override for one field.
+
+Writes land in `~/.dsh/settings.yaml` under the owning namespace and take effect live, without a
+restart. The same store is writable from a session with `/evolution policy set <id> <value>`, and
+`/evolution params` prints every registered parameter with its tier, timing and current source.
+Deployment-side knobs (resource limits, provider choice, prompt-affecting identity) stay in
+`cordis.yml` / the profile patch layer — the section lists only what a user may change, and the
+doctor's divergence section reports the two sides disagreeing.
 ## Turn it down or off
 
 | Dial | Values | Field |
