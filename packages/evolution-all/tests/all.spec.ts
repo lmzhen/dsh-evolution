@@ -13,7 +13,7 @@ const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8
   dsh?: { bundle?: { patch?: string } }
 }
 
-it('evolution-all aggregates the host entry, the four model-tool entries and the preset container (0.3.54)', () => {
+it('evolution-all aggregates the host entry, the four model-tool entries, the preset container and the settings UI (0.3.54)', () => {
   expect(manifest.name).toBe('@deepseek-ai/dsh-evolution-all')
   const expected = [
     '@deepseek-ai/dsh-evolution-host',
@@ -22,6 +22,9 @@ it('evolution-all aggregates the host entry, the four model-tool entries and the
     '@deepseek-ai/dsh-tool-session-query',
     '@deepseek-ai/dsh-evolution-skill-catalog',
     '@deepseek-ai/dsh-evolution-agent-preset',
+    // G4/S4.4: the browser cards. Its Host half registers nothing, so it adds no
+    // infra row and nothing model-visible — only the settings tab's card row.
+    '@deepseek-ai/dsh-evolution-settings-ui',
   ]
   for (const dep of expected) {
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')

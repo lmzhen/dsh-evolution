@@ -51,6 +51,12 @@ const allPatch = rowMap(
 const sharedIds = [...hostPatch.keys()].filter(id => presetPatch.has(id))
 const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog']
 
+/** Rows that are neither infra nor model-facing: the settings UI carries a
+ * BROWSER half only (its Host half registers nothing), so it cannot be
+ * double-mounted as infra and exposes nothing to a model. Listed by name so a
+ * new row of any class still fails the count below until it is decided here. */
+const CLIENT_ONLY_ROWS = ['evolution-settings-ui']
+
 describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
   it('overlaps only on shared infra rows, not the full composition', () => {
     // Both bundles own the infrastructure plane; sharedIds is the overlap.
@@ -90,9 +96,10 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
     }
   })
 
-  it('all row set = host infra ∪ 4 model rows and nothing else', () => {
-    expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length)
+  it('all row set = host infra ∪ 4 model rows ∪ the client-only card row', () => {
+    expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length + CLIENT_ONLY_ROWS.length)
     for (const id of MODEL_TOOLS) expect(hostPatch.has(id)).toBe(false)
+    for (const id of CLIENT_ONLY_ROWS) expect(hostPatch.has(id), `${id} must stay out of the host bundle`).toBe(false)
     for (const id of hostPatch.keys()) expect(allPatch.has(id)).toBe(true)
   })
 

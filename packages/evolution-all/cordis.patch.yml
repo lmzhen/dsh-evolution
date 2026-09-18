@@ -125,6 +125,14 @@
     - id: evolution-replay
       name: '@deepseek-ai/dsh-evolution-replay'
 
+    # ── settings UI: browser cards for the parameter namespaces ──────────────
+    # Host half registers NOTHING; the cards are the browser half, keyed by the
+    # settings namespaces the rows above own (the tab dispatches one slot key
+    # per namespace the Host serves). Disabling this row removes the cards and
+    # changes no host-side behaviour.
+    - id: evolution-settings-ui
+      name: '@deepseek-ai/dsh-evolution-settings-ui'
+
 # ── cross-session recall: enable the native session-query index ─────────────
 # `tool-session-query` (above) exposes `session_search`; this overlay
 # enables the backing SQLite full-text index so that search actually works.

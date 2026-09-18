@@ -675,6 +675,12 @@ function walk(dir) {
         for (const match of inertText(text).matchAll(AGENT_INJECT_RE)) {
           const receiver = (match[1] ?? '').split('.').pop() ?? ''
           if (/^ctx$/i.test(receiver) || /Ctx$/.test(receiver)) continue // cordis DI
+          // The CLIENT slot registry spells its registration `slots.inject(name, cb)`
+          // (S4.4): it contributes a component to a declared slot and delivers no
+          // payload to any session, so it is not the non-waking primitive this rule
+          // is about. Agent delivery keeps its own receiver name (`agent`,
+          // `invocation.agent`), which stays flagged.
+          if (receiver === 'slots') continue
           const open = match.index + match[0].length - 1
           const args = callArgs(text, open)
           if (/^\s*\[/.test(args.raw)) continue // inject(['dep'], cb) is DI

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.pkg.json",
+  // Both faces in one project: the browser half resolves React, the slot map and
+  // the settings scope STRUCTURALLY (src/client/seam.ts + react.d.ts), so it pulls
+  // no platform client sources into this project — a separate client leaf would
+  // only hide the browser half from the family typecheck.
+  "references": [
+    { "path": "../../../vendor/cordis" }
+  ]
+}

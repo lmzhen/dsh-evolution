@@ -846,6 +846,9 @@
       "path": "./packages/evolution/evolution-learning-graph"
     },
     {
+      "path": "./packages/evolution/evolution-settings-ui"
+    },
+    {
       "path": "./packages/evolution/evolution-approval"
     },
     {
