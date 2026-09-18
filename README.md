@@ -18,7 +18,7 @@ Contents: [What it is](#what-it-is) · [Should you install it](#should-you-insta
 
 ## What it is
 
-29 composable Cordis plugins that give a DeepSeek Harness install a self-evolution layer: the agent reviews its
+30 composable Cordis plugins that give a DeepSeek Harness install a self-evolution layer: the agent reviews its
 own conversations, keeps **memory**, proposes and patches **skills**, and curates that skill library over time.
 The model may only write memory and skills — policy, prompts, routing, state and audit history are control-plane
 data it can never touch.

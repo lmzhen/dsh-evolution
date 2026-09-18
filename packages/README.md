@@ -57,6 +57,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-agent` | Agent preset: standard tools + the four model rows (`memory` / `skill_manage` / session search / skill catalog) |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
+| `evolution-settings-ui` | Browser-only settings section (自进化): one card per parameter namespace, controls typed from the registry, styles injected at runtime |
 
 ## Installation
 
