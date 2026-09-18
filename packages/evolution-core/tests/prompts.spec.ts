@@ -61,7 +61,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(19)
+  expect(PROMPT_BUNDLE_VERSION).toBe(20)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {
