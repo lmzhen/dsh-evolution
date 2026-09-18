@@ -50,12 +50,12 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all   # the DEFAULT full bund
 /evolution doctor
 ```
 
-You should see 28 packages installed and, after the restart, a doctor report naming your install form and the
+You should see 29 packages installed (the published list is 30; `@lmzhen/dsh-evolution-preset` ships as an agent preset, not as a `node_modules` plugin), and after the restart a doctor report naming your install form and the
 rows it found. Verify without asking the model anything:
 
 ```bash
-dsh --profile web --dump-config | grep -c 'id: evolution-'   # 18 rows
-dsh --profile web --dump-config | grep -c 'id:'              # 207 ids, all distinct
+dsh --profile web --dump-config | grep -c 'id: evolution-'   # 19 rows
+dsh --profile web --dump-config | grep -c 'id:'              # 209 ids, all distinct
 ```
 
 Nothing writes on boot: the first review waits for the interval window. Want every write gated by your approval
@@ -83,7 +83,7 @@ state onto an empty domain.
 |---|---|
 | Validated DSH platform line | **`0.1.5-rc.2`** (`PLATFORM_VERSION`; `UPSTREAM_SHA=fb2c4b9e…`) |
 | Declared dependency window | `^0.1.5-rc.2` on every `@deepseek-ai/dsh-*` dependency/peer |
-| Family version | `0.4.1` (npm `latest`; per-form status in `packages/INSTALL.md`) |
+| Family version | `0.6.1` (npm `latest`; per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 
 A prerelease range admits **one** anchor, not a family of them: `^0.1.5-rc.2` rejects later prerelease
@@ -133,13 +133,13 @@ environment-variable and field-level knob reference lives there too.
 |---|---|---|
 | autonomy | auto / reviewed / observe | `approval.enabled`, `reviewEnabled` |
 | scope | global / per-session | evolution-all vs host + agent preset |
-| curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` |
+| curatorBackground | on / off | `autoStart` / `curatorIntervalHours` / `minIdleHours` |
 | memoryInjection | on / off | `memoryEnabled` (off = the whole row is a no-op) |
 | threatStrictness | strict / exempt-list | `threatExemptLabels` (declared per config site; the owning list is single-sourced in `evolution-threat/README.md`) |
 
 Three ways down, in increasing order of silence: **gate it** (`approval.enabled: true`), **stop reviewing**
 (`reviewEnabled: false`), or **shrink to M3** (no model tools at all). Defaults that surprise people:
-`reviewEnabled: true`, `reviewMode: 'inject'`, `memoryInterval = skillInterval = 10` turns, substantive
+`reviewEnabled: true`, `reviewMode: 'inject'`, `reviewMemoryInterval = reviewSkillInterval = 10` turns, substantive
 gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent characters", curator due-ness 168 h.
 
 <details>
@@ -176,7 +176,7 @@ gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent charac
   so the activity store and replay views stay empty until you opt into `subagent` reviews.
 - Session-scoped consumers never match on a host-only install (M3), and on M4 only sessions on the Evolution
   preset match.
-- No GUI panel: the family adds slash commands and model tools, not a browser UI.
+- The only GUI surface is one settings section (**自进化**): the family adds slash commands, model tools and that parameter panel — nothing else in the browser UI.
 - One platform anchor: a new platform line needs a family migration, not a config bump.
 - `npm dist-tags.next` is stale at `0.3.18` (historical residual); `latest` is correct and is what `add`
   resolves.
@@ -184,7 +184,7 @@ gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent charac
 ## Troubleshooting
 
 **Nothing has been written yet.** The first review waits for the interval window (`memoryInterval` /
-`skillInterval`, default 10 turns) and the substantive gate — a one-line session is deliberately not worth a
+`reviewSkillInterval`, default 10 turns) and the substantive gate — a one-line session is deliberately not worth a
 review.
 
 **`activity.json` is empty.** That is inject-mode behavior, not a failure; see the first limitation above.
@@ -225,7 +225,7 @@ The loops stop, your data does not: memory, skills, state, reports and approval 
 | [`packages/INSTALL.md`](./packages/INSTALL.md) | install-form semantics and the per-platform verification matrix |
 | [`packages/README.md`](./packages/README.md) | command reference, package map, environment/knob reference, layout notes |
 | [`CHANGELOG.md`](./CHANGELOG.md) | what changed in each version, with reasons and evidence |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 16-step gate, house rules |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 18-step gate, house rules |
 
 <details>
 <summary>For maintainers: upstream upgrade checklist</summary>

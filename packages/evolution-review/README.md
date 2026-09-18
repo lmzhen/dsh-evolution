@@ -36,7 +36,7 @@ own, and the delivery mode lives on the `evolution-policy` row, not here.
 - Deprecated names (G0/S0.3): `memoryInterval` and `skillInterval` are the legacy
   spellings of the policy row's `reviewMemoryInterval` / `reviewSkillInterval`
   (the snapshot shadows them in every shipped composition). Reading them still
-  works; writing them is refused, and both are removed in 0.7.0.
+  works; writing them is refused. Removal was planned for 0.7.0 and is deferred: both aliases still ship, so no later version is claimed here.
 
 ### Review delivery contract
 

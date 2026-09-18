@@ -41,11 +41,11 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all   # 默认全量包
 /evolution doctor
 ```
 
-你会看到装上了 28 个包；重启之后，doctor 报告会说明它识别到的安装形态和找到的行。不用问模型就能验证：
+你会看到装上了 29 个包（发布面 30 个；`@lmzhen/dsh-evolution-preset` 是 agent 预设形态，不进 `node_modules`）；重启之后，doctor 报告会说明它识别到的安装形态和找到的行。不用问模型就能验证：
 
 ```bash
-dsh --profile web --dump-config | grep -c 'id: evolution-'   # 18 行
-dsh --profile web --dump-config | grep -c 'id:'              # 207 个 id，全部互不相同
+dsh --profile web --dump-config | grep -c 'id: evolution-'   # 19 行
+dsh --profile web --dump-config | grep -c 'id:'              # 209 个 id，全部互不相同
 ```
 
 启动时不写任何东西：第一次评审要等间隔窗口。想让每次写入都先过你的批准，而不是全自动？加上 `approval.enabled: true`（也就是 M2）。
@@ -69,7 +69,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 |---|---|
 | 已验证的 DSH 平台线 | **`0.1.5-rc.2`**（`PLATFORM_VERSION`；`UPSTREAM_SHA=fb2c4b9e…`） |
 | 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.1.5-rc.2` |
-| 家族版本 | `0.4.1`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
+| 家族版本 | `0.6.1`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
 
 预发布 range 只认**一个**锚点，而不是一整族：`^0.1.5-rc.2` 会拒绝更晚的预发布后继版，但接受稳定版 `0.1.5`。更早的预发布线在依赖解析阶段就失败——这是支持窗口，不是 bug。
@@ -111,11 +111,11 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 |---|---|---|
 | autonomy | auto / reviewed / observe | `approval.enabled`、`reviewEnabled` |
 | scope | global / per-session | evolution-all vs host + agent 预设 |
-| curatorBackground | on / off | `autoStart` / `intervalHours` / `minIdleHours` |
+| curatorBackground | on / off | `autoStart` / `curatorIntervalHours` / `minIdleHours` |
 | memoryInjection | on / off | `memoryEnabled`（关掉 = 整行变 no-op） |
 | threatStrictness | strict / 豁免清单 | `threatExemptLabels`（按配置点声明；清单唯一出处是 `evolution-threat/README.md`） |
 
-三种调低方式，按安静程度递增：**加闸门**（`approval.enabled: true`）、**停止评审**（`reviewEnabled: false`）、**缩到 M3**（完全没有模型工具）。几个容易让人意外的默认值：`reviewEnabled: true`、`reviewMode: 'inject'`、`memoryInterval = skillInterval = 10` 轮，substantive 门 =「≥3 次工具调用 **或** ≥200 个用户字符 **或** ≥500 个 agent 字符」，curator 到期间隔 168 h。
+三种调低方式，按安静程度递增：**加闸门**（`approval.enabled: true`）、**停止评审**（`reviewEnabled: false`）、**缩到 M3**（完全没有模型工具）。几个容易让人意外的默认值：`reviewEnabled: true`、`reviewMode: 'inject'`、`reviewMemoryInterval = reviewSkillInterval = 10` 轮，substantive 门 =「≥3 次工具调用 **或** ≥200 个用户字符 **或** ≥500 个 agent 字符」，curator 到期间隔 168 h。
 
 <details>
 <summary>环境变量（完整清单）</summary>
@@ -145,13 +145,13 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 
 - `reviewMode` 默认是 `inject`：评审在会话内跑，不产生 `evolution/plan-applied` 账本，所以 activity 存储和 replay 视图会一直空着，直到你选择 `subagent` 评审。
 - 会话作用域的消费者在 host-only 安装（M3）上永远匹配不上；在 M4 上只有选了 Evolution 预设的会话才匹配。
-- 没有 GUI 面板：家族加的是斜杠命令和模型工具，不是浏览器 UI。
+- 浏览器里只有一处界面：一个设置栏（**自进化**）。家族加的是斜杠命令、模型工具和那个参数面板，没有别的网页 UI。
 - 只有一个平台锚点：换一条新的平台线需要一次家族迁移，而不是改个配置。
 - `npm dist-tags.next` 停在 `0.3.18`（历史残留）；`latest` 是正确的，`add` 解析的也是它。
 
 ## 故障排查
 
-**还什么都没写。** 第一次评审要等间隔窗口（`memoryInterval` / `skillInterval`，默认 10 轮）和 substantive 门——一行字的会话本来就不值得评审。
+**还什么都没写。** 第一次评审要等间隔窗口（`reviewMemoryInterval` / `reviewSkillInterval`，默认 10 轮）和 substantive 门——一行字的会话本来就不值得评审。
 
 **`activity.json` 是空的。** 这是 inject 模式的行为，不是故障；见上面第一条已知限制。
 
@@ -189,7 +189,7 @@ dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 | [`packages/INSTALL.md`](./packages/INSTALL.md) | 安装形态的语义与逐平台验证矩阵 |
 | [`packages/README.md`](./packages/README.md) | 命令参考、包地图、环境变量/旋钮参考、布局说明 |
 | [`CHANGELOG.md`](./CHANGELOG.md) | 每个版本改了什么，连同原因和证据 |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | 一个事实只能写在哪儿、十六步门禁、仓库约定 |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | 一个事实只能写在哪儿、十八步门禁、仓库约定 |
 
 <details>
 <summary>维护者：上游升级对照清单</summary>

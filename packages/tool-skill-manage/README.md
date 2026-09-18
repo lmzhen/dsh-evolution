@@ -24,10 +24,10 @@ Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) p
 
 - `maxSkillContentChars` / `maxSkillFileBytes` bound SKILL.md reads and support-file writes on this row.
 - Deprecated name (G0/S0.3): `maxSkillContentChars` is the legacy spelling of the
-  policy row's `skillContentChars` (canonical id). The two are not auto-synchronised
-  yet — this row's value is what the write paths use (the G3 unification closes
-  that gap). Reading the legacy name still works; writing it is refused, and it is
-  removed in 0.7.0.
+  policy row's `skillContentChars` (canonical id). The two are not auto-synchronised with it: this row's value is what
+  the write paths use, and since 0.6.0 the user settings layer can override it
+  per user. Reading the legacy name still works; writing it is refused. Removal was planned for 0.7.0 and is deferred:
+  the alias still ships, so no later version is claimed here.
 
 ## Known limitations
 

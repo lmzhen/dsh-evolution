@@ -15,8 +15,8 @@ Local layered memory provider: registers the `files` provider into `ctx.memory` 
   Deprecated names (G0/S0.3): the canonical ids are the policy row's `memoryChars` /
   `userChars` (what the review planner reads). The two sides are not
   auto-synchronised — `/evolution doctor` reports the divergence (`budgetIssues`).
-  Reading the legacy names still works; writing them is refused, and both are
-  removed in 0.7.0.
+  Reading the legacy names still works; writing them is refused. Removal was planned for 0.7.0 and is deferred:
+  both aliases still ship, so no later version is claimed here.
 - `root`: directory override; `''` means `$DSH_HOME/memories`.
 - `addDatePrefix` / `maxConsolidationFailures` (`false` / `3`) date prefixes on entries; consolidation failures one turn tolerates.
 - `threatExemptLabels` (default `[]`): benign threat labels for the MEMORY store (per-site rule in `evolution-threat`).

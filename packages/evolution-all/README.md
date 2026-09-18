@@ -17,9 +17,9 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all@<ver>
 
 | Bundle | Row set | Notes |
 |---|---|---|
-| `@lmzhen/dsh-evolution-all` | infra + 4 model tools (+ read-only `maintenance_probe`) | **DEFAULT** — most complete first |
+| `@lmzhen/dsh-evolution-all` | infra + 4 model tools + the client settings section (+ read-only `maintenance_probe`) | **DEFAULT** — most complete first |
 | `@lmzhen/dsh-evolution-host` | infra only | Same automation, no memory/skill model tools (evolution without exposing `memory`/`skill_manage`); `maintenance_probe` ships with it |
-| `@lmzhen/dsh-evolution-preset` | ≡ all row set | one-click **compatibility** form, kept for legacy |
+| `@lmzhen/dsh-evolution-preset` | ≡ all's infra + model rows (no client settings row) | one-click **compatibility** form, kept for legacy |
 
 ## Known limitations
 

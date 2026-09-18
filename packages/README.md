@@ -126,7 +126,7 @@ pins the equality).
 |---|---|---|
 | autonomy | auto / reviewed / observe | approval.enabled (profile row), reviewEnabled (evolution-review), pending/approve/reject commands |
 | scope | global / per-session | package choice: evolution-all (global, DEFAULT) vs host + evolution preset (per-session) |
-| curatorBackground | on / off | autoStart, intervalHours, minIdleHours (evolution-curator) |
+| curatorBackground | on / off | autoStart, curatorIntervalHours, minIdleHours (evolution-curator) |
 | memoryInjection | on / off | memoryEnabled (tool-memory: off = the whole row is a no-op, no tool/guidance/snapshot) |
 | threatStrictness | strict / exempt-list | threat config + threatExemptLabels (core SkillLibrary/MemoryStore option) |
 

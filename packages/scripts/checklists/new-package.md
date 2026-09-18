@@ -8,7 +8,7 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
 - [ ] `packages/<pkg>/package.json`: name `@deepseek-ai/dsh-<pkg>` (publishing
       rewrites the scope to `@lmzhen`), the family `version`, `type: module`,
       the `repository` block every other manifest carries, `files` limited to
-      what ships. — *`normalize-mirror.mjs` aligns all 30 manifests (29
+      what ships. — *`normalize-mirror.mjs` aligns all 31 manifests (30
       packages + the root) to the CHANGELOG head, and `verify-layout-sync.mjs`
       fails any manifest that disagrees with it; that guard's other half
       compares the two `scripts/` trees and runs only in the release chain.*
