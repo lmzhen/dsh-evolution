@@ -36,7 +36,18 @@ for (const entry of registry.entries) {
   const namespace = namespaces[entry.owner]
   if (namespace === undefined || entry.tier !== 'E3') continue
   const fields = sections.get(namespace) ?? []
-  fields.push({ id: entry.id, group: entry.group, doc: entry.summary })
+  // The UI metadata travels with the field: the card's label/help text, the control
+  // kind, the unit suffix and the value domain all come from the registry text.
+  fields.push({
+    id: entry.id,
+    group: entry.group,
+    doc: entry.summary,
+    label: entry.label ?? '',
+    hint: entry.hint ?? '',
+    control: entry.control ?? 'text',
+    unit: entry.unit ?? '',
+    values: (entry.values ?? '').split('|').filter(Boolean),
+  })
   sections.set(namespace, fields)
 }
 const ordered = [...sections.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1)
@@ -52,8 +63,18 @@ const lines = [
   "export interface ClientParamField {",
   "  id: string",
   "  group: string",
-  "  /** The registry summary, used as the field help text. */",
+  "  /** The registry summary (English), kept for parity with PARAMETERS.md. */",
   "  doc: string",
+  "  /** Card label, from the registry UI tail (Chinese). */",
+  "  label: string",
+  "  /** Card help text, from the registry UI tail (Chinese). */",
+  "  hint: string",
+  "  /** Which control the card renders. */",
+  "  control: 'number' | 'switch' | 'select' | 'text'",
+  "  /** Unit suffix for a number field ('' when it carries none). */",
+  "  unit: string",
+  "  /** Allowed values for a select field ([] otherwise). */",
+  "  values: readonly string[]",
   "}",
   "",
   "/** One card: the settings namespace plus the fields it exposes. */",
@@ -69,7 +90,10 @@ for (const [namespace, fields] of ordered) {
   lines.push('    namespace: ' + single(namespace) + ',')
   lines.push('    fields: [')
   for (const field of fields) {
-    lines.push('      { id: ' + single(field.id) + ', group: ' + single(field.group) + ', doc: ' + single(field.doc) + ' },')
+    const values = '[' + field.values.map(single).join(', ') + ']'
+    lines.push('      { id: ' + single(field.id) + ', group: ' + single(field.group) + ', doc: ' + single(field.doc) +
+      ', label: ' + single(field.label) + ', hint: ' + single(field.hint) + ', control: ' + single(field.control) +
+      ', unit: ' + single(field.unit) + ', values: ' + values + ' },')
   }
   lines.push('    ],')
   lines.push('  },')

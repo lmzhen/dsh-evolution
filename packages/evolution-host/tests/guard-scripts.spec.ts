@@ -405,7 +405,7 @@ const paramGen = join(scripts, 'gen-param-docs.mjs')
 
 /** One registry entry line in the shape the machine-read contract declares. */
 function entryLine(id: string): string {
-  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'E3'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + "'live'" + ', docAnchor: ' + "'PARAMETERS.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ' },'
+  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'E3'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + "'live'" + ', docAnchor: ' + "'PARAMETERS.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ', label: ' + "'审查间隔'" + ', hint: ' + "'夹具行用的说明文字。'" + ', control: ' + "'number'" + ', unit: ' + "'次'" + ', values: ' + "''" + ' },'
 }
 
 /** A minimal registry source; `Object.freeze({ ... })` mirrors the real file. */

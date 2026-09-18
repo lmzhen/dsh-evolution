@@ -102,6 +102,15 @@ export type ParamAuthority = 'code' | 'cordis' | 'install'
  * `applies` is the SETTINGS-side timing: 'none' means the parameter is not
  * writable through the user layer (a cordis.yml change still follows the
  * deployment's patch-reload policy).
+ *
+ * UI METADATA (0.7.0): every E3 row carries the optional tail
+ * `label, hint, control, unit, values` — in that order, directly after
+ * `summary`, still one entry per line. E3 is the only tier the settings cards
+ * render, so the card's Chinese name, help text, control kind, unit suffix and
+ * value domain come from THIS registry and nowhere else; the browser half is
+ * generated from this text (`gen-param-client-view.mjs`). Non-E3 rows must NOT
+ * carry the tail (there is no UI surface for them), and `control: 'select'`
+ * requires a non-empty pipe-joined `values`.
  */
 export interface ParamExposure {
   id: string
@@ -112,6 +121,16 @@ export interface ParamExposure {
   applies: 'live' | 'restart' | 'none'
   docAnchor: string
   summary: string
+  /** Card label (Chinese, short). Required on E3 rows. */
+  label?: string
+  /** Card help text (Chinese, one sentence). Required on E3 rows. */
+  hint?: string
+  /** Which control the card renders for this field. Required on E3 rows. */
+  control?: 'number' | 'switch' | 'select' | 'text'
+  /** Unit suffix shown next to a number (empty when it carries none). */
+  unit?: string
+  /** Pipe-joined allowed values; non-empty exactly when control is 'select'. */
+  values?: string
 }
 
 /**
@@ -120,47 +139,47 @@ export interface ParamExposure {
  * (live); E2 = resource or identity knob that stays with the deployment.
  */
 export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
-  { id: 'reviewSkillInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Activity units between skill-review injections.' },
-  { id: 'reviewMemoryInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Activity units between memory-review injections.' },
-  { id: 'skillReviewTrigger', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Which channel may inject a skill review (cadence, completion, both).' },
-  { id: 'skillReviewCompletionMinToolCalls', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Tool calls a task needs before the completion channel injects.' },
-  { id: 'reviewEnabled', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Master switch for the review plugin.' },
-  { id: 'reviewMode', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Run the review in the parent session (inject) or on a subagent.' },
-  { id: 'reviewWakeInject', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Deliver the deferred review as a waking follow-up message.' },
+  { id: 'reviewSkillInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Activity units between skill-review injections.', label: '技能审查间隔', hint: '每多少活动单位触发一次技能审查注入。', control: 'number', unit: '次', values: '' },
+  { id: 'reviewMemoryInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Activity units between memory-review injections.', label: '记忆审查间隔', hint: '每多少活动单位触发一次记忆审查注入。', control: 'number', unit: '次', values: '' },
+  { id: 'skillReviewTrigger', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Which channel may inject a skill review (cadence, completion, both).', label: '审查触发通道', hint: '哪个通道可以注入技能审查：cadence＝按间隔、completion＝按完成、both＝两者。', control: 'select', unit: '', values: 'cadence|completion|both' },
+  { id: 'skillReviewCompletionMinToolCalls', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Tool calls a task needs before the completion channel injects.', label: '完成通道最少工具调用', hint: '走完成通道时，任务至少经过多少次工具调用才注入。', control: 'number', unit: '次', values: '' },
+  { id: 'reviewEnabled', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Master switch for the review plugin.', label: '启用审查插件', hint: '审查插件的总开关。', control: 'switch', unit: '', values: '' },
+  { id: 'reviewMode', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Run the review in the parent session (inject) or on a subagent.', label: '审查运行方式', hint: 'inject＝在父会话内注入，subagent＝交给子代理运行。', control: 'select', unit: '', values: 'subagent|inject' },
+  { id: 'reviewWakeInject', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Deliver the deferred review as a waking follow-up message.', label: '审查后续唤醒注入', hint: '把延后的审查作为唤醒消息投递。', control: 'switch', unit: '', values: '' },
   { id: 'reviewProvider', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'PARAMETERS.md#review', summary: 'LLM provider for review subagents (deployment identity).' },
   { id: 'reviewTimeoutMs', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'PARAMETERS.md#review', summary: 'Bound on one review subagent run and its write leg.' },
   { id: 'reviewContextMessages', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'PARAMETERS.md#review', summary: 'Messages of context handed to a review subagent.' },
   { id: 'reviewMessageChars', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'PARAMETERS.md#review', summary: 'Per-message character budget of the review context.' },
   { id: 'reviewMaxDepth', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'PARAMETERS.md#review', summary: 'Absolute delegation-depth cap of the review subagent.' },
   { id: 'reviewToolAllow', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'PARAMETERS.md#review', summary: 'Tools the review subagent may use (safety surface).' },
-  { id: 'skillContentChars', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Character cap on a SKILL.md body (tighten-only).' },
-  { id: 'maxSkillFileBytes', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Byte cap on one support file (tighten-only).' },
-  { id: 'maxSkillNameLength', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Character cap on a skill name (tighten-only).' },
-  { id: 'maxDescriptionLength', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Character cap on a skill description (tighten-only).' },
-  { id: 'descriptionStrict', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Refuse a description over the authoring bar instead of advising.' },
-  { id: 'strictCrossSource', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Refuse writes whose catalog entry resolves outside the family.' },
-  { id: 'citationPolicy', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Refuse a move that would leave a dangling reference, or verify it.' },
+  { id: 'skillContentChars', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Character cap on a SKILL.md body (tighten-only).', label: 'SKILL.md 正文字符上限', hint: 'SKILL.md 正文的字符上限（只许收紧）。', control: 'number', unit: '字符', values: '' },
+  { id: 'maxSkillFileBytes', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Byte cap on one support file (tighten-only).', label: '支持文件字节上限', hint: '单个支持文件的字节上限（只许收紧）。', control: 'number', unit: '字节', values: '' },
+  { id: 'maxSkillNameLength', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Character cap on a skill name (tighten-only).', label: '技能名字符上限', hint: '技能名的字符上限（只许收紧）。', control: 'number', unit: '字符', values: '' },
+  { id: 'maxDescriptionLength', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Character cap on a skill description (tighten-only).', label: '技能描述字符上限', hint: '技能描述的字符上限（只许收紧）。', control: 'number', unit: '字符', values: '' },
+  { id: 'descriptionStrict', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Refuse a description over the authoring bar instead of advising.', label: '描述严格档', hint: '描述超过写作门槛时拒绝写入，而不是只提示。', control: 'switch', unit: '', values: '' },
+  { id: 'strictCrossSource', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Refuse writes whose catalog entry resolves outside the family.', label: '跨源严格档', hint: '目录项解析到家族之外时拒绝写入。', control: 'switch', unit: '', values: '' },
+  { id: 'citationPolicy', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Refuse a move that would leave a dangling reference, or verify it.', label: '引用校验档', hint: '移动或合并时对引用的处置：verify＝校验、refuse＝直接拒绝。', control: 'select', unit: '', values: 'verify|refuse' },
   { id: 'referenceRewrite', group: 'write-caps', tier: 'E2', authority: 'cordis', owner: 'tool-skill-manage', applies: 'none', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Re-home support files and rewrite references during a merge (plan or apply).' },
   { id: 'archiveRetention', group: 'write-caps', tier: 'E2', authority: 'cordis', owner: 'tool-skill-manage', applies: 'none', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Report expired archives, or prune them.' },
-  { id: 'supportFileCharPolicy', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Warn about an oversize support file, or refuse the write.' },
-  { id: 'memoryChars', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Character budget the memory store enforces for MEMORY.md.' },
-  { id: 'userChars', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Character budget the memory store enforces for USER.md.' },
+  { id: 'supportFileCharPolicy', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'tool-skill-manage', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'Warn about an oversize support file, or refuse the write.', label: '支持文件超限档', hint: '支持文件超出字符上限时：report＝只报告、enforce＝拒写。', control: 'select', unit: '', values: 'report|enforce' },
+  { id: 'memoryChars', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Character budget the memory store enforces for MEMORY.md.', label: 'MEMORY.md 字符预算', hint: 'memory 存储对 MEMORY.md 的字符上限。', control: 'number', unit: '字符', values: '' },
+  { id: 'userChars', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Character budget the memory store enforces for USER.md.', label: 'USER.md 字符预算', hint: 'memory 存储对 USER.md 的字符上限。', control: 'number', unit: '字符', values: '' },
   { id: 'memoryEnabled', group: 'memory', tier: 'E2', authority: 'cordis', owner: 'tool-memory', applies: 'none', docAnchor: 'PARAMETERS.md#memory', summary: 'Register the memory tool and its prompt section at all (deployment switch).' },
-  { id: 'entryPreviewChars', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'tool-memory', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Characters of one memory entry shown in a tool result preview.' },
-  { id: 'addDatePrefix', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Prefix stored memory entries with their date heading.' },
-  { id: 'maxConsolidationFailures', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Consolidation failures one turn tolerates before the tool gives up.' },
-  { id: 'curatorIntervalHours', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Minimum hours between deterministic curation passes.' },
-  { id: 'staleAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a skill counts as stale.' },
-  { id: 'archiveAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).' },
-  { id: 'qualityWarnStaleAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Age at which a low quality score starts warning.' },
-  { id: 'minIdleHours', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Idle hours required before an automatic curation pass runs.' },
-  { id: 'minIdleFailOpen', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Let the idle gate open when the activity probe is unavailable.' },
-  { id: 'llmReview', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Enable the LLM nomination pass on top of the deterministic lifecycle.' },
-  { id: 'curatorReviewMaxTokens', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Token budget of the curator LLM review.' },
-  { id: 'curatorReviewTimeoutMs', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Wall-clock bound of the curator LLM review.' },
-  { id: 'healthSoftBodyChars', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Body character line the health view judges against.' },
-  { id: 'healthStampDensityPerKb', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Stamp density per KB that flags log-like content in a body.' },
-  { id: 'healthChurnMinPatches', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Patches without a read that flag a write-ghost skill.' },
+  { id: 'entryPreviewChars', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'tool-memory', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Characters of one memory entry shown in a tool result preview.', label: '条目预览字符数', hint: '单条记忆预览保留多少字符。', control: 'number', unit: '字符', values: '' },
+  { id: 'addDatePrefix', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Prefix stored memory entries with their date heading.', label: '记忆条目加日期前缀', hint: '写入记忆时为条目加上日期标题。', control: 'switch', unit: '', values: '' },
+  { id: 'maxConsolidationFailures', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败容忍次数', hint: '一轮内合并失败多少次后工具放弃。', control: 'number', unit: '次', values: '' },
+  { id: 'curatorIntervalHours', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Minimum hours between deterministic curation passes.', label: '策展间隔', hint: '两次确定性策展之间至少间隔多少小时。', control: 'number', unit: '小时', values: '' },
+  { id: 'staleAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a skill counts as stale.', label: '判为陈旧的天数', hint: '技能多少天没被使用即算陈旧。', control: 'number', unit: '天', values: '' },
+  { id: 'archiveAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).', label: '归档天数', hint: '陈旧技能再过多少天归档（须 ≥ 判为陈旧的天数）。', control: 'number', unit: '天', values: '' },
+  { id: 'qualityWarnStaleAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Age at which a low quality score starts warning.', label: '低质量告警天数', hint: '质量分偏低时从多少天开始告警。', control: 'number', unit: '天', values: '' },
+  { id: 'minIdleHours', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Idle hours required before an automatic curation pass runs.', label: '空闲门槛', hint: '至少空闲多少小时才跑自动策展。', control: 'number', unit: '小时', values: '' },
+  { id: 'minIdleFailOpen', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Let the idle gate open when the activity probe is unavailable.', label: '空闲探针失败时放行', hint: '活动探针不可用时，是否让空闲门槛直接放行。', control: 'switch', unit: '', values: '' },
+  { id: 'llmReview', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Enable the LLM nomination pass on top of the deterministic lifecycle.', label: '启用 LLM 提名', hint: '在确定性生命周期之上再跑一遍 LLM 提名。', control: 'switch', unit: '', values: '' },
+  { id: 'curatorReviewMaxTokens', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Token budget of the curator LLM review.', label: '策展 LLM token 预算', hint: '策展 LLM 审查可用的 token 预算。', control: 'number', unit: 'token', values: '' },
+  { id: 'curatorReviewTimeoutMs', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Wall-clock bound of the curator LLM review.', label: '策展 LLM 超时', hint: '策展 LLM 审查的墙钟上限。', control: 'number', unit: '毫秒', values: '' },
+  { id: 'healthSoftBodyChars', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Body character line the health view judges against.', label: '正文软带', hint: '健康视图判定正文长度的软带。', control: 'number', unit: '字符', values: '' },
+  { id: 'healthStampDensityPerKb', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Stamp density per KB that flags log-like content in a body.', label: '标记密度阈值', hint: '每 KB 出现多少个时间标记就算「像日志」。', control: 'number', unit: '处/KB', values: '' },
+  { id: 'healthChurnMinPatches', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Patches without a read that flag a write-ghost skill.', label: '空写判定补丁数', hint: '多少次改动都没有任何读取，即判为「写幽灵」。', control: 'number', unit: '处', values: '' },
   { id: 'evolution-curator.enabled', group: 'curator', tier: 'E2', authority: 'cordis', owner: 'evolution-curator', applies: 'none', docAnchor: 'PARAMETERS.md#curator', summary: 'Mount the curator plugin at all.' },
   { id: 'autoStart', group: 'curator', tier: 'E2', authority: 'cordis', owner: 'evolution-curator', applies: 'none', docAnchor: 'PARAMETERS.md#curator', summary: 'Arm the hourly due-ness tick with the plugin.' },
   { id: 'bootGraceSeconds', group: 'curator', tier: 'E2', authority: 'cordis', owner: 'evolution-curator', applies: 'none', docAnchor: 'PARAMETERS.md#curator', summary: 'Grace period before the first automatic pass after a restart.' },

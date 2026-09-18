@@ -28,13 +28,32 @@ const REVIEW_E2 = [
 /** Parse the registry text the .mjs generators read (one entry per line). */
 function parseRegistryText(text: string): ParamExposure[] {
   const out: ParamExposure[] = []
-  const entry = new RegExp(
+  // Head (the 8 keys every row carries) + the two legal endings: a plain close, or
+  // the optional UI tail in its fixed order. Mirrors lib-param-registry.mjs, which
+  // is the parser the generators actually use.
+  const head = new RegExp(
     "^\\s*\\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', "
-    + "owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)' \\},$",
+    + "owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'",
+  )
+  const tail = new RegExp(
+    ", label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)' \\},$",
   )
   for (const line of text.split(/\r?\n/)) {
-    const match = entry.exec(line)
+    const match = head.exec(line)
     if (!match) continue
+    const rest = line.slice(match[0].length)
+    const ui = tail.exec(rest)
+    if (ui) {
+      out.push({
+        id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
+        authority: match[4] as ParamExposure['authority'], owner: match[5]!,
+        applies: match[6] as ParamExposure['applies'], docAnchor: match[7]!, summary: match[8]!,
+        label: ui[1]!, hint: ui[2]!, control: ui[3] as NonNullable<ParamExposure['control']>,
+        unit: ui[4]!, values: ui[5]!,
+      })
+      continue
+    }
+    if (!/ \},$/.test(rest)) continue
     out.push({
       id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
       authority: match[4] as ParamExposure['authority'], owner: match[5]!,
@@ -88,6 +107,26 @@ describe('parameter registry (G1/S1.1)', () => {
     for (const entry of PARAM_EXPOSURE) {
       if (entry.tier === 'E3' || entry.tier === 'E4') expect(entry.applies, entry.id).not.toBe('none')
       else expect(entry.applies, entry.id).toBe('none')
+    }
+  })
+
+  it('carries the card metadata on every E3 row and on no other tier (0.7.0)', () => {
+    // The settings cards render E3 rows only, so their Chinese label, help text,
+    // control kind, unit and value domain live in this registry — the browser half
+    // is generated from it. A row without them would render a nameless text box;
+    // a non-E3 row carrying them would describe a control no surface draws.
+    for (const entry of PARAM_EXPOSURE) {
+      if (entry.tier === 'E3') {
+        expect(entry.label, entry.id + ' label is Chinese').toMatch(/[\u4e00-\u9fa5]/)
+        expect(entry.hint, entry.id + ' hint is Chinese').toMatch(/[\u4e00-\u9fa5]/)
+        expect(['number', 'switch', 'select', 'text'], entry.id + ' control').toContain(entry.control)
+        expect(entry.unit, entry.id + ' unit is a string').toBeTypeOf('string')
+        if (entry.control === 'select') expect(entry.values, entry.id + ' select needs values').not.toBe('')
+        else expect(entry.values, entry.id + ' values only for select').toBe('')
+      } else {
+        expect(entry.label, entry.id + ' has no card surface').toBeUndefined()
+        expect(entry.control, entry.id + ' has no card surface').toBeUndefined()
+      }
     }
   })
 

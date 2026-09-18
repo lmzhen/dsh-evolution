@@ -14,13 +14,27 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const ENTRY = /^\s*\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)' \},$/
+// Entry head (the 8 keys every row carries) plus the two legal endings: a plain
+// close, or the optional UI tail (0.7.0) in its fixed order. A row that matches
+// the head but neither ending is reported as malformed instead of silently
+// vanishing from the parsed set — a silent drop is how a registry edit turns
+// into a missing card without any guard firing.
+const ENTRY_HEAD = /^\s*\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'/
+const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)' \},$/
+const ENTRY_PLAIN = / \},$/
 const ALIAS = /^\s*([A-Za-z][A-Za-z0-9]*): '([A-Za-z][A-Za-z0-9]*)',$/
+
+/** The optional UI tail, in its fixed order (see the contract in params.ts). */
+const UI_KEYS = ['label', 'hint', 'control', 'unit', 'values']
 
 export const GROUPS = ['library', 'write-caps', 'review', 'memory', 'curator', 'deployment', 'internal']
 export const TIERS = ['E0', 'E1', 'E2', 'E3', 'E4']
 export const AUTHORITIES = ['code', 'cordis', 'install']
 export const APPLIES = ['live', 'restart', 'none']
+export const CONTROLS = ['number', 'switch', 'select', 'text']
+
+/** Chinese text is required for the card's label/hint (they are user-facing copy). */
+const CJK = /[\u4e00-\u9fa5]/
 
 /** Absolute path of the registry source for one evolution root. */
 export function registryPath(root) {
@@ -66,6 +80,7 @@ export function readRegistry(root) {
   const path = registryPath(root)
   const text = readFileSync(path, 'utf8')
   const entries = []
+  const malformed = []
   const aliases = {}
   let inAliases = false
   for (const line of text.split(/\r?\n/)) {
@@ -75,15 +90,27 @@ export function readRegistry(root) {
       if (alias) aliases[alias[1]] = alias[2]
       if (line.trim().startsWith('})')) inAliases = false
     }
-    const entry = ENTRY.exec(line)
-    if (entry) {
-      entries.push({
-        id: entry[1], group: entry[2], tier: entry[3], authority: entry[4],
-        owner: entry[5], applies: entry[6], docAnchor: entry[7], summary: entry[8],
-      })
+    const head = ENTRY_HEAD.exec(line)
+    if (head) {
+      const rest = line.slice(head[0].length)
+      const tail = ENTRY_TAIL.exec(rest)
+      if (tail) {
+        entries.push({
+          id: head[1], group: head[2], tier: head[3], authority: head[4],
+          owner: head[5], applies: head[6], docAnchor: head[7], summary: head[8],
+          label: tail[1], hint: tail[2], control: tail[3], unit: tail[4], values: tail[5],
+        })
+      } else if (ENTRY_PLAIN.test(rest)) {
+        entries.push({
+          id: head[1], group: head[2], tier: head[3], authority: head[4],
+          owner: head[5], applies: head[6], docAnchor: head[7], summary: head[8],
+        })
+      } else {
+        malformed.push(head[1] + ' (bad UI tail — expected `, label: …, hint: …, control: …, unit: …, values: … },`)')
+      }
     }
   }
-  return { entries, aliases, text, path }
+  return { entries, malformed, aliases, text, path }
 }
 
 /**
@@ -96,6 +123,7 @@ export function registryViolations(registry, root) {
   const violations = []
   const notes = []
   const seen = new Set()
+  for (const bad of registry.malformed ?? []) violations.push('entry ' + bad)
   for (const entry of registry.entries) {
     const where = 'entry ' + entry.id
     if (seen.has(entry.id)) violations.push(where + ': duplicate id')
@@ -114,6 +142,25 @@ export function registryViolations(registry, root) {
     const writable = entry.tier === 'E3' || entry.tier === 'E4'
     if (writable && entry.applies === 'none') violations.push(where + ': tier ' + entry.tier + ' must declare a settings timing')
     if (!writable && entry.applies !== 'none') violations.push(where + ': tier ' + entry.tier + ' is read-only and must use applies: none')
+    // UI metadata (0.7.0): the settings cards render E3 rows only, so the tail is
+    // required there and forbidden everywhere else — a non-E3 row carrying a label
+    // would describe a control that no surface renders.
+    const carried = UI_KEYS.filter(key => entry[key] !== undefined)
+    if (entry.tier === 'E3') {
+      if (carried.length !== UI_KEYS.length) {
+        violations.push(where + ': E3 row must carry the full UI tail ' + UI_KEYS.join('/') + ' (has ' + (carried.join('/') || 'none') + ')')
+      } else {
+        if (entry.label.length === 0) violations.push(where + ': label is empty')
+        if (entry.hint.length === 0) violations.push(where + ': hint is empty')
+        if (!CONTROLS.includes(entry.control)) violations.push(where + ': unknown control ' + entry.control)
+        if (!CJK.test(entry.label)) violations.push(where + ': label must be Chinese text')
+        if (!CJK.test(entry.hint)) violations.push(where + ': hint must be Chinese text')
+        if (entry.control === 'select' && entry.values.length === 0) violations.push(where + ": control 'select' requires a non-empty values list")
+        if (entry.control !== 'select' && entry.values.length > 0) violations.push(where + ": values is only meaningful for control 'select'")
+      }
+    } else if (carried.length > 0) {
+      violations.push(where + ': tier ' + entry.tier + ' must not carry UI metadata (only E3 rows have a card surface)')
+    }
   }
   for (const [alias, canonical] of Object.entries(registry.aliases)) {
     if (!seen.has(canonical)) notes.push('canonical id ' + canonical + ' (alias ' + alias + ') is not registered yet')
