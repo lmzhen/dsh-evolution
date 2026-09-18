@@ -216,6 +216,141 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'install.home', group: 'deployment', tier: 'E4', authority: 'install', owner: 'scripts', applies: 'restart', docAnchor: 'docs/parameters.md#deployment', summary: 'Harness home the installer writes into (--home).' },
   { id: 'install.presetRowOverrides', group: 'deployment', tier: 'E4', authority: 'install', owner: 'scripts', applies: 'restart', docAnchor: 'docs/parameters.md#deployment', summary: 'Preset row overrides the installer injects (row-overrides.json).' },
 ])
+
+/** The settings namespace each group's user-writable knobs live in (design §7.2).
+ * A group without an entry is deployment-only (no user layer). */
+export const PARAM_NAMESPACES: Readonly<Partial<Record<ParamGroup, string>>> = Object.freeze({
+  review: 'evolution-review',
+  memory: 'evolution-memory',
+  curator: 'evolution-curator',
+  'write-caps': 'evolution-skills',
+})
+
+/** Structural view of one registered settings scope (platform Service Definition).
+ * Declared locally so this module keeps its zero-import, zero-dependency shape. */
+interface SettingsScopeLike {
+  get(): unknown
+  watch(callback: (next: unknown, prev: unknown) => void): () => void
+}
+
+/** Structural view of the platform settings provider; only the members the
+ * family uses are named. A missing `describe` disables the user layer loudly
+ * (see {@link paramSectionOverrides}) instead of reading as 'no overrides'. */
+export interface SettingsProviderLike {
+  register(namespace: string, schema: unknown, options: { base: unknown; applies?: 'live' | 'restart' }): SettingsScopeLike
+  describe?(options?: { redactSecrets?: boolean }): { ns: string; user?: Record<string, unknown> }[]
+}
+
+/** Reader for one parameter section: presence-aware user overrides. */
+export interface ParamOverrides<T extends object> {
+  /** The namespace this reader is bound to. */
+  readonly namespace: string
+  /** The user-set value for one key, or undefined when the user never set it. */
+  get<K extends keyof T & string>(key: K): T[K] | undefined
+  /** The resolved section (defaults < base < user) — display and tests. */
+  resolved(): T
+}
+
+/**
+ * G3: expose one parameter section to the user layer.
+ *
+ * Precedence stays 'user > deployment > default': the caller keeps reading its
+ * deployment carriers (policy snapshot, then the plugin row) and consults
+ * {@link ParamOverrides.get} FIRST — an unset key returns undefined, so the
+ * deployment value keeps winning and the family's shadowing rules survive.
+ *
+ * Failure posture: a provider without `describe` (or one whose describe throws)
+ * leaves the user layer UNAVAILABLE and warns once — deployment values then
+ * apply. Treating an unreadable user layer as 'no overrides' would silently
+ * ignore a setting the user did write, so the warning names it.
+ * @typeParam T - the section's value type.
+ * @param provider - the platform settings provider, or undefined when absent.
+ * @param namespace - namespace to register.
+ * @param schema - schemastery schema the platform validates against.
+ * @param base - composition base layer (the plugin row's values).
+ * @param warn - sink for the unavailability warning.
+ * @returns a reader bound to the namespace.
+ */
+export function paramSectionOverrides<T extends object>(
+  provider: SettingsProviderLike | undefined,
+  namespace: string,
+  schema: unknown,
+  base: T,
+  warn: (message: string) => void = () => {},
+): ParamOverrides<T> {
+  if (provider === undefined) return unavailableOverrides(namespace, base)
+  const scope = provider.register(namespace, schema, { base, applies: 'live' })
+  let user: Record<string, unknown> | undefined = readUserLayer(provider, namespace)
+  if (user === undefined) warn('settings provider for ' + namespace + ' exposes no readable user layer; deployment values apply')
+  scope.watch(() => {
+    const next = readUserLayer(provider, namespace)
+    if (next === undefined) {
+      warn('settings provider for ' + namespace + ' stopped exposing its user layer; deployment values apply')
+      user = undefined
+      return
+    }
+    user = next
+  })
+  return {
+    namespace,
+    get: <K extends keyof T & string>(key: K): T[K] | undefined =>
+      user === undefined ? undefined : user[key] as T[K] | undefined,
+    resolved: () => (scope.get() ?? base) as T,
+  }
+}
+
+/** The pre-provider reader: no user layer, deployment values only. */
+function unavailableOverrides<T extends object>(namespace: string, base: T): ParamOverrides<T> {
+  return { namespace, get: () => undefined, resolved: () => base }
+}
+
+/** Read the raw user section, or undefined when the provider cannot report it. */
+function readUserLayer(provider: SettingsProviderLike, namespace: string): Record<string, unknown> | undefined {
+  if (provider.describe === undefined) return undefined
+  try {
+    return provider.describe({ redactSecrets: false }).find(entry => entry.ns === namespace)?.user ?? {}
+  } catch {
+    return undefined
+  }
+}
+
+/** Minimal structural view of the cordis context used to attach a section.
+ * The callback takes `unknown` on purpose: cordis's own `inject` declares a
+ * `Context` parameter, and a callback accepting `unknown` is assignable to it
+ * (parameter contravariance) while a narrower shape is not. */
+export interface SettingsHostLike {
+  inject(names: string[], callback: (ctx: unknown) => void): unknown
+}
+
+/**
+ * Attach a parameter section through the optional settings service.
+ * @typeParam T - the section's value type.
+ * @param host - the plugin context (structurally typed).
+ * @param namespace - namespace to register.
+ * @param schema - schemastery schema the platform validates against.
+ * @param base - composition base layer (the plugin row's values).
+ * @param warn - sink for the unavailability warning.
+ * @returns a reader that follows the provider when it appears.
+ */
+export function installParamSection<T extends object>(
+  host: SettingsHostLike,
+  namespace: string,
+  schema: unknown,
+  base: T,
+  warn: (message: string) => void = () => {},
+): ParamOverrides<T> {
+  let current = unavailableOverrides(namespace, base)
+  host.inject(['settings'], (injected) => {
+    const settings = (injected as { settings: SettingsProviderLike }).settings
+    current = paramSectionOverrides(settings, namespace, schema, base, warn)
+  })
+  return {
+    namespace,
+    get: key => current.get(key),
+    resolved: () => current.resolved(),
+  }
+}
+
 /**
  * Number-typed read over {@link readParam}: the family's tunables are numbers,
  * and a value of another type reads as absent so the caller's default applies

@@ -590,6 +590,47 @@ function reviewPolicy() {
   }
 }
 
+// G3/S3.1: the user settings layer sits ABOVE the deployment carriers, and a
+// committed change is visible to the NEXT turn (no restart). The provider here
+// mirrors what settings-file does: register, describe the raw user section, and
+// fire the registered watchers when the document changes.
+it('G3/S3.1: a user-layer reviewSkillInterval overrides the row on the next turn', async () => {
+  const injected: unknown[] = []
+  const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
+  let user: Record<string, unknown> = {}
+  const watchers: Array<() => void> = []
+  const registrations: Array<{ ns: string; applies: string | undefined }> = []
+  // The platform types `settings` through its own module augmentation, which this
+  // package deliberately does not depend on; provide through an unknown boundary
+  // (`.call(ctx, ...)` keeps the receiver — an unbound reference trips oxlint).
+  ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'settings', {
+    register: (ns: string, _schema: unknown, options: { base: unknown; applies?: string }) => {
+      registrations.push({ ns, applies: options.applies })
+      return {
+        get: () => ({ ...(options.base as Record<string, unknown>), ...user }),
+        watch: (callback: () => void) => { watchers.push(callback); return () => {} },
+      }
+    },
+    describe: () => [{ ns: 'evolution-review', user }],
+  })
+  // Substantive turn, but the ROW interval (10) cannot fire on one turn, and the
+  // policy snapshot deliberately leaves both intervals unset so the chain under
+  // test is user -> row.
+  ctx.provide('evolutionPolicy', {
+    get: () => ({ ...reviewPolicy(), reviewMemoryInterval: undefined, reviewSkillInterval: undefined }),
+  })
+  await ctx.plugin(Review, { reviewEnabled: true, reviewMode: 'inject', memoryInterval: 10, skillInterval: 10 })
+  emitEnd(1)
+  await new Promise(resolve => setTimeout(resolve, 50))
+  expect(injected, 'the row interval alone must not fire').toHaveLength(0)
+  expect(registrations, 'the review section is registered as a live section').toEqual([{ ns: 'evolution-review', applies: 'live' }])
+  // The user edits the settings document: publish, then the NEXT turn fires.
+  user = { reviewSkillInterval: 1 }
+  for (const callback of watchers) callback()
+  emitEnd(2)
+  await vi.waitFor(() => { expect(injected).toHaveLength(1) })
+})
+
 it('V6-23: a throwing review-error listener does not replace the turn-end failure (0.3.36)', async () => {
   const { ctx, session, emitEnd } = await mountReviewFixture({ failState: true })
   const errors: string[] = []

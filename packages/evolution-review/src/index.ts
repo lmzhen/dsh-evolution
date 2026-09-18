@@ -19,7 +19,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { foldToolDispatches, readDispatchSignal, readNumberParam, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
+import { PARAM_NAMESPACES, foldToolDispatches, installParamSection, readDispatchSignal, readNumberParam, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
@@ -359,6 +359,41 @@ function policySnapshotOf(source: unknown): PolicySnapshotFields | undefined {
   return (source as { get?(): PolicySnapshotFields } | undefined)?.get?.()
 }
 
+/** Namespace the review group's user-writable knobs live in (core's PARAM_NAMESPACES). */
+export const REVIEW_SETTINGS_NAMESPACE = 'evolution-review'
+
+/** Review behaviour a user may change (G3/S3.1). Field names are the CANONICAL
+ * parameter ids from the registry, so the settings document, the params output,
+ * the doctor report and the cards all spell one name. */
+export interface ReviewSettings {
+  /** Activity units between skill-review injections. */
+  reviewSkillInterval: number
+  /** Activity units between memory-review injections. */
+  reviewMemoryInterval: number
+  /** Which channel may inject a skill review. */
+  skillReviewTrigger: 'cadence' | 'completion' | 'both'
+  /** Tool calls a task needs before the completion channel injects. */
+  skillReviewCompletionMinToolCalls: number
+  /** Master switch for the review plugin. */
+  reviewEnabled: boolean
+  /** Run the review in the parent session (inject) or on a subagent. */
+  reviewMode: 'subagent' | 'inject'
+  /** Deliver the deferred review as a waking follow-up message. */
+  reviewWakeInject: boolean
+}
+
+/** Schema the platform validates the user layer against; defaults mirror the
+ * core constants so an empty document resolves to today's behaviour. */
+export const REVIEW_SETTINGS_SCHEMA: z<ReviewSettings> = z.object({
+  reviewSkillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
+  reviewMemoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
+  skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER),
+  skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
+  reviewEnabled: z.boolean().default(true),
+  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject'),
+  reviewWakeInject: z.boolean().default(true),
+})
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
@@ -440,6 +475,44 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let reviewInFlight = false
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
+  // G3/S3.1: the USER layer sits above the deployment carriers. `params()` is the
+  // one reader of the review group's behaviour knobs: it consults the user layer
+  // first (only for keys the user actually set), then the policy snapshot, then
+  // this row — the precedence the design fixes (user > deployment > default).
+  // Consumers call it at USE time, so a committed settings change is live.
+  // The base layer is this row's resolved configuration; the two optional
+  // members fall back to the schema defaults their own Config declares.
+  const settingsBase: ReviewSettings = {
+    reviewSkillInterval: config.skillInterval,
+    reviewMemoryInterval: config.memoryInterval,
+    skillReviewTrigger: config.skillReviewTrigger ?? DEFAULT_SKILL_REVIEW_TRIGGER,
+    skillReviewCompletionMinToolCalls: config.skillReviewCompletionMinToolCalls,
+    reviewEnabled: config.reviewEnabled ?? true,
+    reviewMode: config.reviewMode ?? 'inject',
+    reviewWakeInject: config.reviewWakeInject ?? true,
+  }
+  const overrides = installParamSection<ReviewSettings>(
+    ctx,
+    PARAM_NAMESPACES.review ?? REVIEW_SETTINGS_NAMESPACE,
+    REVIEW_SETTINGS_SCHEMA,
+    settingsBase,
+    (message) => { ctx.logger.warn('dsh-evolution-review: ' + message) },
+  )
+  const params = (): ReviewSettings => {
+    const snapshot = policy()
+    return {
+      reviewSkillInterval: overrides.get('reviewSkillInterval') ?? snapshot?.reviewSkillInterval ?? config.skillInterval,
+      reviewMemoryInterval: overrides.get('reviewMemoryInterval') ?? snapshot?.reviewMemoryInterval ?? config.memoryInterval,
+      skillReviewTrigger: overrides.get('skillReviewTrigger') ?? config.skillReviewTrigger ?? DEFAULT_SKILL_REVIEW_TRIGGER,
+      skillReviewCompletionMinToolCalls: overrides.get('skillReviewCompletionMinToolCalls') ?? config.skillReviewCompletionMinToolCalls,
+      reviewEnabled: overrides.get('reviewEnabled') ?? config.reviewEnabled ?? true,
+      // The two booleans/unions are optional on the row type, so the chain ends
+      // at the schema default the plugin's own Config declares.
+      reviewMode: overrides.get('reviewMode') ?? snapshot?.reviewMode ?? config.reviewMode ?? 'inject',
+      reviewWakeInject: overrides.get('reviewWakeInject') ?? config.reviewWakeInject ?? true,
+    }
+  }
+
   // S2.2 (v37 P2-24): the policy snapshot shadows these three row fields in
   // every shipped composition (host/all/preset). The loader fills schema
   // defaults into the config, so "this row set a value" is the observable
@@ -463,7 +536,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // S2.2 (v37 P1-1③): the 'inject' channel executes the review in the parent
   // session and emits no `evolution/plan-applied` — an empty ledger is a
   // property of the composition, so it is disclosed once at load, not per review.
-  if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
+  if (params().reviewMode === 'inject') {
     ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (default) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see the evolution-review README, "Known Limitations and Deferred Work"). Set reviewMode: "subagent" on the evolution-policy row to keep the audited plan path.')
   }
 
@@ -566,7 +639,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   async function runOnTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
-    if (!config.reviewEnabled) return
+    if (!params().reviewEnabled) return
     if (session.header.origin === 'subagent') return
     const agent = ctx.agents.get(session.id)
     if (!agent) return
@@ -622,8 +695,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     await withReviewStateLock(session.id, async () => {
       state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
       advanced.kind = advanceReview(state, event.data.turn, signal, {
-        memoryInterval: snapshot?.reviewMemoryInterval ?? config.memoryInterval,
-        skillInterval: snapshot?.reviewSkillInterval ?? config.skillInterval,
+        memoryInterval: params().reviewMemoryInterval,
+        skillInterval: params().reviewSkillInterval,
         // V27 G2.4: the fallbacks are the SAME core constants the policy schema
         // defaults to — a bare 3/200/500 here silently diverged the moment the
         // policy default changed (a snapshot-less deployment kept the old bar).
@@ -668,7 +741,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // Explicit 'inject' deployments also execute at the end (the user
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
-        if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') {
+        if (params().reviewMode === 'inject') {
           // 0.3.73: a refused delivery restores the latch and returns BEFORE the
           // reset below, so the segment's review retries instead of vanishing.
           if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
@@ -807,10 +880,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // bypassing deliverMessage — reviewWakeInject did not apply and the woken
     // turn's cadence fire was not suppressed. It now shares the waking
     // followup-first channel with every other review delivery.
-    const trigger = config.skillReviewTrigger
+    const trigger = params().skillReviewTrigger
     if (trigger !== 'completion' && trigger !== 'both') return
     if (completionInjected.has(session.id)) return
-    if (!shouldCompletionReview(event.data.reason, cumulative, config.skillReviewCompletionMinToolCalls)) return
+    if (!shouldCompletionReview(event.data.reason, cumulative, params().skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
     // V24-03 (v24): the completion channel is the one delivery path that
     // bypassed E-19's single-flight — while a cadence subagent review was in
@@ -992,7 +1065,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // `followup` is a prototype method (`this.send(...)`), so a detached
     // reference loses its receiver. Bound arrow stubs in tests cannot show it.
     try {
-      if (config.reviewWakeInject && typeof wake.followup === 'function') {
+      if (params().reviewWakeInject && typeof wake.followup === 'function') {
         wake.followup(message)
         // V7-02: the waking turn's cadence fire is suppressed once (its own
         // review prompt must not re-trigger a review with interval=1).
@@ -1150,7 +1223,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred' | 'dropped'> {
-    if ((policy()?.reviewMode ?? config.reviewMode) === 'inject') return false
+    if (params().reviewMode === 'inject') return false
     const subagents = ctx.get('subagents') as SubagentLike | undefined
     if (!subagents) return false
     // 0.3.18 (E-19) single-flight: another review is running (the window can
