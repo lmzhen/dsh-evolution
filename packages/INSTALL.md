@@ -142,6 +142,21 @@ node packages/scripts/install-layered.mjs \
 
 Omit `--home` to use `$DSH_HOME` or `~/.dsh`.
 
+Every flag the installer accepts (`node packages/scripts/install-layered.mjs --help`
+prints this same table; `guard-scripts.spec.ts` fails when the two drift):
+
+| Flag | Value | Meaning |
+|---|---|---|
+| `--mode` | `layered` \| `profile-root` | Install target plane (default `layered`). |
+| `--profile` | `<name>` | Profile directory under `$DSH_HOME/profiles` (default `web`). |
+| `--base` | `<name>[,<name>...]` | Platform agent-preset base the family preset follows (repeatable). |
+| `--home` | `<dir>` | Harness home to write into (default `$DSH_HOME`). |
+| `--dry-run` | — | Report what would change and write nothing. |
+| `--force` | — | Proceed past a conflicting install form. |
+| `--check-presets` | — | Report on the presets already on disk (composes with any mode). |
+| `--uninstall` | — | Remove the generated preset and its rows. |
+| `--help` | — | Print the flag table and exit. |
+
 This performs:
 
 1. copies every evolution package (including a built `lib/` when present) into

@@ -1374,6 +1374,34 @@ export async function install(options = {}) {
   return result
 }
 
+/** Flag table for `--help` and for the INSTALL.md parity fixture (G2/S2.3).
+ * Every flag the parser accepts appears here exactly once, with its value kind. */
+export const INSTALL_FLAGS = [
+  { flag: '--mode', value: '<layered|profile-root>', summary: 'install target plane (default layered)' },
+  { flag: '--profile', value: '<name>', summary: 'profile directory under $DSH_HOME/profiles (default web)' },
+  { flag: '--base', value: '<name>[,<name>...]', summary: 'platform agent-preset base the family preset follows (repeatable)' },
+  { flag: '--home', value: '<dir>', summary: 'harness home to write into (default $DSH_HOME)' },
+  { flag: '--dry-run', value: '', summary: 'report what would change and write nothing' },
+  { flag: '--force', value: '', summary: 'proceed past a conflicting install form' },
+  { flag: '--check-presets', value: '', summary: 'report on the presets already on disk (composes with any mode)' },
+  { flag: '--uninstall', value: '', summary: 'remove the generated preset and its rows' },
+  { flag: '--help', value: '', summary: 'print this table and exit' },
+]
+
+/** @returns {string} the usage block `--help` prints. */
+export function usageText() {
+  const width = Math.max(...INSTALL_FLAGS.map(entry => entry.flag.length + entry.value.length + 1))
+  const rows = INSTALL_FLAGS.map(entry => {
+    const left = (entry.flag + ' ' + entry.value).trim().padEnd(width)
+    return '  ' + left + '  ' + entry.summary
+  })
+  return [
+    'usage: node install-layered.mjs [flags]',
+    '',
+    ...rows,
+  ].join('\n')
+}
+
 function parseArgs(argv) {
   const options = { mode: 'layered', profile: 'web', bases: [] }
   for (let i = 0; i < argv.length; i += 1) {
@@ -1402,6 +1430,7 @@ function parseArgs(argv) {
     // on disk and writes nothing, so it composes with any (or no) --mode.
     else if (arg === '--check-presets') options.checkPresets = true
     else if (arg === '--uninstall') options.uninstall = true
+    else if (arg === '--help') options.help = true
     else throw new Error(`unknown argument ${arg}`)
   }
   return options
@@ -1427,7 +1456,11 @@ const isMain = process.argv[1] !== undefined && (() => {
 if (isMain) {
   try {
     const options = parseArgs(process.argv.slice(2))
-    if (options.checkPresets) {
+    // G2/S2.3: a real help surface. Before this, `--help` was an unknown argument
+    // and threw, so the flag table had no single home to diff against INSTALL.md.
+    if (options.help) {
+      console.log(usageText())
+    } else if (options.checkPresets) {
       const report = await checkAgentPresetFreshness(options)
       for (const entry of report.bases) {
         console.log(`preset:   ${entry.destination}  ${entry.status === 'differs' ? 'DIFFERS' : entry.status}`)

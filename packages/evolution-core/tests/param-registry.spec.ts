@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -44,18 +44,24 @@ function parseRegistryText(text: string): ParamExposure[] {
   return out
 }
 
+/** The packages root: these specs run from <root>/evolution-core/tests. */
+const packagesRoot = fileURLToPath(new URL('../../', import.meta.url))
+
 describe('parameter registry (G1/S1.1)', () => {
   it('carries only complete, enum-valid entries with unique canonical ids', () => {
     const ids = new Set<string>()
     for (const entry of PARAM_EXPOSURE) {
-      expect(entry.id).toMatch(/^[a-z][A-Za-z0-9]*$/)
+      // Bare camelCase ids by default; `<package>.<field>` when the same field name
+      // exists in several rows (paths, providers, enable switches, session scoping).
+      expect(entry.id).toMatch(/^([a-z][a-z0-9-]*\.)?[a-z][A-Za-z0-9]*$/)
       expect(ids.has(entry.id), entry.id + ' is unique').toBe(false)
       ids.add(entry.id)
       expect(GROUPS, entry.id + ' group').toContain(entry.group)
       expect(TIERS, entry.id + ' tier').toContain(entry.tier)
       expect(AUTHORITIES, entry.id + ' authority').toContain(entry.authority)
       expect(APPLIES, entry.id + ' applies').toContain(entry.applies)
-      expect(entry.owner, entry.id + ' owner').toMatch(/^evolution-/u)
+      expect(entry.owner, entry.id + ' owner is named').not.toBe('')
+      expect(existsSync(join(packagesRoot, entry.owner)), entry.id + ' owner package exists').toBe(true)
       expect(entry.docAnchor, entry.id + ' docAnchor').toMatch(/^docs/ )
       expect(entry.summary.length, entry.id + ' summary').toBeGreaterThan(10)
       // The registry names canonical ids; a deprecated alias is never an id.

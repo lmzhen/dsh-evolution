@@ -80,7 +80,9 @@ export function registryViolations(registry, root) {
     if (!AUTHORITIES.includes(entry.authority)) violations.push(where + ': unknown authority ' + entry.authority)
     if (!APPLIES.includes(entry.applies)) violations.push(where + ': unknown applies ' + entry.applies)
     if (registry.aliases[entry.id] !== undefined) violations.push(where + ': registers a deprecated alias instead of the canonical id')
-    if (!/^evolution-[a-z0-9-]+$/.test(entry.owner)) violations.push(where + ': owner must be an evolution-<pkg> name')
+    // The owner is the package DIRECTORY name (the family mixes evolution-* with bare
+    // names such as memory-files/tool-memory), so existence is the real check.
+    if (entry.owner.length === 0) violations.push(where + ': owner is empty')
     else if (!existsSync(join(root, entry.owner))) violations.push(where + ': owner package ' + entry.owner + ' does not exist')
     if (!entry.docAnchor.startsWith('docs/')) violations.push(where + ': docAnchor must start with docs/')
     if (entry.summary.length < 10) violations.push(where + ': summary is too short to be useful')

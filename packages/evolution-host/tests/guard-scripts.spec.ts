@@ -420,6 +420,18 @@ function registrySource(entries: string[]): string {
   ].join('\n')
 }
 
+describe('installer flag documentation (G2/S2.3)', () => {
+  it('documents every flag the installer accepts in packages/INSTALL.md', async () => {
+    const installer = join(scripts, 'install-layered.mjs')
+    const help = await run(process.execPath, [installer, '--help'], { encoding: 'utf8' })
+    const flags = [...new Set(help.stdout.match(/--[a-z][a-z-]*/g) ?? [])]
+    expect(flags.length, 'the installer must list its flags').toBeGreaterThan(5)
+    const doc = readFileSync(join(psRoot, 'INSTALL.md'), 'utf8')
+    const missing = flags.filter(flag => !doc.includes(flag))
+    expect(missing, 'INSTALL.md must document every installer flag').toEqual([])
+  })
+})
+
 describe('parameter registry guard (G1/S1.3 sentry)', () => {
   it('passes on the real tree with the generated document', async () => {
     const ok = await run(process.execPath, [paramGuard, psRoot, '--strict'], { encoding: 'utf8' })
