@@ -53,7 +53,7 @@ function parseRegistryText(text: string): ParamExposure[] {
       })
       continue
     }
-    if (!/ \},$/.test(rest)) continue
+    if (!/^ \},$/.test(rest)) continue
     out.push({
       id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
       authority: match[4] as ParamExposure['authority'], owner: match[5]!,

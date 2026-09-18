@@ -402,6 +402,7 @@ describe('guard scripts (V4-30 sentry)', () => {
 // and a hand-edited product.
 const paramGuard = join(scripts, 'verify-param-registry.mjs')
 const paramGen = join(scripts, 'gen-param-docs.mjs')
+const paramViewGen = join(scripts, 'gen-param-client-view.mjs')
 
 /** One registry entry line in the shape the machine-read contract declares. */
 function entryLine(id: string): string {
@@ -468,6 +469,10 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(missing?.stderr).toContain('missing generated document')
     await run(process.execPath, [paramGen, root], { encoding: 'utf8' })
+    // The guard also checks the generated CLIENT VIEW, so a root that claims to be
+    // complete has to carry it too (this fixture is the "everything current" case).
+    await mkdir(join(root, 'evolution-settings-ui', 'src', 'client'), { recursive: true })
+    await run(process.execPath, [paramViewGen, root], { encoding: 'utf8' })
     const current = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
     expect(current.stdout).toContain('verify-param-registry: OK')
     const doc = join(root, 'PARAMETERS.md')
@@ -476,6 +481,30 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(stale?.code).toBe(1)
     expect(stale?.stderr).toContain('stale generated document')
+  })
+
+  // The client view carries the per-field UI metadata the cards render (label, hint,
+  // control, unit, values). The parity guard compares the field-id SET only, so
+  // without this case a registry edit that changed a unit or an enum domain would
+  // ship stale metadata to the browser with every gate step green.
+  it('fails when the generated client view goes stale', async () => {
+    const root = await tempRoot('guard-registry-client-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await mkdir(join(root, 'evolution-review'), { recursive: true })
+    await mkdir(join(root, 'evolution-settings-ui', 'src', 'client'), { recursive: true })
+    const namespaces = "export const PARAM_NAMESPACES = Object.freeze({\n  'evolution-review': 'review',\n})\n"
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'),
+      registrySource([entryLine('reviewSkillInterval'), entryLine('reviewEnabled')]) + namespaces, 'utf8')
+    await run(process.execPath, [paramGen, root], { encoding: 'utf8' })
+    await run(process.execPath, [paramViewGen, root], { encoding: 'utf8' })
+    const fresh = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+    expect(fresh.stdout).toContain('verify-param-registry: OK')
+    const view = join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts')
+    await writeFile(view, readFileSync(view, 'utf8').replace("label: '审查间隔'", "label: '手改过的名字'"), 'utf8')
+    const stale = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(stale?.code).toBe(1)
+    expect(stale?.stderr).toContain('stale generated client view')
   })
 })
 

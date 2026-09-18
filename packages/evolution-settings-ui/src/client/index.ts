@@ -43,17 +43,24 @@ export function apply(ctx: ClientContext): void {
   // when this bundle unloads (a hot reload or the row being switched off), which is
   // the same shape the platform's own client plugins use. A seat that refuses the
   // registration (an older shell) leaves the bundle on its own copy instead.
+  let registered = false
   ctx.effect(() => {
     try {
-      return seam.locale.register(NS, { zh, en })
+      const dispose = seam.locale.register(NS, { zh, en })
+      registered = true
+      return dispose
     } catch {
+      // A seat that refuses the registration (an older shell, or a namespace clash)
+      // leaves the flag false and the bundle stays on its own copy below.
       return () => {}
     }
   }, NS + ': dictionaries')
-  // Bind once per apply: `bind` allocates a translator, and the card calls `t` on
-  // every render.
+  // Bind once per apply: `bind` allocates a translator and the card calls `t` on every
+  // render. `bind` itself does not throw (a missing key falls back to the key name), so
+  // the meaningful guard is whether the REGISTRATION above succeeded.
   let bound: ((key: string) => string) | null = null
   const t = (key: MessageKey): string => {
+    if (!registered) return message(key)
     if (bound === null) {
       try {
         bound = seam.locale.bind(NS)

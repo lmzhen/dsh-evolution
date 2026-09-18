@@ -21,7 +21,10 @@ import { join } from 'node:path'
 // into a missing card without any guard firing.
 const ENTRY_HEAD = /^\s*\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'/
 const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)' \},$/
-const ENTRY_PLAIN = / \},$/
+// A plain row ends with ' },' and NOTHING else: a half-written UI tail (say only a
+// label) also ends that way, and accepting it would drop the tail silently while
+// the "non-E3 rows must not carry UI metadata" rule never fired.
+const ENTRY_PLAIN = /^ \},$/
 const ALIAS = /^\s*([A-Za-z][A-Za-z0-9]*): '([A-Za-z][A-Za-z0-9]*)',$/
 
 /** The optional UI tail, in its fixed order (see the contract in params.ts). */

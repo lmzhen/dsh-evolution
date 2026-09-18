@@ -67,23 +67,11 @@ function isSection(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** What a rejected write carries (the platform's error codes ride on it). */
-interface RejectionShape {
-  code?: unknown
-  message?: unknown
+/** Let the settings store settle one write before the read-back (it batches updates). */
+async function settle(): Promise<void> {
+  await new Promise<void>((done) => { setTimeout(done, 60) })
 }
 
-/**
- * The one line an operator should read when a write fails.
- * @param error - whatever the scope rejected with.
- * @param t - the card's translator.
- * @returns the conflict copy for a revision clash, else the owner's own message.
- */
-function failureText(error: unknown, t: (key: MessageKey) => string): string {
-  const shaped = error as RejectionShape
-  if (shaped.code === 'SETTINGS_CONFLICT') return t('conflict')
-  return typeof shaped.message === 'string' && shaped.message !== '' ? shaped.message : String(error)
-}
 
 interface FieldBlockProps {
   field: ClientParamField
@@ -188,9 +176,28 @@ export function ParamCard(props: ParamCardProps): ReactNode {
     void (async () => {
       try {
         for (const field of dirty) await write(field.id, parseFor(field.control, textOf(field)))
+        // The client settings scope RESOLVES a refused write: it recovers the
+        // snapshot and returns, and the remote call never rejects (verified in the
+        // installed dsh-client-ui-settings bundle). Success therefore has to be READ
+        // BACK — a field the Host refused leaves no key in the raw user section —
+        // and the read is retried briefly because the store may still be settling.
+        let landed = isSection(props.hooks.paramSection.getSnapshot().user)
+          ? props.hooks.paramSection.getSnapshot().user as Record<string, unknown>
+          : {}
+        for (let attempt = 0; attempt < 4 && dirty.some(field => !Object.hasOwn(landed, field.id)); attempt += 1) {
+          await settle()
+          const fresh = props.hooks.paramSection.getSnapshot()
+          landed = isSection(fresh.user) ? fresh.user : {}
+        }
+        if (dirty.some(field => !Object.hasOwn(landed, field.id))) {
+          setError(t('refused'))
+          return
+        }
         setDraft({})
       } catch (caught) {
-        setError(failureText(caught, t))
+        // Transport-level failures (and any future shell that rejects): keep the draft
+        // so nothing the operator typed is lost.
+        setError(caught instanceof Error && caught.message !== '' ? caught.message : t('refused'))
       } finally {
         setBusy(false)
       }

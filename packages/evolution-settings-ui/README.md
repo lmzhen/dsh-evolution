@@ -16,7 +16,7 @@ The cards claim the keyed child slot per namespace, so a namespace the Host does
 
 ## What a card does
 
-A card renders the namespace's user-writable (E3) fields with the registry's Chinese label, its unit, a 用户/部署 source chip, a control **typed from the registry** (switch / select / number / text) holding the current value, the registry's hint, and a per-field 恢复部署默认 action when a user override exists. The card's foot carries one 放弃修改 / 保存 pair: edits live in a draft, 保存 writes only the dirty fields in order and clears the draft on success, and a rejected write renders one line — the conflict copy for `SETTINGS_CONFLICT`, otherwise the owner's message verbatim, which is how the tighten-only and cross-field refusals reach the operator.
+A card renders the namespace's user-writable (E3) fields with the registry's Chinese label, its unit, a 用户/部署 source chip, a control **typed from the registry** (switch / select / number / text) holding the current value, the registry's hint, and a per-field 恢复部署默认 action when a user override exists. The card's foot carries one 放弃修改 / 保存 pair: edits live in a draft, 保存 writes only the dirty fields in order and clears the draft on success. Success is decided by READING BACK the raw user section — the client settings scope resolves a refused write (it recovers the snapshot and returns; the remote call never rejects), so a field the Host refused simply leaves no user key. When that happens the card reports it under the fields and keeps the draft, so nothing the operator typed is lost and a refusal never looks like a silent revert.
 
 Writes go through the client settings scope (`set`/`unset`), which carries the revision it read as the write's fence; a field whose key is present in the raw user section reads as a user override even when its value equals the deployment value.
 
@@ -38,4 +38,5 @@ The browser half ships as the client module system's lazy CJS factory artifact (
 
 - Only E3 (user-writable) rows are rendered; deployment tiers are reported by `/evolution params` and the doctor divergence section instead.
 - The section renders plain controls styled with the design tokens rather than the platform's `@deepseek-ai/dsh-client-ui-primitives` kit: that module IS available to out-of-repo bundles (the market plugin requires it), but its prop shapes are not published, and guessing them would break the live GUI.
+- An unsaved draft lives in the card's own component state and the settings shell renders only the active section, so switching to another section drops a draft that was not saved yet. Values already written are unaffected; moving the draft into an apply-time store is the 0.7.x follow-up.
 - A deployment that overrides a field through the `evolution-policy` row does not show on the card: the card reports the deployment value the settings scope serves, while the policy snapshot can differ. That divergence stays a doctor / `/evolution params` matter.

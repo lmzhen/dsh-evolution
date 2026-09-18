@@ -50,7 +50,7 @@ export const CSS = [
   '.evolution-param-check:disabled{cursor:default;opacity:.5}',
   '.evolution-param-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 0 0;border-top:.5px solid var(--dsw-alias-border-l3)}',
   '.evolution-param-note{margin:0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.5}',
-  '.evolution-param-error{margin:0;color:var(--dsw-alias-label-error);font-size:12px;line-height:1.5}',
+  '.evolution-param-error{margin:0;color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:1.5}',
 ].join('')
 
 /** The slice of the DOM the injection touches (this package typechecks without DOM lib). */
