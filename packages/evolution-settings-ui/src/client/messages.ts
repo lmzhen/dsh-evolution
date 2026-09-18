@@ -24,6 +24,12 @@ export const zh = {
   apply: '保存',
   reset: '恢复部署默认',
   empty: '这个命名空间没有可改项',
+  changed: '{n} 项已改',
+  cardReview: '审查',
+  cardMemory: '记忆',
+  cardToolMemory: '记忆工具',
+  cardCurator: '策展',
+  cardSkills: '技能',
 } as const
 
 /** English copy, key for key with {@link zh}. */
@@ -38,7 +44,26 @@ export const en: Record<keyof typeof zh, string> = {
   apply: 'Save',
   reset: 'Reset to deployment',
   empty: 'no writable field in this namespace',
+  changed: '{n} changed',
+  cardReview: 'Review',
+  cardMemory: 'Memory',
+  cardToolMemory: 'Memory tools',
+  cardCurator: 'Curation',
+  cardSkills: 'Skills',
 }
+
+/**
+ * Card titles per settings namespace. A namespace without an entry falls back to
+ * its raw name, so a Host that registers a new namespace still renders — the
+ * title is presentation, the namespace is the join key.
+ */
+export const NAMESPACE_TITLES: Readonly<Record<string, string>> = Object.freeze({
+  'evolution-review': 'cardReview',
+  'evolution-memory': 'cardMemory',
+  'evolution-tool-memory': 'cardToolMemory',
+  'evolution-curator': 'cardCurator',
+  'evolution-skills': 'cardSkills',
+})
 
 /** One message key. */
 export type MessageKey = keyof typeof zh

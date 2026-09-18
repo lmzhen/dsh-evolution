@@ -21,6 +21,7 @@ import { en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace } from './ParamCard.ts'
 import { CARD_SLOT, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { SettingsSection } from './SettingsSection.ts'
+import { injectStyles } from './styles.ts'
 
 /** Required client services: the slot registry, the settings transport, the locale seat. */
 export const inject = ['slots', 'settingsScope', 'locale']
@@ -34,6 +35,9 @@ export const SECTION_ORDER = 25
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
+  // The stylesheet goes in first: the section renders as soon as the shell mounts
+  // it, and an unstyled pass would flash before a later injection.
+  injectStyles()
   const seam = ctx as unknown as ClientSeam
   try {
     seam.locale.register(NS, { zh, en })
