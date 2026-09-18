@@ -250,7 +250,17 @@ export interface SettingsProviderLike {
      * cannot express); throwing refuses the WRITE that produced the value. */
     validate?: (value: unknown) => void
   }): SettingsScopeLike
-  describe?(options?: { redactSecrets?: boolean }): { ns: string; user?: Record<string, unknown> }[]
+  describe?(options?: { redactSecrets?: boolean }): {
+    ns: string
+    /** Current resolved section (schema defaults < base < user). */
+    value?: unknown
+    /** Raw user section: a key's PRESENCE marks a user override. */
+    user?: Record<string, unknown>
+    /** Monotonic revision of that raw section; a write sends it back. */
+    revision?: number
+    /** Owner's declared effect timing. */
+    applies?: 'live' | 'restart'
+  }[]
 }
 
 /** Hooks a caller may supply when a section attaches to the settings service.

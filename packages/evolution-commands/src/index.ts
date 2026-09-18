@@ -8,9 +8,10 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
+import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -887,6 +888,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
           if (!replay) return err('E-303: replay service not mounted. Next: mount the evolution-replay row (evolution-host/evolution-all) and run /evolution doctor.')
           return ok(replay.compare().report)
+        }
+        const paramsMatch = /^params(?: --group ([a-z-]+))?(?: --json)?$/.exec(input)
+        if (paramsMatch) {
+          // S4.1: the READ face over the registry. Read-only and 0-token — the
+          // text renders in the command surface, exactly like `maintain --facts`.
+          const provider = ctx.get('settings') as SettingsProviderLike | undefined
+          const sections = new Map<string, ParamSectionView>()
+          if (provider?.describe !== undefined) {
+            try {
+              for (const descriptor of provider.describe({ redactSecrets: false })) {
+                // The family registry declares no secret field, and the verbatim
+                // view is what makes `user` answerable — it never leaves this process.
+                const section: ParamSectionView = {}
+                if (descriptor.user !== undefined) section.user = descriptor.user
+                const resolved = descriptor.value
+                if (typeof resolved === 'object' && resolved !== null) section.value = resolved as Record<string, unknown>
+                sections.set(descriptor.ns, section)
+              }
+            } catch (error) {
+              // Unreadable is NOT "no overrides" (the S3.x posture): refuse instead
+              // of rendering every row as if the user had set nothing.
+              return err(`E-307: the settings service could not report its sections (${error instanceof Error ? error.message : String(error)}). /evolution params needs the user layer to tell an override from a deployment value; run /evolution doctor to see which services are mounted.`)
+            }
+          }
+          const rows = paramSurfaceRows(sections, PARAM_EXPOSURE)
+          const group = paramsMatch[1]
+          const selected = group === undefined ? rows : rows.filter(row => row.group === group)
+          if (group !== undefined && selected.length === 0) {
+            return err(`E-308: unknown parameter group "${group}" — known groups: ${paramGroups(PARAM_EXPOSURE).join(', ')}.`)
+          }
+          if (input.endsWith('--json')) return ok(renderParamJson(selected))
+          return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
         }
         if (input === 'doctor' || input === 'doctor --json') {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
