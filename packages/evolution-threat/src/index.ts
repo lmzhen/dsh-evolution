@@ -5,7 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_THREAT_MAX_SCAN_CHARS, EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'
 import type { ToolGuard } from '@deepseek-ai/dsh-tools'
 
@@ -29,7 +29,7 @@ export const Config: z<Config> = z.object({
   // below the overlap floor cannot guarantee full-coverage scanning (see
   // evolution-core PATTERN_OVERLAP), so the schema rejects it at load and the
   // assembly clamp falls back to the default.
-  maxScanChars: z.number().min(PATTERN_OVERLAP + 1).default(65_536),
+  maxScanChars: z.number().min(PATTERN_OVERLAP + 1).default(DEFAULT_THREAT_MAX_SCAN_CHARS),
   threatExemptLabels: z.array(z.string()).default([]),
 })
 
@@ -79,12 +79,12 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
 }
 
 /** Resolve the effective `maxScanChars`, clamping invalid values to the
- * default (G3.1: 0/negative/NaN/±Infinity → 65_536; V6-05: a value below
+ * default (G3.1: 0/negative/NaN/±Infinity → DEFAULT_THREAT_MAX_SCAN_CHARS; V6-05: a value below
  * PATTERN_OVERLAP + 1 is out of the coverage-guarantee domain → default).
  * Exported so the clamp is directly testable; `apply` warns when a
  * user-supplied value was corrected. */
 export function resolveMaxScanChars(config: Config): number {
-  return clampedNumber(config.maxScanChars ?? 65_536, 65_536, { min: PATTERN_OVERLAP + 1 })
+  return clampedNumber(config.maxScanChars ?? DEFAULT_THREAT_MAX_SCAN_CHARS, DEFAULT_THREAT_MAX_SCAN_CHARS, { min: PATTERN_OVERLAP + 1 })
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -95,8 +95,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // would corrupt the scan window; the schema `.min(PATTERN_OVERLAP + 1)` and
   // this clamp were both raised to the overlap floor in V6-05.
   const maxScanChars = resolveMaxScanChars(rawConfig)
-  if (maxScanChars !== (rawConfig.maxScanChars ?? 65_536)) {
-    ctx.logger.warn(`evolution-threat: maxScanChars=${String(rawConfig.maxScanChars)} is invalid; falling back to the default 65_536`)
+  if (maxScanChars !== (rawConfig.maxScanChars ?? DEFAULT_THREAT_MAX_SCAN_CHARS)) {
+    ctx.logger.warn(`evolution-threat: maxScanChars=${String(rawConfig.maxScanChars)} is invalid; falling back to the default ${DEFAULT_THREAT_MAX_SCAN_CHARS}`)
   }
   // P2-4 (v14): the store gates already honored `threatExemptLabels`; the guard
   // channel did not, so an exempted payload was still denied here and the deny

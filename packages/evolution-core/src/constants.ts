@@ -138,6 +138,12 @@ export const DEFAULT_REVIEW_CONTEXT_MESSAGES = 60
 export const DEFAULT_REVIEW_MESSAGE_CHARS = 2_000
 export const DEFAULT_CURATOR_BOOT_GRACE_SECONDS = 10
 export const DEFAULT_CURATOR_REVIEW_MAX_TOKENS = 2_048
+/** Threat-scan WINDOW SIZE (not a total cap — E-12: the whole text is scanned in
+ * overlapping windows, so content beyond this stays in scope). The coverage
+ * floor is `PATTERN_OVERLAP + 1` (V6-05). Single home for the core scanners'
+ * default parameter and clamp fallback, plus evolution-threat's Config default
+ * — the two packages previously wrote 65_536 independently (G0/S0.1). */
+export const DEFAULT_THREAT_MAX_SCAN_CHARS = 65_536
 
 /** 0.3.17 (S3.10, T-1): control-plane fields a model-facing write call may
  * never carry — single source for plan-validator, evolution-policy and the

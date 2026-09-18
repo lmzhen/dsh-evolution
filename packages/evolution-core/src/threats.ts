@@ -14,6 +14,7 @@
  * write. Blocking them turned every emoji into a security event.
  */
 
+import { DEFAULT_THREAT_MAX_SCAN_CHARS } from './constants.ts'
 import { clampedNumber } from './numeric.ts'
 
 type ThreatScope = 'all' | 'context' | 'strict'
@@ -230,7 +231,7 @@ export const PATTERN_OVERLAP = 4096
  * text is always scanned in overlapping windows, so content beyond 65,536
  * characters (skill files may run to 100,000) is no longer a blind zone.
  */
-export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): ThreatFinding[] {
+export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScanChars = DEFAULT_THREAT_MAX_SCAN_CHARS, options: ScanOptions = NO_SCAN_OPTIONS): ThreatFinding[] {
   // V4-43 self-defense: a non-finite (NaN/±Infinity) or out-of-domain window
   // size would fold the window loop into an empty first window (or a NaN spin)
   // and make every in-scope pattern blind. Clamp to the default so an invalid
@@ -240,7 +241,7 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
   // but the clamp is the guarantee for any third-party caller, not a promise
   // about call sites. V6-05: the floor is now PATTERN_OVERLAP + 1 — a window
   // below it cannot guarantee full coverage (see PATTERN_OVERLAP).
-  const windowSize = clampedNumber(maxScanChars, 65_536, { min: PATTERN_OVERLAP + 1 })
+  const windowSize = clampedNumber(maxScanChars, DEFAULT_THREAT_MAX_SCAN_CHARS, { min: PATTERN_OVERLAP + 1 })
   const findings: ThreatFinding[] = []
   const excluded = new Set(options.excludeLabels ?? [])
   // P3-22 (v14): unicode obfuscation is scope-INDEPENDENT by design — the
@@ -331,13 +332,17 @@ export function scanThreats(text: string, scope: ThreatScope = 'strict', maxScan
 /** Blocking policy (P1-1, v19): a finding blocks unless it is explicitly
  * `report`-only. Pattern findings carry no severity and therefore block as
  * before. */
-export function evaluateThreat(text: string, scope: ThreatScope = 'strict', maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): { blocked: boolean; findings: ThreatFinding[] } {
+export function evaluateThreat(text: string, scope: ThreatScope = 'strict', maxScanChars = DEFAULT_THREAT_MAX_SCAN_CHARS, options: ScanOptions = NO_SCAN_OPTIONS): { blocked: boolean; findings: ThreatFinding[] } {
   const findings = scanThreats(text, scope, maxScanChars, options)
   return { blocked: findings.some(finding => finding.severity !== 'report'), findings }
 }
 
 /** User-facing block message for memory writes. */
-export function scanMemoryThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
+export function scanMemoryThreats(
+  text: string,
+  maxScanChars = DEFAULT_THREAT_MAX_SCAN_CHARS,
+  options: ScanOptions = NO_SCAN_OPTIONS,
+): string | null {
   const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
   const pattern = findings.find(f => f.category !== 'unicode_obfuscation')
@@ -348,7 +353,11 @@ export function scanMemoryThreats(text: string, maxScanChars = 65_536, options: 
 }
 
 /** User-facing block message for skill content writes. */
-export function scanContentThreats(text: string, maxScanChars = 65_536, options: ScanOptions = NO_SCAN_OPTIONS): string | null {
+export function scanContentThreats(
+  text: string,
+  maxScanChars = DEFAULT_THREAT_MAX_SCAN_CHARS,
+  options: ScanOptions = NO_SCAN_OPTIONS,
+): string | null {
   const { blocked, findings } = evaluateThreat(text, 'strict', maxScanChars, options)
   if (!blocked) return null
   // OPT-11 (2026-09): name an actual BLOCKING pattern, not `findings[0]` —
