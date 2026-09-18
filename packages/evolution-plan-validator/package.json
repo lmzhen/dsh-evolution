@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-plan-validator",
   "description": "Deterministic validator for model-produced evolution plans",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publishConfig": {
     "access": "public"
   },
