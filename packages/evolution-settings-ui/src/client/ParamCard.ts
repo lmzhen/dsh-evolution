@@ -6,11 +6,12 @@
  * settings scope and its snapshot are declared by the shape the renderer hands
  * over (\`getSnapshot\`/\`subscribe\`, status/value/user/writable).
  *
- * The layout follows the platform's own settings fields: a collapsed card header
- * (namespace title, change count, chevron), then one block per field — label with
- * its unit and source chip, the control holding the CURRENT value, the hint — with
- * the field's own actions at the end. Steps 3 and 4 of the 0.7.0 redesign land
- * here; the typed controls and the card-level save/discard follow.
+ * Layout and behaviour follow the platform's own settings fields: a collapsed card
+ * header (namespace title, change count, chevron), then one block per field —
+ * label with its unit and source chip, a control HOLDING THE CURRENT VALUE, the
+ * Chinese hint — and one 放弃修改/保存 pair at the card's foot. The control is
+ * typed from the registry (\`control\`), so booleans are switches, enums are
+ * selects and numbers are numeric inputs with the unit shown beside the label.
  */
 import { createElement, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
@@ -33,20 +34,31 @@ export type ParamCardProps = ParamCardFace & {
   readonly useParamSection: <T>(selector: (state: ParamSectionSnapshot) => T) => T
 }
 
-/** One cell's text: absent reads as a dash, containers as JSON. */
+/** One cell's text: absent reads as an empty control, containers as JSON. */
 function format(value: unknown): string {
   if (value === undefined) return ''
   if (typeof value === 'string') return value
   return JSON.stringify(value)
 }
 
-/** Parse one typed value the way the command surface does: JSON, else raw text. */
-function parse(draft: string): unknown {
-  const text = draft.trim()
+/**
+ * Parse one edited value into what the scope should receive.
+ * @param control - the registry's control kind for the field.
+ * @param text - the text the operator left in the control.
+ * @returns the value handed to \`set\`; a string stays raw so the Host's own
+ *   validation produces the error message the operator reads.
+ */
+function parseFor(control: ClientParamField['control'], text: string): unknown {
+  const trimmed = text.trim()
+  if (control === 'switch') return trimmed === 'true'
+  if (control === 'number') {
+    const parsed = Number(trimmed)
+    return trimmed !== '' && Number.isFinite(parsed) ? parsed : trimmed
+  }
   try {
-    return JSON.parse(text) as unknown
+    return JSON.parse(trimmed) as unknown
   } catch {
-    return text
+    return trimmed
   }
 }
 
@@ -55,71 +67,89 @@ function isSection(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-interface FieldLabelProps {
-  field: ClientParamField
-  overridden: boolean
-  t: (key: MessageKey) => string
+/** What a rejected write carries (the platform's error codes ride on it). */
+interface RejectionShape {
+  code?: unknown
+  message?: unknown
 }
 
-/** One field's label: the registry's Chinese name, its unit, its source chip. */
-function fieldLabel(props: FieldLabelProps): ReactNode {
-  const { field, t } = props
-  return createElement('div', { className: 'evolution-param-label' },
-    createElement('label', { htmlFor: 'evolution-param-' + field.id }, field.label === '' ? field.id : field.label),
-    field.unit === '' ? null : createElement('span', { className: 'evolution-param-unit' }, '（' + field.unit + '）'),
-    createElement('span', {
-      className: 'evolution-param-source',
-      'data-user': props.overridden ? 'true' : 'false',
-    }, props.overridden ? t('overridden') : t('deployment')),
-  )
+/**
+ * The one line an operator should read when a write fails.
+ * @param error - whatever the scope rejected with.
+ * @param t - the card's translator.
+ * @returns the conflict copy for a revision clash, else the owner's own message.
+ */
+function failureText(error: unknown, t: (key: MessageKey) => string): string {
+  const shaped = error as RejectionShape
+  if (shaped.code === 'SETTINGS_CONFLICT') return t('conflict')
+  return typeof shaped.message === 'string' && shaped.message !== '' ? shaped.message : String(error)
 }
 
-interface FieldRowProps {
+interface FieldBlockProps {
   field: ClientParamField
-  value: unknown
+  text: string
   overridden: boolean
   disabled: boolean
   t: (key: MessageKey) => string
-  write: (field: string, value: unknown) => Promise<void>
+  onChange: (id: string, text: string) => void
   clear: (field: string) => Promise<void>
 }
 
-/** One parameter field: label, the control holding the current value, the hint. */
-function FieldRow(props: FieldRowProps): ReactNode {
-  const { field, t } = props
-  // The draft starts as null so the control shows the CURRENT value until the
-  // operator edits it; applying then writes only what actually changed.
-  const [draft, setDraft] = useState<string | null>(null)
-  const current = format(props.value)
-  const text = draft ?? current
-  const dirty = draft !== null && draft !== current
-  return createElement('div', { className: 'evolution-param-field' },
-    fieldLabel({ field, overridden: props.overridden, t }),
-    createElement('input', {
-      id: 'evolution-param-' + field.id,
-      className: 'evolution-param-input',
+/** One field's control, typed from the registry. */
+function FieldControl(props: FieldBlockProps): ReactNode {
+  const { field, text } = props
+  const id = 'evolution-param-' + field.id
+  const common = { id, disabled: props.disabled, className: 'evolution-param-input' }
+  if (field.control === 'switch') {
+    return createElement('input', {
+      ...common,
+      className: 'evolution-param-check',
+      type: 'checkbox',
+      checked: text === 'true',
+      onChange: (event: { target: { checked: boolean } }) => { props.onChange(field.id, String(event.target.checked)) },
+    })
+  }
+  if (field.control === 'select') {
+    return createElement('select', {
+      ...common,
+      className: 'evolution-param-select',
       value: text,
-      disabled: props.disabled,
-      onChange: (event: { target: { value: string } }) => { setDraft(event.target.value) },
-    }),
+      onChange: (event: { target: { value: string } }) => { props.onChange(field.id, event.target.value) },
+    }, field.values.map(value => createElement('option', { key: value, value }, value)))
+  }
+  return createElement('input', {
+    ...common,
+    type: field.control === 'number' ? 'number' : 'text',
+    value: text,
+    onChange: (event: { target: { value: string } }) => { props.onChange(field.id, event.target.value) },
+  })
+}
+
+/** One parameter field: label, control, hint, and its reset-to-deployment action. */
+function FieldBlock(props: FieldBlockProps): ReactNode {
+  const { field, t } = props
+  const unit = field.unit === '' ? null : createElement('span', { className: 'evolution-param-unit' }, '（' + field.unit + '）')
+  return createElement('div', { className: 'evolution-param-field' },
+    createElement('div', { className: 'evolution-param-label' },
+      createElement('label', { htmlFor: 'evolution-param-' + field.id }, field.label === '' ? field.id : field.label),
+      unit,
+      createElement('span', {
+        className: 'evolution-param-source',
+        'data-user': props.overridden ? 'true' : 'false',
+      }, props.overridden ? t('overridden') : t('deployment')),
+    ),
+    FieldControl(props),
     createElement('p', { className: 'evolution-param-hint' }, field.hint === '' ? field.doc : field.hint),
-    createElement('div', { className: 'evolution-param-actions' },
-      props.overridden
-        ? createElement('button', {
+    props.overridden
+      ? createElement('div', { className: 'evolution-param-actions' },
+        createElement('button', {
           type: 'button',
           className: 'evolution-param-button',
           disabled: props.disabled,
           onClick: () => { void props.clear(field.id) },
-        }, t('reset'))
-        : null,
-      createElement('button', {
-        type: 'button',
-        className: 'evolution-param-button',
-        'data-primary': 'true',
-        disabled: props.disabled || !dirty,
-        onClick: () => { void props.write(field.id, parse(text)) },
-      }, t('apply')),
-    ),
+        }, t('reset')),
+      )
+      : null,
   )
 }
 
@@ -131,6 +161,9 @@ function FieldRow(props: FieldRowProps): ReactNode {
 export function ParamCard(props: ParamCardProps): ReactNode {
   const { t, fields, write, clear, namespace } = props
   const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const snapshot = props.useParamSection((state: ParamSectionSnapshot) => state)
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
   if (snapshot.status === 'unavailable') return createElement('p', { className: 'evolution-param-note' }, t('unavailable'))
@@ -140,6 +173,23 @@ export function ParamCard(props: ParamCardProps): ReactNode {
   const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
   const title = titleKey === undefined ? namespace : t(titleKey)
   const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
+  const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[field.id])
+  const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[field.id]))
+  const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
+  const save = (): void => {
+    setBusy(true)
+    setError('')
+    void (async () => {
+      try {
+        for (const field of dirty) await write(field.id, parseFor(field.control, textOf(field)))
+        setDraft({})
+      } catch (caught) {
+        setError(failureText(caught, t))
+      } finally {
+        setBusy(false)
+      }
+    })()
+  }
   return createElement('section', { className: 'evolution-param-card' },
     createElement('button', {
       type: 'button',
@@ -156,16 +206,32 @@ export function ParamCard(props: ParamCardProps): ReactNode {
         disabled ? createElement('p', { className: 'evolution-param-note' }, t('readonly')) : null,
         fields.length === 0
           ? createElement('p', { className: 'evolution-param-note' }, t('empty'))
-          : fields.map(field => createElement(FieldRow, {
+          : fields.map(field => createElement(FieldBlock, {
             key: field.id,
             field,
-            value: value[field.id],
+            text: textOf(field),
             overridden: Object.hasOwn(user, field.id),
             disabled,
             t,
-            write,
+            onChange: change,
             clear,
           })),
+        error === '' ? null : createElement('p', { className: 'evolution-param-error' }, error),
+        fields.length === 0 ? null : createElement('div', { className: 'evolution-param-footer' },
+          createElement('button', {
+            type: 'button',
+            className: 'evolution-param-button',
+            disabled: busy || dirty.length === 0,
+            onClick: () => { setDraft({}); setError('') },
+          }, t('discard')),
+          createElement('button', {
+            type: 'button',
+            className: 'evolution-param-button',
+            'data-primary': 'true',
+            disabled: disabled || busy || dirty.length === 0,
+            onClick: save,
+          }, busy ? t('saving') : t('apply')),
+        ),
       )
       : null,
   )

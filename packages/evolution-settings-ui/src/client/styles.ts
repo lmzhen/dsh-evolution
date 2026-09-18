@@ -43,6 +43,12 @@ export const CSS = [
   '.evolution-param-button[data-primary="true"]{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border-color:transparent}',
   '.evolution-param-button[data-primary="true"]:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}',
   '.evolution-param-button:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
+  '.evolution-param-select{width:100%;box-sizing:border-box;padding:8px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5}',
+  '.evolution-param-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}',
+  '.evolution-param-select:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
+  '.evolution-param-check{width:16px;height:16px;margin:0;accent-color:var(--dsw-alias-brand-primary);cursor:pointer}',
+  '.evolution-param-check:disabled{cursor:default;opacity:.5}',
+  '.evolution-param-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 0 0;border-top:.5px solid var(--dsw-alias-border-l3)}',
   '.evolution-param-note{margin:0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.5}',
   '.evolution-param-error{margin:0;color:var(--dsw-alias-label-error);font-size:12px;line-height:1.5}',
 ].join('')
