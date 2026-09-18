@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.6.0 (minor) — 参数治理批：注册表与门禁 / 用户设置层四个命名空间 / 命令面与卡片 / 四渠道同名守卫
+
+> 依据 `dsh-evolution-parameter-governance-design.md` 与施工手册 §S0–S5 落地（G0 归集 → G1 注册表与守卫 → G2 三面分配 → G3 参数层 → G4 接口与展示 → G5 收口）。
+> **行为变化集中在三处**（见下表 B1–B3）：用户设置层首次生效、写上限只许收紧且跨字段规则在**写入时**拒绝、四个写行为档位改为 live；另新增两条命令与一个客户端卡片包。
+> 磁盘布局与既有事件不变；新增注册表（95 条）与生成物 `packages/PARAMETERS.md`；门禁 16 → **18 步**（＋`verify-param-registry`、＋`verify-param-channel-parity`）；发布面 29 → **30 个包**（＋`@lmzhen/dsh-evolution-settings-ui`）。
+
+### 新能力（用户可感）
+
+| # | 能力 | 位置 |
+|---|---|---|
+| N1 | `/evolution params [--group <name>] [--json]`：按注册表列出每条参数的组／档／生效时机／当前值与**来源**（user／deployment／unregistered），0 token（只渲染给用户） | `evolution-commands` |
+| N2 | `/evolution policy set <id> <value> [--expect <n>]`：只走 settings 的写面（E3；E1/E2 明确拒绝并指 cordis.yml），带 revision 冲突保护，owner 的拒绝报文原样透出 | `evolution-commands` |
+| N3 | 四组用户可改参数**即时生效**：review 7 个、memory 4＋1 个（两个命名空间）、curator 12 个、skills 10 个（四个上限＋四个档位） | `evolution-review`／`memory-files`／`tool-memory`／`evolution-curator`／`tool-skill-manage` |
+| N4 | **跨字段与只许收紧**：`archiveAfterDays ≥ staleAfterDays`、四个写上限不得高于部署值——由平台 owner `validate` 钩子在写入时拒绝 | `evolution-core`（`ParamSectionOptions.validate`） |
+| N5 | doctor 新增「参数面分歧」三类：用户覆盖／旧名仍在写／声明可写但本组合没有用户层；设置面读不出时明确报『未检查』 | `evolution-commands/src/doctor.ts` |
+| N6 | 客户端卡片包 `@lmzhen/dsh-evolution-settings-ui`：设置页按命名空间出现四张卡（当前值＋来源徽标＋写入／恢复为部署默认）；Host 半不注册任何东西，禁用该行只消失卡片 | 新包 |
+| N7 | 生成物 `packages/PARAMETERS.md`（95 条／6 组）＋门禁第 17 步 `verify-param-registry`（契约与新鲜度）与第 18 步 `verify-param-channel-parity`（四渠道同名同义） | `packages/scripts` |
+
+### 行为变化（升级前必读）
+
+| # | 变化 | 对既有的影响与回退 |
+|---|---|---|
+| B1 | **用户设置层生效**（此前只有部署面）：`settings.yaml` 按 canonical id 写的值优先于 policy 行与插件行；未设的键仍走部署值与 schema 默认 | 不写用户设置者**零变化**；要回到纯部署面，清空对应命名空间的用户段即可 |
+| B2 | 写上限**只许收紧**：用户设的上限高于部署值即在写入时被拒（报文写明超了哪个值） | 部署值不变；要放宽只能改 `cordis.yml` |
+| B3 | 四个写行为档位（`citationPolicy`／`referenceRewrite`／`archiveRetention`／`supportFileCharPolicy`）改判 **applies: live**（原表为 restart） | 改档位后**下一次写**即按新档；不写用户设置者不受影响 |
+| B4 | 六个旧名（`skillInterval`／`memoryInterval`／`intervalHours`／`maxSkillContentChars`／`memoryCharLimit`／`userCharLimit`）**可读不可写**，写路径拒绝并给出 canonical 名 | 既有 `cordis.yml` 行继续可用旧名读取；建议按 `/evolution params` 的登记名迁移（0.7.0 移除） |
+| B5 | 卡片包新增一行到 `evolution-all` 的补丁层 | 老 profile 升级后即出现卡片；不要卡片就禁用该行（host 侧零影响） |
+
 ## 0.5.0 (minor) — 技能库维护能力批：引用解析 / 成本口径（判定统一 token 尺）/ 需求观测 / 钩子与退役建议 + 四个档位开关
 
 > 依据 `references/design-skill-library-maintenance.md` 的七步方案与 §16 的架构分层批次（V1–V6）落地。
