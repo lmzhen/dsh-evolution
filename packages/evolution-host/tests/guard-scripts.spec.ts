@@ -395,3 +395,69 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(offenders, 'cite the package README Known Limitations section instead').toEqual([])
   })
 })
+
+// G1/S1.3: the parameter-registry guard reads the SAME text the runtime module
+// uses (machine-read contract in params.ts) and also checks that the generated
+// document is current, so the sentry covers both halves: a contract violation
+// and a hand-edited product.
+const paramGuard = join(scripts, 'verify-param-registry.mjs')
+const paramGen = join(scripts, 'gen-param-docs.mjs')
+
+/** One registry entry line in the shape the machine-read contract declares. */
+function entryLine(id: string): string {
+  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'E3'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + "'live'" + ', docAnchor: ' + "'docs/parameters.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ' },'
+}
+
+/** A minimal registry source; `Object.freeze({ ... })` mirrors the real file. */
+function registrySource(entries: string[]): string {
+  return [
+    'export const PARAM_ALIASES: Readonly<Record<string, string>> = Object.freeze({',
+    "  memoryInterval: 'reviewMemoryInterval',",
+    '})',
+    'export const PARAM_EXPOSURE = Object.freeze([',
+    ...entries,
+    '])',
+  ].join('\n')
+}
+
+describe('parameter registry guard (G1/S1.3 sentry)', () => {
+  it('passes on the real tree with the generated document', async () => {
+    const ok = await run(process.execPath, [paramGuard, psRoot, '--strict'], { encoding: 'utf8' })
+    expect(ok.stdout).toContain('verify-param-registry: OK')
+  })
+
+  it('fails on a duplicate id and on a vacuum root', async () => {
+    const root = await tempRoot('guard-registry-dup-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await mkdir(join(root, 'evolution-review'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval'), entryLine('reviewSkillInterval')]), 'utf8')
+    const duplicate = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(duplicate?.code).toBe(1)
+    expect(duplicate?.stderr).toContain('duplicate id')
+    const empty = await tempRoot('guard-registry-empty-')
+    const vacuum = await run(process.execPath, [paramGuard, empty, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(vacuum?.code).toBe(1)
+    expect(vacuum?.stderr).toContain('no registry under')
+  })
+
+  it('fails when the generated document is stale or missing', async () => {
+    const root = await tempRoot('guard-registry-doc-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await mkdir(join(root, 'evolution-review'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval'), entryLine('reviewEnabled')]), 'utf8')
+    const missing = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(missing?.stderr).toContain('missing generated document')
+    await run(process.execPath, [paramGen, root], { encoding: 'utf8' })
+    const current = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+    expect(current.stdout).toContain('verify-param-registry: OK')
+    const doc = join(root, 'docs', 'parameters.md')
+    await writeFile(doc, readFileSync(doc, 'utf8') + '\n| hand edit |', 'utf8')
+    const stale = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(stale?.code).toBe(1)
+    expect(stale?.stderr).toContain('stale generated document')
+  })
+})

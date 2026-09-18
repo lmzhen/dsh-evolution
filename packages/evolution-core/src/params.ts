@@ -80,6 +80,60 @@ export function readParam(carrier: object | undefined, id: string): unknown {
   return undefined
 }
 
+/** Exposure group (design §7.2): the unit a developer changes together. */
+export type ParamGroup = 'library' | 'write-caps' | 'review' | 'memory' | 'curator' | 'deployment' | 'internal'
+
+/** Exposure tier (design §7.1): the interface combination a parameter gets. */
+export type ParamTier = 'E0' | 'E1' | 'E2' | 'E3' | 'E4'
+
+/** Where the authoritative value lives. */
+export type ParamAuthority = 'code' | 'cordis' | 'install'
+
+/**
+ * One parameter's exposure contract (design §8.1).
+ *
+ * MACHINE-READ CONTRACT: the entries below are written ONE PER LINE with the
+ * key order id, group, tier, authority, owner, applies, docAnchor, summary so
+ * the .mjs generators (`gen-param-docs.mjs`, `verify-param-registry.mjs`) can
+ * parse this text without importing TypeScript. `param-registry.spec.ts`
+ * asserts that the parsed text and this runtime array agree, so the two sides
+ * cannot drift.
+ *
+ * `applies` is the SETTINGS-side timing: 'none' means the parameter is not
+ * writable through the user layer (a cordis.yml change still follows the
+ * deployment's patch-reload policy).
+ */
+export interface ParamExposure {
+  id: string
+  group: ParamGroup
+  tier: ParamTier
+  authority: ParamAuthority
+  owner: string
+  applies: 'live' | 'restart' | 'none'
+  docAnchor: string
+  summary: string
+}
+
+/**
+ * The parameter registry. G1/S1.1 seeds it with the review group (G-C); the
+ * remaining groups land in S2.1. E3 = behaviour preference the user may change
+ * (live); E2 = resource or identity knob that stays with the deployment.
+ */
+export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
+  { id: 'reviewSkillInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Activity units between skill-review injections.' },
+  { id: 'reviewMemoryInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Activity units between memory-review injections.' },
+  { id: 'skillReviewTrigger', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Which channel may inject a skill review (cadence, completion, both).' },
+  { id: 'skillReviewCompletionMinToolCalls', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Tool calls a task needs before the completion channel injects.' },
+  { id: 'reviewEnabled', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Master switch for the review plugin.' },
+  { id: 'reviewMode', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Run the review in the parent session (inject) or on a subagent.' },
+  { id: 'reviewWakeInject', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'docs/parameters.md#review', summary: 'Deliver the deferred review as a waking follow-up message.' },
+  { id: 'reviewProvider', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'docs/parameters.md#review', summary: 'LLM provider for review subagents (deployment identity).' },
+  { id: 'reviewTimeoutMs', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'docs/parameters.md#review', summary: 'Bound on one review subagent run and its write leg.' },
+  { id: 'reviewContextMessages', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'docs/parameters.md#review', summary: 'Messages of context handed to a review subagent.' },
+  { id: 'reviewMessageChars', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'docs/parameters.md#review', summary: 'Per-message character budget of the review context.' },
+  { id: 'reviewMaxDepth', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'docs/parameters.md#review', summary: 'Absolute delegation-depth cap of the review subagent.' },
+  { id: 'reviewToolAllow', group: 'review', tier: 'E2', authority: 'cordis', owner: 'evolution-review', applies: 'none', docAnchor: 'docs/parameters.md#review', summary: 'Tools the review subagent may use (safety surface).' },
+])
 /**
  * Number-typed read over {@link readParam}: the family's tunables are numbers,
  * and a value of another type reads as absent so the caller's default applies
