@@ -243,18 +243,30 @@ interface SettingsScopeLike {
  * family uses are named. A missing `describe` disables the user layer loudly
  * (see {@link paramSectionOverrides}) instead of reading as 'no overrides'. */
 export interface SettingsProviderLike {
-  register(namespace: string, schema: unknown, options: { base: unknown; applies?: 'live' | 'restart' }): SettingsScopeLike
+  register(namespace: string, schema: unknown, options: {
+    base: unknown
+    applies?: 'live' | 'restart'
+    /** Owner-side refusal of a resolved section (cross-field rules the schema
+     * cannot express); throwing refuses the WRITE that produced the value. */
+    validate?: (value: unknown) => void
+  }): SettingsScopeLike
   describe?(options?: { redactSecrets?: boolean }): { ns: string; user?: Record<string, unknown> }[]
 }
 
-/** Hooks a caller may supply when a section attaches to the settings service. */
-export interface ParamSectionOptions {
+/** Hooks a caller may supply when a section attaches to the settings service.
+ * @typeParam T - the section's value type (what `validate` inspects). */
+export interface ParamSectionOptions<T extends object = object> {
   /** Called once when the user layer turns unreadable (a warning, never silent). */
   warn?: (message: string) => void
   /** Called after every committed change that the reader can observe — the place
    * to REBUILD registration-level facts (the platform's own `installSection`
    * documents the same hook shape). Consumers that read at use time pass nothing. */
   onChange?: () => void
+  /** Refuse a resolved section the owner could not act on: a cross-field rule the
+   * schema cannot express (the platform applies this hook to the RESOLVED section,
+   * so a user value is judged together with the deployment layer beneath it).
+   * Throwing refuses the write that produced the value. */
+  validate?: (value: T) => void
 }
 
 /** Reader for one parameter section: presence-aware user overrides. */
@@ -292,10 +304,12 @@ export function paramSectionOverrides<T extends object>(
   namespace: string,
   schema: unknown,
   base: T,
-  options: ParamSectionOptions = {},
+  options: ParamSectionOptions<T> = {},
 ): ParamOverrides<T> {
   if (provider === undefined) return unavailableOverrides(namespace, base)
-  const scope = provider.register(namespace, schema, { base, applies: 'live' })
+  const scope = options.validate === undefined
+    ? provider.register(namespace, schema, { base, applies: 'live' })
+    : provider.register(namespace, schema, { base, applies: 'live', validate: options.validate as (value: unknown) => void })
   const warn = options.warn ?? ((): void => {})
   let user: Record<string, unknown> | undefined = readUserLayer(provider, namespace)
   if (user === undefined) warn('settings provider for ' + namespace + ' exposes no readable user layer; deployment values apply')
@@ -356,7 +370,7 @@ export function installParamSection<T extends object>(
   namespace: string,
   schema: unknown,
   base: T,
-  options: ParamSectionOptions = {},
+  options: ParamSectionOptions<T> = {},
 ): ParamOverrides<T> {
   let current = unavailableOverrides(namespace, base)
   host.inject(['settings'], (injected) => {

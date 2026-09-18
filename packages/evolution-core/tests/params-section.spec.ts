@@ -16,12 +16,20 @@ interface FakeOptions {
   omitDescribe?: boolean
 }
 
+/** One captured registration, as the fake provider saw it. */
+interface Registration {
+  namespace: string
+  base: unknown
+  applies?: string | undefined
+  validate?: ((value: unknown) => void) | undefined
+}
+
 function fakeProvider(options: FakeOptions = {}) {
   const watchers: ((next: unknown, prev: unknown) => void)[] = []
-  const registrations: { namespace: string; base: unknown; applies?: string | undefined }[] = []
+  const registrations: Registration[] = []
   const provider: SettingsProviderLike = {
     register: (namespace, _schema, registered) => {
-      registrations.push({ namespace, base: registered.base, applies: registered.applies })
+      registrations.push({ namespace, base: registered.base, applies: registered.applies, validate: registered.validate })
       return {
         get: () => ({ ...(registered.base as Record<string, unknown>), ...options.user }),
         watch: (callback) => { watchers.push(callback); return () => {} },
@@ -98,6 +106,18 @@ describe('family parameter sections (G3/S3.1)', () => {
     fake.push(undefined)
     expect(onChange).toHaveBeenCalledTimes(2)
     expect(overrides.get('reviewSkillInterval')).toBeUndefined()
+  })
+
+  it('forwards the owner validate hook to the platform registration (G3/S3.3)', () => {
+    const validate = vi.fn()
+    const hooked = fakeProvider()
+    paramSectionOverrides(hooked.provider, 'evolution-review', {}, BASE, { validate })
+    expect(hooked.registrations[0]?.validate, 'the cross-field hook must ride the registration').toBe(validate)
+    // Without a hook the registration keeps the platform's plain option set, so a
+    // section that needs no cross-field rule is registered exactly as before.
+    const plain = fakeProvider()
+    paramSectionOverrides(plain.provider, 'evolution-review', {}, BASE)
+    expect(plain.registrations[0]?.validate).toBeUndefined()
   })
 
   it('attaches through the optional service and follows it when it appears', () => {
