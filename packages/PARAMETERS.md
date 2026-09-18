@@ -41,10 +41,10 @@
 | `maxDescriptionLength` | E3 | live | cordis | tool-skill-manage | — | Character cap on a skill description (tighten-only). |
 | `descriptionStrict` | E3 | live | cordis | tool-skill-manage | — | Refuse a description over the authoring bar instead of advising. |
 | `strictCrossSource` | E3 | live | cordis | tool-skill-manage | — | Refuse writes whose catalog entry resolves outside the family. |
-| `citationPolicy` | E3 | restart | cordis | tool-skill-manage | — | Refuse a move that would leave a dangling reference, or verify it. |
-| `referenceRewrite` | E3 | restart | cordis | tool-skill-manage | — | Re-home support files and rewrite references during a merge (plan or apply). |
-| `archiveRetention` | E3 | restart | cordis | tool-skill-manage | — | Report expired archives, or prune them. |
-| `supportFileCharPolicy` | E3 | restart | cordis | tool-skill-manage | — | Warn about an oversize support file, or refuse the write. |
+| `citationPolicy` | E3 | live | cordis | tool-skill-manage | — | Refuse a move that would leave a dangling reference, or verify it. |
+| `referenceRewrite` | E3 | live | cordis | tool-skill-manage | — | Re-home support files and rewrite references during a merge (plan or apply). |
+| `archiveRetention` | E3 | live | cordis | tool-skill-manage | — | Report expired archives, or prune them. |
+| `supportFileCharPolicy` | E3 | live | cordis | tool-skill-manage | — | Warn about an oversize support file, or refuse the write. |
 
 ## review
 
