@@ -478,3 +478,37 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
     expect(stale?.stderr).toContain('stale generated document')
   })
 })
+
+// G5/S5.1: one name per fact across the four channels that spell it (the
+// deployment carriers' schema, the command face, the doctor section, and the two
+// generated artifacts). The sentry covers both halves: a clean tree passes, and a
+// channel that renamed a parameter fails with the offending name.
+const paramParity = join(scripts, 'verify-param-channel-parity.mjs')
+
+describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
+  it('passes on the real tree and fails when the document renames a parameter', async () => {
+    const ok = await run(process.execPath, [paramParity, psRoot, '--strict'], { encoding: 'utf8' })
+    expect(ok.stdout).toContain('verify-param-channel-parity: OK')
+    const root = await tempRoot('guard-parity-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]), 'utf8')
+    await writeFile(join(root, 'PARAMETERS.md'), '| `reviewSkillIntervalX` | E3 | live | cordis | evolution-review | — | Renamed by hand. |\n', 'utf8')
+    const renamed = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(renamed?.stderr).toContain('does not document "reviewSkillInterval"')
+    expect(renamed?.stderr).toContain('documents "reviewSkillIntervalX"')
+    // A deprecated alias in a CHANNEL is the other refusal: writes reject the old
+    // name, so a surface that still spells it teaches something unusable. (The
+    // document is checked by id parity above; the alias rule reads channel sources,
+    // where such a literal is a real reference rather than prose.)
+    await writeFile(join(root, 'PARAMETERS.md'), '| `reviewSkillInterval` | E3 | live | cordis | evolution-review | — | Aliased by hand. |\n', 'utf8')
+    await mkdir(join(root, 'evolution-commands', 'src'), { recursive: true })
+    // The fixture registry declares `memoryInterval`, so that is the alias a channel
+    // keeping the old name would spell.
+    await writeFile(join(root, 'evolution-commands', 'src', 'params.ts'), "// fixture: a channel that kept the deprecated name\nconst alias = 'memoryInterval'\nexport const untouched = alias\n", 'utf8')
+    const aliased = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(aliased?.code).toBe(1)
+    expect(aliased?.stderr).toContain('DEPRECATED alias "memoryInterval"')
+  })
+})
