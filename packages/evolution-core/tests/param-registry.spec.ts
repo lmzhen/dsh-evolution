@@ -62,7 +62,7 @@ describe('parameter registry (G1/S1.1)', () => {
       expect(APPLIES, entry.id + ' applies').toContain(entry.applies)
       expect(entry.owner, entry.id + ' owner is named').not.toBe('')
       expect(existsSync(join(packagesRoot, entry.owner)), entry.id + ' owner package exists').toBe(true)
-      expect(entry.docAnchor, entry.id + ' docAnchor').toMatch(/^docs/ )
+      expect(entry.docAnchor, entry.id + ' docAnchor').toMatch(/^PARAMETERS\.md#/)
       expect(entry.summary.length, entry.id + ' summary').toBeGreaterThan(10)
       // The registry names canonical ids; a deprecated alias is never an id.
       expect(PARAM_ALIASES[entry.id], entry.id + ' is canonical').toBeUndefined()

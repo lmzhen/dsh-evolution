@@ -78,6 +78,16 @@ exercised) — that table is the record; a platform change reviewed with no fami
 action taken is recorded in the CHANGELOG section of the round that reviewed it
 (no separate register file: `packages/docs/**` is not a versioned surface).
 
+## Parameters
+
+[PARAMETERS.md](./PARAMETERS.md) lists every parameter the family registers: its
+tier (who may write it), the surface that writes it, and when a change takes
+effect. The table is generated from the registry in
+`evolution-core/src/params.ts` (`node packages/scripts/gen-param-docs.mjs
+packages`), and `verify-param-registry.mjs` fails the gate when the two differ,
+so it mirrors the registry rather than duplicating it. Inside a session the same
+rows come from `/evolution params` (see the command reference below).
+
 ## Command reference
 
 The `/evolution` surface below is generated from the subcommand registry

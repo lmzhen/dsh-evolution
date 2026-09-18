@@ -9,12 +9,26 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { PARAM_NAMESPACES, clampedNumber, installParamSection, MEMORY_GUIDANCE_SECTION_ORDER, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
 /** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
 const DEFAULT_ENTRY_PREVIEW_CHARS = 200
+
+/** G3/S3.2: the memory TOOL's user-tunable display knob (canonical id).
+ * `memoryEnabled` stays a deployment switch on purpose: it decides whether the
+ * tool and its prompt section are REGISTERED at all, so making it live would mean
+ * dynamic registration with catalog-visible effects — a structural change this
+ * batch deliberately does not make (registry tier E2). */
+export interface ToolMemorySettings {
+  /** Characters of one memory entry shown in a tool result preview. */
+  entryPreviewChars: number
+}
+
+export const TOOL_MEMORY_SETTINGS_SCHEMA: z<ToolMemorySettings> = z.object({
+  entryPreviewChars: z.number().min(1).default(DEFAULT_ENTRY_PREVIEW_CHARS),
+})
 export const inject = ['tools', 'memory']
 
 /**
@@ -115,6 +129,16 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   // (`slice(0, NaN)`). The schema `.min(1)` rejects 0/negative at load; this
   // clamp also covers NaN/±Infinity.
   const entryPreviewChars = clampedNumber(rawConfig.entryPreviewChars, DEFAULT_ENTRY_PREVIEW_CHARS, { min: 1 })
+  // G3/S3.2: the user layer may override the preview length; read at USE time so
+  // a committed change applies to the next tool result without a restart.
+  const previewOverrides = installParamSection<ToolMemorySettings>(
+    ctx,
+    PARAM_NAMESPACES['tool-memory'] ?? 'tool-memory',
+    TOOL_MEMORY_SETTINGS_SCHEMA,
+    { entryPreviewChars },
+    { warn: (message) => { ctx.logger.warn('tool-memory: ' + message) } },
+  )
+  const previewChars = (): number => previewOverrides.get('entryPreviewChars') ?? entryPreviewChars
   if (entryPreviewChars !== (rawConfig.entryPreviewChars ?? DEFAULT_ENTRY_PREVIEW_CHARS)) {
     ctx.logger.warn(`tool-memory: entryPreviewChars=${String(rawConfig.entryPreviewChars)} is invalid; falling back to the default ${DEFAULT_ENTRY_PREVIEW_CHARS}`)
   }
@@ -238,7 +262,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     return {
       ok: result.ok,
       message: result.message,
-      entries: result.entries.map(entry => entry.slice(0, entryPreviewChars)),
+      entries: result.entries.map(entry => entry.slice(0, previewChars())),
       chars: result.chars,
       limit: result.limit,
     }

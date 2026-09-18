@@ -328,6 +328,37 @@ describe('tool-memory', () => {
     expect(entries[0]).toHaveLength(200)
   })
 
+  it('G3/S3.2: a user-layer entryPreviewChars applies to the next tool result', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    // Fake settings provider: the user layer caps the preview, and `push`
+    // republishes it the way settings-file does on an external edit.
+    let user: Record<string, unknown> = { entryPreviewChars: 4 }
+    const watchers: Array<() => void> = []
+    ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'settings', {
+      register: (_ns: string, _schema: unknown, options: { base: unknown }) => ({
+        get: () => ({ ...(options.base as Record<string, unknown>), ...user }),
+        watch: (callback: () => void) => { watchers.push(callback); return () => {} },
+      }),
+      describe: () => [{ ns: 'evolution-tool-memory', user }],
+    })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: { session: { header: { version: 0, id: 's9', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
+    const capped = await tool.execute({ target: 'memory', action: 'add', facts: 'abcdefghij' }, execArg) as MemoryToolResult
+    expect(capped.ok).toBe(true)
+    expect(capped.entries[0], 'the user cap, not the 200-character default').toHaveLength(4)
+    // Live: raising it applies to the NEXT result without a restart.
+    user = { entryPreviewChars: 8 }
+    for (const callback of watchers) callback()
+    const raised = await tool.execute({ target: 'memory', action: 'add', facts: 'klmnopqrst' }, execArg) as MemoryToolResult
+    expect(raised.entries[0]).toHaveLength(8)
+  })
+
   it('V7-07: an empty operations array is rejected BEFORE the approval gate (0.3.43)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)

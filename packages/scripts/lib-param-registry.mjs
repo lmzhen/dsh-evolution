@@ -27,9 +27,13 @@ export function registryPath(root) {
   return join(root, 'evolution-core', 'src', 'params.ts')
 }
 
-/** Absolute path of the generated parameter document for one evolution root. */
+/** Absolute path of the generated parameter document for one evolution root.
+ *
+ * It sits at the family root BESIDE INSTALL.md, not under `packages/docs/`: that
+ * tree is gitignored and CONTRIBUTING calls it a source of material, never a
+ * home, so a gate cannot require a tracked document to match it. */
 export function docsPath(root) {
-  return join(root, 'docs', 'parameters.md')
+  return join(root, 'PARAMETERS.md')
 }
 
 /**
@@ -84,7 +88,7 @@ export function registryViolations(registry, root) {
     // names such as memory-files/tool-memory), so existence is the real check.
     if (entry.owner.length === 0) violations.push(where + ': owner is empty')
     else if (!existsSync(join(root, entry.owner))) violations.push(where + ': owner package ' + entry.owner + ' does not exist')
-    if (!entry.docAnchor.startsWith('docs/')) violations.push(where + ': docAnchor must start with docs/')
+    if (!entry.docAnchor.startsWith('PARAMETERS.md#')) violations.push(where + ': docAnchor must start with PARAMETERS.md# (the tracked parameter table)')
     if (entry.summary.length < 10) violations.push(where + ': summary is too short to be useful')
     const writable = entry.tier === 'E3' || entry.tier === 'E4'
     if (writable && entry.applies === 'none') violations.push(where + ': tier ' + entry.tier + ' must declare a settings timing')
@@ -111,8 +115,10 @@ export function renderParamDocs(registry, check) {
   const lines = [
     '# 参数表（生成物，勿手改）',
     '',
-    '> 由 `packages/scripts/gen-param-docs.mjs` 从 `evolution-core/src/params.ts` 的注册表生成；',
+    '> 由 `packages/scripts/gen-param-docs.mjs` 从 `evolution-core/src/params.ts` 的注册表生成，',
+    '> 门禁 `verify-param-registry` 逐字节比对两者（本文件受版本控制，是可引用的正文面）。',
     '> 改参数请改注册表，然后重跑生成器（`node packages/scripts/gen-param-docs.mjs packages`）。',
+    '> 会话内读同一份数据不需要文件：`/evolution params` 打印同样的行。',
     '',
     '## 档位含义（改哪个面）',
     '',

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate packages/docs/parameters.md from the parameter registry (G1/S1.2).
+ * Generate packages/PARAMETERS.md from the parameter registry (G1/S1.2).
  *
  * The registry is the single source; this document is a build product, so a
  * hand edit is drift by definition and verify-param-registry.mjs reports it.

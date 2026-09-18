@@ -32,7 +32,7 @@ function fakeProvider(options: FakeOptions = {}) {
     provider.describe = () => {
       if (options.describeThrows === true) throw new Error('describe unavailable')
       const user = options.user
-      const entry: { ns: string; user?: Record<string, unknown> } = { ns: PARAM_NAMESPACES.review! }
+      const entry: { ns: string; user?: Record<string, unknown> } = { ns: PARAM_NAMESPACES['evolution-review']! }
       if (user !== undefined) entry.user = user
       return [entry]
     }
@@ -79,12 +79,25 @@ describe('family parameter sections (G3/S3.1)', () => {
   it('warns and falls back when the user layer cannot be read', () => {
     for (const options of [{ describeThrows: true }, { omitDescribe: true }] as FakeOptions[]) {
       const warn = vi.fn()
-      const overrides = paramSectionOverrides(fakeProvider(options).provider, 'evolution-review', {}, BASE, warn)
+      const overrides = paramSectionOverrides(fakeProvider(options).provider, 'evolution-review', {}, BASE, { warn })
       expect(overrides.get('reviewSkillInterval')).toBeUndefined()
       expect(overrides.resolved()).toEqual(BASE)
       expect(warn).toHaveBeenCalledTimes(1)
       expect(String(warn.mock.calls[0]?.[0])).toContain('no readable user layer')
     }
+  })
+
+  it('notifies onChange after every committed change and after attach', () => {
+    const fake = fakeProvider()
+    const onChange = vi.fn()
+    const overrides = paramSectionOverrides(fake.provider, 'evolution-review', {}, BASE, { onChange })
+    expect(onChange, 'the initial read is not a change').not.toHaveBeenCalled()
+    fake.push({ reviewSkillInterval: 4 })
+    expect(onChange).toHaveBeenCalledTimes(1)
+    // Losing the user layer is also a committed change: consumers must rebuild.
+    fake.push(undefined)
+    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(overrides.get('reviewSkillInterval')).toBeUndefined()
   })
 
   it('attaches through the optional service and follows it when it appears', () => {

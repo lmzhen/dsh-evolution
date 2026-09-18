@@ -35,6 +35,21 @@ async function context(policy?: { memoryChars: number; userChars: number }) {
   return ctx
 }
 
+/** A fake platform settings provider: register + describe + a publish helper that
+ * fires the registered watchers, which is what settings-file does on an edit. */
+function provideSettings(ctx: Context, initialUser: Record<string, unknown>) {
+  let user = initialUser
+  const watchers: Array<() => void> = []
+  ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'settings', {
+    register: (_ns: string, _schema: unknown, options: { base: unknown }) => ({
+      get: () => ({ ...(options.base as Record<string, unknown>), ...user }),
+      watch: (callback: () => void) => { watchers.push(callback); return () => {} },
+    }),
+    describe: () => [{ ns: 'evolution-memory', user }],
+  })
+  return { push: (next: Record<string, unknown>) => { user = next; for (const callback of watchers) callback() } }
+}
+
 const budgetOf = (ctx: Context): Budget =>
   (ctx as unknown as { get(name: string): unknown }).get('evolutionMemoryBudget') as Budget
 
@@ -82,6 +97,27 @@ describe('memory budget surfaces (S2-12③)', () => {
     expect(budget.memoryCharLimit).toBe(4000)
     expect(budget.memorySource).toBe('config')
     expect(warnSpy.mock.calls.filter(call => String(call[0]).includes('contradicts evolution-policy'))).toHaveLength(0)
+  })
+
+  it('G3/S3.2: a user-layer budget wins, is reported as source user, and the STORE enforces it', async () => {
+    const ctx = await context({ memoryChars: 4000, userChars: 900 })
+    const settings = provideSettings(ctx, { memoryChars: 30 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-user-') })
+    const budget = budgetOf(ctx)
+    expect(budget.memoryCharLimit, 'the user layer is the highest-priority surface').toBe(30)
+    expect(budget.memorySource).toBe('user')
+    expect(budget.userCharLimit, 'an unset key still follows the policy').toBe(900)
+    expect(budget.userSource).toBe('policy')
+    // The store itself must judge by the user value: a 40-char entry is refused
+    // against the 30-char limit the user set, not the policy's 4000.
+    const refused = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'x'.repeat(40) }])
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain('30')
+    // Live: the next committed change rebuilds the store, so a RAISED limit
+    // accepts the same entry without a restart.
+    settings.push({ memoryChars: 4000 })
+    const accepted = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'y'.repeat(40) }])
+    expect(accepted.ok).toBe(true)
   })
 
   it('a value equal to the SCHEMA DEFAULT is treated as unset (documented limitation)', async () => {

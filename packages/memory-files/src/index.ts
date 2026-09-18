@@ -7,9 +7,32 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, PARAM_NAMESPACES, evolutionIoAdapter, installParamSection, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
+import type { ParamOverrides } from '@deepseek-ai/dsh-evolution-core'
+
+/** G3/S3.2: the memory section's schema. Field names are the CANONICAL ids from
+ * the parameter registry (`memoryChars`/`userChars` are the policy-side names the
+ * review planner reads too), so the settings document, the params output, the
+ * doctor report and the cards spell one name. */
+export interface MemorySettings {
+  /** Character budget the store enforces for MEMORY.md. */
+  memoryChars: number
+  /** Character budget the store enforces for USER.md. */
+  userChars: number
+  /** Prefix stored entries with their date heading. */
+  addDatePrefix: boolean
+  /** Consolidation failures one turn tolerates before the tool stops retrying. */
+  maxConsolidationFailures: number
+}
+
+export const MEMORY_SETTINGS_SCHEMA: z<MemorySettings> = z.object({
+  memoryChars: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
+  userChars: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
+  addDatePrefix: z.boolean().default(false),
+  maxConsolidationFailures: z.number().min(1).default(DEFAULT_CONSOLIDATION_FAILURES),
+})
 
 export const name = 'memory-files'
 export const inject = ['memory', 'evolutionIo']
@@ -131,16 +154,44 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // the memoryRoot() default unchanged.
   const trimmedRoot = (config.root || '').trim()
   const resolvedRoot = trimmedRoot === '' ? '' : resolve(trimmedRoot)
-  const store = new MemoryStore({
-    memoryCharLimit: config.memoryCharLimit,
-    userCharLimit: config.userCharLimit,
-    addDatePrefix: config.addDatePrefix,
-    maxConsolidationFailures: config.maxConsolidationFailures,
+  // G3/S3.2: the user layer sits above the deployment carriers for these four
+  // knobs. `MemoryStore` reads its limits in the CONSTRUCTOR, so a committed
+  // change rebuilds the store (the platform's `onChange` hook exists for exactly
+  // this: rebuild registration-level facts). The store holds no state beyond its
+  // options — the write queue lives outside it — so swapping it is safe, and the
+  // provider closures below read the CURRENT binding at call time.
+  // The reader lives in a holder: `installParamSection` may attach a provider
+  // inside this same tick (which fires onChange), so the builder must be able to
+  // look the reader up without a temporal-dead-zone read. The family uses the
+  // same holder idiom where control-flow analysis would otherwise narrow a
+  // later assignment away.
+  const section: { overrides?: ParamOverrides<MemorySettings> } = {}
+  const buildStore = (): MemoryStore => new MemoryStore({
+    memoryCharLimit: section.overrides?.get('memoryChars') ?? config.memoryCharLimit,
+    userCharLimit: section.overrides?.get('userChars') ?? config.userCharLimit,
+    addDatePrefix: section.overrides?.get('addDatePrefix') ?? config.addDatePrefix,
+    maxConsolidationFailures: section.overrides?.get('maxConsolidationFailures') ?? config.maxConsolidationFailures,
     // F-2 (v18): the memory store's own exemption list, now configurable.
     threatExemptLabels: config.threatExemptLabels,
     ...resolvedRoot !== '' ? { root: resolvedRoot } : {},
     io,
   })
+  let store = buildStore()
+  section.overrides = installParamSection<MemorySettings>(
+    ctx,
+    PARAM_NAMESPACES['memory-files'] ?? 'evolution-memory',
+    MEMORY_SETTINGS_SCHEMA,
+    {
+      memoryChars: config.memoryCharLimit,
+      userChars: config.userCharLimit,
+      addDatePrefix: config.addDatePrefix,
+      maxConsolidationFailures: config.maxConsolidationFailures,
+    },
+    {
+      warn: (message) => { ctx.logger.warn('memory-files: ' + message) },
+      onChange: () => { store = buildStore() },
+    },
+  )
   const provider: MemoryProvider = {
     name: config.providerName,
     read: (target: MemoryTarget) => store.read(target),
@@ -174,11 +225,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // S2-12③: publish the EFFECTIVE budget so doctor can compare the two surfaces
   // at run time (the same one-writer/one-reader contract as evolutionFeedback /
   // evolutionReplay). `source` names which surface won at load.
+  // G3/S3.2: the published budget is a LIVE VIEW (getters), because the user
+  // layer can change at run time and the store is rebuilt to match. 'user' is the
+  // highest-priority source; the deployment reasons keep their names.
+  const limitSource = (name: 'memoryChars' | 'userChars', explicit: boolean, policyValue: number | undefined): string => {
+    if (section.overrides?.get(name) !== undefined) return 'user'
+    if (explicit) return 'config'
+    return policyValue === undefined ? 'default' : 'policy'
+  }
   ctx.provide('evolutionMemoryBudget', {
-    memoryCharLimit: config.memoryCharLimit,
-    userCharLimit: config.userCharLimit,
-    memorySource: explicitLimit('memoryCharLimit') ? 'config' : (budget.memory === undefined ? 'default' : 'policy'),
-    userSource: explicitLimit('userCharLimit') ? 'config' : (budget.user === undefined ? 'default' : 'policy'),
+    get memoryCharLimit(): number { return section.overrides?.get('memoryChars') ?? config.memoryCharLimit },
+    get userCharLimit(): number { return section.overrides?.get('userChars') ?? config.userCharLimit },
+    get memorySource(): string { return limitSource('memoryChars', explicitLimit('memoryCharLimit'), budget.memory) },
+    get userSource(): string { return limitSource('userChars', explicitLimit('userCharLimit'), budget.user) },
     policyMemoryChars: budget.memory,
     policyUserChars: budget.user,
   })

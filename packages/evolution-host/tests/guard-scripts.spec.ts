@@ -405,7 +405,7 @@ const paramGen = join(scripts, 'gen-param-docs.mjs')
 
 /** One registry entry line in the shape the machine-read contract declares. */
 function entryLine(id: string): string {
-  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'E3'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + "'live'" + ', docAnchor: ' + "'docs/parameters.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ' },'
+  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'E3'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + "'live'" + ', docAnchor: ' + "'PARAMETERS.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ' },'
 }
 
 /** A minimal registry source; `Object.freeze({ ... })` mirrors the real file. */
@@ -436,6 +436,11 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
   it('passes on the real tree with the generated document', async () => {
     const ok = await run(process.execPath, [paramGuard, psRoot, '--strict'], { encoding: 'utf8' })
     expect(ok.stdout).toContain('verify-param-registry: OK')
+    // The document must live on a TRACKED surface: `packages/docs/**` is
+    // gitignored (CONTRIBUTING: a source of material, never a home), so a gate
+    // that required a document there would fail on a fresh clone.
+    expect(existsSync(join(psRoot, 'PARAMETERS.md')), 'the table sits beside INSTALL.md').toBe(true)
+    expect(existsSync(join(psRoot, 'docs', 'parameters.md')), 'not under the gitignored tree').toBe(false)
   })
 
   it('fails on a duplicate id and on a vacuum root', async () => {
@@ -465,7 +470,7 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
     await run(process.execPath, [paramGen, root], { encoding: 'utf8' })
     const current = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
     expect(current.stdout).toContain('verify-param-registry: OK')
-    const doc = join(root, 'docs', 'parameters.md')
+    const doc = join(root, 'PARAMETERS.md')
     await writeFile(doc, readFileSync(doc, 'utf8') + '\n| hand edit |', 'utf8')
     const stale = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })

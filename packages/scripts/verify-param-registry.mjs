@@ -3,7 +3,7 @@
  * Parameter-registry guard (G1/S1.3, gate step after verify-declared-config).
  *
  * Two mechanical questions: does the registry satisfy its contract (design
- * 8.1), and is packages/docs/parameters.md current with respect to it? Both are
+ * 8.1), and is packages/PARAMETERS.md current with respect to it? Both are
  * answered from the SAME text the runtime module uses (machine-read contract in
  * params.ts), and param-registry.spec.ts pins text-versus-module agreement.
  *

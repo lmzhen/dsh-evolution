@@ -493,10 +493,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   const overrides = installParamSection<ReviewSettings>(
     ctx,
-    PARAM_NAMESPACES.review ?? REVIEW_SETTINGS_NAMESPACE,
+    PARAM_NAMESPACES['evolution-review'] ?? REVIEW_SETTINGS_NAMESPACE,
     REVIEW_SETTINGS_SCHEMA,
     settingsBase,
-    (message) => { ctx.logger.warn('dsh-evolution-review: ' + message) },
+    // No onChange: every consumer reads params() at use time.
+    { warn: (message) => { ctx.logger.warn('dsh-evolution-review: ' + message) } },
   )
   const params = (): ReviewSettings => {
     const snapshot = policy()
