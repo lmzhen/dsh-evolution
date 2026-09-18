@@ -1,42 +1,78 @@
 /**
- * Browser half: one card per settings namespace the family registers.
+ * Browser half: one settings section ("自进化") hosting one card per namespace.
  *
- * The join key is the namespace itself — the Host half of each owning plugin
- * registers it, this half claims it in the keyed `settings.plugin.item` slot, and
- * the configuration tab pairs them. A namespace the Host does not serve renders
- * nothing, and a deployment that drops this row shows no cards at all: the pair
- * carries no Host-side behaviour.
+ * Until 0.7.0 the cards lived inside the platform's own 插件 section, because
+ * this bundle injected `@deepseek-ai/dsh-client-ui-settings-plugins` and claimed
+ * its keyed `settings.plugin.item` slot. The parameters are not a plugin
+ * inventory though — the other feature areas (market, skins, Web plugins, side
+ * cards) each register their OWN section, so this bundle now does the same:
+ * inject the settings shell, register `settings.section`, and host the cards in
+ * a keyed child slot of that section.
+ *
+ * The join key is still the namespace itself: the Host half of each owning plugin
+ * registers it, this half claims it in the keyed card slot, and the section pairs
+ * them. A namespace the Host does not serve renders nothing, and a deployment that
+ * drops this row shows no section at all: the pair carries no Host-side behaviour.
  * @module @deepseek-ai/dsh-evolution-settings-ui/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
+import { en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace } from './ParamCard.ts'
-import { message } from './messages.ts'
-import type { ClientSeam, ParamSectionSource } from './seam.ts'
+import { CARD_SLOT, type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { SettingsSection } from './SettingsSection.ts'
 
-/** Required client services: the slot registry and the settings transport. */
-export const inject = ['slots', 'settingsScope']
+/** Required client services: the slot registry, the settings transport, the locale seat. */
+export const inject = ['slots', 'settingsScope', 'locale']
+
+/** Section id and nav order (the platform's own sections sit at 0/10/15/20). */
+export const SECTION_ID = 'evolution'
+export const SECTION_ORDER = 25
 
 /**
- * Register one card per generated namespace section.
+ * Register the locale namespace, the section and its cards.
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
   const seam = ctx as unknown as ClientSeam
-  seam.slots.inject('settings.plugin.item', function* () {
+  try {
+    seam.locale.register(NS, { zh, en })
+  } catch {
+    // The locale seat is optional: without it the bundle falls back to its own copy.
+  }
+  const t = (key: MessageKey): string => {
+    try {
+      return seam.locale.bind(NS)(key)
+    } catch {
+      return message(key)
+    }
+  }
+
+  seam.slots.inject('settings.section', function* () {
+    yield seam.slots.register({
+      name: 'settings.section',
+      id: SECTION_ID,
+      order: SECTION_ORDER,
+      label: () => t('title'),
+      locale: NS,
+      children: { [CARD_SLOT]: { kind: 'keyed', scope: 'root' } },
+    }, SettingsSection)
+  })
+
+  seam.slots.inject(CARD_SLOT, function* () {
     for (const section of CLIENT_PARAM_SECTIONS) {
       const scope = seam.settingsScope.bind({ namespace: section.namespace })
       const source = scope as unknown as ParamSectionSource
       const face = (): ParamCardFace => ({
         namespace: section.namespace,
         fields: section.fields,
-        t: key => message(key),
+        t,
         write: (field, value) => scope.set(field, value),
         clear: field => scope.unset(field),
         hooks: { paramSection: source },
       })
       yield seam.slots.register({
-        name: 'settings.plugin.item',
+        name: CARD_SLOT,
         key: section.namespace,
         inject: face,
       }, ParamCard)
