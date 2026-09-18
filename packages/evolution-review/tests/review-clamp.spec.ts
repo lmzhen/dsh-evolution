@@ -48,6 +48,23 @@ describe('evolution-review G3.1 numeric clamping', () => {
     warnSpy.mockRestore()
   })
 
+
+  it('G0/S0.4: a row spelling the canonical ids resolves exactly like the alias', async () => {
+    const ctx = new Context()
+    const warnSpy = vi.spyOn(ctx.logger, 'warn')
+    // The canonical ids (`reviewSkillInterval`/`reviewMemoryInterval`) reach the
+    // row carrier once G3 widens the schema; the alias-aware read makes both
+    // spellings resolve to the same number already, with no clamp warning.
+    const clamped = Review.clampReviewConfig(
+      { reviewSkillInterval: 30, reviewMemoryInterval: 12 } as unknown as Review.Config,
+      ctx,
+    )
+    expect(clamped.skillInterval).toBe(30)
+    expect(clamped.memoryInterval).toBe(12)
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
+    warnSpy.mockRestore()
+  })
+
   it('V4-44: AbortSignal.timeout(0) aborts immediately — the semantic that forces the 0 clamp', async () => {
     // A 0 reviewTimeoutMs is NOT "no timeout"; it is an immediate abort. This
     // behavior-level assertion documents why the clamp to at least 1 exists.

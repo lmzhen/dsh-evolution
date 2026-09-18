@@ -19,7 +19,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { foldToolDispatches, readDispatchSignal, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
+import { foldToolDispatches, readDispatchSignal, readNumberParam, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
@@ -331,8 +331,10 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
     return result
   }
   const config = Object.assign({}, rawConfig, {
-    memoryInterval: field('memoryInterval', rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
-    skillInterval: field('skillInterval', rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+    // G0/S0.4: the row carrier may spell either the legacy alias (today) or the
+    // canonical policy id (once G3 widens the schema) — one rule, one helper.
+    memoryInterval: field('memoryInterval', readNumberParam(rawConfig, 'reviewMemoryInterval'), DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
+    skillInterval: field('skillInterval', readNumberParam(rawConfig, 'reviewSkillInterval'), DEFAULT_REVIEW_SKILL_INTERVAL, 1),
     // B-2 (v18): the 32-bit ceiling is enforced here as well as in the schema
     // (the schema may be bypassed by a programmatic assembly; clampedNumber
     // also catches NaN/±Infinity, which z.number() lets through).

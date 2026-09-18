@@ -69,12 +69,26 @@ export function canonicalWriteId(id: string): string {
  * @param id - canonical id (a deprecated alias is accepted and resolved first).
  * @returns the canonical value when present, else the alias value, else undefined.
  */
-export function readParam(carrier: Record<string, unknown> | undefined, id: string): unknown {
+export function readParam(carrier: object | undefined, id: string): unknown {
   if (carrier === undefined) return undefined
+  const record = carrier as Record<string, unknown>
   const canonical = resolveParamId(id)
-  if (carrier[canonical] !== undefined) return carrier[canonical]
+  if (record[canonical] !== undefined) return record[canonical]
   for (const alias of ALIASES_BY_CANONICAL[canonical] ?? []) {
-    if (carrier[alias] !== undefined) return carrier[alias]
+    if (record[alias] !== undefined) return record[alias]
   }
   return undefined
+}
+
+/**
+ * Number-typed read over {@link readParam}: the family's tunables are numbers,
+ * and a value of another type reads as absent so the caller's default applies
+ * (the same outcome the numeric clamps produce for a malformed value).
+ * @param carrier - config/snapshot object to read from, or undefined.
+ * @param id - canonical id (a deprecated alias is accepted and resolved first).
+ * @returns the resolved number, or undefined when absent or not a number.
+ */
+export function readNumberParam(carrier: object | undefined, id: string): number | undefined {
+  const value = readParam(carrier, id)
+  return typeof value === 'number' ? value : undefined
 }

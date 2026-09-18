@@ -16,7 +16,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, isPresent, isUnknown, probeList, probeMtime, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, isPresent, isUnknown, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
@@ -268,7 +268,8 @@ export class EvolutionCurator extends Service {
       if (value !== undefined && result !== value) clamped.push(name)
       return result
     }
-    this.intervalHours = field('intervalHours', config.intervalHours, DEFAULT_CURATOR_INTERVAL_HOURS, 1)
+    // G0/S0.4: alias-aware read (canonical `curatorIntervalHours` resolves too).
+    this.intervalHours = field('intervalHours', readNumberParam(config, 'curatorIntervalHours'), DEFAULT_CURATOR_INTERVAL_HOURS, 1)
     this.staleAfterDays = field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS, 1)
     this.archiveAfterDays = field('archiveAfterDays', config.archiveAfterDays, DEFAULT_ARCHIVE_AFTER_DAYS, 1)
     // A2-17 (v18): a stale threshold above the archive threshold makes the

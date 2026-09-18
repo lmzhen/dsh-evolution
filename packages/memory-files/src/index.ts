@@ -87,6 +87,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // row that pins the default value explicitly is therefore indistinguishable
   // from one that leaves it unset, and follows the policy like the latter.
   const schemaDefaults = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: Config } } })['~standard'].validate({}).value
+  // G0/S0.4: the alias rule is deliberately NOT applied here. This predicate asks
+  // whether the OPERATOR set the row value (differs from the schema default), not
+  // what the value resolves to — routing it through readParam would let a canonical
+  // spelling count as explicit while the alias spelling still did, which is the
+  // question this branch exists to answer. The pair is documented in the Config
+  // JSDoc and reported by /evolution doctor (budgetIssues).
   const explicitLimit = (name: 'memoryCharLimit' | 'userCharLimit'): boolean =>
     rawConfig[name] !== undefined && rawConfig[name] !== schemaDefaults[name]
   const config = Object.assign({}, rawConfig, {

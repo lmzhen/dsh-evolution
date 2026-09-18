@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_SKILL_LIMITS, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -173,7 +173,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     ...policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy'))),
     maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
-    maxSkillContentChars: limit('maxSkillContentChars', rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+    // G0/S0.4: alias-aware read (canonical `skillContentChars` resolves too).
+    maxSkillContentChars: limit('maxSkillContentChars', readNumberParam(rawConfig, 'skillContentChars'), DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
   }
   const library = newSkillLibrary({ config: rawConfig, io, limits: libraryOptions, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
