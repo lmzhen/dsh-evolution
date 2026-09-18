@@ -68,8 +68,6 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
       { id: 'descriptionStrict', group: 'write-caps', doc: 'Refuse a description over the authoring bar instead of advising.' },
       { id: 'strictCrossSource', group: 'write-caps', doc: 'Refuse writes whose catalog entry resolves outside the family.' },
       { id: 'citationPolicy', group: 'write-caps', doc: 'Refuse a move that would leave a dangling reference, or verify it.' },
-      { id: 'referenceRewrite', group: 'write-caps', doc: 'Re-home support files and rewrite references during a merge (plan or apply).' },
-      { id: 'archiveRetention', group: 'write-caps', doc: 'Report expired archives, or prune them.' },
       { id: 'supportFileCharPolicy', group: 'write-caps', doc: 'Warn about an oversize support file, or refuse the write.' },
     ],
   },

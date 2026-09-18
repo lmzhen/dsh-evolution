@@ -26,8 +26,6 @@ function sectionValues(): SkillSettings {
     descriptionStrict: false,
     strictCrossSource: false,
     citationPolicy: 'verify',
-    referenceRewrite: 'plan',
-    archiveRetention: 'report',
     supportFileCharPolicy: 'report',
   }
 }
@@ -86,7 +84,7 @@ async function setup(user: Record<string, unknown> = {}) {
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
-  return { ctx, settings, execute, cleanup }
+  return { ctx, settings, execute, cleanup, root }
 }
 
 /** The tool's structured result, as the tests read it back. */
@@ -155,7 +153,6 @@ describe('skill write settings (G3/S3.4)', () => {
     expect(valueOf(refused).message).toContain('strict bar')
     await cleanup()
   })
-
   it('switches the citation stage to refuse for a section that stays behind', async () => {
     const { settings, execute, cleanup } = await setup()
     const body = (name: string) => ['---', 'name: ' + name, 'description: Cited body.', '---', '', '# Cited', '', '## Log', '', '> 详见 references/notes.md', '', '## Usage', '', 'Use it.', ''].join('\n')

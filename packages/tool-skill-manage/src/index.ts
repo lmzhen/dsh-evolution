@@ -25,7 +25,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY, PARAM_NAMESPACES, installParamSection, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
-import type { ArchiveRetentionPolicy, CitationPolicy, ParamOverrides, ReferenceRewritePolicy, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 
@@ -100,10 +100,6 @@ export interface SkillSettings {
   strictCrossSource: boolean
   /** Refuse a move that would leave a dangling reference, or verify it. */
   citationPolicy: CitationPolicy
-  /** Re-home support files and rewrite references during a merge (plan or apply). */
-  referenceRewrite: ReferenceRewritePolicy
-  /** Report expired archives, or prune them. */
-  archiveRetention: ArchiveRetentionPolicy
   /** Warn about an oversize support file, or refuse the write. */
   supportFileCharPolicy: SupportFileCharPolicy
 }
@@ -118,8 +114,6 @@ export const SKILLS_SETTINGS_SCHEMA: z<SkillSettings> = z.object({
   descriptionStrict: z.boolean().default(false),
   strictCrossSource: z.boolean().default(false),
   citationPolicy: z.union([z.const('verify'), z.const('refuse')]).default(DEFAULT_CITATION_POLICY),
-  referenceRewrite: z.union([z.const('off'), z.const('plan'), z.const('apply')]).default(DEFAULT_REFERENCE_REWRITE_POLICY),
-  archiveRetention: z.union([z.const('report'), z.const('prune')]).default(DEFAULT_ARCHIVE_RETENTION_POLICY),
   supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).default(DEFAULT_SUPPORT_FILE_CHAR_POLICY),
 })
 
@@ -267,8 +261,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     descriptionStrict: rawConfig.descriptionStrict ?? false,
     strictCrossSource: rawConfig.strictCrossSource ?? false,
     citationPolicy: libraryLimits.citationPolicy ?? DEFAULT_CITATION_POLICY,
-    referenceRewrite: libraryLimits.referenceRewrite ?? DEFAULT_REFERENCE_REWRITE_POLICY,
-    archiveRetention: libraryLimits.archiveRetention ?? DEFAULT_ARCHIVE_RETENTION_POLICY,
     supportFileCharPolicy: libraryLimits.supportFileCharPolicy ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY,
   }
   // The reader lives in a holder: attaching the section can fire `onChange`
@@ -292,21 +284,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       descriptionStrict: pick('descriptionStrict'),
       strictCrossSource: pick('strictCrossSource'),
       citationPolicy: overridden('citationPolicy') ?? stages.citationPolicy ?? settingsBase.citationPolicy,
-      referenceRewrite: overridden('referenceRewrite') ?? stages.referenceRewrite ?? settingsBase.referenceRewrite,
-      archiveRetention: overridden('archiveRetention') ?? stages.archiveRetention ?? settingsBase.archiveRetention,
       supportFileCharPolicy: overridden('supportFileCharPolicy') ?? stages.supportFileCharPolicy ?? settingsBase.supportFileCharPolicy,
     }
   }
   const applyLimits = (): void => {
     const resolved = settings()
+    // Read the deployment carriers at apply time too: a policy edit lands on the
+    // next write without a restart, exactly like a user-layer edit does.
+    const stages = policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy')))
     Object.assign(libraryLimits, {
       maxNameLength: resolved.maxSkillNameLength,
       maxDescriptionLength: resolved.maxDescriptionLength,
       maxSkillContentChars: resolved.skillContentChars,
       maxSkillFileBytes: resolved.maxSkillFileBytes,
       citationPolicy: resolved.citationPolicy,
-      referenceRewrite: resolved.referenceRewrite,
-      archiveRetention: resolved.archiveRetention,
+      // These two stages have no consumer in THIS package's write path (the merge
+      // and the archive prune live in evolution-curator and the rollback path), so
+      // they stay on the deployment policy — the registry declares them E2 for
+      // exactly that reason. Only the two the owner's writes actually read are
+      // user-writable.
+      referenceRewrite: stages.referenceRewrite ?? DEFAULT_REFERENCE_REWRITE_POLICY,
+      archiveRetention: stages.archiveRetention ?? DEFAULT_ARCHIVE_RETENTION_POLICY,
       supportFileCharPolicy: resolved.supportFileCharPolicy,
     })
   }
