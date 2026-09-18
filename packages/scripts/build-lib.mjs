@@ -43,3 +43,10 @@ for (const name of packages) {
   console.log(`build: ${name}`)
   run(tsdown, ['--config', config], join(evolutionRoot, name))
 }
+// G4/S4.4: the BROWSER halves. A package declaring `dsh.client` ships a loader
+// artifact (`lib/client.js`) that the host build above never produces: without
+// this step a release would publish a missing or stale bundle while every host
+// artifact stayed current. build-client.mjs discovers those packages itself and
+// is a no-op when none declares `dsh.client`.
+const clientBuild = join(evolutionRoot, 'scripts', 'build-client.mjs')
+if (existsSync(clientBuild)) run(clientBuild, [], repoRoot)
