@@ -103,6 +103,49 @@ export function renderParamRows(rows: readonly ParamSurfaceRow[], options: { pro
 }
 
 /**
+ * Parse one command-line value into what the settings document stores: JSON
+ * when it parses (numbers, booleans, quoted strings, arrays, objects), the raw
+ * text otherwise, so a bare word like `enforce` stays a word.
+ * @param raw - the text typed after the parameter id.
+ * @returns the value to write.
+ */
+export function parseParamValue(raw: string): unknown {
+  const text = raw.trim()
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    // Not JSON: the schema decides whether a bare word is legal (enums) or not.
+    return text
+  }
+}
+
+/** One accepted write, as the command echoes it back. */
+export interface ParamWriteEcho {
+  id: string
+  namespace: string
+  applies: ParamExposure['applies']
+  before: unknown
+  after: unknown
+  /** Whether the user section already carried this key. */
+  wasOverridden: boolean
+}
+
+/**
+ * Render the write result: the value move, then where it landed and when it
+ * takes effect (the two things a caller cannot infer from the command line).
+ * @param write - the accepted write.
+ * @returns the command text.
+ */
+export function renderPolicySet(write: ParamWriteEcho): string {
+  const timing = write.applies === 'live'
+    ? 'takes effect at the next use (live)'
+    : 'takes effect after a host restart (restart)'
+  const origin = write.wasOverridden ? 'replacing your earlier override' : 'now a user override (the deployment value stays underneath)'
+  return [`${write.id}: ${renderValue(write.before)} → ${renderValue(write.after)}`,
+    `namespace ${write.namespace}; applies ${write.applies} — ${timing}; ${origin}`].join('\n')
+}
+
+/**
  * Render the rows as JSON for scripts (same fields, no formatting).
  * @param rows - rows from {@link paramSurfaceRows}.
  * @returns a JSON document with a `params` array.

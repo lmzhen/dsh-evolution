@@ -250,6 +250,9 @@ export interface SettingsProviderLike {
      * cannot express); throwing refuses the WRITE that produced the value. */
     validate?: (value: unknown) => void
   }): SettingsScopeLike
+  /** Merge a patch into one namespace's user layer. A stale `expectedRevision`
+   * rejects with the platform's SETTINGS_CONFLICT error. */
+  update?(namespace: string, patch: object, expectedRevision?: number): Promise<void>
   describe?(options?: { redactSecrets?: boolean }): {
     ns: string
     /** Current resolved section (schema defaults < base < user). */

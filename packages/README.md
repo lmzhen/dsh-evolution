@@ -111,6 +111,7 @@ pins the equality).
 | `/evolution skills refresh` | drop the catalog caches and re-read the tree |
 | `/evolution learn [request]` | send a learning request to this session |
 | `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
+| `/evolution policy set <id> <value> [--expect <revision>]` | write one user-writable parameter through the settings service (E3 only; E1/E2 stay in cordis.yml) |
 | `/evolution params [--group <name>] [--json]` | list every registered parameter: group, tier, timing, source and value (--json feeds scripts) |
 | `/evolution preset install [--base <name>[,<name>...]]` | generate one Evolution agent preset per named base into the user root (bases from the agent package's bases.json) |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |

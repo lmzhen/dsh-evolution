@@ -31,6 +31,7 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { usage: 'skills refresh', summary: 'drop the catalog caches and re-read the tree' },
   { usage: 'learn [request]', summary: 'send a learning request to this session' },
   { usage: 'maintain [--timeout=<ms> | --facts]', summary: 'run a maintenance scan (--facts: 0-token preview)' },
+  { usage: 'policy set <id> <value> [--expect <revision>]', summary: 'write one user-writable parameter through the settings service (E3 only; E1/E2 stay in cordis.yml)' },
   { usage: 'params [--group <name>] [--json]', summary: 'list every registered parameter: group, tier, timing, source and value (--json feeds scripts)' },
   { usage: 'preset install [--base <name>[,<name>...]]', summary: 'generate one Evolution agent preset per named base into the user root (bases from the agent package\'s bases.json)' },
   { usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', summary: 'move a body section into a references/ file' },

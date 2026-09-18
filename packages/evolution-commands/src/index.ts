@@ -8,10 +8,10 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
-import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
+import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
 import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -920,6 +920,68 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           if (input.endsWith('--json')) return ok(renderParamJson(selected))
           return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
+        }
+        const policySetMatch = /^policy set ([A-Za-z][A-Za-z0-9.-]*) (.+?)(?: --expect (\d+))?$/.exec(input)
+        if (policySetMatch) {
+          // S4.2: the WRITE face. One path only — the settings service. There is
+          // deliberately no YAML fallback: a command that edits cordis.yml would
+          // be a second write path to the same fact (design §8.3).
+          const provider = ctx.get('settings') as SettingsProviderLike | undefined
+          if (provider?.update === undefined || provider.describe === undefined) {
+            return err('E-311: no settings service is mounted, so there is no user layer to write. Mount the settings row (packages/settings/settings-file) and retry; this command never edits cordis.yml — a deployment value belongs to the deployment. /evolution doctor lists the mounted services.')
+          }
+          const rawId = policySetMatch[1] ?? ''
+          const rawValue = policySetMatch[2] ?? ''
+          let id: string
+          try {
+            id = canonicalWriteId(rawId)
+          } catch (error) {
+            return err(`E-312: ${error instanceof Error ? error.message : String(error)} — /evolution params lists the canonical ids.`)
+          }
+          const entry = PARAM_EXPOSURE.find(candidate => candidate.id === id)
+          if (entry === undefined) {
+            return err(`E-313: unknown parameter "${id}" — /evolution params lists every registered id with its tier and user layer.`)
+          }
+          if (entry.tier !== 'E3') {
+            return err(`E-314: "${id}" is a deployment parameter (tier ${entry.tier}, owner ${entry.owner}) — it is written in cordis.yml on its plugin or policy row, not from a session. /evolution params shows who may write each row.`)
+          }
+          const namespace = PARAM_NAMESPACES[entry.owner]
+          if (namespace === undefined) {
+            return err(`E-315: "${id}" has no user layer — owner ${entry.owner} publishes no settings namespace, so the value stays with the deployment.`)
+          }
+          let descriptor: { ns: string; value?: unknown; user?: Record<string, unknown>; revision?: number } | undefined
+          try {
+            descriptor = provider.describe({ redactSecrets: false }).find(candidate => candidate.ns === namespace)
+          } catch (error) {
+            return err(`E-307: the settings service could not report its sections (${error instanceof Error ? error.message : String(error)}). /evolution policy set needs the current revision to write safely; run /evolution doctor to see which services are mounted.`)
+          }
+          if (descriptor === undefined) {
+            return err(`E-316: namespace "${namespace}" is not registered — owner ${entry.owner} is not mounted in this composition, so its parameters cannot be written from here. /evolution params marks those rows 'unregistered'.`)
+          }
+          const current = descriptor.value
+          const resolved = typeof current === 'object' && current !== null ? current as Record<string, unknown> : undefined
+          const expectedRaw = policySetMatch[3]
+          const expected = expectedRaw === undefined ? descriptor.revision : Number(expectedRaw)
+          if (expectedRaw !== undefined && descriptor.revision !== undefined && Number(expectedRaw) !== descriptor.revision) {
+            return err(`E-309: revision conflict — you sent ${expectedRaw}, the document stands at ${descriptor.revision}. Re-read with /evolution params --json and retry.`)
+          }
+          const value = parseParamValue(rawValue)
+          try {
+            await provider.update(namespace, { [id]: value }, expected)
+          } catch (error) {
+            const code = (error as { code?: unknown } | null)?.code
+            const message = error instanceof Error ? error.message : String(error)
+            if (code === 'SETTINGS_CONFLICT') {
+              return err(`E-309: revision conflict — ${message}. Re-read with /evolution params --json and retry.`)
+            }
+            return err(`E-310: the settings service refused the write: ${message} — the owning plugin's rule stands (a cross-field pair, or a cap that may only be tightened). /evolution params shows the current value.`)
+          }
+          return ok(renderPolicySet({
+            id, namespace, applies: entry.applies,
+            before: descriptor.user?.[id] ?? resolved?.[id],
+            after: value,
+            wasOverridden: descriptor.user !== undefined && Object.hasOwn(descriptor.user, id),
+          }))
         }
         if (input === 'doctor' || input === 'doctor --json') {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
