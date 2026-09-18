@@ -27,6 +27,27 @@ export function registryPath(root) {
   return join(root, 'evolution-core', 'src', 'params.ts')
 }
 
+const NAMESPACE_ENTRY = /^\s*'([^']+)': '([^']+)',$/
+
+/**
+ * Parse the owner-package → namespace map from the registry text (the same
+ * machine-read contract the entries use: one entry per line). Keep this in step
+ * with PARAM_NAMESPACES in params.ts — param-registry.spec.ts asserts the two.
+ * @param {string} root - evolution root (the directory holding the packages).
+ * @returns {Record<string, string>} owner package directory name → namespace.
+ */
+export function readNamespaces(root) {
+  const text = readFileSync(registryPath(root), 'utf8')
+  const start = text.indexOf('export const PARAM_NAMESPACES')
+  const body = start < 0 ? '' : text.slice(start, text.indexOf('})', start))
+  const namespaces = {}
+  for (const line of body.split(/\r?\n/)) {
+    const match = NAMESPACE_ENTRY.exec(line)
+    if (match) namespaces[match[1]] = match[2]
+  }
+  return namespaces
+}
+
 /** Absolute path of the generated parameter document for one evolution root.
  *
  * It sits at the family root BESIDE INSTALL.md, not under `packages/docs/`: that

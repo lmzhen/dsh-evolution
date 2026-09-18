@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { PARAM_ALIASES, PARAM_EXPOSURE, type ParamExposure } from '@deepseek-ai/dsh-evolution-core'
+import { PARAM_ALIASES, PARAM_EXPOSURE, PARAM_NAMESPACES, type ParamExposure } from '@deepseek-ai/dsh-evolution-core'
 
 /**
  * G1/S1.1 guard for the parameter registry. It pins two things the .mjs tools
@@ -67,6 +67,21 @@ describe('parameter registry (G1/S1.1)', () => {
       // The registry names canonical ids; a deprecated alias is never an id.
       expect(PARAM_ALIASES[entry.id], entry.id + ' is canonical').toBeUndefined()
     }
+  })
+
+  it('pins the owner→namespace map to its machine-read text (G4/S4.4)', () => {
+    const text = readFileSync(join(packagesRoot, 'evolution-core', 'src', 'params.ts'), 'utf8')
+    const start = text.indexOf('export const PARAM_NAMESPACES')
+    const body = start < 0 ? '' : text.slice(start, text.indexOf('})', start))
+    const parsed: Record<string, string> = {}
+    for (const line of body.split(/\r?\n/)) {
+      const match = /^\s*'([^']+)': '([^']+)',$/.exec(line)
+      if (match) parsed[match[1]!] = match[2]!
+    }
+    // The client-card generator reads this text; a map that only exists in the
+    // module would leave the cards describing namespaces that do not exist.
+    expect(parsed).toEqual(PARAM_NAMESPACES)
+    expect(Object.keys(parsed).length).toBeGreaterThan(0)
   })
 
   it('treats E3 as the writable tier and everything below it as read-only', () => {
