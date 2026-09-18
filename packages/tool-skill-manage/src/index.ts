@@ -41,6 +41,11 @@ export interface Config {
   root?: string
   maxSkillNameLength?: number
   maxDescriptionLength?: number
+  /** Read cap for SKILL.md writes. Same semantic as the policy row's
+   * `skillContentChars` (the canonical id, G0/S0.2) — but NO automatic
+   * shadowing today: this row's value is what the write paths use, which is
+   * what the G3 unification has to close. Deprecated alias (G0/S0.3): still
+   * readable, refused by writes; removed in 0.7.0. */
   maxSkillContentChars?: number
   maxSkillFileBytes?: number
   /** When true, create/update refuse a description over the 60-char authoring bar (default: advisory feedback only). */

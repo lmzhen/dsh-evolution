@@ -12,6 +12,11 @@ Local layered memory provider: registers the `files` provider into `ctx.memory` 
 
 - `providerName` (default `files`): the registered name.
 - `memoryCharLimit` / `userCharLimit` (`2200` / `1375`) the budget the STORE enforces per target.
+  Deprecated names (G0/S0.3): the canonical ids are the policy row's `memoryChars` /
+  `userChars` (what the review planner reads). The two sides are not
+  auto-synchronised — `/evolution doctor` reports the divergence (`budgetIssues`).
+  Reading the legacy names still works; writing them is refused, and both are
+  removed in 0.7.0.
 - `root`: directory override; `''` means `$DSH_HOME/memories`.
 - `addDatePrefix` / `maxConsolidationFailures` (`false` / `3`) date prefixes on entries; consolidation failures one turn tolerates.
 - `threatExemptLabels` (default `[]`): benign threat labels for the MEMORY store (per-site rule in `evolution-threat`).

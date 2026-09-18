@@ -33,6 +33,10 @@ own, and the delivery mode lives on the `evolution-policy` row, not here.
 - `reviewToolAllow`: the allow-list review subagents are spawned with (default `[skill]`).
 - `reviewWakeInject` (default `true`): waking (`agent.followup`) delivery instead of the non-waking `agent.inject`.
 - `skillReviewTrigger` (`'cadence'` default, or `'completion'` / `'both'`): gates only the completion channel.
+- Deprecated names (G0/S0.3): `memoryInterval` and `skillInterval` are the legacy
+  spellings of the policy row's `reviewMemoryInterval` / `reviewSkillInterval`
+  (the snapshot shadows them in every shipped composition). Reading them still
+  works; writing them is refused, and both are removed in 0.7.0.
 
 ### Review delivery contract
 

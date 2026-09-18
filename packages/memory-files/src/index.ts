@@ -16,7 +16,15 @@ export const inject = ['memory', 'evolutionIo']
 
 export interface Config {
   providerName?: string
+  /** Store-enforced character budget for MEMORY.md. The policy row's
+   * `memoryChars` is the same semantic on the review-planner side and is the
+   * canonical id (G0/S0.2); the two are NOT auto-synchronised —
+   * `/evolution doctor` reports the divergence (budgetIssues). Deprecated alias
+   * (G0/S0.3): still readable, refused by writes; removed in 0.7.0. */
   memoryCharLimit?: number
+  /** Store-enforced character budget for USER.md; the canonical id is the policy
+   * row's `userChars`. Divergence is reported by `/evolution doctor`. Deprecated
+   * alias (G0/S0.3): still readable, refused by writes; removed in 0.7.0. */
   userCharLimit?: number
   addDatePrefix?: boolean
   root?: string

@@ -46,6 +46,10 @@ declare module '@deepseek-ai/cordis' {
 
 export interface Config {
   enabled?: boolean
+  /** The due-ness interval. The policy snapshot shadows it in every shipped
+   * composition — configure `curatorIntervalHours` there; that name is the
+   * canonical id. Deprecated alias (G0/S0.3): still readable, refused by
+   * writes; removed 0.7.0. */
   intervalHours?: number
   staleAfterDays?: number
   archiveAfterDays?: number

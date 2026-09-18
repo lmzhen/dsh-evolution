@@ -64,8 +64,12 @@ export interface Config {
    * row's value, which the plugin reports once at load (v37 P2-24). */
   reviewMode?: 'subagent' | 'inject'
   /** Shadowed by the policy snapshot in every shipped composition — configure
-   * `reviewMemoryInterval` on the `evolution-policy` row instead (v37 P2-24). */
+   * `reviewMemoryInterval` on the `evolution-policy` row instead (v37 P2-24).
+   * Deprecated alias (G0/S0.3): still readable, refused by writes; removed 0.7.0. */
   memoryInterval?: number
+  /** Shadowed by the policy snapshot in every shipped composition — configure
+   * `reviewSkillInterval` on the `evolution-policy` row instead. Deprecated
+   * alias (G0/S0.3): still readable, refused by writes; removed 0.7.0. */
   skillInterval?: number
   /**
    * Tools the one-shot review subagent may use. Only actually-existing tools

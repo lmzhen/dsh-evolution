@@ -20,6 +20,15 @@ Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) p
 
 `pin` and `unpin` are deliberately **outside** the approval seam. Pinning only lifts/restores the curator-lifecycle freeze (a lifecycle flag, never content) and is fully reversible by the same tool. Routing it through `policy:'ask'` would let a staged-but-never-approved request hold the library in a pinned state invisibly. Tradeoff accepted: no approval on a lifecycle-flag flip; if product policy changes, pin/unpin should be wired into the same staging path as `patch`.
 
+## Configuration
+
+- `maxSkillContentChars` / `maxSkillFileBytes` bound SKILL.md reads and support-file writes on this row.
+- Deprecated name (G0/S0.3): `maxSkillContentChars` is the legacy spelling of the
+  policy row's `skillContentChars` (canonical id). The two are not auto-synchronised
+  yet — this row's value is what the write paths use (the G3 unification closes
+  that gap). Reading the legacy name still works; writing it is refused, and it is
+  removed in 0.7.0.
+
 ## Known limitations
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
