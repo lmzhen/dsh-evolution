@@ -69,7 +69,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 |---|---|
 | 已验证的 DSH 平台线 | **`0.1.5-rc.2`**（`PLATFORM_VERSION`；`UPSTREAM_SHA=fb2c4b9e…`） |
 | 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.1.5-rc.2` |
-| 家族版本 | `0.7.0`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
+| 家族版本 | `0.7.1`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
 
 预发布 range 只认**一个**锚点，而不是一整族：`^0.1.5-rc.2` 会拒绝更晚的预发布后继版，但接受稳定版 `0.1.5`。更早的预发布线在依赖解析阶段就失败——这是支持窗口，不是 bug。
