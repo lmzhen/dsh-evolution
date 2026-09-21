@@ -24,4 +24,11 @@ declare module 'react' {
    * @returns the current value and its setter.
    */
   export function useState<S>(initial: S): [S, (next: S) => void]
+  /**
+   * Run one effect after the render that produced it, and again when a dependency
+   * changes.
+   * @param effect - the effect; a returned function cleans it up.
+   * @param deps - dependency list the renderer compares between renders.
+   */
+  export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void
 }

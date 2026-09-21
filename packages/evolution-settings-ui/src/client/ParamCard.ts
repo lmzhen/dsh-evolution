@@ -13,12 +13,19 @@
  * typed from the registry (\`control\`), so booleans are switches, enums are
  * selects and numbers are numeric inputs with the unit shown beside the label.
  */
-import { createElement, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
 import type { ParamSectionSnapshot, ParamSectionSource } from './seam.ts'
 
-/** Injected face: plain data and callbacks, plus the hook seat. */
+/**
+ * Injected face: plain data and callbacks, plus the hook seat.
+ *
+ * The `hooks` compartment belongs to the shell, not to the component: the
+ * renderer binds its entries to `use<Name>` props and omits `hooks` from what
+ * the component receives. A card that reads `props.hooks` therefore reads a prop
+ * that never exists.
+ */
 export interface ParamCardFace {
   namespace: string
   fields: readonly ClientParamField[]
@@ -28,8 +35,12 @@ export interface ParamCardFace {
   hooks: { paramSection: ParamSectionSource }
 }
 
-/** Props the renderer binds for one card: the inject face plus its hook seat. */
-export type ParamCardProps = ParamCardFace & {
+/**
+ * Props the renderer binds for one card: the inject face minus its hook compartment,
+ * plus the seats bound from it. Spelled the way the shell derives it, so reaching for
+ * `props.hooks` fails the type check instead of failing at runtime.
+ */
+export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
   /** Bound from \`hooks.paramSection\` by the renderer. */
   readonly useParamSection: <T>(selector: (state: ParamSectionSnapshot) => T) => T
 }
@@ -66,12 +77,6 @@ function parseFor(control: ClientParamField['control'], text: string): unknown {
 function isSection(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
-
-/** Let the settings store settle one write before the read-back (it batches updates). */
-async function settle(): Promise<void> {
-  await new Promise<void>((done) => { setTimeout(done, 60) })
-}
-
 
 interface FieldBlockProps {
   field: ClientParamField
@@ -158,48 +163,52 @@ export function ParamCard(props: ParamCardProps): ReactNode {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [pending, setPending] = useState<readonly string[] | null>(null)
   const snapshot = props.useParamSection((state: ParamSectionSnapshot) => state)
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
   if (snapshot.status === 'unavailable') return createElement('p', { className: 'evolution-param-note' }, t('unavailable'))
   const user = isSection(snapshot.user) ? snapshot.user : {}
   const value = isSection(snapshot.value) ? snapshot.value : {}
   const disabled = !snapshot.writable
+  // Controls lock while a write is in flight: the drafts this save staged are the ones
+  // the settling effect clears, so typing over them would lose the newer text.
+  const locked = disabled || busy
   const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
   const title = titleKey === undefined ? namespace : t(titleKey)
   const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
   const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[field.id])
   const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[field.id]))
   const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
+  /**
+   * Settle a staged write against the Host's answer.
+   *
+   * Both settings scopes this bundle runs on (the shell's own controller and the bridge
+   * variant) finish their recovery read BEFORE the write promise resolves, so the user
+   * layer read here is already the verdict: a field the Host refused leaves no key in
+   * it. The check lives in an effect, not in the save callback, because the raw
+   * snapshot is reachable only through the render-time seat — the face's `hooks`
+   * compartment never reaches the component.
+   */
+  useEffect(() => {
+    if (pending === null) return
+    const landed = isSection(snapshot.user) ? snapshot.user : {}
+    setPending(null)
+    setBusy(false)
+    if (pending.every(id => Object.hasOwn(landed, id))) setDraft({})
+    else setError(t('refused'))
+  }, [pending, snapshot.user, t])
   const save = (): void => {
     setBusy(true)
     setError('')
     void (async () => {
       try {
         for (const field of dirty) await write(field.id, parseFor(field.control, textOf(field)))
-        // The client settings scope RESOLVES a refused write: it recovers the
-        // snapshot and returns, and the remote call never rejects (verified in the
-        // installed dsh-client-ui-settings bundle). Success therefore has to be READ
-        // BACK — a field the Host refused leaves no key in the raw user section —
-        // and the read is retried briefly because the store may still be settling.
-        let landed = isSection(props.hooks.paramSection.getSnapshot().user)
-          ? props.hooks.paramSection.getSnapshot().user as Record<string, unknown>
-          : {}
-        for (let attempt = 0; attempt < 4 && dirty.some(field => !Object.hasOwn(landed, field.id)); attempt += 1) {
-          await settle()
-          const fresh = props.hooks.paramSection.getSnapshot()
-          landed = isSection(fresh.user) ? fresh.user : {}
-        }
-        if (dirty.some(field => !Object.hasOwn(landed, field.id))) {
-          setError(t('refused'))
-          return
-        }
-        setDraft({})
+        setPending(dirty.map(field => field.id))
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
         // so nothing the operator typed is lost.
-        setError(caught instanceof Error && caught.message !== '' ? caught.message : t('refused'))
-      } finally {
         setBusy(false)
+        setError(caught instanceof Error && caught.message !== '' ? caught.message : t('refused'))
       }
     })()
   }
@@ -224,7 +233,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
             field,
             text: textOf(field),
             overridden: Object.hasOwn(user, field.id),
-            disabled,
+            disabled: locked,
             t,
             onChange: change,
             clear,
