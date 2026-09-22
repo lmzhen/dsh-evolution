@@ -105,7 +105,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // `approval.list()` calls for the same reason).
     const evolutionCommand = {
       name: 'evolution',
-      description: 'Self-evolution status and approval controls',
+      description: '自进化：状态与待批准写入',
       recordInput: false,
       // input declaration: the frontend treats a declared-input command as
       // args-tolerant (leading claim keeps the whole rest, spaces included) —
@@ -991,7 +991,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
           return ok(renderDoctorText(report))
         }
-        return ok(`Evolution: memory, skills, review, curator — self-evolution status, approval and maintenance.\n${renderHelpText()}`)
+        return ok(`自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。\n${renderHelpText()}`)
       },
       handler: (invocation: CommandInvocation): Promise<CommandResult> =>
         evolutionCommand.run(invocation).catch((error: unknown): CommandResult => ({

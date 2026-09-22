@@ -47,6 +47,9 @@ for (const entry of registry.entries) {
     control: entry.control ?? 'text',
     unit: entry.unit ?? '',
     values: (entry.values ?? '').split('|').filter(Boolean),
+    // Display names for `values`, same order; an empty list keeps the raw value as the
+    // option text (older registries have no valueLabels at all).
+    valueLabels: (entry.valueLabels ?? '').split('|').filter(Boolean),
   })
   sections.set(namespace, fields)
 }
@@ -75,6 +78,8 @@ const lines = [
   "  unit: string",
   "  /** Allowed values for a select field ([] otherwise). */",
   "  values: readonly string[]",
+  "  /** Display names for `values`, same order ([] shows the raw value). */",
+  "  valueLabels: readonly string[]",
   "}",
   "",
   "/** One card: the settings namespace plus the fields it exposes. */",
@@ -91,9 +96,10 @@ for (const [namespace, fields] of ordered) {
   lines.push('    fields: [')
   for (const field of fields) {
     const values = '[' + field.values.map(single).join(', ') + ']'
+    const valueLabels = '[' + field.valueLabels.map(single).join(', ') + ']'
     lines.push('      { id: ' + single(field.id) + ', group: ' + single(field.group) + ', doc: ' + single(field.doc) +
       ', label: ' + single(field.label) + ', hint: ' + single(field.hint) + ', control: ' + single(field.control) +
-      ', unit: ' + single(field.unit) + ', values: ' + values + ' },')
+      ', unit: ' + single(field.unit) + ', values: ' + values + ', valueLabels: ' + valueLabels + ' },')
   }
   lines.push('    ],')
   lines.push('  },')

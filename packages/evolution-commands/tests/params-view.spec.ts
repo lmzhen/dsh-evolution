@@ -51,10 +51,10 @@ describe('params view (G4/S4.1)', () => {
   it('renders one line per row plus the counts, JSON for scripts', () => {
     const rows = paramSurfaceRows(new Map([[REVIEW_NS, { user: { reviewSkillInterval: 30 }, value: { reviewSkillInterval: 30 } }]]))
     const text = renderParamRows(rows, { providerMounted: true })
-    expect(text.split('\n')[0]).toContain('SOURCE')
+    expect(text.split('\n')[0]).toContain('来源')
     expect(text).toContain('reviewSkillInterval')
-    expect(text).toMatch(new RegExp(`${PARAM_EXPOSURE.length} parameter\\(s\\): E0 0`))
-    expect(text).toContain('1 overridden by the user')
+    expect(text).toContain(`共 ${PARAM_EXPOSURE.length} 个参数：E0 0`)
+    expect(text).toContain('你改过的：1 项')
     const parsed = JSON.parse(renderParamJson(rows)) as { params: Array<{ id: string; source: string }> }
     expect(parsed.params).toHaveLength(rows.length)
     expect(parsed.params.find(row => row.id === 'reviewSkillInterval')?.source).toBe('user')
@@ -80,8 +80,8 @@ describe('params view (G4/S4.1)', () => {
   it('says the user layer is unavailable instead of reporting no overrides', async () => {
     const bare = await mount('params')
     expect(bare.kind).toBe('success')
-    expect(bare.text).toContain('settings provider not mounted')
-    expect(bare.text).not.toContain('0 overridden by the user')
+    expect(bare.text).toContain('设置服务未挂载')
+    expect(bare.text).not.toContain('你改过的：0 项')
     // A provider whose describe throws is also not 'nothing is overridden'.
     const broken = await mount('params', () => { throw new Error('describe unavailable') })
     expect(broken.kind).toBe('error')

@@ -490,20 +490,25 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
       session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
       await expect.poll(() => capturedRequest !== undefined, { timeout: 10000, interval: 50 }).toBe(true)
-      // Wait for the plan to settle: op 2 either landed (the accept direction)
-      // or was refused (the clobber direction) — both end with the file no
-      // longer equal to op 1's intermediate bytes. Read the final bytes INSIDE
-      // the fixture: the temp DSH_HOME is removed in the finally below.
+      // Wait for the plan to SETTLE, not merely to have started. The earlier form
+      // ('the file differs from op 1's bytes') was satisfied by the PRE-RUN body as
+      // well — it differs from `first` too — so under a saturated suite the helper
+      // could return before either op landed, and the case read the untouched skill
+      // (REV-06b, twice). Quiescence is the observable that actually means 'settled':
+      // two consecutive samples agree AND the file has moved past op 1. The accept
+      // direction reaches `second`, the clobber direction keeps the concurrent
+      // writer's bytes, and a refused op 2 stays on `first` — which never satisfies
+      // this predicate, so that outcome fails the case instead of racing it.
+      let previousBytes: string | null = null
       await expect.poll(
         async () => {
           const current = await library.read(name).catch(() => null)
-          return current !== null && current !== first
+          const settled = current !== null && current !== first && current === previousBytes
+          previousBytes = current
+          return settled
         },
-        // The plan settles asynchronously after the captured request, and the poll
-        // budget must not be tighter than the case's own patience: a 3s budget here
-        // failed twice under a saturated suite (33 files transforming at once) while
-        // the same case passed in isolation — the budget, not the behaviour, was the
-        // defect. These two cases declare 30s, so the poll follows the case.
+        // These two cases declare 30s; the poll follows the case rather than
+        // inventing a tighter budget of its own.
         { timeout: 15_000, interval: 50 },
       ).toBe(true)
       return { first, second, landed: await library.read(name).catch(() => null) }

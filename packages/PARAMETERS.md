@@ -15,7 +15,7 @@
 | E3 | 本机用户 | `settings.yaml`／GUI 卡／`/evolution policy set` | 见 applies 列 |
 | E4 | 安装者 | 安装器开关／`row-overrides.json` | 装完固化 |
 
-## library
+## library（技能库）
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|
@@ -31,7 +31,7 @@
 | `sessionScoped` | E2 | none | cordis | evolution-review | — | Act only on sessions carrying the family model tools. |
 | `skill-usage.sessionScoped` | E2 | none | cordis | skill-usage | — | Keep the usage sidecar scoped per session (row-local name). |
 
-## write-caps
+## write-caps（写入上限）
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|
@@ -46,7 +46,7 @@
 | `archiveRetention` | E2 | none | cordis | tool-skill-manage | — | Report expired archives, or prune them. |
 | `supportFileCharPolicy` | E3 | live | cordis | tool-skill-manage | — | Warn about an oversize support file, or refuse the write. |
 
-## review
+## review（会话回顾）
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|
@@ -64,7 +64,7 @@
 | `reviewMaxDepth` | E2 | none | cordis | evolution-review | — | Absolute delegation-depth cap of the review subagent. |
 | `reviewToolAllow` | E2 | none | cordis | evolution-review | — | Tools the review subagent may use (safety surface). |
 
-## memory
+## memory（记忆）
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|
@@ -75,7 +75,7 @@
 | `addDatePrefix` | E3 | live | cordis | memory-files | — | Prefix stored memory entries with their date heading. |
 | `maxConsolidationFailures` | E3 | live | cordis | memory-files | — | Consolidation failures one turn tolerates before the tool gives up. |
 
-## curator
+## curator（技能整理）
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|
@@ -97,7 +97,7 @@
 | `curatorProvider` | E2 | none | cordis | evolution-curator | — | LLM provider for curator reviews (deployment identity). |
 | `curatorModel` | E2 | none | cordis | evolution-curator | — | Model for curator reviews (deployment identity). |
 
-## deployment
+## deployment（安装配置）
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|

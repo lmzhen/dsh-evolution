@@ -20,15 +20,17 @@ import { join } from 'node:path'
 // vanishing from the parsed set — a silent drop is how a registry edit turns
 // into a missing card without any guard firing.
 const ENTRY_HEAD = /^\s*\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'/
-const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)' \},$/
+const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')? \},$/
 // A plain row ends with ' },' and NOTHING else: a half-written UI tail (say only a
 // label) also ends that way, and accepting it would drop the tail silently while
 // the "non-E3 rows must not carry UI metadata" rule never fired.
 const ENTRY_PLAIN = /^ \},$/
 const ALIAS = /^\s*([A-Za-z][A-Za-z0-9]*): '([A-Za-z][A-Za-z0-9]*)',$/
 
-/** The optional UI tail, in its fixed order (see the contract in params.ts). */
+/** The UI tail, in its fixed order (see the contract in params.ts). */
 const UI_KEYS = ['label', 'hint', 'control', 'unit', 'values']
+/** Trailing UI keys a select row MAY add; never required, never allowed elsewhere. */
+const OPTIONAL_UI_KEYS = ['valueLabels']
 
 export const GROUPS = ['library', 'write-caps', 'review', 'memory', 'curator', 'deployment', 'internal']
 export const TIERS = ['E0', 'E1', 'E2', 'E3', 'E4']
@@ -45,6 +47,7 @@ export function registryPath(root) {
 }
 
 const NAMESPACE_ENTRY = /^\s*'([^']+)': '([^']+)',$/
+const GROUP_LABEL_ENTRY = /^\s*'?([a-z-]+)'?: '([^']+)',$/
 
 /**
  * Parse the owner-package → namespace map from the registry text (the same
@@ -79,6 +82,27 @@ export function docsPath(root) {
  * @param {string} root - evolution root (the directory holding the packages).
  * @returns {{ entries: object[], aliases: Record<string, string>, text: string, path: string }}
  */
+/**
+ * Parse the group → Chinese display-name block (same one-entry-per-line contract).
+ * @param {string} text - the registry source.
+ * @returns {Record<string, string>} group id → display name.
+ */
+function readGroupLabels(text) {
+  const start = text.indexOf('export const PARAM_GROUP_LABELS')
+  const body = start < 0 ? '' : text.slice(start, text.indexOf('})', start))
+  const labels = {}
+  for (const line of body.split(/\r?\n/)) {
+    const match = GROUP_LABEL_ENTRY.exec(line)
+    if (match) labels[match[1]] = match[2]
+  }
+  return labels
+}
+
+/**
+ * Parse the registry text.
+ * @param {string} root - evolution root (the directory holding the packages).
+ * @returns {{ entries: object[], aliases: Record<string, string>, groupLabels: Record<string, string>, text: string, path: string }}
+ */
 export function readRegistry(root) {
   const path = registryPath(root)
   const text = readFileSync(path, 'utf8')
@@ -98,22 +122,26 @@ export function readRegistry(root) {
       const rest = line.slice(head[0].length)
       const tail = ENTRY_TAIL.exec(rest)
       if (tail) {
-        entries.push({
+        const entry = {
           id: head[1], group: head[2], tier: head[3], authority: head[4],
           owner: head[5], applies: head[6], docAnchor: head[7], summary: head[8],
           label: tail[1], hint: tail[2], control: tail[3], unit: tail[4], values: tail[5],
-        })
+        }
+        // Absent stays absent: the validator distinguishes 'row did not opt in' from
+        // 'row opted in with an empty list'.
+        if (tail[6] !== undefined) entry.valueLabels = tail[6]
+        entries.push(entry)
       } else if (ENTRY_PLAIN.test(rest)) {
         entries.push({
           id: head[1], group: head[2], tier: head[3], authority: head[4],
           owner: head[5], applies: head[6], docAnchor: head[7], summary: head[8],
         })
       } else {
-        malformed.push(head[1] + ' (bad UI tail — expected `, label: …, hint: …, control: …, unit: …, values: … },`)')
+        malformed.push(head[1] + ' (bad UI tail — expected `, label: …, hint: …, control: …, unit: …, values: …[, valueLabels: …] },`)')
       }
     }
   }
-  return { entries, malformed, aliases, text, path }
+  return { entries, malformed, aliases, groupLabels: readGroupLabels(text), text, path }
 }
 
 /**
@@ -148,10 +176,11 @@ export function registryViolations(registry, root) {
     // UI metadata (0.7.0): the settings cards render E3 rows only, so the tail is
     // required there and forbidden everywhere else — a non-E3 row carrying a label
     // would describe a control that no surface renders.
-    const carried = UI_KEYS.filter(key => entry[key] !== undefined)
+    const carried = [...UI_KEYS, ...OPTIONAL_UI_KEYS].filter(key => entry[key] !== undefined)
     if (entry.tier === 'E3') {
-      if (carried.length !== UI_KEYS.length) {
-        violations.push(where + ': E3 row must carry the full UI tail ' + UI_KEYS.join('/') + ' (has ' + (carried.join('/') || 'none') + ')')
+      const missing = UI_KEYS.filter(key => entry[key] === undefined)
+      if (missing.length > 0) {
+        violations.push(where + ': E3 row must carry the full UI tail ' + UI_KEYS.join('/') + ' (missing ' + missing.join('/') + ')')
       } else {
         if (entry.label.length === 0) violations.push(where + ': label is empty')
         if (entry.hint.length === 0) violations.push(where + ': hint is empty')
@@ -160,6 +189,15 @@ export function registryViolations(registry, root) {
         if (!CJK.test(entry.hint)) violations.push(where + ': hint must be Chinese text')
         if (entry.control === 'select' && entry.values.length === 0) violations.push(where + ": control 'select' requires a non-empty values list")
         if (entry.control !== 'select' && entry.values.length > 0) violations.push(where + ": values is only meaningful for control 'select'")
+        // valueLabels (0.9.0): display names for the enum, one per value. The stored
+        // value stays raw, so a mismatch here would mislabel an option in the card.
+        if (entry.valueLabels !== undefined) {
+          const names = entry.valueLabels.split('|')
+          const values = entry.values.split('|')
+          if (entry.control !== 'select') violations.push(where + ': valueLabels is only meaningful for control ' + String(entry.control))
+          else if (names.length !== values.length) violations.push(where + ': valueLabels has ' + names.length + ' name(s) for ' + values.length + ' value(s)')
+          else for (const name of names) if (!CJK.test(name)) violations.push(where + ': valueLabels must be Chinese text (' + name + ')')
+        }
       }
     } else if (carried.length > 0) {
       violations.push(where + ': tier ' + entry.tier + ' must not carry UI metadata (only E3 rows have a card surface)')
@@ -205,7 +243,8 @@ export function renderParamDocs(registry, check) {
   for (const group of GROUPS) {
     const rows = registry.entries.filter(entry => entry.group === group)
     if (rows.length === 0) continue
-    lines.push('## ' + group, '', '| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |', '|---|---|---|---|---|---|---|')
+    const label = registry.groupLabels?.[group]
+    lines.push('## ' + group + (label === undefined ? '' : '（' + label + '）'), '', '| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |', '|---|---|---|---|---|---|---|')
     for (const entry of rows) {
       const legacy = (aliasOf[entry.id] ?? []).join(', ') || '—'
       lines.push('| `' + entry.id + '` | ' + entry.tier + ' | ' + entry.applies + ' | ' + entry.authority + ' | ' + entry.owner + ' | ' + legacy + ' | ' + entry.summary + ' |')

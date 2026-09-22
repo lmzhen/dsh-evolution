@@ -29,14 +29,16 @@ const REVIEW_E2 = [
 function parseRegistryText(text: string): ParamExposure[] {
   const out: ParamExposure[] = []
   // Head (the 8 keys every row carries) + the two legal endings: a plain close, or
-  // the optional UI tail in its fixed order. Mirrors lib-param-registry.mjs, which
-  // is the parser the generators actually use.
+  // the UI tail in its fixed order plus the OPTIONAL trailing valueLabels
+  // (0.9.0). Mirrors lib-param-registry.mjs, which is the parser the generators
+  // actually use — a row this helper cannot read is exactly the drift the agreement
+  // check exists to catch.
   const head = new RegExp(
     "^\\s*\\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', "
     + "owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'",
   )
   const tail = new RegExp(
-    ", label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)' \\},$",
+    ", label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')? \\},$",
   )
   for (const line of text.split(/\r?\n/)) {
     const match = head.exec(line)
@@ -50,6 +52,7 @@ function parseRegistryText(text: string): ParamExposure[] {
         applies: match[6] as ParamExposure['applies'], docAnchor: match[7]!, summary: match[8]!,
         label: ui[1]!, hint: ui[2]!, control: ui[3] as NonNullable<ParamExposure['control']>,
         unit: ui[4]!, values: ui[5]!,
+        ...(ui[6] === undefined ? {} : { valueLabels: ui[6] }),
       })
       continue
     }

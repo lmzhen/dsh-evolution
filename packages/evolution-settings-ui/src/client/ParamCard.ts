@@ -114,7 +114,10 @@ function FieldControl(props: FieldBlockProps): ReactNode {
       // value outside the current enum) still gets an option: without it the select
       // renders blank and the operator cannot see what is actually configured.
       field.values.includes(text) || text === '' ? null : createElement('option', { key: text, value: text }, text),
-      ...field.values.map(value => createElement('option', { key: value, value }, value)),
+      // The option TEXT comes from the registry's display names; the option VALUE stays
+      // the raw spelling the settings document stores (a translation here would write a
+      // value the Host does not know).
+      ...field.values.map((value, index) => createElement('option', { key: value, value }, field.valueLabels[index] ?? value)),
     ])
   }
   return createElement('input', {

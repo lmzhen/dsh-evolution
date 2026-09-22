@@ -125,25 +125,25 @@ pins the equality).
 
 | Command | Purpose |
 |---|---|
-| `/evolution pending [--detail]` | list staged evolution writes (--detail shows staged args) |
-| `/evolution approve <id>` | replay an approved staged write through its runner |
-| `/evolution reject <id>` | drop a staged write without running it |
-| `/evolution release <id>` | return an orphaned EXECUTING write to the pending window (verify the effect first, then approve or reject) |
-| `/evolution doctor [--json]` | read-only self-check: install form, conflicts, env, services (--json feeds scripts) |
-| `/evolution curator run\|pause\|resume\|status\|report\|scope` | run one curation pass, control or inspect automatic curation |
-| `/evolution mutations` | list skill-mutation audit records |
-| `/evolution restore` | restore skills from the latest snapshot |
-| `/evolution consolidate <target> <sources...> [--plan <runId>]` | merge source skills into a target umbrella skill |
-| `/evolution skill restore <name>` | restore one archived skill by name |
-| `/evolution skills health` | structure-health verdicts for the skill library |
-| `/evolution skills refresh` | drop the catalog caches and re-read the tree |
-| `/evolution learn [request]` | send a learning request to this session |
-| `/evolution maintain [--timeout=<ms> \| --facts]` | run a maintenance scan (--facts: 0-token preview) |
-| `/evolution policy set <id> <value> [--expect <revision>]` | write one user-writable parameter through the settings service (E3 only; E1/E2 stay in cordis.yml) |
-| `/evolution params [--group <name>] [--json]` | list every registered parameter: group, tier, timing, source and value (--json feeds scripts) |
-| `/evolution preset install [--base <name>[,<name>...]]` | generate one Evolution agent preset per named base into the user root (bases from the agent package's bases.json) |
-| `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | move a body section into a references/ file |
-| `/evolution replay` | compare plan outcomes across sessions and restarts (backfilled from the activity store) |
+| `/evolution pending [--detail]` | 列出暂存的写入（--detail 显示参数） |
+| `/evolution approve <id>` | 执行一条已批准的写入 |
+| `/evolution reject <id>` | 丢弃一条暂存写入，不执行 |
+| `/evolution release <id>` | 把卡在执行中的写入放回待批窗口（先确认效果再批准 or reject) |
+| `/evolution doctor [--json]` | 只读自检：安装形态、冲突、环境、服务（--json 供脚本用） |
+| `/evolution curator run\|pause\|resume\|status\|report\|scope` | 立即运行一次自动整理，或暂停／恢复／查看状态 |
+| `/evolution mutations` | 列出技能改动记录 |
+| `/evolution restore` | 从最近的快照恢复技能 |
+| `/evolution consolidate <target> <sources...> [--plan <runId>]` | 把若干技能合并进一个总括技能 |
+| `/evolution skill restore <name>` | 按名字恢复一个已归档的技能 |
+| `/evolution skills health` | 技能库结构体检 |
+| `/evolution skills refresh` | 丢弃目录缓存并重新读取技能树 |
+| `/evolution learn [request]` | 向本会话发一条学习请求 |
+| `/evolution maintain [--timeout=<ms> \| --facts]` | 运行一次维护扫描（--facts 为 0 token 预览） |
+| `/evolution policy set <id> <value> [--expect <revision>]` | 通过设置服务写入一个你可改的参数 (E3 only; E1/E2 stay in cordis.yml) |
+| `/evolution params [--group <name>] [--json]` | 列出全部参数：分组、档位、生效时机、来源与当前值（--json feeds scripts) |
+| `/evolution preset install [--base <name>[,<name>...]]` | 按指定基础生成自进化 Agent 预设到用户 root (bases from the agent package's bases.json) |
+| `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | 把技能正文的一节移到 references 文件 |
+| `/evolution replay` | 比较不同会话与重启之间的计划结果（从活动记录回填） |
 
 ## Composition details
 
