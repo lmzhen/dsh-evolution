@@ -173,6 +173,14 @@
  *       a second copy that the registry cannot see — the three that existed here
  *       were all equal to their map entry, so the fallback could never fire and
  *       nobody would have noticed a package whose entry moved.
+ *   N23. a durable-file WRITE lives in the IO seam: outside `evolution-core/src/io.ts`
+ *       (the node:fs provider) a `src` file that imports `writeFile(Sync)`, `mkdir(Sync)`,
+ *       `rename(Sync)`, `copyFile(Sync)`, `rm(Sync)`, `unlink(Sync)`, `appendFileSync` or
+ *       `createWriteStream` from `node:fs` fails here unless it is in the register above
+ *       with its reason. The seam owns the lock/transaction protocol, so an unregistered
+ *       raw writer is exactly the class that skips it silently. Reading is out of scope:
+ *       `readFileSync`/`existsSync`/`readdirSync`/`lstat` stay legal anywhere (the audit
+ *       behind this rule found four such readers and no fifth writer).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -211,6 +219,39 @@ function errorCodeLiterals(text) {
     if (quote !== null) out.push(match[0].slice(0, -1))
   }
   return out
+}
+
+/** N23: the files allowed to write durable files directly, and why. */
+const IO_SEAM_WRITERS = new Set([CORE_SRC + '/io.ts'])
+const RAW_WRITE_REGISTER = new Set([
+  // The preset installer writes DEPLOYMENT assets (not the state medium) with its own
+  // atomic stage→rename protocol and an injectable FsOps surface (F-211); routing it
+  // through ctx.evolutionIo would couple a one-shot installer to the runtime seam.
+  'evolution-commands/src/index.ts',
+])
+
+/** The `node:fs` write APIs (reading a file is out of scope: the rule is about writes). */
+const FS_WRITE_APIS = /writeFileSync|writeFile|mkdirSync|mkdir|renameSync|rename|copyFileSync|copyFile|rmSync|rm|unlinkSync|unlink|appendFileSync|createWriteStream/
+
+/**
+ * N23: write APIs imported straight from `node:fs` / `node:fs/promises`.
+ * @param text - one file's source.
+ * @returns the imported write APIs (a namespace import is reported as `<name> (namespace)`).
+ */
+function fsWriteImports(text) {
+  const found = []
+  for (const match of text.matchAll(/import\s+([^;]+?)\s+from\s+['\"]node:fs(?:\/promises)?['\"]/g)) {
+    const clause = match[1].trim()
+    // `import type { Dirent } from 'node:fs'` is a TYPE import: it writes nothing (the
+    // shape that produced this rule's first false positive).
+    if (clause.startsWith('type')) continue
+    if (!clause.startsWith('{')) { found.push(clause.split(/\s+as\s+/)[0] + ' (namespace)'); continue }
+    for (const raw of clause.slice(clause.indexOf('{') + 1, clause.lastIndexOf('}')).split(',')) {
+      const name = raw.trim().split(/\s+as\s+/)[0]
+      if (name !== '' && FS_WRITE_APIS.test(name)) found.push(name)
+    }
+  }
+  return found
 }
 
 /**
@@ -402,6 +443,7 @@ const RULES = [
   { id: 'N20', title: 'declared persisted write sites match their writers' },
   { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts' },
   { id: 'N22', title: 'settings namespaces are spelled once, in the registry' },
+  { id: 'N23', title: 'durable-file writes live in the IO seam' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -799,6 +841,12 @@ function walk(dir) {
           violations.push(`${rel}: settings namespace spelled here (${split}) — the owner → namespace map in evolution-core owns it (rule N22); read it with paramNamespace(owner)`)
         }
       }
+      // N23 (C5/B13, 0.8.0): raw durable-file writes live in the IO seam — see docblock.
+      if (rel.includes('/src/') && !IO_SEAM_WRITERS.has(rel) && !RAW_WRITE_REGISTER.has(rel)) {
+        for (const api of fsWriteImports(text)) {
+          violations.push(`${rel}: imports \`${api}\` from node:fs — a durable-file write outside the IO seam skips the lock/transaction protocol (rule N23); route it through ctx.evolutionIo, or register the writer with its reason`)
+        }
+      }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
       if (rel === `${CORE_SRC}/threats.ts`) {
         for (const match of text.matchAll(REGEXP_CLASS_RE)) {
@@ -890,6 +938,12 @@ if (process.argv.includes('--list-rules')) {
       && namespaceSplits("PARAM_NAMESPACES['evolution-curator'] ?? CURATOR_SETTINGS_NAMESPACE").length === 1
       && namespaceSplits("const ns = paramNamespace('evolution-curator')").length === 0
       && namespaceSplits("  'evolution-curator': 'evolution-curator',").length === 0],
+    ['N23', () => fsWriteImports("import { readFileSync, writeFileSync } from 'node:fs'").join() === 'writeFileSync'
+      && fsWriteImports("import { rename } from 'node:fs/promises'").length === 1
+      && fsWriteImports("import * as fs from 'node:fs'").join().includes('(namespace)')
+      && fsWriteImports("import { existsSync, readdirSync, lstat } from 'node:fs'").length === 0
+      && fsWriteImports("import type { Dirent } from 'node:fs'").length === 0
+      && fsWriteImports("import { type Dirent, readdirSync } from 'node:fs'").length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {
