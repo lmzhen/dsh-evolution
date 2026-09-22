@@ -180,7 +180,13 @@ doctor 的「参数面分歧」一节会报告两边不一致的地方。
 | `E-306` | 该部署对前台写入做 stage，但这条命令没法通过技能 runner 重放 | 直接 approve-and-execute，或者明确设成 `stageForeground: false` |
 | `E-304` | 挂载的 approval 服务早于 release 能力（升级不完整/错位） | 改用 `reject` 处理该 pending 记录，不要 `release` |
 | `E-305` | 本次调用没有携带 agent（脚本/headless 调用方走到了需要会话的分支） | 在 GUI 或 CLI 的会话里运行该命令 |
+| `E-307` / `E-311` | 设置服务缺失或报不出 section（`/evolution params`、`/evolution policy set` 需要它） | 挂上设置行（随 host/all 提供），然后跑 doctor |
+| `E-308` / `E-313` | 参数分组或参数 id 不存在 | 用 `/evolution params` 列出来：每个注册 id 的层级与 owner 都在里面 |
+| `E-314` / `E-315` / `E-316` | 该 id 是部署参数、没有用户层，或它的 owner 没挂载 | 在 `cordis.yml` 里写，或挂上 owner 行 —— 报文里点名层级、owner 与命名空间 |
+| `E-309` / `E-310` | 你的写入输给了并发修订，或设置服务拒绝了它（原因随报文给出） | 用 `/evolution params` 重读后重试 |
 | doctor 报 `install form: none` | 没有装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
+
+本表是「症状 → 下一步」对照；每条编号的原文只存一处（`evolution-core/src/errors.ts`，`E-301`–`E-316`），运行时按原文输出。
 
 </details>
 

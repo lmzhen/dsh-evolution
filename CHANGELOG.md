@@ -25,7 +25,7 @@
 | # | 内容 | 门禁与守卫 |
 |---|---|---|
 | C1 | 行集单源：`packages/scripts/bundle-rows.json` → `gen-bundle-patches.mjs` 生成三份 `cordis.patch.yml`（与手写版**逐字节相同**） | 新 `verify-bundle-rows.mjs`（门禁第 11 步）＋哨兵「手改 patch 必红」 |
-| C2 | 错误码表 `evolution-core/src/errors.ts`（22 条**场景**逐字文案）＋装机产物冒烟 `smoke-built-entries.mjs`（暂存 `lib/`＋manifest、软链已装平台作用域；实测 24 个被挂载入口＋30 个包根全部导入） | 规则 **N21**（码只在表内）；门禁新增 `build-lib`／`smoke-built-entries` |
+| C2 | 错误码表 `evolution-core/src/errors.ts`（20 个场景键 / 22 条逐字文案，`E-301`–`E-316`）＋装机产物冒烟 `smoke-built-entries.mjs`（暂存 `lib/`＋manifest、软链已装平台作用域；实测 24 个被挂载入口＋30 个包根全部导入） | 规则 **N21**（码只在表内）；门禁新增 `build-lib`／`smoke-built-entries` |
 | C3 | 命名空间单点 `paramNamespace(owner)`（删 3 个同值常量与永不生效的 `??` 兜底）＋每个 E3 行必须是其 owner section schema 的键、反之亦然（实测 **32 ↔ 32**） | 规则 **N22**；四渠道 parity 守卫增加写面校验 |
 | C5 | 规则 **N23**：durable-file 写只在 io 缝内（缝豁免 ＋ 登记册 ＋ 证伪探测器） | 守卫 **24** 条规则干净 |
 

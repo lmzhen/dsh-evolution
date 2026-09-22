@@ -219,7 +219,14 @@ review.
 | `E-306` | this deployment stages foreground writes, but the named command is not replayable through the skill runner | approve-and-execute it directly, or set `stageForeground: false` deliberately |
 | `E-304` | the mounted approval service predates the release capability (a skewed/partial upgrade) | `reject` the pending record instead of `release` |
 | `E-305` | the invocation carries no agent (a script/headless caller reached a session-backed branch) | run the command from a session in the GUI or the CLI |
+| `E-307` / `E-311` | the settings service is missing or cannot report its sections (`/evolution params`, `/evolution policy set`) | mount the settings row (ships with host/all), then run doctor |
+| `E-308` / `E-313` | unknown parameter group or id | list them: `/evolution params` shows every registered id with its tier and owner |
+| `E-314` / `E-315` / `E-316` | the id is a deployment parameter, has no user layer, or its owner is not mounted | write it in `cordis.yml`, or mount the owner row — the message names tier, owner and namespace |
+| `E-309` / `E-310` | your write lost a revision race, or the settings service refused it (the reason is included) | re-read with `/evolution params` and retry |
 | doctor says `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
+
+Symptom → next step; the exact text of every code (`E-301`–`E-316`) is stored once in
+`evolution-core/src/errors.ts` and printed verbatim.
 
 </details>
 

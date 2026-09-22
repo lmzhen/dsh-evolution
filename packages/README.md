@@ -95,7 +95,8 @@ The family's user-visible failures carry `E-3xx` codes. The exact text each code
 emits lives in ONE table, `evolution-core/src/errors.ts`, keyed by the scenario that
 answers with it: a code may legitimately carry more than one text (`E-301` answers
 pending / approve / reject with different guidance), and each message is stored once
-with the `${aN}` slots its call site used to interpolate. Call sites render it with
+with `%aN%` slots for the values its call site used to interpolate (measured: 20
+scenario keys, 22 texts, codes `E-301`–`E-316`). Call sites render it with
 `errorText('<scenario>', { a1: … })`.
 
 Architecture rule **N21** fails the gate when any other `src` file spells a code
