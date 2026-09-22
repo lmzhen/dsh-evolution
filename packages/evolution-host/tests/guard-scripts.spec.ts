@@ -403,6 +403,8 @@ describe('guard scripts (V4-30 sentry)', () => {
 const paramGuard = join(scripts, 'verify-param-registry.mjs')
 const paramGen = join(scripts, 'gen-param-docs.mjs')
 const paramViewGen = join(scripts, 'gen-param-client-view.mjs')
+const bundleGuard = join(scripts, 'verify-bundle-rows.mjs')
+const bundleGen = join(scripts, 'gen-bundle-patches.mjs')
 
 /** One registry entry line in the shape the machine-read contract declares. */
 function entryLine(id: string): string {
@@ -505,6 +507,36 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(stale?.code).toBe(1)
     expect(stale?.stderr).toContain('stale generated client view')
+  })
+
+  // C1 (0.8.0): the three bundle patches are GENERATED from scripts/bundle-rows.json.
+  // A row moved between install forms, or a hand edit of one patch, used to be caught
+  // only by a three-way byte comparison AFTER two files had already disagreed; this
+  // case pins the replacement: the files fall out of the roster, and a hand edit of
+  // any one of them fails the guard.
+  it('fails when a bundle patch goes stale', async () => {
+    const forms = ['all', 'host', 'preset']
+    const root = await tempRoot('guard-bundle-rows-')
+    const banners = Object.fromEntries(forms.map(form => [form, '    # ── only group']))
+    const roster = {
+      version: 1,
+      note: 'fixture',
+      forms: Object.fromEntries(forms.map(form => [form, { header: ['# fixture'], tail: [] }])),
+      groups: [{ id: 'fixture-row', banners }],
+      rows: [{ id: 'fixture-row', group: 'fixture-row', forms, lead: [], body: ["      name: '@deepseek-ai/dsh-fixture'"] }],
+    }
+    await mkdir(join(root, 'scripts'), { recursive: true })
+    await writeFile(join(root, 'scripts', 'bundle-rows.json'), JSON.stringify(roster, null, 2) + '\n', 'utf8')
+    for (const form of forms) await mkdir(join(root, 'evolution-' + form), { recursive: true })
+    await run(process.execPath, [bundleGen, root], { encoding: 'utf8' })
+    const fresh = await run(process.execPath, [bundleGuard, root, '--strict'], { encoding: 'utf8' })
+    expect(fresh.stdout).toContain('verify-bundle-rows: OK')
+    const patch = join(root, 'evolution-host', 'cordis.patch.yml')
+    await writeFile(patch, readFileSync(patch, 'utf8').replace('fixture-row', 'hand-edited-row'), 'utf8')
+    const stale = await run(process.execPath, [bundleGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(stale?.code).toBe(1)
+    expect(stale?.stderr).toContain('not current')
   })
 })
 

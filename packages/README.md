@@ -89,6 +89,19 @@ packages`), and `verify-param-registry.mjs` fails the gate when the two differ,
 so it mirrors the registry rather than duplicating it. Inside a session the same
 rows come from `/evolution params` (see the command reference below).
 
+## Install forms
+
+The three bundle patches (`evolution-all` / `-host` / `-preset`) are generated from
+one roster: `packages/scripts/bundle-rows.json` holds each row's YAML body once,
+the install forms that mount it, and the prose that belongs to a single form
+(group banners, the comments above a row, and the top-level override blocks that
+sit outside the `- insert:` list). `node packages/scripts/gen-bundle-patches.mjs
+packages` renders the patches, so moving a row between install forms is a one-field
+edit instead of a synchronized edit of two or three files.
+`verify-bundle-rows.mjs` (gate step 9) runs that generator with `--check`, which is
+what makes a hand-edited patch fail the gate; the three-way byte comparison in
+`evolution-host/tests/bundle-mutual-exclusion.spec.ts` stays as the independent
+cross-check of the emitted files.
 ## Command reference
 
 The `/evolution` surface below is generated from the subcommand registry

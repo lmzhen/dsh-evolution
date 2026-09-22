@@ -240,7 +240,7 @@ The loops stop, your data does not: memory, skills, state, reports and approval 
 | [`packages/INSTALL.md`](./packages/INSTALL.md) | install-form semantics and the per-platform verification matrix |
 | [`packages/README.md`](./packages/README.md) | command reference, package map, environment/knob reference, layout notes |
 | [`CHANGELOG.md`](./CHANGELOG.md) | what changed in each version, with reasons and evidence |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 18-step gate, house rules |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 19-step gate, house rules |
 
 <details>
 <summary>For maintainers: upstream upgrade checklist</summary>
