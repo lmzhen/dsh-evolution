@@ -16,7 +16,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, PARAM_NAMESPACES, claimInstance, installParamSection, isPresent, isUnknown, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, installParamSection, isPresent, isUnknown, paramNamespace, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParamOverrides, SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
@@ -92,9 +92,6 @@ export interface Config {
   /** Structure-health write-ghost floor: patches at/above with zero reads (A2). */
   healthChurnMinPatches?: number
 }
-
-/** Namespace the curator group's user-writable knobs live in (core's PARAM_NAMESPACES). */
-export const CURATOR_SETTINGS_NAMESPACE = 'evolution-curator'
 
 /** Curator behaviour a user may change (G3/S3.3). Field names are the CANONICAL
  * parameter ids from the registry, so the settings document, the params output,
@@ -401,7 +398,7 @@ export class EvolutionCurator extends Service {
     }
     this.overrides = installParamSection<CuratorSettings>(
       ctx,
-      PARAM_NAMESPACES['evolution-curator'] ?? CURATOR_SETTINGS_NAMESPACE,
+      paramNamespace('evolution-curator'),
       CURATOR_SETTINGS_SCHEMA,
       this.settingsBase,
       {

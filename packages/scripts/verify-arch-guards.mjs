@@ -166,6 +166,13 @@
  *       drift; prose that NAMES a code (the comments explaining which branch
  *       answers which error) stays legal, because the rule reads string
  *       literals only. Render one with `errorText('<scenario>', { a1: ... })`.
+ *   N22. a settings namespace is spelled in the registry, never in a domain: the
+ *       owner → namespace map (`PARAM_NAMESPACES`) is the one home, and a package
+ *       reads it through `paramNamespace(owner)`. A private `X_SETTINGS_NAMESPACE`
+ *       constant, or a `?? X_SETTINGS_NAMESPACE` fallback beside the map read, is
+ *       a second copy that the registry cannot see — the three that existed here
+ *       were all equal to their map entry, so the fallback could never fire and
+ *       nobody would have noticed a package whose entry moved.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -203,6 +210,18 @@ function errorCodeLiterals(text) {
     }
     if (quote !== null) out.push(match[0].slice(0, -1))
   }
+  return out
+}
+
+/**
+ * N22: settings-namespace literals declared outside the registry.
+ * @param text - one file's source.
+ * @returns the offending spellings (a duplicate constant, or a `??` fallback).
+ */
+function namespaceSplits(text) {
+  const out = []
+  for (const match of text.matchAll(/export const ([A-Z_]+_SETTINGS_NAMESPACE)[\s]*=/g)) out.push(match[1])
+  for (const match of text.matchAll(/[\?][\?][\s]*([A-Z_]+_SETTINGS_NAMESPACE)/g)) out.push(match[1] + ' (fallback)')
   return out
 }
 const APPROVAL_SRC = 'evolution-approval/src'
@@ -382,6 +401,7 @@ const RULES = [
   { id: 'N19', title: 'one home per family fact (docs cite, never copy)' },
   { id: 'N20', title: 'declared persisted write sites match their writers' },
   { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts' },
+  { id: 'N22', title: 'settings namespaces are spelled once, in the registry' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -773,6 +793,12 @@ function walk(dir) {
           violations.push(`${rel}: the message for ${code} is spelled here — the family's error-code table owns it (rule N21); render it with errorText(...)`)
         }
       }
+      // N22 (C3, 0.8.0): the namespace comes from the registry — see the docblock.
+      if (rel.includes('/src/')) {
+        for (const split of namespaceSplits(text)) {
+          violations.push(`${rel}: settings namespace spelled here (${split}) — the owner → namespace map in evolution-core owns it (rule N22); read it with paramNamespace(owner)`)
+        }
+      }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
       if (rel === `${CORE_SRC}/threats.ts`) {
         for (const match of text.matchAll(REGEXP_CLASS_RE)) {
@@ -860,6 +886,10 @@ if (process.argv.includes('--list-rules')) {
       && errorCodeLiterals("throw new Error(\"E-301: approval service not mounted\")").length === 1
       && errorCodeLiterals('// prose: this branch answers E-305 the same way').length === 0
       && errorCodeLiterals("const ok = errorText('e-305-this-invocation-carries-no')").length === 0],
+    ['N22', () => namespaceSplits("export const CURATOR_SETTINGS_NAMESPACE = 'evolution-curator'").length === 1
+      && namespaceSplits("PARAM_NAMESPACES['evolution-curator'] ?? CURATOR_SETTINGS_NAMESPACE").length === 1
+      && namespaceSplits("const ns = paramNamespace('evolution-curator')").length === 0
+      && namespaceSplits("  'evolution-curator': 'evolution-curator',").length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {

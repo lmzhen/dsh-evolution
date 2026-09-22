@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY, PARAM_NAMESPACES, installParamSection, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -77,9 +77,6 @@ export const Config: z<Config> = z.object({
   // OPT-19 (plan D3): default warn-only on cross-source same-name writes.
   strictCrossSource: z.boolean().default(false),
 })
-
-/** Namespace the write caps and the four stage policies live in (core's PARAM_NAMESPACES). */
-export const SKILLS_SETTINGS_NAMESPACE = 'evolution-skills'
 
 /** Write behaviour a user may change (G3/S3.4). Field names are the CANONICAL
  * parameter ids from the registry. The four caps are TIGHTEN-ONLY: the settings
@@ -310,7 +307,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   section.overrides = installParamSection<SkillSettings>(
     ctx,
-    PARAM_NAMESPACES['tool-skill-manage'] ?? SKILLS_SETTINGS_NAMESPACE,
+    paramNamespace('tool-skill-manage'),
     SKILLS_SETTINGS_SCHEMA,
     settingsBase,
     {

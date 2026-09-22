@@ -251,6 +251,21 @@ export const PARAM_NAMESPACES: Readonly<Record<string, string>> = Object.freeze(
   'tool-skill-manage': 'evolution-skills',
 })
 
+/**
+ * The settings namespace one owner package registers. The registry's map is the only
+ * place a namespace is spelled: a package without an entry has no user layer, so a
+ * missing entry must fail loud here instead of letting a package fall back to a
+ * private constant that the registry never sees.
+ * @param owner - owner package directory name (the map's key).
+ * @returns the namespace that owner registers.
+ * @throws when the owner has no entry in {@link PARAM_NAMESPACES}.
+ */
+export function paramNamespace(owner: string): string {
+  const namespace = PARAM_NAMESPACES[owner]
+  if (namespace === undefined) throw new Error('no settings namespace registered for owner `' + owner + '` (add it to PARAM_NAMESPACES)')
+  return namespace
+}
+
 /** Structural view of one registered settings scope (platform Service Definition).
  * Declared locally so this module keeps its zero-import, zero-dependency shape. */
 interface SettingsScopeLike {

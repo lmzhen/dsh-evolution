@@ -19,7 +19,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { PARAM_NAMESPACES, foldToolDispatches, installParamSection, readDispatchSignal, readNumberParam, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
+import { foldToolDispatches, installParamSection, paramNamespace, readDispatchSignal, readNumberParam, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
@@ -359,9 +359,6 @@ function policySnapshotOf(source: unknown): PolicySnapshotFields | undefined {
   return (source as { get?(): PolicySnapshotFields } | undefined)?.get?.()
 }
 
-/** Namespace the review group's user-writable knobs live in (core's PARAM_NAMESPACES). */
-export const REVIEW_SETTINGS_NAMESPACE = 'evolution-review'
-
 /** Review behaviour a user may change (G3/S3.1). Field names are the CANONICAL
  * parameter ids from the registry, so the settings document, the params output,
  * the doctor report and the cards all spell one name. */
@@ -493,7 +490,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   const overrides = installParamSection<ReviewSettings>(
     ctx,
-    PARAM_NAMESPACES['evolution-review'] ?? REVIEW_SETTINGS_NAMESPACE,
+    paramNamespace('evolution-review'),
     REVIEW_SETTINGS_SCHEMA,
     settingsBase,
     // No onChange: every consumer reads params() at use time.

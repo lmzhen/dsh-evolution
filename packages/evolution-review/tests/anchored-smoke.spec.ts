@@ -499,7 +499,12 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
           const current = await library.read(name).catch(() => null)
           return current !== null && current !== first
         },
-        { timeout: 3000, interval: 50 },
+        // The plan settles asynchronously after the captured request, and the poll
+        // budget must not be tighter than the case's own patience: a 3s budget here
+        // failed twice under a saturated suite (33 files transforming at once) while
+        // the same case passed in isolation — the budget, not the behaviour, was the
+        // defect. These two cases declare 30s, so the poll follows the case.
+        { timeout: 15_000, interval: 50 },
       ).toBe(true)
       return { first, second, landed: await library.read(name).catch(() => null) }
     } finally {
