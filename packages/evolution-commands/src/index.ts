@@ -8,7 +8,8 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import {
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
@@ -145,7 +146,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           | (CommandInvocation['agent'] & { followup?: unknown; inject?: unknown })
           | undefined
         const agentMissing = (need: string): CommandResult | undefined => invocationAgent === undefined
-          ? err(`E-305: this invocation carries no agent — \`${need}\` needs a session-backed call (run it from a session in the GUI or the CLI).`)
+          ? err(errorText('e-305-this-invocation-carries-no', { a1: need }))
           : undefined
         // v43 audit (P1-2): consolidate, the whole-tree `restore` and `skill
         // restore <name>` are destructive and had NO approval seam, while their
@@ -161,7 +162,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const sessionPolicy = effectiveSessionPolicy(ctx, session)
           const wouldStage = approval.isEnabled !== false && sessionPolicy !== 'never' && approval.stageForeground !== false
           if (!wouldStage) return undefined
-          return err(`E-306: this deployment stages foreground writes, but \`/evolution ${what}\` is not replayable through the skill runner — there is nothing to stage. Run it from a session whose approval policy is 'never', or set \`stageForeground: false\` on the evolution-approval row, then repeat the command.`)
+          return err(errorText('e-306-this-deployment-stages-foreground', { a1: what }))
         }
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         const pendingMatch = /^pending(?: --detail)?$/.exec(input)
@@ -177,7 +178,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // used to render as the success line below, so a degraded assembly
           // read "service unavailable" as "nothing in flight". Match the
           // E-301 posture of approve/reject instead.
-          if (!approval) return err('E-301: approval service not mounted — pending writes cannot be listed or replayed. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.')
+          if (!approval) return err(errorText('e-301-approval-service-not-mounted'))
           const listed = [...await approval.list('pending'), ...await approval.list('executing')]
           const pending = [...new Map(listed.map(row => [row.id, row])).values()]
           if (pending.length === 0) return ok('No pending evolution writes.')
@@ -198,12 +199,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('approve ')) {
           const id = input.slice(8).trim()
-          const result = approval ? await approval.approve(id) : { ok: false, message: 'E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.' }
+          const result = approval ? await approval.approve(id) : { ok: false, message: errorText('e-301-approval-service-not-mounted-2') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('reject ')) {
           const id = input.slice(7).trim()
-          const result = approval ? await approval.reject(id) : { ok: false, message: 'E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.' }
+          const result = approval ? await approval.reject(id) : { ok: false, message: errorText('e-301-approval-service-not-mounted-2') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('release ')) {
@@ -217,14 +218,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // verified, so that release is a destructive operator action whose
           // message states the replay risk.
           const id = input.slice(8).trim()
-          if (!approval) return err('E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.')
-          if (!approval.release) return err('E-304: the mounted approval service predates the release capability — reject the record instead.')
+          if (!approval) return err(errorText('e-301-approval-service-not-mounted-2'))
+          if (!approval.release) return err(errorText('e-304-the-mounted-approval-service'))
           const result = await approval.release(id)
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; skipped?: string; report: { runId: string; snapshotPath?: string } }> } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const result = await curator.run({ ignoreGates: true })
           // D-12 (v18): a reentrant run that was skipped must not be reported
           // as a completed 0/0/0 pass.
@@ -235,7 +236,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator pause' || input === 'curator resume') {
           const curator = ctx.get('evolutionCurator') as { setPaused(paused: boolean): Promise<void> } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const paused = input === 'curator pause'
           await curator.setPaused(paused)
           // H-07 completion: in a state-less composition the curator warns and
@@ -250,7 +251,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator status') {
           const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const state = await curator.status()
           if (!state) return ok('No curator state yet: the first automatic pass is deferred until the interval elapses.')
           // A corrupt state record must not crash the command surface with a
@@ -267,7 +268,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'mutations') {
           const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const records: unknown = await curator.skills.listMutations()
           // V6-41 (0.3.36): the mutations file is out-of-band editable — a
           // damaged record must not crash the command with a TypeError (the
@@ -286,7 +287,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator scope') {
           const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const view = await curator.scopeView()
           const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
           return ok([
@@ -300,7 +301,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator report') {
           const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }>; aborted?: string; unattributed?: string[] } | null> } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const report: unknown = await curator.latestReport()
           if (!report) return ok('No curator report available.')
           // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
@@ -360,7 +361,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const restoreRefusal = unreplayableWriteRefusal('restore')
           if (restoreRefusal) return restoreRefusal
           const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
+          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('consolidate ')) {
@@ -373,7 +374,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const [target, ...sources] = names
           if (!target || sources.length === 0) return err('Usage: /evolution consolidate <target> <source...>')
           const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
+          const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           if (!result.ok) return err(result.message)
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
         }
@@ -383,12 +384,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const skillRestoreRefusal = unreplayableWriteRefusal('skill restore')
           if (skillRestoreRefusal) return skillRestoreRefusal
           const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restore(name) : { ok: false, message: 'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.' }
+          const result = curator ? await curator.restore(name) : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'skills health') {
           const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>>; usageObserved(): Promise<boolean> } | undefined
-          if (!curator) return err('E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const [rows, observed] = await Promise.all([curator.healthView(), curator.usageObserved()])
           // C observation window: before ANY observed read exists, view_count
           // zero is not evidence — say so instead of silently showing a clean
@@ -444,7 +445,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           } else if (typeof agent.inject === 'function') {
             (agent as unknown as { inject: (message: unknown) => void }).inject(message)
           } else {
-            return err('E-305: the invocation agent exposes neither `followup` nor `inject` — this learn request has no delivery channel.')
+            return err(errorText('e-305-the-invocation-agent-exposes'))
           }
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is
@@ -836,7 +837,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // helper. Same structured refusal here; with a session present the
             // behavior is unchanged.
             if (stagesForeground && session === undefined) {
-              return err('E-306: this deployment stages foreground writes, but this invocation carries no agent session — `/evolution restructure` would stage a record with no session attribution. Run it from a session in the GUI or the CLI, or set `stageForeground: false` on the evolution-approval row, then repeat the command.')
+              return err(errorText('e-306-this-deployment-stages-foreground-2'))
             }
             const willStage = stagesForeground
             if (willStage && !approval.hasRunner('skill')) {
@@ -886,7 +887,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'replay') {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
-          if (!replay) return err('E-303: replay service not mounted. Next: mount the evolution-replay row (evolution-host/evolution-all) and run /evolution doctor.')
+          if (!replay) return err(errorText('e-303-replay-service-not-mounted'))
           return ok(replay.compare().report)
         }
         const paramsMatch = /^params(?: --group ([a-z-]+))?(?: --json)?$/.exec(input)
@@ -909,14 +910,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             } catch (error) {
               // Unreadable is NOT "no overrides" (the S3.x posture): refuse instead
               // of rendering every row as if the user had set nothing.
-              return err(`E-307: the settings service could not report its sections (${error instanceof Error ? error.message : String(error)}). /evolution params needs the user layer to tell an override from a deployment value; run /evolution doctor to see which services are mounted.`)
+              return err(errorText('e-307-the-settings-service-could', { a1: error instanceof Error ? error.message : String(error) }))
             }
           }
           const rows = paramSurfaceRows(sections, PARAM_EXPOSURE)
           const group = paramsMatch[1]
           const selected = group === undefined ? rows : rows.filter(row => row.group === group)
           if (group !== undefined && selected.length === 0) {
-            return err(`E-308: unknown parameter group "${group}" — known groups: ${paramGroups(PARAM_EXPOSURE).join(', ')}.`)
+            return err(errorText('e-308-unknown-parameter-group-group', { a1: group, a2: paramGroups(PARAM_EXPOSURE).join(', ') }))
           }
           if (input.endsWith('--json')) return ok(renderParamJson(selected))
           return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
@@ -928,7 +929,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // be a second write path to the same fact (design §8.3).
           const provider = ctx.get('settings') as SettingsProviderLike | undefined
           if (provider?.update === undefined || provider.describe === undefined) {
-            return err('E-311: no settings service is mounted, so there is no user layer to write. Mount the settings row (packages/settings/settings-file) and retry; this command never edits cordis.yml — a deployment value belongs to the deployment. /evolution doctor lists the mounted services.')
+            return err(errorText('e-311-no-settings-service-is'))
           }
           const rawId = policySetMatch[1] ?? ''
           const rawValue = policySetMatch[2] ?? ''
@@ -936,34 +937,34 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             id = canonicalWriteId(rawId)
           } catch (error) {
-            return err(`E-312: ${error instanceof Error ? error.message : String(error)} — /evolution params lists the canonical ids.`)
+            return err(errorText('e-312-error-instanceof-Error-error', { a1: error instanceof Error ? error.message : String(error) }))
           }
           const entry = PARAM_EXPOSURE.find(candidate => candidate.id === id)
           if (entry === undefined) {
-            return err(`E-313: unknown parameter "${id}" — /evolution params lists every registered id with its tier and user layer.`)
+            return err(errorText('e-313-unknown-parameter-id-evolution', { a1: id }))
           }
           if (entry.tier !== 'E3') {
-            return err(`E-314: "${id}" is a deployment parameter (tier ${entry.tier}, owner ${entry.owner}) — it is written in cordis.yml on its plugin or policy row, not from a session. /evolution params shows who may write each row.`)
+            return err(errorText('e-314-id-is-a-deployment', { a1: id, a2: entry.tier, a3: entry.owner }))
           }
           const namespace = PARAM_NAMESPACES[entry.owner]
           if (namespace === undefined) {
-            return err(`E-315: "${id}" has no user layer — owner ${entry.owner} publishes no settings namespace, so the value stays with the deployment.`)
+            return err(errorText('e-315-id-has-no-user', { a1: id, a2: entry.owner }))
           }
           let descriptor: { ns: string; value?: unknown; user?: Record<string, unknown>; revision?: number } | undefined
           try {
             descriptor = provider.describe({ redactSecrets: false }).find(candidate => candidate.ns === namespace)
           } catch (error) {
-            return err(`E-307: the settings service could not report its sections (${error instanceof Error ? error.message : String(error)}). /evolution policy set needs the current revision to write safely; run /evolution doctor to see which services are mounted.`)
+            return err(errorText('e-307-the-settings-service-could-2', { a1: error instanceof Error ? error.message : String(error) }))
           }
           if (descriptor === undefined) {
-            return err(`E-316: namespace "${namespace}" is not registered — owner ${entry.owner} is not mounted in this composition, so its parameters cannot be written from here. /evolution params marks those rows 'unregistered'.`)
+            return err(errorText('e-316-namespace-namespace-is-not', { a1: namespace, a2: entry.owner }))
           }
           const current = descriptor.value
           const resolved = typeof current === 'object' && current !== null ? current as Record<string, unknown> : undefined
           const expectedRaw = policySetMatch[3]
           const expected = expectedRaw === undefined ? descriptor.revision : Number(expectedRaw)
           if (expectedRaw !== undefined && descriptor.revision !== undefined && Number(expectedRaw) !== descriptor.revision) {
-            return err(`E-309: revision conflict — you sent ${expectedRaw}, the document stands at ${descriptor.revision}. Re-read with /evolution params --json and retry.`)
+            return err(errorText('e-309-revision-conflict-you-sent', { a1: expectedRaw, a2: descriptor.revision }))
           }
           const value = parseParamValue(rawValue)
           try {
@@ -972,9 +973,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const code = (error as { code?: unknown } | null)?.code
             const message = error instanceof Error ? error.message : String(error)
             if (code === 'SETTINGS_CONFLICT') {
-              return err(`E-309: revision conflict — ${message}. Re-read with /evolution params --json and retry.`)
+              return err(errorText('e-309-revision-conflict-message-Re', { a1: message }))
             }
-            return err(`E-310: the settings service refused the write: ${message} — the owning plugin's rule stands (a cross-field pair, or a cap that may only be tightened). /evolution params shows the current value.`)
+            return err(errorText('e-310-the-settings-service-refused', { a1: message }))
           }
           return ok(renderPolicySet({
             id, namespace, applies: entry.applies,

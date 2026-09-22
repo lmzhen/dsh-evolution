@@ -14,7 +14,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveExecOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import {
+  errorText, SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveExecOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 export interface GraphNode {
   id: string
@@ -353,7 +354,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           | undefined
         const session = invocationAgent?.session
         const sessionMissing = (need: string): CommandResult | undefined => session === undefined
-          ? err(`E-305: this invocation carries no agent — \`${need}\` needs a session-backed call (run it from a session in the GUI or the CLI).`)
+          ? err(errorText('e-305-this-invocation-carries-no-2', { a1: need }))
           : undefined
         const input = invocation.rawInput.trim()
         const detail = /^detail\s+(\S+)$/.exec(input)

@@ -158,6 +158,14 @@
  * mirror `packages/scripts/…`; the packages root argument is the evolution
  * tree regardless of layout):
  *   node <scripts-dir>/verify-arch-guards.mjs <packages/evolution-root> [--strict]
+ *   N21. the error codes are spelled ONCE: every `E-3xx:` message lives in the
+ *       table at `evolution-core/src/errors.ts`, and any other `src` file that
+ *       spells one inside a string literal fails here. The codes used to be
+ *       inline at 33 call sites across two packages, so one code's wording could
+ *       drift between the branches that answer it and nothing could see the
+ *       drift; prose that NAMES a code (the comments explaining which branch
+ *       answers which error) stays legal, because the rule reads string
+ *       literals only. Render one with `errorText('<scenario>', { a1: ... })`.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -172,6 +180,31 @@ if (!existsSync(root)) {
 }
 const strict = process.argv.includes('--strict') || process.env.DSH_EVOLUTION_ARCH_STRICT === '1'
 const CORE_SRC = 'evolution-core/src'
+
+/** N21: the one file allowed to spell an error message. */
+const ERROR_TABLE_OWNER = CORE_SRC + '/errors.ts'
+
+/**
+ * N21: `E-3xx:` messages spelled OUTSIDE the table.
+ * @param text - one file's source.
+ * @returns the codes spelled inside a string literal on the same line.
+ */
+function errorCodeLiterals(text) {
+  const out = []
+  for (const match of text.matchAll(/E-3[0-9][0-9]:/g)) {
+    const before = text.slice(0, match.index)
+    const line = before.slice(before.lastIndexOf('\n') + 1)
+    let quote = null
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i]
+      if (ch === '\\') { i += 1; continue }
+      if (quote === null && (ch === "'" || ch === '"' || ch === '`')) quote = ch
+      else if (quote !== null && ch === quote) quote = null
+    }
+    if (quote !== null) out.push(match[0].slice(0, -1))
+  }
+  return out
+}
 const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
 const DSH_HOME_RE = /process\.env\.DSH_HOME|process\.env\[['\"]DSH_HOME['\"]\]/
@@ -348,6 +381,7 @@ const RULES = [
   { id: 'N18', title: 'session/event consumers consult the opt-in gate' },
   { id: 'N19', title: 'one home per family fact (docs cite, never copy)' },
   { id: 'N20', title: 'declared persisted write sites match their writers' },
+  { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts' },
 ]
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
@@ -733,6 +767,12 @@ function walk(dir) {
           violations.push(`${rel}: ${key} — a session/event consumer must consult the opt-in gate; call sessionAudited(ctx, session.id, config.sessionScoped) at the top of the listener, or register the deliberate exception in SESSION_GATE_REGISTER: ${full}`)
         }
       }
+      // N21 (C2, 0.8.0): error codes are spelled once — see the docblock.
+      if (rel !== ERROR_TABLE_OWNER && rel.includes('/src/')) {
+        for (const code of errorCodeLiterals(text)) {
+          violations.push(`${rel}: the message for ${code} is spelled here — the family's error-code table owns it (rule N21); render it with errorText(...)`)
+        }
+      }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
       if (rel === `${CORE_SRC}/threats.ts`) {
         for (const match of text.matchAll(REGEXP_CLASS_RE)) {
@@ -763,6 +803,7 @@ if (process.argv.includes('--list-rules')) {
     console.error(`verify-arch-guards: rule inventory mismatch — undocumented: [${undocumented.join(', ')}], unregistered: [${unregistered.join(', ')}] (the docblock and RULES must list the same ids)`)
     process.exit(1)
   }
+
   const detectors = [
     ['N16', () => scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name)").length === 1
       && scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name, scope)").length === 0
@@ -815,6 +856,10 @@ if (process.argv.includes('--list-rules')) {
       && inventoryViolations([{ id: 'c', writer: 'a.ts', serializedBy: 'instance-claim' }], () => 'claimInstance(').length === 1
       && inventoryViolations([{ id: 's', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(', state: ['a.ts :: ghost'] }], () => 'transactIo(').length === 1
       && inventoryViolations([{ id: 's', writer: 'gone.ts', serializedBy: 'transact', marker: 'x' }], () => null).length === 1],
+    ['N21', () => errorCodeLiterals("return err('E-305: nope')").length === 1
+      && errorCodeLiterals("throw new Error(\"E-301: approval service not mounted\")").length === 1
+      && errorCodeLiterals('// prose: this branch answers E-305 the same way').length === 0
+      && errorCodeLiterals("const ok = errorText('e-305-this-invocation-carries-no')").length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {

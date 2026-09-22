@@ -89,6 +89,19 @@ packages`), and `verify-param-registry.mjs` fails the gate when the two differ,
 so it mirrors the registry rather than duplicating it. Inside a session the same
 rows come from `/evolution params` (see the command reference below).
 
+## Error codes
+
+The family's user-visible failures carry `E-3xx` codes. The exact text each code
+emits lives in ONE table, `evolution-core/src/errors.ts`, keyed by the scenario that
+answers with it: a code may legitimately carry more than one text (`E-301` answers
+pending / approve / reject with different guidance), and each message is stored once
+with the `${aN}` slots its call site used to interpolate. Call sites render it with
+`errorText('<scenario>', { a1: … })`.
+
+Architecture rule **N21** fails the gate when any other `src` file spells a code
+inside a string literal (prose that merely names a code stays legal, because the
+rule reads string literals only). The root README's table remains the reader-facing
+explanation of what each code means and what to do about it.
 ## Install forms
 
 The three bundle patches (`evolution-all` / `-host` / `-preset`) are generated from

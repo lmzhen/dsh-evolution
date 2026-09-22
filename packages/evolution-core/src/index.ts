@@ -14,7 +14,7 @@
  *
  * - **Cross-cutting basics** — `state-store.ts` (env roots — the single
  *   source of DSH-home semantics), `serial.ts`, `numeric.ts`, `constants.ts`,
- *   `mutations.ts`, `events.ts`, `gates.ts`.
+ *   `mutations.ts`, `events.ts`, `gates.ts`, `errors.ts` (the error-code table).
  * - **Security primitives** — `threats.ts` (content threat scanner),
  *   `redact.ts` (credential masking at model boundaries). Consumers:
  *   evolution-policy/threat, both stores, review, maintenance.
@@ -34,6 +34,7 @@ export * from './evolution-events.ts'
 export * from './gates.ts'
 export * from './events.ts'
 export * from './env.ts'
+export * from './errors.ts'
 export * from './io.ts'
 export * from './learn-prompt.ts'
 export * from './memory-store.ts'
