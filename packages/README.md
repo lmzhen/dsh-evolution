@@ -111,7 +111,7 @@ the install forms that mount it, and the prose that belongs to a single form
 sit outside the `- insert:` list). `node packages/scripts/gen-bundle-patches.mjs
 packages` renders the patches, so moving a row between install forms is a one-field
 edit instead of a synchronized edit of two or three files.
-`verify-bundle-rows.mjs` (gate step 9) runs that generator with `--check`, which is
+`verify-bundle-rows.mjs` (gate step 11) runs that generator with `--check`, which is
 what makes a hand-edited patch fail the gate; the three-way byte comparison in
 `evolution-host/tests/bundle-mutual-exclusion.spec.ts` stays as the independent
 cross-check of the emitted files.
