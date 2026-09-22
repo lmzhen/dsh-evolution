@@ -46,7 +46,7 @@ automation (that is install form ①: `packages/INSTALL.md` has the forms and th
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all   # the DEFAULT full bundle
-# restart the host so the profile is recomposed, then in any session:
+# restart dsh so the profile is recomposed, then in any session:
 /evolution doctor
 ```
 
@@ -97,7 +97,7 @@ the support window, not a bug.
 | **Review** | watches session events, applies the substantive gate, produces a validated plan (`evolution-review`, `evolution-plan-validator`) | reviews happen at conversation boundaries, not mid-task |
 | **Memory loop** | writes durable facts and a user profile, injects guidance into new sessions (`memory`, `memory-files`, `tool-memory`) | new sessions already know your project |
 | **Skill loop** | proposes, writes and patches skills through the `skill_manage` tool; the catalog exposes them to the model (`tool-skill-manage`, `evolution-skill-catalog`) | skills you did not have to write yourself |
-| **Curator** | deterministic stale/archive lifecycle plus LLM nomination, with a snapshot before every run (`evolution-curator`) | the library stays small and merges duplicates |
+| **Curator** (the **技能整理 / Skill tidy-up** card in the settings section) | deterministic stale/archive lifecycle plus LLM nomination, with a snapshot before every run (`evolution-curator`) | the library stays small and merges duplicates |
 | **Control plane** | threat scan, immutable policy, optional staged approval with replay (`evolution-threat`, `evolution-policy`, `evolution-approval`) | a refused write tells you why, and nothing destructive is silent |
 | **Plumbing** | IO seam, state providers, events, activity, replay, learning graph (`evolution-io*`, `evolution-state*`, `evolution-activity`, `evolution-replay`) | everything is a file you can read, back up or delete |
 
@@ -130,15 +130,20 @@ environment-variable and field-level knob reference lives there too.
 ### Changing parameters from the GUI
 
 The family ships exactly one browser surface: a settings section named **自进化**. It lists the
-user-writable parameters of the review, memory, curation and skill namespaces as collapsible cards —
-each field carries its unit, where the current value comes from (`部署` deployment / `用户` your
-override), a control typed from the parameter registry (switch, dropdown, number, text) and the
-registry's own explanation. Edit and press 保存; 放弃修改 drops the draft, and 恢复部署默认 removes
-your override for one field.
+user-writable parameters as five collapsible cards — **会话回顾** (Session review), **长期记忆**
+(Long-term memory), **记忆写入** (Writing memory), **技能整理** (Skill tidy-up) and **技能写入规则**
+(Skill write rules); the card titles and every field's Chinese label and explanation come from the
+parameter registry. Each field carries its unit, where the current value comes from (**我改过**
+edited by you / **默认** the deployment default), a control typed from the registry (switch,
+dropdown, number, text) and that explanation. Edit and press 保存; 放弃修改 drops the draft, and
+恢复默认值 removes your override for one field. A dropdown's options are named in Chinese while the
+stored value stays the raw one (the registry's optional `valueLabels`).
 
-Writes land in `~/.dsh/settings.yaml` under the owning namespace and take effect live, without a
+Writes land in `~/.dsh/settings.yaml`, in the owning plugin's section, and take effect live, without a
 restart. The same store is writable from a session with `/evolution policy set <id> <value>`, and
-`/evolution params` prints every registered parameter with its tier, timing and current source.
+`/evolution params` prints every registered parameter — the human-readable table is Chinese
+(参数／分组／档位／生效／来源／当前值 plus a tier legend), while `--json` keeps the raw field names and
+values for scripts.
 Deployment-side knobs (resource limits, provider choice, prompt-affecting identity) stay in
 `cordis.yml` / the profile patch layer — the section lists only what a user may change, and the
 doctor's divergence section reports the two sides disagreeing.
@@ -205,7 +210,7 @@ review.
 **`activity.json` is empty.** That is inject-mode behavior, not a failure; see the first limitation above.
 
 **How do I check the running version?** Compare `profiles/<name>/pnpm-lock.yaml` with
-`npm view @lmzhen/dsh-evolution-all version`; the profile is recomposed at host restart.
+`npm view @lmzhen/dsh-evolution-all version`; the profile is recomposed when dsh restarts.
 
 **A threat scan refused a write.** Rephrase it, or exempt a known-innocent label via `threatExemptLabels`.
 

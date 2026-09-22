@@ -27,7 +27,7 @@
 如果你已经烦透了每个新会话都要重新解释同一个项目，或者烦透了手工维护一堆永远不进步的技能，那就装它。装了之后：
 
 - **事实留得下来。** 评审会把真正重要的东西写进记忆，之后的会话自动拿到这份注入。
-- **技能会自己变好。** Agent 从真实发生过的事里修补自己的技能，计划先验证再执行——还有 curator 合并近重复、归档已经没人用的。
+- **技能会自己变好。** Agent 从真实发生过的事里修补自己的技能，计划先验证再执行——还有**技能整理**（curator）会合并近重复、归档已经没人用的。
 - **控制权始终在你手里。** 每一次写入都过威胁扫描和不可变策略；再加一个开关，每次写入都会先等你批准。技能销毁从来不是硬删除。
 - **一切看得见。** 计数、运行报告和变更日志都是 `$DSH_HOME` 下的文件。没有遥测服务——除了你本来就在发的提示词，什么都不离开你的机器。
 
@@ -37,7 +37,7 @@
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all   # 默认全量包
-# 重启宿主让 profile 重新组合，然后在任意会话里：
+# 重启 dsh 让 profile 重新组合，然后在任意会话里：
 /evolution doctor
 ```
 
@@ -81,7 +81,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 | **Review** | 观察会话事件，应用 substantive 门，产出经过验证的计划（`evolution-review`、`evolution-plan-validator`） | 评审发生在对话边界，不会打断任务中途 |
 | **记忆回路** | 写持久事实与用户画像，把指引注入新会话（`memory`、`memory-files`、`tool-memory`） | 新会话已经知道你的项目 |
 | **技能回路** | 通过 `skill_manage` 工具提出、写入、修补技能；目录把它们暴露给模型（`tool-skill-manage`、`evolution-skill-catalog`） | 你不必自己写的技能 |
-| **Curator** | 确定性的 stale/archive 生命周期 + LLM 提名，每次运行前先快照（`evolution-curator`） | 技能库保持小而整洁，重复的被合并 |
+| **Curator**（界面卡片叫**技能整理**） | 确定性的 stale/archive 生命周期 + LLM 提名，每次运行前先快照（`evolution-curator`） | 技能库保持小而整洁，重复的被合并 |
 | **控制面** | 威胁扫描、不可变策略、可选带重放的分阶段审批（`evolution-threat`、`evolution-policy`、`evolution-approval`） | 被拒绝的写入会告诉你原因，破坏性动作绝不静默 |
 | **管道** | IO 接缝、状态 provider、事件、activity、replay、学习图谱（`evolution-io*`、`evolution-state*`、`evolution-activity`、`evolution-replay`） | 一切都是你能读、能备份、能删除的文件 |
 
@@ -107,14 +107,16 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 
 ### 在界面里改参数
 
-家族在浏览器里只有一处界面：设置栏 **「自进化」**。它把审查／记忆／策展／技能四个命名空间里**用户可改**
-的参数列成可折叠卡片——每个字段带单位、当前值的来源（`部署` / `用户`）、按注册表类型渲染的控件
-（开关／下拉／数字／文本），以及注册表自己的说明。改完按「保存」；「放弃修改」丢弃草稿；想让某个字段
-回到部署值，按它自己的「恢复部署默认」。
+家族在浏览器里只有一处界面：设置栏 **「自进化」**。它把**你能改**的参数分成五张可折叠卡片：
+**会话回顾／长期记忆／记忆写入／技能整理／技能写入规则**——卡片名、每个字段的中文标签与说明都来自参数
+注册表。每个字段带单位、当前值的来源（**我改过** / **默认**）、按注册表类型渲染的控件（开关／下拉／
+数字／文本），以及那句说明。改完按「保存」；「放弃修改」丢弃草稿；想让某个字段回到默认值，按它自己的
+「恢复默认值」。下拉框里显示的是中文名，**存进去的仍是原值**（注册表新增的可选 `valueLabels`）。
 
-写入落在 `~/.dsh/settings.yaml` 的对应命名空间下，**即时生效、不用重启**。同一个 store 也可以在会话里用
-`/evolution policy set <id> <value>` 写，`/evolution params` 会把每条参数的档位、生效时机与当前来源打出来。
-资源上限、provider、影响提示词身份这类**部署面**参数仍留在 `cordis.yml`／profile 的补丁层——卡片只列可改项，
+写入落在 `~/.dsh/settings.yaml` 里属于该插件的那一段，**即时生效、不用重启**。同一个 store 也可以在会话里用
+`/evolution policy set <id> <value>` 写；`/evolution params` 给人看的那份表是中文的（参数／分组／档位／生效／来源／当前值，
+外加一行档位图例），脚本用 `--json` 则保持原字段名与取值。
+资源上限、provider、影响提示词身份这类**安装时定的**参数仍留在 `cordis.yml`／profile 的补丁层——卡片只列可改项，
 doctor 的「参数面分歧」一节会报告两边不一致的地方。
 ## 如何调低或关掉
 
@@ -166,7 +168,7 @@ doctor 的「参数面分歧」一节会报告两边不一致的地方。
 
 **`activity.json` 是空的。** 这是 inject 模式的行为，不是故障；见上面第一条已知限制。
 
-**怎么确认正在跑哪个版本？** 拿 `profiles/<name>/pnpm-lock.yaml` 和 `npm view @lmzhen/dsh-evolution-all version` 对一下；宿主重启时 profile 才会重新组合。
+**怎么确认正在跑哪个版本？** 拿 `profiles/<name>/pnpm-lock.yaml` 和 `npm view @lmzhen/dsh-evolution-all version` 对一下；dsh 重启时 profile 才会重新组合。
 
 **威胁扫描拒绝了一次写入。** 改写它，或者用 `threatExemptLabels` 豁免一个已知无害的 label。
 
@@ -182,7 +184,7 @@ doctor 的「参数面分歧」一节会报告两边不一致的地方。
 | `E-305` | 本次调用没有携带 agent（脚本/headless 调用方走到了需要会话的分支） | 在 GUI 或 CLI 的会话里运行该命令 |
 | `E-307` / `E-311` | 设置服务缺失或报不出 section（`/evolution params`、`/evolution policy set` 需要它） | 挂上设置行（随 host/all 提供），然后跑 doctor |
 | `E-308` / `E-313` | 参数分组或参数 id 不存在 | 用 `/evolution params` 列出来：每个注册 id 的层级与 owner 都在里面 |
-| `E-314` / `E-315` / `E-316` | 该 id 是部署参数、没有用户层，或它的 owner 没挂载 | 在 `cordis.yml` 里写，或挂上 owner 行 —— 报文里点名层级、owner 与命名空间 |
+| `E-314` / `E-315` / `E-316` | 该 id 是安装时定的参数、不能由用户改，或它的 owner 没挂载 | 在 `cordis.yml` 里写，或挂上 owner 行 —— 报文里点名层级与 owner |
 | `E-309` / `E-310` | 你的写入输给了并发修订，或设置服务拒绝了它（原因随报文给出） | 用 `/evolution params` 重读后重试 |
 | doctor 报 `install form: none` | 没有装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 

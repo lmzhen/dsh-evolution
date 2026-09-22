@@ -57,7 +57,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-agent` | Agent preset: standard tools + the four model rows (`memory` / `skill_manage` / session search / skill catalog) |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
-| `evolution-settings-ui` | Browser-only settings section (自进化): one card per parameter namespace, controls typed from the registry, styles injected at runtime |
+| `evolution-settings-ui` | Browser-only settings section (自进化): one card per parameter namespace, Chinese card titles / field labels / hints typed from the registry (plus optional `valueLabels` for enum options), styles injected at runtime |
 
 ## Installation
 
@@ -87,7 +87,11 @@ effect. The table is generated from the registry in
 `evolution-core/src/params.ts` (`node packages/scripts/gen-param-docs.mjs
 packages`), and `verify-param-registry.mjs` fails the gate when the two differ,
 so it mirrors the registry rather than duplicating it. Inside a session the same
-rows come from `/evolution params` (see the command reference below).
+rows come from `/evolution params` (see the command reference below); the human-readable
+table is Chinese while `--json` keeps the raw field names for scripts. The same registry owns the
+browser surface's copy: every E3 row carries the UI tail `label / hint / control / unit / values`
+(plus optional `valueLabels`, the display names a select shows while storing the raw value), which
+`gen-param-client-view.mjs` turns into the settings cards' field metadata.
 
 ## Error codes
 
