@@ -405,6 +405,7 @@ const paramGen = join(scripts, 'gen-param-docs.mjs')
 const paramViewGen = join(scripts, 'gen-param-client-view.mjs')
 const bundleGuard = join(scripts, 'verify-bundle-rows.mjs')
 const bundleGen = join(scripts, 'gen-bundle-patches.mjs')
+const builtSmoke = join(scripts, 'smoke-built-entries.mjs')
 
 /** One registry entry line in the shape the machine-read contract declares. */
 function entryLine(id: string): string {
@@ -537,6 +538,44 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(stale?.code).toBe(1)
     expect(stale?.stderr).toContain('not current')
+  })
+
+  // C2b (0.8.0): the built entries are what a profile actually loads, and nothing else
+  // imports them against the platform a host resolves at runtime. The smoke stages the
+  // family tree beside the installed platform scope, then imports every entry a
+  // composition mounts plus every package root. This case pins both halves: a clean
+  // tree passes, and a mounted entry whose `apply` is not a function fails.
+  it('fails when a built entry cannot serve the loader', async () => {
+    const root = await tempRoot('guard-built-entries-')
+    const platform = join(root, 'platform-scope')
+    await mkdir(platform, { recursive: true })
+    const pkg = join(root, 'evolution-fixture')
+    await mkdir(join(pkg, 'lib'), { recursive: true })
+    await mkdir(join(root, 'scripts'), { recursive: true })
+    const manifest = {
+      name: '@deepseek-ai/dsh-evolution-fixture',
+      version: '0.0.0',
+      type: 'module',
+      main: 'lib/index.js',
+      exports: { '.': './lib/index.js', './package.json': './package.json' },
+    }
+    await writeFile(join(pkg, 'package.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+    const roster = {
+      version: 1,
+      note: 'fixture',
+      forms: { all: { header: ['# fixture'], tail: [] } },
+      groups: [{ id: 'fixture-row', banners: { all: '    # ── fixture' } }],
+      rows: [{ id: 'fixture-row', group: 'fixture-row', forms: ['all'], lead: [], body: ["      name: '@deepseek-ai/dsh-evolution-fixture'"] }],
+    }
+    await writeFile(join(root, 'scripts', 'bundle-rows.json'), JSON.stringify(roster, null, 2) + '\n', 'utf8')
+    await writeFile(join(pkg, 'lib', 'index.js'), 'export const name = "fixture"\nexport function apply() {}\n', 'utf8')
+    const clean = await run(process.execPath, [builtSmoke, root, '--platform', platform], { encoding: 'utf8' })
+    expect(clean.stdout).toContain('smoke-built-entries: OK')
+    await writeFile(join(pkg, 'lib', 'index.js'), 'export const apply = "not a function"\n', 'utf8')
+    const broken = await run(process.execPath, [builtSmoke, root, '--platform', platform], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(broken?.code).toBe(1)
+    expect(broken?.stderr).toContain('`apply` is exported but is not a function')
   })
 })
 

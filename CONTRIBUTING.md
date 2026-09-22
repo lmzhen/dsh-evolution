@@ -53,7 +53,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  19-step gate runs it on every batch; a second copy fails and names both files.
+  21-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -86,28 +86,30 @@ Run from the two trees (never reorder or rename these steps):
 | 1 | `node node_modules/typescript/lib/tsc.js -b tsconfig.host.json` | overlay |
 | 2 | `node node_modules/oxlint/bin/oxlint packages/evolution` | overlay |
 | 3 | `node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000` | overlay |
-| 4 | `node packages/scripts/verify-dependency-closure.mjs packages --strict` | mirror |
-| 5 | `node packages/scripts/verify-arch-guards.mjs packages --strict` | mirror |
-| 6 | `node packages/scripts/verify-event-pairing.mjs packages --strict` | mirror |
-| 7 | `node packages/scripts/verify-declared-config.mjs packages --strict` | mirror |
-| 8 | `node packages/scripts/verify-param-registry.mjs packages --strict` | mirror |
-| 9 | `node packages/scripts/verify-bundle-rows.mjs packages --strict` | mirror |
-| 10 | `node packages/scripts/verify-param-channel-parity.mjs packages --strict` | mirror |
-| 11 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local (outside this repo) |
-| 12 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local (outside this repo) |
-| 13 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | `D:/dsh` (machine-local) |
-| 14 | `node packages/scripts/verify-profile-bundles.mjs` | mirror |
-| 15 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
-| 16 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.1.5-rc.2` | mirror |
-| 17 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |
-| 18 | `node packages/scripts/verify-family-tool-names.mjs packages --strict` | mirror |
-| 19 | `node packages/scripts/verify-skill-roots.mjs packages --strict` | mirror |
+| 4 | `node packages/evolution/scripts/build-lib.mjs` | overlay |
+| 5 | `node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution` | overlay |
+| 6 | `node packages/scripts/verify-dependency-closure.mjs packages --strict` | mirror |
+| 7 | `node packages/scripts/verify-arch-guards.mjs packages --strict` | mirror |
+| 8 | `node packages/scripts/verify-event-pairing.mjs packages --strict` | mirror |
+| 9 | `node packages/scripts/verify-declared-config.mjs packages --strict` | mirror |
+| 10 | `node packages/scripts/verify-param-registry.mjs packages --strict` | mirror |
+| 11 | `node packages/scripts/verify-bundle-rows.mjs packages --strict` | mirror |
+| 12 | `node packages/scripts/verify-param-channel-parity.mjs packages --strict` | mirror |
+| 13 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local (outside this repo) |
+| 14 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local (outside this repo) |
+| 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | `D:/dsh` (machine-local) |
+| 16 | `node packages/scripts/verify-profile-bundles.mjs` | mirror |
+| 17 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
+| 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.1.5-rc.2` | mirror |
+| 19 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |
+| 20 | `node packages/scripts/verify-family-tool-names.mjs packages --strict` | mirror |
+| 21 | `node packages/scripts/verify-skill-roots.mjs packages --strict` | mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a
 drift between this table and the executed set is visible in every gate log).
 
-Steps 11-13 live **outside this repository** and are machine-local: tsconfig
+Steps 13-15 live **outside this repository** and are machine-local: tsconfig
 registration, manifest version uniformity and mirror↔overlay parity. Each row
 names its absolute path precisely because these three are NOT shipped guards
 (citing a bare script name here would claim a guard the repository does not
