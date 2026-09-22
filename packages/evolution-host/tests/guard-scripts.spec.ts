@@ -611,4 +611,28 @@ describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
     expect(aliased?.code).toBe(1)
     expect(aliased?.stderr).toContain('DEPRECATED alias "memoryInterval"')
   })
+
+  // C3b (0.8.0): the registry says a row is E3 and the card offers it, but the write
+  // lands in the OWNER's section schema. A row that schema does not declare is a knob
+  // whose write has nowhere to land; the reverse - a schema key nobody registered - is a
+  // knob the registry, the cards, the doctor and the document all miss. Both directions
+  // are pinned here, and the fixed tree has to come back clean.
+  it('fails when an E3 row is missing from its owner section schema', async () => {
+    const root = await tempRoot('guard-owner-schema-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    const namespaces = "export const PARAM_NAMESPACES = Object.freeze({\n  'evolution-review': 'evolution-review',\n})\n"
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]) + namespaces, 'utf8')
+    const owner = join(root, 'evolution-review', 'src')
+    await mkdir(owner, { recursive: true })
+    const schemaOf = (key: string): string => 'export const REVIEW_SETTINGS_SCHEMA: z<object> = z.object({\n  ' + key + ': z.number(),\n})\n'
+    await writeFile(join(owner, 'index.ts'), schemaOf('somethingElse'), 'utf8')
+    const missing = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(missing?.code).toBe(1)
+    expect(missing?.stderr).toContain('registers "reviewSkillInterval" as E3 but REVIEW_SETTINGS_SCHEMA has no such key')
+    expect(missing?.stderr).toContain('declares "somethingElse"')
+    await writeFile(join(owner, 'index.ts'), schemaOf('reviewSkillInterval'), 'utf8')
+    const clean = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
+    expect(clean.stdout).toContain('verify-param-channel-parity: OK')
+  })
 })

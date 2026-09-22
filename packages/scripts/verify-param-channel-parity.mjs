@@ -8,7 +8,9 @@
  * rows), `/evolution params` and `/evolution policy set` (the command face), the
  * doctor divergence section, and the generated artifacts (`PARAMETERS.md` plus the
  * settings-UI package's generated field list). This guard asserts that every
- * id-shaped literal those channels carry is a registry id — and that the generated
+ * id-shaped literal those channels carry is a registry id; that every E3 row is a key of
+ * its OWNER's section schema (and every schema key is a registered id), so a registered
+ * knob has somewhere to land; and that the generated
  * artifacts carry EXACTLY the registry's ids, so a hand edit in either one fails
  * here even before the byte-level freshness check runs.
  *
@@ -57,10 +59,15 @@ function aliasLiterals(path, aliases) {
   return found
 }
 
-/** The keys a schemastery `z.object({ … })` block declares (unquoted identifiers). */
-function schemaKeys(path) {
+/**
+ * The keys a schemastery `z.object({ … })` block declares (unquoted identifiers).
+ * @param path - the file carrying the block.
+ * @param anchor - the declaration the block belongs to (`Config`, or an owner's `<X>_SETTINGS_SCHEMA`).
+ * @returns the declared keys.
+ */
+function schemaKeys(path, anchor = 'Config') {
   const text = readFileSync(path, 'utf8')
-  const start = text.indexOf('Config')
+  const start = text.indexOf(anchor)
   const body = start < 0 ? '' : text.slice(start, text.indexOf('})', start))
   const keys = new Set()
   for (const match of body.matchAll(/^\s{2,}([a-z][A-Za-z0-9]*):/gm)) keys.add(match[1])
@@ -106,6 +113,35 @@ if (existsSync(policySchema)) {
   notes.push('policy schema keys checked: ' + named.length + ' (' + carried + ' registry ids)')
 }
 
+
+// 3. Every E3 row must be a key of its OWNER's section schema: the platform validates
+// a write against that schema, so an id the schema does not declare is a parameter the
+// card offers (the field list is generated from the registry) whose write has nowhere
+// to land. The reverse direction matters too — a schema key nobody registered is a
+// knob the registry, the cards, the doctor and the document all miss.
+const SETTINGS_SCHEMA_ANCHOR = /export const ([A-Z_]+_SETTINGS_SCHEMA)\b/
+for (const owner of Object.keys(namespaces)) {
+  const ownedIds = registry.entries.filter(entry => entry.owner === owner && entry.tier === 'E3').map(entry => entry.id)
+  if (ownedIds.length === 0) continue
+  const file = join(root, owner, 'src', 'index.ts')
+  if (!existsSync(file)) {
+    problems.push('owner-schema: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but has no src/index.ts')
+    continue
+  }
+  const anchor = SETTINGS_SCHEMA_ANCHOR.exec(readFileSync(file, 'utf8'))
+  if (anchor === null) {
+    problems.push('owner-schema: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but publishes no <X>_SETTINGS_SCHEMA')
+    continue
+  }
+  const keys = schemaKeys(file, anchor[1])
+  for (const id of ownedIds) {
+    if (!keys.has(id)) problems.push('owner-schema: ' + owner + ' registers "' + id + '" as E3 but ' + anchor[1] + ' has no such key — the write has nowhere to land')
+  }
+  for (const key of keys) {
+    if (key.length >= 6 && !ids.has(key)) problems.push('owner-schema: ' + owner + ' declares "' + key + '" in ' + anchor[1] + ', which the registry does not know — add the row or drop the knob')
+  }
+  notes.push(owner + ' schema: ' + keys.size + ' key(s)')
+}
 // The generated artifacts must carry EXACTLY the ids they are generated from:
 // the client field list is the E3 rows, the document is every row.
 const clientFile = join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts')
@@ -126,7 +162,7 @@ if (existsSync(docFile)) {
   notes.push(documented.size + ' documented row(s)')
 }
 
-const summary = ids.size + ' id(s), ' + CHANNELS.length + ' channel(s), ' + notes.join(', ')
+const summary = ids.size + ' id(s), ' + CHANNELS.length + ' channel(s), ' + Object.keys(namespaces).length + ' owner schema(s), ' + notes.join(', ')
 if (problems.length === 0) {
   console.log('verify-param-channel-parity: OK — ' + summary)
   process.exit(0)
