@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-memory-files",
   "description": "Local layered memory provider",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publishConfig": {
     "access": "public"
   },
