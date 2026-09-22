@@ -8,9 +8,11 @@
  * runtime. A platform member that moved, a subpath that stopped resolving, or a
  * module that throws while evaluating is a failure here instead of a broken boot.
  *
- * The entries are STAGED: every family package is copied (`lib/` + manifest) into a
- * temporary `node_modules`, the installed platform scope is symlinked in, and the
- * entries are imported from there — the layout a profile gets from `dsh plugin add`.
+ * The entries are STAGED: a temporary `node_modules` holds every family package as a
+ * real copy (`lib/` + manifest) plus one junction per installed platform package, and
+ * the entries are imported from there — the layout a profile gets from `dsh plugin add`.
+ * Nothing is written into the installed platform scope itself: junctioning that scope as
+ * a whole would route these copies into the operator's own install directory.
  *
  * The surface under test is DERIVED from the composition files (bundle roster + the
  * preset YAMLs), never hand-listed: each specifier a composition mounts — including
@@ -27,7 +29,7 @@
  */
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const NL = String.fromCharCode(10)
@@ -131,13 +133,29 @@ for (const specifier of mounted) {
 }
 
 const stage = mkdtempSync(join(tmpdir(), 'evo-smoke-'))
-const scope = join(stage, 'node_modules', '@deepseek-ai')
-mkdirSync(join(stage, 'node_modules'), { recursive: true })
+const stageModules = join(stage, 'node_modules')
+const scope = join(stageModules, '@deepseek-ai')
+mkdirSync(scope, { recursive: true })
 if (!existsSync(platform)) {
   console.error('smoke-built-entries: no platform scope at ' + platform + ' — pass --platform')
   process.exit(2)
 }
-symlinkSync(platform, scope, 'junction')
+// Reproduce the installed resolution topology WITHOUT writing into it: `@deepseek-ai` is a
+// real directory in the stage, one junction per installed platform package sits inside it,
+// and one junction per sibling package of the installed scope (`yaml`, `zod`, …) sits beside
+// it, so a family package resolves exactly what an installed one resolves. Junctioning the
+// installed scope as a whole instead would send the family copies below into the operator's
+// own plugin directory, where removing the stage leaves them behind.
+const scopeRoot = dirname(platform)
+const linkDir = (target, link) => { symlinkSync(target, link, 'junction') }
+for (const entry of readdirSync(scopeRoot, { withFileTypes: true })) {
+  if (entry.name === basename(platform) || (!entry.isDirectory() && !entry.isSymbolicLink())) continue
+  linkDir(join(scopeRoot, entry.name), join(stageModules, entry.name))
+}
+for (const entry of readdirSync(platform, { withFileTypes: true })) {
+  if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+  linkDir(join(platform, entry.name), join(scope, entry.name))
+}
 
 /** Map a package-relative path onto the staged copy. */
 const staged = (file, dir) => join(scope, dir.manifest.name.slice(dir.manifest.name.indexOf('/') + 1), file.slice(dir.dir.length + 1))
@@ -152,6 +170,7 @@ try {
     cpSync(join(pkg.dir, 'package.json'), join(target, 'package.json'))
   }
   // 1) the entries a composition mounts — the deployment surface.
+  if (treeMounted.length === 0) problems.push('the composition files mounted no entry at all — this smoke would import nothing and pass')
   for (const specifier of treeMounted) {
     const target = targetOf(specifier)
     if (target === null) continue

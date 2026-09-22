@@ -230,26 +230,47 @@ const RAW_WRITE_REGISTER = new Set([
   'evolution-commands/src/index.ts',
 ])
 
-/** The `node:fs` write APIs (reading a file is out of scope: the rule is about writes). */
-const FS_WRITE_APIS = /writeFileSync|writeFile|mkdirSync|mkdir|renameSync|rename|copyFileSync|copyFile|rmSync|rm|unlinkSync|unlink|appendFileSync|createWriteStream/
+/** `node:fs` specifiers, either face, with or without the `node:` prefix. */
+const FS_SPECIFIER = /^(?:node:)?fs(?:\/promises)?$/
 
 /**
- * N23: write APIs imported straight from `node:fs` / `node:fs/promises`.
+ * The fs APIs that only READ. Every other name imported from an fs specifier counts as a
+ * write, so an unrecognized API (`open`, `openSync`, a future addition) fails closed.
+ */
+const FS_READ_APIS = new Set([
+  'readFileSync', 'readFile', 'readdirSync', 'readdir', 'opendirSync', 'opendir',
+  'existsSync', 'statSync', 'stat', 'lstatSync', 'lstat', 'realpathSync', 'realpath',
+  'accessSync', 'access', 'readlinkSync', 'readlink', 'createReadStream', 'watch', 'watchFile',
+])
+
+/**
+ * N23: fs imports a `/src/` file could write through.
+ *
+ * Judged in reverse of a write-name whitelist, which missed `open` + `writeFile`,
+ * `promises as fsp`, the specifier without the `node:` prefix, and the dynamic forms —
+ * each of them reaches the same syscalls while the rule stayed green.
  * @param text - one file's source.
- * @returns the imported write APIs (a namespace import is reported as `<name> (namespace)`).
+ * @returns the offending imports (a namespace import reads `<name> (namespace)`, a dynamic
+ *   import or `require` call reads `<dynamic> <specifier>`).
  */
 function fsWriteImports(text) {
   const found = []
-  for (const match of text.matchAll(/import\s+([^;]+?)\s+from\s+['\"]node:fs(?:\/promises)?['\"]/g)) {
+  for (const match of text.matchAll(/import\s+([^;]+?)\s+from\s+['\"]([^'\"]+)['\"]/g)) {
+    if (!FS_SPECIFIER.test(match[2])) continue
     const clause = match[1].trim()
     // `import type { Dirent } from 'node:fs'` is a TYPE import: it writes nothing (the
     // shape that produced this rule's first false positive).
     if (clause.startsWith('type')) continue
     if (!clause.startsWith('{')) { found.push(clause.split(/\s+as\s+/)[0] + ' (namespace)'); continue }
     for (const raw of clause.slice(clause.indexOf('{') + 1, clause.lastIndexOf('}')).split(',')) {
-      const name = raw.trim().split(/\s+as\s+/)[0]
-      if (name !== '' && FS_WRITE_APIS.test(name)) found.push(name)
+      const cell = raw.trim()
+      if (cell === '' || cell.startsWith('type ')) continue
+      const name = cell.split(/\s+as\s+/)[0]
+      if (!FS_READ_APIS.has(name)) found.push(name)
     }
+  }
+  for (const match of text.matchAll(/(?:import\s*\(|require\s*\()\s*['\"]([^'\"]+)['\"]\s*\)/g)) {
+    if (FS_SPECIFIER.test(match[1])) found.push('<dynamic> ' + match[1])
   }
   return found
 }
@@ -844,7 +865,7 @@ function walk(dir) {
       // N23 (C5/B13, 0.8.0): raw durable-file writes live in the IO seam — see docblock.
       if (rel.includes('/src/') && !IO_SEAM_WRITERS.has(rel) && !RAW_WRITE_REGISTER.has(rel)) {
         for (const api of fsWriteImports(text)) {
-          violations.push(`${rel}: imports \`${api}\` from node:fs — a durable-file write outside the IO seam skips the lock/transaction protocol (rule N23); route it through ctx.evolutionIo, or register the writer with its reason`)
+          violations.push(`${rel}: imports \`${api}\` — a durable-file write outside the IO seam skips the lock/transaction protocol (rule N23); route it through ctx.evolutionIo, or register the writer with its reason`)
         }
       }
       // N9 (v39, S0.4 invariant): splitter ⊇ finding — see docblock.
@@ -938,12 +959,23 @@ if (process.argv.includes('--list-rules')) {
       && namespaceSplits("PARAM_NAMESPACES['evolution-curator'] ?? CURATOR_SETTINGS_NAMESPACE").length === 1
       && namespaceSplits("const ns = paramNamespace('evolution-curator')").length === 0
       && namespaceSplits("  'evolution-curator': 'evolution-curator',").length === 0],
+    // The four SHAPES the first version of this rule missed (0.8.0 review): an API that
+    // writes only when called a certain way, the promise face under an alias, the same
+    // module without the `node:` prefix, and the dynamic forms.
     ['N23', () => fsWriteImports("import { readFileSync, writeFileSync } from 'node:fs'").join() === 'writeFileSync'
       && fsWriteImports("import { rename } from 'node:fs/promises'").length === 1
       && fsWriteImports("import * as fs from 'node:fs'").join().includes('(namespace)')
       && fsWriteImports("import { existsSync, readdirSync, lstat } from 'node:fs'").length === 0
       && fsWriteImports("import type { Dirent } from 'node:fs'").length === 0
-      && fsWriteImports("import { type Dirent, readdirSync } from 'node:fs'").length === 0],
+      && fsWriteImports("import { type Dirent, readdirSync } from 'node:fs'").length === 0
+      && fsWriteImports("import { open } from 'node:fs/promises'").join() === 'open'
+      && fsWriteImports("import { promises as fsp } from 'node:fs'").join() === 'promises'
+      && fsWriteImports("import { writeFileSync } from 'fs'").join() === 'writeFileSync'
+      && fsWriteImports("import { openSync, writeSync } from 'node:fs'").join() === 'openSync,writeSync'
+      && fsWriteImports("const fs = await import('node:fs')").join() === '<dynamic> node:fs'
+      && fsWriteImports("const fs = require('fs')").join() === '<dynamic> fs'
+      && fsWriteImports("import { readFileSync } from 'fs'").length === 0
+      && fsWriteImports("import { readFile } from './io.ts'").length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {

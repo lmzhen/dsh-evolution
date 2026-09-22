@@ -16,6 +16,7 @@
 import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
+import { landedWrites, type PendingWrite } from './settle.ts'
 import type { ParamSectionSnapshot, ParamSectionSource } from './seam.ts'
 
 /**
@@ -163,7 +164,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [pending, setPending] = useState<readonly string[] | null>(null)
+  const [pending, setPending] = useState<readonly PendingWrite[] | null>(null)
   const snapshot = props.useParamSection((state: ParamSectionSnapshot) => state)
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
   if (snapshot.status === 'unavailable') return createElement('p', { className: 'evolution-param-note' }, t('unavailable'))
@@ -182,19 +183,21 @@ export function ParamCard(props: ParamCardProps): ReactNode {
   /**
    * Settle a staged write against the Host's answer.
    *
-   * Both settings scopes this bundle runs on (the shell's own controller and the bridge
-   * variant) finish their recovery read BEFORE the write promise resolves, so the user
-   * layer read here is already the verdict: a field the Host refused leaves no key in
-   * it. The check lives in an effect, not in the save callback, because the raw
-   * snapshot is reachable only through the render-time seat — the face's `hooks`
-   * compartment never reaches the component.
+   * A resolved write promise is not the verdict: both settings scopes this bundle runs
+   * on (the shell's own controller and the bridge variant) finish their recovery read
+   * BEFORE it resolves, so a value the Host refused is simply still the previous one.
+   * Presence in the user layer therefore cannot answer the question — on a field the
+   * operator had already overridden, a refused value's key is present as well. The
+   * verdict asks whether each staged id now holds the value this card requested.
+   * The check lives in an effect, not in the save callback, because the raw snapshot is
+   * reachable only through the render-time seat — the face's `hooks` compartment never
+   * reaches the component.
    */
   useEffect(() => {
     if (pending === null) return
-    const landed = isSection(snapshot.user) ? snapshot.user : {}
     setPending(null)
     setBusy(false)
-    if (pending.every(id => Object.hasOwn(landed, id))) setDraft({})
+    if (landedWrites(pending, snapshot.user)) setDraft({})
     else setError(t('refused'))
   }, [pending, snapshot.user, t])
   const save = (): void => {
@@ -203,7 +206,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
     void (async () => {
       try {
         for (const field of dirty) await write(field.id, parseFor(field.control, textOf(field)))
-        setPending(dirty.map(field => field.id))
+        setPending(dirty.map(field => ({ id: field.id, want: parseFor(field.control, textOf(field)) })))
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
         // so nothing the operator typed is lost.

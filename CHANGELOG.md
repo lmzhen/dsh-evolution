@@ -18,6 +18,8 @@
 | F3 | 写入在途时控件上锁，保存期间的新输入不会被随后清掉的草稿带走 | 同上 |
 | F4 | 本地 React 声明补 `useEffect` | `src/client/react.d.ts` |
 
+> **本版最终形态（发布前独立复核修正，见下 R1）**：保存成败的判定从「用户层有没有这个键」改为「请求的值是否真的进了用户层」，被拒提示渲染在**卡片底部（字段列表之后）**，不是字段正下方。
+>
 > **运维口径（本版实测）**：客户端半**不能**手改装机包里的 `lib/client.js` 来验证——平台按客户端模块摘要装载，改过的文件会让整包客户端行加载失败（`failed to import loader entry … client-modules: bundle /plugins/??…`）。验证只能走「发布 → 装包 → 刷新页面」这条路。
 
 ### 内部收敛（逐批留档；C4／C5 经前置实测无代码目标）
@@ -25,15 +27,29 @@
 | # | 内容 | 门禁与守卫 |
 |---|---|---|
 | C1 | 行集单源：`packages/scripts/bundle-rows.json` → `gen-bundle-patches.mjs` 生成三份 `cordis.patch.yml`（与手写版**逐字节相同**） | 新 `verify-bundle-rows.mjs`（门禁第 11 步）＋哨兵「手改 patch 必红」 |
-| C2 | 错误码表 `evolution-core/src/errors.ts`（20 个场景键 / 22 条逐字文案，`E-301`–`E-316`）＋装机产物冒烟 `smoke-built-entries.mjs`（暂存 `lib/`＋manifest、软链已装平台作用域；实测 24 个被挂载入口＋30 个包根全部导入） | 规则 **N21**（码只在表内）；门禁新增 `build-lib`／`smoke-built-entries` |
+| C2 | 错误码表 `evolution-core/src/errors.ts`（20 个场景键 / 22 条逐字文案，`E-301`–`E-316`）＋装机产物冒烟 `smoke-built-entries.mjs`（把 `lib/`＋manifest 拷进**临时作用域**、平台包**逐个 junction**，不写安装目录；实测 24 个被挂载入口＋30 个包根全部导入） | 规则 **N21**（码只在表内）；门禁新增 `build-lib`／`smoke-built-entries` |
 | C3 | 命名空间单点 `paramNamespace(owner)`（删 3 个同值常量与永不生效的 `??` 兜底）＋每个 E3 行必须是其 owner section schema 的键、反之亦然（实测 **32 ↔ 32**） | 规则 **N22**；四渠道 parity 守卫增加写面校验 |
-| C5 | 规则 **N23**：durable-file 写只在 io 缝内（缝豁免 ＋ 登记册 ＋ 证伪探测器） | 守卫 **24** 条规则干净 |
+| C5 | 规则 **N23**：durable-file 写只在 io 缝内（缝按路径豁免 ＋ 登记册 ＋ **反向判定**：fs 导入里非只读 API 即违规） | 守卫 **24** 条规则干净；证伪探针 **13** 条（含 R3 的四种绕过形状） |
+
+### 发布前独立复核（2026-09-22；四条发现全部落地）
+
+独立子代理做对抗式复核（范围 `ea1b100..af9b100`；只报 P0–P2，每条要求 file:line 与可复现命令）。四条发现与处置：
+
+| # | 复核发现 | 处置 |
+|---|---|---|
+| R1（P0） | 保存判定只看「用户层有没有这个键」：字段此前已带用户覆盖时，**被拒**写入的键本来就在 ⇒ 判成成功、草稿被静默清掉 —— 正是本次修复要消灭的那种「像成功一样回退」 | 判定改比**请求值**：保存时记下每个待写 id 与请求值，结算时要求该 id 现在就是该值（新 `src/client/settle.ts`，`ParamCard` 改用 `landedWrites`）；新增该包**首个用例** `tests/settle.spec.ts`（含「已覆盖字段被拒」这条反例） |
+| R2（P1） | 装机产物冒烟把家族包**写进了已安装的平台作用域**（整作用域 junction ⇒ `cpSync` 穿透，清理只删链接）：30 份副本留在 `~/.dsh/profiles/node_modules/@deepseek-ai`，并让改名/删包后的 import 仍能解析到旧包 | 暂存改成真目录 ＋ **平台包逐个 junction**（家族包落临时目录）；本机那 30 份残留已按创建时间戳核对后清除；mounted 计数加**非零断言**；docblock 与本文档口径同步改正 |
+| R3（P1） | 规则 **N23** 只认「从 `node:fs` 具名导入的白名单名字」：`open`＋`writeFile`、`promises as fsp`、去掉 `node:` 前缀、`openSync`/`writeSync`、动态 `import()`/`require` 全部**绕过**（缝自己用的就是 `open`） | 判定改**反向**：fs 模块导入里凡不是已知**只读** API 的一律违规，另加动态导入／`require` 文本检查；内置证伪探针 5 → **13** 条（含上述五种绕过形状）；当前树仍 **24 规则干净** |
+| R4（P2） | 行集生成器对「group 拼错」或「forms 为空」的行**静默丢弃**，而生成的 patch 依旧算「新鲜」 | `gen-bundle-patches.mjs` 增加 `validate()`：未知 group／未知 form／空 forms 一律 exit 2 |
+
+> 复核同时**验证成立**的：C1 产物与重构前逐字节相同且手改必红；C2 的 33 个调用点在占位符归一化后与旧字面量**多重集完全相等**（无文案漂移）；C4 parity 不可平凡满足；C3 确为 built 产物导入（空平台作用域 48 红）。
+> 复核的 P2-1（称错误码表是「22 键」）**不成立**：实测 **20 键 / 22 条文案（其中一对逐字相同 ⇒ 21 条互异）/ 16 个码 `E-301`–`E-316`**，调用点 **33**（commands 32／graph 1）——文档计数本就正确（该复核脚本把 22 条文案数当成了键数）。
 
 ### 行为变化（升级前必读）
 
 | # | 变化 | 回退／影响 |
 |---|---|---|
-| B1 | 设置卡保存：被宿主拒绝时字段下出现提示并保留草稿（不再「像成功一样静默回退」） | 撤 `evolution-settings-ui` 行即回原状 |
+| B1 | 设置卡保存：被宿主拒绝时**卡片底部**出现提示并**保留草稿**（判定按请求值，已带用户覆盖的字段不再被误判成成功） | 撤 `evolution-settings-ui` 行即回原状 |
 | B2 | 移除三个导出的常量 `CURATOR_SETTINGS_NAMESPACE`／`REVIEW_SETTINGS_NAMESPACE`／`SKILLS_SETTINGS_NAMESPACE`，改用 `paramNamespace(owner)` | 实测全仓（含测试与文档）无消费者；跨包 import 它们的代码改一行 |
 
 > **口径**：本版**不减行数**——C1/C2 净增约 1,450 行（声明面＋生成器＋验证器＋哨兵＋门禁两步）；C4（state 栈折叠）与 C5 的多数子项经**前置实测否决**（两个已发布提供者 ＋ 已发布 conformance 套件 ＋ 部署面 `provider` 选择；动作表／有界原语／替身 kit／侧车各自不同形或属兼容保证），否决理由逐条写进设计档以防重提。

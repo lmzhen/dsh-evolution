@@ -63,6 +63,32 @@ try {
   process.exit(2)
 }
 
+/**
+ * Refuse a roster that would silently drop a row.
+ *
+ * `render` walks the groups and filters rows into them, so a row naming a group that
+ * does not exist — or listing no form at all — simply never appears in any patch, and the
+ * freshness check would still call the result up to date.
+ * @param parsed - the parsed roster.
+ */
+function validate(parsed) {
+  const known = new Set(parsed.groups.map((group) => group.id))
+  for (const row of parsed.rows) {
+    if (!known.has(row.group)) throw new Error('row ' + row.id + ' names unknown group ' + String(row.group))
+    if (!Array.isArray(row.forms) || row.forms.length === 0) throw new Error('row ' + row.id + ' lists no install form')
+    for (const form of row.forms) {
+      if (!(form in parsed.forms)) throw new Error('row ' + row.id + ' names unknown form ' + String(form))
+    }
+  }
+}
+
+try {
+  validate(roster)
+} catch (error) {
+  console.error('gen-bundle-patches: ' + (error instanceof Error ? error.message : String(error)) + ' — a dropped row is invisible in the generated patches')
+  process.exit(2)
+}
+
 const forms = Object.keys(roster.forms)
 let stale = 0
 for (const form of forms) {
