@@ -28,7 +28,7 @@ import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTI
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { runWriteGates } from './write-gates.ts'
+import { runWriteGates, type WriteConfirmRequest } from './write-gates.ts'
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
@@ -172,6 +172,77 @@ interface SkillToolExec {
       snapshotEvents?: () => Iterable<{ type: string; data?: unknown }>
     }
   }
+  /** The call's cancellation, forwarded to the confirmation prompt so a cancelled call cannot leave
+   * a question waiting for an answer nobody will give. */
+  signal?: AbortSignal
+}
+
+/** The platform services the confirm gate reads; both are OPTIONAL seams. */
+interface ConfirmProbeContext {
+  get(name: 'agents'): AgentsLike | undefined
+  get(name: 'userQuestions'): UserQuestionsLike | undefined
+}
+
+/** The platform's agent registry, as far as this tool reads it. */
+interface AgentsLike {
+  /** @returns the live agent whose shared agent/session id this is, if any. */
+  get(id: string): unknown
+  /** @returns the live top-level agents. */
+  roots(): readonly unknown[]
+}
+
+/** The platform's question service, as far as this tool reads it. */
+interface UserQuestionsLike {
+  /** @returns the operator's answers, one per question. */
+  ask(request: ConfirmAskRequest): Promise<{ answers: readonly { id: string; selected: readonly string[] }[] }>
+}
+
+/** One `ask()` request: the question, the agent it is routed through, and the call's cancellation. */
+interface ConfirmAskRequest {
+  questions: Array<{ id: string; header?: string; question: string; options?: Array<{ label: string }> }>
+  agent?: unknown
+  signal?: AbortSignal
+}
+
+/** The platform error code a question-service failure carries, when it carries one. */
+function questionErrorCode(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null | undefined)?.code
+  return typeof code === 'string' ? code : undefined
+}
+
+/** The message of a caught platform error, for the one warning a degraded gate emits. */
+function reasonOfError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The registry's live ROOT agent for this call's session, or `undefined`.
+ *
+ * The registry keys agents by their shared agent/session id (platform `agent/src/index.ts:567`), and
+ * the platform's `ask()` accepts only an agent that is BOTH its exact live instance and a root
+ * (platform `user-questions/src/index.ts:96-106`). An id that resolves to an agent owned by another
+ * agent is not a root: the caller then proceeds unconfirmed rather than blocking a human question on
+ * an agent no human is watching.
+ * @param probe - the context, read through the optional-service probe.
+ * @param exec - this call's execution context.
+ * @returns the live root agent, when this session has one.
+ */
+function liveRootAgentOf(probe: ConfirmProbeContext, exec: SkillToolExec): unknown {
+  const agents = probe.get('agents')
+  const sessionId = exec.agent?.session?.id
+  if (agents === undefined || typeof sessionId !== 'string') return undefined
+  const candidate = agents.get(sessionId)
+  return candidate !== undefined && agents.roots().includes(candidate) ? candidate : undefined
+}
+
+/** The one thing the operator's answer decides: was the confirm label selected? */
+function confirmedBy(
+  answer: { answers: readonly { id: string; selected: readonly string[] }[] },
+  questionId: string,
+  confirmLabel: string,
+): boolean {
+  const selected = answer.answers.find(entry => entry.id === questionId)?.selected ?? []
+  return selected.includes(confirmLabel)
 }
 
 /** v30 REV-02: read the protected-skill list off the (optional) policy
@@ -207,6 +278,52 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (writeGateWarned) return
     writeGateWarned = true
     ctx.logger.warn(message)
+  }
+  // ③ (design §4.1): the tool path's ONE human confirmation point. Both platform seams it needs
+  // are OPTIONAL (a headless deployment mounts neither), so both are soft-probed and EVERY failure
+  // path PROCEEDS: the gate is UX, and the operator's own session stays the authority that asked for
+  // the write. The warning latches once per process — the condition belongs to the deployment.
+  const probe = ctx as unknown as ConfirmProbeContext
+  let confirmWarned = false
+  const confirmUnavailable = (reason: string): true => {
+    if (!confirmWarned) {
+      confirmWarned = true
+      ctx.logger.warn(`skill_manage: the confirmation prompt could not be shown (${reason}) — the write proceeds unconfirmed.`)
+    }
+    return true
+  }
+  const confirmSkillWrite = async (request: WriteConfirmRequest, exec: SkillToolExec): Promise<boolean> => {
+    const questions = probe.get('userQuestions')
+    if (questions === undefined) return confirmUnavailable('no user-questions service is mounted')
+    const ask = (agent: unknown) => questions.ask({
+      questions: [{
+        id: request.question.id,
+        header: request.question.header,
+        question: request.question.question,
+        options: request.question.options.map(option => ({ label: option.label })),
+      }],
+      agent,
+      ...exec.signal !== undefined ? { signal: exec.signal } : {},
+    })
+    // The platform validates that the supplied agent IS the registry's exact live root, while this
+    // tool's exec contract declares agent and session structurally — a wrapper that forwarded a copy
+    // is rejected as CALLER_NOT_LIVE. Re-resolve through the registry for that one code only (the
+    // session id is the id the registry keys agents with); every other failure proceeds.
+    const declared = exec.agent
+    if (declared !== undefined) {
+      try {
+        return confirmedBy(await ask(declared), request.question.id, request.confirmLabel)
+      } catch (error) {
+        if (questionErrorCode(error) !== 'CALLER_NOT_LIVE') return confirmUnavailable(reasonOfError(error))
+      }
+    }
+    const located = liveRootAgentOf(probe, exec)
+    if (located === undefined) return confirmUnavailable('the calling session has no live root agent')
+    try {
+      return confirmedBy(await ask(located), request.question.id, request.confirmLabel)
+    } catch (error) {
+      return confirmUnavailable(reasonOfError(error))
+    }
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   // V6-06 (0.3.35): the numeric limits go through the assembly-time clamp so a
@@ -430,6 +547,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       origin,
       protectedNames: protectedSkillNamesOf(),
       readNames: undefined,
+      confirm: undefined,
       warn: warnWriteGateOnce,
     })
     if (refusal !== null) {
@@ -729,6 +847,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         origin: libraryOrigin,
         protectedNames: protectedSkillNamesOf(),
         readNames: sessionReadSkillNames(exec.agent?.session),
+        confirm: async request => confirmSkillWrite(request, exec),
         warn: warnWriteGateOnce,
       })
       if (refusal !== null) {

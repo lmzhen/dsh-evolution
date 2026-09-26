@@ -27,6 +27,13 @@ write whose target the session never read is refused with `E-318`, and only a re
 counts. A session log the tool cannot read proceeds with one warning rather than blocking every
 autonomous write.
 
+A foreground `create`, or a bare foreground `delete`, asks the operator once before it writes and is
+refused with `E-317` when the answer is not the confirm label; a `delete` carrying `absorbed_into` is the
+merge protocol and does not ask. This gate is UX, not a security door: it is admission-only (a
+replayed record already carries the human release that staged it), and an unmounted question
+service, a caller that is not the registry's exact live root agent, or a failing ask all PROCEED
+with one warning — the operator's own session stays the authority that asked for the write.
+
 ### Approval seam
 
 Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) pass through the evolution approval seam when `evolution-approval` is mounted; approved/staged writes are replayed by the registered runner with the library origin preserved. The admission gates run BEFORE that boundary, so a write that cannot execute is refused, never staged for approval.

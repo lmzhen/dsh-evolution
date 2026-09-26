@@ -1,5 +1,6 @@
 /**
- * THE error-code table: E-301…E-318 with the exact text each one emits.
+ * THE error-code table: E-301…E-318 with the exact text each one emits (E-317 and E-318 are the
+ * write-admission gates' own refusals).
  *
  * The codes used to be spelled out at 33 call sites across two packages, so one
  * code's wording could drift between the branches that answer it and nothing could
@@ -55,7 +56,9 @@ export const EVOLUTION_ERRORS = Object.freeze({
     'E-310: the settings service refused the write: %a1% — the owning plugin\'s rule stands (a cross-field pair, or a cap that may only be tightened). /evolution params shows the current value.',
   'e-305-this-invocation-carries-no-2':
     'E-305: this invocation carries no agent — `%a1%` needs a session-backed call (run it from a session in the GUI or the CLI).',
-  // 0.9.0: the write-admission sequence's own refusal (tool-skill-manage/src/write-gates.ts).
+  // 0.9.0: the write-admission sequence's own refusals (tool-skill-manage/src/write-gates.ts).
+  'e-317-skill-write-not-confirmed':
+    'E-317: skill "%a1%" was not %a2% — the confirmation prompt was declined, so nothing was written. The prompt appears on every create and bare delete; repeat the call only if the operator asks for it.',
   'e-318-skill-write-without-a-read':
     'E-318: skill "%a1%" was not read in this session, so this write is refused. Read it with the `skill` tool first (a read that failed does not count), then repeat the write.',
 } as const)

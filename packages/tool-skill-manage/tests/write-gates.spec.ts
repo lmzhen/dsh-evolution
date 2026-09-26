@@ -252,3 +252,157 @@ describe('write gates: the execution point still refuses a stored plan', () => {
     expect(malformed.message).toContain('"name" must be a string')
   })
 })
+
+describe('write gates: the foreground confirmation (E-317)', () => {
+  interface AskedQuestion {
+    id: string
+    header?: string
+    question: string
+    options?: Array<{ label: string }>
+  }
+
+  /**
+   * A stub question service: it records what the operator was asked and which agent the prompt was
+   * routed through. `accept` reproduces the platform's identity check (throwing CALLER_NOT_LIVE for
+   * anything but the exact live instance); a rejected prompt never reaches the human, so it is not
+   * recorded.
+   */
+  function mountQuestions(
+    ctx: Context,
+    decide: (question: AskedQuestion) => string[],
+    accept?: (agent: unknown) => boolean,
+  ): { asked: AskedQuestion[]; routing: unknown[] } {
+    const asked: AskedQuestion[] = []
+    const routing: unknown[] = []
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: AskedQuestion[]; agent?: unknown }) => {
+        if (accept !== undefined && !accept(request.agent)) {
+          throw Object.assign(new Error('human interaction requires the exact live calling agent when an agent is supplied'), { code: 'CALLER_NOT_LIVE' })
+        }
+        const question = request.questions[0] as AskedQuestion
+        asked.push(question)
+        routing.push(request.agent)
+        return { answers: [{ id: question.id, selected: decide(question) }] }
+      },
+    })
+    return { asked, routing }
+  }
+
+  it('asks exactly once before a foreground create, and writes when confirmed', async () => {
+    const { ctx, root } = await setup()
+    const { asked, routing } = mountQuestions(ctx, () => ['Create'])
+    const session = sessionOf(undefined)
+    const created = await callTool(ctx, { action: 'create', name: 'confirm-yes', content: skillBody('confirm-yes') }, session)
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(asked).toHaveLength(1)
+    expect(asked[0]?.id).toBe('evolution-skill-write')
+    expect(asked[0]?.options?.map(option => option.label)).toEqual(['Create', 'Cancel'])
+    expect(asked[0]?.question).toContain('confirm-yes')
+    // The prompt is routed through the CALLING agent (the platform's ask() takes an agent, not a
+    // session), so assert the routing target is the one the call came from.
+    expect((routing[0] as { session?: unknown }).session).toBe(session)
+    expect(await readFile(skillPath(root, 'confirm-yes'), 'utf8')).toContain('Body.')
+  })
+
+  it('declines the write when the operator picks anything but the confirm label', async () => {
+    const { ctx, root } = await setup()
+    const { asked } = mountQuestions(ctx, () => ['Cancel'])
+    const refused = await callTool(ctx, { action: 'create', name: 'confirm-no', content: skillBody('confirm-no') }, sessionOf(undefined))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-317')
+    expect(valueOf(refused).message).toContain('"confirm-no"')
+    expect(asked).toHaveLength(1)
+    expect(await readFile(skillPath(root, 'confirm-no'), 'utf8').catch(() => null)).toBeNull()
+  })
+
+  it('asks once for a bare delete and not for an absorbed one', async () => {
+    const { ctx } = await setup()
+    // Answer the FIRST option, i.e. the confirm label of whatever action is being confirmed.
+    const { asked } = mountQuestions(ctx, question => [question.options?.[0]?.label ?? 'Cancel'])
+    await createTarget(ctx, 'confirm-umbrella')
+    await createTarget(ctx, 'confirm-absorbed')
+    await createTarget(ctx, 'confirm-bare')
+    expect(asked).toHaveLength(3)
+    const absorbed = await callTool(ctx, { action: 'delete', name: 'confirm-absorbed', absorbed_into: 'confirm-umbrella' }, sessionOf(undefined))
+    expect(valueOf(absorbed).ok, valueOf(absorbed).message).toBe(true)
+    expect(asked).toHaveLength(3)
+    const bare = await callTool(ctx, { action: 'delete', name: 'confirm-bare' }, sessionOf(undefined))
+    expect(valueOf(bare).ok, valueOf(bare).message).toBe(true)
+    expect(asked).toHaveLength(4)
+    expect(asked[3]?.options?.map(option => option.label)).toEqual(['Delete', 'Cancel'])
+  })
+
+  it('does not ask a subagent, and does not ask on the replay path', async () => {
+    const { ctx } = await setup()
+    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const subagentCreate = await callTool(ctx, { action: 'create', name: 'confirm-subagent', content: skillBody('confirm-subagent') }, sessionOf('subagent'))
+    expect(valueOf(subagentCreate).ok, valueOf(subagentCreate).message).toBe(true)
+    expect(asked).toHaveLength(0)
+    ctx.provide('evolutionState', {
+      listPending: async () => [],
+      savePending: async () => {},
+      tryResolvePending: async () => ({ record: null, applied: false }),
+      claimPending: async () => null,
+      releasePendingClaim: async () => {},
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    await ctx.plugin(EvolutionApproval, { enabled: true })
+    // The human release that staged the record IS the confirmation: a replay must not ask again.
+    const replayed = await ctx.evolutionApproval.run('skill', {
+      operation: { action: 'create', name: 'confirm-replay', content: skillBody('confirm-replay') },
+      origin: 'foreground',
+      libraryOrigin: 'foreground',
+    }, { interface: 'background_review' })
+    expect(replayed.ok, replayed.message).toBe(true)
+    expect(asked).toHaveLength(0)
+  })
+
+  it('refuses a malformed call before asking anything', async () => {
+    const { ctx } = await setup()
+    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const refused = await callTool(ctx, { action: 'create', name: 'confirm-missing' }, sessionOf(undefined))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('skill_manage create requires content')
+    expect(asked).toHaveLength(0)
+  })
+
+  it('proceeds with ONE warning when no question service is mounted', async () => {
+    const { ctx } = await setup()
+    const warns: string[] = []
+    ctx.logger.warn = ((message: string) => { warns.push(message) }) as typeof ctx.logger.warn
+    const first = await callTool(ctx, { action: 'create', name: 'confirm-noservice', content: skillBody('confirm-noservice') }, sessionOf(undefined))
+    const second = await callTool(ctx, { action: 'create', name: 'confirm-noservice-2', content: skillBody('confirm-noservice-2') }, sessionOf(undefined))
+    expect(valueOf(first).ok, valueOf(first).message).toBe(true)
+    expect(valueOf(second).ok, valueOf(second).message).toBe(true)
+    expect(warns.filter(message => message.includes('confirmation prompt'))).toHaveLength(1)
+  })
+
+  it('re-resolves the registry live root when the forwarded agent is not the live instance', async () => {
+    const { ctx } = await setup()
+    const sessionId = 'wg-confirm-live'
+    const session = { id: sessionId, header: {}, snapshotEvents: () => [] }
+    const live = { id: sessionId, session, ctx, inject: () => {} } as unknown as Agent
+    ctx.agents.register(live)
+    const { asked, routing } = mountQuestions(ctx, () => ['Create'], agent => agent === live)
+    // A structural copy carrying the same session id: the platform rejects it as CALLER_NOT_LIVE,
+    // so the gate has to route through the registry's live root instead.
+    const forwarded = { id: sessionId, header: { origin: undefined }, snapshotEvents: () => [] }
+    const created = await callTool(ctx, { action: 'create', name: 'confirm-live', content: skillBody('confirm-live') }, forwarded)
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(asked).toHaveLength(1)
+    expect(routing[0]).toBe(live)
+  })
+
+  it('proceeds with a warning when the session has no live root agent', async () => {
+    const { ctx } = await setup()
+    const warns: string[] = []
+    ctx.logger.warn = ((message: string) => { warns.push(message) }) as typeof ctx.logger.warn
+    const { asked } = mountQuestions(ctx, () => ['Create'], () => false)
+    const created = await callTool(ctx, { action: 'create', name: 'confirm-noroot', content: skillBody('confirm-noroot') }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(asked).toHaveLength(0)
+    expect(warns.filter(message => message.includes('confirmation prompt'))).toHaveLength(1)
+  })
+})
+

@@ -27,6 +27,42 @@ import { SKILL_ACTION_REQUIRED_FIELDS, errorText, isUnreadWrite, type WriteOrigi
 /** The point whose verdict is being taken. */
 export type WriteGatePoint = 'admission' | 'execution'
 
+/** The confirm question's stable id — one question per write, so an answer to an earlier prompt
+ * can never be read as the answer to a later one. */
+const CONFIRM_QUESTION_ID = 'evolution-skill-write'
+
+/** The cancel label every confirm question offers. */
+const CANCEL_LABEL = 'Cancel'
+
+/** One confirm question, as the gate writes it and the seam asks it. */
+export interface WriteConfirmRequest {
+  /** The action being confirmed (`create` or `delete`). */
+  readonly action: string
+  /** The skill the write would create or archive. */
+  readonly name: string
+  /** The question for the operator: the options are the confirm label, then the cancel label. */
+  readonly question: {
+    readonly id: string
+    readonly header: string
+    readonly question: string
+    readonly options: readonly { readonly label: string }[]
+  }
+  /** The option label that means "proceed". */
+  readonly confirmLabel: string
+}
+
+/**
+ * Ask the human to confirm one irreversible skill write.
+ *
+ * MUST be total: an implementation resolves every unavailability — no question service, no live root
+ * agent, a failing ask — to `true`, because this gate is an operator convenience and no failure of the
+ * question service may block the operator's own write. `false` means the human answered something
+ * other than the confirm label.
+ * @param request - the question to put to the operator and the label that means "proceed".
+ * @returns true to proceed with the write.
+ */
+export type WriteConfirm = (request: WriteConfirmRequest) => Promise<boolean>
+
 /** The scalar fields the tool schema types as strings; the replay channel has no schema. */
 const SCALAR_ARG_FIELDS = ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const
 
@@ -42,6 +78,8 @@ export interface WriteGateContext {
   readonly protectedNames: readonly string[] | undefined
   /** Names this session read successfully; `undefined` when the session log is not readable. */
   readonly readNames: ReadonlySet<string> | undefined
+  /** The human confirm seam — read only by the gates that apply to `'admission'`. */
+  readonly confirm: WriteConfirm | undefined
   /** Report a degraded gate; called at most once per write, and must not throw. */
   readonly warn: (message: string) => void
 }
@@ -52,6 +90,8 @@ interface GateArgs {
   readonly action: string | undefined
   /** The skill name, or `''` when the caller sent none. */
   readonly name: string
+  /** `delete` with this set is a merge into an umbrella, not a bare archive. */
+  readonly absorbedInto: string | undefined
   /** The raw arguments object, for the scalar shape gate. */
   readonly scalars: Record<string, unknown>
 }
@@ -82,9 +122,11 @@ function gateArgsOf(args: unknown): GateArgs {
   const scalars = (typeof args === 'object' && args !== null ? args : {}) as Record<string, unknown>
   const action = scalars.action
   const name = scalars.name
+  const absorbedInto = scalars.absorbed_into
   return {
     action: typeof action === 'string' ? action : undefined,
     name: typeof name === 'string' ? name : '',
+    absorbedInto: typeof absorbedInto === 'string' ? absorbedInto : undefined,
     scalars,
   }
 }
@@ -177,12 +219,60 @@ const READ_BEFORE_WRITE: WriteGate = {
   },
 }
 
+/**
+ * The confirm gate (design §4.1): a foreground create, or a bare foreground delete, is
+ * irreversible and gets ONE question. Admission only — a replayed record already carries the human
+ * release that staged it, so asking there would be the second interruption for one write.
+ *
+ * `delete` with `absorbed_into` is exempt: that is the merge protocol (an umbrella absorbs the source),
+ * and asking once per absorbed skill would turn one merge into N questions. A BARE delete is the
+ * destructive primitive the plan layer reserves for a human — a review may only delete into an
+ * umbrella (core's `SKILL_ACTION_REQUIRED_FIELDS` docblock).
+ *
+ * The gate is UX, not a security door (those are policy protection and read-before-write): the seam
+ * is required to be total, so an unmounted question service or a caller that is not the live root
+ * agent PROCEEDS — the operator's own session is the authority that asked for the write.
+ */
+const HUMAN_CONFIRM: WriteGate = {
+  id: 'human-confirm',
+  appliesTo: ['admission'],
+  run: async ({ view, origin, confirm, warn }) => {
+    const action = view.action
+    if (action === undefined || origin !== 'foreground' || view.name === '') return null
+    const destructive = action === 'create' || (action === 'delete' && view.absorbedInto === undefined)
+    if (!destructive) return null
+    if (confirm === undefined) {
+      warn('skill_manage: no confirmation channel is mounted, so the write proceeds unconfirmed.')
+      return null
+    }
+    const confirmLabel = action === 'create' ? 'Create' : 'Delete'
+    const confirmed = await confirm({
+      action,
+      name: view.name,
+      confirmLabel,
+      question: {
+        id: CONFIRM_QUESTION_ID,
+        header: 'Confirm',
+        question: action === 'create'
+          ? `Create skill "${view.name}"? A new skill directory is written into the family tree.`
+          : `Delete skill "${view.name}"? It is archived under .archive and leaves the catalog.`,
+        options: [{ label: confirmLabel }, { label: CANCEL_LABEL }],
+      },
+    })
+    if (confirmed) return null
+    return errorText('e-317-skill-write-not-confirmed', {
+      a1: view.name,
+      a2: action === 'create' ? 'created' : 'deleted',
+    })
+  },
+}
+
 /** The sequence, in order. A gate whose `appliesTo` omits the asking point is skipped. */
-const GATES: readonly WriteGate[] = [ARGUMENT_SHAPE, MISSING_ARGS, POLICY_PROTECTION, READ_BEFORE_WRITE]
+const GATES: readonly WriteGate[] = [ARGUMENT_SHAPE, MISSING_ARGS, POLICY_PROTECTION, READ_BEFORE_WRITE, HUMAN_CONFIRM]
 
 /**
  * Run the sequence for one write attempt.
- * @param context - the asking point, the write, and the seams a human-facing gate would need.
+ * @param context - the asking point, the write, and the seams the human-facing gate needs.
  * @returns the FIRST refusal, or null when every applicable gate passed. Both points return the
  *   message as the tool result unchanged, so the two entries refuse with identical wording.
  */
