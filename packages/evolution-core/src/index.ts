@@ -20,7 +20,8 @@
  *   evolution-policy/threat, both stores, review, maintenance.
  * - **Core domain stores/logic** — `skill-store.ts` (skill tree engine +
  *   IO-seam consumer), `memory-store.ts`, `usage.ts`, `curator.ts`,
- *   `quality.ts`, `signals.ts`, `drift-signals.ts`, `skill-health.ts`,
+ *   `quality.ts`, `signals.ts`, `skill-reads.ts` (the read-before-write rule, shared by the
+ *   tool path and the review's plan path), `drift-signals.ts`, `skill-health.ts`,
  *   `preset-composition.ts`, `prompts.ts`, `learn-prompt.ts`,
  *   `evolution-events.ts`, `io.ts` (the ctx.evolutionIo seam itself).
  * @module @deepseek-ai/dsh-evolution-core
@@ -51,6 +52,7 @@ export * from './write-inventory.ts'
 export * from './scope.ts'
 export * from './skill-health.ts'
 export * from './signals.ts'
+export * from './skill-reads.ts'
 export * from './drift-signals.ts'
 export * from './skill-store.ts'
 export * from './state-store.ts'

@@ -19,9 +19,16 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { foldToolDispatches, installParamSection, paramNamespace, readDispatchSignal, readNumberParam, sessionAudited, skillReadNameOf } from '@deepseek-ai/dsh-evolution-core'
+import { collectReadSkillNames, installParamSection, paramNamespace, readDispatchSignal, readNumberParam, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
+import { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
+
+// The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
+// tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
+// core's events-based collectReadSkillNames, imported above. Re-exported so this package's
+// published surface keeps naming the rule.
+export { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 import { SessionScopedState } from './session-state.ts'
 
@@ -1372,7 +1379,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // `skill` reads are visible to read-before-write (session events of
         // the child never reach the parent; the child session must be read
         // before dispose).
-        const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session) : new Set<string>()
+        const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session.snapshotEvents()) : new Set<string>()
         const plan: unknown = result.structured
         const policyFingerprint = fingerprintPolicy(snapshot)
         const validation = validateEvolutionPlan(plan as EvolutionPlan, {
@@ -1387,7 +1394,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // (read-before-write, matching the original Hermes background guard).
         // Union of the PARENT session's reads and the review SUBAGENT's own reads.
         const acceptedSkillOps = validation.accepted.skillOps ?? []
-        const readNames = new Set<string>([...collectReadSkillNames(session), ...childReads])
+        const readNames = new Set<string>([...collectReadSkillNames(session.snapshotEvents()), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
@@ -2029,29 +2036,6 @@ function staleRefusal(result: SkillActionResult, name: string, filePath?: string
   }
 }
 
-/**
- * v37 P7a: the read-before-write credit now comes from evolution-core's
- * `tool-dispatch` module — the ONE reader of the platform's dispatch event
- * types, and the ONE authority on which tool reads a skill.
- *
- * v32 REV-06(a) is preserved by the normalizer: a skill counts as READ only
- * when it did not fail, so a failed/timeout read still cannot pass the
- * read-before-write gate and let the review blind-overwrite content the model
- * never saw. What changed is the vocabulary the gate listens to: matching
- * `tool/call` here meant every PTC session (`tool/ptc-dispatch*`) collected an
- * EMPTY set, so `filterUnreadSkillOps` dropped every mutating op the model had
- * legitimately read first — and nothing reported the loss.
- * @param session - the session whose log is folded.
- * @returns the skill names this session read through a non-failed dispatch.
- */
-function collectReadSkillNames(session: Session): Set<string> {
-  const names = new Set<string>()
-  for (const dispatch of foldToolDispatches(session.snapshotEvents())) {
-    const name = skillReadNameOf(dispatch)
-    if (name !== undefined) names.add(name)
-  }
-  return names
-}
 
 /** Map/set size that triggers a dead-session counter sweep (bounded, not a hard cap). */
 const COUNTER_SWEEP_THRESHOLD = 128
@@ -2074,30 +2058,6 @@ export function sweepDeadSessionEntries<K>(entries: Map<K, unknown> | Set<K>, is
   return removed
 }
 
-/**
- * Drop mutating ops whose target was not read this session, in place.
- * Create is exempt (no read required to author a new skill). Covers the same
- * mutating surface Hermes guards (edit/patch/write_file/remove_file), so a
- * background review cannot blind-touch support files or edits of skills it
- * never loaded. Returns the count of dropped ops so the plan event can report
- * them as rejected.
- */
-export function filterUnreadSkillOps(ops: Array<{ action?: string; name?: string }>, readNames: ReadonlySet<string>): number {
-  const READ_REQUIRED = ['edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure']
-  let dropped = 0
-  for (let index = ops.length - 1; index >= 0; index -= 1) {
-    const op = ops[index]
-    if (!op) continue
-    // V6-26 (0.3.37): the validator normalizes a missing action to 'patch', so
-    // the check no longer needs the `!== undefined` precondition — a missing
-    // action is a patch (read-required), never silently exempt.
-    if (op.name && READ_REQUIRED.includes(op.action ?? 'patch') && !readNames.has(op.name)) {
-      ops.splice(index, 1)
-      dropped += 1
-    }
-  }
-  return dropped
-}
 
 function fingerprintPolicy(snapshot: unknown): string | undefined {
   try {
