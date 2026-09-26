@@ -23,7 +23,8 @@
  *   `quality.ts`, `signals.ts`, `skill-reads.ts` (the read-before-write rule, shared by the
  *   tool path and the review's plan path), `drift-signals.ts`, `skill-health.ts`,
  *   `preset-composition.ts`, `prompts.ts`, `learn-prompt.ts`,
- *   `evolution-events.ts`, `io.ts` (the ctx.evolutionIo seam itself).
+ *   `evolution-events.ts`, `evidence.ts` (which session frames count as content, for the plan
+ *   path's evidence-class report), `io.ts` (the ctx.evolutionIo seam itself).
  * @module @deepseek-ai/dsh-evolution-core
  */
 
@@ -53,6 +54,7 @@ export * from './scope.ts'
 export * from './skill-health.ts'
 export * from './signals.ts'
 export * from './skill-reads.ts'
+export * from './evidence.ts'
 export * from './drift-signals.ts'
 export * from './skill-history.ts'
 export * from './skill-store.ts'

@@ -19,7 +19,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { collectReadSkillNames, installParamSection, paramNamespace, readDispatchSignal, readNumberParam, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
+import { collectReadSkillNames, evidenceKindIndex, installParamSection, paramNamespace, readDispatchSignal, readNumberParam, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
@@ -1327,6 +1327,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // window — which the model never saw — widen the accepted evidence
       // range (the validator accepts any integer in [0, sessionSeq]).
       const sessionSeqAtPlanTime = session.seq - 1
+      // Batch D (2026-09-27, design §3D): which frames the plan could call EVIDENCE, read at the
+      // SAME instant as the range above and for the same reason — an op must not be able to cite
+      // a frame that did not exist (or was not yet substantive) when the plan was authored.
+      // `undefined` when the log carries no seq at all (a stub session): the class rule then has
+      // nothing to say, which is not the same answer as "every frame is a boundary".
+      const substantiveEvidenceSeqs = evidenceKindIndex(session.snapshotEvents())
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: reviewText }],
@@ -1388,12 +1394,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const policyFingerprint = fingerprintPolicy(snapshot)
         const validation = validateEvolutionPlan(plan as EvolutionPlan, {
           sessionSeq: sessionSeqAtPlanTime,
+          // Batch D phase 1: the report-only dimension. `reports` never enters `ok`, so this
+          // changes no verdict — it makes the observation window readable in the operator log.
+          substantiveEvidenceSeqs,
           maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
           protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
           maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
           maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
           maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
         })
+        // Batch D (phase 1): the EVIDENCE_CLASS findings, said out loud and nowhere else. The
+        // model's notice is deliberately untouched — this dimension is not yet a decision, and a
+        // model-visible line would make it one (design §3D, §5.5).
+        if (validation.reports.length > 0) {
+          ctx.logger.warn(`dsh-evolution-review: ${validation.reports.length} op(s) cite only bookkeeping frames as evidence: ${validation.reports.map(report => report.reason).join('; ')}`)
+        }
         // F19: the background review may only patch skills it read this session
         // (read-before-write, matching the original Hermes background guard).
         // Union of the PARENT session's reads and the review SUBAGENT's own reads.
@@ -1427,6 +1442,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // leaderboard penalize one refusal twice (rejectedOps weight AND the
               // executionFailures dimension).
               ...skippedUnread > 0 ? { skippedUnread } : {},
+              ...validation.reports.length > 0 ? { evidenceClassReports: validation.reports.length } : {},
               executionFailures: report.failedOps?.length ?? 0,
               ...report.executionError !== undefined ? { executionError: report.executionError } : {},
               evidenceQuotes,

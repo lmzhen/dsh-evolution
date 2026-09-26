@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MemoryOp, SkillOp } from '../src/index.ts'
-import { validateEvolutionPlan } from '../src/index.ts'
+import { PLAN_RULES, validateEvolutionPlan } from '../src/index.ts'
 
 describe('evolution-plan-validator', () => {
   it('rejects ops without evidence and protected skills', () => {
@@ -231,4 +231,55 @@ describe('evolution-plan-validator', () => {
     expect(result.rejected.some(r => r.reason.includes('write_file requires file_path'))).toBe(true)
     expect(result.rejected.some(r => r.reason.includes('remove_file requires file_path'))).toBe(true)
   })
+
+  it('D: PLAN_RULES is the named table — every id and the two orders are pinned', () => {
+    expect(PLAN_RULES.memory.map(rule => rule.id)).toEqual([
+      'FIELD_TYPE', 'EVIDENCE_RANGE', 'CONTROL_KEYS', 'TARGET', 'ACTION', 'PAYLOAD', 'ANCHOR', 'BUDGET', 'EVIDENCE_CLASS',
+    ])
+    expect(PLAN_RULES.skill.map(rule => rule.id)).toEqual([
+      'FIELD_TYPE', 'REPLACE_ALL', 'CONTROL_KEYS', 'NAME', 'PROTECTED', 'EVIDENCE_RANGE', 'ACTION',
+      'REQUIRED_FIELDS', 'WRITE_PAYLOAD', 'PATCH_ANCHOR', 'DELETE_TARGET', 'SUPPORT_PAYLOAD', 'BUDGET', 'RESTRUCTURE', 'EVIDENCE_CLASS',
+    ])
+    // Exactly one report-only row per table, and it is LAST: a report may never preempt a
+    // refusal, and a refusal may never be recorded as a report.
+    for (const rules of [PLAN_RULES.memory, PLAN_RULES.skill]) {
+      expect(rules.filter(rule => rule.reportOnly === true).map(rule => rule.id)).toEqual(['EVIDENCE_CLASS'])
+      expect(rules[rules.length - 1]?.id).toBe('EVIDENCE_CLASS')
+    }
+  })
+
+  it('D (phase 1): an op citing ONLY bookkeeping frames is REPORTED and the plan still executes', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: 'user prefers tea', evidence: [{ event_seq: 1 }] }],
+      skillOps: [{ action: 'patch', name: 'a', old_string: 'x', new_string: 'y', evidence: [{ event_seq: 3 }] }],
+    }, { sessionSeq: 10, substantiveEvidenceSeqs: new Set([3]) })
+    // Report-only means exactly this: ok, and the op is in `accepted`.
+    expect(result.ok).toBe(true)
+    expect(result.accepted.memoryOps).toHaveLength(1)
+    expect(result.reports.map(report => [report.rule, report.kind, report.index])).toEqual([['EVIDENCE_CLASS', 'memory', 0]])
+    expect(result.reports[0]?.reason).toContain('every cited evidence seq is a turn/step boundary frame')
+  })
+
+  it('D: the class rule is silent without an index, silent when one cited frame carries content, and speaks for an empty set', () => {
+    const op = { action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] } satisfies MemoryOp
+    // No index: the caller could not classify the log (a stub session) — silence, not a report.
+    expect(validateEvolutionPlan({ memoryOps: [op] }, { sessionSeq: 10 }).reports).toEqual([])
+    expect(validateEvolutionPlan({ memoryOps: [{ ...op, evidence: [{ event_seq: 1 }, { event_seq: 2 }] }] }, {
+      sessionSeq: 10,
+      substantiveEvidenceSeqs: new Set([2]),
+    }).reports).toEqual([])
+    // An EMPTY set is a different fact: every sequenced frame is a boundary.
+    const emptyIndex = validateEvolutionPlan({ memoryOps: [op] }, { sessionSeq: 10, substantiveEvidenceSeqs: new Set() })
+    expect(emptyIndex.reports).toHaveLength(1)
+  })
+
+  it('D: one verdict per op — a refusal is never also a report', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 99 }] }],
+    }, { sessionSeq: 10, substantiveEvidenceSeqs: new Set() })
+    expect(result.ok).toBe(false)
+    expect(result.rejected[0]?.reason).toContain('evidence is required')
+    expect(result.reports).toEqual([])
+  })
 })
+

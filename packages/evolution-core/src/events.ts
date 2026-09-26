@@ -61,6 +61,13 @@ export interface EvolutionPlanAppliedEvent {
   skippedUnread?: number | undefined
   /** First execution-layer failure message (abort reason or op failure). */
   executionError?: string | undefined
+  /** Batch D (2026-09-27): ops whose ENTIRE evidence list cites bookkeeping frames
+   * (a turn/step boundary) — the report-only phase of the plan path's
+   * `EVIDENCE_CLASS` rule. Not a refusal and not a "not done" cause: the ops in
+   * this count executed. It rides the same payload as the other dimensions so the
+   * observation window has a durable record; the model's notice says nothing about
+   * it. */
+  evidenceClassReports?: number | undefined
   evidenceQuotes?: number | undefined
   estimatedInputChars?: number | undefined
 }

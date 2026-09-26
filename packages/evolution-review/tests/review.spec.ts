@@ -504,6 +504,9 @@ async function mountReviewFixture(options: {
    * coalescing step; the default agent has NO `inbox` at all (the older-host /
    * degradation shape every other case in this suite already runs through). */
   inbox?: unknown
+  /** Batch D: the session's plan-time seq (`sessionSeqAtPlanTime = seq - 1`), and the only
+   * way a case can cite an evidence seq at all. Default 1 — the shape every other case uses. */
+  seq?: number
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
@@ -527,7 +530,7 @@ async function mountReviewFixture(options: {
   const session = {
     id: SessionId('e19-fixture-session'),
     // seq=1 ⇒ foldTurn starts at 0 and scans the tool/call below (substantive).
-    seq: 1,
+    seq: options.seq ?? 1,
     header: { origin: undefined },
     // v33 G0.1: the fixture presents the post-0.1.5 accessor. The removed
     // `events` getter made every production reader throw inside the pipeline,
@@ -1292,4 +1295,73 @@ it('PLAN S4.1 (2026-09-16, P2-12): a persisted content block of null skips inste
   expect(request).toContain('USER: please remember the preference')
   // The null block contributed no text and no separator noise.
   expect(request).not.toContain('null')
+})
+
+it('D (phase 1): evidence citing only a bookkeeping frame is REPORTED — the plan still executes', async () => {
+  // A real session log WITH seqs: frame 1 is the turn boundary, frame 2 is the user's own
+  // message. Only frame 2 can back a claim.
+  const events = [
+    { type: 'turn/start', seq: 1, data: { turn: 1 } },
+    { type: 'user/message', seq: 2, data: { content: [{ type: 'text', text: 'the release notes live in CHANGELOG.md' }] } },
+  ]
+  const { ctx, emitEnd } = await mountReviewFixture({ seq: 3, events })
+  const applied: Array<{ evidenceClassReports?: number | undefined; memoryApplied: number }> = []
+  ctx.on('evolution/plan-applied', event => applied.push(event))
+  ctx.provide('subagents', {
+    start: async () => ({
+      result: Promise.resolve({
+        structured: {
+          memoryOps: [
+            // Cites the turn boundary: in range, but no content frame behind it.
+            { action: 'add', target: 'memory', facts: 'user prefers tea', evidence: [{ event_seq: 1 }] },
+            // Cites the user's message: nothing to report.
+            { action: 'add', target: 'memory', facts: 'release notes live in CHANGELOG.md', evidence: [{ event_seq: 2 }] },
+          ],
+          skillOps: [],
+          summary: 'two memory ops',
+        },
+      }),
+      dispose: async () => {},
+    }),
+  })
+  // The memory write leg needs its service: without it the ops are "applied 0" and the report
+  // count would be indistinguishable from a plan that never ran.
+  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+  emitEnd(1, 'blocked')
+  emitEnd(2) // the review executes at the flush boundary
+  await vi.waitFor(() => { expect(applied).toHaveLength(1) })
+  // REPORTED, not refused: both ops landed and the report counts exactly the one op.
+  expect(applied[0]?.memoryApplied).toBe(2)
+  expect(applied[0]?.evidenceClassReports).toBe(1)
+})
+
+it('D: a log whose frames carry no seq leaves the class rule silent (cannot classify)', async () => {
+  // The frames here carry no seq at all — the stub shape. The op cites seq 0, which the range
+  // rule accepts (the plan-time seq is 0) and the class rule must NOT report: an
+  // unclassifiable log is not an all-bookkeeping log.
+  const { ctx, emitEnd } = await mountReviewFixture({ events: [{ type: 'turn/start', data: { turn: 1 } }] })
+  const applied: Array<{ evidenceClassReports?: number | undefined; memoryApplied: number }> = []
+  ctx.on('evolution/plan-applied', event => applied.push(event))
+  ctx.provide('subagents', {
+    start: async () => ({
+      result: Promise.resolve({
+        structured: {
+          memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 0 }] }],
+          skillOps: [],
+          summary: 'one memory op',
+        },
+      }),
+      dispose: async () => {},
+    }),
+  })
+  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+  emitEnd(1, 'blocked')
+  emitEnd(2)
+  await vi.waitFor(() => { expect(applied).toHaveLength(1) })
+  expect(applied[0]?.memoryApplied).toBe(1)
+  expect(applied[0]?.evidenceClassReports).toBeUndefined()
 })

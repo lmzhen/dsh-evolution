@@ -1,6 +1,21 @@
 /**
  * Deterministic validator for model-produced evolution plans.
  * The validator never calls the model and never mutates state.
+ *
+ * The per-op questions are a NAMED, ORDERED TABLE (design
+ * `dsh-evolution-skill-history-design.md` §3D), the same form as the tool path's
+ * `tool-skill-manage/src/write-gates.ts`: the rule BODIES read the shared core tables
+ * (`FORBIDDEN_CONTROL_KEYS`, `SKILL_ACTION_REQUIRED_FIELDS`, the restructure-target
+ * rule), and this module owns the ORDER and the wording. Order is part of the contract — the first
+ * refusing rule names the reason the model reads — and container-level rejections (a non-array
+ * `skillOps`, a malformed entry) stay outside the tables because they judge the container,
+ * not an operation.
+ *
+ * One row is REPORT-ONLY: `EVIDENCE_CLASS` records a finding in
+ * `ValidationResult.reports` and never refuses an op. It is phase 1 of the
+ * evidence-consistency rule — the range rule cannot tell a real exchange from a `turn/start`
+ * boundary, and refusing on that difference is a later decision this observation window has to
+ * earn (design §3D, §5.5).
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
@@ -45,6 +60,12 @@ export interface EvolutionPlan {
 export interface ValidationContext {
   /** Upper bound for the latest valid session seq. */
   sessionSeq: number
+  /** The seqs of the frames that carry CONTENT (core `evidenceKindIndex`), or
+   * `undefined` when the caller cannot classify the log (a session whose events carry no
+   * seq). Read by the report-only `EVIDENCE_CLASS` row only: an op whose entire citation
+   * list is a bookkeeping frame (`turn/start`, `step/start`, …) becomes visible
+   * without being refused. */
+  substantiveEvidenceSeqs?: ReadonlySet<number> | undefined
   maxOpsPerPlan?: number
   protectedSkillNames?: ReadonlySet<string>
   maxMemoryChars?: number
@@ -58,10 +79,43 @@ export interface RejectedOp {
   reason: string
 }
 
+/** The op kinds a plan carries, and the two keys of {@link PLAN_RULES}. */
+export type PlanOpKind = 'memory' | 'skill'
+
+/** One report-only finding: a rule that let the op proceed and still had something to say.
+ * `ValidationResult.ok` ignores this list — a report is never a refusal. */
+export interface PlanRuleReport {
+  /** The reporting rule's id from {@link PLAN_RULES}. */
+  rule: string
+  kind: PlanOpKind
+  index: number
+  reason: string
+}
+
 export interface ValidationResult {
   accepted: EvolutionPlan
   rejected: RejectedOp[]
+  /** Findings from the report-only rows; empty when every op was either clean or refused. */
+  reports: PlanRuleReport[]
   ok: boolean
+}
+
+/** What one rule reads: the op, which table it came from, and the caller's context. */
+export interface PlanRuleInput<Op> {
+  readonly op: Op
+  readonly kind: PlanOpKind
+  readonly index: number
+  readonly context: ValidationContext
+}
+
+/** One named question the plan path asks about ONE op. */
+export interface PlanRule<Op> {
+  /** Stable id: a report cites it, and the table's order is the refusal order. */
+  readonly id: string
+  /** Records the verdict in `ValidationResult.reports` instead of refusing the op. */
+  readonly reportOnly?: boolean
+  /** @returns the refusal reason, or null to let the op proceed. */
+  run(input: PlanRuleInput<Op>): string | null
 }
 
 const MEMORY_ACTIONS = new Set(['add', 'replace', 'remove'])
@@ -69,26 +123,308 @@ const SKILL_ACTIONS = new Set(['create', 'edit', 'update', 'patch', 'delete', 'w
 // 0.3.17 (S3.10, T-1): single source lives in core constants.
 const FORBIDDEN_KEYS: readonly string[] = FORBIDDEN_CONTROL_KEYS
 
-/** v31 REV-08 (stated honestly): this gate is SEQUENCE-RANGE ONLY — every
- * evidence item must carry an integer seq within [0, sessionSeq]. There is NO
- * quoted-text/content verification: a model can satisfy it by citing any
- * in-range event (even an unrelated one). Anti-fabrication strength lives in
- * read-before-write, budgets, and the threat scan — not here. */
+/** The seq ONE evidence item cites, or -1 when it cites none.
+ *
+ * P3 (v3 audit): only a REAL numeric seq passes — Number(null)/Number('')/Number(false) coerce
+ * to 0 and would mint fake evidence order. */
+function citedEvidenceSeq(item: unknown): number {
+  if (!item || typeof item !== 'object') return -1
+  const record = item as Record<string, unknown>
+  return typeof record.event_seq === 'number'
+    ? record.event_seq
+    : typeof record.seq === 'number' ? record.seq
+      : typeof record.event_seq === 'string' && /^[0-9]+$/.test(record.event_seq)
+        ? Number(record.event_seq)
+        : -1
+}
+
+/** v31 REV-08 (stated honestly): this gate is SEQUENCE-RANGE ONLY — every evidence item must
+ * carry an integer seq within [0, sessionSeq]. There is NO quoted-text/content verification: a
+ * model can satisfy it by citing any in-range event (even an unrelated one). Anti-fabrication
+ * strength lives in read-before-write, budgets, and the threat scan — not here. The CLASS of the
+ * cited frame is a separate, report-only question (`EVIDENCE_CLASS`). */
 function hasValidEvidence(evidence: unknown, sessionSeq: number): boolean {
   if (!Array.isArray(evidence) || evidence.length === 0) return false
   return evidence.every((item) => {
-    if (!item || typeof item !== 'object') return false
-    const record = item as Record<string, unknown>
-    // P3 (v3 audit): only a REAL numeric seq passes — Number(null)/Number('')/
-    // Number(false) coerce to 0 and would mint fake evidence order.
-    const seq = typeof record.event_seq === 'number'
-      ? record.event_seq
-      : typeof record.seq === 'number' ? record.seq
-        : typeof record.event_seq === 'string' && /^\d+$/.test(record.event_seq)
-          ? Number(record.event_seq)
-          : -1
+    const seq = citedEvidenceSeq(item)
     return Number.isInteger(seq) && seq >= 0 && seq <= sessionSeq
   })
+}
+
+/** EVIDENCE_CLASS — phase 1 of the evidence-consistency question: does ANY cited frame carry
+ * content? An op whose whole citation list is a turn/step boundary is reported, never refused.
+ *
+ * `undefined` is not an empty set: a caller that could not classify the log has nothing to
+ * say, and reporting every op would be the false-positive flood this phase exists to avoid. */
+function bookkeepingEvidenceReason<Op extends { evidence?: unknown[] }>(input: PlanRuleInput<Op>): string | null {
+  const substantive = input.context.substantiveEvidenceSeqs
+  if (substantive === undefined) return null
+  const evidence = input.op.evidence
+  if (!Array.isArray(evidence) || evidence.length === 0) return null
+  if (evidence.some(item => substantive.has(citedEvidenceSeq(item)))) return null
+  return `${input.kind} op ${input.index}: every cited evidence seq is a turn/step boundary frame — no content frame backs this op`
+}
+
+/** P2-1 (v15): the string-typed fields the executors dereference with
+ * `.trim()`/`.length`. `target` is included for memory ops because the
+ * engine compares it against literals. */
+function malformedStringField(op: object, fields: readonly string[]): string | null {
+  const record = op as Record<string, unknown>
+  for (const field of fields) {
+    const value = record[field]
+    if (value !== undefined && value !== null && typeof value !== 'string') return field
+  }
+  return null
+}
+
+/** The memory op's questions, in the order the model meets them. */
+const MEMORY_PLAN_RULES: readonly PlanRule<MemoryOp>[] = [
+  {
+    // P2-1 (v15): field-level type guard — `??` chains only paper over
+    // null/undefined, so a non-string truthy field (e.g. `facts: {...}`)
+    // reached `.trim()` and threw a TypeError out of the "deterministic
+    // validator", failing the WHOLE review round (the exact shape E-60 killed
+    // at the op level). Reject per-op instead.
+    id: 'FIELD_TYPE',
+    run: ({ op, index }) => {
+      const badField = malformedStringField(op, ['facts', 'content', 'old_text', 'target'])
+      return badField === null ? null : `memory op ${index}: field ${badField} must be a string`
+    },
+  },
+  {
+    id: 'EVIDENCE_RANGE',
+    run: ({ op, index, context }) => (hasValidEvidence(op.evidence, context.sessionSeq)
+      ? null
+      : `memory op ${index}: evidence is required and must reference a valid session seq`),
+  },
+  {
+    id: 'CONTROL_KEYS',
+    run: ({ op, index }) => {
+      for (const key of FORBIDDEN_KEYS) if (key in op) return `memory op ${index}: forbidden field ${key}`
+      return null
+    },
+  },
+  {
+    id: 'TARGET',
+    run: ({ op, index }) => (op.target === 'memory' || op.target === 'user'
+      ? null
+      : `memory op ${index}: target must be memory or user`),
+  },
+  {
+    id: 'ACTION',
+    run: ({ op, index }) => {
+      const action = op.action ?? 'add'
+      return MEMORY_ACTIONS.has(action) ? null : `memory op ${index}: unknown action ${action}`
+    },
+  },
+  {
+    id: 'PAYLOAD',
+    run: ({ op, index }) => {
+      const action = op.action ?? 'add'
+      const text = (op.facts ?? op.content ?? '').trim()
+      return action !== 'remove' && text.length === 0 ? `memory op ${index}: ${action} requires facts/content` : null
+    },
+  },
+  {
+    id: 'ANCHOR',
+    run: ({ op, index }) => {
+      const action = op.action ?? 'add'
+      return action !== 'add' && !(op.old_text ?? '').trim() ? `memory op ${index}: ${action} requires old_text` : null
+    },
+  },
+  {
+    id: 'BUDGET',
+    run: ({ op, index, context }) => {
+      const text = (op.facts ?? op.content ?? '').trim()
+      const budget = op.target === 'user' ? (context.maxUserChars ?? DEFAULT_USER_CHAR_LIMIT) : (context.maxMemoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT)
+      return text.length > budget
+        ? `memory op ${index}: content exceeds ${op.target === 'user' ? 'user' : 'memory'} budget`
+        : null
+    },
+  },
+  { id: 'EVIDENCE_CLASS', reportOnly: true, run: bookkeepingEvidenceReason },
+]
+
+/** The skill op's questions, in the order the model meets them. */
+const SKILL_PLAN_RULES: readonly PlanRule<SkillOp>[] = [
+  {
+    // P2-1 (v15): field-level type guard (see the memory table).
+    // v16 (P2 follow-up): `file_path` added — the executors pass it verbatim
+    // into validateSupportPath's string replace; a non-string truthy value
+    // used to escape the validator and TypeError mid-plan.
+    id: 'FIELD_TYPE',
+    run: ({ op, index }) => {
+      const badField = malformedStringField(op, ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'])
+      return badField === null ? null : `skill op ${index}: field ${badField} must be a string`
+    },
+  },
+  {
+    // S1-C1: replace_all is a BOOLEAN flag (the executor passes it verbatim into
+    // the library patch); a non-boolean truthy value would still have "worked",
+    // but a string 'false' flipping the semantics is the kind of silent surprise
+    // the validator exists to catch.
+    id: 'REPLACE_ALL',
+    run: ({ op, index }) => (op.replace_all === undefined || typeof op.replace_all === 'boolean'
+      ? null
+      : `skill op ${index}: field replace_all must be a boolean`),
+  },
+  {
+    id: 'CONTROL_KEYS',
+    run: ({ op, index }) => {
+      for (const key of FORBIDDEN_KEYS) if (key in op) return `skill op ${index}: forbidden field ${key}`
+      return null
+    },
+  },
+  {
+    id: 'NAME',
+    run: ({ op, index }) => ((op.name ?? '').trim() ? null : `skill op ${index}: name is required`),
+  },
+  {
+    id: 'PROTECTED',
+    run: ({ op, index, context }) => {
+      const name = (op.name ?? '').trim()
+      return context.protectedSkillNames?.has(name) ? `skill op ${index}: skill "${name}" is protected` : null
+    },
+  },
+  {
+    id: 'EVIDENCE_RANGE',
+    run: ({ op, index, context }) => (hasValidEvidence(op.evidence, context.sessionSeq)
+      ? null
+      : `skill op ${index}: evidence is required and must reference a valid session seq`),
+  },
+  {
+    id: 'ACTION',
+    run: ({ op, index }) => {
+      const action = op.action ?? 'patch'
+      return SKILL_ACTIONS.has(action) ? null : `skill op ${index}: unknown action ${action}`
+    },
+  },
+  {
+    // OPT-05 (2026-09): required-field gate from the SAME table the tool's
+    // argument gate reads (core SKILL_ACTION_REQUIRED_FIELDS). A plan was able
+    // to pass validation with a write_file/remove_file that had no file_path —
+    // the staged write then failed deterministically at every approve. Only
+    // missing (null/undefined) fields are caught here; payload emptiness keeps
+    // its dedicated `.trim()` checks in the rows below (their wording is
+    // pinned by tests).
+    id: 'REQUIRED_FIELDS',
+    run: ({ op, index }) => {
+      const action = op.action ?? 'patch'
+      const requiredFields = SKILL_ACTION_REQUIRED_FIELDS[action]
+      if (requiredFields === undefined) return null
+      const record = op as unknown as Record<string, unknown>
+      for (const field of requiredFields) {
+        if (record[field] === undefined || record[field] === null) return `skill op ${index}: ${action} requires ${field}`
+      }
+      return null
+    },
+  },
+  {
+    id: 'WRITE_PAYLOAD',
+    run: ({ op, index }) => {
+      const action = op.action ?? 'patch'
+      return (action === 'create' || action === 'edit' || action === 'update') && !(op.content ?? '').trim()
+        ? `skill op ${index}: ${action} requires content`
+        : null
+    },
+  },
+  {
+    id: 'PATCH_ANCHOR',
+    run: ({ op, index }) => (op.action === 'patch' && !(op.old_string ?? '')
+      ? `skill op ${index}: patch requires old_string`
+      : null),
+  },
+  {
+    // Hermes background guard: a review pass may only DELETE into an explicit
+    // absorbed_into umbrella target — a bare delete is reserved for the
+    // deterministic curator channel and the user's foreground path.
+    id: 'DELETE_TARGET',
+    run: ({ op, index }) => (op.action === 'delete' && !(op.absorbed_into ?? '').trim()
+      ? `skill op ${index}: delete requires absorbed_into`
+      : null),
+  },
+  {
+    // P3 (v15): executor parity — the executor reads `args.file_content ?? ''`
+    // ONLY (tool-skill-manage executeCore), so the validator's `?? op.content`
+    // fallback used to admit a write_file that then wrote an EMPTY support file
+    // and counted a successful write. Same field, or it does not pass.
+    id: 'SUPPORT_PAYLOAD',
+    run: ({ op, index }) => (op.action === 'write_file' && !(op.file_content ?? '').trim()
+      ? `skill op ${index}: write_file requires file_content`
+      : null),
+  },
+  {
+    // 0.3.17 (E-27): a patch's new_string IS the write payload — the budget
+    // must see it too (threat scanning already treats it as real field).
+    // 0.3.20 (N-3): the three payload fields are ALTERNATIVES (the executor
+    // writes file_content / content / new_string depending on the action), so
+    // the budget checks the MAX — the previous `??` chain let an empty
+    // earlier field (e.g. content:'') shadow a huge new_string.
+    id: 'BUDGET',
+    run: ({ op, index, context }) => {
+      const writeBytes = [op.file_content ?? '', op.content ?? '', op.new_string ?? '']
+        .reduce((max, value) => Math.max(max, value.length), 0)
+      return writeBytes > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)
+        ? `skill op ${index}: content exceeds skill budget`
+        : null
+    },
+  },
+  {
+    id: 'RESTRUCTURE',
+    run: ({ op, index }) => {
+      if (op.action !== 'restructure') return null
+      if (!Array.isArray(op.restructure) || op.restructure.length === 0) return `skill op ${index}: restructure requires a non-empty restructure list`
+      if (op.restructure.length > MAX_RESTRUCTURE_MOVES) return `skill op ${index}: restructure exceeds ${MAX_RESTRUCTURE_MOVES} moves`
+      for (const [moveIndex, move] of op.restructure.entries()) {
+        if (!move || typeof move.heading !== 'string' || !move.heading.trim()) {
+          return `skill op ${index}: restructure[${moveIndex}] requires a non-empty heading`
+        }
+        if (typeof move.to_file !== 'string') {
+          return `skill op ${index}: restructure[${moveIndex}] to_file must be references/<topic>.md`
+        }
+        // A1-6 (v18): the single validator also rejects Windows device stems,
+        // so a plan cannot target `references/nul.md` (unmanageable afterwards).
+        const targetIssue = validateRestructureTarget(move.to_file)
+        if (targetIssue) return `skill op ${index}: restructure[${moveIndex}] ${targetIssue}`
+      }
+      return null
+    },
+  },
+  { id: 'EVIDENCE_CLASS', reportOnly: true, run: bookkeepingEvidenceReason },
+]
+
+/**
+ * The plan path's rule tables, by op kind — the named set whose ORDER this module owns.
+ *
+ * Exported so a rename or a reorder is a visible change (the suite pins the ids), and so the tool
+ * path's gate table and this one can be compared side by side without reading either
+ * implementation.
+ */
+export const PLAN_RULES = {
+  memory: MEMORY_PLAN_RULES,
+  skill: SKILL_PLAN_RULES,
+} as const
+
+/** Run one op's table in order: the first refusing rule names the reason, a report-only row
+ * records its verdict and lets the op continue. */
+function runPlanRules<Op extends { evidence?: unknown[] }>(
+  rules: readonly PlanRule<Op>[],
+  op: Op,
+  context: ValidationContext,
+  index: number,
+  kind: PlanOpKind,
+  reports: PlanRuleReport[],
+): string | null {
+  for (const rule of rules) {
+    const reason = rule.run({ op, kind, index, context })
+    if (reason === null) continue
+    if (rule.reportOnly === true) {
+      reports.push({ rule: rule.id, kind, index, reason })
+      continue
+    }
+    return reason
+  }
+  return null
 }
 
 /** Object root guard (V4-23, symmetric with the maintain validator): null,
@@ -99,15 +435,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationContext): ValidationResult {
+  const reports: PlanRuleReport[] = []
   // V4-23 root guard (symmetric with the maintain validator): null, primitives
   // and arrays are not a plan record and must be rejected explicitly, never a
-  // raw TypeError from `.memoryOps`/`.summary`. `plan` is typed non-null, so
-  // the check runs through an `unknown` local to stay TS-clean.
+  // raw TypeError from `.memoryOps`/`.summary`. `plan` is typed non-null,
+  // so the check runs through an `unknown` local to stay TS-clean.
   const root: unknown = plan
   if (!isRecord(root)) {
     return {
       accepted: { memoryOps: [], skillOps: [] },
       rejected: [{ index: 0, kind: 'memory', reason: 'plan root: must be an object' }],
+      reports,
       ok: false,
     }
   }
@@ -133,11 +471,11 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
   }
   if (allOps === 0 && rejected.length === 0) {
     rejected.push({ index: 0, kind: 'memory', reason: 'plan contains no operations' })
-    return { accepted, rejected, ok: false }
+    return { accepted, rejected, reports, ok: false }
   }
   if (allOps > maxOps) {
     rejected.push({ index: 0, kind: 'memory', reason: `plan exceeds maxOpsPerPlan ${maxOps}` })
-    return { accepted, rejected, ok: false }
+    return { accepted, rejected, reports, ok: false }
   }
 
   // Items stay `unknown` (cast below) so the per-item malformed guards remain
@@ -152,7 +490,7 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
       continue
     }
     const op = rawOp as MemoryOp
-    const reason = validateMemoryOp(op, context, index)
+    const reason = runPlanRules(MEMORY_PLAN_RULES, op, context, index, 'memory', reports)
     if (reason) rejected.push({ index, kind: 'memory', reason })
     // V8-23⑪ (0.3.49): the V6-26 explicit-action normalization applied to
     // skillOps only — a memory op without `action` was written to `accepted`
@@ -166,7 +504,7 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
       continue
     }
     const op = rawOp as SkillOp
-    const reason = validateSkillOp(op, context, index)
+    const reason = runPlanRules(SKILL_PLAN_RULES, op, context, index, 'skill', reports)
     if (reason) rejected.push({ index, kind: 'skill', reason })
     // V6-26 (0.3.37): accept the op with an EXPLICIT action (missing defaults to
     // 'patch' at the op level, not at the consumer) — every downstream check
@@ -175,111 +513,5 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
     else skillOps.push(op.action === undefined ? { ...op, action: 'patch' } : op)
   }
 
-  return { accepted, rejected, ok: rejected.length === 0 && (memoryOps.length + skillOps.length > 0) }
-}
-
-function validateMemoryOp(op: MemoryOp, context: ValidationContext, index: number): string | null {
-  // P2-1 (v15): field-level type guard — `??` chains only paper over
-  // null/undefined, so a non-string truthy field (e.g. `facts: {...}`)
-  // reached `.trim()` and threw a TypeError out of the "deterministic
-  // validator", failing the WHOLE review round (the exact shape E-60 killed
-  // at the op level). Reject per-op instead.
-  const badField = malformedStringField(op, ['facts', 'content', 'old_text', 'target'])
-  if (badField) return `memory op ${index}: field ${badField} must be a string`
-  if (!hasValidEvidence(op.evidence, context.sessionSeq)) return `memory op ${index}: evidence is required and must reference a valid session seq`
-  for (const key of FORBIDDEN_KEYS) if (key in op) return `memory op ${index}: forbidden field ${key}`
-  if (op.target !== 'memory' && op.target !== 'user') return `memory op ${index}: target must be memory or user`
-  const action = op.action ?? 'add'
-  if (!MEMORY_ACTIONS.has(action)) return `memory op ${index}: unknown action ${action}`
-  const text = (op.facts ?? op.content ?? '').trim()
-  if (action !== 'remove' && text.length === 0) return `memory op ${index}: ${action} requires facts/content`
-  if (action !== 'add' && !(op.old_text ?? '').trim()) return `memory op ${index}: ${action} requires old_text`
-  const budget = op.target === 'user' ? (context.maxUserChars ?? DEFAULT_USER_CHAR_LIMIT) : (context.maxMemoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT)
-  if (text.length > budget) return `memory op ${index}: content exceeds ${op.target === 'user' ? 'user' : 'memory'} budget`
-  return null
-}
-
-/** P2-1 (v15): the string-typed fields the executors dereference with
- * `.trim()`/`.length`. `target` is included for memory ops because the
- * engine compares it against literals. */
-function malformedStringField(op: object, fields: readonly string[]): string | null {
-  const record = op as Record<string, unknown>
-  for (const field of fields) {
-    const value = record[field]
-    if (value !== undefined && value !== null && typeof value !== 'string') return field
-  }
-  return null
-}
-
-function validateSkillOp(op: SkillOp, context: ValidationContext, index: number): string | null {
-  // P2-1 (v15): field-level type guard (see validateMemoryOp).
-  // v16 (P2 follow-up): `file_path` added — the executors pass it verbatim
-  // into validateSupportPath's string replace; a non-string truthy value
-  // used to escape the validator and TypeError mid-plan.
-  const badField = malformedStringField(op, ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'])
-  if (badField) return `skill op ${index}: field ${badField} must be a string`
-  // S1-C1: replace_all is a BOOLEAN flag (the executor passes it verbatim into
-  // the library patch); a non-boolean truthy value would still have "worked",
-  // but a string 'false' flipping the semantics is the kind of silent surprise
-  // the validator exists to catch.
-  if (op.replace_all !== undefined && typeof op.replace_all !== 'boolean') return `skill op ${index}: field replace_all must be a boolean`
-  for (const key of FORBIDDEN_KEYS) if (key in op) return `skill op ${index}: forbidden field ${key}`
-  const name = (op.name ?? '').trim()
-  if (!name) return `skill op ${index}: name is required`
-  if (context.protectedSkillNames?.has(name)) return `skill op ${index}: skill "${name}" is protected`
-  if (!hasValidEvidence(op.evidence, context.sessionSeq)) return `skill op ${index}: evidence is required and must reference a valid session seq`
-  const action = op.action ?? 'patch'
-  if (!SKILL_ACTIONS.has(action)) return `skill op ${index}: unknown action ${action}`
-  // OPT-05 (2026-09): required-field gate from the SAME table the tool's
-  // argument gate reads (core SKILL_ACTION_REQUIRED_FIELDS). A plan was able
-  // to pass validation with a write_file/remove_file that had no file_path —
-  // the staged write then failed deterministically at every approve. Only
-  // missing (null/undefined) fields are caught here; payload emptiness keeps
-  // its dedicated `.trim()` checks below (their wording is pinned by tests).
-  const requiredFields = SKILL_ACTION_REQUIRED_FIELDS[action]
-  if (requiredFields !== undefined) {
-    const record = op as unknown as Record<string, unknown>
-    for (const field of requiredFields) {
-      if (record[field] === undefined || record[field] === null) return `skill op ${index}: ${action} requires ${field}`
-    }
-  }
-  if ((action === 'create' || action === 'edit' || action === 'update') && !(op.content ?? '').trim()) {
-    return `skill op ${index}: ${action} requires content`
-  }
-  if (action === 'patch' && !(op.old_string ?? '')) return `skill op ${index}: patch requires old_string`
-  // Hermes background guard: a review pass may only DELETE into an explicit
-  // absorbed_into umbrella target — a bare delete is reserved for the
-  // deterministic curator channel and the user's foreground path.
-  if (action === 'delete' && !(op.absorbed_into ?? '').trim()) return `skill op ${index}: delete requires absorbed_into`
-  // 0.3.17 (E-27): a patch's new_string IS the write payload — the budget
-  // must see it too (threat scanning already treats it as real field).
-  // 0.3.20 (N-3): the three payload fields are ALTERNATIVES (the executor
-  // writes file_content / content / new_string depending on the action), so
-  // the budget checks the MAX — the previous `??` chain let an empty earlier
-  // field (e.g. content:'') shadow a huge new_string.
-  const writeBytes = [op.file_content ?? '', op.content ?? '', op.new_string ?? '']
-    .reduce((max, value) => Math.max(max, value.length), 0)
-  // P3 (v15): executor parity — the executor reads `args.file_content ?? ''`
-  // ONLY (tool-skill-manage executeCore), so the validator's `?? op.content`
-  // fallback used to admit a write_file that then wrote an EMPTY support file
-  // and counted a successful write. Same field, or it does not pass.
-  if (action === 'write_file' && !(op.file_content ?? '').trim()) return `skill op ${index}: write_file requires file_content`
-  if (writeBytes > (context.maxSkillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS)) return `skill op ${index}: content exceeds skill budget`
-  if (action === 'restructure') {
-    if (!Array.isArray(op.restructure) || op.restructure.length === 0) return `skill op ${index}: restructure requires a non-empty restructure list`
-    if (op.restructure.length > MAX_RESTRUCTURE_MOVES) return `skill op ${index}: restructure exceeds ${MAX_RESTRUCTURE_MOVES} moves`
-    for (const [moveIndex, move] of op.restructure.entries()) {
-      if (!move || typeof move.heading !== 'string' || !move.heading.trim()) {
-        return `skill op ${index}: restructure[${moveIndex}] requires a non-empty heading`
-      }
-      if (typeof move.to_file !== 'string') {
-        return `skill op ${index}: restructure[${moveIndex}] to_file must be references/<topic>.md`
-      }
-      // A1-6 (v18): the single validator also rejects Windows device stems,
-      // so a plan cannot target `references/nul.md` (unmanageable afterwards).
-      const targetIssue = validateRestructureTarget(move.to_file)
-      if (targetIssue) return `skill op ${index}: restructure[${moveIndex}] ${targetIssue}`
-    }
-  }
-  return null
+  return { accepted, rejected, reports, ok: rejected.length === 0 && (memoryOps.length + skillOps.length > 0) }
 }
