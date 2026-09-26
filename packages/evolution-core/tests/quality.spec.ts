@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest'
-import { computeQualityScores, computeDedupGroups, computePrefixClusters, normalizeUsageRecord } from '@deepseek-ai/dsh-evolution-core'
+import { describe, expect, it } from 'vitest'
+import { computeQualityScores, computeDedupGroups, computePrefixClusters, normalizeUsageRecord, identity, affinity, vocabulary, projectionText, nearDuplicateSummaries, SUMMARY_DUPLICATE_HINT_THRESHOLD } from '@deepseek-ai/dsh-evolution-core'
 
 function record(now: Date, overrides: Partial<{
   created_at: string
@@ -131,6 +131,75 @@ it('PLAN-R2 P2-8 (2026-09-16): a tiny pair budget truncates the scan, reports it
   expect(capped.groups).toEqual([['a', 'b'], ['g', 'h']])
 })
 
+it('C: identity is the "same text?" question — case/whitespace-insensitive, projection-free', () => {
+  expect(identity('Run  tests\nwith pytest')).toBe(identity('run tests with pytest'))
+  expect(identity('a')).not.toBe(identity('b'))
+  // It answers about WHATEVER text it is handed: the same question asked of a
+  // body and of a name+description projection, no hidden normalization.
+  expect(identity(projectionText('body', { content: 'x' }))).toBe(identity('x'))
+})
+
+it('C: affinity is the "shared vocabulary" question over two vocabulary sets', () => {
+  expect(affinity(vocabulary('alpha beta gamma'), vocabulary('alpha beta gamma'))).toBe(1)
+  expect(affinity(vocabulary('alpha beta'), vocabulary('gamma delta'))).toBe(0)
+  // An empty side has no vocabulary to share — 0, never NaN.
+  expect(affinity(vocabulary(''), vocabulary('alpha'))).toBe(0)
+  expect(affinity(new Set<string>(), new Set<string>())).toBe(0)
+  // 2 shared of 4 distinct tokens.
+  expect(affinity(vocabulary('alpha beta'), vocabulary('alpha beta gamma delta'))).toBeCloseTo(0.5, 10)
+})
+
+it('C: a projection must be declared — body and summary are different texts', () => {
+  expect(projectionText('body', { content: 'BODY', name: 'n', description: 'd' })).toBe('BODY')
+  expect(projectionText('summary', { content: 'BODY', name: 'n', description: 'd' })).toBe('n d')
+  // The summary projection is body-blind by construction: the same call with and
+  // without a body is the same text.
+  expect(projectionText('summary', { name: 'n', description: 'd' }))
+    .toBe(projectionText('summary', { name: 'n', description: 'd', content: 'anything at all' }))
+})
+
+describe('C: the create-time near-duplicate question (summary projection)', () => {
+  const existing = [
+    { name: 'dsh-plugin-discovery', description: 'Search, filter and rank DSH plugins from the live catalog.' },
+    { name: 'git-repo-sync', description: 'Safely update or synchronize a local git repository with its remote.' },
+  ]
+
+  it('names a near-copy and ranks the closest first', () => {
+    const matches = nearDuplicateSummaries({
+      candidate: { name: 'dsh-plugin-search', description: 'Search, filter and rank DSH plugins from the live catalog.' },
+      existing,
+    })
+    expect(matches.map(match => match.name)).toEqual(['dsh-plugin-discovery'])
+    expect(matches[0]!.score).toBeGreaterThanOrEqual(SUMMARY_DUPLICATE_HINT_THRESHOLD)
+  })
+
+  it('stays silent for an unrelated candidate, and for the candidate\'s own name', () => {
+    // Unrelated: nothing above the level.
+    expect(nearDuplicateSummaries({
+      candidate: { name: 'windows-screen-capture', description: 'Take DPI-correct screenshots for the model.' },
+      existing,
+    })).toEqual([])
+    // The same NAME is the library's own refusal, not this line's news.
+    expect(nearDuplicateSummaries({
+      candidate: { name: 'git-repo-sync', description: 'Safely update or synchronize a local git repository with its remote.' },
+      existing,
+    }).map(match => match.name)).toEqual([])
+  })
+
+  it('FALSIFIABLE: it cannot see bodies — a body-identical candidate with an unrelated summary does not fire', () => {
+    // The projection IS the answer here: the body scan (`computeDedupGroups`) would
+    // group these two, and this question must not — it is handed no body at all,
+    // which is what keeps a create from paying a whole-tree body read to warn
+    // about a copy.
+    const body = 'Identical body text about tides and turbines and nothing else.'
+    const scan = computeDedupGroups({ contents: new Map([['tides', body], ['turbines', body]]) })
+    expect(scan.groups).toEqual([['tides', 'turbines']])
+    expect(nearDuplicateSummaries({
+      candidate: { name: 'turbines', description: 'An entirely different sentence about kitchen remodels.' },
+      existing: [{ name: 'tides', description: 'A sentence about tides.' }],
+    })).toEqual([])
+  })
+})
 it('prefix clusters group by the first alphanumeric run, size-descending (rc.67 merge heuristic)', () => {
   const clusters = computePrefixClusters(['sql-backup', 'SQL-restore', 'sql-index', 'unrelated', '--dash-start'])
   expect(clusters).toEqual([

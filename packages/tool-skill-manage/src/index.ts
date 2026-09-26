@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -639,10 +639,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // P0 authoring feedback: every create/update reports the description
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
+    let candidateDescription = ''
     if ((action === 'create' || action === 'edit' || action === 'update') && args.content) {
       const parsed = parseFrontmatter(args.content)
       if (parsed) {
         const feedback = authoringFeedback(parsed.frontmatter)
+        candidateDescription = parsed.frontmatter.description ?? ''
         feedbackLines = feedback.lines
         if (settings().descriptionStrict && feedback.over60) {
           return { ok: false, message: `Authoring check: description ${feedback.descriptionChars}/60 characters exceeds the strict bar; tighten it to <=60 or set descriptionStrict=false.`, skills: [] }
@@ -650,7 +652,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     let result
-    if (action === 'create') result = await library.create(name, args.content ?? '', origin)
+    if (action === 'create') {
+      // Batch C (2026-09-27, design §3C-2): the create-time near-duplicate hint
+      // rides the SAME "Authoring check" channel the description bar uses — one
+      // extra line, no new result field (design §2: the message channel is the
+      // family's feedback surface, and a structured field would have no
+      // consumer). Computed BEFORE the create, because afterwards the candidate
+      // is in the listing it was compared against.
+      feedbackLines.push(...await duplicateHintLines(name, candidateDescription))
+      result = await library.create(name, args.content ?? '', origin)
+    }
     else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin, stagedAnchor)
     else if (action === 'patch') result = await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
     else if (action === 'delete') result = await library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
@@ -735,6 +746,34 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         : result.message,
       skills: [],
     }
+  }
+
+  /** Batch C (2026-09-27, design §3C-2): the create-time near-duplicate hint — one
+   * line naming the existing skill(s) this candidate is about to near-copy, over
+   * core's `summary` projection (name + description). Three properties are the
+   * design's, not stylistic choices:
+   *
+   *   - NO body is read. `library.list()` publishes `description`; bodies are
+   *     attached only when a caller asks for them, and this one does not. The
+   *     hint therefore cannot cost a whole-tree body read on a create.
+   *   - It is a HINT: the write proceeds either way (G4 — create's foreground
+   *     behavior is unchanged). The model gets the news, not a refusal.
+   *   - A failed listing degrades to a NAMED line, never to silence: "nothing
+   *     similar was checked" and "nothing similar exists" must not look alike
+   *     (the PLAN-R2 P2-5 posture the review path already takes).
+   *
+   * The level and the math live in core (`nearDuplicateSummaries`,
+   * `SUMMARY_DUPLICATE_HINT_THRESHOLD`) — this function owns the wording only. */
+  async function duplicateHintLines(name: string, description: string): Promise<string[]> {
+    let matches: ReturnType<typeof nearDuplicateSummaries>
+    try {
+      matches = nearDuplicateSummaries({ candidate: { name, description }, existing: await library.list() })
+    } catch (error) {
+      return [`Duplicate check skipped: the skill listing failed (${error instanceof Error ? error.message : String(error)}).`]
+    }
+    if (matches.length === 0) return []
+    const named = matches.map(match => `${match.name} (${match.score.toFixed(2)})`).join(', ')
+    return [`Near-duplicate of existing skill(s): ${named} — prefer patch/update on that skill over adding a near-copy.`]
   }
 
   async function buildSkillReviewText(): Promise<string> {

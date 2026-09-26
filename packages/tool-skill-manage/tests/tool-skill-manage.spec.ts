@@ -1016,3 +1016,63 @@ it('P2-5: unreadable skill bodies are excluded from review dedup grouping and co
   else process.env.DSH_HOME = previousHome
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
+
+// C (2026-09-27, design §3C-2): the create-time near-duplicate hint. Three
+// properties are pinned, and the third is the falsifiable one: the hint is asked
+// over core's SUMMARY projection, so a candidate whose body is nearly a byte copy
+// of an existing skill stays silent — which is only possible if no body was read
+// or weighed. The same library DOES group those two bodies in review, so the two
+// projections are observed side by side, not asserted from a comment.
+it('C: create reports a near-duplicate hint, writes anyway, and cannot see bodies', async () => {
+  const { ctx, root, previousHome } = await setup()
+  const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    callId: ToolCallId(`dup-hint-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: args,
+    agent: fakeAgent(undefined),
+    signal: new AbortController().signal,
+  })
+  const message = (result: { value?: unknown }): string =>
+    (result.value as { message?: string } | undefined)?.message ?? ''
+  const md = (name: string, description: string, body: string): string =>
+    `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`
+
+  const target = md('amp-ranker', 'Rank guitar amplifiers by their clean headroom.', 'Body A.')
+  expect((await execute({ action: 'create', name: 'amp-ranker', content: target })).isError).toBe(false)
+
+  // (1) A near-copy: same description, hyphen-extended name.
+  const clone = await execute({ action: 'create', name: 'amp-ranker-clone', content: md('amp-ranker-clone', 'Rank guitar amplifiers by their clean headroom.', 'Body B.') })
+  expect(clone.isError).toBe(false)
+  expect(message(clone)).toContain('Near-duplicate of existing skill(s): amp-ranker')
+  expect(message(clone)).toContain('prefer patch/update')
+  // HINT ONLY (G4): the hint changed no verdict — the write landed.
+  expect(await readFile(join(root, 'skills', 'amp-ranker-clone', 'SKILL.md'), 'utf8')).toContain('Body B.')
+
+  // (2) An unrelated create: not one extra line.
+  const unrelated = await execute({ action: 'create', name: 'kitchen-remodel', content: md('kitchen-remodel', 'Plan a kitchen remodel around a load-bearing wall.', 'Body K.') })
+  expect(unrelated.isError).toBe(false)
+  expect(message(unrelated)).not.toContain('Near-duplicate')
+
+  // (3) FALSIFIABLE: near-identical BODIES, unrelated summaries. The summary
+  // projection cannot see the shared body, so the hint stays silent; review's
+  // body projection groups exactly those two.
+  const sharedProse = Array.from({ length: 400 }, (_, index) => `tt${index}`).join(' ')
+  await mkdir(join(root, 'skills', 'zucchini-tides'), { recursive: true })
+  await writeFile(
+    join(root, 'skills', 'zucchini-tides', 'SKILL.md'),
+    md('zucchini-tides', 'Notes about tides and turbines.', sharedProse),
+  )
+  const bodyTwin = await execute({
+    action: 'create',
+    name: 'harvest-log',
+    content: md('harvest-log', 'Notes about seasonal zucchini harvests.', sharedProse),
+  })
+  expect(bodyTwin.isError).toBe(false)
+  expect(message(bodyTwin)).not.toContain('Near-duplicate of existing skill')
+  const review = await execute({ action: 'review' })
+  expect(message(review)).toMatch(/- (zucchini-tides ~ harvest-log|harvest-log ~ zucchini-tides)/)
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+

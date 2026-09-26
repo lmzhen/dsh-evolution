@@ -7,6 +7,12 @@
  * mutation maturity is a documented DSH approximation (single per-month patch
  * trend ratio replaces the claw timestamp-trend formula, since DSH usage
  * records only carry the last patched timestamp).
+ *
+ * Batch C (2026-09-27): the similarity half of this module is now TWO NAMED
+ * QUESTIONS plus a declared projection — {@link identity} ("is it the same
+ * text?") and {@link affinity} ("how much vocabulary do these two share?") asked
+ * over {@link projectionText}. Callers name the question and the projection
+ * instead of growing a fourth unnamed ruler (design §3C / §1 I2).
  * @module @deepseek-ai/dsh-evolution-core
  */
 
@@ -100,23 +106,91 @@ function normalize(content: string): string {
   return content.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-/** C-26 (v10 audit): renamed from `contentHash` — mutations.ts exports a
+/* ------------------------------------------------------------------------- *
+ * Similarity: two NAMED questions, and the projection a caller declares.
+ *
+ * Batch C (2026-09-27, design §3C) — the module used to carry three unnamed
+ * rulers (a normalized hash, a token Jaccard, a first-word name index) whose
+ * questions overlapped without saying so. The questions are now named, and a
+ * caller that wants a comparison must name the one it is asking:
+ *
+ *   1. {@link identity}  — "is this the SAME TEXT?" (normalized-content hash)
+ *   2. {@link affinity}  — "how much VOCABULARY do these two share?" (Jaccard
+ *                          over two {@link vocabulary} sets)
+ *
+ * {@link computePrefixClusters} stays what it always was — a name-side
+ * STRUCTURAL index (which names share a first word), not a similarity score.
+ * What a caller declares instead of inventing a fourth ruler is the PROJECTION
+ * ({@link projectionText}): `body` = the whole SKILL.md, `summary` = name +
+ * description. Adding a projection is one entry in that table, and the two
+ * callers stop disagreeing about what they compared (design §6.4).
+ * ------------------------------------------------------------------------- */
+
+/** Named similarity question 1 — "is it the same text?" — as a normalized
+ * content hash: case- and whitespace-insensitive, so two texts that differ only
+ * in formatting are the SAME text here. Invariant under which projection the
+ * caller read the text from.
+ *
+ * C-26 (v10 audit): NOT named `contentHash` — mutations.ts exports a
  * contentHash of RAW bytes, this one hashes the NORMALIZED text for dedup
- * grouping. Same private helper, unambiguous name. */
-function normalizedHash(content: string): string {
-  return createHash('sha256').update(normalize(content)).digest('hex')
+ * grouping. Same helper as that rename, now a named question. */
+export function identity(text: string): string {
+  return createHash('sha256').update(normalize(text)).digest('hex')
 }
 
-function tokenize(content: string): Set<string> {
-  return new Set(normalize(content).split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean))
+/** Which text a similarity question is asked about. Declared by the caller. */
+export type SimilarityProjection = 'body' | 'summary'
+
+/** The one input shape both projections read from: a caller passes what it has. */
+export interface SimilarityInput {
+  /** The whole SKILL.md — the `body` projection. */
+  content?: string
+  /** The skill name — half of the `summary` projection. */
+  name?: string
+  /** The frontmatter description — half of the `summary` projection. */
+  description?: string
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
+/**
+ * The declared projection: WHICH text a comparison weighs.
+ *
+ * `body` is the library-wide scan's projection (whole SKILL.md, costs a body
+ * read). `summary` is name + description in one string — the projection a
+ * listing already publishes (`SkillSummary` carries both fields, and a body is
+ * attached only when the caller asks for it), which is what makes the
+ * create-time duplicate hint cost no extra read.
+ */
+export function projectionText(projection: SimilarityProjection, input: SimilarityInput): string {
+  switch (projection) {
+    case 'body': return input.content ?? ''
+    case 'summary': return `${input.name ?? ''} ${input.description ?? ''}`
+  }
+}
+
+/** The comparable vocabulary of one text: lowercase alphanumeric runs, plus
+ * whole CJK runs (a Chinese description tokenizes by punctuation, not by word —
+ * deliberately: the ruler is one home, and a real tokenizer is a different
+ * question than "do these two share vocabulary?"). */
+export function vocabulary(text: string): ReadonlySet<string> {
+  return new Set(normalize(text).split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean))
+}
+
+/** Named similarity question 2 — "how much vocabulary do these two share?" —
+ * Jaccard over two {@link vocabulary} sets, 0 (nothing in common, or either side
+ * empty) to 1 (identical vocabulary). Set-based on purpose: the bulk scan
+ * memoizes each name's set once and only the comparisons are budgeted. */
+export function affinity(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   if (a.size === 0 || b.size === 0) return 0
   let intersection = 0
   for (const token of a) if (b.has(token)) intersection += 1
   return intersection / (a.size + b.size - intersection)
 }
+
+/** The `affinity` level at which two bodies are treated as the same skill
+ * (design §3C: the default is unchanged at 0.95 — it is now a NAME, because the
+ * docblock below has linked it since PLAN-R2 while the code carried a bare
+ * literal). Callers may still pass their own level. */
+export const DEDUP_SIMILARITY_THRESHOLD = 0.95
 
 /** PLAN-R2 P2-8 (2026-09-16): default cap on two-name comparisons in
  * {@link computeDedupGroups}. A 2000-skill library is ~2M pairs; the old
@@ -154,12 +228,14 @@ export function computeDedupGroups(input: {
    * {@link DEDUP_MAX_PAIR_COMPARISONS}; a smaller value truncates earlier. */
   maxPairComparisons?: number
 }): DedupScanResult {
-  const threshold = input.threshold ?? 0.95
+  const threshold = input.threshold ?? DEDUP_SIMILARITY_THRESHOLD
   const maxPairComparisons = input.maxPairComparisons ?? DEDUP_MAX_PAIR_COMPARISONS
   const names = [...input.contents.keys()]
   const hashes = new Map<string, string[]>()
   for (const name of names) {
-    const hash = normalizedHash(input.contents.get(name) ?? '')
+    // Question 1 over the declared projection: the body is what this scan weighs
+    // (it was handed bodies by its caller — see the tool path's exclusion notes).
+    const hash = identity(projectionText('body', { content: input.contents.get(name) ?? '' }))
     const bucket = hashes.get(hash)
     if (bucket) bucket.push(name)
     else hashes.set(hash, [name])
@@ -183,11 +259,11 @@ export function computeDedupGroups(input: {
       if (peer) union(first, peer)
     }
   }
-  const tokens = new Map<string, Set<string>>()
-  const tokenSet = (name: string): Set<string> => {
+  const tokens = new Map<string, ReadonlySet<string>>()
+  const tokenSet = (name: string): ReadonlySet<string> => {
     let set = tokens.get(name)
     if (!set) {
-      set = tokenize(input.contents.get(name) ?? '')
+      set = vocabulary(projectionText('body', { content: input.contents.get(name) ?? '' }))
       tokens.set(name, set)
     }
     return set
@@ -209,7 +285,7 @@ export function computeDedupGroups(input: {
       compared += 1
       const [ta, tb] = [tokenSet(a), tokenSet(b)]
       if (Math.max(ta.size, tb.size) / Math.max(1, Math.min(ta.size, tb.size)) > 5) continue
-      if (jaccard(ta, tb) >= threshold) union(a, b)
+      if (affinity(ta, tb) >= threshold) union(a, b)
     }
   }
   const groups = new Map<string, string[]>()
@@ -220,6 +296,62 @@ export function computeDedupGroups(input: {
     else groups.set(root, [name])
   }
   return { groups: [...groups.values()].filter(group => group.length > 1), truncated }
+}
+
+/**
+ * The create-time near-duplicate question (batch C, design §3C-2): WHICH
+ * existing skills is this authoring candidate about to near-copy?
+ *
+ * It is the SAME {@link affinity} question as the library-wide scan, asked over
+ * the `summary` projection — the one a listing already publishes
+ * (`SkillSummary` carries `name` and `description`; nothing here can see a
+ * body, which is the point: a create must not pay a whole-tree body read to warn
+ * about a copy). Deliberately hint-only: the caller writes regardless, and the
+ * matches are news, not a gate (G4 — the create-time foreground behavior is
+ * unchanged).
+ *
+ * The default level is far below the scan's {@link DEDUP_SIMILARITY_THRESHOLD}
+ * because the projection is thinner: a name plus one sentence shares far fewer
+ * tokens than two bodies, and a hint that fires on every new skill is noise.
+ * Exact same-name candidates are skipped — the library's own create refuses
+ * those, and this line must not repeat that refusal.
+ */
+export const SUMMARY_DUPLICATE_HINT_THRESHOLD = 0.5
+
+/** The fields {@link nearDuplicateSummaries} weighs — a structural subset of
+ * `SkillSummary`, so a listing feeds it without a conversion. */
+export interface SummaryCandidate {
+  name: string
+  description?: string
+}
+
+export interface SummaryMatch {
+  name: string
+  /** The `summary`-projection {@link affinity} in 0..1. */
+  score: number
+}
+
+export function nearDuplicateSummaries(input: {
+  candidate: SummaryCandidate
+  existing: ReadonlyArray<SummaryCandidate>
+  /** Level at which a match is reported. Defaults to
+   * {@link SUMMARY_DUPLICATE_HINT_THRESHOLD}. */
+  threshold?: number
+  /** Cap on returned matches, closest first. Defaults to 3. */
+  limit?: number
+}): SummaryMatch[] {
+  const threshold = input.threshold ?? SUMMARY_DUPLICATE_HINT_THRESHOLD
+  const limit = input.limit ?? 3
+  const candidateTokens = vocabulary(projectionText('summary', input.candidate))
+  const matches: SummaryMatch[] = []
+  for (const existing of input.existing) {
+    if (existing.name === input.candidate.name) continue
+    const score = affinity(candidateTokens, vocabulary(projectionText('summary', existing)))
+    if (score >= threshold) matches.push({ name: existing.name, score })
+  }
+  return matches
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, limit)
 }
 
 /**
