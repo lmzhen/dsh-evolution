@@ -13,6 +13,7 @@ import { nodeEvolutionIo } from '../src/io.ts'
 import { SkillLibrary } from '../src/skill-store.ts'
 import {
   BASELINE_ACTION,
+  contentRetentionFeedback,
   HISTORY_INDEX_VERSION,
   historyIndexFile,
   loadVersions,
@@ -20,6 +21,7 @@ import {
   parseHistoryIndex,
   loadVersionContent,
   recordVersions,
+  RETENTION_FEEDBACK_MIN_CHARS,
   type SkillVersion,
 } from '../src/skill-history.ts'
 
@@ -168,6 +170,51 @@ describe('skill-history: the library records what it writes', () => {
     }
   })
 
+describe('skill-history: the retention line (design §4 item 3)', () => {
+  const big = 'x'.repeat(RETENTION_FEEDBACK_MIN_CHARS)
+
+  it('speaks only for a significant whole-body replacement', () => {
+    // A 4x shrink of a body above the floor: the line names the share kept, in characters.
+    const line = contentRetentionFeedback({ name: 's', action: 'update', before: big, after: 'x'.repeat(50) })
+    expect(line).toContain('Content kept 25% of the previous body (50 of 200 characters)')
+    expect(line).toContain('the replaced version is preserved')
+    // Growth, an equal size and a small shrink are edits, not news.
+    expect(contentRetentionFeedback({ name: 's', action: 'update', before: big, after: big + big })).toBeNull()
+    expect(contentRetentionFeedback({ name: 's', action: 'update', before: big, after: big })).toBeNull()
+    expect(contentRetentionFeedback({ name: 's', action: 'update', before: big, after: 'x'.repeat(150) })).toBeNull()
+    // Below the floor the ratio is noise (a 40-character skill cut in half).
+    expect(contentRetentionFeedback({ name: 's', action: 'update', before: 'x'.repeat(40), after: 'x' })).toBeNull()
+  })
+
+  it('is silent for every action that is not a whole-body replacement', () => {
+    for (const action of ['create', 'patch', 'write_file', 'remove_file', 'archive', 'restore', 'restructure']) {
+      expect(contentRetentionFeedback({ name: 's', action, before: big, after: 'x' })).toBeNull()
+    }
+    // A missing side is not a ratio either.
+    expect(contentRetentionFeedback({ name: 's', action: 'update', before: null, after: 'x' })).toBeNull()
+    expect(contentRetentionFeedback({ name: 's', action: 'update', before: big, after: null })).toBeNull()
+  })
+
+  it('reaches the message of a real shrinking update and never changes ok', async () => {
+    const root = await tempRoot('dsh-skill-history-retention-')
+    const io = nodeEvolutionIo()
+    const lib = new SkillLibrary(root, io, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    try {
+      const body = Array.from({ length: 10 }, (_, index) => `## Section ${index}\n${'detail '.repeat(20)}`).join('\n')
+      await lib.create('shrink-skill', skill('shrink-skill', body))
+      const rewritten = await lib.update('shrink-skill', skill('shrink-skill', '## Section 0\nsummary only'))
+      expect(rewritten.ok).toBe(true)
+      expect(rewritten.message).toContain('Content kept')
+      expect(rewritten.message).toContain('the replaced version is preserved')
+      // The line is FEEDBACK: a huge shrink still writes, and the growth direction stays quiet.
+      const grown = await lib.update('shrink-skill', skill('shrink-skill', body))
+      expect(grown.ok).toBe(true)
+      expect(grown.message).not.toContain('Content kept')
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+})
   it('recordVersions writes the index under the history directory, versioned', async () => {
     const root = await tempRoot('dsh-skill-history-record-')
     const io = nodeEvolutionIo()

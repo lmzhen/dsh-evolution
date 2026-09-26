@@ -1,8 +1,6 @@
 # @deepseek-ai/dsh-evolution-core
 
-Shared pure library for the family: `SkillLibrary`/`MemoryStore`, the prompts and guidance text,
-the threat/quality/drift signals and the IO primitives (`nodeEvolutionIo`, `transactIo`,
-`evolutionIoAdapter`). It is **not a Cordis row** — it registers no service, tool or prompt
+Shared pure library for the family: `SkillLibrary`/`MemoryStore`, the prompts and guidance text, the threat/quality/drift signals, the skill CONTENT history (`skill-history.ts`: content-addressed versions behind every write) and the frame classification the plan path reports over (`evidence.ts`), plus the IO primitives (`nodeEvolutionIo`, `transactIo`, `evolutionIoAdapter`). It is **not a Cordis row** — it registers no service, tool or prompt
 section, and importing the package root is its only entry.
 
 ## Model surface
@@ -21,6 +19,12 @@ section, and importing the package root is its only entry.
 
 ## Notes and history
 
+- Similarity is TWO NAMED QUESTIONS plus a projection the caller declares (`quality.ts`): `identity(text)` ("is it the same text?", a normalized-content hash) and `affinity(a, b)` ("how much vocabulary do these two share?", Jaccard over two `vocabulary()` sets), asked over `projectionText(projection, input)` — `body` for the library-wide scan, `summary` (name + description) for the create-time hint. `computePrefixClusters` stays a name-side STRUCTURAL index, not a score. Adding a projection is one entry in that table; a caller that wants a fourth ruler should name the question it is really asking instead.
+- A whole-body replacement that keeps less than half of the previous body appends one line to its own result
+  (`contentRetentionFeedback`, design §4 item 3): the ratio, both character counts, and the fact that the
+  replaced version is still in the history. Computed in the write funnel where both bodies are in hand, feedback
+  only — no ratio refuses a write, and the function owns no configuration.
+- Content history is HISTORY ONLY: the skill tree is the single truth for current content, and no judgement reads the version index (design invariant I1). Recording is best-effort but happens inside the write lock, so the index never describes content that did not land; a failed record warns once per instance instead of failing the write.
 - Skill-library mutations are read-modify-write on one file, so `SkillLibrary` serializes them in-process with a `makeSerialQueue` chain: `update`, `patch`, `restructure`, `writeSupportFile` and (since 0.3.46) `consolidate`'s target read→merge→commit run their whole read→validate→write under one serial task, so two concurrent mutators on one skill never interleave in this process.
 - `create` is INSIDE the serial chain and, when a transact backend is bound, its exists check runs inside the same per-file transact (v18); `archive`/`consolidate` are rename-based two-phase paths and stay outside the single-file serial chain.
 - **v18 residual (updated):** `create`, `removeSupportFile` and `setPinned` now run on the serial chain (`removeSupportFile`'s delete also goes through the per-file transact), so the remaining single-file residual is the protection TOCTOU (a marker check outside the transact) and the multi-file two-phase paths `archive`/`consolidate`/`restructure`.

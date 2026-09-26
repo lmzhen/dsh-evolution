@@ -72,6 +72,27 @@ only the second one refuses a write:
 The third row is a view, not a rule: a description the family accepts can still be cut in a catalog
 viewer, which is why the authoring feedback names the bar rather than treating the cut as a limit.
 
+### The create-time duplicate hint
+
+A `create` compares its candidate against the library listing before it writes, over the name +
+description projection (core `nearDuplicateSummaries`, at `SUMMARY_DUPLICATE_HINT_THRESHOLD`), and
+names the closest existing skills in the same "Authoring check" block. Three properties are
+deliberate: it reads NO skill body (the listing already publishes the description, and a create must
+not pay a whole-tree body read to warn about a copy); it is a HINT (the write proceeds — only the
+model's next decision changes); and a listing failure degrades to a named line instead of silence,
+because "nothing similar was checked" and "nothing similar exists" must not look alike. The
+library-wide BODY scan stays where it was, in the `review` action.
+
+### The retention line
+
+A whole-body replacement that keeps less than half of the previous SKILL.md says so in the same result
+message (`Content kept 26% of the previous body (2104 of 8123 characters); the replaced version is
+preserved in this skill's history.`). It is computed where the write path still holds both bodies — the
+library's own in-lock read, core `contentRetentionFeedback` — because a caller re-reading the file
+would race the writers the library serializes. Like the duplicate hint it is FEEDBACK, not a gate: no ratio
+refuses a write, small skills stay quiet (a 40-character skill cut in half is not news), and patches,
+support-file writes, creates and archives have no ratio to report.
+
 ## Known limitations
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.

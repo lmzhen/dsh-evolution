@@ -47,7 +47,7 @@ import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFront
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
-import { HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
+import { contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
@@ -806,15 +806,26 @@ export class SkillLibrary {
     // cleanups). Without this, a SKILL.md-less ghost dir blocks
     // restoreFromArchive forever ("carries no SKILL.md; remove or repair it").
     if (o.ghostDir === true) await this.cleanupGhostDir(path)
+    let result = o.result
     if (o.write !== null && o.audit) {
       await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary)
+      // Design §4 item 3: the retention line, said HERE because this is the only place that still
+      // holds both bodies (the write's own in-lock read) — a caller would have to re-read the file
+      // and race the writers this library serializes. Feedback only: it never changes the ok flag.
+      const retention = contentRetentionFeedback({
+        name: o.audit.skillName,
+        action: o.audit.action,
+        before: o.audit.before,
+        after: o.audit.after,
+      })
+      if (retention !== null && result.ok) result = { ...result, message: `${result.message}\n${retention}` }
     }
     if (o.write !== null && o.event) this.notifyMutation(o.event)
     // A1-15 (v18): audit and the mutation event ran even when only the fsync
     // failed — say so in the result instead of pretending the write failed.
-    return durabilityWarning === '' || !o.result.ok
-      ? o.result
-      : { ...o.result, message: `${o.result.message} (warning: the write landed but the directory fsync failed — durability unconfirmed: ${durabilityWarning})` }
+    return durabilityWarning === '' || !result.ok
+      ? result
+      : { ...result, message: `${result.message} (warning: the write landed but the directory fsync failed — durability unconfirmed: ${durabilityWarning})` }
   }
 
   /**

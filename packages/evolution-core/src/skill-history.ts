@@ -176,6 +176,52 @@ export function nextHistoryIndex(
   return { versions: trimmed, recorded }
 }
 
+
+/** Shrink level at which the retention line speaks: a body that keeps less than this share of the
+ * previous one is a rewrite, not an edit. */
+export const RETENTION_FEEDBACK_KEEP_RATIO = 0.5
+
+/** Floor on the REPLACED body: below this a ratio is noise (a 40-character skill cut in half is not
+ * news), so the line stays off for small skills. */
+export const RETENTION_FEEDBACK_MIN_CHARS = 200
+
+/** What {@link contentRetentionFeedback} reads: the one write it describes. */
+export interface RetentionFeedbackInput {
+  /** The skill's name, for the sentence. */
+  readonly name: string
+  /** The action that produced the write; only a whole-body replacement is described. */
+  readonly action: string
+  /** The replaced body, or null when the skill had none (create / restore). */
+  readonly before: string | null
+  /** The body now on disk, or null when it was removed (archive / remove_file). */
+  readonly after: string | null
+}
+
+/**
+ * The anti-overwrite feedback line (design §4, item 3): says how much of the previous body a
+ * replacement kept, so a destructive rewrite is visible in the same message that reports the write.
+ *
+ * Computed where the replaced bytes are still in hand — the write path's own in-lock read — instead of
+ * re-reading the file from a caller (that second read would race the writers this library serializes).
+ * It is FEEDBACK, never a gate: no ratio refuses a write, and the function owns no configuration
+ * (a toggle nobody reads would be configuration that does nothing).
+ *
+ * @param input - the write being described.
+ * @returns the line, or null when the write is not a significant whole-body replacement.
+ */
+export function contentRetentionFeedback(input: RetentionFeedbackInput): string | null {
+  // Only a whole-body replacement has a retention ratio: a patch touches an anchor, a support-file
+  // write replaces a different artifact, and a create/archive has no pair of bodies to compare.
+  if (input.action !== 'update') return null
+  const before = input.before
+  const after = input.after
+  if (before === null || after === null) return null
+  if (before.length < RETENTION_FEEDBACK_MIN_CHARS) return null
+  if (after.length >= before.length * RETENTION_FEEDBACK_KEEP_RATIO) return null
+  const kept = Math.round(after.length / before.length * 100)
+  return `Content kept ${kept}% of the previous body (${after.length} of ${before.length} characters); the replaced version is preserved in this skill's history.`
+}
+
 /**
  * Read one skill's versions, oldest first.
  * @param root - the skills root.
