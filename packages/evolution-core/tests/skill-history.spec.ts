@@ -18,7 +18,7 @@ import {
   loadVersions,
   nextHistoryIndex,
   parseHistoryIndex,
-  readVersion,
+  loadVersionContent,
   recordVersions,
   type SkillVersion,
 } from '../src/skill-history.ts'
@@ -97,9 +97,9 @@ describe('skill-history: the library records what it writes', () => {
       expect(versions.map(v => v.action)).toEqual(['create', 'update', 'patch'])
       expect(versions.map(v => v.v)).toEqual([1, 2, 3])
       // The content of each version is readable, in order — the whole point of the seam.
-      expect(await readVersion(root, io, 'hist-skill', 1)).toContain('One.')
-      expect(await readVersion(root, io, 'hist-skill', 2)).toContain('Two.')
-      expect(await readVersion(root, io, 'hist-skill', 3)).toContain('Three.')
+      expect(await loadVersionContent(root, io, 'hist-skill', 1)).toContain('One.')
+      expect(await loadVersionContent(root, io, 'hist-skill', 2)).toContain('Two.')
+      expect(await loadVersionContent(root, io, 'hist-skill', 3)).toContain('Three.')
       // The ledger points at the versions it produced.
       const ledger = await lib.listMutations()
       const update = ledger.find(record => record.action === 'update')
@@ -140,7 +140,7 @@ describe('skill-history: the library records what it writes', () => {
       const versions = await loadVersions(root, io, 'trim-skill')
       expect(versions).toHaveLength(2)
       expect(versions.at(-1)?.chars ?? 0).toBeGreaterThan(0)
-      expect(await readVersion(root, io, 'trim-skill', 1)).toBeNull()
+      expect(await loadVersionContent(root, io, 'trim-skill', 1)).toBeNull()
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }

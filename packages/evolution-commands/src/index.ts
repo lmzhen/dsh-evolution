@@ -387,6 +387,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const result = curator ? await curator.restore(name) : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
+        if (input.startsWith('skill history ')) {
+          const name = input.slice(14).trim()
+          if (!name) return err('Usage: /evolution skill history <name>')
+          const curator = ctx.get('evolutionCurator') as {
+            history(name: string): Promise<Array<{ v: number; at: string; action: string; hash: string; chars: number }>>
+          } | undefined
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          const versions = await curator.history(name)
+          if (versions.length === 0) return ok(`No content versions are recorded for "${name}" yet — they appear after the next write through skill_manage.`)
+          const rows = versions.map(entry => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}`)
+          return ok([`Content versions for "${name}" (oldest first, ${versions.length} of at most the retained count):`, ...rows].join('\n'))
+        }
+        if (input.startsWith('skill undo ')) {
+          const rest = input.slice(11).trim()
+          const toMatch = /--to\s+v?(\d+)\s*$/.exec(rest)
+          const name = (toMatch?.index === undefined ? rest : rest.slice(0, toMatch.index)).trim()
+          if (!name) return err('Usage: /evolution skill undo <name> [--to v<N>]')
+          const skillUndoRefusal = unreplayableWriteRefusal('skill undo')
+          if (skillUndoRefusal) return skillUndoRefusal
+          const curator = ctx.get('evolutionCurator') as { undo(name: string, v?: number): Promise<{ ok: boolean; message: string }> } | undefined
+          const target = toMatch?.[1] === undefined ? undefined : Number(toMatch[1])
+          const result = curator
+            ? await (target === undefined ? curator.undo(name) : curator.undo(name, target))
+            : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
+          return result.ok ? ok(result.message) : err(result.message)
+        }
         if (input === 'skills health') {
           const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>>; usageObserved(): Promise<boolean> } | undefined
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))

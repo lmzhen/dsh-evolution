@@ -27,6 +27,8 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { usage: 'restore', summary: '从最近的快照恢复技能' },
   { usage: 'consolidate <target> <sources...> [--plan <runId>]', summary: '把若干技能合并进一个总括技能' },
   { usage: 'skill restore <name>', summary: '按名字恢复一个已归档的技能' },
+  { usage: 'skill history <name>', summary: '列出某个技能的内容版本（含时间、动作、字符数、哈希前缀）' },
+  { usage: 'skill undo <name> [--to v<N>]', summary: '把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版）' },
   { usage: 'skills health', summary: '技能库结构体检' },
   { usage: 'skills refresh', summary: '丢弃目录缓存并重新读取技能树' },
   { usage: 'learn [request]', summary: '向本会话发一条学习请求' },

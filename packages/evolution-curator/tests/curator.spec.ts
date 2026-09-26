@@ -7,7 +7,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import type { EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, SkillLibrary, blobPath, computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 import { tempHome } from '../../test-support/temp-home.ts'
 
@@ -61,6 +61,62 @@ type StateRecord = { lastRunAt: number; runCount: number; lastSummary: string; p
 type StateTransactTask = (current: StateRecord | null) => StateRecord | null
 
 describe('evolution-curator', () => {
+  it('undo rolls one skill CONTENT back to a recorded version, through an anchored write', async () => {
+    await tempHome('dsh-curator-undo-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: undo-skill\ndescription: undo fixture\n---\n${text}\n`
+    await library.create('undo-skill', body('One.'))
+    await library.update('undo-skill', body('Two.'))
+    expect((await ctx.evolutionCurator.history('undo-skill')).map(entry => entry.action)).toEqual(['create', 'update'])
+    const undone = await ctx.evolutionCurator.undo('undo-skill')
+    expect(undone.ok, undone.message).toBe(true)
+    expect(undone.message).toContain('undone to v1')
+    expect(await library.read('undo-skill')).toContain('One.')
+    // The undo is itself a version (history only appends), and it is anchored: a second undo now
+    // goes back to v2 — the state the first undo replaced.
+    const after = await ctx.evolutionCurator.history('undo-skill')
+    expect(after).toHaveLength(3)
+    const twice = await ctx.evolutionCurator.undo('undo-skill')
+    expect(twice.ok, twice.message).toBe(true)
+    expect(await library.read('undo-skill')).toContain('Two.')
+  })
+
+  it('undo refuses with a reason instead of guessing: no history, not live, unreadable blob', async () => {
+    await tempHome('dsh-curator-undo-refusals-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: undo-refuse\ndescription: undo fixture\n---\n${text}\n`
+    // No history at all.
+    const empty = await ctx.evolutionCurator.undo('never-written')
+    expect(empty.ok).toBe(false)
+    expect(empty.message).toContain('No content versions are recorded')
+    // History exists but the skill is not live (archived): point at the command that handles it.
+    await library.create('undo-refuse', body('One.'))
+    await library.update('undo-refuse', body('Two.'))
+    await library.archive('undo-refuse')
+    const archived = await ctx.evolutionCurator.undo('undo-refuse')
+    expect(archived.ok).toBe(false)
+    expect(archived.message).toContain('skill restore')
+    // A version the index lists but whose blob is gone: refuse rather than write a guess.
+    await library.restoreFromArchive('undo-refuse')
+    const versions = await ctx.evolutionCurator.history('undo-refuse')
+    const first = versions[0]
+    expect(first).toBeDefined()
+    if (first !== undefined) await rm(blobPath(root, first.hash), { force: true })
+    const missingBlob = await ctx.evolutionCurator.undo('undo-refuse', first?.v)
+    expect(missingBlob.ok).toBe(false)
+    expect(missingBlob.message).toContain('could not be read')
+  })
+
   it('starts stopped by default, runs manually, and persists a run report', async () => {
     await tempHome('dsh-curator-')
     const ctx = new Context()

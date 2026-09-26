@@ -140,6 +140,8 @@ pins the equality).
 | `/evolution restore` | 从最近的快照恢复技能 |
 | `/evolution consolidate <target> <sources...> [--plan <runId>]` | 把若干技能合并进一个总括技能 |
 | `/evolution skill restore <name>` | 按名字恢复一个已归档的技能 |
+| `/evolution skill history <name>` | 列出某个技能的内容版本（含时间、动作、字符数、哈希前缀） |
+| `/evolution skill undo <name> [--to v<N>]` | 把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版） |
 | `/evolution skills health` | 技能库结构体检 |
 | `/evolution skills refresh` | 丢弃目录缓存并重新读取技能树 |
 | `/evolution learn [request]` | 向本会话发一条学习请求 |

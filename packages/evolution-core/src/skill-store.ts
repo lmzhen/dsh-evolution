@@ -47,7 +47,7 @@ import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFront
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
-import { HISTORY_DIR, recordVersions, type RecordedVersions } from './skill-history.ts'
+import { HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
@@ -1276,6 +1276,34 @@ export class SkillLibrary {
   /** Recent mutation audit records (read-only inspection surface). */
   async listMutations(): Promise<MutationRecord[]> {
     return await loadMutations(this.root, this.io)
+  }
+
+  /**
+   * Content versions recorded for one skill, oldest first (skill-history.ts, batch A).
+   *
+   * Read-only: the version seam never feeds a judgment — callers use it to LIST and to read content
+   * back. A malformed or unreadable index reads as empty, and a bad name reads as empty too (the
+   * caller is a human command, so "no versions" is the honest answer for a name that cannot exist).
+   * @param rawName - the skill's name.
+   * @returns the versions, oldest first.
+   */
+  async listVersions(rawName: string): Promise<SkillVersion[]> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return []
+    return await loadVersions(this.root, this.io, name)
+  }
+
+  /**
+   * One version's content, read back from the content-addressed blob store.
+   * @param rawName - the skill's name.
+   * @param v - the version number (see {@link SkillLibrary.listVersions}).
+   * @returns the content, or null when the version does not exist, the name is unusable, or the
+   *   blob cannot be read — never an empty string.
+   */
+  async readVersion(rawName: string, v: number): Promise<string | null> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return null
+    return await loadVersionContent(this.root, this.io, name, v)
   }
 
   /**

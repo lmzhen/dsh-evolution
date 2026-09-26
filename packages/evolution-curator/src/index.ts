@@ -16,7 +16,8 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, installParamSection, isPresent, isUnknown, paramNamespace, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, installParamSection, isPresent, isUnknown, paramNamespace, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParamOverrides, SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
@@ -2001,6 +2002,82 @@ export class EvolutionCurator extends Service {
       }
     }
     return result
+  }
+
+  /**
+   * One skill's content versions, oldest first (skill-history.ts, batch A).
+   *
+   * READ-ONLY on purpose: no control-plane mutex and no instance claim. A human asking "which
+   * versions exist?" must not be blocked by a running pass, and this cannot change anything.
+   * @param name - the skill's name.
+   * @returns the versions; a skill with no history (or an index that cannot be read) answers [].
+   */
+  async history(name: string): Promise<SkillVersion[]> {
+    return await this.skills.listVersions(name)
+  }
+
+  /**
+   * Control-plane undo: put one skill's CONTENT back to a recorded version.
+   *
+   * The undo is an ordinary anchored write (design I5): it goes through `update`, so it earns its
+   * own version, joins the mutation ledger, and is refused if the live content changed since the
+   * caller read it — there is no second write channel to bypass. Only content moves: markers
+   * (`.pinned`/`.hermes-managed`), usage counters and curation state are deliberately untouched,
+   * which the result message says so nobody reads this as a time machine.
+   * @param name - the skill's name.
+   * @param v - the version to restore; omitted means "the newest version that differs from the live
+   *   content", i.e. the state before the latest change.
+   * @returns the write result (`ok:false` with the reason when there is nothing to undo).
+   */
+  async undo(name: string, v?: number): Promise<SkillActionResult> {
+    const release = await this.acquireMutex()
+    try {
+      if (!this.holdsInstance) return this.instanceHeldRefusal('undo')
+      return await this.undoMutate(name, v)
+    } finally {
+      release()
+    }
+  }
+
+  private async undoMutate(name: string, v?: number): Promise<SkillActionResult> {
+    const versions = await this.skills.listVersions(name)
+    if (versions.length === 0) {
+      return { ok: false, message: `No content versions are recorded for "${name}" yet — nothing to undo.` }
+    }
+    const live = await this.skills.read(name)
+    if (live === null) {
+      return {
+        ok: false,
+        message: `"${name}" is not in the active tree — undo restores CONTENT of a live skill; use '/evolution skill restore ${name}' for an archived one.`,
+      }
+    }
+    const liveHash = contentHash(live)
+    const target = v ?? this.previousVersionOf(versions, liveHash)
+    if (target === undefined) {
+      return { ok: false, message: `"${name}" is already at its recorded content — no earlier version to undo to.` }
+    }
+    const content = await this.skills.readVersion(name, target)
+    if (content === null) {
+      return { ok: false, message: `Version v${target} of "${name}" could not be read (the index lists it, the blob does not) — refusing rather than writing a guess.` }
+    }
+    // The anchor is the bytes we just read: a concurrent change between the read and the write is
+    // refused by the library, which is the same protection every other staged write gets.
+    const anchor: WriteAnchor = { sha256: liveHash }
+    const result = await this.skills.update(name, content, 'foreground', anchor)
+    if (!result.ok) return result
+    return {
+      ok: true,
+      message: `${result.message} (undone to v${target} — content only: markers, usage counts and curation state are unchanged, and this undo is itself a new version.)`,
+    }
+  }
+
+  /** The newest version whose content differs from the live bytes, or undefined when none does. */
+  private previousVersionOf(versions: readonly SkillVersion[], liveHash: string): number | undefined {
+    for (let index = versions.length - 1; index >= 0; index -= 1) {
+      const entry = versions[index]
+      if (entry !== undefined && entry.hash !== liveHash) return entry.v
+    }
+    return undefined
   }
 }
 

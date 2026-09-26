@@ -196,7 +196,7 @@ export async function loadVersions(root: string, io: EvolutionIoLike, name: stri
  * @param v - the version number.
  * @returns the content, or null when the version or its blob cannot be read (never '').
  */
-export async function readVersion(root: string, io: EvolutionIoLike, name: string, v: number): Promise<string | null> {
+export async function loadVersionContent(root: string, io: EvolutionIoLike, name: string, v: number): Promise<string | null> {
   const versions = await loadVersions(root, io, name)
   const entry = versions.find(candidate => candidate.v === v)
   if (entry === undefined) return null

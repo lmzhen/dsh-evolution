@@ -30,6 +30,17 @@ describe('evolution-commands', () => {
         calls.push(`restore:${name}`)
         return { ok: true, message: `Skill "${name}" restored from .archive.` }
       },
+      history: async (name: string) => {
+        calls.push(`history:${name}`)
+        return [
+          { v: 1, at: '2026-09-27T00:00:00.000Z', action: 'create', hash: 'aaaaaaaaaaaaaaaaaaaa', chars: 42 },
+          { v: 2, at: '2026-09-27T00:01:00.000Z', action: 'update', hash: 'bbbbbbbbbbbbbbbbbbbb', chars: 43 },
+        ]
+      },
+      undo: async (name: string, v?: number) => {
+        calls.push(`undo:${name}:${v === undefined ? 'prev' : v}`)
+        return { ok: true, message: `Skill "${name}" updated. (undone to v${v ?? 1} — content only)` }
+      },
     })
     await ctx.plugin(Commands)
     expect(captured).toBeDefined()
@@ -39,6 +50,17 @@ describe('evolution-commands', () => {
     const restoreResult = await captured!.handler({ rawInput: 'skill restore source-b' })
     expect(restoreResult.text).toContain('restored from .archive.')
     expect(calls).toEqual(['consolidate:target-a:source-b,source-c', 'restore:source-b'])
+    // skill history renders the recorded versions (one line each, oldest first).
+    const historyResult = await captured!.handler({ rawInput: 'skill history source-b' })
+    expect(historyResult.kind).toBe('success')
+    expect(historyResult.text).toContain('Content versions for "source-b"')
+    expect(historyResult.text).toContain('v1	2026-09-27T00:00:00.000Z	create	42 chars	aaaaaaaaaaaa')
+    // skill undo parses the optional --to (with or without the v prefix) and defaults to "previous".
+    const undoTo = await captured!.handler({ rawInput: 'skill undo source-b --to v1' })
+    expect(undoTo.kind).toBe('success')
+    const undoPrev = await captured!.handler({ rawInput: 'skill undo source-b' })
+    expect(undoPrev.kind).toBe('success')
+    expect(calls.slice(-3)).toEqual(['history:source-b', 'undo:source-b:1', 'undo:source-b:prev'])
     // Commands runtime contract: handlers must return a CommandResult with kind.
     expect(result.kind).toBe('success')
     expect(restoreResult.kind).toBe('success')
@@ -1011,6 +1033,7 @@ describe('evolution-commands', () => {
       { input: 'consolidate target src', what: 'consolidate' },
       { input: 'restore', what: 'restore' },
       { input: 'skill restore demo', what: 'skill restore' },
+      { input: 'skill undo demo', what: 'skill undo' },
     ]
     for (const { input, what } of cases) {
       const ctx = new Context()
