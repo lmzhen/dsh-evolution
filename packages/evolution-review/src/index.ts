@@ -73,6 +73,8 @@ export interface Config {
   /** Shadowed by the policy snapshot in every shipped composition — configure
    * `reviewMemoryInterval` on the `evolution-policy` row instead (v37 P2-24).
    * Deprecated alias (G0/S0.3): still readable, refused by writes; removed 0.7.0. */
+  /** Review cadence in TOOL CALLS (signals.ts: a turn advances by its tool-call count, minimum 1,
+   * or by 1 when the turn itself carried the memory signal). */
   memoryInterval?: number
   /** Shadowed by the policy snapshot in every shipped composition — configure
    * `reviewSkillInterval` on the `evolution-policy` row instead. Deprecated
@@ -370,9 +372,11 @@ function policySnapshotOf(source: unknown): PolicySnapshotFields | undefined {
  * parameter ids from the registry, so the settings document, the params output,
  * the doctor report and the cards all spell one name. */
 export interface ReviewSettings {
-  /** Activity units between skill-review injections. */
+  /** Tool calls between skill-review injections (a turn with no tool call counts as one; a turn
+   * that itself used a skill advances the counter by 1). */
   reviewSkillInterval: number
-  /** Activity units between memory-review injections. */
+  /** Tool calls between memory-review injections (a turn with no tool call counts as one; a turn
+   * that itself touched memory advances the counter by 1). */
   reviewMemoryInterval: number
   /** Which channel may inject a skill review. */
   skillReviewTrigger: 'cadence' | 'completion' | 'both'

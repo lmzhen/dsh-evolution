@@ -14,13 +14,20 @@ library nor its lifecycle rules.
 
 ### Write gates
 
-Every mutation passes ONE ordered admission sequence (`src/write-gates.ts`): the scalar argument
-shape, the required arguments per action, the policy's protected list, and read-before-write. The
+Every mutation THROUGH THIS TOOL passes ONE ordered admission sequence (`src/write-gates.ts`): the
+scalar argument shape, the required arguments per action, the policy's protected list,
+read-before-write, and the operator confirmation. The
 ADMISSION point runs the sequence before the approval seam, so a write that is refused is never
 staged for approval and never spends the operator's attention; the EXECUTION point (`executeCore`)
 re-runs the gates a replay or a direct write can still fail, because a replay's stored arguments
 passed no schema and the protected list can change while a record sits pending. Both points read the
 same table, so they cannot diverge.
+
+The sequence covers the MODEL tool path. The family's other writers reach their own library
+handles: the `/evolution` and `/graph` command face writes what the operator typed (the operator is
+the authority there), the review's plan executor writes a plan its own filter already screened
+(`filterUnreadSkillOps`), and a record staged outside this tool replays into the execution point
+without re-deciding the admission-only gates — there is no writing session to read.
 
 Read-before-write is admission-only (the replayed record has no writing session): a non-foreground
 write whose target the session never read is refused with `E-318`, and only a read that did not fail
@@ -60,7 +67,7 @@ only the second one refuses a write:
 |---|---|---|---|
 | Authoring bar | 60 chars | `AUTHORING_DESCRIPTION_BAR` (the upstream 60-char rule) | advisory feedback on every create/edit/update; `descriptionStrict: true` turns it into a refusal |
 | Family storage ceiling | 1024 chars | `MAX_DESCRIPTION_LENGTH`, lowered per deployment by this row's `maxDescriptionLength` | the hard validation limit — the ONLY refusal threshold of the three |
-| Platform catalog view | 500 chars by default | `catalogDescriptionMaxLength` on the platform's `tool-skill` row (`PLATFORM_CATALOG_DESCRIPTION_DEFAULT`) | truncates the description in the skill catalog the model reads; the family's host/all rows set that field to 60 |
+| Platform catalog view | 500 chars by default | `catalogDescriptionMaxLength` on the platform's `tool-skill` row (`PLATFORM_CATALOG_DESCRIPTION_DEFAULT`) | truncates the description in the skill catalog the model reads; the family's own rows set that field to 60 (`evolution-host`, `evolution-all` and `evolution-preset` each carry it, and the composer injects it onto a generated preset row too), so 500 governs only a composition that overrides none of them; `packages/README.md` states which of those rows takes effect per install form |
 
 The third row is a view, not a rule: a description the family accepts can still be cut in a catalog
 viewer, which is why the authoring feedback names the bar rather than treating the cut as a limit.

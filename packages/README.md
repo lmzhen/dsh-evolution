@@ -100,7 +100,8 @@ emits lives in ONE table, `evolution-core/src/errors.ts`, keyed by the scenario 
 answers with it: a code may legitimately carry more than one text (`E-301` answers
 pending / approve / reject with different guidance), and each message is stored once
 with `%aN%` slots for the values its call site used to interpolate (measured: 24
-scenario keys, 24 texts, codes `E-301`–`E-318`). Call sites render it with
+scenario keys, 24 message literals — two E-305 scenarios share one literal, so 23 distinct
+strings — over codes `E-301`–`E-318`). Call sites render it with
 `errorText('<scenario>', { a1: … })`.
 
 Architecture rule **N21** fails the gate when any other `src` file spells a code

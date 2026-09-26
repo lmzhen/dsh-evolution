@@ -8,7 +8,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { SKILLS_GUIDANCE, contentHash } from '@deepseek-ai/dsh-evolution-core'
 import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -98,14 +98,22 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guard-')) })
     await ctx.plugin(ToolSkillManage)
     let protectedNames: string[] = []
-    ctx.provide('evolutionPolicy', { get: () => ({ protectedSkillNames: protectedNames }) })
+    let policyThrows = false
+    ctx.provide('evolutionPolicy', {
+      get: () => {
+        if (policyThrows) throw new Error('policy unavailable')
+        return { protectedSkillNames: protectedNames }
+      },
+    })
     // renderPrompt is where the platform interpolates sections and drops empty ones — the raw
     // assembly still carries the reference text.
     const rendered = async (): Promise<string> => renderPrompt(await ctx.systemPrompt.assemble())
     // No protected names: the variable renders empty, the section is the guidance verbatim, and no
     // unresolved `{{...}}` reference may survive into a request.
     const bare = await rendered()
-    expect(bare).toContain('Skills guidance:')
+    // Byte identity, not merely "no extra line": the section text interpolates to the shared
+    // constant itself, which is what keeps the guidance's prefix-cache behaviour unchanged.
+    expect(bare).toContain(SKILLS_GUIDANCE)
     expect(bare).not.toContain('Protected skills')
     expect(bare).not.toContain('{{')
     protectedNames = ['alpha', 'beta']
@@ -118,6 +126,12 @@ describe('tool-skill-manage', () => {
     const changed = await rendered()
     expect(changed).toContain('Protected skills (do not edit): gamma')
     expect(changed).not.toContain('alpha')
+    // A policy service that throws costs the LINE, never the prompt: the provider runs inside
+    // prompt assembly, so an unguarded throw here would fail every request of the deployment.
+    policyThrows = true
+    const degraded = await rendered()
+    expect(degraded).toContain(SKILLS_GUIDANCE)
+    expect(degraded).not.toContain('Protected skills')
     await ctx.fiber.dispose()
   })
 

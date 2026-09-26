@@ -406,3 +406,92 @@ describe('write gates: the foreground confirmation (E-317)', () => {
   })
 })
 
+
+describe('write gates: review-fix sentinels (2026-09-26 independent review)', () => {
+  interface AskedQuestion {
+    id: string
+    header?: string
+    question: string
+    options?: Array<{ label: string }>
+  }
+
+  /** A question service whose answer depends on the question, so a delete answers "Delete". */
+  function mountQuestions(ctx: Context, decide: (question: AskedQuestion) => string[]): { asked: AskedQuestion[] } {
+    const asked: AskedQuestion[] = []
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: AskedQuestion[] }) => {
+        const question = request.questions[0] as AskedQuestion
+        asked.push(question)
+        return { answers: [{ id: question.id, selected: decide(question) }] }
+      },
+    })
+    return { asked }
+  }
+
+  const confirmLabelOf = (question: AskedQuestion): string => question.options?.[0]?.label ?? 'Cancel'
+
+  it('asks for a delete whose absorbed_into is BLANK (a blank is a bare archive, not a merge)', async () => {
+    const { ctx } = await setup()
+    const { asked } = mountQuestions(ctx, question => [confirmLabelOf(question)])
+    await createTarget(ctx, 'blank-absorb-source')
+    await createTarget(ctx, 'blank-absorb-target')
+    expect(asked).toHaveLength(2)
+    // The archive call is truthiness-based, so a blank performs a BARE archive — it must not borrow
+    // the merge exemption (review P1: the gate and the write disagreed about what blank means).
+    const blank = await callTool(
+      ctx,
+      { action: 'delete', name: 'blank-absorb-target', absorbed_into: '   ' },
+      sessionOf(undefined),
+    )
+    expect(asked).toHaveLength(3)
+    expect(asked[2]?.options?.map(option => option.label)).toEqual(['Delete', 'Cancel'])
+    // The confirmation ran and was accepted; the LIBRARY still refuses the blank umbrella name,
+    // which is the outcome the gate's exemption would have hidden.
+    expect(valueOf(blank).ok).toBe(false)
+    expect(valueOf(blank).message).toContain('Invalid skill name')
+  })
+
+  it('refuses a DISMISSED prompt instead of writing unconfirmed (ASK_ABORTED)', async () => {
+    const { ctx, root } = await setup()
+    ctx.provide('userQuestions', {
+      ask: async () => {
+        throw Object.assign(new Error('ask_user_question was aborted before the user answered'), { code: 'ASK_ABORTED' })
+      },
+    })
+    const refused = await callTool(ctx, { action: 'create', name: 'abort-create', content: skillBody('abort-create') }, sessionOf(undefined))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-317')
+    expect(await readFile(skillPath(root, 'abort-create'), 'utf8').catch(() => null)).toBeNull()
+  })
+
+  it('refuses a non-string action by name at the execution point, and lets a MISSING action reach the library', async () => {
+    const { ctx } = await setup()
+    // The tool schema is in front of the tool path, so the shape gate is driven through the
+    // schema-less replay channel — the route a forged pending record takes (v21 R-2 keeps the
+    // schema-bypassed route as the way to reach these gates at all).
+    ctx.provide('evolutionState', {
+      listPending: async () => [],
+      savePending: async () => {},
+      tryResolvePending: async () => ({ record: null, applied: false }),
+      claimPending: async () => null,
+      releasePendingClaim: async () => {},
+      loadReviewState: async () => null,
+      saveReviewState: async () => {},
+    })
+    await ctx.plugin(EvolutionApproval, { enabled: true })
+    const replay = (operation: Record<string, unknown>) => ctx.evolutionApproval.run('skill', {
+      operation,
+      origin: 'background_review',
+      libraryOrigin: 'background_review',
+    }, { interface: 'background_review' })
+    const garbage = await replay({ action: 42, name: 'garbage-action' })
+    expect(garbage.ok).toBe(false)
+    expect(garbage.message).toContain('"action" must be a string')
+    await createTarget(ctx, 'missing-action')
+    // An absent action is not a read-required write: the tool schema requires one, so the library
+    // owns that refusal rather than the read gate sending the model to read a skill it cannot write.
+    const absent = await replay({ name: 'missing-action' })
+    expect(absent.ok).toBe(false)
+    expect(absent.message).not.toContain('E-318')
+  })
+})

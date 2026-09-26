@@ -348,6 +348,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     return true
   }
+  // A DISMISSED prompt is not consent: the platform answers `ASK_ABORTED` when the question was
+  // aborted before anyone answered (user-questions/src/index.ts:41-47), and the operator closing
+  // the card or cancelling the turn means the human did not say yes. That one code refuses the
+  // write like a declined prompt (E-317); every other failure stays fail-open, because those mean
+  // "no prompt could be shown", not "the human walked away".
+  const isDismissed = (error: unknown): boolean => questionErrorCode(error) === 'ASK_ABORTED'
   const confirmSkillWrite = async (request: WriteConfirmRequest, exec: SkillToolExec): Promise<boolean> => {
     const questions = probe.get('userQuestions')
     if (questions === undefined) return confirmUnavailable('no user-questions service is mounted')
@@ -370,6 +376,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       try {
         return confirmedBy(await ask(declared), request.question.id, request.confirmLabel)
       } catch (error) {
+        if (isDismissed(error)) return false
         if (questionErrorCode(error) !== 'CALLER_NOT_LIVE') return confirmUnavailable(reasonOfError(error))
       }
     }
@@ -378,7 +385,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     try {
       return confirmedBy(await ask(located), request.question.id, request.confirmLabel)
     } catch (error) {
-      return confirmUnavailable(reasonOfError(error))
+      return isDismissed(error) ? false : confirmUnavailable(reasonOfError(error))
     }
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())

@@ -9,8 +9,11 @@
  * The READER is not here either: `tool-dispatch.collectReadSkillNames(events)` folds a session log
  * into the names read through a non-failed dispatch — the review's old session-shaped copy was a
  * line-for-line duplicate of it. What this module adds over it is the session-shaped ADAPTER
- * (`sessionReadSkillNames`), because two callers need the same answer to "which accessor does this
- * platform generation expose, and what does an unreadable session mean".
+ * (`sessionReadSkillNames`), for the ONE caller that holds a session only STRUCTURALLY (the tool
+ * path's gate, whose exec view may be a bare stub): it answers "which accessor, and what does an
+ * unreadable session mean" — `undefined`, so the gate keeps its previous behavior instead of
+ * refusing every write. The review path reads a real platform `Session` and calls the reader
+ * directly; a fallback there would be dead code for an impossible case.
  *
  * v32 REV-06(a) is preserved by the dispatch normalizer: a skill counts as READ only when its read
  * did not fail, so a failed/timeout read cannot pass the gate and let a writer blind-overwrite

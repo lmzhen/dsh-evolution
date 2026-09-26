@@ -25,7 +25,8 @@ import { tempHome } from '../../test-support/temp-home.ts'
  *  1. `foldTurn` (evolution-core) — the review signal fold.
  *  2. `recentSessionActive` (evolution-curator) — the pre-run idle gate, reached
  *     through the curator's public `run()`.
- *  3. `collectReadSkillNames` (evolution-review) — the read-before-write credit,
+ *  3. `collectReadSkillNames` (evolution-core/tool-dispatch.ts — it moved there, and the tool
+ *     path's admission gate reads the same fold) — the read-before-write credit,
  *     observed through the plan the review actually applies.
  *
  * Reverting any of the three to `.events` makes this file fail: the first two

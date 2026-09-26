@@ -63,8 +63,11 @@ export interface WriteConfirmRequest {
  */
 export type WriteConfirm = (request: WriteConfirmRequest) => Promise<boolean>
 
-/** The scalar fields the tool schema types as strings; the replay channel has no schema. */
-const SCALAR_ARG_FIELDS = ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const
+/** The scalar fields the tool schema types as strings; the replay channel has no schema.
+ * `action` is one of them: a non-string action used to fall through to the library as "Unknown
+ * action" while the read gate re-defaulted it to `patch` and refused with E-318 (review
+ * 2026-09-26, P2), so the shape gate refuses it by name instead. */
+const SCALAR_ARG_FIELDS = ['action', 'name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const
 
 /** What every gate reads. */
 export interface WriteGateContext {
@@ -80,7 +83,9 @@ export interface WriteGateContext {
   readonly readNames: ReadonlySet<string> | undefined
   /** The human confirm seam — read only by the gates that apply to `'admission'`. */
   readonly confirm: WriteConfirm | undefined
-  /** Report a degraded gate; called at most once per write, and must not throw. */
+  /** Report a degraded gate; must not throw. The implementation decides how often it speaks — the
+   * shipped seam latches once per PROCESS, because the conditions it reports (no question service,
+   * an unreadable session log) belong to the deployment, not to one write. */
   readonly warn: (message: string) => void
 }
 
@@ -126,7 +131,11 @@ function gateArgsOf(args: unknown): GateArgs {
   return {
     action: typeof action === 'string' ? action : undefined,
     name: typeof name === 'string' ? name : '',
-    absorbedInto: typeof absorbedInto === 'string' ? absorbedInto : undefined,
+    // A BLANK absorbed_into is absent: the plan validator reads it the same way
+    // (`!(op.absorbed_into ?? '').trim()`), and the archive call itself is truthiness-based
+    // (`args.absorbed_into ? { absorbedInto } : {}`) — so `''` performs a BARE archive and must not
+    // borrow the merge exemption (review 2026-09-26, P1).
+    absorbedInto: typeof absorbedInto === 'string' && absorbedInto.trim() !== '' ? absorbedInto : undefined,
     scalars,
   }
 }
@@ -211,10 +220,12 @@ const READ_BEFORE_WRITE: WriteGate = {
       warn('skill_manage: the read-before-write check could not run for this call — the session log is not readable here, so the write is allowed.')
       return null
     }
-    // A missing action stays ABSENT: the rule defaults an absent action to `patch` (V6-26), which
-    // an explicitly passed `action: undefined` would not reproduce.
-    const op = view.action === undefined ? { name: view.name } : { action: view.action, name: view.name }
-    if (!isUnreadWrite(op, readNames)) return null
+    // A missing action is NOT this gate's business: the tool schema requires one, so an absent
+    // action is a malformed call whose refusal the LIBRARY owns ("Unknown action") — answering
+    // E-318 would send the model to read a skill for a call that cannot work (review 2026-09-26,
+    // P2). The rule's default-to-`patch` (V6-26) stays where it belongs, on the plan path.
+    if (view.action === undefined) return null
+    if (!isUnreadWrite({ action: view.action, name: view.name }, readNames)) return null
     return errorText('e-318-skill-write-without-a-read', { a1: view.name })
   },
 }
