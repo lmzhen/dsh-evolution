@@ -37,6 +37,19 @@ export const inject = ['tools', 'skillUsage', 'evolutionIo']
  * (a cap, not a per-group limit) — the one named bound for the slice below. */
 const MAX_DEDUP_GROUPS_IN_REVIEW = 3
 
+/** B4 (design §4.3): the prompt variable that carries the protected-skill list into the guidance
+ * section. Names must match the platform's `[a-z][a-z0-9_]*` reference syntax. */
+const PROTECTED_SKILLS_VARIABLE = 'evolution_skill_guard'
+
+/** Names shown inline before the line collapses to a count — the guidance is in EVERY request, so
+ * the line is bounded even when the policy protects a long list. */
+const PROTECTED_SKILLS_INLINE_MAX = 12
+
+/** The guidance section's text: `SKILLS_GUIDANCE` followed by the variable reference. Composed HERE
+ * rather than inside the core constant, because the review prompts share that constant and no
+ * variable is registered for them. */
+const GUIDANCE_WITH_GUARD = `${SKILLS_GUIDANCE}{{${PROTECTED_SKILLS_VARIABLE}}}`
+
 export interface Config {
   /** Skill tree root; empty uses $DSH_HOME/skills. Align with skill-usage/catalog rows. */
   root?: string
@@ -263,14 +276,57 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // dependency strength (M-7).
   // P2-13 (v16): the REAL upstream type (family-completes the v15 batch —
   // tool-memory was migrated, this call site was missed).
-  const systemPrompt = ctx.get('systemPrompt') as { section(section: PromptSection): () => void } | undefined
+  const systemPrompt = ctx.get('systemPrompt') as {
+    section(section: PromptSection): () => void
+    /** B4: the platform's variable seam — the provider runs SYNCHRONOUSLY at every assembly. */
+    variable(name: string, provider: (context: unknown) => string | undefined): () => void
+  } | undefined
   if (systemPrompt) {
-    ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: SKILLS_GUIDANCE_SECTION_ORDER, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
+    // B4 (design §4.3): the protected-skill list is deployment state that changes without a reload,
+    // so it rides a prompt VARIABLE instead of baked section text. ONE effect registers the variable
+    // and the section together: the platform throws on a section that references an unregistered
+    // variable (system-prompt/src/index.ts:344), so a window holding only one of the two would fail
+    // every request assembled during it. The section is disposed first, the variable last.
+    ctx.effect(() => {
+      const disposeVariable = systemPrompt.variable(PROTECTED_SKILLS_VARIABLE, () => protectedSkillsLine())
+      const disposeSection = systemPrompt.section({
+        name: 'evolution-skills-guidance',
+        order: SKILLS_GUIDANCE_SECTION_ORDER,
+        text: GUIDANCE_WITH_GUARD,
+      })
+      return () => {
+        disposeSection()
+        disposeVariable()
+      }
+    }, 'tool-skill-manage.skills-guidance')
   }
   /** The policy snapshot's protected list, or `undefined` when the row is not mounted — read by
    * the write gates at BOTH points, through the one unknown-boundary helper above. */
   const protectedSkillNamesOf = (): readonly string[] | undefined =>
     policySnapshotOf(ctx.get('evolutionPolicy'))?.protectedSkillNames
+  /**
+   * The protected-skill line appended to the skills guidance (B4, design §4.3).
+   *
+   * The list is otherwise visible only to the REVIEW prompts, so the tool-path model could learn a
+   * name was protected only by having a write refused — this line is what lets it avoid the call.
+   * It returns `''` — never `undefined`, which the platform refuses to render — when no policy
+   * row is mounted or nothing is protected, and the empty value leaves the section byte-identical
+   * to the guidance alone, so the guidance's prefix-cache stability is untouched.
+   * @returns the line including the newline that joins it to the guidance.
+   */
+  const protectedSkillsLine = (): string => {
+    try {
+      const names = protectedSkillNamesOf() ?? []
+      if (names.length === 0) return ''
+      const shown = names.slice(0, PROTECTED_SKILLS_INLINE_MAX)
+      const rest = names.length - shown.length
+      return `\nProtected skills (do not edit): ${shown.join(', ')}${rest > 0 ? `, and ${rest} more` : ''}`
+    } catch {
+      // The provider runs INSIDE prompt assembly: a throw here would fail every request of the
+      // deployment, so an unreadable policy costs this line and never the prompt.
+      return ''
+    }
+  }
   // A gate that degrades (the session log is not readable in this composition) warns ONCE: the
   // condition belongs to the deployment, not to the write.
   let writeGateWarned = false

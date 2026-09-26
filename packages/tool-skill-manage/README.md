@@ -6,7 +6,7 @@ library nor its lifecycle rules.
 
 ## Model surface
 
-- **Model-visible:** the `skill_manage` tool schema and its success/validation messages; result tokens scale with what is returned.
+- **Model-visible:** the `skill_manage` tool schema and its success/validation messages; result tokens scale with what is returned. The skills-guidance section (`evolution-skills-guidance`) ends with the policy's protected-skill list, carried by the prompt variable `evolution_skill_guard`: the provider runs at EVERY assembly (a policy change needs no reload), and an empty list leaves the section byte-identical to the guidance alone, so the guidance's prefix-cache behaviour is unchanged.
 - **Prompt prefix / KV cache:** the tool schema is prefix-stable, and skill writes do not alter the current request prompt; catalog invalidation affects the next request; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `tool-skill-manage` row, carried by the `evolution-all` and one-click `evolution-preset` bundles and the Evolution agent preset delta.
 

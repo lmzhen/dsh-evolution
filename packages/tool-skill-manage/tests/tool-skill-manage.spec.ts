@@ -9,6 +9,7 @@ import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -86,6 +87,37 @@ describe('tool-skill-manage', () => {
     const rendered = (assembly.sections ?? []).map(s => (typeof s === 'string' ? s : s.text)).join('\n')
     expect(rendered).toContain('Skills guidance:')
     expect(rendered).toContain('don\'t wait to be asked')
+    await ctx.fiber.dispose()
+  })
+
+  it('B4: the guidance carries the policy protected list, and reads it at every assembly', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guard-')) })
+    await ctx.plugin(ToolSkillManage)
+    let protectedNames: string[] = []
+    ctx.provide('evolutionPolicy', { get: () => ({ protectedSkillNames: protectedNames }) })
+    // renderPrompt is where the platform interpolates sections and drops empty ones — the raw
+    // assembly still carries the reference text.
+    const rendered = async (): Promise<string> => renderPrompt(await ctx.systemPrompt.assemble())
+    // No protected names: the variable renders empty, the section is the guidance verbatim, and no
+    // unresolved `{{...}}` reference may survive into a request.
+    const bare = await rendered()
+    expect(bare).toContain('Skills guidance:')
+    expect(bare).not.toContain('Protected skills')
+    expect(bare).not.toContain('{{')
+    protectedNames = ['alpha', 'beta']
+    const guarded = await rendered()
+    expect(guarded).toContain('Protected skills (do not edit): alpha, beta')
+    expect(guarded).not.toContain('{{')
+    // The provider is read at EVERY assembly, so a policy change needs neither a reload nor a
+    // restart — and the stale names cannot linger in the next request.
+    protectedNames = ['gamma']
+    const changed = await rendered()
+    expect(changed).toContain('Protected skills (do not edit): gamma')
+    expect(changed).not.toContain('alpha')
     await ctx.fiber.dispose()
   })
 
