@@ -138,7 +138,10 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
       && isOptionalCount((item as EvolutionActivityRecord).skippedUnread)
       && isOptionalCount((item as EvolutionActivityRecord).executionFailures)
       && isOptionalCount((item as EvolutionActivityRecord).evidenceQuotes)
-      && isOptionalCount((item as EvolutionActivityRecord).estimatedInputChars))
+      && isOptionalCount((item as EvolutionActivityRecord).estimatedInputChars)
+      // 0.10.0: the evidence-class dimension is a count like its siblings — a hand-edited sidecar
+      // that puts a string here is dropped, not half-parsed into a report that renders it raw.
+      && isOptionalCount((item as EvolutionActivityRecord).evidenceClassReports))
   } catch {
     // Unparsable bytes fold to empty so every READER stays total; the single
     // WRITE path (see apply) quarantines those bytes before it can overwrite

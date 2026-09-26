@@ -7,7 +7,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import type { EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
-import { DEFAULT_SKILL_LIMITS, SkillLibrary, blobPath, computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, SkillLibrary, blobPath, computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, historyIndexFile, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, parseHistoryIndex, saveSuppressedNames, saveUsage, loadUsage, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 import { tempHome } from '../../test-support/temp-home.ts'
 
@@ -117,6 +117,123 @@ describe('evolution-curator', () => {
     expect(missingBlob.message).toContain('could not be read')
   })
 
+  it('undo follows the CHAIN when two writers interleaved the index (review P1)', async () => {
+    await tempHome('dsh-curator-undo-chain-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: chain-skill\ndescription: chain fixture\n---\n${text}\n`
+    await library.create('chain-skill', body('One.'))
+    await library.update('chain-skill', body('Two.'))
+    await library.update('chain-skill', body('Three.'))
+    // Simulate the interleaving a second writer produces: the index holds the right entries but in
+    // the wrong APPEND order (v3 landed before v2). The chain links still say what replaced what.
+    const index = historyIndexFile(root, 'chain-skill')
+    const io = nodeEvolutionIo()
+    const stored = parseHistoryIndex(await io.readText(index))
+    expect(stored).toHaveLength(3)
+    const inverted = [stored[0]!, stored[2]!, stored[1]!]
+    await io.writeText(index, JSON.stringify({ version: 1, versions: inverted }, null, 2))
+    // The live content is 'Three.' (v3). Undo must go back to v2 ('Two.'), NOT to whatever the tail
+    // of the stored array happens to be.
+    const undone = await ctx.evolutionCurator.undo('chain-skill')
+    expect(undone.ok, undone.message).toBe(true)
+    expect(undone.message).toContain('undone to v2')
+    expect(await library.read('chain-skill')).toContain('Two.')
+  })
+
+  it('undo says nothing was written when the target already IS the live content (review P2)', async () => {
+    await tempHome('dsh-curator-undo-noop-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: noop-skill\ndescription: noop fixture\n---\n${text}\n`
+    await library.create('noop-skill', body('One.'))
+    await library.update('noop-skill', body('Two.'))
+    // v2 IS the live content: the anchored write is a no-op, so the result must not claim a version.
+    const before = await ctx.evolutionCurator.history('noop-skill')
+    const noop = await ctx.evolutionCurator.undo('noop-skill', 2)
+    expect(noop.ok, noop.message).toBe(true)
+    expect(noop.message).toContain('already holds the content of v2')
+    expect(noop.message).not.toContain('itself a new version')
+    expect(await ctx.evolutionCurator.history('noop-skill')).toHaveLength(before.length)
+  })
+
+  it('undo names an out-of-range --to as missing from the history, not as a lost blob (review P2)', async () => {
+    await tempHome('dsh-curator-undo-range-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 1 })
+    const body = (text: string): string => `---\nname: range-skill\ndescription: range fixture\n---\n${text}\n`
+    await library.create('range-skill', body('One.'))
+    await library.update('range-skill', body('Two.'))
+    await library.update('range-skill', body('Three.'))
+    // keep=1: v1 and v2 were trimmed out of the index entirely.
+    expect((await ctx.evolutionCurator.history('range-skill')).map(entry => entry.v)).toEqual([3])
+    const missing = await ctx.evolutionCurator.undo('range-skill', 1)
+    expect(missing.ok).toBe(false)
+    expect(missing.message).toContain('is not in the recorded history')
+    expect(missing.message).not.toContain('could not be read')
+  })
+
+  it('undo refuses and changes nothing when the skill moved under it (anchor, design §3B)', async () => {
+    await tempHome('dsh-curator-undo-anchor-')
+    const ctx = new Context()
+    // A racing provider: the io the curator reads through changes the file AFTER handing back the
+    // bytes undo anchors on, which is exactly the concurrent-writer window the anchor exists for.
+    const base = nodeEvolutionIo()
+    let arm = false
+    const racing = {
+      name: 'racing',
+      readText: async (path: string) => {
+        const raw = await base.readText(path)
+        if (arm && path.endsWith('SKILL.md')) {
+          arm = false
+          await base.writeText(path, '---\nname: anchor-skill\ndescription: anchor fixture\n---\nRaced.\n')
+        }
+        return raw
+      },
+      writeText: (path: string, content: string) => base.writeText(path, content),
+      remove: (path: string) => base.remove(path),
+      list: (path: string) => base.list(path),
+      exists: (path: string) => base.exists(path),
+      rename: (path: string, destination: string) => base.rename(path, destination),
+      copy: (path: string, destination: string) => base.copy(path, destination),
+      size: (path: string) => base.size?.(path) ?? Promise.resolve(null),
+      mtime: (path: string) => base.mtime?.(path) ?? Promise.resolve(null),
+      isSymlink: (path: string) => base.isSymlink?.(path) ?? Promise.resolve(null),
+      ...base.transact === undefined ? {} : {
+        transact: (path: string, task: (current: string | null) => Promise<string | null>) => base.transact!(path, task),
+      },
+    }
+    await ctx.plugin(EvolutionIoRegistry)
+    ctx.evolutionIo.registerProvider(racing, { default: true })
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: anchor-skill\ndescription: anchor fixture\n---\n${text}\n`
+    await library.create('anchor-skill', body('One.'))
+    await library.update('anchor-skill', body('Two.'))
+    arm = true
+    const raced = await ctx.evolutionCurator.undo('anchor-skill')
+    expect(raced.ok).toBe(false)
+    // The library's own stale verdict (the curator returns it unchanged: its wording belongs to the
+    // write path, not to this service).
+    expect(raced.message).toContain('changed since it was read')
+    // The racing writer's content is what is on disk: undo did NOT overwrite it.
+    expect(await library.read('anchor-skill')).toContain('Raced.')
+    expect(await library.read('anchor-skill')).not.toContain('One.')
+  })
   it('starts stopped by default, runs manually, and persists a run report', async () => {
     await tempHome('dsh-curator-')
     const ctx = new Context()

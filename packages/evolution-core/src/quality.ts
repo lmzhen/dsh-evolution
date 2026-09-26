@@ -154,11 +154,12 @@ export interface SimilarityInput {
 /**
  * The declared projection: WHICH text a comparison weighs.
  *
- * `body` is the library-wide scan's projection (whole SKILL.md, costs a body
- * read). `summary` is name + description in one string — the projection a
+ * `body` is the library-wide scan's projection (whole SKILL.md, read by the
+ * caller). `summary` is name + description in one string — the projection a
  * listing already publishes (`SkillSummary` carries both fields, and a body is
- * attached only when the caller asks for it), which is what makes the
- * create-time duplicate hint cost no extra read.
+ * attached only when the caller asks for it) — so a summary comparison never
+ * reads a body OF ITS OWN: the create-time hint is fed by the listing pass the
+ * tool already pays for its frontmatter, and calls no read of its own.
  */
 export function projectionText(projection: SimilarityProjection, input: SimilarityInput): string {
   switch (projection) {
@@ -305,8 +306,8 @@ export function computeDedupGroups(input: {
  * It is the SAME {@link affinity} question as the library-wide scan, asked over
  * the `summary` projection — the one a listing already publishes
  * (`SkillSummary` carries `name` and `description`; nothing here can see a
- * body, which is the point: a create must not pay a whole-tree body read to warn
- * about a copy). Deliberately hint-only: the caller writes regardless, and the
+ * body, which is the point: a create must not pay a SECOND whole-tree pass — the
+ * listing's own frontmatter read is what feeds this comparison). Deliberately hint-only: the caller writes regardless, and the
  * matches are news, not a gate (G4 — the create-time foreground behavior is
  * unchanged).
  *

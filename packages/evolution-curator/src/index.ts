@@ -2056,23 +2056,46 @@ export class EvolutionCurator extends Service {
     if (target === undefined) {
       return { ok: false, message: `"${name}" is already at its recorded content — no earlier version to undo to.` }
     }
+    // An explicit --to can name a version the index no longer carries (retention trimmed it, or the
+    // number never existed). Say THAT: the read cannot tell it apart from a lost blob, and the old
+    // wording asserted the blob cause for both.
+    if (!versions.some(candidate => candidate.v === target)) {
+      const listed = versions.map(candidate => `v${candidate.v}`).join(', ')
+      return { ok: false, message: `Version v${target} of "${name}" is not in the recorded history (recorded: ${listed === '' ? 'none' : listed}).` }
+    }
     const content = await this.skills.readVersion(name, target)
     if (content === null) {
-      return { ok: false, message: `Version v${target} of "${name}" could not be read (the index lists it, the blob does not) — refusing rather than writing a guess.` }
+      return { ok: false, message: `Version v${target} of "${name}" is listed in the index but its stored content could not be read — refusing rather than writing a guess.` }
     }
     // The anchor is the bytes we just read: a concurrent change between the read and the write is
     // refused by the library, which is the same protection every other staged write gets.
     const anchor: WriteAnchor = { sha256: liveHash }
     const result = await this.skills.update(name, content, 'foreground', anchor)
     if (!result.ok) return result
+    // The library answers `noop` when the target content already equals the live bytes (a --to naming
+    // the live version is the ordinary way there): reporting "this undo is itself a new version" for a
+    // write that never happened would be false.
+    if (result.noop === true) {
+      return { ok: true, message: `"${name}" already holds the content of v${target} — nothing was written and no new version was recorded.` }
+    }
     return {
       ok: true,
       message: `${result.message} (undone to v${target} — content only: markers, usage counts and curation state are unchanged, and this undo is itself a new version.)`,
     }
   }
 
-  /** The newest version whose content differs from the live bytes, or undefined when none does. */
+  /** The content the live bytes replaced: the CHAIN first, the recorded order as the fallback.
+   *
+   * Every entry written from 0.10.0 on carries `beforeHash`, read under the content lock, so the link
+   * survives two writers of one skill appending their versions out of order. The tail scan stays for
+   * entries written before the link existed and for a live body no version recorded (a hand-edited
+   * tree): the newest version whose content differs from the live bytes. */
   private previousVersionOf(versions: readonly SkillVersion[], liveHash: string): number | undefined {
+    const live = [...versions].reverse().find(entry => entry.hash === liveHash)
+    if (live?.beforeHash !== undefined) {
+      const predecessor = [...versions].reverse().find(entry => entry.hash === live.beforeHash)
+      if (predecessor !== undefined) return predecessor.v
+    }
     for (let index = versions.length - 1; index >= 0; index -= 1) {
       const entry = versions[index]
       if (entry !== undefined && entry.hash !== liveHash) return entry.v

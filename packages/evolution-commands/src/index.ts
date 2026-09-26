@@ -9,7 +9,7 @@ import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, orderVersions, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
@@ -396,8 +396,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const versions = await curator.history(name)
           if (versions.length === 0) return ok(`No content versions are recorded for "${name}" yet — they appear after the next write through skill_manage.`)
-          const rows = versions.map(entry => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}`)
-          return ok([`Content versions for "${name}" (oldest first, ${versions.length} of at most the retained count):`, ...rows].join('\n'))
+          // Content order, not append order: two writers of one skill can interleave their index
+          // appends, and every entry written from 0.10.0 on links the version it replaced.
+          const ordered = orderVersions(versions)
+          const rows = ordered.map(entry => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}`)
+          return ok([`Content versions for "${name}" (oldest first, ${ordered.length} of at most the retained count):`, ...rows].join('\n'))
         }
         if (input.startsWith('skill undo ')) {
           const rest = input.slice(11).trim()

@@ -77,10 +77,11 @@ viewer, which is why the authoring feedback names the bar rather than treating t
 A `create` compares its candidate against the library listing before it writes, over the name +
 description projection (core `nearDuplicateSummaries`, at `SUMMARY_DUPLICATE_HINT_THRESHOLD`), and
 names the closest existing skills in the same "Authoring check" block. Three properties are
-deliberate: it reads NO skill body (the listing already publishes the description, and a create must
-not pay a whole-tree body read to warn about a copy); it is a HINT (the write proceeds — only the
-model's next decision changes); and a listing failure degrades to a named line instead of silence,
-because "nothing similar was checked" and "nothing similar exists" must not look alike. The
+deliberate: it adds no read of its own (`library.list()` already reads every SKILL.md to parse
+its frontmatter — that listing is what publishes `description` — and the hint never calls
+`library.read`, never holds a body and never compares content); it is a HINT (the write proceeds
+— only the model's next decision changes); and a listing failure degrades to a named line instead of
+silence, because "nothing similar was checked" and "nothing similar exists" must not look alike. The
 library-wide BODY scan stays where it was, in the `review` action.
 
 ### The retention line

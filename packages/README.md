@@ -36,7 +36,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 
 | Package | Role |
 |---|---|
-| `evolution-core` | Shared pure stores/prompts/signals/constants; no main Cordis plugin entry (importing the package root is the only entry) |
+| `evolution-core` | Shared pure stores/prompts/signals/constants plus the skill content history (`skill-history.ts`), the two named similarity questions (`quality.ts`) and the session-frame classification (`evidence.ts`); no main Cordis plugin entry (importing the package root is the only entry) |
 | `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
@@ -358,7 +358,10 @@ joins only when mounted (D-30):
    live writer's lock is skipped, recorded in the snapshot manifest, and
    reported as not-restored by a later restore).
 4. Review plans require event-sequence evidence bounded by the session seq;
-   invalid ops are dropped while valid ops still apply.
+   invalid ops are dropped while valid ops still apply. Since 0.10.0 the plan path ALSO reports — never drops — an op
+   whose whole evidence list cites a turn/step boundary frame: the range rule cannot tell such a frame from a real
+   exchange, so phase 1 measures the difference before anyone refuses on it (`EVIDENCE_CLASS`, counted in
+   `evolution/plan-applied` as `evidenceClassReports`).
 5. Provider seams (`ctx.evolutionIo`, `ctx.evolutionStateStorage`) keep media
    decisions out of policy code; media providers perform no node:fs IO of
    their own (commands' preset/doctor helpers are the explicit direct-fs exception).
@@ -375,6 +378,7 @@ being bypassed. (v14 audit §7.)
 | New memory backend | `ctx.memory.registerProvider` | `snapshot()` **and** `renderContext()` must both be single-generation (v14 P2-3) |
 | New threat rule | `evolution-core/threats.ts` `PATTERNS` row + `scope` | one false-positive and one true-positive case; add the label to the exemption surface if it can be benign |
 | New `/evolution` subcommand | `evolution-commands/src/registry.ts` row + handler | the README command table is rendered from this table (T-WD2 pins it) |
+| New plan-path rule | `evolution-plan-validator/src/index.ts` `PLAN_RULES` row (the memory/skill table, in the order the model meets the questions) | one case per table it joins; a report-only row needs its context field and a caller that passes it |
 | New model-facing tool | the tool package + the `evolution-agent` delta row (+ a bundle row only if every session needs it) | tool description must name the real fields/tools; unit test on the tool surface |
 | New agent-preset row | `evolution-agent/agent.cordis.yml` (delta only) | never repeat a host-owned row; `composePresetComposition` / installer byte-parity test |
 | Upstream platform bump | `UPSTREAM_SHA` + `PLATFORM_VERSION` + the name-collision check | CI baseline **and** released-compat chains; re-verify the seams listed in the audit report §3 |

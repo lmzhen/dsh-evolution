@@ -13,6 +13,12 @@ section, and importing the package root is its only entry.
 
 - This package is a library, not a Cordis row; do not mount it as a plugin.
 - 数值配置已在消费方 Config 面钳制（`min 1`/各字段域）；`MemoryStore` 内部对 `limit <= 0` 仍按 unbounded 防御处理——那是库内部防御，不构成"0 = 禁用"的配置语义。
+- **Content-history storage grows with the number of DISTINCT bodies a skill has ever been written
+  with, not with the retained count.** Trimming drops index entries; the blobs they point at stay on
+  disk (they are shared by content, so a reference count would have to span every skill's index, and no
+  sweeper exists yet). Measured on a 3.6 KB skill written 41 times: a 5.7 KB index over 20 entries and
+  41 blob files totalling 150 KB (41x the live body); unchanged writes add nothing. Plan disk accordingly
+  or remove `.history/blobs` entries by hand.
 - Skill-library writes are serialized in-process; cross-process writers to the SAME skill file must go through the single-file paths (`update`, `patch`, `writeSupportFile`). The full concurrency model, its two-phase exceptions and their provenance are in Notes and history.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).

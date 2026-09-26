@@ -753,9 +753,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * core's `summary` projection (name + description). Three properties are the
    * design's, not stylistic choices:
    *
-   *   - NO body is read. `library.list()` publishes `description`; bodies are
-   *     attached only when a caller asks for them, and this one does not. The
-   *     hint therefore cannot cost a whole-tree body read on a create.
+   *   - It adds NO read of its own. `library.list()` reads each SKILL.md to parse its
+   *     frontmatter — that listing is what publishes `description` — and the hint never
+   *     calls `library.read`, never holds a body and never compares content, so a create
+   *     pays no SECOND whole-tree pass for it.
    *   - It is a HINT: the write proceeds either way (G4 — create's foreground
    *     behavior is unchanged). The model gets the news, not a refusal.
    *   - A failed listing degrades to a NAMED line, never to silence: "nothing

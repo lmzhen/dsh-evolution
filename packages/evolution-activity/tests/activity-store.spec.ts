@@ -318,6 +318,17 @@ function serialize(items: EvolutionActivityRecord[]): string {
     expect(items[0]).toMatchObject({ memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 })
     await ctx.fiber.dispose()
   })
+  it('D: a hand-edited sidecar entry with a non-numeric evidence-class field is DROPPED, like its siblings', () => {
+    // The read barrier validates every optional count; the newest dimension must not be the one
+    // field that reaches a report as a raw string.
+    const base = applyActivityEvent([], payload(), DEFAULT_MAX_ITEMS, 1000)[0]!
+    const poisoned = { ...base, evidenceClassReports: 'not-a-number' } as unknown as typeof base
+    expect(parseActivityContent(serializeActivity([poisoned]))).toEqual([])
+    // Control: the same shape with its sibling field is dropped too (the discipline is uniform).
+    expect(parseActivityContent(serializeActivity([{ ...base, evidenceQuotes: 'not-a-number' } as unknown as typeof base]))).toEqual([])
+    // A finite number still parses.
+    expect(parseActivityContent(serializeActivity([{ ...base, evidenceClassReports: 2 }]))[0]?.evidenceClassReports).toBe(2)
+  })
   it('D: the evidence-class dimension folds into the record and keeps the key ABSENT when the payload omits it', { timeout: 20_000 }, async () => {
     // Phase 1 of the plan path's evidence-class rule is an OBSERVATION WINDOW, so the
     // dimension has to survive into the sidecar an operator actually reads.

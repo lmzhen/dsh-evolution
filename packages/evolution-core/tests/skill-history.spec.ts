@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { DEFAULT_SKILL_LIMITS } from '../src/limits.ts'
 import { nodeEvolutionIo } from '../src/io.ts'
 import { SkillLibrary } from '../src/skill-store.ts'
+import { contentHash } from '../src/mutations.ts'
 import {
   BASELINE_ACTION,
   contentRetentionFeedback,
@@ -18,7 +19,9 @@ import {
   historyIndexFile,
   loadVersions,
   nextHistoryIndex,
+  orderVersions,
   parseHistoryIndex,
+  readHistoryIndex,
   loadVersionContent,
   recordVersions,
   RETENTION_FEEDBACK_MIN_CHARS,
@@ -170,6 +173,121 @@ describe('skill-history: the library records what it writes', () => {
     }
   })
 
+  it('recordVersions writes the index under the history directory, versioned', async () => {
+    const root = await tempRoot('dsh-skill-history-record-')
+    const io = nodeEvolutionIo()
+    try {
+      const recorded = await recordVersions(root, io, { skillName: 'raw', action: 'create', before: null, after: 'body', at: 'T' }, 20)
+      expect(recorded).toEqual({ afterVersion: 1 })
+      const raw = await io.readText(historyIndexFile(root, 'raw'))
+      expect(raw).toContain(`"version": ${HISTORY_INDEX_VERSION}`)
+      expect(raw).toContain('"action": "create"')
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+})
+
+describe('skill-history: the chain link survives interleaved writers (review P1)', () => {
+  it('records the replaced content, and asks the WHOLE index before minting a baseline', () => {
+    // The predecessor sits two entries back — the shape two writers of one skill produce when their
+    // audits land out of order. A tail test would mint a bogus baseline here.
+    const first = 'first body'
+    const second = 'second body'
+    const third = 'third body'
+    const interleaved: SkillVersion[] = [
+      { v: 1, at: 'T1', action: 'create', hash: contentHash(first), chars: first.length },
+      { v: 2, at: 'T2', action: 'update', hash: contentHash(second), chars: second.length, beforeHash: contentHash(first) },
+      { v: 3, at: 'T3', action: 'update', hash: contentHash(third), chars: third.length, beforeHash: contentHash(second) },
+    ]
+    const grown = nextHistoryIndex(interleaved, { skillName: 's', action: 'update', before: second, after: 'fourth body', at: 'T4' }, 20)
+    // No baseline: a version with the predecessor's hash is already recorded.
+    expect(grown.versions.filter(entry => entry.action === BASELINE_ACTION)).toEqual([])
+    expect(grown.versions).toHaveLength(4)
+    const written = grown.versions[3]!
+    expect(written.action).toBe('update')
+    expect(written.beforeHash).toBe(contentHash(second))
+  })
+
+  it('orderVersions rebuilds content order from the chain, and keeps the stored order when the chain is broken', () => {
+    // An index whose APPEND order is wrong: v3 landed before v2 (two writers, audits out of order).
+    const inverted: SkillVersion[] = [
+      { v: 1, at: 'T1', action: 'create', hash: 'aaa', chars: 3 },
+      { v: 3, at: 'T3', action: 'update', hash: 'ccc', chars: 3, beforeHash: 'bbb' },
+      { v: 2, at: 'T2', action: 'update', hash: 'bbb', chars: 3, beforeHash: 'aaa' },
+    ]
+    expect(orderVersions(inverted).map(entry => entry.v)).toEqual([1, 2, 3])
+    // A broken chain (an entry written before the link existed) is left exactly as stored.
+    const broken: SkillVersion[] = [
+      { v: 1, at: 'T1', action: 'create', hash: 'aaa', chars: 3 },
+      { v: 2, at: 'T2', action: 'update', hash: 'bbb', chars: 3 },
+    ]
+    expect(orderVersions(broken).map(entry => entry.v)).toEqual([1, 2])
+    expect(orderVersions([])).toEqual([])
+  })
+
+  it('reads an index nobody can understand as UNREADABLE, and a real one as ok', () => {
+    expect(readHistoryIndex(null)).toEqual({ kind: 'absent' })
+    expect(readHistoryIndex('   ')).toEqual({ kind: 'unreadable' })
+    expect(readHistoryIndex('{not json')).toEqual({ kind: 'unreadable' })
+    expect(readHistoryIndex('[1,2]')).toEqual({ kind: 'unreadable' })
+    expect(readHistoryIndex(JSON.stringify({ version: HISTORY_INDEX_VERSION + 1, versions: [] }))).toEqual({ kind: 'unreadable' })
+    // A well-formed file carrying an entry this reader would have to DROP counts as unreadable:
+    // dropping it silently is the overwrite the audit posture forbids.
+    expect(readHistoryIndex(JSON.stringify({ version: 1, versions: [{ v: 1 }] }))).toEqual({ kind: 'unreadable' })
+    const ok = readHistoryIndex(JSON.stringify({ version: 1, versions: [{ v: 1, at: 'T', action: 'create', hash: 'aaa', chars: 3, beforeHash: 'zzz' }] }))
+    expect(ok.kind).toBe('ok')
+    expect(ok.kind === 'ok' ? ok.versions[0]?.beforeHash : null).toBe('zzz')
+  })
+})
+
+describe('skill-history: an unreadable index is preserved, never overwritten (review P1)', () => {
+  it('copies the bytes it cannot understand to .corrupt and starts a fresh index', async () => {
+    const root = await tempRoot('dsh-skill-history-quarantine-')
+    const io = nodeEvolutionIo()
+    const index = historyIndexFile(root, 'legacy-skill')
+    const corrupt = '{"version":1,"versions":[{"v":7,"at":"T","action":"update","hash":"deadbeef","chars":4}'
+    await io.writeText(index, corrupt)
+    try {
+      const recorded = await recordVersions(root, io, { skillName: 'legacy-skill', action: 'update', before: 'old body', after: 'new body', at: 'T2' }, 20)
+      // The replaced body becomes v1 (a baseline the quarantined index could no longer supply), the
+      // write itself v2.
+      expect(recorded?.beforeVersion).toBe(1)
+      expect(recorded?.afterVersion).toBe(2)
+      // The old bytes are still on disk, verbatim, under the quarantine name.
+      expect(await io.readText(`${index}.corrupt`)).toBe(corrupt)
+      // And the fresh index is readable and starts from this write.
+      expect((await loadVersions(root, io, 'legacy-skill')).map(entry => entry.action)).toEqual(['baseline', 'update'])
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('REFUSES to record when the quarantine copy itself fails (the old bytes stay the only copy)', async () => {
+    const root = await tempRoot('dsh-skill-history-quarantine-fail-')
+    const base = nodeEvolutionIo()
+    const index = historyIndexFile(root, 'legacy-skill')
+    await base.writeText(index, '{not json')
+    const io = {
+      name: 'copy-fails',
+      readText: (path: string) => base.readText(path),
+      writeText: (path: string, content: string) => base.writeText(path, content),
+      remove: (path: string) => base.remove(path),
+      list: (path: string) => base.list(path),
+      exists: (path: string) => base.exists(path),
+      rename: (path: string, destination: string) => base.rename(path, destination),
+      copy: async () => { throw new Error('quarantine write refused') },
+    }
+    try {
+      await expect(recordVersions(root, io, { skillName: 'legacy-skill', action: 'update', before: 'a', after: 'b', at: 'T' }, 20)).rejects.toThrow('quarantine write refused')
+      // Nothing replaced them: the unreadable bytes are exactly what was there.
+      expect(await base.readText(index)).toBe('{not json')
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+})
+
 describe('skill-history: the retention line (design §4 item 3)', () => {
   const big = 'x'.repeat(RETENTION_FEEDBACK_MIN_CHARS)
 
@@ -210,20 +328,6 @@ describe('skill-history: the retention line (design §4 item 3)', () => {
       const grown = await lib.update('shrink-skill', skill('shrink-skill', body))
       expect(grown.ok).toBe(true)
       expect(grown.message).not.toContain('Content kept')
-    } finally {
-      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
-  })
-})
-  it('recordVersions writes the index under the history directory, versioned', async () => {
-    const root = await tempRoot('dsh-skill-history-record-')
-    const io = nodeEvolutionIo()
-    try {
-      const recorded = await recordVersions(root, io, { skillName: 'raw', action: 'create', before: null, after: 'body', at: 'T' }, 20)
-      expect(recorded).toEqual({ afterVersion: 1 })
-      const raw = await io.readText(historyIndexFile(root, 'raw'))
-      expect(raw).toContain(`"version": ${HISTORY_INDEX_VERSION}`)
-      expect(raw).toContain('"action": "create"')
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }

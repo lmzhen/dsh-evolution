@@ -14,7 +14,12 @@
  *    that already landed.
  *  - Blobs are content-addressed, so identical bodies are stored once (across skills too).
  *  - Versions are numbered by `v` (max+1), NOT by the clock: a moved system clock must not reorder
- *    history (KiroCrew's `v<N>` choice, independently arrived at).
+ *    history (KiroCrew's `v<N>` choice, independently arrived at). Numbering and the index read-modify-write run
+ *    under the INDEX's own io lock, so two writers of one skill cannot mint the same number.
+ *  - The array's ORDER is append order, and the index is appended after the content lock is released, so two
+ *    writers of ONE skill can interleave their appends. Each entry therefore carries `beforeHash` — the content
+ *    it replaced, read under that writer's lock — and that link, not the position, is what `undo` follows
+ *    ({@link orderVersions} rebuilds the content order for display when the chain is complete).
  *
  * NOT here: blob garbage collection. Trimming drops INDEX entries; orphan blobs stay until a
  * sweeper collects them, because a reference count would have to span every skill's index and that
@@ -47,6 +52,11 @@ export interface SkillVersion {
   hash: string
   /** Content length in characters, so a listing needs no blob read. */
   chars: number
+  /** The content this write REPLACED, as its hash — absent on a create, on a baseline, and on any
+   * entry written before 0.10.0. The array's ORDER is append order, which two writers of one skill
+   * can interleave (the index is appended after the content lock is released); this link is computed
+   * from the bytes a write lock actually read, so it is the authoritative predecessor. */
+  beforeHash?: string
 }
 
 /** One history write, carrying the content the caller already holds. */
@@ -62,8 +72,8 @@ export interface VersionRecordInput {
 
 /** The version numbers one write produced; a side with no content contributes nothing. */
 export interface RecordedVersions {
-  beforeVersion?: number
-  afterVersion?: number
+  beforeVersion?: number | undefined
+  afterVersion?: number | undefined
 }
 
 /** The root-level history directory. */
@@ -79,6 +89,36 @@ export function blobPath(root: string, hash: string): string {
 /** One skill's index file. */
 export function historyIndexFile(root: string, name: string): string {
   return join(historyRoot(root), 'skills', name, 'index.json')
+}
+
+/**
+ * The versions in CONTENT order (oldest first), rebuilt from the chain links, for display.
+ *
+ * The stored array is append order, which interleaves when two writers of one skill audit out of
+ * order; the links say what actually replaced what. The rebuild runs only when it can account for
+ * EVERY entry (exactly one start and a forward link for each step) — otherwise the stored order is
+ * returned unchanged, because a partial reconstruction would be a worse answer than the honest one.
+ * @param versions - the stored index, oldest first as recorded.
+ * @returns the same entries, in content order when the chain is complete.
+ */
+export function orderVersions(versions: readonly SkillVersion[]): SkillVersion[] {
+  if (versions.length < 2) return [...versions]
+  const replaced = new Set<string>()
+  for (const entry of versions) if (entry.beforeHash !== undefined) replaced.add(entry.beforeHash)
+  // The NEWEST entry is the one no write replaced; every other entry is named as someone's predecessor.
+  const ends = versions.filter(entry => !replaced.has(entry.hash))
+  if (ends.length !== 1) return [...versions]
+  const used = new Set<SkillVersion>()
+  const backward: SkillVersion[] = []
+  let cursor: SkillVersion | undefined = ends[0]
+  while (cursor !== undefined && !used.has(cursor)) {
+    used.add(cursor)
+    backward.push(cursor)
+    const before = cursor.beforeHash
+    // A hash may repeat (an undo restores earlier content): take the newest entry not yet emitted.
+    cursor = before === undefined ? undefined : [...versions].reverse().find(entry => !used.has(entry) && entry.hash === before)
+  }
+  return backward.length === versions.length ? backward.reverse() : [...versions]
 }
 
 /** Keep nothing less than one version, whatever the deployment asks for. */
@@ -102,33 +142,69 @@ function lastVersionOf(versions: readonly SkillVersion[], hash: string): number 
   return undefined
 }
 
+/** What one index file's bytes said. `absent` (no file yet) and `unreadable` (bytes that cannot be
+ * understood: malformed JSON, a foreign shape, an entry this reader would have to drop, or a writer
+ * NEWER than this reader) are DIFFERENT facts — the recorder must never replace the second with an
+ * index derived from "nothing", so it preserves those bytes instead. */
+export type HistoryIndexState =
+  | { readonly kind: 'ok'; readonly versions: SkillVersion[] }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'unreadable' }
+
+/** One entry as this reader accepts it, or null when the entry cannot be understood. */
+function readVersionEntry(entry: unknown): SkillVersion | null {
+  if (typeof entry !== 'object' || entry === null) return null
+  const candidate = entry as SkillVersion
+  if (typeof candidate.v !== 'number' || !Number.isInteger(candidate.v) || candidate.v <= 0) return null
+  if (typeof candidate.hash !== 'string' || candidate.hash === '') return null
+  if (typeof candidate.at !== 'string') return null
+  if (typeof candidate.action !== 'string') return null
+  if (typeof candidate.chars !== 'number') return null
+  // The chain link is metadata: a garbled value drops the link, not the version it belongs to.
+  return typeof candidate.beforeHash === 'string' && candidate.beforeHash !== ''
+    ? { ...candidate, beforeHash: candidate.beforeHash }
+    : { v: candidate.v, at: candidate.at, action: candidate.action, hash: candidate.hash, chars: candidate.chars }
+}
+
 /**
- * Parse one index body. Malformed content, a foreign shape, or a version NEWER than this reader all
- * read as empty — the audit posture: never overwrite what cannot be understood, and never guess.
+ * Read one index body for a RECORDER: "understood", "no file", or "cannot be understood".
+ * A file whose shape is right but which carries an entry this reader would have to drop counts as
+ * unreadable — dropping it silently would be the overwrite the audit posture forbids.
  * @param raw - the index file's bytes, or null when absent.
- * @returns the versions, oldest first.
+ * @returns the three-state answer.
  */
-export function parseHistoryIndex(raw: string | null): SkillVersion[] {
-  if (raw === null) return []
+export function readHistoryIndex(raw: string | null): HistoryIndexState {
+  if (raw === null) return { kind: 'absent' }
+  if (raw.trim() === '') return { kind: 'unreadable' }
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return []
+    return { kind: 'unreadable' }
   }
-  if (typeof parsed !== 'object' || parsed === null) return []
+  if (typeof parsed !== 'object' || parsed === null) return { kind: 'unreadable' }
   const holder = parsed as { version?: unknown; versions?: unknown }
-  if (typeof holder.version === 'number' && holder.version > HISTORY_INDEX_VERSION) return []
-  if (!Array.isArray(holder.versions)) return []
-  return holder.versions.filter((entry): entry is SkillVersion => {
-    if (typeof entry !== 'object' || entry === null) return false
-    const candidate = entry as SkillVersion
-    return typeof candidate.v === 'number' && Number.isInteger(candidate.v) && candidate.v > 0
-      && typeof candidate.hash === 'string' && candidate.hash !== ''
-      && typeof candidate.at === 'string'
-      && typeof candidate.action === 'string'
-      && typeof candidate.chars === 'number'
-  })
+  if (typeof holder.version === 'number' && holder.version > HISTORY_INDEX_VERSION) return { kind: 'unreadable' }
+  if (!Array.isArray(holder.versions)) return { kind: 'unreadable' }
+  const versions: SkillVersion[] = []
+  for (const entry of holder.versions) {
+    const version = readVersionEntry(entry)
+    if (version === null) return { kind: 'unreadable' }
+    versions.push(version)
+  }
+  return { kind: 'ok', versions }
+}
+
+/**
+ * Parse one index body for a READER. Malformed content, a foreign shape, or a version NEWER than this
+ * reader all read as empty — the audit posture: never guess. A recorder must use
+ * {@link readHistoryIndex} instead, because it has to PRESERVE bytes it cannot understand.
+ * @param raw - the index file's bytes, or null when absent.
+ * @returns the versions, oldest first.
+ */
+export function parseHistoryIndex(raw: string | null): SkillVersion[] {
+  const state = readHistoryIndex(raw)
+  return state.kind === 'ok' ? state.versions : []
 }
 
 /**
@@ -151,16 +227,24 @@ export function nextHistoryIndex(
   const beforeHash = input.before === null ? null : contentHash(input.before)
   const afterHash = input.after === null ? null : contentHash(input.after)
   const grown: SkillVersion[] = [...versions]
-  if (beforeHash !== null) {
-    const tail = grown[grown.length - 1]
-    if (tail?.hash !== beforeHash) {
-      grown.push({ v: nextVersion(grown), at: input.at, action: BASELINE_ACTION, hash: beforeHash, chars: input.before?.length ?? 0 })
-    }
+  // "Is the predecessor already recorded?" is asked of the WHOLE index, not of its tail: two writers
+  // of one skill append after releasing the content lock, so their entries can interleave — a tail
+  // test would mint a bogus baseline for a predecessor that sits two entries back.
+  if (beforeHash !== null && !grown.some(entry => entry.hash === beforeHash)) {
+    grown.push({ v: nextVersion(grown), at: input.at, action: BASELINE_ACTION, hash: beforeHash, chars: input.before?.length ?? 0 })
   }
   if (afterHash !== null) {
     const tail = grown[grown.length - 1]
     if (tail?.hash !== afterHash) {
-      grown.push({ v: nextVersion(grown), at: input.at, action: input.action, hash: afterHash, chars: input.after?.length ?? 0 })
+      grown.push({
+        v: nextVersion(grown),
+        at: input.at,
+        action: input.action,
+        hash: afterHash,
+        chars: input.after?.length ?? 0,
+        // The authoritative predecessor link: what THIS write replaced, read under the write lock.
+        ...beforeHash === null ? {} : { beforeHash },
+      })
     }
   }
   const trimmed = grown.slice(Math.max(0, grown.length - clampKeep(keep)))
@@ -276,10 +360,24 @@ export async function recordVersions(
     if (!await io.exists(path).catch(() => false)) await io.writeText(path, side)
   }
   const file = historyIndexFile(root, input.skillName)
-  let recorded: RecordedVersions = {}
+  // Bytes this reader cannot understand are PRESERVED before a fresh index replaces them (the same
+  // posture as the activity sidecar's quarantine): deriving an index from "nothing" over a corrupt or
+  // newer-reader file would drop every version it lists and orphan their blobs. If the copy itself
+  // fails, the record is abandoned — the mutation stands, the old bytes stay recoverable.
+  const probe = readHistoryIndex(await io.readText(file).catch(() => null))
+  if (probe.kind === 'unreadable') {
+    const quarantine = `${file}.corrupt`
+    await io.copy(file, quarantine)
+    console.warn(`skill-store: ${file} could not be understood (malformed, foreign, or written by a newer reader); its bytes were copied to ${quarantine} and a fresh index starts from this write`)
+  }
+  const recorded: RecordedVersions = {}
   await transactIo(io, file, (current) => {
-    const { versions, recorded: numbers } = nextHistoryIndex(parseHistoryIndex(current), input, keep)
-    recorded = numbers
+    const state = readHistoryIndex(current)
+    // A race that turned the file unreadable between the probe and this read falls back to the probe's
+    // answer (an empty index): the copy above already preserved whatever the probe saw.
+    const { versions, recorded: numbers } = nextHistoryIndex(state.kind === 'ok' ? state.versions : [], input, keep)
+    recorded.beforeVersion = numbers.beforeVersion
+    recorded.afterVersion = numbers.afterVersion
     return JSON.stringify({ version: HISTORY_INDEX_VERSION, versions }, null, 2)
   })
   return recorded
