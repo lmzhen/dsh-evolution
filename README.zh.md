@@ -28,7 +28,7 @@
 
 - **事实留得下来。** 评审会把真正重要的东西写进记忆，之后的会话自动拿到这份注入。
 - **技能会自己变好。** Agent 从真实发生过的事里修补自己的技能，计划先验证再执行——还有**技能整理**（curator）会合并近重复、归档已经没人用的。
-- **控制权始终在你手里。** 每一次写入都过威胁扫描和不可变策略；再加一个开关，每次写入都会先等你批准。技能销毁从来不是硬删除。
+- **控制权始终在你手里。** 每一次写入都过威胁扫描和不可变策略；再加一个开关，每次写入都会先等你批准。技能销毁从来不是硬删除；每次写入都留下被替换掉的那一版内容——单个技能可以退回它最近 20 版中的任意一版，不用动库里其他技能。
 - **一切看得见。** 计数、运行报告和变更日志都是 `$DSH_HOME` 下的文件。没有遥测服务——除了你本来就在发的提示词，什么都不离开你的机器。
 
 如果你想要一个完全撒手不管的黑盒，或者需要「按会话给工具、但不要 profile 级自动化」（那是安装形态 ①：各形态及其验证状态都在 `packages/INSTALL.md`），那就别装。
@@ -69,7 +69,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 |---|---|
 | 已验证的 DSH 平台线 | **`0.1.5-rc.2`**（`PLATFORM_VERSION`；`UPSTREAM_SHA=fb2c4b9e…`） |
 | 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.1.5-rc.2` |
-| 家族版本 | `0.9.0`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
+| 家族版本 | `0.10.0`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
 
 预发布 range 只认**一个**锚点，而不是一整族：`^0.1.5-rc.2` 会拒绝更晚的预发布后继版，但接受稳定版 `0.1.5`。更早的预发布线在依赖解析阶段就失败——这是支持窗口，不是 bug。
@@ -80,7 +80,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 |---|---|---|
 | **Review** | 观察会话事件，应用 substantive 门，产出经过验证的计划（`evolution-review`、`evolution-plan-validator`） | 评审发生在对话边界，不会打断任务中途 |
 | **记忆回路** | 写持久事实与用户画像，把指引注入新会话（`memory`、`memory-files`、`tool-memory`） | 新会话已经知道你的项目 |
-| **技能回路** | 通过 `skill_manage` 工具提出、写入、修补技能；目录把它们暴露给模型（`tool-skill-manage`、`evolution-skill-catalog`） | 你不必自己写的技能 |
+| **技能回路** | 通过 `skill_manage` 工具提出、写入、修补技能；目录把它们暴露给模型（`tool-skill-manage`、`evolution-skill-catalog`） | 你不必自己写的技能，而且任何单个技能都能退回上一版 |
 | **Curator**（界面卡片叫**技能整理**） | 确定性的 stale/archive 生命周期 + LLM 提名，每次运行前先快照（`evolution-curator`） | 技能库保持小而整洁，重复的被合并 |
 | **控制面** | 威胁扫描、不可变策略、可选带重放的分阶段审批（`evolution-threat`、`evolution-policy`、`evolution-approval`） | 被拒绝的写入会告诉你原因，破坏性动作绝不静默 |
 | **管道** | IO 接缝、状态 provider、事件、activity、replay、学习图谱（`evolution-io*`、`evolution-state*`、`evolution-activity`、`evolution-replay`） | 一切都是你能读、能备份、能删除的文件 |
@@ -89,7 +89,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 $DSH_HOME/evolution/events.json     追加式的反馈/用量时间线
 $DSH_HOME/evolution/review-state.json  每个会话的评审计数
 $DSH_HOME/evolution/activity.json    计划执行结果        reports/  curator 运行报告
-$DSH_HOME/skills/                    技能树（+ .usage.json）
+$DSH_HOME/skills/                    技能树（+ .usage.json 计数、.history/ 内容版本）
 $DSH_HOME/memories/                  MEMORY.md + USER.md
 ```
 
@@ -101,6 +101,7 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 - `/evolution pending` + `approve` / `reject`：分阶段写入（M2）。
 - `/evolution curator status`：上次运行与下次到期（curator 每小时 tick；默认每 168 h 到期一次，所以安静几周是正常的）。
 - `/evolution preset install [--base <name>[,<name>...]]`：生成家族 agent 预设（M4）。
+- `/evolution skill history <name>` 列出某个技能的内容版本；`/evolution skill undo <name> [--to v<N>]` 把该技能退回某一版（只动内容——冻结标记、用量计数与整理状态保持不变，撤销本身也记为新的一版）。
 - `/evolution mutations` 是写入日志；`/graph` 把技能与记忆画成图谱。
 
 完整的命令面只渲染一次，放在 `packages/README.md`（§Command reference）；环境变量与字段级旋钮的完整参考也在那里。

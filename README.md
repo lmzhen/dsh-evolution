@@ -35,7 +35,8 @@ of skills that never improve. Then:
 - **Skills improve themselves.** The agent patches its own skills from what actually happened, with plans
   validated before execution — and a curator that merges near-duplicates and archives what stopped being used.
 - **You stay in control.** Every write passes a threat scan and an immutable policy; with one flag, every write
-  also waits for your approval. Skill destruction is never a hard delete.
+  also waits for your approval. Skill destruction is never a hard delete, and every skill write keeps the content
+  it replaced — one skill goes back to any of its last 20 versions without touching the rest of the library.
 - **You can see everything.** Counters, run reports and a mutation log live in files under `$DSH_HOME`. No
   telemetry service, nothing leaves your machine except the prompts you already send.
 
@@ -83,7 +84,7 @@ state onto an empty domain.
 |---|---|
 | Validated DSH platform line | **`0.1.5-rc.2`** (`PLATFORM_VERSION`; `UPSTREAM_SHA=fb2c4b9e…`) |
 | Declared dependency window | `^0.1.5-rc.2` on every `@deepseek-ai/dsh-*` dependency/peer |
-| Family version | `0.9.0` (npm `latest`; per-form status in `packages/INSTALL.md`) |
+| Family version | `0.10.0` (npm `latest`; per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 
 A prerelease range admits **one** anchor, not a family of them: `^0.1.5-rc.2` rejects later prerelease
@@ -96,7 +97,7 @@ the support window, not a bug.
 |---|---|---|
 | **Review** | watches session events, applies the substantive gate, produces a validated plan (`evolution-review`, `evolution-plan-validator`) | reviews happen at conversation boundaries, not mid-task |
 | **Memory loop** | writes durable facts and a user profile, injects guidance into new sessions (`memory`, `memory-files`, `tool-memory`) | new sessions already know your project |
-| **Skill loop** | proposes, writes and patches skills through the `skill_manage` tool; the catalog exposes them to the model (`tool-skill-manage`, `evolution-skill-catalog`) | skills you did not have to write yourself |
+| **Skill loop** | proposes, writes and patches skills through the `skill_manage` tool; the catalog exposes them to the model (`tool-skill-manage`, `evolution-skill-catalog`) | skills you did not have to write yourself, and any one of them can be rolled back |
 | **Curator** (the **技能整理 / Skill tidy-up** card in the settings section) | deterministic stale/archive lifecycle plus LLM nomination, with a snapshot before every run (`evolution-curator`) | the library stays small and merges duplicates |
 | **Control plane** | threat scan, immutable policy, optional staged approval with replay (`evolution-threat`, `evolution-policy`, `evolution-approval`) | a refused write tells you why, and nothing destructive is silent |
 | **Plumbing** | IO seam, state providers, events, activity, replay, learning graph (`evolution-io*`, `evolution-state*`, `evolution-activity`, `evolution-replay`) | everything is a file you can read, back up or delete |
@@ -105,7 +106,7 @@ the support window, not a bug.
 $DSH_HOME/evolution/events.json      append-only feedback/usage timeline
 $DSH_HOME/evolution/review-state.json  per-session review counters
 $DSH_HOME/evolution/activity.json    plan outcomes          reports/  curator run reports
-$DSH_HOME/skills/                    the skill tree (+ .usage.json)
+$DSH_HOME/skills/                    the skill tree (+ .usage.json counters, .history/ content versions)
 $DSH_HOME/memories/                  MEMORY.md + USER.md
 ```
 
@@ -122,6 +123,9 @@ under M1, never true for a host-only install (M3), which the plugin reports once
 - `/evolution curator status` shows the last run and the next due time (the curator ticks hourly; a run is due every 168 h by
   default, so quiet weeks are normal).
 - `/evolution preset install [--base <name>[,<name>...]]` generates the family agent preset (M4).
+- `/evolution skill history <name>` lists one skill's content versions; `/evolution skill undo <name>
+  [--to v<N>]` rolls that skill back (content only — the pin marker, usage counters and curation state stay
+  as they are, and the rollback is itself recorded as a new version).
 - `/evolution mutations` (the write log) and `/graph` (skills and memory as a graph).
 
 The full command surface is rendered once in `packages/README.md` (§Command reference); the complete

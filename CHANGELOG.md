@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.10.0 (minor) — 技能内容版本与单技能撤销 ＋ 两处判定收敛（相似度问句具名、计划规则成表）
+
+> **由来**：外部档《SKILL-ATOMIC-UNITS.md》评估（判定档 `dsh-evolution-skill-atomic-units-eval.md` §7 架构层级撞车检查、§8 屎山判定与收敛方案）后定下的四条可借项；口径是**忽略短期工程量、从效果最优化出发**，同时把**防屎山**当硬约束。批次划分、七条不变量与逐批验收见设计档 `dsh-evolution-skill-history-design.md`（本机存档）。
+> **四条线可分别回退**：A 内容历史缝（无用户可见变化）→ B 单技能版本读/撤销（首个用户可见收益）→ C 两个相似度问句具名 ＋ 创建期判重提示 → D 计划路径规则表 ＋ 证据类别**只报告**。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 新命令 | `/evolution skill history <name>` 列出某技能的内容版本（版本号／时间／动作／字符数／哈希前缀）；`/evolution skill undo <name> [--to v<N>]` 把该技能内容退回某一版（默认上一版；只动内容，撤销本身也记为新的一版） |
+| 技能写入的反馈 | `skill_manage` 在**新建疑似重复**时多一行提示（点名最接近的既有技能与相似度，指向 patch/update）——**照常写入**，只是让模型看见 |
+| 技能写入的反馈（2） | 整篇替换一次技能正文、且新版**不足旧版一半**时，结果消息多一行保留率（例如「保留了 26%（2104／8123 字符），被替换的版本仍在版本史里」）——只提示，不拒写；小技能（旧正文 < 200 字符）不打扰 |
+| 磁盘 | 每次技能写入留一版内容：`$DSH_HOME/skills/.history/blobs/<sha256>`（同内容天然去重）＋ `.history/skills/<name>/index.json`；每技能保留份数＝新参数 `skillVersionKeep`（默认 20） |
+| 后台审查 | 计划里**证据只引用 turn/step 边界帧**的 op 会被**记一笔**（操作者日志一行 ＋ `evolution/plan-applied` 的 `evidenceClassReports` ＋ `activity.json` 记录），**不拒绝、不丢 op**；模型可见文本不变 |
+
+### 不动的（契约）
+
+- **模型可见文本**：A 批零改动；C 批只**新增**那一行（既有「Authoring check」各行逐字不变）；D 批零改动（报告只走操作者面）；**A＋B 节末补的反覆盖反馈行是另一条新增行**（整篇替换且保留不足一半时，追加在既有 `Skill "x" updated.` 之后，既有文本一字不动）。发布前独立复核实测：六个创作面文件的字面量集合**零删除**（只有新增）。
+- **写路径**：撤销＝**一次正常的带锚点 update**，不新建第二条写通道；威胁扫描、策略、审批缝、审计账本照旧。
+- **去重判定**：`computeDedupGroups` 行为逐字节不变（阈值 0.95、精确哈希预合并、pair 预算与 `truncated` 语义都不动），既有用例原样通过。
+- **计划路径的拒绝行为**不变：`EVIDENCE_CLASS` 只报告；`EVIDENCE_RANGE` 仍是唯一的证据拒绝行。
+- **参数三角**照旧：新参数只走 core 常量 ＋ Config schema ＋ 注册表行 ＋ `PARAMETERS.md` 生成物（E2，本版无新增设置卡）。
+
+### 内容历史与单技能撤销（A ＋ B）
+
+> **由来**：`mutations.ts` 自称 "reviewable and replayable"，但记录只有哈希、内容**无法回放**；改坏一个技能今天只能整树快照回滚（连带丢别的改动）或从 `.archive` 取回被删的。
+> **改法（A）**：core 新模块 `skill-history.ts` —— 内容寻址 blob（`.history/blobs/<sha256>`）＋ 逐技能版本索引（`.history/skills/<name>/index.json`，条目 `{v, at, action, hash, chars}`）；挂进写路径**已有的共享写后漏斗** `SkillLibrary.audit()`（**7 个调用点**覆盖 create/update/patch/write_file/remove_file/archive/restore/restructure/pin 这 9 个动作；before/after 正文都在手，**不需要碰锁**）；与账本记录**互相独立 best-effort**（两个 try）——历史写失败**不静默**（每实例警告一次），且绝不让写入失败。`.history` 同时进**两张**排除表：写者探针跳过表与**整树恢复的 clear 跳过表**（后者不改，一次 `restoreLatestSnapshot` 就会把历史清空——历史与账本同属「真实历史，恢复不该抹掉」）。
+> **改法（B）**：`SkillLibrary.listVersions/readVersion` 只读封装；`EvolutionCurator.history(name)`（只读、不抢控制面互斥——人问「有哪些版本」不该被正在跑的整理挡住）与 `undo(name, v?)`（抢互斥 ＋ 实例声明；实现为**一次正常 update**：内容取该版字节、锚点取**当前 live 哈希**，因此并发改写被锚点拒绝、撤销本身进版本史、可以再撤销）。命令面两条经 `registry.ts` 单一来源（README 命令表由生成物逐字节比对）。
+> **保留份数**：新参数 `skillVersionKeep`（E2，owner=tool-skill-manage，与 `archiveRetention` 同组；默认 20；客户端无卡片）。**本轮仍不做 blob GC**：trim 只裁索引——跨技能共享的 blob 需要全局引用计数，那是全库扫描的活，写路径不做（模块 docblock 写明），且**当前没有任何清扫器**（发布前复核发现生成物文案曾承诺「等 curator 清扫」，已改正）。**实测增长**（2026-09-27）：3.6 KB 正文、写 41 次（`versionKeep=20`）⇒ 索引 5,718 B／20 条，blob 41 个文件共 150 KB ≈ 41× 当前正文；**无变化写入 +0 B**。增长随「历史上出现过的不同正文数」走，不随保留份数走——已作为限制写进 `evolution-core/README.md`（含手工清理指引）。
+> **反覆盖反馈（判定档 §4 覆盖表第 3 条）**：**最终自查时发现这一条在设计档 §3 的批次改法里没有落点**（§4 覆盖表列了它、§2 也写了「库在写锁内算＋自己的 message 加一行」，但 A–D 四批的改法都没有它）——本轮补齐：core 具名函数 `contentRetentionFeedback`，在写后漏斗（两个正文都还在手的地方）算出保留率并追加到该次写入自己的结果消息里；阈值 `RETENTION_FEEDBACK_KEEP_RATIO = 0.5` ＋ 地板 `RETENTION_FEEDBACK_MIN_CHARS = 200`；只对整篇 `update` 生效（patch 是锚点编辑、support 文件是另一种产物、create/archive 没有可比的正文对）；**不加开关**（没有读取点的开关＝什么都不做的配置）。
+> **语义边界**：撤销的是**内容**，不含 `.pinned`/`.hermes-managed` 标记、用量计数与策展状态——结果文案明说，避免被读成时光机。**读的边界**：索引读不出来／字段布局陌生／由更新的读者写过，一律读作「没有版本」（never-guess 姿态）；下一次成功写入会用基线条目重新播种索引，所以是**自愈**而非静默丢失。
+
+### 发布前独立复核与修复（8 条全部为真）
+
+> **口径**：子代理**只读**复核 `4269158..d93c9d0`（A–D 四批）＋当时的 activity 改动，只报 P0–P2 且每条附**可证伪命令**（探针只写 `%TEMP%`）；我逐条**源码复验**后落地。**无 P0**；2 条 P1、6 条 P2，**无一条误报**。
+
+| 级 | 发现 | 修复 |
+|---|---|---|
+| P1 | 内容历史在**内容锁外**追加 ⇒ 两个写者会让索引顺序交错，且基线判定按尾巴算会补出假基线 | 索引条目新增 **`beforeHash`**（写锁内读到的旧字节哈希）：基线判定改为「整表是否已记录过该前驱」，**`undo` 的默认目标沿链回溯**，列表用 `orderVersions` 按链复原内容顺序（链不完整退回存储顺序）。没有把历史塞进 `transact`——那个 API 的写发生在任务返回**之后**，塞进去会记下尚未落地的内容 |
+| P1 | **读不懂的索引被覆盖**（malformed／陌生形态／更新的读者），与 docblock 的「never overwrite」相反 | 照 activity 的既有先例：读不懂的字节先 **copy 到 `<index>.corrupt`** 再起新索引；**copy 失败则拒绝记录**（宁可这次不记，也不毁唯一副本）。新增三态读 `readHistoryIndex`（ok／absent／unreadable，含「能解析但有条目必须被丢弃」） |
+| P2 | 创建期提示**并非零读**：`library.list()` 会整篇读每个 SKILL.md 解 frontmatter | **改口径不改实现**：提示自身不新增读、不调用 `library.read`、不留正文；上文与本节的措辞已按实测改正 |
+| P2 | activity 读屏障**漏了新维度** ⇒ 手工编辑的 sidecar 能把字符串喂进数字字段 | `evidenceClassReports` 进 `isOptionalCount` 链（与兄弟字段同规）＋ 用例 |
+| P2 | `--to v<N>` 指向当前内容时写是 no-op，却回报「撤销本身也记为一版」 | 读 `result.noop`：改报「已经是该版本的内容——什么都没写，也没有新版本」 |
+| P2 | 撤销拒绝**断言假原因**（把被 trim 的版本说成「blob 丢了」） | 先查索引里有没有该 `v`：没有就说「不在已记录的版本里（现有：…）」；只有真在索引里而内容读不出才是 blob 问题。**不新增 E 码**（命令面拒绝按 `skill restore` 先例走消息） |
+| P2 | blob 永不回收，而生成物文案承诺「等 curator 清扫」 | 改正注册表 summary（回填 `PARAMETERS.md`）＋ 把**实测增长**写进 core README 的 Known limitations（含手工清理指引） |
+| P2 | 设计档 §3B 的「并发改 ⇒ 锚点拒绝」**没有用例**（I7 缺口） | curator 加**确定性竞态用例**：注入一个「读完就改写文件」的默认 io，使 undo 的锚点必然过期 ⇒ 断言拒绝且盘上留下竞态写者的内容 |
+
+> 复核另给「七问」的逐条答复（历史不被判定读取／撤销无第二条通道／提示不改判定／计划路径拒绝行为**逐字节不变**／模型可见字面量**零删除**／参数三角完整／两张排除表与快照关系正确），与自查一致；它同时列出未扫描面（平台树、真实运行时装配、注入竞态下的 curator 上下文、21 步门禁其余步骤），本轮修复正是针对其中可判定的部分。
+### 相似度问句具名与创建期判重（C）
+
+> **由来**：`quality.ts` 原有三把尺（规范化哈希、token Jaccard、首词名字索引）问句重叠却都没有名字；判定档 §7.1 的口径是「新增尺不是禁区，**未具名、问句重叠**的第四把尺才是」。
+> **改法**：收敛成**两个具名问句** ＋ 一个**调用方声明的投影**：`identity(text)`（「是同一段文本吗？」规范化内容哈希）与 `affinity(a, b)`（「两段文本共享多少词汇？」两个 `vocabulary()` 集合的 Jaccard），都问在 `projectionText(projection, input)` 上（`body`＝整篇 SKILL.md；`summary`＝名＋描述）。`computePrefixClusters` 保持原样：名字侧的**结构索引**，不是相似度分数。顺手把 docblock 自 PLAN-R2 起就 `{@link}` 却**并不存在**的 `DEDUP_SIMILARITY_THRESHOLD`（0.95）补成真常量——值不变。
+> **创建期判重**：`skill_manage create` 前用 `library.list()`（**提示自身不新增任何读**：该 listing 本就要读每个 SKILL.md 解 frontmatter，提示不调用 `library.read`、不留正文、不做正文比对）＋ `nearDuplicateSummaries`（同一个 affinity 问句，问在 summary 投影上）给一行提示。**阈值 0.5 有实测依据**：本机真实 24 个技能两两 summary affinity 的最高合法对是 0.333（`capability-claim-audit` ~ `theory-paper-log-audit`），0.5 落在实测空档；`dsh-session-forensics` ~ `dsh-session-preset-repair` 这类同前缀异域技能本就低于 0.5，不误报。
+> **验收用投影盲区而非调用计数**：同一对「正文近乎相同、名＋描述无关」的技能在 `review`（body 投影）里**成组**、在 create 提示里**静默**——调用计数区分不了 `list()` 的 frontmatter 读与 `read()` 的整篇读（同走 `readText`），投影盲区能。
+
+### 计划路径规则表与证据类别只报告（D）
+
+> **由来**：计划路径的每-op 判定原本是匿名内联检查；`turn/start` 这类记账帧满足「区间内的整数」却承载不了任何断言。
+> **改法**：每类 op 一张**具名有序规则表** `PLAN_RULES`（与工具路径的 `write-gates.ts` 同形：规则体读 core 的共享表，本模块拥有**顺序**与文案），id 与顺序由用例钉死；新增 `EVIDENCE_CLASS` **只报告**行，读 `ValidationContext.substantiveEvidenceSeqs`（core 新模块 `evidence.ts`：deny list＝四个 turn/step bookends，未知帧算「有内容」）。
+> **三态**：`undefined`（日志根本没有 seq，例如测试桩）**保持沉默**——把「无法分类」当成「全无内容」会把每个 op 都报一遍；空集（有 seq 且全是边界）才是真报告。**一 op 一结论**：报告只对**通过全部拒绝行**的 op 产生。索引与证据区间**同一时刻读**（计划不能引用作者当时还不存在的帧）。
+> **实现路线由架构守卫 N11 决定**：家族守卫禁止 `evidence.ts` 直接匹配 `'tool/call'`/`'tool/result'`（平台派发词表只有一个读者），deny list 方案对这两类帧天然都算内容——零词表、零违规。
+> **账本两处都落**：`evidenceClassReports` 先进事件载荷（与 `evidenceQuotes` 同形：可选、有值时才有），再折进 `evolution-activity` 的持久记录（同形可选字段；`ACTIVITY_FILE_VERSION` 仍是 2——可选字段是加法，旧 sidecar 照常解析）。**文档阶段改正过一次口径**：初稿写成「只进事件、不进 activity」，而操作者实际读的是 `activity.json`，阶段 1 的观察窗必须落在那里。
+
+### 验证
+
+- **四批各自过 21 步门禁**（tsc／oxlint 0／vitest-full／build-lib／smoke ＋ 16 个 verify；`mirror-sync differ=0`）：A `2a6cd54`（tsc 12s／vitest-full 511s）、B `b2c5ee0`（tsc 9s／548s）、C `62001b5`（tsc 9s／516s）、D `d93c9d0`（tsc 60s／512s）。
+- **新增/扩展用例**：`skill-history.spec.ts` 10 条（版本规则纯函数、索引三态、保留策略）；curator 端到端撤销 2 条（含三种拒绝）；`quality.spec.ts` ＋6（两个问句、投影声明、摘要判重，含「正文相同而摘要无关 ⇒ 不报」的证伪用例）；`tool-skill-manage.spec.ts` ＋1（提示出现／照常写入／投影盲区三向）；`evidence.spec.ts` 4 条；`validator.spec.ts` ＋4（规则表 id 与顺序、只报告、三态、一 op 一结论）；`review.spec.ts` ＋2（真实会话端到端：报告计数进 `plan-applied`；无 seq 的桩日志静默）；`activity-store.spec.ts` ＋1（新维度进 sidecar，缺省时键保持缺失）。
+- **反覆盖反馈补齐**（见 A＋B 节末）：`skill-history.spec.ts` ＋3（阈值与地板、非整篇替换一律沉默、真实库的一次「10 节压成 1 节」update 出现该行且 `ok` 不变、反向增长保持安静），core 62 个 spec 文件 681 条全绿（`--maxWorkers=2`，与门禁同参数）。
+- **发布前独立只读复核**（子代理读全量 diff，只报 P0–P2、每条附可证伪命令）＋ 逐条源码复验，结果见下方小节。
 ## 0.9.0 (minor) — 技能写入门禁（设计档 B1–B5 ＋ 发布前复核批 B6）＋ 用词改版：界面／命令／文档说人话（「策展」等内部词退场）
 
 > **由来**：0.8.0 装机复验时，用户直接反馈「『策展』这个词不知道是什么」。据此按判据 J1–J6（行业词／内部代号／英文裸词／自造缩略／自造比喻／生硬书面语）**全量排查**所有用户可见的配置项说明，清单与逐条建议留档 `D:\dsh\dsh-evolution-user-facing-wording-audit.md`。
