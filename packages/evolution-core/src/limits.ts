@@ -6,7 +6,7 @@
  * export surface is unchanged.
  */
 
-import { MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, MAX_SKILL_NAME_LENGTH } from './constants.ts'
+import { DEFAULT_SKILL_VERSION_KEEP, MAX_DESCRIPTION_LENGTH, MAX_SKILL_CONTENT_CHARS, MAX_SKILL_FILE_BYTES, MAX_SKILL_NAME_LENGTH } from './constants.ts'
 
 /** How a restructure treats a section carrying support-file citations (design §2.2). */
 export type CitationPolicy = 'verify' | 'refuse'
@@ -100,6 +100,9 @@ export interface SkillLimits {
   archiveRetention?: ArchiveRetentionPolicy | undefined
   /** See SupportFileCharPolicy; absent means the default (`report`). */
   supportFileCharPolicy?: SupportFileCharPolicy | undefined
+  /** Content versions retained per skill (skill-history.ts); absent means
+   * `DEFAULT_SKILL_VERSION_KEEP`. */
+  versionKeep?: number | undefined
 }
 
 export const DEFAULT_SKILL_LIMITS: SkillLimits = {
@@ -107,4 +110,5 @@ export const DEFAULT_SKILL_LIMITS: SkillLimits = {
   maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
   maxSkillContentChars: MAX_SKILL_CONTENT_CHARS,
   maxSkillFileBytes: MAX_SKILL_FILE_BYTES,
+  versionKeep: DEFAULT_SKILL_VERSION_KEEP,
 }

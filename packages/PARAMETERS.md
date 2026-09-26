@@ -44,6 +44,7 @@
 | `citationPolicy` | E3 | live | cordis | tool-skill-manage | — | Refuse a move that would leave a dangling reference, or verify it. |
 | `referenceRewrite` | E2 | none | cordis | tool-skill-manage | — | Re-home support files and rewrite references during a merge (plan or apply). |
 | `archiveRetention` | E2 | none | cordis | tool-skill-manage | — | Report expired archives, or prune them. |
+| `skillVersionKeep` | E2 | none | cordis | tool-skill-manage | — | Content versions retained per skill; older ones leave the index (their blobs wait for the curator sweep). |
 | `supportFileCharPolicy` | E3 | live | cordis | tool-skill-manage | — | Warn about an oversize support file, or refuse the write. |
 
 ## review（会话回顾）

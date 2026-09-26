@@ -77,6 +77,11 @@ export const MAX_SKILL_NAME_LENGTH = 64
 export const MAX_DESCRIPTION_LENGTH = 1024
 export const MAX_SKILL_CONTENT_CHARS = 100_000
 
+/** How many content versions to retain per skill (skill-history.ts). 20 mirrors the count
+ * KiroCrew settled on for the same job (its `MAX_SKILL_VERSIONS`), and is an E2 deployment
+ * parameter — the value is a retention policy, not a protocol constant. */
+export const DEFAULT_SKILL_VERSION_KEEP = 20
+
 /** The authoring DISCIPLINE band, taken from the upstream standard (archive §5):
  * peer skills sit at 8-14k characters and a body pushing past 20k belongs in
  * `references/*.md`. Deliberately separate from `MAX_SKILL_CONTENT_CHARS`: the

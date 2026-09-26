@@ -14,6 +14,11 @@ export interface MutationRecord {
   action: string
   beforeHash?: string
   afterHash?: string
+  /** The skill-history version the content on each side of this mutation belongs to
+   * (skill-history.ts). Optional: records written before content history existed carry none, and
+   * the hashes above stay the authority for "what changed". */
+  beforeVersion?: number
+  afterVersion?: number
   summary: string
   at: string
 }

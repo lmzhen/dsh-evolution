@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -74,6 +74,10 @@ export interface Config {
    * the family tree) is REFUSED instead of warned about. Default false —
    * warn only, keeping the family tree an autonomous evolution zone. */
   strictCrossSource?: boolean
+  /** Content versions retained per skill (skill-history.ts). E2: a deployment value on this row,
+   * like the four caps above — the settings layer deliberately has no card for it (retention is
+   * storage policy, not an authoring knob). */
+  skillVersionKeep?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -90,6 +94,9 @@ export const Config: z<Config> = z.object({
   threatExemptLabels: z.array(z.string()).default([]),
   // OPT-19 (plan D3): default warn-only on cross-source same-name writes.
   strictCrossSource: z.boolean().default(false),
+  // skill-history.ts: how many content versions each skill keeps. Lower bound 1 — the history
+  // trim would otherwise drop the version it just recorded.
+  skillVersionKeep: z.number().min(1).default(DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
 })
 
 /** Write behaviour a user may change (G3/S3.4). Field names are the CANONICAL
@@ -413,6 +420,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // G0/S0.4: alias-aware read (canonical `skillContentChars` resolves too).
     maxSkillContentChars: limit('maxSkillContentChars', readNumberParam(rawConfig, 'skillContentChars'), DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
+    // skill-history.ts (batch A): the same assembly-time clamp covers 0/negative/NaN.
+    versionKeep: limit('skillVersionKeep', rawConfig.skillVersionKeep, DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
   }
   // G3/S3.4: the library reads `this.limits.<field>` at EVERY use site, so the
   // object it was handed is the live surface — a committed settings change

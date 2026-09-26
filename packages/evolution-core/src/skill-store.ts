@@ -47,9 +47,10 @@ import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFront
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
+import { HISTORY_DIR, recordVersions, type RecordedVersions } from './skill-history.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
-import { CONTENT_SPLIT_HINT, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 /** 0.3.16 (S1.13, T-6): the pointer-line prefix written into a body when a
  * section is moved to references/ — single literal, both restructure and
@@ -690,6 +691,9 @@ export class SkillLibrary {
   /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
    * default — the strict ANY-hit-blocks policy is unchanged. */
   private readonly threatExemptLabels: readonly string[]
+  /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
+   * but it is a deployment condition, not a per-write event, so it warns once per instance. */
+  private historyWarned = false
 
   constructor(
     root = skillsRoot(),
@@ -1233,16 +1237,35 @@ export class SkillLibrary {
     }
   }
 
-  /** Best-effort audit trail entry; never blocks the mutation. */
+  /** Best-effort audit trail entry; never blocks the mutation.
+   *
+   * Two independent best-effort writes run here, because either one failing must not cost the
+   * other: the CONTENT history (skill-history.ts, so a version can be read back at all) and the
+   * mutation ledger that points at it. The history failure is not silent — a deployment whose
+   * history stopped growing is a degradation worth seeing once (the ledger keeps hashes either
+   * way). */
   private async audit(skillName: string, action: string, before: string | null, after: string | null, summary: string): Promise<void> {
+    const at = new Date().toISOString()
+    let versions: RecordedVersions | null = null
+    try {
+      const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
+      versions = await recordVersions(this.root, this.io, { skillName, action, before, after, at }, keep)
+    } catch (error) {
+      if (!this.historyWarned) {
+        this.historyWarned = true
+        console.warn(`skill-store: content history not recorded for "${skillName}" (${error instanceof Error ? error.message : String(error)}); the mutation itself landed and the audit ledger keeps its hashes`)
+      }
+    }
     try {
       await recordMutation(this.root, this.io, {
         skillName,
         action,
         ...before === null ? {} : { beforeHash: contentHash(before) },
         ...after === null ? {} : { afterHash: contentHash(after) },
+        ...versions?.beforeVersion === undefined ? {} : { beforeVersion: versions.beforeVersion },
+        ...versions?.afterVersion === undefined ? {} : { afterVersion: versions.afterVersion },
         summary,
-        at: new Date().toISOString(),
+        at,
       })
     } catch {
       // Auditing is best-effort; a transient disk failure must not surface
@@ -3334,7 +3357,7 @@ export class SkillLibrary {
     // writer does not block recovery. Root-level sidecar locks are checked the
     // same way (a live `.usage.json.lock` must not be deleted by the clear).
     for (const entry of rootEntries) {
-      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json') continue
+      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json' || entry === HISTORY_DIR) continue
       if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) {
         await this.refuseLiveLockOrSweep(join(this.root, entry), entry)
         continue
@@ -3365,6 +3388,9 @@ export class SkillLibrary {
     // clear skips them (a live one was refused above, a dead one swept).
     for (const entry of rootEntries) {
       if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json') continue
+      // Content history is real history (like the mutation audit) — a whole-tree restore must not
+      // erase the versions a rollback itself might need.
+      if (entry === HISTORY_DIR) continue
       if (entry === '.curator-suppressed.json' && restoresSuppressed) continue
       if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) continue
       await this.io.remove(join(this.root, entry))
