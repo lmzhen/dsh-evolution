@@ -40,6 +40,10 @@ export interface EvolutionActivityRecord {
   executionError?: string | undefined
   evidenceQuotes?: number | undefined
   estimatedInputChars?: number | undefined
+  /** Batch D (2026-09-27): ops whose whole evidence list cites a turn/step boundary
+   * (the plan path's report-only phase-1 dimension). NOT a "work not done" cause —
+   * those ops executed. Optional so sidecars written before the dimension parse. */
+  evidenceClassReports?: number | undefined
   at: number
 }
 
@@ -84,6 +88,7 @@ export function applyActivityEvent(
     ...event.executionError !== undefined ? { executionError: event.executionError } : {},
     ...event.evidenceQuotes !== undefined ? { evidenceQuotes: event.evidenceQuotes } : {},
     ...event.estimatedInputChars !== undefined ? { estimatedInputChars: event.estimatedInputChars } : {},
+    ...event.evidenceClassReports !== undefined ? { evidenceClassReports: event.evidenceClassReports } : {},
     at,
   }
   // A non-positive cap would disable the window entirely (`slice(-0)` keeps

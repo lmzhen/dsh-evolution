@@ -318,6 +318,15 @@ function serialize(items: EvolutionActivityRecord[]): string {
     expect(items[0]).toMatchObject({ memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 })
     await ctx.fiber.dispose()
   })
+  it('D: the evidence-class dimension folds into the record and keeps the key ABSENT when the payload omits it', { timeout: 20_000 }, async () => {
+    // Phase 1 of the plan path's evidence-class rule is an OBSERVATION WINDOW, so the
+    // dimension has to survive into the sidecar an operator actually reads.
+    const report = applyActivityEvent([], payload({ evidenceClassReports: 2 }), DEFAULT_MAX_ITEMS, 1000)
+    expect(report[0]?.evidenceClassReports).toBe(2)
+    expect(parseActivityContent(serializeActivity(report))[0]?.evidenceClassReports).toBe(2)
+    // A clean plan keeps the key absent (the H-05 invariant every optional field shares).
+    expect('evidenceClassReports' in applyActivityEvent([], payload(), DEFAULT_MAX_ITEMS, 1000)[0]!).toBe(false)
+  })
 
   it('P2-15: an unparsable sidecar is quarantined to .corrupt instead of being overwritten by the next event', { timeout: 20_000 }, async () => {
     const root = await tempHome('dsh-activity-corrupt-')

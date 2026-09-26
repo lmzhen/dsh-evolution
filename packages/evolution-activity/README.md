@@ -15,6 +15,7 @@ durability lives here; a storage-domain table is deferred until a consumer needs
 
 ## Configuration
 
+- Payload fields it folds: `sessionId`, `planId`, `policyFingerprint`, `memoryApplied`, `skillApplied`, `rejectedOps`, `skippedUnread`, `executionFailures`, `executionError` and `evidenceClassReports` (ops whose whole evidence list cites a turn/step boundary — the plan path's report-only phase-1 dimension; they are counted, never refused, so the field is not a "work not done" cause). Fields the fold does not name are ignored, so the payload can gain dimensions without a schema migration here.
 - `maxItems` (default `DEFAULT_MAX_ITEMS = 200`): bound on the retained sidecar; a non-finite value falls back to the default, a non-positive value fails loud at the schema.
 
 ## Known limitations
