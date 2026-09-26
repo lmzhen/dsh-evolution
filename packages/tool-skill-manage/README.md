@@ -51,6 +51,20 @@ Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) p
   per user. Reading the legacy name still works; writing it is refused. Removal was planned for 0.7.0 and is deferred:
   the alias still ships, so no later version is claimed here.
 
+### Description length: the three numbers
+
+A skill description is measured against three different bounds. They are not interchangeable, and
+only the second one refuses a write:
+
+| Bound | Value | Source | What it does |
+|---|---|---|---|
+| Authoring bar | 60 chars | `AUTHORING_DESCRIPTION_BAR` (the upstream 60-char rule) | advisory feedback on every create/edit/update; `descriptionStrict: true` turns it into a refusal |
+| Family storage ceiling | 1024 chars | `MAX_DESCRIPTION_LENGTH`, lowered per deployment by this row's `maxDescriptionLength` | the hard validation limit — the ONLY refusal threshold of the three |
+| Platform catalog view | 500 chars by default | `catalogDescriptionMaxLength` on the platform's `tool-skill` row (`PLATFORM_CATALOG_DESCRIPTION_DEFAULT`) | truncates the description in the skill catalog the model reads; the family's host/all rows set that field to 60 |
+
+The third row is a view, not a rule: a description the family accepts can still be cut in a catalog
+viewer, which is why the authoring feedback names the bar rather than treating the cut as a limit.
+
 ## Known limitations
 
 - No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.

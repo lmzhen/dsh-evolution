@@ -61,8 +61,8 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   {
     namespace: 'evolution-review',
     fields: [
-      { id: 'reviewSkillInterval', group: 'review', doc: 'Activity units between skill-review injections.', label: '技能检查间隔', hint: '每多少次活动（消息、工具调用等）检查一次技能。', control: 'number', unit: '次', values: [], valueLabels: [] },
-      { id: 'reviewMemoryInterval', group: 'review', doc: 'Activity units between memory-review injections.', label: '记忆检查间隔', hint: '每多少次活动检查一次记忆。', control: 'number', unit: '次', values: [], valueLabels: [] },
+      { id: 'reviewSkillInterval', group: 'review', doc: 'Tool calls between skill-review injections (a turn that made no tool call still counts as one).', label: '技能检查间隔', hint: '每累计多少次工具调用检查一次技能（一轮没有工具调用也算 1 次）。', control: 'number', unit: '次', values: [], valueLabels: [] },
+      { id: 'reviewMemoryInterval', group: 'review', doc: 'Tool calls between memory-review injections (a turn that made no tool call still counts as one).', label: '记忆检查间隔', hint: '每累计多少次工具调用检查一次记忆（一轮没有工具调用也算 1 次）。', control: 'number', unit: '次', values: [], valueLabels: [] },
       { id: 'skillReviewTrigger', group: 'review', doc: 'Which channel may inject a skill review (cadence, completion, both).', label: '技能检查时机', hint: '什么时候检查技能：按间隔／按任务完成／两者。', control: 'select', unit: '', values: ['cadence', 'completion', 'both'], valueLabels: ['按间隔', '按任务完成', '两者'] },
       { id: 'skillReviewCompletionMinToolCalls', group: 'review', doc: 'Tool calls a task needs before the completion channel injects.', label: '完成时的最少工具调用', hint: '选「按任务完成」时，任务至少用了几次工具才检查。', control: 'number', unit: '次', values: [], valueLabels: [] },
       { id: 'reviewEnabled', group: 'review', doc: 'Master switch for the review plugin.', label: '启用自动检查', hint: '关闭后不再自动回顾会话。', control: 'switch', unit: '', values: [], valueLabels: [] },

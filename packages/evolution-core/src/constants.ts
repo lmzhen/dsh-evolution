@@ -164,6 +164,17 @@ export const EVOLUTION_WRITE_TOOLS = ['memory', 'skill_manage'] as const
  * can reference it without importing the skill-store module. */
 export const AUTHORING_DESCRIPTION_BAR = 60
 
+/** The PLATFORM's default cap on the description a skill catalog shows —
+ * `catalogDescriptionMaxLength` on the platform's `tool-skill` row (default 500).
+ *
+ * Recorded here because it is the third number in the description-length relationship, and the one
+ * that is easiest to misread as a family rule: the family's own host/all rows SET that field to
+ * `AUTHORING_DESCRIPTION_BAR` (60), so what a family deployment truncates at is the ROW's value —
+ * this default only governs compositions that do not override it. It is NOT a refusal threshold:
+ * the only refusal is `MAX_DESCRIPTION_LENGTH` / the row's `maxDescriptionLength`, and the catalog
+ * cut is a view, not a validation. See tool-skill-manage/README.md for the three-number table. */
+export const PLATFORM_CATALOG_DESCRIPTION_DEFAULT = 500
+
 /** The split hint both size refusals share (0.5.0 V1). The same sentence used to
  * be copied into validateFrontmatter AND the patch path, and neither copy named
  * where the content should go — the upstream cap message names the destination

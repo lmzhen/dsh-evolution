@@ -50,8 +50,8 @@
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |
 |---|---|---|---|---|---|---|
-| `reviewSkillInterval` | E3 | live | cordis | evolution-review | skillInterval | Activity units between skill-review injections. |
-| `reviewMemoryInterval` | E3 | live | cordis | evolution-review | memoryInterval | Activity units between memory-review injections. |
+| `reviewSkillInterval` | E3 | live | cordis | evolution-review | skillInterval | Tool calls between skill-review injections (a turn that made no tool call still counts as one). |
+| `reviewMemoryInterval` | E3 | live | cordis | evolution-review | memoryInterval | Tool calls between memory-review injections (a turn that made no tool call still counts as one). |
 | `skillReviewTrigger` | E3 | live | cordis | evolution-review | — | Which channel may inject a skill review (cadence, completion, both). |
 | `skillReviewCompletionMinToolCalls` | E3 | live | cordis | evolution-review | — | Tool calls a task needs before the completion channel injects. |
 | `reviewEnabled` | E3 | live | cordis | evolution-review | — | Master switch for the review plugin. |
