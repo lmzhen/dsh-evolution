@@ -186,9 +186,10 @@ doctor 的「参数面分歧」一节会报告两边不一致的地方。
 | `E-308` / `E-313` | 参数分组或参数 id 不存在 | 用 `/evolution params` 列出来：每个注册 id 的层级与 owner 都在里面 |
 | `E-314` / `E-315` / `E-316` | 该 id 是安装时定的参数、不能由用户改，或它的 owner 没挂载 | 在 `cordis.yml` 里写，或挂上 owner 行 —— 报文里点名层级与 owner |
 | `E-309` / `E-310` | 你的写入输给了并发修订，或设置服务拒绝了它（原因随报文给出） | 用 `/evolution params` 重读后重试 |
+| `E-318` | 没读就写：本会话没有加载过该技能，写入被拒（只对技能；前台操作者自己的会话豁免） | 先用 `skill` 工具读它，再重试写入 |
 | doctor 报 `install form: none` | 没有装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
-本表是「症状 → 下一步」对照；每条编号的原文只存一处（`evolution-core/src/errors.ts`，`E-301`–`E-316`），运行时按原文输出。
+本表是「症状 → 下一步」对照；每条编号的原文只存一处（`evolution-core/src/errors.ts`，`E-301`–`E-318`），运行时按原文输出。
 
 </details>
 

@@ -24,7 +24,7 @@
 
 /**
  * Required argument names per `skill_manage` action — the SINGLE SOURCE read
- * by the tool's argument gate (tool-skill-manage executeCore) and the plan
+ * by the tool's argument gate (tool-skill-manage write-gates.ts) and the plan
  * validator (evolution-plan-validator), so the two can never drift.
  * OPT-05 (2026-09): the plan validator used to accept a `write_file`/
  * `remove_file` op without `file_path` while the executor required it — the

@@ -24,10 +24,11 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, SKILL_ACTION_REQUIRED_FIELDS, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
+import { runWriteGates } from './write-gates.ts'
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
@@ -155,39 +156,29 @@ interface SkillWriteArgs {
   staged_from_sha256?: string
 }
 
+/**
+ * The execution context this tool reads, as a minimal structural view of the platform's
+ * `ToolRunContext` (extra fields are ignored).
+ *
+ * `snapshotEvents()` is the 0.1.5-onward accessor for a session's log (plain `session.events`
+ * before it) and is what the read-before-write gate folds; a session object that does not expose it
+ * is "not readable", never "nothing was read".
+ */
+interface SkillToolExec {
+  agent?: {
+    session?: {
+      id: string
+      header: { origin?: string }
+      snapshotEvents?: () => Iterable<{ type: string; data?: unknown }>
+    }
+  }
+}
+
 /** v30 REV-02: read the protected-skill list off the (optional) policy
  * snapshot through an `unknown` boundary — the Context augmentation types the
  * getter non-optionally, but at runtime the row can be absent. */
 function policySnapshotOf(source: unknown): ({ protectedSkillNames?: readonly string[] } & PolicyStageFields) | undefined {
   return (source as { get?(): { protectedSkillNames?: readonly string[] } & PolicyStageFields } | undefined)?.get?.()
-}
-
-// PLAN-R2 P2-7 (2026-09-16): the missing-required-argument check as ONE
-// function that both the approval stage boundary (execute's pre-check) and
-// executeCore read, so the pre-check and the execution check cannot diverge:
-// the same single-source table (core `SKILL_ACTION_REQUIRED_FIELDS`, OPT-05 —
-// the plan validator reads the same rows), the same OWN-property narrowing
-// (v29 TSM-01 — a plain-object index resolves inherited members
-// (`constructor`, `toString`, …) to truthy functions, reachable through the
-// approval replay runner, which executes STORED args with no schema in front
-// of it), and the same exists semantics (V27 G5.1): undefined/null is
-// missing; an EMPTY string is deliberately NOT — it still reaches the
-// library, whose branch messages carry the more specific remedy (e.g. an
-// empty patch anchor points at `update`).
-function missingRequiredArgs(args: SkillWriteArgs): readonly string[] {
-  const action = args.action
-  const scalarArgs = args as Record<string, unknown>
-  const requiredArgs: readonly string[] =
-    action === undefined || typeof action !== 'string' || !Object.hasOwn(SKILL_ACTION_REQUIRED_FIELDS, action)
-      ? []
-      : SKILL_ACTION_REQUIRED_FIELDS[action] ?? []
-  return requiredArgs.filter((field: string) => scalarArgs[field] === undefined || scalarArgs[field] === null)
-}
-
-// PLAN-R2 P2-7 (2026-09-16): one refusal builder so the stage-boundary
-// pre-check and executeCore emit the identical structured message.
-function missingArgsRefusal(action: string | undefined, missing: readonly string[]): { ok: false; message: string; skills: string[] } {
-  return { ok: false, message: `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`, skills: [] }
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -204,6 +195,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const systemPrompt = ctx.get('systemPrompt') as { section(section: PromptSection): () => void } | undefined
   if (systemPrompt) {
     ctx.effect(() => systemPrompt.section({ name: 'evolution-skills-guidance', order: SKILLS_GUIDANCE_SECTION_ORDER, text: SKILLS_GUIDANCE }), 'tool-skill-manage.skills-guidance')
+  }
+  /** The policy snapshot's protected list, or `undefined` when the row is not mounted — read by
+   * the write gates at BOTH points, through the one unknown-boundary helper above. */
+  const protectedSkillNamesOf = (): readonly string[] | undefined =>
+    policySnapshotOf(ctx.get('evolutionPolicy'))?.protectedSkillNames
+  // A gate that degrades (the session log is not readable in this composition) warns ONCE: the
+  // condition belongs to the deployment, not to the write.
+  let writeGateWarned = false
+  const warnWriteGateOnce = (message: string): void => {
+    if (writeGateWarned) return
+    writeGateWarned = true
+    ctx.logger.warn(message)
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   // V6-06 (0.3.35): the numeric limits go through the assembly-time clamp so a
@@ -414,45 +417,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return { ok: false, message: `skill_manage list: skill tree scan failed (${error instanceof Error ? error.message : String(error)}).`, skills: [] }
       }
     }
-    // v20 (D-1, V8-09 sibling): the schema does not strictly guarantee scalar
-    // shapes (the F-07 class of garbage that slipped past the schema), and a
-    // non-string scalar used to escape as a bare TypeError from SkillLibrary
-    // (`name.trim()` / `md.includes(...)`). Family posture: a STRUCTURED
-    // refusal, same as the restructure array guard below. Absent/undefined
-    // stays legal — the branches below already default it.
-    const scalarArgs = args as Record<string, unknown>
-    for (const field of ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const) {
-      const value = scalarArgs[field]
-      if (value !== undefined && value !== null && typeof value !== 'string') {
-        return { ok: false, message: `skill_manage: "${field}" must be a string (got ${typeof value}); refusing the write.`, skills: [] }
-      }
-    }
-    // v30 REV-02: the immutable policy's protected list is enforced at plan
-    // validation, but the replay channel executes STORED plans — one accepted
-    // under an older policy must not land on a skill the CURRENT policy
-    // protects. Foreground (operator) writes are deliberately not gated by
-    // this list. Soft probe: deployments without the policy row keep the
-    // previous behavior.
-    if (origin !== 'foreground') {
-      // v30 REV-02: the runtime value CAN be undefined (policy row not
-      // mounted) even though the Context augmentation types the getter
-      // non-optionally — the unknown-boundary helper keeps that guard honest
-      // for both the compiler and the linter.
-      const protectedNames = policySnapshotOf(ctx.get('evolutionPolicy'))?.protectedSkillNames
-      if (protectedNames?.includes(name)) {
-        return { ok: false, message: `skill_manage: "${name}" is protected by the current policy (protectedSkillNames); replayed/autonomous writes are refused.`, skills: [] }
-      }
-    }
-    // V27 G5.1 (v27 T-2) / OPT-05 (2026-09): name the missing per-action
-    // arguments before anything is read or written. PLAN-R2 P2-7 (2026-09-16):
-    // the table, the Object.hasOwn narrowing, the exists semantics and the
-    // refusal wording live in the shared helpers above, so this execution-time
-    // check and the execute() stage-boundary pre-check cannot diverge. The
-    // replay channel enters HERE (no schema, no approval seam in front), so
-    // this check must stay.
-    const missing = missingRequiredArgs(args)
-    if (missing.length > 0) {
-      return missingArgsRefusal(action, missing)
+    // The write-admission sequence, EXECUTION point (design §3): the gates whose verdict can
+    // change between admission and execution run here, at the bytes. The replay channel enters
+    // HERE with STORED arguments and no schema in front of it, so the scalar shape and the
+    // required arguments must be decided again; the policy's protected list is re-read because a
+    // record accepted under an older policy must not land on a skill the CURRENT policy protects
+    // (v30 REV-02). The admission-only gates (read-before-write) stay at the tool path: their
+    // verdict belongs to the writing session, which a replayed record does not have.
+    const refusal = await runWriteGates({
+      point: 'execution',
+      args,
+      origin,
+      protectedNames: protectedSkillNamesOf(),
+      readNames: undefined,
+      warn: warnWriteGateOnce,
+    })
+    if (refusal !== null) {
+      return { ok: false, message: refusal, skills: [] }
     }
     let feedbackLines: string[] = []
     // v23 (AP-3) / v30 REV-03 → v35 C9: the stage-time anchor is no longer
@@ -689,9 +670,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     isConcurrencySafe: () => false,
     // F-06: `session` is optional in the exec contract too — the
     // defensive chaining below is only honest if the type says so.
-    async execute(args: SkillWriteArgs, exec: {
-      agent?: { session?: { id: string; header: { origin?: string }; events?: readonly unknown[] } }
-    }) {
+    async execute(args: SkillWriteArgs, exec: SkillToolExec) {
       // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
       // every delegated subagent as the review channel, while the LIBRARY
       // surface keeps the Hermes distinction - a delegated subagent write is
@@ -737,20 +716,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const refusal = await crossSourceRefusal(args.name)
         if (refusal !== null) return { ok: false, message: refusal, skills: [] }
       }
-      // PLAN-R2 P2-7 (2026-09-16): the missing-argument pre-check runs BEFORE
-      // the approval seam. On an approval-enabled deployment a write that
-      // cannot execute (e.g. patch without new_string) used to be STAGED,
-      // spend a human approval, and only then fail the replay inside
-      // executeCore — wasted operator attention for a guaranteed refusal
-      // (the defect class GRAPH-03/OPT-05/V7-07 closed on their surfaces).
-      // The stage boundary now refuses with the SAME structured message
-      // executeCore produces (one shared helper, so the two sites cannot
-      // diverge); direct writes get the identical refusal a moment earlier,
-      // and executeCore keeps its own check because the replay channel enters
-      // there directly.
-      const missing = missingRequiredArgs(args)
-      if (missing.length > 0) {
-        return missingArgsRefusal(args.action, missing)
+      // The write-admission sequence, ADMISSION point (design §3). It runs BEFORE the approval
+      // seam, so a write that is refused is never staged: on an approval-enabled deployment a
+      // guaranteed refusal (patch without new_string, an unread target, a protected name) used to
+      // be staged, spend a human approval, and only then fail inside executeCore — wasted operator
+      // attention for a refusal the tool already knew (PLAN-R2 P2-7 closed the missing-argument
+      // half of that class; the shared table now carries the rest). The execution point re-runs
+      // the gates a replay can still fail, with the SAME table, so the two cannot diverge.
+      const refusal = await runWriteGates({
+        point: 'admission',
+        args,
+        origin: libraryOrigin,
+        protectedNames: protectedSkillNamesOf(),
+        readNames: sessionReadSkillNames(exec.agent?.session),
+        warn: warnWriteGateOnce,
+      })
+      if (refusal !== null) {
+        return { ok: false, message: refusal, skills: [] }
       }
       const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {

@@ -6,10 +6,11 @@
  * background review's plan. Before this module the rule lived in `evolution-review` only, so the
  * tool path could not see it at all.
  *
- * The READER is NOT here: `tool-dispatch.collectReadSkillNames(events)` already folds a session
- * log into the names read through a non-failed dispatch — the review's old session-shaped copy was
- * a line-for-line duplicate of it. Callers pass `session.snapshotEvents()`. Keeping the rule and
- * the reader in their two existing homes is what makes this ONE fact instead of three.
+ * The READER is not here either: `tool-dispatch.collectReadSkillNames(events)` folds a session log
+ * into the names read through a non-failed dispatch — the review's old session-shaped copy was a
+ * line-for-line duplicate of it. What this module adds over it is the session-shaped ADAPTER
+ * (`sessionReadSkillNames`), because two callers need the same answer to "which accessor does this
+ * platform generation expose, and what does an unreadable session mean".
  *
  * v32 REV-06(a) is preserved by the dispatch normalizer: a skill counts as READ only when its read
  * did not fail, so a failed/timeout read cannot pass the gate and let a writer blind-overwrite
@@ -18,6 +19,27 @@
  * was dropped — and nothing reported the loss.
  * @module @deepseek-ai/dsh-evolution-core
  */
+import { collectReadSkillNames } from './tool-dispatch.ts'
+
+/** The session-log accessor the platform exposes (0.1.5 on; `session.events` before it). */
+export interface EvolutionSessionLogView {
+  /** @returns the session's events, oldest first. */
+  snapshotEvents?: () => Iterable<{ type: string; data?: unknown }>
+}
+
+/**
+ * The skill names ONE session read, or `undefined` when its log is not readable.
+ *
+ * `undefined` is NOT an empty set: a caller that must decide (the tool path's read-before-write
+ * gate) can then keep its previous behavior instead of refusing every write in a composition whose
+ * session objects expose no log at all.
+ * @param session - the session whose reads are wanted; `undefined` when the call carries none.
+ * @returns the names read through a non-failed `skill` dispatch, or `undefined` when unreadable.
+ */
+export function sessionReadSkillNames(session: EvolutionSessionLogView | undefined): ReadonlySet<string> | undefined {
+  const events = session?.snapshotEvents?.()
+  return events === undefined ? undefined : collectReadSkillNames(events)
+}
 
 /** Actions whose target must have been read first (create is authorship, so it is exempt). */
 export const READ_REQUIRED_ACTIONS: readonly string[] = Object.freeze([
