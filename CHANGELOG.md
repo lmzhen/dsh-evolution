@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.2 (patch) — 修复：宿主半在 web server 之后装配时路由不注册（面板能开、每次调用 404）
+
+> **症状（在**已安装产物**上实测；CI 全绿测不出）**：左栏「技能历史」行出现、面板正常渲染（标题／提示／空态都对），但每次读取都回 `读取失败：HTTP 404`。
+> **根因**：`src/index.ts` 的 apply 里 `const webServer = ctx.get('webServer')` ＋ `if (webServer === undefined) return`——profile 行按文件顺序装配，**这一行 apply 时 web server 还没提供**，于是"没有 web server 就惰性"的本意被一个**时序事实**误判成永久静默 inert：路由从未注册。
+> **修法**：改成 `ctx.inject(['webServer'], (scope) => scope.effect(() => …))`——服务到了再挂；永远没有 web server 的 profile 只是不执行回调（**惰性，且不产生 pending 行**，与原意一致）。
+> **回归与判别性验证**：新增 `tests/apply-order.spec.ts`（web server **后到**仍注册四条路由；没有 web server 也不抛）；把旧 apply 体放回 overlay 复跑 ⇒ **必须见红**（1 failed | 1 passed）；还原 ⇒ 见绿（2 passed）。
+> **npm／发布面**：无变化——包名与 OIDC 绑定照旧，本版只是抬版本重发（0.11.1 的包内容除这一处外完全相同）。
 ## 0.11.1 (minor) — 技能历史的图形面：左栏「技能历史」面板 ＋ 四条 loopback 路由（版本分链，文件版本按名拒绝，G6 占用行决定不做）
 
 > **为什么重切（0.11.0 → 0.11.1）**：tag `v0.11.0` 已推、CI 的 `validate (baseline)` 红在

@@ -16,25 +16,28 @@ import { makeSkillHistoryRoutes } from './routes.ts'
 
 export const name = 'evolution-skill-history'
 
-/** No declared service: the web server is OPTIONAL (a headless profile has none) and the curator is
- * resolved per request, so the row activates wherever it is installed and answers honestly where a
- * service is missing — the platform rule for optional services is ctx.get, not a waited-on inject. */
+/** No declared service: a headless profile must not leave a pending row, and the curator is resolved
+ * per request. The web server is waited on INSIDE apply (see below), not declared here. */
 export const inject: string[] = []
 
 /**
- * Mount the routes as ONE effect: the disposers run on unload and on HMR.
- * @param ctx - the host context carrying webServer and the curator.
+ * Wait for the web server, then mount the routes as ONE effect (disposers run on unload and on HMR).
+ *
+ * **Why `ctx.inject` and not `ctx.get`**: profile rows apply in file order, so at this row's apply time
+ * the web server may not exist yet — `ctx.get('webServer')` returning undefined is a TIMING fact, not a
+ * verdict, and acting on it (0.11.1 shipped that way) left the routes permanently unregistered while the
+ * panel rendered and every call answered HTTP 404. Waiting on the service mounts the routes whenever it
+ * arrives, and a profile that never gets one simply never runs this callback — inert, never pending.
+ * @param ctx - the host context; the web server and curator arrive through it.
  */
 export function apply(ctx: Context): void {
-  const webServer = ctx.get('webServer')
-  // A profile with no web server (headless, or a row installed without the web app) has nothing to
-  // mount: the slash commands stay the entry point there, so this row is inert rather than pending.
-  if (webServer === undefined) return
-  ctx.effect(() => {
-    const routes = makeSkillHistoryRoutes({ getCurator: () => ctx.get('evolutionCurator') })
-    const disposers = routes.map(route => webServer.register(route))
-    return () => {
-      for (const dispose of disposers) dispose()
-    }
-  }, 'evolution-skill-history: routes')
+  ctx.inject(['webServer'], (scope) => {
+    scope.effect(() => {
+      const routes = makeSkillHistoryRoutes({ getCurator: () => scope.get('evolutionCurator') })
+      const disposers = routes.map(route => scope.webServer.register(route))
+      return () => {
+        for (const dispose of disposers) dispose()
+      }
+    }, 'evolution-skill-history: routes')
+  })
 }
