@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.5 (patch) — 左列加宽 16px：把 V6 的 12px 内缩还给技能名
+
+> **症状**：0.13.3 的 V6 把左列列表的横向内距从 6px 改成 12px（让技能行与上面的搜索框共用同一条左缘），行宽因此少 12px；最长的技能名 `dsh-evolution-maintenance`（26 字符）正好卡在这 12px 上，真机显示成 `dsh-evolution-maint…`——而它在 0.13.2 是完整的。
+> **修法**：左列 `264px → 280px`（列表 24px 内距 ＋ 行 16px 内距 ＋ 名字与计数共 230px ⇒ 需 ≥270，取 280 留余量）。V6 的对齐不动，计数也不缩短。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0；vitest 全绿；门禁 **21/21**（前缀 `v0135a`）。真机复验见发布记录（`dsh-evolution-maintenance` 与 `windows-computer-use` 均完整显示）。
+> **教训（写进发布记录）**：客户端半的「观感」改动只有发布＋装机之后才看得见 ⇒ 外观批次的第一版发布后要立刻做真机复核，把 fallout 收进紧随的补丁；本轮 0.13.4／0.13.5 两发都是这一类收尾。
+
 ## 0.13.4 (patch) — 修 0.13.3 的一处自伤：面板字号回到「chrome 减一档」，技能名不再被截断
 
 > **症状**：0.13.3 把面板根的 `font-size` 从 token 改成「继承 chrome 尺寸」后，正文由 13px 变 14px；左列固定 264px 已装不下 `dsh-evolution-maintenance` 与 `windows-computer-use`，真机上两行技能名分别显示成 `dsh-evolution-mai…`／`windows-computer-…`——面板里最要紧的标识被截断。

@@ -30,7 +30,9 @@ export const CSS = [
   // it). The step is relative, so the panel scales with the shell, not with the conversation: the
   // dense list needs it — at the raw chrome size `dsh-evolution-maintenance` truncates in 264px.
   '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;font-size:calc(1em - 1px);color:var(--dsw-alias-label-primary)}',
-  '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 264px;width:264px;min-height:0;border-right:.5px solid var(--dsw-alias-border-l2)}',
+  // 280px, not 264: the list's 12px inset (so rows share the search field's left edge) plus the
+  // version count left `dsh-evolution-maintenance` truncated at the panel's type size.
+  '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 280px;width:280px;min-height:0;border-right:.5px solid var(--dsw-alias-border-l2)}',
   '.evo-hist-search{padding:12px 12px 4px}',
   '.evo-hist-search input{width:100%;box-sizing:border-box;padding:6px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}',
   '.evo-hist-search input:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',
