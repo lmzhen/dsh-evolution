@@ -849,6 +849,9 @@
       "path": "./packages/evolution/evolution-settings-ui"
     },
     {
+      "path": "./packages/evolution/evolution-skill-history"
+    },
+    {
       "path": "./packages/evolution/evolution-approval"
     },
     {

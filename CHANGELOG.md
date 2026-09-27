@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.11.0 (minor) — 技能历史的图形面：左栏「技能历史」面板 ＋ 四条 loopback 路由（版本分链，文件版本按名拒绝，G6 占用行决定不做）
+## 0.11.1 (minor) — 技能历史的图形面：左栏「技能历史」面板 ＋ 四条 loopback 路由（版本分链，文件版本按名拒绝，G6 占用行决定不做）
+
+> **为什么重切（0.11.0 → 0.11.1）**：tag `v0.11.0` 已推、CI 的 `validate (baseline)` 红在
+> `File '…/packages/evolution/evolution-skill-history/src/routes.ts' is not listed within the file list of project '…/tsconfig.host.json'`
+> ——baseline 作业会把**镜像根目录的 `tsconfig.host.json`（项目图）覆盖进 upstream**，而新包没进那份图（本地 overlay 的同一份图我加了引用，镜像那份漏了）。
+> **npm 侧一个包都没发出去**（publish 作业被 skip），故按家族口径**抬版本重切**；tag `v0.11.0` 保留为历史，不删不挪。
 
 > **由来**：0.10.0 把内容版本与单技能撤销做成了两条斜杠命令（A/B 批），但"事后想起来去看"的用户没有可点的面。判定档 `dsh-evolution-skill-history-entry-options.md` §10–§13 逐项取优＋整体复核后定下三条：**只开一个新面**（⑥b 左栏面板行）、**复用唯一写通道**（`curator.undo`）、**先修事实层再上面板**。
 > **命令面不动**：`/evolution skill history|undo` 的解析与文案逐字不变——CLI／无 GUI 会话里它们是唯一入口，也是这个面的等价物。
