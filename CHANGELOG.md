@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.6 (patch) — 重发：npm 上 `dsh-skill-usage@0.13.5` 只有元数据、没有 tarball
+
+> **症状**：0.13.5 发布后本机安装报 `ERR_PNPM_FETCH_404 …/@lmzhen/dsh-skill-usage/-/dsh-skill-usage-0.13.5.tgz`；registry 的 packument 里 0.13.5 在（`latest` 也是它），但 **tarball 拉不到**（HEAD 持续 404 二十余分钟）。⇒ 装机出现 29×0.13.5 ＋ 1×0.13.4 的混装。
+> **为什么不能就地补**：`publish-scoped.mjs` 对「已在 registry 且 integrity 一致」的版本是 **skip**（不一致才抛 E409），所以重跑 publish 作业不会重传；而 0.13.5 的 `dist.integrity` 与本地 tarball 一致 ⇒ 判定为 registry 侧的 blob 缺失，不是我们发错内容。本机没有 npm 发布凭据（`npm whoami` 空），unpublish 也走不了。
+> **修法**：抬版本到 **0.13.6**（家族口径：已发布版本只能抬版本），整套 31 包重新发布。**代码与 0.13.5 完全相同**（只有版本号变），所以门禁沿用 `v0135a` 的 **21/21 exit=0**，不重复跑。
+> **验证**：npm **31/31 at 0.13.6**，且单独 HEAD 过 `@lmzhen/dsh-skill-usage` 的 0.13.6 tarball（200）；本机 `dsh plugin add` 后 30 包全 0.13.6、零混装。
+
 ## 0.13.5 (patch) — 左列加宽 16px：把 V6 的 12px 内缩还给技能名
 
 > **症状**：0.13.3 的 V6 把左列列表的横向内距从 6px 改成 12px（让技能行与上面的搜索框共用同一条左缘），行宽因此少 12px；最长的技能名 `dsh-evolution-maintenance`（26 字符）正好卡在这 12px 上，真机显示成 `dsh-evolution-maint…`——而它在 0.13.2 是完整的。
