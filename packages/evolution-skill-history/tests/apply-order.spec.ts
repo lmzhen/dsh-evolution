@@ -22,7 +22,7 @@ function fakeWebServer(): { paths: string[]; register: (route: { path: string })
 }
 
 describe('skill-history host half: mounting order', () => {
-  it('registers the four routes when the web server mounts AFTER the row applies', async () => {
+  it('registers every route when the web server mounts AFTER the row applies', async () => {
     const ctx = new Context()
     const server = fakeWebServer()
     await ctx.plugin(SkillHistory)
@@ -30,6 +30,7 @@ describe('skill-history host half: mounting order', () => {
     ctx.provide('webServer', server as never)
     await new Promise(resolve => setTimeout(resolve, 20))
     expect([...server.paths].sort()).toEqual([
+      SKILL_HISTORY_ROUTES.diff,
       SKILL_HISTORY_ROUTES.health,
       SKILL_HISTORY_ROUTES.skills,
       SKILL_HISTORY_ROUTES.undo,

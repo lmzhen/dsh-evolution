@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.13.0 (minor) — 对外界面按「事实只算一次、词只在各自字典、控件与排版走平台 token」重整：面板信息设计重写、确认卡说明用途、命令首行结论化
+
+> **由来**：用户两轮口径——① 「技能历史页面美观性很差…没有多少有助于决策的信息；创建技能的询问界面也一样」② 「检查全量对外功能里是否还有同类问题」——收敛成 `dsh-evolution-ui-ux-gap-list.md`（三轮共 22 条，P／A／C／T 四组）。本版按该档 §9 架构方案与 §10 分组计划实施 G1–G3。
+> **G0 探针结论（先做，且否决了原路线）**：方案原本要让面板直接用平台原语（`ui-primitives` 的 Button/Tag/StateDot/DisclosureRow/HoverCard/DiffBlock…）。实测**走不通**：该 specifier 在家族 tsconfig 里有 `paths` 映射，`tsc -b tsconfig.host.json` 会把平台客户端包的**源码**拉进本包工程 ⇒ `TS6059`（不在 rootDir 下）＋ `TS6307`（不在工程文件表内）＋ `TS2305`（家族的 `react.d.ts` 环境声明遮蔽真 react 类型，平台源码自己编不过）。走这条路要给本包**拆 host/client 两个编译面**＋加 `react` devDeps＋装依赖＋改 CI 图——不是一条 import 能解决的事。
+> **因此改走 §10 的备用路线（自绘 ＋ token）**：面板自带一张样式表（`src/client/styles.ts`，与家族设置卡同一姿势：字符串注入 `<style data-plugin-css=…>`），**度量从平台自己的 CSS 抄来并写明出处**（命令卡的 `<pre>`：`--dsw-font-markdown-code-block-small`／`.5px` 边框／`12px 16px` 内距／`max-height:260px`／radius `12px`；侧栏行的 hover 与焦点环：`--dsw-alias-interactive-bg-hover` ＋ 2px 内嵌 outline），字号一律走 token（`--dsh-content-font-size-secondary` 与其 `calc()` 派生），**不再有字面字号／字体／颜色**。对照物（用户举的标杆「技能中心」＝第三方 `dsh-client-ui-skill-explorer`）同样自绘＋token：这条路在本平台有先例。
+> **⚠ 本版未做（如实记，各有归属）**：③ 新门禁规则 **N24**（客户端半禁字面字号／字体／颜色）；④ **jsdom 组件车道**（需本包加 `react` devDep ＋ overlay 跑一次 `pnpm install`；写法已查明）；⑤ **G4 摘要档**（`skillVersionSummary` 参数 ＋ 写路径调用；core 侧提示词与 `summary` 字段**已就位**）；⑥ **P1-5**（设置卡显示被覆盖的部署默认值）——查证后确认**数据不在客户端手上**（`snapshot.user`／`snapshot.value` 是覆盖值与解析值），要先在设置缝里加字段，故列为后续项而不是硬造。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 左栏面板行图标 | **emoji 🕘 → 平台风格线图标**（内联 SVG：`currentColor`、1.5px 描边、随侧栏槽位的 16/18px）——emoji 不跟主题色、不吃尺寸约定、跨系统形状不同 |
+| 面板左列 | 两行式：名字 ＋「N 个版本」；第二行是**技能描述**（列表本来就带，此前被丢掉）＋ 管理状态；顶部**搜索框**（名字或描述过滤，纯客户端，无新路由） |
+| 面板版本行 | 从 `v1 <ISO> baseline 11836 chars <hash12>` 改成 `v2  定点修改  2026-09-27 18:20 · 3 小时前  （+1363 字符）`；「当前」是胶囊、动作是按钮；**「差异」就地展开**该版与前驱的差异（增删行数＋变更区域，超长标注截断） |
+| 错误态 | **先给可行动的解释**（「面板读不到宿主路由——通常是插件版本与宿主不匹配，重启 dsh web 后重试」）再附宿主原句 |
+| 时间与动作词 | 时间＝本地时间＋相对量（`elapsedSince` 在 core，返回 `{unit, n}`，**词在 locale 字典**）；动作词＝`versionActionKind` 的闭集键 → 字典（初始快照／新建／定点修改／整篇更新／回退／删除／归档／合并／结构调整／附带文件写入） |
+| 创建/删除确认卡 | 问句后**多两行事实**：`What it does: <frontmatter description>` 与 `Content versions recorded: N`。数据由工具**惰性**提供（不问就不读），措辞仍只在 `write-gates.ts` 一处 |
+| 命令面首行 | `/evolution`（裸）＝`/evolution subcommands (N):`；`/evolution params`＝`共 N 个参数：…；你改过的：M 项。`（平台命令卡把**第一行**当折叠摘要，此前两条的第一行分别是子命令列表与表头） |
+| 待批项 | `/evolution pending` 每行补**年龄与来源**：`· 5 minutes ago  from foreground (session 1a2b3c4d)` |
+| 暂存结果 | 被 stage 的写入在**文本里**带上句柄：`… (staged id: <id> — /evolution pending lists it)` |
+| 设置卡字号 | 标题／标签／输入／提示改走平台 token，跟随「字号大小」设置，不再写死 16/13/12px |
+
+### 不动的（契约）
+
+- **模型可见文本**：`skill_manage` 的 description 与工具 schema 不变；新增的只有工具结果文本里的一小段（暂存 id）与确认卡的问题正文（人看的）。
+- **写通道**：仍只有 `curator.undo`（面板）与库句柄（工具／命令）；面板照旧不写盘、不订阅、不轮询，新增的 diff 只是**多一条只读 loopback 路由**。
+- **唯一座位**：`sidebar.panellist` 一行 ＋ 同 id 的 `main` 面板体，没有新座位、没有新 store、不绑定会话。
+- **命令面形态**：纯文本（有意为之），本版只改首行与补字段，不做卡片。
+- **core 依旧无句子**：`versionActionKind`／`textDiffFacts`／`elapsedSince`／`normalizeVersionSummary`／`versionSummaryPrompt` 全部返回事实或固定提示词，用户可见字句只在 locale 字典与命令面英文里。
+
+### 新用例与证据
+
+- `evolution-core/tests/skill-history.spec.ts` ＋6：动作闭集 pin（源码扫描：库能写的 action 不许落到 `other`）、diff 边界（无变化／单处／超长截断）、**summary 两条读取分支**（无 `beforeHash` 的那条正是会丢字段的）、摘要归一与提示词 pin。
+- `evolution-skill-history/tests/routes.spec.ts`：skills 行的描述/状态、versions 行的 `actionKind`／`age`／`undoable`、**新 diff 路由**（正常／与 v1 比较／不在历史回 404／坏参数回 400）；`apply-order.spec.ts` 改断言五条路由。
+- `evolution-commands/tests/params-view.spec.ts` 与 `commands.spec.ts`：首行＝结论行、待批行的归属段（正则锚定，不再依赖固定换行）。
+
 ## 0.12.0 (minor) — 技能写入的确认变成**可配模式**（含删除），默认**不弹窗直接写**
 
 > **由来（用户口径，2026-09-27 真机）**：0.9.0 那次「创建/删除前问一次」在真机上暴露两件事：① **无人应答时它会挂住**——工具调用停在问题上，本轮再也走不到下一步（实测挂满一次 600s 调用上限），后台/无人值守的 run 等于被卡死；② 人不在电脑边就干等。要求：**包括删除在内，所有弹窗都做成可配置的**，并把**默认设为不弹窗自动确认**。

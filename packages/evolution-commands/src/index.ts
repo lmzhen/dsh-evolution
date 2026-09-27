@@ -9,7 +9,7 @@ import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, type EvolutionIoLike, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, type EvolutionIoLike, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
@@ -186,10 +186,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
           const detailed = pendingMatch[0] === 'pending --detail'
+          // A staged write is a DECISION someone has to make, so the row carries when it was staged
+          // and who staged it: an abandoned record and one from a minute ago must not look alike.
+          // (The words are the command surface's own — English, like every other line it prints.)
+          const nowMs = Date.now()
+          const attribution = (p: { createdAt: string; origin?: string | undefined; sessionId?: string | undefined }): string => {
+            const age = elapsedSince(p.createdAt, nowMs)
+            const unit = age.n === 1 ? age.unit.replace(/s$/u, '') : age.unit
+            const when = age.unit === 'now' ? 'just now' : `${age.n} ${unit} ago`
+            const who = p.origin === undefined ? '' : `  from ${p.origin}`
+            const session = p.sessionId === undefined ? '' : ` (session ${p.sessionId.slice(0, 8)})`
+            return `  ·  ${when}${who}${session}`
+          }
           const body = pending.map((p) => {
-            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}`
+            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}${attribution(p)}`
             const status = p.status === 'executing' ? 'EXECUTING' : p.status
-            const line = `${p.id}  ${p.kind}  ${status}  ${p.summary}`
+            const line = `${p.id}  ${p.kind}  ${status}  ${p.summary}${attribution(p)}`
             return p.args === undefined ? line : `${line}\n  staged args: ${safeStagedArgs(p.args)}`
           }).join('\n')
           const hint = pending.some(p => p.status === 'executing')

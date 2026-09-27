@@ -51,7 +51,10 @@ describe('params view (G4/S4.1)', () => {
   it('renders one line per row plus the counts, JSON for scripts', () => {
     const rows = paramSurfaceRows(new Map([[REVIEW_NS, { user: { reviewSkillInterval: 30 }, value: { reviewSkillInterval: 30 } }]]))
     const text = renderParamRows(rows, { providerMounted: true })
-    expect(text.split('\n')[0]).toContain('来源')
+    // The FIRST line is the collapsed summary the platform's command row shows, so it is the count
+    // line, not the column header (0.13.0).
+    expect(text.split('\n')[0]).toContain('共 ' + String(PARAM_EXPOSURE.length) + ' 个参数')
+    expect(text).toContain('来源')
     expect(text).toContain('reviewSkillInterval')
     expect(text).toContain(`共 ${PARAM_EXPOSURE.length} 个参数：E0 0`)
     expect(text).toContain('你改过的：1 项')

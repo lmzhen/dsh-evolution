@@ -996,6 +996,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.
         confirmMode: settings().skillWriteConfirm,
         confirmTimeoutSeconds: settings().skillWriteConfirmTimeoutSeconds,
+        // The card says what the target IS, not only its name: a create already holds the body it is
+        // about to write, a delete can read the one it is about to archive. Lazy, so a write nobody
+        // is asked about pays nothing for it.
+        describeTarget: async () => {
+          const versions = typeof args.name === 'string' && args.name !== ''
+            ? (await library.listVersions(args.name).catch(() => [])).length
+            : 0
+          const body = typeof args.content === 'string' && args.content !== ''
+            ? args.content
+            : typeof args.name === 'string' && args.name !== '' ? await library.read(args.name).catch(() => null) : null
+          const frontmatter = body === null ? null : parseFrontmatter(body)?.frontmatter ?? null
+          const parsedDescription = frontmatter === null ? undefined : frontmatter.description
+          const description = typeof parsedDescription === 'string' ? parsedDescription : ''
+          return {
+            ...description === '' ? {} : { description },
+            ...versions === 0 ? {} : { versions },
+          }
+        },
         warn: warnWriteGateOnce,
       })
       if (refusal !== null) {
@@ -1051,7 +1069,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // 0.3.18 (E-70): no `pending_id ?? ''` — an absent id must stay absent.
           return {
             ok: true,
-            message: decision.message,
+            // The id belongs in the WORDS too: the transcript is where an operator (and the model)
+            // reads the result, and "staged" without a handle cannot be acted on.
+            message: decision.pendingId === undefined
+              ? decision.message
+              : decision.message + ' (staged id: ' + decision.pendingId + ' — /evolution pending lists it)',
             skills: [],
             ...decision.pendingId !== undefined ? { pending_id: decision.pendingId } : {},
           }

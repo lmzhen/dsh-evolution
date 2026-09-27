@@ -1165,7 +1165,10 @@ describe('evolution-commands', () => {
     const argsJson = JSON.stringify(pendingRecord.args)
     // The staged args are rendered (truncated to 500 chars), so the operator
     // can see what approve will actually replay rather than "blind-approving".
-    expect(detail.text).toContain(`a1  skill  pending  create demo\n  staged args: ${argsJson.slice(0, 500)}…(truncated ${argsJson.length - 500} chars)`)
+    // 0.13.0: the row carries its attribution (age, origin) between the summary and the args, so the
+    // assertion is anchored on the summary and the staged-args line rather than on a fixed newline.
+    expect(detail.text).toMatch(/a1 {2}skill {2}pending {2}create demo {2}· {2}[^\n]+\n {2}staged args: /)
+    expect(detail.text).toContain(`  staged args: ${argsJson.slice(0, 500)}…(truncated ${argsJson.length - 500} chars)`)
     // The truncation is explicitly marked — an oversized payload never reads as
     // a complete-but-cut JSON, even when the cut lands mid-escape (V4-19).
     expect(detail.text).toMatch(/\(truncated \d+ chars\)/)

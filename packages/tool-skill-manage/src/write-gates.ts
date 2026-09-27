@@ -62,6 +62,13 @@ function timeoutSecondsOf(configured: number | undefined): number {
     : DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS
 }
 
+/** What the operator is told about the target before answering. Every field is optional: a target
+ * with no frontmatter, or one the library cannot read, simply carries less. */
+export interface ConfirmContext {
+  readonly description?: string | undefined
+  readonly versions?: number | undefined
+}
+
 /** One confirm question, as the gate writes it and the seam asks it. */
 export interface WriteConfirmRequest {
   /** The action being confirmed (`create` or `delete`). */
@@ -77,6 +84,7 @@ export interface WriteConfirmRequest {
   }
   /** The option label that means "proceed". */
   readonly confirmLabel: string
+
   /** A deadline the gate imposes on itself (`timeout` mode); the seam combines it with the call's
    * own cancellation. An abort is a dismissal, never a consent. */
   readonly signal?: AbortSignal
@@ -118,6 +126,9 @@ export interface WriteGateContext {
   readonly confirmMode?: WriteConfirmMode
   /** The registry's `skillWriteConfirmTimeoutSeconds`, read only in `timeout` mode. */
   readonly confirmTimeoutSeconds?: number
+  /** Read the target's own words for the confirmation card. LAZY on purpose: a write that is not
+   * asked about must not pay a read for a question nobody sees. Absent means "say nothing extra". */
+  readonly describeTarget?: (() => Promise<ConfirmContext | undefined>) | undefined
   /** Report a degraded gate; must not throw. The implementation decides how often it speaks — the
    * shipped seam latches once per PROCESS, because the conditions it reports (no question service,
    * an unreadable session log) belong to the deployment, not to one write. */
@@ -288,7 +299,7 @@ const READ_BEFORE_WRITE: WriteGate = {
 const HUMAN_CONFIRM: WriteGate = {
   id: 'human-confirm',
   appliesTo: ['admission'],
-  run: async ({ view, origin, confirm, warn, confirmMode, confirmTimeoutSeconds }) => {
+  run: async ({ view, origin, confirm, warn, confirmMode, confirmTimeoutSeconds, describeTarget }) => {
     const action = view.action
     if (action === undefined || origin !== 'foreground' || view.name === '') return null
     const destructive = action === 'create' || (action === 'delete' && view.absorbedInto === undefined)
@@ -319,6 +330,16 @@ const HUMAN_CONFIRM: WriteGate = {
         timer.unref()
       })
       : undefined
+    // The question says what the OPERATOR needs: the consequence, then the target in its own words.
+    // Asking for a decision by name alone is asking someone to authorize an unknown artifact.
+    const context = await describeTarget?.()
+    const details = [
+      context?.description === undefined || context.description === '' ? null : 'What it does: ' + context.description,
+      context?.versions === undefined ? null : 'Content versions recorded: ' + String(context.versions),
+    ].filter((line): line is string => line !== null)
+    const consequence = action === 'create'
+      ? `Create skill "${view.name}"? A new skill directory is written into the family tree.`
+      : `Delete skill "${view.name}"? It is archived under .archive and leaves the catalog.`
     const asked = confirm({
       action,
       name: view.name,
@@ -326,9 +347,9 @@ const HUMAN_CONFIRM: WriteGate = {
       question: {
         id: CONFIRM_QUESTION_ID,
         header: 'Confirm',
-        question: action === 'create'
-          ? `Create skill "${view.name}"? A new skill directory is written into the family tree.`
-          : `Delete skill "${view.name}"? It is archived under .archive and leaves the catalog.`,
+        // ONE line: the platform's question composer does not preserve newlines, so a multi-line
+        // question arrives as a run-on sentence. The facts are separated instead.
+        question: details.length === 0 ? consequence : consequence + ' ' + details.join(' · '),
         options: [{ label: confirmLabel }, { label: CANCEL_LABEL }],
       },
       ...mode === 'timeout' ? { signal: cancel.signal } : {},

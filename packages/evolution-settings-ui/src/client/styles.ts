@@ -17,7 +17,7 @@ export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-settings-ui/settings.css'
 /** The stylesheet the section injects once. */
 export const CSS = [
   '.evolution-params{display:flex;flex-direction:column}',
-  '.evolution-params-title{margin:0 0 4px;color:var(--dsw-alias-label-primary);font-size:16px;font-weight:600;line-height:1.5}',
+  '.evolution-params-title{margin:0 0 4px;color:var(--dsw-alias-label-primary);font-size:calc(var(--dsh-content-font-size,14px) + 2px);font-weight:600;line-height:1.5}',
   '.evolution-params-subtitle{margin:0 0 16px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.5}',
   '.evolution-param-card{border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);margin-bottom:12px}',
   '.evolution-param-head{display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;background:none;border:0;text-align:left;cursor:pointer;color:inherit;font:inherit}',
@@ -28,11 +28,11 @@ export const CSS = [
   '.evolution-param-body{padding:0 14px 12px;border-top:.5px solid var(--dsw-alias-border-l3)}',
   '.evolution-param-field{display:flex;flex-direction:column;gap:6px;padding:12px 0}',
   '.evolution-param-field+.evolution-param-field{border-top:.5px solid var(--dsw-alias-border-l4)}',
-  '.evolution-param-label{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500;line-height:1.5}',
+  '.evolution-param-label{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size,14px);font-weight:500;line-height:1.5}',
   '.evolution-param-unit{color:var(--dsw-alias-label-tertiary);font-weight:400}',
-  '.evolution-param-hint{margin:0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.5}',
+  '.evolution-param-hint{margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--dsh-content-font-size-secondary,13px);line-height:1.5}',
   '.evolution-param-value{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5}',
-  '.evolution-param-input{width:100%;box-sizing:border-box;padding:8px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5}',
+  '.evolution-param-input{width:100%;box-sizing:border-box;padding:8px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size,14px);line-height:1.5}',
   '.evolution-param-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}',
   '.evolution-param-input:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
   '.evolution-param-source{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:4px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary);font-size:12px;line-height:20px}',

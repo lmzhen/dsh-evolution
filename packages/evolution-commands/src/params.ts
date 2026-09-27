@@ -127,7 +127,9 @@ export function renderParamRows(rows: readonly ParamSurfaceRow[], options: { pro
   const note = options.providerMounted
     ? '来源：我改过＝你在设置里改的；默认＝安装时的配置；不可改＝该功能不提供用户可改项。'
     : '设置服务未挂载——读不到你改过的值，所以每行显示的都是安装时的配置（这不等于「你没改过」）。'
-  return [header, ...body, '', counts, TIER_LEGEND, note].join('\n')
+  // The platform's command row shows a command's FIRST LINE as its collapsed summary, so the
+  // headline leads and the table follows: a reader who never expands still learns what this is.
+  return [counts, '', header, ...body, '', TIER_LEGEND, note].join('\n')
 }
 
 /**

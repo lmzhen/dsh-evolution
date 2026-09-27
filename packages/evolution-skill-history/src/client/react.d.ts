@@ -23,7 +23,7 @@ declare module 'react' {
    * @param initial - the initial value.
    * @returns the current value and its setter.
    */
-  export function useState<S>(initial: S): [S, (next: S) => void]
+  export function useState<S>(initial: S): [S, (next: S | ((current: S) => S)) => void]
   /**
    * One mutable box that survives re-renders without causing one.
    * @param initial - the initial value.
@@ -36,4 +36,11 @@ declare module 'react' {
    * @param deps - the dependency list.
    */
   export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void
+  /**
+   * A value derived from the render's inputs, recomputed only when a dependency changes.
+   * @param factory - computes the value.
+   * @param deps - the dependency list.
+   * @returns the memoized value.
+   */
+  export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T
 }

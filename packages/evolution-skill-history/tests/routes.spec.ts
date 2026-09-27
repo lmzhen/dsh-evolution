@@ -115,17 +115,63 @@ describe('skill-history routes: over a real socket', () => {
       // Skills: only the tree entries that actually recorded a version.
       const skills = await fetch(host.origin + SKILL_HISTORY_ROUTES.skills)
       expect(skills.status).toBe(200)
-      const skillBody = await skills.json() as { ok: boolean; data: Array<{ name: string; versions: number }> }
-      expect(skillBody.data).toEqual([{ name: 'panel-skill', versions: 3 }])
-      // Versions: the body chain and the support-file chain come back apart.
+      const skillBody = await skills.json() as {
+        ok: boolean
+        data: Array<{
+          name: string
+          versions: number
+          description: string
+          managed: boolean
+          protectedBy: string | null
+          protectionUnknown: boolean
+        }>
+      }
+      // The row carries what the listing already knew, so the left column can say what a skill IS.
+      expect(skillBody.data).toHaveLength(1)
+      expect(skillBody.data[0]?.name).toBe('panel-skill')
+      expect(skillBody.data[0]?.versions).toBe(3)
+      expect(skillBody.data[0]?.description).toContain('fixture')
+      expect(typeof skillBody.data[0]?.managed).toBe('boolean')
+      expect(skillBody.data[0]?.protectionUnknown).toBe(false)
+      // Versions: the body chain and the support-file chain come back apart, and every row carries
+      // the verdicts and the vocabulary key the panel renders (it owns no rule of its own).
       const versions = await fetch(host.origin + SKILL_HISTORY_ROUTES.versions + '?name=panel-skill')
       expect(versions.status).toBe(200)
       const versionBody = await versions.json() as {
         ok: boolean
-        data: { content: Array<{ action: string }>; support: Array<{ action: string }> }
+        data: {
+          content: Array<{ action: string; actionKind: string; age: { unit: string; n: number }; undoable: boolean; charsDelta?: number }>
+          support: Array<{ action: string; actionKind: string }>
+          liveHash: string | null
+        }
       }
       expect(versionBody.data.content.map(entry => entry.action)).toEqual(['create', 'update'])
+      expect(versionBody.data.content.map(entry => entry.actionKind)).toEqual(['create', 'update'])
       expect(versionBody.data.support.map(entry => entry.action)).toEqual(['write_file'])
+      expect(versionBody.data.support.map(entry => entry.actionKind)).toEqual(['support-write'])
+      expect(typeof versionBody.data.content[0]?.age.unit).toBe('string')
+      // The live content is the newest body version, so exactly that row is not undoable.
+      expect(versionBody.data.content.filter(entry => ! entry.undoable)).toHaveLength(1)
+      // The diff route: one version against its predecessor, as facts plus the changed region.
+      const diff = await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=2')
+      expect(diff.status).toBe(200)
+      const diffBody = await diff.json() as {
+        ok: boolean
+        data: {
+          v: number
+          against: number | null
+          hunks: Array<{ path: string; oldText: string; newText: string }>
+          truncated: boolean
+        }
+      }
+      expect(diffBody.data.v).toBe(2)
+      expect(diffBody.data.against).toBe(1)
+      expect(diffBody.data.hunks[0]?.path).toBe('SKILL.md')
+      expect(diffBody.data.hunks[0]?.oldText).not.toBe(diffBody.data.hunks[0]?.newText)
+      // Refusals stay refusals: a version that is not in the history, and a malformed query.
+      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=99')).status).toBe(404)
+      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=x')).status).toBe(400)
+      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff)).status).toBe(400)
       // A support version is refused with the curator's own sentence, not a frontmatter error.
       const refused = await fetch(host.origin + SKILL_HISTORY_ROUTES.undo, {
         method: 'POST',

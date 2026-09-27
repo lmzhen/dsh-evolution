@@ -47,8 +47,10 @@ export function renderHint(): string {
 
 /** The bare `/evolution` help body (one line per subcommand). */
 export function renderHelpText(): string {
-  return COMMAND_ENTRIES
-    .map(entry => `  ${entry.usage.padEnd(44)} ${entry.summary}`)
+  // First line first: the platform's command row collapses to the output's FIRST LINE, and a list
+  // whose first line is a subcommand reads like that subcommand was what ran.
+  return [`/evolution subcommands (${COMMAND_ENTRIES.length}):`, '', ...COMMAND_ENTRIES
+    .map(entry => `  ${entry.usage.padEnd(44)} ${entry.summary}`)]
     .join('\n')
 }
 

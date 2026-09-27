@@ -11,8 +11,27 @@
 export const HOST_ROUTES = {
   skills: '/api/dsh-evolution/skill-history/skills',
   versions: '/api/dsh-evolution/skill-history/versions',
+  diff: '/api/dsh-evolution/skill-history/versions/diff',
   undo: '/api/dsh-evolution/skill-history/undo',
 } as const
+
+/** One changed region, as the host reports it (the platform diff card's own shape). */
+export interface DiffHunkRow {
+  readonly path: string
+  readonly oldText: string
+  readonly newText: string
+}
+
+/** One version's diff, as the host computes it. */
+export interface VersionDiffRow {
+  readonly v: number
+  /** The version this one replaced, or null for the first recorded version. */
+  readonly against: number | null
+  readonly linesAdded: number
+  readonly linesRemoved: number
+  readonly hunks: readonly DiffHunkRow[]
+  readonly truncated: boolean
+}
 
 /** One recorded version, as the host reports it. */
 export interface VersionRow {
@@ -23,12 +42,24 @@ export interface VersionRow {
   readonly chars: number
   /** Present on body rows: false when this version already IS the live content. */
   readonly undoable?: boolean
+  /** Characters this version added to (or removed from) the one before it; absent on the first. */
+  readonly charsDelta?: number
+  /** Which kind of write produced it (the vocabulary key the panel turns into words). */
+  readonly actionKind: string
+  /** How long ago the host recorded it, as a bucket plus a count — never a sentence. */
+  readonly age: { readonly unit: string; readonly n: number }
+  /** The one line the optional summarizer wrote, when the deployment turned it on. */
+  readonly summary?: string
 }
 
-/** One skill that has recorded versions. */
+/** One skill that has recorded versions, with what the listing already knows about it. */
 export interface SkillRow {
   readonly name: string
   readonly versions: number
+  readonly description: string
+  readonly managed: boolean
+  readonly protectedBy: string | null
+  readonly protectionUnknown: boolean
 }
 
 /** The two chains, plus the live body hash the panel marks as "current". */
@@ -43,6 +74,7 @@ export interface SkillHistoryApi {
   readonly skills: () => Promise<readonly SkillRow[]>
   readonly versions: (name: string) => Promise<VersionsPayload>
   readonly undo: (name: string, v?: number) => Promise<string>
+  readonly diff: (name: string, v: number) => Promise<VersionDiffRow>
 }
 
 /** A refusal the host reported, carrying its own sentence (the curator's, not ours). */
@@ -64,6 +96,7 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
   return {
     skills: async () => await request(HOST_ROUTES.skills) as readonly SkillRow[],
     versions: async (name: string) => await request(HOST_ROUTES.versions + '?name=' + encodeURIComponent(name)) as VersionsPayload,
+    diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
     undo: async (name: string, v?: number) => {
       const data = await request(HOST_ROUTES.undo, {
         method: 'POST',

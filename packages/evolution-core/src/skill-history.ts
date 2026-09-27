@@ -57,6 +57,10 @@ export interface SkillVersion {
    * can interleave (the index is appended after the content lock is released); this link is computed
    * from the bytes a write lock actually read, so it is the authoritative predecessor. */
   beforeHash?: string
+  /** One line saying what this write changed, when the deployment turned the summarizer on
+   * (registry `skillVersionSummary`). Absent is a first-class state: the faces say so instead of
+   * inventing a sentence, and a version recorded before the feature existed simply has none. */
+  summary?: string
 }
 
 /** One history write, carrying the content the caller already holds. */
@@ -68,6 +72,8 @@ export interface VersionRecordInput {
   /** Content after the mutation, or null when there is none (archive/remove_file). */
   after: string | null
   at: string
+  /** The one-line summary of THIS write, or undefined when the deployment does not summarize. */
+  summary?: string
 }
 
 /** The version numbers one write produced; a side with no content contributes nothing. */
@@ -220,9 +226,14 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   if (typeof candidate.action !== 'string') return null
   if (typeof candidate.chars !== 'number') return null
   // The chain link is metadata: a garbled value drops the link, not the version it belongs to.
+  // `summary` is metadata too, and BOTH branches must carry it: the explicit literal below is the
+  // one a create (which has no beforeHash) takes, and recordVersions re-serializes whatever this
+  // reader returned — a field dropped here is dropped for good on the next write.
+  const summary = typeof candidate.summary === 'string' && candidate.summary !== '' ? candidate.summary : undefined
+  const base = { v: candidate.v, at: candidate.at, action: candidate.action, hash: candidate.hash, chars: candidate.chars }
   return typeof candidate.beforeHash === 'string' && candidate.beforeHash !== ''
-    ? { ...candidate, beforeHash: candidate.beforeHash }
-    : { v: candidate.v, at: candidate.at, action: candidate.action, hash: candidate.hash, chars: candidate.chars }
+    ? { ...base, beforeHash: candidate.beforeHash, ...summary === undefined ? {} : { summary } }
+    : { ...base, ...summary === undefined ? {} : { summary } }
 }
 
 /**
@@ -301,6 +312,9 @@ export function nextHistoryIndex(
         action: input.action,
         hash: afterHash,
         chars: input.after?.length ?? 0,
+        // The summary describes THIS write, so it rides the after-entry only: the baseline minted
+        // above is the state BEFORE it and has nothing to summarize.
+        ...input.summary === undefined ? {} : { summary: input.summary },
         // The authoritative predecessor link: what THIS write replaced, read under the write lock.
         ...beforeHash === null ? {} : { beforeHash },
       })
@@ -441,3 +455,184 @@ export async function recordVersions(
   })
   return recorded
 }
+// ─── Faces of one version (0.13.0) ──────────────────────────────────────────
+// Everything a PERSON reads about a version is derived here, once: the faces (the browser panel and
+// the slash commands) translate facts into their own words and never re-derive, so the two cannot
+// drift. No sentence lives in this module — the words belong to the locale dictionary (panel) and to
+// the command surface (English).
+
+/** What kind of change one recorded version carries, as a CLOSED set. */
+export type VersionActionKind =
+  | 'baseline' | 'create' | 'patch' | 'update' | 'restore' | 'delete' | 'archive'
+  | 'consolidate' | 'restructure' | 'support-write' | 'support-remove' | 'other'
+
+/**
+ * Classify one version action for display. Fail-closed like {@link versionTarget}: an action this
+ * module does not know reads as `other` rather than being guessed, and `tests/skill-history.spec.ts`
+ * pins every action the library can write, so a new one cannot land unclassified.
+ * @param action - the entry’s action label.
+ * @returns the kind the faces switch on.
+ */
+export function versionActionKind(action: string): VersionActionKind {
+  switch (action) {
+    case BASELINE_ACTION: return 'baseline'
+    case 'create': return 'create'
+    case 'patch': case 'edit': return 'patch'
+    case 'update': return 'update'
+    case 'restore': return 'restore'
+    // The body a delete or an archive REMOVED is what the entry holds, so it labels itself.
+    case 'delete': return 'delete'
+    case 'archive': return 'archive'
+    case 'consolidate': return 'consolidate'
+    case 'restructure': return 'restructure'
+    case 'write_file': return 'support-write'
+    case 'remove_file': return 'support-remove'
+    default: return 'other'
+  }
+}
+
+/** One changed region between two bodies — the shape the platform’s diff card eats. */
+export interface TextDiffHunk {
+  readonly path: string
+  readonly oldText: string
+  readonly newText: string
+}
+
+/** What one whole-body replacement changed, as facts. */
+export interface TextDiffFacts {
+  readonly linesAdded: number
+  readonly linesRemoved: number
+  readonly hunks: readonly TextDiffHunk[]
+  /** True when a changed region was longer than the window, so its text is a prefix. */
+  readonly truncated: boolean
+}
+
+/** Lines one changed region may carry before it is windowed and flagged. */
+export const TEXT_DIFF_MAX_LINES = 40
+
+/** Characters one windowed side may carry, so a single enormous line cannot travel whole. */
+export const TEXT_DIFF_MAX_CHARS = 4_000
+
+/**
+ * The facts of one whole-body replacement: how many lines the changed region gained and lost, and
+ * that region itself as one hunk.
+ *
+ * The algorithm is the honest one for "what did this edit touch": common leading and trailing lines
+ * are trimmed away and what remains is ONE contiguous region. It is not a minimal edit script — a
+ * body edited in two distant places reports their span as one region — and that limitation is the
+ * reason the faces show the region as context rather than as a line-by-line proof.
+ * @param before - the body the write replaced.
+ * @param after - the body the write stored.
+ * @param path - the path the hunk names (the platform’s diff card requires one).
+ * @param maxLines - the window a region’s text is capped to.
+ * @returns the counts, the windowed hunk, and whether the window cut anything.
+ */
+export function textDiffFacts(before: string, after: string, path: string, maxLines: number = TEXT_DIFF_MAX_LINES): TextDiffFacts {
+  // An EMPTY body is zero lines, not one blank line: otherwise every first version reports a removal
+  // that never happened (`before: ''` was being counted as one line).
+  const oldLines = before === '' ? [] : before.split('\n')
+  const newLines = after === '' ? [] : after.split('\n')
+  let head = 0
+  while (head < oldLines.length && head < newLines.length && oldLines[head] === newLines[head]) head += 1
+  let tail = 0
+  while (tail < oldLines.length - head && tail < newLines.length - head
+    && oldLines[oldLines.length - 1 - tail] === newLines[newLines.length - 1 - tail]) tail += 1
+  const oldRegion = oldLines.slice(head, oldLines.length - tail)
+  const newRegion = newLines.slice(head, newLines.length - tail)
+  if (oldRegion.length === 0 && newRegion.length === 0) {
+    return { linesAdded: 0, linesRemoved: 0, hunks: [], truncated: false }
+  }
+  // The window is bounded by BOTH lines and characters: a single 100 KB line is one line and would
+  // otherwise travel whole, which is exactly what the request-side body cap exists to prevent.
+  const window = (lines: readonly string[]): { text: string; cut: boolean } => {
+    const byLines = lines.slice(0, maxLines)
+    const joined = byLines.join('\n')
+    if (joined.length <= TEXT_DIFF_MAX_CHARS) return { text: joined, cut: lines.length > maxLines }
+    return { text: joined.slice(0, TEXT_DIFF_MAX_CHARS), cut: true }
+  }
+  const oldWindow = window(oldRegion)
+  const newWindow = window(newRegion)
+  return {
+    linesAdded: newRegion.length,
+    linesRemoved: oldRegion.length,
+    hunks: [{ path, oldText: oldWindow.text, newText: newWindow.text }],
+    truncated: oldWindow.cut || newWindow.cut,
+  }
+}
+
+/** Characters one generated summary may carry. */
+export const VERSION_SUMMARY_MAX_CHARS = 80
+
+/**
+ * The fixed prompt the optional per-write summarizer runs (registry `skillVersionSummary`).
+ *
+ * Model-visible, so it is written from the model’s perspective and pinned: the tests assert that it
+ * carries the skill name, the character cap and both bodies, because a silent change to a prompt is a
+ * silent change to what every recorded version says.
+ * @param input - the skill, the action, and the two bodies (null when absent).
+ * @returns the prompt text.
+ */
+export function versionSummaryPrompt(input: { name: string; action: string; before: string | null; after: string | null }): string {
+  return [
+    'You are writing ONE line that tells a reader what this single edit to the agent skill',
+    '"' + input.name + '" changed. The edit action was "' + input.action + '".',
+    'Rules: at most ' + String(VERSION_SUMMARY_MAX_CHARS) + ' characters; the same language as the body;',
+    'name the decision, number or section that moved (for example "keeps 30 days instead of 90 days");',
+    'never say merely that something changed; no preamble, quotes, markdown or trailing period.',
+    '',
+    'Body BEFORE the edit:',
+    input.before ?? '(the skill did not exist before this edit)',
+    '',
+    'Body AFTER the edit:',
+    input.after ?? '(the skill does not exist after this edit)',
+  ].join('\n')
+}
+
+/**
+ * Reduce a model answer to the one line the index stores.
+ * @param raw - the model’s answer, whatever shape it came in.
+ * @param maxChars - the character cap.
+ * @returns the one line, or undefined when there is nothing usable (callers store no summary).
+ */
+export function normalizeVersionSummary(raw: string, maxChars: number = VERSION_SUMMARY_MAX_CHARS): string | undefined {
+  const firstLine = raw.split('\n').map(line => line.trim()).find(line => line !== '')
+  if (firstLine === undefined) return undefined
+  const stripped = firstLine.replace(/^["'`*•s]+/u, '').replace(/["'`*s]+$/u, '').replace(/[。.]$/u, '').trim()
+  if (stripped === '') return undefined
+  return stripped.length > maxChars ? stripped.slice(0, maxChars - 1) + '…' : stripped
+}
+/** A relative age, in the shape the platform’s own `relativeTime(at, now)` returns. */
+export interface RelativeAge {
+  readonly unit: 'now' | 'minutes' | 'hours' | 'days' | 'months' | 'years'
+  readonly n: number
+}
+
+/**
+ * How long ago an ISO timestamp was, as a bucket plus a count — never as a sentence.
+ *
+ * The shape deliberately mirrors the platform’s `relativeTime` (`ui-primitives`), so a face that later
+ * may import the platform helper swaps one call and keeps its dictionary; the WORDS live in the
+ * faces (the panel’s locale dictionary, the command surface’s English), which is why this module
+ * returns numbers.
+ * @param at - an ISO timestamp, or any string `Date.parse` understands.
+ * @param nowMs - the reference instant.
+ * @returns the bucket and its count; an unparsable timestamp reads as `now` with 0.
+ */
+export function elapsedSince(at: string, nowMs: number): RelativeAge {
+  const then = Date.parse(at)
+  if (Number.isNaN(then)) return { unit: 'now', n: 0 }
+  const minutes = Math.floor(Math.max(0, nowMs - then) / 60_000)
+  if (minutes < 1) return { unit: 'now', n: 0 }
+  if (minutes < 60) return { unit: 'minutes', n: minutes }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return { unit: 'hours', n: hours }
+  const days = Math.floor(hours / 24)
+  if (days < 30) return { unit: 'days', n: days }
+  const months = Math.floor(days / 30)
+  if (months < 12) return { unit: 'months', n: months }
+  // A year is never "0 years ago": 360 days reads as months by the platform's own helper, and here as
+  // the first year, which is the honest bucket for "older than eleven months".
+  return { unit: 'years', n: Math.max(1, Math.floor(days / 365)) }
+}
+
+

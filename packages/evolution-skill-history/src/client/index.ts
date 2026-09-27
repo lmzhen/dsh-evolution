@@ -10,7 +10,8 @@
 import { createElement } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
-import { en, NS, zh } from './messages.ts'
+import { en, fill, NS, zh } from './messages.ts'
+import { CSS, CSS_TAG_ID } from './styles.ts'
 import { SkillHistoryPanel } from './Panel.ts'
 import { PANEL_ID, type ClientSeam } from './seam.ts'
 
@@ -20,9 +21,29 @@ export const inject = ['slots', 'locale']
 /** Row order inside the global panel list (beside the platform's own rows). */
 export const PANEL_ORDER = 35
 
-/** The row's icon: the label carries the accessible name, so the glyph is decoration only. */
+/**
+ * The row's icon: a platform-style line glyph rather than an emoji.
+ *
+ * An emoji cannot follow `currentColor`, cannot match the 16/18px the sidebar hands its glyph slot,
+ * and renders differently on every platform font — the sidebar's other rows are 1.5px-stroke line
+ * icons, and this one now is too. The label carries the accessible name, so the glyph stays
+ * decoration.
+ */
 function PanelIcon(): unknown {
-  return createElement('span', { 'aria-hidden': 'true' }, '🕘')
+  return createElement('svg', {
+    'aria-hidden': 'true',
+    width: '100%',
+    height: '100%',
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '1.5',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  },
+  createElement('circle', { cx: '8', cy: '8', r: '5.75' }),
+  createElement('path', { d: 'M8 4.75V8l2.25 1.5' }),
+  )
 }
 
 /**
@@ -40,6 +61,19 @@ export function apply(ctx: ClientContext): void {
     return dispose
   }, 'evolution-skill-history: locale')
   const t = seam.locale.bind(NS)
+  // The panel's own stylesheet, injected once behind its tag. The bundle is built outside the
+  // platform's CSS-Modules pipeline, so it carries the string itself (the family's settings section
+  // does the same); the tag id keeps a hot reload from stacking copies.
+  ctx.effect(() => {
+    if (document.querySelector('style[data-plugin-css="' + CSS_TAG_ID + '"]') === null) {
+      const tag = document.createElement('style')
+      tag.setAttribute('data-plugin-css', CSS_TAG_ID)
+      tag.textContent = CSS
+      document.head.append(tag)
+      return () => { tag.remove() }
+    }
+    return () => {}
+  }, 'evolution-skill-history: styles')
   // A thunk, not a string: the sidebar re-reads the label on every projection, so a locale switch
   // follows without re-registering the row.
   seam.slots.inject('sidebar.panellist', function* () {
@@ -48,7 +82,15 @@ export function apply(ctx: ClientContext): void {
       PanelIcon,
     )
     yield seam.slots.register(
-      { name: 'main', key: PANEL_ID, inject: () => ({ t, loadSkills: api.skills, loadVersions: api.versions, undo: api.undo }) },
+      { name: 'main', key: PANEL_ID, inject: () => ({
+        t,
+        // The seat resolves the key; the dictionary owns the sentence and its slots.
+        format: (key: string, values: Record<string, string | number>) => fill(t(key), values),
+        loadSkills: api.skills,
+        loadVersions: api.versions,
+        loadDiff: api.diff,
+        undo: api.undo,
+      }) },
       SkillHistoryPanel,
     )
   })

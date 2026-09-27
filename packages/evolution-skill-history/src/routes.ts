@@ -1,5 +1,5 @@
 /**
- * The skill-history HTTP surface: four loopback routes over the curator's read/write seam.
+ * The skill-history HTTP surface: five loopback routes over the curator's read/write seam (four reads plus the one write).
  *
  * Layering: this module maps a route to a USE CASE and does nothing else. "Which artifact does this
  * version hold" and "how do the two chains split" live in evolution-core; the only write is
@@ -10,12 +10,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { contentHash, errorText, partitionVersions } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, elapsedSince, errorText, partitionVersions, textDiffFacts, versionActionKind } from '@deepseek-ai/dsh-evolution-core'
 
 /** Route paths. The client bundle mirrors these literals; a spec asserts the two sides agree. */
 export const SKILL_HISTORY_ROUTES = {
   skills: '/api/dsh-evolution/skill-history/skills',
   versions: '/api/dsh-evolution/skill-history/versions',
+  diff: '/api/dsh-evolution/skill-history/versions/diff',
   undo: '/api/dsh-evolution/skill-history/undo',
   health: '/api/dsh-evolution/skill-history/health',
 } as const
@@ -165,10 +166,30 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
         if (!guard(req, res, 'GET')) return
         await withCurator(res, async (curator) => {
           const listed = await curator.skills.list()
-          const withHistory: Array<{ name: string; versions: number }> = []
+          // The row carries what the LISTING already holds: the description and the two marker facts
+          // cost no extra read, and they are what makes a left column answer "what is this" rather
+          // than only "how many versions". Quality and last-use stay out on purpose — they live in
+          // the curator's health view and the usage store, and joining them here would make this
+          // route a second home for facts it does not own.
+          const withHistory: Array<{
+            name: string
+            versions: number
+            description: string
+            managed: boolean
+            protectedBy: string | null
+            protectionUnknown: boolean
+          }> = []
           for (const skill of listed) {
             const versions = await curator.skills.listVersions(skill.name)
-            if (versions.length > 0) withHistory.push({ name: skill.name, versions: versions.length })
+            if (versions.length === 0) continue
+            withHistory.push({
+              name: skill.name,
+              versions: versions.length,
+              description: skill.description,
+              managed: skill.managed,
+              protectedBy: skill.protectedBy,
+              protectionUnknown: skill.protectionUnknown,
+            })
           }
           writeJson(res, 200, { ok: true, data: withHistory })
         })
@@ -192,8 +213,72 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
           const groups = partitionVersions(versions)
           const live = await curator.skills.read(name)
           const liveHash = live === null ? null : contentHash(live)
-          const content = groups.content.map(entry => ({ ...entry, undoable: entry.hash !== liveHash }))
-          writeJson(res, 200, { ok: true, data: { content, support: groups.support, liveHash } })
+          // Everything a ROW needs is decided here, once: the artifact verdict (undoable), the
+          // vocabulary key the face turns into words (actionKind), and the age bucket relative to
+          // this request. The panel therefore owns no rule and no arithmetic — it substitutes words.
+          // `charsDelta` is free (both counts are already in the index); the DIFF itself is a bigger
+          // object and has its own route.
+          const now = Date.now()
+          type ChainEntry = typeof groups.content[number]
+          const decorate = (entry: ChainEntry, index: number, chain: readonly ChainEntry[], withDelta: boolean) => {
+            const previous = index === 0 ? undefined : chain[index - 1]
+            return {
+              ...entry,
+              actionKind: versionActionKind(entry.action),
+              age: elapsedSince(entry.at, now),
+              // A delta is offered only where a DIFF is served: the diff route answers for the body
+              // chain, so advertising one on a support row would render a refusal as an error.
+              ...!withDelta || previous === undefined ? {} : { charsDelta: entry.chars - previous.chars },
+            }
+          }
+          const content = groups.content.map((entry, index) => ({
+            ...decorate(entry, index, groups.content, true),
+            undoable: entry.hash !== liveHash,
+          }))
+          const support = groups.support.map((entry, index) => decorate(entry, index, groups.support, false))
+          writeJson(res, 200, { ok: true, data: { content, support, liveHash } })
+        })
+      },
+    },
+    {
+      kind: 'exact',
+      path: SKILL_HISTORY_ROUTES.diff,
+      handler: async (req, res) => {
+        if (!guard(req, res, 'GET')) return
+        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+        const name = params.get('name')?.trim() ?? ''
+        const rawV = params.get('v')?.trim() ?? ''
+        const v = Number.parseInt(rawV, 10)
+        if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name and a positive integer v are required' })
+          return
+        }
+        await withCurator(res, async (curator) => {
+          const groups = partitionVersions(await curator.history(name))
+          const index = groups.content.findIndex(entry => entry.v === v)
+          if (index === -1) {
+            writeJson(res, 404, { ok: false, code: 'not-found', message: 'that version is not in the recorded history of "' + name + '"' })
+            return
+          }
+          const entry = groups.content[index]
+          // `beforeHash` is the AUTHORITATIVE predecessor (core computes it from the bytes a write lock
+          // actually read); the array position is only the fallback for entries written before the link
+          // existed. Two writers of one skill interleave in the index, so position can name the wrong
+          // version — and the platform's own order rebuild already treats this as the authority.
+          const linked = entry === undefined || entry.beforeHash === undefined
+            ? undefined
+            : groups.content.find(candidate => candidate.hash === entry.beforeHash)
+          const previous = (linked ?? (index === 0 ? undefined : groups.content[index - 1]))
+          // The FIRST version is compared against nothing, which the same function reports honestly
+          // as "everything is new" — no second code path for it.
+          const after = entry === undefined ? null : await curator.skills.readVersion(name, v)
+          const before = previous === undefined ? '' : await curator.skills.readVersion(name, previous.v)
+          if (after === null || before === null) {
+            writeJson(res, 404, { ok: false, code: 'not-found', message: 'the stored content of that version could not be read' })
+            return
+          }
+          const facts = textDiffFacts(before, after, 'SKILL.md')
+          writeJson(res, 200, { ok: true, data: { v, against: previous?.v ?? null, ...facts } })
         })
       },
     },

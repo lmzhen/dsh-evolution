@@ -25,8 +25,14 @@ import {
   readHistoryIndex,
   loadVersionContent,
   recordVersions,
+  normalizeVersionSummary,
   RETENTION_FEEDBACK_MIN_CHARS,
   type SkillVersion,
+  textDiffFacts,
+  TEXT_DIFF_MAX_LINES,
+  VERSION_SUMMARY_MAX_CHARS,
+  versionActionKind,
+  versionSummaryPrompt,
   versionTarget,
 } from '../src/skill-history.ts'
 
@@ -369,6 +375,89 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
     const unclassified = [...found].filter(action => versionTarget(action) === 'other' && !nonLabelling.has(action))
     expect(unclassified).toEqual([])
     expect(found.size).toBeGreaterThanOrEqual(8)
+  })
+
+  describe('skill-history: what a person reads about a version (0.13.0)', () => {
+    it('classifies every action the library can write, and fails closed on an unknown one', async () => {
+      for (const action of ['create', 'update', 'patch', 'edit', 'restore', 'delete', 'archive', 'consolidate', 'restructure', 'write_file', 'remove_file']) {
+        expect(versionActionKind(action), action).not.toBe('other')
+      }
+      expect(versionActionKind(BASELINE_ACTION)).toBe('baseline')
+      expect(versionActionKind('invented-by-a-future-release')).toBe('other')
+      // The source scan the versionTarget pin uses, with the same exemption list: an action that never
+      // LABELS a version (pin/unpin record no content at all) need not be classified.
+      const source = await readFile(join(import.meta.dirname, '../src/skill-store.ts'), 'utf8')
+      const found = new Set<string>()
+      const shapes = [
+        /action: '([a-z_]+)'/g,
+        /auditAction: '([a-z_]+)'/g,
+        /this\.audit\([^,]+, '([a-z_]+)'/g,
+        /this\.audit\([^,]+, \w+ \? '([a-z_]+)' : '([a-z_]+)'/g,
+      ]
+      for (const shape of shapes) {
+        for (const match of source.matchAll(shape)) {
+          for (const group of match.slice(1)) if (group !== undefined) found.add(group)
+        }
+      }
+      const nonLabelling = new Set(['pin', 'unpin'])
+      expect([...found].filter(action => versionActionKind(action) === 'other' && !nonLabelling.has(action))).toEqual([])
+    })
+
+    it('reports a replacement as counts plus the one changed region', () => {
+      const facts = textDiffFacts('a\nb\nc\nd\n', 'a\nB\nc\nd\n', 'SKILL.md')
+      expect(facts.linesAdded).toBe(1)
+      expect(facts.linesRemoved).toBe(1)
+      expect(facts.truncated).toBe(false)
+      expect(facts.hunks).toHaveLength(1)
+      expect(facts.hunks[0]?.path).toBe('SKILL.md')
+      expect(facts.hunks[0]?.oldText).toBe('b')
+      expect(facts.hunks[0]?.newText).toBe('B')
+    })
+
+    it('says nothing changed for identical bodies, and windows a long region', () => {
+      expect(textDiffFacts('same\n', 'same\n', 'SKILL.md')).toEqual({ linesAdded: 0, linesRemoved: 0, hunks: [], truncated: false })
+      const before = Array.from({ length: TEXT_DIFF_MAX_LINES + 5 }, (_, i) => 'old ' + String(i)).join('\n')
+      const after = Array.from({ length: TEXT_DIFF_MAX_LINES + 5 }, (_, i) => 'new ' + String(i)).join('\n')
+      const facts = textDiffFacts(before, after, 'SKILL.md')
+      expect(facts.truncated).toBe(true)
+      expect(facts.hunks[0]?.newText.split('\n')).toHaveLength(TEXT_DIFF_MAX_LINES)
+    })
+
+    it('keeps a summary through the index in BOTH reader branches', () => {
+    // The create-shaped entry carries no beforeHash — the branch whose explicit literal used to drop
+    // every unknown field, and recordVersions re-serializes what the reader returned.
+      const raw = JSON.stringify({ version: HISTORY_INDEX_VERSION, versions: [{ v: 1, at: 'T', action: 'create', hash: 'h1', chars: 3, summary: 'first body' }] })
+      const state = readHistoryIndex(raw)
+      expect(state.kind).toBe('ok')
+      expect(state.kind === 'ok' ? state.versions[0]?.summary : undefined).toBe('first body')
+      const linked = readHistoryIndex(JSON.stringify({ version: HISTORY_INDEX_VERSION, versions: [{ v: 2, at: 'T', action: 'patch', hash: 'h2', chars: 3, beforeHash: 'h1', summary: 'tightened the rule' }] }))
+      expect(linked.kind === 'ok' ? linked.versions[0]?.summary : undefined).toBe('tightened the rule')
+      // And it survives the writer: nextHistoryIndex puts it on the AFTER entry only.
+      const grown = nextHistoryIndex([{ v: 1, at: 'T', action: 'create', hash: 'h1', chars: 3 }], { skillName: 's', action: 'patch', before: 'a\n', after: 'b\n', at: 'T2', summary: 'one line' }, 20)
+      const after = grown.versions[grown.versions.length - 1]
+      expect(after?.summary).toBe('one line')
+      expect(grown.versions[0]?.summary).toBeUndefined()
+    })
+
+    it('reduces a model answer to one line, or to nothing', () => {
+      expect(normalizeVersionSummary('  tighten the retention rule to 30 days.  ')).toBe('tighten the retention rule to 30 days')
+      expect(normalizeVersionSummary('"quoted"\nsecond line')).toBe('quoted')
+      expect(normalizeVersionSummary('   \n  ')).toBeUndefined()
+      const long = normalizeVersionSummary('x'.repeat(VERSION_SUMMARY_MAX_CHARS + 20))
+      expect(long?.length).toBe(VERSION_SUMMARY_MAX_CHARS)
+      expect(long?.endsWith('\u2026')).toBe(true)
+    })
+
+    it('pins the summarizer prompt to the skill, the cap and both bodies', () => {
+      const prompt = versionSummaryPrompt({ name: 'demo', action: 'patch', before: 'OLD BODY', after: 'NEW BODY' })
+      expect(prompt).toContain('demo')
+      expect(prompt).toContain('patch')
+      expect(prompt).toContain(String(VERSION_SUMMARY_MAX_CHARS))
+      expect(prompt).toContain('OLD BODY')
+      expect(prompt).toContain('NEW BODY')
+      const created = versionSummaryPrompt({ name: 'demo', action: 'create', before: null, after: 'NEW BODY' })
+      expect(created).toContain('did not exist')
+    })
   })
 
   it('splits the two chains, so the body keeps its content order when a support file shares the index', () => {
