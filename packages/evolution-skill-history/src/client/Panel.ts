@@ -93,6 +93,7 @@ function versionRow(
   openDiff: number | undefined,
   diff: DiffState | undefined,
   restore: (v: number) => void,
+  cancelRestore: () => void,
   toggleDiff: (v: number) => void,
 ): ReactNode {
   const parts: ReactNode[] = [
@@ -105,6 +106,16 @@ function versionRow(
   const actions: ReactNode[] = []
   if (row.undoable === false) actions.push(createElement('span', { key: 'current', className: 'evo-hist-capsule' }, face.t('current')))
   if (row.undoable === true) {
+    // The confirmation is a second click on the same button, so it needs an exit of its own: without
+    // one the only way back was clicking another row's button, which silently moved the pending write.
+    if (confirming === row.v) {
+      actions.push(createElement('button', {
+        key: 'cancel',
+        type: 'button',
+        className: 'evo-hist-button',
+        onClick: () => { cancelRestore() },
+      }, face.t('undo.no')))
+    }
     actions.push(createElement('button', {
       key: 'undo',
       type: 'button',
@@ -162,6 +173,7 @@ function group(face: PanelFace, title: string, entries: readonly VersionRow[], n
       state.openDiff,
       state.diffs.get(entry.v),
       state.restore,
+      state.cancelRestore,
       state.toggleDiff,
     )),
   )
@@ -173,6 +185,7 @@ interface RowState {
   readonly openDiff: number | undefined
   readonly diffs: ReadonlyMap<number, DiffState>
   readonly restore: (v: number) => void
+  readonly cancelRestore: () => void
   readonly toggleDiff: (v: number) => void
 }
 
@@ -303,7 +316,10 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   [skills, needle])
 
   const loaded = payload !== undefined
-  const rowState: RowState = { confirming: pending, openDiff, diffs, restore, toggleDiff }
+  /** Drop the pending confirmation: the button that opened it must not be the only way out. */
+  const cancelRestore = (): void => { setPending(undefined) }
+
+  const rowState: RowState = { confirming: pending, openDiff, diffs, restore, cancelRestore, toggleDiff }
   return createElement('div', { className: 'evo-hist-root' },
     createElement('aside', { className: 'evo-hist-aside' },
       createElement('div', { className: 'evo-hist-search' },
@@ -340,7 +356,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         createElement('h2', { className: 'evo-hist-title' }, face.t('title')),
         createElement('button', { type: 'button', className: 'evo-hist-button', onClick: refresh }, face.t('refresh')),
       ),
-      createElement('p', { className: 'evo-hist-hint' }, face.t('hint') + ' ' + face.t('hint.current')),
+      createElement('p', { className: 'evo-hist-hint' }, face.t('hint')),
       noteText === undefined ? null : createElement('p', { className: 'evo-hist-note', 'data-error': noteError ? 'true' : undefined }, noteText),
       selected === undefined ? null : (loaded ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('loading'))),
       loaded

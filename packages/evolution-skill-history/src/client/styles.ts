@@ -39,7 +39,9 @@ export const CSS = [
   '.evo-hist-skill-line{display:flex;align-items:baseline;gap:6px}',
   '.evo-hist-skill-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   '.evo-hist-skill-count{flex:none;margin-left:auto;color:var(--dsw-alias-label-tertiary)}',
-  '.evo-hist-skill-desc{margin-top:2px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  // A BLOCK box on purpose: `text-overflow` is inert on an inline span, and the description then
+  // ran past the row's background into the pane divider (measured on the installed 0.13.1).
+  '.evo-hist-skill-desc{display:block;margin-top:2px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   '.evo-hist-main{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:12px 14px}',
   '.evo-hist-head{display:flex;align-items:center;gap:10px;margin:0 0 4px}',
   '.evo-hist-title{flex:1 1 auto;margin:0;font-size:inherit;font-weight:600}',
@@ -59,6 +61,8 @@ export const CSS = [
   '.evo-hist-button:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',
   '.evo-hist-button[data-tone="primary"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
   '.evo-hist-pre{margin:6px 0 2px;padding:12px 16px;max-height:260px;overflow:auto;border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
-  '.evo-hist-pre-add{color:var(--dsw-alias-brand-primary)}',
+  // Added/removed use the platform's semantic pair; `--dsw-alias-brand-primary` is the primary label
+  // colour (near-black in light, near-white in dark), so the pair read as red-versus-plain.
+  '.evo-hist-pre-add{color:var(--dsw-alias-state-success-primary)}',
   '.evo-hist-pre-del{color:var(--dsw-alias-state-error-primary)}',
 ].join('\n')
