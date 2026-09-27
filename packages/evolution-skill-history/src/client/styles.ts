@@ -25,12 +25,16 @@ export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-skill-history/panel.css'
 
 /** The stylesheet the panel injects once. */
 export const CSS = [
-  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;font-size:var(--dsh-content-font-size-secondary,13px);color:var(--dsw-alias-label-primary)}',
+  // No font-size here: the panel is CHROME, and the setting behind `--dsh-content-font-size*` says it
+  // affects conversation content only (the platform's own surfaces declare no font-size at all). The
+  // panel therefore inherits the shell's chrome size and derives its steps with `calc(1em ± Npx)`.
+  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;color:var(--dsw-alias-label-primary)}',
   '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 264px;width:264px;min-height:0;border-right:.5px solid var(--dsw-alias-border-l2)}',
-  '.evo-hist-search{padding:10px 12px 4px}',
+  '.evo-hist-search{padding:12px 12px 4px}',
   '.evo-hist-search input{width:100%;box-sizing:border-box;padding:6px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}',
   '.evo-hist-search input:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',
-  '.evo-hist-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 6px 10px}',
+  // 12px inline: the skill rows line up with the search field above them, not 6px to its left.
+  '.evo-hist-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 12px 10px}',
   '.evo-hist-empty{padding:8px 12px;color:var(--dsw-alias-label-tertiary)}',
   '.evo-hist-skill{display:block;width:100%;box-sizing:border-box;padding:7px 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;text-align:left;cursor:pointer}',
   '.evo-hist-skill:hover{background:var(--dsw-alias-interactive-bg-hover)}',
@@ -42,20 +46,27 @@ export const CSS = [
   // A BLOCK box on purpose: `text-overflow` is inert on an inline span, and the description then
   // ran past the row's background into the pane divider (measured on the installed 0.13.1).
   '.evo-hist-skill-desc{display:block;margin-top:2px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  '.evo-hist-main{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:12px 14px}',
+  // 12px both ways: the pane's first line and the aside's search field share one left edge.
+  '.evo-hist-main{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:12px 12px}',
   '.evo-hist-head{display:flex;align-items:center;gap:10px;margin:0 0 4px}',
-  '.evo-hist-title{flex:1 1 auto;margin:0;font-size:inherit;font-weight:600}',
+  '.evo-hist-title{flex:1 1 auto;margin:0;font-size:calc(1em + 2px);font-weight:600}',
   '.evo-hist-hint{margin:0 0 10px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
+  '.evo-hist-pane-empty{margin:2px 0 0;color:var(--dsw-alias-label-tertiary)}',
   '.evo-hist-note{margin:0 0 10px;color:var(--dsw-alias-label-secondary);line-height:1.5;white-space:pre-wrap}',
   '.evo-hist-note[data-error="true"]{color:var(--dsw-alias-state-error-primary)}',
-  '.evo-hist-group{margin:10px 0 2px;font-size:inherit;font-weight:600}',
-  '.evo-hist-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-top:.5px solid var(--dsw-alias-border-l3)}',
+  '.evo-hist-group{margin:10px 0 2px;font-size:calc(1em - 1px);font-weight:600;color:var(--dsw-alias-label-secondary)}',
+  // Separators use the platform's dominant hairline (`border-l2`); the first row of a group carries
+  // none, so the group heading is not underlined by its own list.
+  '.evo-hist-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-top:.5px solid var(--dsw-alias-border-l2)}',
+  '.evo-hist-row:first-of-type{border-top:0}',
   '.evo-hist-row-body{flex:1 1 auto;min-width:0}',
   '.evo-hist-row-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}',
   '.evo-hist-row-meta{color:var(--dsw-alias-label-tertiary)}',
   '.evo-hist-row-summary{margin-top:2px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
   '.evo-hist-actions{display:flex;flex:none;align-items:center;gap:6px}',
-  '.evo-hist-capsule{flex:none;padding:1px 6px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;color:var(--dsw-alias-label-secondary)}',
+  // A filled chip, not an outlined one: `当前` is a state, and the outline made it look clickable
+  // next to the two real buttons beside it.
+  '.evo-hist-capsule{flex:none;padding:1px 8px;border:0;border-radius:999px;background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-secondary)}',
   '.evo-hist-button{flex:none;font:inherit;padding:3px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:transparent;color:inherit;cursor:pointer}',
   '.evo-hist-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
   '.evo-hist-button:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',

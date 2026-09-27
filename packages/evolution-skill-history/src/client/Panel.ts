@@ -54,6 +54,19 @@ function stateKey(skill: SkillRow): string {
   return skill.managed ? 'state.managed' : 'state.foreign'
 }
 
+/**
+ * The one clause an action word needs: what the recorded artifact IS. It rides the action word's
+ * `title` instead of widening the row (a parenthetical in the sentence pushed time and size aside).
+ * @param face - copy plus the data callbacks.
+ * @param row - the version row whose action is being named.
+ * @returns the clause, or undefined for the actions that need none.
+ */
+function actionNote(face: PanelFace, row: VersionRow): string | undefined {
+  if (row.actionKind === 'delete') return face.t('action.delete.note')
+  if (row.actionKind === 'archive') return face.t('action.archive.note')
+  return undefined
+}
+
 /** The relative-time sentence for one row's bucket. */
 function ageText(face: PanelFace, age: VersionRow['age']): string {
   if (age.unit === 'now') return face.t('time.now')
@@ -98,8 +111,9 @@ function versionRow(
 ): ReactNode {
   const parts: ReactNode[] = [
     createElement('span', { key: 'v', className: 'evo-hist-row-meta' }, 'v' + String(row.v)),
-    createElement('span', { key: 'action' }, face.t('action.' + row.actionKind)),
-    createElement('span', { key: 'time', className: 'evo-hist-row-meta' }, localTime(row.at) + ' · ' + ageText(face, row.age)),
+    createElement('span', { key: 'action', title: actionNote(face, row) }, face.t('action.' + row.actionKind)),
+    // The relative age is the scannable fact; the absolute clock is the hover text (one time, not two).
+    createElement('span', { key: 'time', className: 'evo-hist-row-meta', title: localTime(row.at) }, ageText(face, row.age)),
   ]
   const delta = deltaText(face, row)
   if (delta !== null) parts.push(createElement('span', { key: 'delta', className: 'evo-hist-row-meta' }, delta))
@@ -357,6 +371,9 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         createElement('button', { type: 'button', className: 'evo-hist-button', onClick: refresh }, face.t('refresh')),
       ),
       createElement('p', { className: 'evo-hist-hint' }, face.t('hint')),
+      selected === undefined
+        ? createElement('p', { className: 'evo-hist-pane-empty' }, face.t(skills.length === 0 ? 'empty.skills' : 'empty.pick'))
+        : null,
       noteText === undefined ? null : createElement('p', { className: 'evo-hist-note', 'data-error': noteError ? 'true' : undefined }, noteText),
       selected === undefined ? null : (loaded ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('loading'))),
       loaded
