@@ -25,6 +25,12 @@ declare module 'react' {
    */
   export function useState<S>(initial: S): [S, (next: S) => void]
   /**
+   * One mutable box that survives re-renders without causing one.
+   * @param initial - the initial value.
+   * @returns the box; assign to `current` to change it.
+   */
+  export function useRef<T>(initial: T): { current: T }
+  /**
    * Run one effect after the render that produced it, and again when a dependency changes.
    * @param effect - the effect; a returned function cleans it up.
    * @param deps - the dependency list.

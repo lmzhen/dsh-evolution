@@ -32,7 +32,7 @@ The row is **inert without a web server** (`ctx.get('webServer')`, not a declare
 
 ## What the panel shows
 
-The selected skill's versions as two groups: **Body versions** (restorable) and **File versions** (history only, because a restore rewrites `SKILL.md`). A body row offers **Restore this version** unless it already IS the live content (the host marks those), and the button turns into an inline confirmation first. After a restore the list is read again, because the restore itself is a new version.
+The selected skill's versions as two groups: **Body versions** (restorable) and **File versions** (history only, because a restore rewrites `SKILL.md`). A body row offers **Restore this version** unless it already IS the live content (the host marks those), and the button turns into an inline confirmation first. After a restore the rows are read again — the restore itself is a new version — while the curator's result sentence stays on screen. **Refresh** re-reads the skill list and the open skill; before it, seeing what another writer recorded in the meantime meant opening the panel again for the list, or clicking the open skill again for its rows (the aside counts are read with the list, not per row).
 
 ## Build
 
@@ -44,7 +44,7 @@ This package adds **no model-visible content**: no prompt section, no tool schem
 
 ## Known limitations and deferred work
 
-- **No rendered spec.** The family's specs are Node-level and this package's client half cannot be rendered there, so the panel is covered by `tsc`, the client bundle build, the pure `tests/client-api.spec.ts` and a live pass on the installed artifact. A rendered spec (jsdom plus a driven fixture runtime) is the follow-up that would catch wiring in CI.
+- **No rendered spec.** The family's specs are Node-level and this package's client half cannot be rendered there, so the panel is covered by `tsc`, the client bundle build, the pure `tests/client-api.spec.ts` and a live pass on the installed artifact. A rendered spec (jsdom plus a driven fixture runtime) is the follow-up that would catch wiring in CI — 0.11.3 is the cost of not having one: the first installed pass restored the content correctly and re-read the rows correctly while the curator's result sentence never appeared, because the reload that follows a restore cleared the note state it had just set. No Node-level spec and no `tsc` can see the order of two state updates; only clicking the panel showed it.
 - **The list shows skills with recorded versions only.** A skill that never wrote through the library has no history to browse, so it does not appear; the tree-wide listing stays with the skill catalog.
 - **No diff view.** The routes return entries, not bodies; a two-version diff would need a second read route and a client-side differ.
 - **Support-file bytes are history only.** They share the index with the body, so they are listed and labelled, but `undo` refuses them by name — the bytes stay in the blob store for a hand copy.
