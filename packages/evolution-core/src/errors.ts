@@ -1,5 +1,5 @@
 /**
- * THE error-code table: E-301…E-318 with the exact text each one emits (E-317 and E-318 are the
+ * THE error-code table: E-301…E-319 with the exact text each one emits (E-317…E-319 are the
  * write-admission gates' own refusals).
  *
  * The codes used to be spelled out at 33 call sites across two packages, so one
@@ -61,6 +61,9 @@ export const EVOLUTION_ERRORS = Object.freeze({
     'E-317: skill "%a1%" was not %a2% — the confirmation prompt was declined or dismissed, so nothing was written. The prompt appears on every create and bare delete; repeat the call only if the operator asks for it.',
   'e-318-skill-write-without-a-read':
     'E-318: skill "%a1%" was not read in this session, so this write is refused. Read it with the `skill` tool first (a read that failed does not count), then repeat the write.',
+  // 0.12.0: the confirmation's own deadline (`skillWriteConfirm: 'timeout'`).
+  'e-319-skill-write-confirm-timed-out':
+    'E-319: skill "%a1%" was not %a2% — the confirmation prompt went unanswered for %a3% second(s), so the write was cancelled. Nobody was there to decide: set `skillWriteConfirm` to `auto` to write without a prompt, keep `ask` to wait until someone answers, or raise `skillWriteConfirmTimeoutSeconds`.',
 } as const)
 
 /** One table key. */

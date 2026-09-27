@@ -43,14 +43,20 @@ function skillPath(root: string, name: string): string {
   return join(root, 'skills', name, 'SKILL.md')
 }
 
-async function setup(): Promise<{ ctx: Context; root: string }> {
+/**
+ * Mount the tool. The fixture's default is `skillWriteConfirm: 'ask'` — the wait-forever
+ * confirmation every case written before 0.12.0 assumes — while the shipped default is `auto`.
+ * A case that exercises the SHIPPED behaviour passes `{}` (the schema default then applies) or
+ * names its mode outright; see the mode block at the end of this file.
+ */
+async function setup(config: Record<string, unknown> = { skillWriteConfirm: 'ask' }): Promise<{ ctx: Context; root: string }> {
   const root = await tempHome('dsh-write-gates-')
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })
-  await ctx.plugin(ToolSkillManage)
+  await ctx.plugin(ToolSkillManage, config)
   return { ctx, root }
 }
 
@@ -406,6 +412,111 @@ describe('write gates: the foreground confirmation (E-317)', () => {
   })
 })
 
+describe('write gates: the confirmation MODE (0.12.0)', () => {
+  /** A question service that records the request and never answers it. */
+  function mountSilentQuestions(ctx: Context): { signals: Array<AbortSignal | undefined>; asked: string[] } {
+    const signals: Array<AbortSignal | undefined> = []
+    const asked: string[] = []
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: Array<{ question: string }>; signal?: AbortSignal }) => {
+        asked.push(request.questions[0]?.question ?? '')
+        signals.push(request.signal)
+        return await new Promise<never>(() => {})
+      },
+    })
+    return { signals, asked }
+  }
+
+  it('the SHIPPED default writes without asking (auto), even with a question service mounted', async () => {
+    const { ctx, root } = await setup({})
+    const { asked } = mountSilentQuestions(ctx)
+    const created = await callTool(ctx, { action: 'create', name: 'mode-auto', content: skillBody('mode-auto') }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(asked).toHaveLength(0)
+    expect(await readFile(skillPath(root, 'mode-auto'), 'utf8')).toContain('Body.')
+  })
+
+  it('auto writes without asking on a bare delete too', async () => {
+    const { ctx } = await setup({})
+    const { asked } = mountSilentQuestions(ctx)
+    await createTarget(ctx, 'mode-auto-delete')
+    const deleted = await callTool(ctx, { action: 'delete', name: 'mode-auto-delete' }, sessionOf(undefined))
+    expect(valueOf(deleted).ok, valueOf(deleted).message).toBe(true)
+    expect(asked).toHaveLength(0)
+  })
+
+  it('timeout cancels the write when nobody answers, and names the knob (E-319)', async () => {
+    const { ctx, root } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 1 })
+    const { signals, asked } = mountSilentQuestions(ctx)
+    const refused = await callTool(ctx, { action: 'create', name: 'mode-timeout', content: skillBody('mode-timeout') }, sessionOf(undefined))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-319')
+    expect(valueOf(refused).message).toContain('"mode-timeout"')
+    expect(valueOf(refused).message).toContain('skillWriteConfirm')
+    expect(asked).toHaveLength(1)
+    // The deadline rides the question as an abort signal, so the platform can drop the card.
+    expect(signals[0]).toBeInstanceOf(AbortSignal)
+    expect(signals[0]?.aborted).toBe(true)
+    expect(await readFile(skillPath(root, 'mode-timeout'), 'utf8').catch(() => null)).toBeNull()
+  }, 15_000)
+
+  it('timeout still writes when the operator answers in time, and the question carries a signal', async () => {
+    const { ctx, root } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 30 })
+    const signals: Array<AbortSignal | undefined> = []
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: Array<{ id: string }>; signal?: AbortSignal }) => {
+        signals.push(request.signal)
+        return { answers: [{ id: request.questions[0]?.id ?? '', selected: ['Create'] }] }
+      },
+    })
+    const created = await callTool(ctx, { action: 'create', name: 'mode-timeout-yes', content: skillBody('mode-timeout-yes') }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(signals[0]?.aborted).toBe(false)
+    expect(await readFile(skillPath(root, 'mode-timeout-yes'), 'utf8')).toContain('Body.')
+  })
+
+  it('a question service that HONORS the deadline (ASK_ABORTED) still lands on E-319', async () => {
+    const { ctx, root } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 1 })
+    // The platform answers an aborted question with ASK_ABORTED, which the seam reads as a dismissal
+    // — so this case is the one where the deadline and the refusal race each other in the microtask
+    // queue. It must still be reported as a TIMEOUT, not as a human declining.
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: Array<{ id: string }>; signal?: AbortSignal }) => await new Promise((_resolve, reject) => {
+        request.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('ask_user_question was aborted before the user answered'), { code: 'ASK_ABORTED' }))
+        }, { once: true })
+      }),
+    })
+    const refused = await callTool(ctx, { action: 'create', name: 'mode-timeout-aborted', content: skillBody('mode-timeout-aborted') }, sessionOf(undefined))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-319')
+    expect(await readFile(skillPath(root, 'mode-timeout-aborted'), 'utf8').catch(() => null)).toBeNull()
+  }, 15_000)
+
+  it('leaves no live timer behind once the prompt is answered', async () => {
+    const { ctx } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 30 })
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: Array<{ id: string }> }) => ({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['Create'] }] }),
+    })
+    // A referenced timer would keep a one-shot CLI process alive for the whole window after the write
+    // returned; the gate unrefs and clears it, so the armed-timer count must not grow.
+    const timers = (): number => process.getActiveResourcesInfo().filter(kind => kind === 'Timeout').length
+    const before = timers()
+    const created = await callTool(ctx, { action: 'create', name: 'mode-timeout-cleared', content: skillBody('mode-timeout-cleared') }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(timers()).toBeLessThanOrEqual(before)
+  })
+  it('a declined prompt in ask mode is still E-317, not the timeout sentence', async () => {
+    const { ctx } = await setup({ skillWriteConfirm: 'ask' })
+    ctx.provide('userQuestions', {
+      ask: async (request: { questions: Array<{ id: string }> }) => ({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['Cancel'] }] }),
+    })
+    const refused = await callTool(ctx, { action: 'create', name: 'mode-ask-no', content: skillBody('mode-ask-no') }, sessionOf(undefined))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-317')
+    expect(valueOf(refused).message).not.toContain('E-319')
+  })
+})
 
 describe('write gates: review-fix sentinels (2026-09-26 independent review)', () => {
   interface AskedQuestion {

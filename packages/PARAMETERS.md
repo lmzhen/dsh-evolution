@@ -46,6 +46,8 @@
 | `archiveRetention` | E2 | none | cordis | tool-skill-manage | — | Report expired archives, or prune them. |
 | `skillVersionKeep` | E2 | none | cordis | tool-skill-manage | — | Content versions retained per skill; older ones leave the index. Their stored blobs stay on disk — no automatic sweep exists yet, so a long-lived library grows by the distinct bodies it has written. |
 | `supportFileCharPolicy` | E3 | live | cordis | tool-skill-manage | — | Warn about an oversize support file, or refuse the write. |
+| `skillWriteConfirm` | E3 | live | cordis | tool-skill-manage | — | What the one confirmation before a create or a bare delete does: write straight through, wait for an answer, or cancel the write when nobody answers within the timeout. |
+| `skillWriteConfirmTimeoutSeconds` | E3 | live | cordis | tool-skill-manage | — | Seconds the confirmation waits for an answer in timeout mode before the write is cancelled. |
 
 ## review（会话回顾）
 

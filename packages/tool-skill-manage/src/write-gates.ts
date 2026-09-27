@@ -34,6 +34,34 @@ const CONFIRM_QUESTION_ID = 'evolution-skill-write'
 /** The cancel label every confirm question offers. */
 const CANCEL_LABEL = 'Cancel'
 
+/** What a `timeout`-mode deadline settles with: comparable by identity against the seam's
+ * boolean, so the two outcomes stay distinguishable without a mutable flag (which a linter
+ * cannot follow through a timer callback, and a reader cannot either). */
+const CONFIRM_TIMED_OUT = 'confirm-timed-out' as const
+
+/**
+ * How the ONE confirmation behaves (registry `skillWriteConfirm`).
+ *
+ * `auto` writes without asking — the default, because an unattended run (a background pass, a
+ * scheduled review, a headless session) must not park a tool call on a question nobody will answer.
+ * `ask` waits for as long as it takes, which is the deployment that wants the gate in the loop.
+ * `timeout` asks and cancels the write on its own deadline.
+ */
+export type WriteConfirmMode = 'auto' | 'ask' | 'timeout'
+
+/** The mode a deployment that configures nothing gets. */
+export const DEFAULT_WRITE_CONFIRM_MODE: WriteConfirmMode = 'auto'
+
+/** Seconds a `timeout`-mode prompt waits before the write is cancelled. */
+export const DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS = 120
+
+/** A usable deadline: the configured value when it is a positive finite number, else the default. */
+function timeoutSecondsOf(configured: number | undefined): number {
+  return configured !== undefined && Number.isFinite(configured) && configured >= 1
+    ? Math.floor(configured)
+    : DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS
+}
+
 /** One confirm question, as the gate writes it and the seam asks it. */
 export interface WriteConfirmRequest {
   /** The action being confirmed (`create` or `delete`). */
@@ -49,6 +77,9 @@ export interface WriteConfirmRequest {
   }
   /** The option label that means "proceed". */
   readonly confirmLabel: string
+  /** A deadline the gate imposes on itself (`timeout` mode); the seam combines it with the call's
+   * own cancellation. An abort is a dismissal, never a consent. */
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -83,6 +114,10 @@ export interface WriteGateContext {
   readonly readNames: ReadonlySet<string> | undefined
   /** The human confirm seam — read only by the gates that apply to `'admission'`. */
   readonly confirm: WriteConfirm | undefined
+  /** The registry's `skillWriteConfirm`: `auto` (the default) skips the question entirely. */
+  readonly confirmMode?: WriteConfirmMode
+  /** The registry's `skillWriteConfirmTimeoutSeconds`, read only in `timeout` mode. */
+  readonly confirmTimeoutSeconds?: number
   /** Report a degraded gate; must not throw. The implementation decides how often it speaks — the
    * shipped seam latches once per PROCESS, because the conditions it reports (no question service,
    * an unreadable session log) belong to the deployment, not to one write. */
@@ -243,21 +278,48 @@ const READ_BEFORE_WRITE: WriteGate = {
  * The gate is UX, not a security door (those are policy protection and read-before-write): the seam
  * is required to be total, so an unmounted question service or a caller that is not the live root
  * agent PROCEEDS — the operator's own session is the authority that asked for the write.
+ *
+ * Whether the question is put at all is CONFIGURED (`skillWriteConfirm`): `auto` writes without
+ * asking, `ask` waits for an answer indefinitely (what this gate did before the knob existed), and
+ * `timeout` asks but cancels the write on its own deadline. `auto` is the default because an
+ * unattended run — a background pass, a scheduled review, a headless session — must not park a tool
+ * call on a question nobody will answer.
  */
 const HUMAN_CONFIRM: WriteGate = {
   id: 'human-confirm',
   appliesTo: ['admission'],
-  run: async ({ view, origin, confirm, warn }) => {
+  run: async ({ view, origin, confirm, warn, confirmMode, confirmTimeoutSeconds }) => {
     const action = view.action
     if (action === undefined || origin !== 'foreground' || view.name === '') return null
     const destructive = action === 'create' || (action === 'delete' && view.absorbedInto === undefined)
     if (!destructive) return null
+    const mode = confirmMode ?? DEFAULT_WRITE_CONFIRM_MODE
+    if (mode === 'auto') return null
     if (confirm === undefined) {
       warn('skill_manage: no confirmation channel is mounted, so the write proceeds unconfirmed.')
       return null
     }
     const confirmLabel = action === 'create' ? 'Create' : 'Delete'
-    const confirmed = await confirm({
+    const seconds = timeoutSecondsOf(confirmTimeoutSeconds)
+    const cancel = new AbortController()
+    // The deadline is enforced HERE, not only carried by the signal: the signal lets the client
+    // take the card down, while the race guarantees the call returns even if nothing is listening
+    // to it — a prompt that outlives its deadline is the parked tool call this mode exists to
+    // prevent.
+    let timer: NodeJS.Timeout | undefined
+    const deadline = mode === 'timeout'
+      ? new Promise<typeof CONFIRM_TIMED_OUT>((resolve) => {
+        timer = setTimeout(() => {
+          cancel.abort()
+          resolve(CONFIRM_TIMED_OUT)
+        }, seconds * 1000)
+        // Never hold the process open: a one-shot CLI run must not linger for the rest of the
+        // window after the write already returned. A server keeps the loop alive anyway, which is
+        // where the deadline does its work.
+        timer.unref()
+      })
+      : undefined
+    const asked = confirm({
       action,
       name: view.name,
       confirmLabel,
@@ -269,8 +331,27 @@ const HUMAN_CONFIRM: WriteGate = {
           : `Delete skill "${view.name}"? It is archived under .archive and leaves the catalog.`,
         options: [{ label: confirmLabel }, { label: CANCEL_LABEL }],
       },
+      ...mode === 'timeout' ? { signal: cancel.signal } : {},
     })
-    if (confirmed) return null
+    let outcome: boolean | typeof CONFIRM_TIMED_OUT
+    try {
+      outcome = deadline === undefined ? await asked : await Promise.race([asked, deadline])
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+    }
+    if (outcome === true) return null
+    // Running out of time is not the same answer as being declined: the write was cancelled
+    // because nobody was there to decide, and the refusal names the knob that changes that. Which
+    // promise the race returned first is a microtask-order detail — a platform that answers the
+    // abort with its own dismissal can settle `asked` first — so the case is decided by the
+    // deadline's signal, which only this gate aborts.
+    if (outcome === CONFIRM_TIMED_OUT || cancel.signal.aborted) {
+      return errorText('e-319-skill-write-confirm-timed-out', {
+        a1: view.name,
+        a2: action === 'create' ? 'created' : 'deleted',
+        a3: String(seconds),
+      })
+    }
     return errorText('e-317-skill-write-not-confirmed', {
       a1: view.name,
       a2: action === 'create' ? 'created' : 'deleted',

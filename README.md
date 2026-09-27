@@ -238,11 +238,12 @@ review.
 | `E-308` / `E-313` | unknown parameter group or id | list them: `/evolution params` shows every registered id with its tier and owner |
 | `E-314` / `E-315` / `E-316` | the id is a deployment parameter, has no user layer, or its owner is not mounted | write it in `cordis.yml`, or mount the owner row — the message names tier, owner and namespace |
 | `E-309` / `E-310` | your write lost a revision race, or the settings service refused it (the reason is included) | re-read with `/evolution params` and retry |
-| `E-317` | you declined the confirmation the tool asked before creating or deleting a skill (a foreground create or bare delete asks once) | nothing was written; repeat the call if you do want it |
+| `E-317` | you declined the confirmation the tool asked before creating or deleting a skill (a foreground create or bare delete asks when `skillWriteConfirm` is `ask` or `timeout`; the default `auto` does not ask at all) | nothing was written; repeat the call if you do want it |
 | `E-318` | a write without a read: the session never loaded that skill, so the write is refused (skills only; the foreground operator session is exempt) | load it with the `skill` tool, then repeat the write |
+| `E-319` | the confirmation before a create or bare delete went unanswered for `skillWriteConfirmTimeoutSeconds` (`skillWriteConfirm: 'timeout'`), so the write was cancelled | set `skillWriteConfirm` to `auto` (write without asking), keep `ask` (wait until answered), or raise the timeout |
 | doctor says `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
-Symptom → next step; the exact text of every code (`E-301`–`E-318`) is stored once in
+Symptom → next step; the exact text of every code (`E-301`–`E-319`) is stored once in
 `evolution-core/src/errors.ts` and printed verbatim.
 
 </details>

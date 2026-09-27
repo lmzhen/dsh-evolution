@@ -28,7 +28,7 @@ import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTI
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { runWriteGates, type WriteConfirmRequest } from './write-gates.ts'
+import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
@@ -78,6 +78,11 @@ export interface Config {
    * like the four caps above — the settings layer deliberately has no card for it (retention is
    * storage policy, not an authoring knob). */
   skillVersionKeep?: number
+  /** What the ONE confirmation before a create or a bare delete does (registry `skillWriteConfirm`).
+   * Default `auto`: an unattended run must not park a tool call on a question nobody will answer. */
+  skillWriteConfirm?: WriteConfirmMode
+  /** Seconds a `timeout`-mode prompt waits for an answer before the write is cancelled. */
+  skillWriteConfirmTimeoutSeconds?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -97,6 +102,11 @@ export const Config: z<Config> = z.object({
   // skill-history.ts: how many content versions each skill keeps. Lower bound 1 — the history
   // trim would otherwise drop the version it just recorded.
   skillVersionKeep: z.number().min(1).default(DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
+  // The write-admission confirmation (0.12.0). The DEFAULT is `auto`: a background pass, a
+  // scheduled review or a headless session has nobody to answer a question, and a tool call parked
+  // on one blocks the run. `ask` restores the wait-forever behaviour; `timeout` asks and cancels.
+  skillWriteConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default(DEFAULT_WRITE_CONFIRM_MODE),
+  skillWriteConfirmTimeoutSeconds: z.number().min(1).default(DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
 })
 
 /** Write behaviour a user may change (G3/S3.4). Field names are the CANONICAL
@@ -120,6 +130,10 @@ export interface SkillSettings {
   citationPolicy: CitationPolicy
   /** Warn about an oversize support file, or refuse the write. */
   supportFileCharPolicy: SupportFileCharPolicy
+  /** What the confirmation before a create or a bare delete does (0.12.0). */
+  skillWriteConfirm: WriteConfirmMode
+  /** Seconds a `timeout`-mode confirmation waits before the write is cancelled. */
+  skillWriteConfirmTimeoutSeconds: number
 }
 
 /** Schema the platform validates the user layer against; defaults mirror the core
@@ -133,6 +147,8 @@ export const SKILLS_SETTINGS_SCHEMA: z<SkillSettings> = z.object({
   strictCrossSource: z.boolean().default(false),
   citationPolicy: z.union([z.const('verify'), z.const('refuse')]).default(DEFAULT_CITATION_POLICY),
   supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).default(DEFAULT_SUPPORT_FILE_CHAR_POLICY),
+  skillWriteConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default(DEFAULT_WRITE_CONFIRM_MODE),
+  skillWriteConfirmTimeoutSeconds: z.number().min(1).default(DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
 })
 
 /** The four caps a user may only tighten, in schema order (the sentry reads it). */
@@ -195,6 +211,19 @@ interface SkillToolExec {
   /** The call's cancellation, forwarded to the confirmation prompt so a cancelled call cannot leave
    * a question waiting for an answer nobody will give. */
   signal?: AbortSignal
+}
+
+/** One abort signal that carries BOTH cancellations: the call's own (the operator cancelled the
+ * turn) and the gate's deadline (`skillWriteConfirm: 'timeout'`). `undefined` when neither exists —
+ * the platform's `ask()` then waits without a signal, which is the `ask` mode.
+ * @param call - this call's cancellation signal, when the exec context carries one.
+ * @param deadline - the gate's own deadline signal, when the mode imposes one.
+ * @returns the request field to spread, or undefined when neither signal exists.
+ */
+function combinedSignal(call: AbortSignal | undefined, deadline: AbortSignal | undefined): { signal?: AbortSignal } | undefined {
+  if (call === undefined) return deadline === undefined ? undefined : { signal: deadline }
+  if (deadline === undefined) return { signal: call }
+  return { signal: AbortSignal.any([call, deadline]) }
 }
 
 /** The platform services the confirm gate reads; both are OPTIONAL seams. */
@@ -372,7 +401,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         options: request.question.options.map(option => ({ label: option.label })),
       }],
       agent,
-      ...exec.signal !== undefined ? { signal: exec.signal } : {},
+      ...(combinedSignal(exec.signal, request.signal) ?? {}),
     })
     // The platform validates that the supplied agent IS the registry's exact live root, while this
     // tool's exec contract declares agent and session structurally — a wrapper that forwarded a copy
@@ -451,6 +480,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     strictCrossSource: rawConfig.strictCrossSource ?? false,
     citationPolicy: libraryLimits.citationPolicy ?? DEFAULT_CITATION_POLICY,
     supportFileCharPolicy: libraryLimits.supportFileCharPolicy ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+    skillWriteConfirm: rawConfig.skillWriteConfirm ?? DEFAULT_WRITE_CONFIRM_MODE,
+    skillWriteConfirmTimeoutSeconds: rawConfig.skillWriteConfirmTimeoutSeconds ?? DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS,
   }
   // The reader lives in a holder: attaching the section can fire `onChange`
   // inside this same tick, before the assignment below completes.
@@ -474,6 +505,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       strictCrossSource: pick('strictCrossSource'),
       citationPolicy: overridden('citationPolicy') ?? stages.citationPolicy ?? settingsBase.citationPolicy,
       supportFileCharPolicy: overridden('supportFileCharPolicy') ?? stages.supportFileCharPolicy ?? settingsBase.supportFileCharPolicy,
+      skillWriteConfirm: pick('skillWriteConfirm'),
+      skillWriteConfirmTimeoutSeconds: pick('skillWriteConfirmTimeoutSeconds'),
     }
   }
   const applyLimits = (): void => {
@@ -960,6 +993,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         protectedNames: protectedSkillNamesOf(),
         readNames: sessionReadSkillNames(exec.agent?.session),
         confirm: async request => confirmSkillWrite(request, exec),
+        // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.
+        confirmMode: settings().skillWriteConfirm,
+        confirmTimeoutSeconds: settings().skillWriteConfirmTimeoutSeconds,
         warn: warnWriteGateOnce,
       })
       if (refusal !== null) {

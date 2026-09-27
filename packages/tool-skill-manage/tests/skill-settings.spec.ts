@@ -27,6 +27,8 @@ function sectionValues(): SkillSettings {
     strictCrossSource: false,
     citationPolicy: 'verify',
     supportFileCharPolicy: 'report',
+    skillWriteConfirm: 'auto',
+    skillWriteConfirmTimeoutSeconds: 120,
   }
 }
 

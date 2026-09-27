@@ -34,12 +34,25 @@ write whose target the session never read is refused with `E-318`, and only a re
 counts. A session log the tool cannot read proceeds with one warning rather than blocking every
 autonomous write.
 
-A foreground `create`, or a bare foreground `delete`, asks the operator once before it writes and is
-refused with `E-317` when the answer is not the confirm label; a `delete` carrying `absorbed_into` is the
-merge protocol and does not ask. This gate is UX, not a security door: it is admission-only (a
-replayed record already carries the human release that staged it), and an unmounted question
-service, a caller that is not the registry's exact live root agent, or a failing ask all PROCEED
-with one warning — the operator's own session stays the authority that asked for the write.
+A foreground `create`, or a bare foreground `delete`, is the ONE write this tool puts to a human
+before writing; a `delete` carrying `absorbed_into` is the merge protocol and does not ask. WHAT
+that confirmation does is the `skillWriteConfirm` parameter (`/evolution params`, and the
+技能写入规则 card):
+
+| Mode | What happens |
+|---|---|
+| `auto` (**the default**) | the write proceeds with no prompt — an unattended run (a background pass, a scheduled review, a headless session) must not park a tool call on a question nobody will answer |
+| `ask` | the question waits for as long as it takes; the answer is `Create`/`Delete` to proceed, `Cancel` (or a dismissed card) to refuse with `E-317` |
+| `timeout` | the question is asked with a deadline of `skillWriteConfirmTimeoutSeconds` (default 120 s); an unanswered prompt cancels the write with `E-319`, which names the three knobs |
+
+The deadline is enforced by the gate itself, not only by the abort signal it hands the question
+service: a prompt that outlives it returns anyway, and the timer is unref'd and cleared, so an
+answered prompt leaves neither a parked call nor a live timer behind. This gate is UX, not a
+security door: it is admission-only (a replayed record already carries the human release that staged
+it), and — in the two modes that ask at all — an unmounted question service, a caller that is not
+the registry's exact live root agent, or a failing ask all PROCEED with one warning. The shipped
+`auto` mode asks nothing, so it never reaches those fallbacks; the operator's own session stays the
+authority that asked for the write.
 
 ### Approval seam
 

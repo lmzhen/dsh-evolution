@@ -81,6 +81,8 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
       { id: 'strictCrossSource', group: 'write-caps', doc: 'Refuse writes whose catalog entry resolves outside the family.', label: '引用外部内容即拒绝', hint: '技能引用了本插件之外的文件时拒绝写入。', control: 'switch', unit: '', values: [], valueLabels: [] },
       { id: 'citationPolicy', group: 'write-caps', doc: 'Refuse a move that would leave a dangling reference, or verify it.', label: '引用检查方式', hint: '移动或合并技能时怎么处理引用：先检查／直接拒绝。', control: 'select', unit: '', values: ['verify', 'refuse'], valueLabels: ['先检查', '直接拒绝'] },
       { id: 'supportFileCharPolicy', group: 'write-caps', doc: 'Warn about an oversize support file, or refuse the write.', label: '附带文件超限时', hint: '附带文件超出上限时：只提醒／拒绝写入。', control: 'select', unit: '', values: ['report', 'enforce'], valueLabels: ['只提醒', '拒绝写入'] },
+      { id: 'skillWriteConfirm', group: 'write-caps', doc: 'What the one confirmation before a create or a bare delete does: write straight through, wait for an answer, or cancel the write when nobody answers within the timeout.', label: '写入前是否确认', hint: '新建或删除技能前要不要问你：直接写入／一直等你回答／超时未答就取消这次写入。', control: 'select', unit: '', values: ['auto', 'ask', 'timeout'], valueLabels: ['不弹窗直接写入', '一直等待回答', '超时自动取消'] },
+      { id: 'skillWriteConfirmTimeoutSeconds', group: 'write-caps', doc: 'Seconds the confirmation waits for an answer in timeout mode before the write is cancelled.', label: '确认等待秒数', hint: '选「超时自动取消」时，等多少秒没人回答就取消这次写入。', control: 'number', unit: '秒', values: [], valueLabels: [] },
     ],
   },
   {
