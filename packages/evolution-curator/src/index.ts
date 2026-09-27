@@ -16,7 +16,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, installParamSection, isPresent, isUnknown, paramNamespace, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, installParamSection, isPresent, isUnknown, paramNamespace, probeList, probeMtime, readNumberParam, releaseInstance, transactIo, versionTarget } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -2063,6 +2063,16 @@ export class EvolutionCurator extends Service {
       const listed = versions.map(candidate => `v${candidate.v}`).join(', ')
       return { ok: false, message: `Version v${target} of "${name}" is not in the recorded history (recorded: ${listed === '' ? 'none' : listed}).` }
     }
+    // One index carries two chains: the body's versions and the bytes of support files the skill
+    // wrote. Naming a support version used to send those bytes at the frontmatter gate, which refused
+    // them for a reason the user cannot act on. Say what the version holds instead — before the read.
+    const entry = versions.find(candidate => candidate.v === target)
+    if (entry !== undefined && versionTarget(entry.action) === 'support') {
+      return {
+        ok: false,
+        message: `Version v${target} of "${name}" was written by '${entry.action}' and holds a SUPPORT FILE's bytes, not this skill's SKILL.md — undo restores the body only. The recorded bytes stay in the history store; copy the blob back over that file to restore them.`,
+      }
+    }
     const content = await this.skills.readVersion(name, target)
     if (content === null) {
       return { ok: false, message: `Version v${target} of "${name}" is listed in the index but its stored content could not be read — refusing rather than writing a guess.` }
@@ -2089,16 +2099,19 @@ export class EvolutionCurator extends Service {
    * Every entry written from 0.10.0 on carries `beforeHash`, read under the content lock, so the link
    * survives two writers of one skill appending their versions out of order. The tail scan stays for
    * entries written before the link existed and for a live body no version recorded (a hand-edited
-   * tree): the newest version whose content differs from the live bytes. */
+   * tree): the newest version whose content differs from the live bytes.
+   *
+   * Support-file versions are skipped in both branches: undo restores the skill BODY, and a version
+   * holding a support file's bytes is not a state the body was ever in (0.10.1). */
   private previousVersionOf(versions: readonly SkillVersion[], liveHash: string): number | undefined {
     const live = [...versions].reverse().find(entry => entry.hash === liveHash)
     if (live?.beforeHash !== undefined) {
       const predecessor = [...versions].reverse().find(entry => entry.hash === live.beforeHash)
-      if (predecessor !== undefined) return predecessor.v
+      if (predecessor !== undefined && versionTarget(predecessor.action) !== 'support') return predecessor.v
     }
     for (let index = versions.length - 1; index >= 0; index -= 1) {
       const entry = versions[index]
-      if (entry !== undefined && entry.hash !== liveHash) return entry.v
+      if (entry !== undefined && entry.hash !== liveHash && versionTarget(entry.action) !== 'support') return entry.v
     }
     return undefined
   }

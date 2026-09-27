@@ -55,7 +55,7 @@ const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', '
  * BROWSER half only (its Host half registers nothing), so it cannot be
  * double-mounted as infra and exposes nothing to a model. Listed by name so a
  * new row of any class still fails the count below until it is decided here. */
-const CLIENT_ONLY_ROWS = ['evolution-settings-ui']
+const CLIENT_ONLY_ROWS = ['evolution-settings-ui', 'evolution-skill-history']
 
 describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
   it('overlaps only on shared infra rows, not the full composition', () => {

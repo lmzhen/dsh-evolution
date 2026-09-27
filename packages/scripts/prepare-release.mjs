@@ -543,6 +543,9 @@ const publishGroups = [
   // nothing), so it has no family dependency to order after — but the bundle in
   // the next group depends on it, and the table must cover every staged tarball.
   ['evolution-settings-ui'],
+  // 0.11.0: the skill-history surface. Also client-only in order (its Host half mounts routes
+  // but depends on nothing the family orders), and the bundles below depend on it too.
+  ['evolution-skill-history'],
   ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
 // P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-all",
   "description": "Full-functionality evolution bundle — DEFAULT install: host automation + model tools, all profile-root",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "publishConfig": {
     "access": "public"
   },
@@ -39,6 +39,7 @@
     "@deepseek-ai/dsh-tool-session-query": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^",
-    "@deepseek-ai/dsh-evolution-settings-ui": "workspace:^"
+    "@deepseek-ai/dsh-evolution-settings-ui": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-history": "workspace:^"
   }
 }

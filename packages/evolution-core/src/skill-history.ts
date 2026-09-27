@@ -121,6 +121,65 @@ export function orderVersions(versions: readonly SkillVersion[]): SkillVersion[]
   return backward.length === versions.length ? backward.reverse() : [...versions]
 }
 
+/** Which artifact one recorded version holds.
+ *
+ * `content` is the skill's own SKILL.md body. `support` is a support file's bytes: a `write_file`
+ * or `remove_file` mutation stores them in the SAME index as the body's versions, so a skill that
+ * ever wrote a support file has two chains in one index. `other` is an entry whose action does not say
+ * which artifact the bytes belong to — a `baseline` predecessor found on disk, or an action that
+ * records no content of its own (`pin`/`unpin`/`archive` record only predecessors).
+ *
+ * The split is FAIL-CLOSED: an action this module does not know reads as `other` rather than being
+ * assumed to be the body, so a caller that offers "restore this version" never advertises bytes the
+ * index cannot vouch for. `tests/skill-history.spec.ts` pins every action the library can write, so a
+ * new one cannot land unclassified. */
+export type VersionTarget = 'content' | 'support' | 'other'
+
+/** The actions that record a SUPPORT FILE's bytes (they share the skill's version index). */
+const SUPPORT_ACTIONS: readonly string[] = ['write_file', 'remove_file']
+
+/** The actions that record the skill's own SKILL.md body. */
+const CONTENT_ACTIONS: readonly string[] = ['create', 'update', 'patch', 'consolidate', 'restructure', 'restore']
+
+/**
+ * Which artifact one recorded version holds, from the action that produced it.
+ * @param action - the entry's action label.
+ * @returns the artifact class; `other` when the label does not say.
+ */
+export function versionTarget(action: string): VersionTarget {
+  if (SUPPORT_ACTIONS.includes(action)) return 'support'
+  if (CONTENT_ACTIONS.includes(action)) return 'content'
+  return 'other'
+}
+
+/** The versions of one skill, split by the artifact they hold. */
+export interface VersionGroups {
+  /** The body's versions, plus predecessors whose artifact the index cannot name. */
+  readonly content: SkillVersion[]
+  /** Support-file versions: real history, but not restorable over SKILL.md. */
+  readonly support: SkillVersion[]
+}
+
+/**
+ * Split one index into the skill body's chain and the support files' versions.
+ *
+ * Both share ONE index, so a skill that ever wrote a support file has two chains and
+ * {@link orderVersions} cannot account for every entry (it falls back to the stored order). Splitting
+ * first lets each group rebuild its own order, and keeps the body's chain intact by leaving every
+ * entry the index cannot classify in it — a `baseline` predecessor is usually the body's first link.
+ * @param versions - the stored index, oldest first as recorded.
+ * @returns the two groups, each in content order when its chain is complete.
+ */
+export function partitionVersions(versions: readonly SkillVersion[]): VersionGroups {
+  const content: SkillVersion[] = []
+  const support: SkillVersion[] = []
+  for (const entry of versions) {
+    if (versionTarget(entry.action) === 'support') support.push(entry)
+    else content.push(entry)
+  }
+  return { content: orderVersions(content), support: orderVersions(support) }
+}
+
 /** Keep nothing less than one version, whatever the deployment asks for. */
 function clampKeep(keep: number): number {
   return Number.isFinite(keep) ? Math.max(1, Math.floor(keep)) : 1

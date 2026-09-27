@@ -35,6 +35,8 @@ describe('evolution-commands', () => {
         return [
           { v: 1, at: '2026-09-27T00:00:00.000Z', action: 'create', hash: 'aaaaaaaaaaaaaaaaaaaa', chars: 42 },
           { v: 2, at: '2026-09-27T00:01:00.000Z', action: 'update', hash: 'bbbbbbbbbbbbbbbbbbbb', chars: 43 },
+          // A support file shares the index: it must not read as a version of the body (0.10.1).
+          { v: 3, at: '2026-09-27T00:02:00.000Z', action: 'write_file', hash: 'cccccccccccccccccccc', chars: 9 },
         ]
       },
       undo: async (name: string, v?: number) => {
@@ -53,8 +55,10 @@ describe('evolution-commands', () => {
     // skill history renders the recorded versions (one line each, oldest first).
     const historyResult = await captured!.handler({ rawInput: 'skill history source-b' })
     expect(historyResult.kind).toBe('success')
-    expect(historyResult.text).toContain('Content versions for "source-b"')
+    expect(historyResult.text).toContain('Content versions for "source-b" (oldest first, 2 of at most the retained count):')
     expect(historyResult.text).toContain('v1	2026-09-27T00:00:00.000Z	create	42 chars	aaaaaaaaaaaa')
+    expect(historyResult.text).toContain('Support-file versions (history only')
+    expect(historyResult.text).toContain('v3	2026-09-27T00:02:00.000Z	write_file	9 chars	cccccccccccc')
     // skill undo parses the optional --to (with or without the v prefix) and defaults to "previous".
     const undoTo = await captured!.handler({ rawInput: 'skill undo source-b --to v1' })
     expect(undoTo.kind).toBe('success')

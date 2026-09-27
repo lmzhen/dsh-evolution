@@ -117,6 +117,49 @@ describe('evolution-curator', () => {
     expect(missingBlob.message).toContain('could not be read')
   })
 
+  it('names a support-file version as such instead of letting the frontmatter gate explain it (0.10.1)', async () => {
+    await tempHome('dsh-curator-undo-support-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: support-skill\ndescription: support fixture\n---\n${text}\n`
+    await library.create('support-skill', body('One.'))
+    await library.update('support-skill', body('Two.'))
+    const wrote = await library.writeSupportFile('support-skill', 'references/notes.md', '# notes\n')
+    expect(wrote.ok, wrote.message).toBe(true)
+    const versions = await ctx.evolutionCurator.history('support-skill')
+    const file = versions.find(entry => entry.action === 'write_file')
+    expect(file).toBeDefined()
+    const refused = await ctx.evolutionCurator.undo('support-skill', file?.v)
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain("holds a SUPPORT FILE's bytes, not this skill's SKILL.md")
+    expect(refused.message).toContain('write_file')
+    // Nothing was written: the refusal happens before the bytes are read.
+    expect(await library.read('support-skill')).toContain('Two.')
+  })
+
+  it('the default undo target skips a NEWER support-file version and lands on the body before it (0.10.1)', async () => {
+    await tempHome('dsh-curator-undo-skip-support-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: skip-skill\ndescription: skip fixture\n---\n${text}\n`
+    await library.create('skip-skill', body('One.'))
+    await library.update('skip-skill', body('Two.'))
+    await library.writeSupportFile('skip-skill', 'references/notes.md', '# notes\n')
+    // The newest entry is the file write; the body undo must go to v1, not attempt the file bytes.
+    const undone = await ctx.evolutionCurator.undo('skip-skill')
+    expect(undone.ok, undone.message).toBe(true)
+    expect(undone.message).toContain('undone to v1')
+    expect(await library.read('skip-skill')).toContain('One.')
+  })
+
   it('undo follows the CHAIN when two writers interleaved the index (review P1)', async () => {
     await tempHome('dsh-curator-undo-chain-')
     const ctx = new Context()

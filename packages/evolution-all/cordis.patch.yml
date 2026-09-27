@@ -133,6 +133,14 @@
     - id: evolution-settings-ui
       name: '@deepseek-ai/dsh-evolution-settings-ui'
 
+    # ── skill history: the sidebar panel over the content-version store ──────
+    # Host half mounts four loopback routes under /api/dsh-evolution/skill-history/*
+    # (the panel's only data path, and the same curator undo the slash command uses);
+    # the browser half is the left-sidebar panel row that reads them. Disabling this
+    # row removes the panel and its routes, and changes no other row's behaviour.
+    - id: evolution-skill-history
+      name: '@deepseek-ai/dsh-evolution-skill-history'
+
 # ── cross-session recall: enable the native session-query index ─────────────
 # `tool-session-query` (above) exposes `session_search`; this overlay
 # enables the backing SQLite full-text index so that search actually works.

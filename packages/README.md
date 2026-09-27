@@ -57,6 +57,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-agent` | Agent preset: standard tools + the four model rows (`memory` / `skill_manage` / session search / skill catalog) |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
+| `evolution-skill-history` | Browser-only sidebar panel (技能历史): the skills that recorded content versions, the body chain and the support-file chain apart, and one restore per body version — its Host half mounts the four loopback routes the panel reads |
 | `evolution-settings-ui` | Browser-only settings section (自进化): one card per parameter namespace, Chinese card titles / field labels / hints typed from the registry (plus optional `valueLabels` for enum options), styles injected at runtime |
 
 ## Installation
@@ -151,6 +152,8 @@ pins the equality).
 | `/evolution preset install [--base <name>[,<name>...]]` | 按指定基础生成自进化 Agent 预设到用户 root (bases from the agent package's bases.json) |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | 把技能正文的一节移到 references 文件 |
 | `/evolution replay` | 比较不同会话与重启之间的计划结果（从活动记录回填） |
+
+上表里的两条技能版本命令还有一个**图形面**：左栏面板行 **「技能历史」**（`@deepseek-ai/dsh-evolution-skill-history`，见上面的包表）——它读的是同一份索引、调的是同一条 `curator.undo`，只是把「事后去看」这件事变成点得到的行。
 
 ## Composition details
 

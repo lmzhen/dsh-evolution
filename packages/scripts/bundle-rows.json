@@ -306,6 +306,12 @@
       "banners": {
         "all": "    # ── settings UI: browser cards for the parameter namespaces ──────────────"
       }
+    },
+    {
+      "id": "evolution-skill-history",
+      "banners": {
+        "all": "    # ── skill history: the sidebar panel over the content-version store ──────"
+      }
     }
   ],
   "rows": [
@@ -803,6 +809,22 @@
       ],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-settings-ui'"
+      ]
+    },
+    {
+      "id": "evolution-skill-history",
+      "group": "evolution-skill-history",
+      "forms": [
+        "all"
+      ],
+      "lead": [
+        "    # Host half mounts four loopback routes under /api/dsh-evolution/skill-history/*",
+        "    # (the panel's only data path, and the same curator undo the slash command uses);",
+        "    # the browser half is the left-sidebar panel row that reads them. Disabling this",
+        "    # row removes the panel and its routes, and changes no other row's behaviour."
+      ],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-skill-history'"
       ]
     }
   ]

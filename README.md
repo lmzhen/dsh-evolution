@@ -125,7 +125,10 @@ under M1, never true for a host-only install (M3), which the plugin reports once
 - `/evolution preset install [--base <name>[,<name>...]]` generates the family agent preset (M4).
 - `/evolution skill history <name>` lists one skill's content versions; `/evolution skill undo <name>
   [--to v<N>]` rolls that skill back (content only — the pin marker, usage counters and curation state stay
-  as they are, and the rollback is itself recorded as a new version).
+  as they are, and the rollback is itself recorded as a new version). The sidebar row **Skill history**
+  (left edge, beside the platform's own panel rows) is the same feature with a face: it lists the skills that
+  recorded versions, shows the body chain and the support-file chain apart, and restores one version after an
+  inline confirmation — the same `curator.undo` the command calls.
 - `/evolution mutations` (the write log) and `/graph` (skills and memory as a graph).
 
 The full command surface is rendered once in `packages/README.md` (§Command reference); the complete
@@ -133,7 +136,7 @@ environment-variable and field-level knob reference lives there too.
 
 ### Changing parameters from the GUI
 
-The family ships exactly one browser surface: a settings section named **自进化**. It lists the
+The family ships two browser surfaces, both of them optional rows. The settings section **自进化** lists the
 user-writable parameters as five collapsible cards — **会话回顾** (Session review), **长期记忆**
 (Long-term memory), **记忆写入** (Writing memory), **技能整理** (Skill tidy-up) and **技能写入规则**
 (Skill write rules); the card titles and every field's Chinese label and explanation come from the
@@ -141,7 +144,10 @@ parameter registry. Each field carries its unit, where the current value comes f
 edited by you / **默认** the deployment default), a control typed from the registry (switch,
 dropdown, number, text) and that explanation. Edit and press 保存; 放弃修改 drops the draft, and
 恢复默认值 removes your override for one field. A dropdown's options are named in Chinese while the
-stored value stays the raw one (the registry's optional `valueLabels`).
+stored value stays the raw one (the registry's optional `valueLabels`). The other surface is the sidebar
+panel **Skill history** (`sidebar.panellist` row + its `main` panel body, one id): it browses the content
+versions every skill write records and restores one — see `/evolution skill history` for the same data in a
+terminal.
 
 Writes land in `~/.dsh/settings.yaml`, in the owning plugin's section, and take effect live, without a
 restart. The same store is writable from a session with `/evolution policy set <id> <value>`, and
@@ -200,7 +206,7 @@ gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent charac
   so the activity store and replay views stay empty until you opt into `subagent` reviews.
 - Session-scoped consumers never match on a host-only install (M3), and on M4 only sessions on the Evolution
   preset match.
-- The only GUI surface is one settings section (**自进化**): the family adds slash commands, model tools and that parameter panel — nothing else in the browser UI.
+- The GUI is two optional rows: the settings section (**自进化**) and the sidebar panel (**Skill history**). The family adds slash commands, model tools and those two surfaces — nothing else in the browser UI. The panel's rendering has no CI coverage (the family has no rendered-client test lane); `tsc`, the client bundle build, the API spec and a live pass carry it.
 - One platform anchor: a new platform line needs a family migration, not a config bump.
 - `npm dist-tags.next` is stale at `0.3.18` (historical residual); `latest` is correct and is what `add`
   resolves.

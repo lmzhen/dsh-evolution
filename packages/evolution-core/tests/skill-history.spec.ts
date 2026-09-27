@@ -5,7 +5,7 @@
  * recorder over a real library (create/update/patch → versions that can be read back).
  */
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_SKILL_LIMITS } from '../src/limits.ts'
@@ -20,12 +20,14 @@ import {
   loadVersions,
   nextHistoryIndex,
   orderVersions,
+  partitionVersions,
   parseHistoryIndex,
   readHistoryIndex,
   loadVersionContent,
   recordVersions,
   RETENTION_FEEDBACK_MIN_CHARS,
   type SkillVersion,
+  versionTarget,
 } from '../src/skill-history.ts'
 
 const skill = (name: string, body = 'Body.'): string => `---\nname: ${name}\ndescription: history fixture\n---\n${body}\n`
@@ -331,5 +333,70 @@ describe('skill-history: the retention line (design §4 item 3)', () => {
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
+  })
+})
+
+describe('skill-history: which artifact a version holds (0.10.1)', () => {
+  it('classifies by action, and is fail-closed for an action it does not know', () => {
+    for (const action of ['create', 'update', 'patch', 'consolidate', 'restructure', 'restore']) {
+      expect(versionTarget(action), action).toBe('content')
+    }
+    for (const action of ['write_file', 'remove_file']) expect(versionTarget(action), action).toBe('support')
+    // A predecessor found on disk: the index does not say which file it holds.
+    expect(versionTarget(BASELINE_ACTION)).toBe('other')
+    // An action nobody registered reads as 'other', never as the body: a caller that offers
+    // "restore this version" must not advertise bytes the index cannot vouch for.
+    expect(versionTarget('invented-by-a-future-release')).toBe('other')
+  })
+
+  it('pins every action the library can write, so a new one cannot land unclassified', async () => {
+    const source = await readFile(new URL('../src/skill-store.ts', import.meta.url), 'utf8')
+    const found = new Set<string>()
+    const shapes = [
+      /action: '([a-z_]+)'/g,
+      /auditAction: '([a-z_]+)'/g,
+      /this\.audit\([^,]+, '([a-z_]+)'/g,
+      /this\.audit\([^,]+, \w+ \? '([a-z_]+)' : '([a-z_]+)'/g,
+    ]
+    for (const shape of shapes) {
+      for (const match of source.matchAll(shape)) {
+        for (const group of match.slice(1)) if (group !== undefined) found.add(group)
+      }
+    }
+    // Actions whose entries are predecessors or nothing at all (they never label a version):
+    // pin/unpin record no content (both sides null), archive records only the body it removed.
+    const nonLabelling = new Set(['pin', 'unpin', 'archive'])
+    const unclassified = [...found].filter(action => versionTarget(action) === 'other' && !nonLabelling.has(action))
+    expect(unclassified).toEqual([])
+    expect(found.size).toBeGreaterThanOrEqual(8)
+  })
+
+  it('splits the two chains, so the body keeps its content order when a support file shares the index', () => {
+    const versions: SkillVersion[] = [
+      { v: 1, at: 'T1', action: 'create', hash: 'h1', chars: 10 },
+      { v: 2, at: 'T2', action: 'update', hash: 'h2', chars: 10, beforeHash: 'h1' },
+      { v: 3, at: 'T3', action: 'write_file', hash: 'f1', chars: 9 },
+      { v: 4, at: 'T4', action: 'write_file', hash: 'f2', chars: 9, beforeHash: 'f1' },
+    ]
+    // Two chains: no single end, so the whole-index rebuild falls back to the stored order (honest).
+    expect(orderVersions(versions).map(entry => entry.v)).toEqual([1, 2, 3, 4])
+    const groups = partitionVersions(versions)
+    expect(groups.content.map(entry => entry.v)).toEqual([1, 2])
+    expect(groups.support.map(entry => entry.v)).toEqual([3, 4])
+    // Interleaved appends (v3 landed before v2) still rebuild inside each group.
+    const interleaved = [versions[0]!, versions[2]!, versions[1]!, versions[3]!]
+    expect(partitionVersions(interleaved).content.map(entry => entry.v)).toEqual([1, 2])
+    expect(partitionVersions(interleaved).support.map(entry => entry.v)).toEqual([3, 4])
+  })
+
+  it('keeps a baseline predecessor in the BODY group, so its chain keeps its first link', () => {
+    const versions: SkillVersion[] = [
+      { v: 1, at: 'T1', action: BASELINE_ACTION, hash: 'b1', chars: 10 },
+      { v: 2, at: 'T2', action: 'update', hash: 'b2', chars: 10, beforeHash: 'b1' },
+      { v: 3, at: 'T3', action: 'write_file', hash: 'f1', chars: 9 },
+    ]
+    const groups = partitionVersions(versions)
+    expect(groups.content.map(entry => entry.v)).toEqual([1, 2])
+    expect(groups.support.map(entry => entry.v)).toEqual([3])
   })
 })

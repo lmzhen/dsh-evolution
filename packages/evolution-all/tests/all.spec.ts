@@ -25,6 +25,9 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     // G4/S4.4: the browser cards. Its Host half registers nothing, so it adds no
     // infra row and nothing model-visible — only the settings tab's card row.
     '@deepseek-ai/dsh-evolution-settings-ui',
+    // 0.11.0: the skill-history surface. Its Host half mounts four loopback routes and its
+    // browser half the sidebar panel; like the cards above it is a CLIENT_ONLY row.
+    '@deepseek-ai/dsh-evolution-skill-history',
   ]
   for (const dep of expected) {
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')

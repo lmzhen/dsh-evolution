@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.11.0 (minor) — 技能历史的图形面：左栏「技能历史」面板 ＋ 四条 loopback 路由（版本分链，文件版本按名拒绝，G6 占用行决定不做）
+
+> **由来**：0.10.0 把内容版本与单技能撤销做成了两条斜杠命令（A/B 批），但"事后想起来去看"的用户没有可点的面。判定档 `dsh-evolution-skill-history-entry-options.md` §10–§13 逐项取优＋整体复核后定下三条：**只开一个新面**（⑥b 左栏面板行）、**复用唯一写通道**（`curator.undo`）、**先修事实层再上面板**。
+> **命令面不动**：`/evolution skill history|undo` 的解析与文案逐字不变——CLI／无 GUI 会话里它们是唯一入口，也是这个面的等价物。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 左栏新增一行 | 「技能历史」面板行（`sidebar.panellist`，id `skill-history`，order 35）＋ 同 id 的 layout `main` 面板体；禁用或删掉该行即整块消失，host 侧不留残余 |
+| 面板内容 | 左列列出**有版本记录的技能**；右列是该技能的两条链：**正文版本**（可回退；已是当前内容的那版标「当前」）与**文件版本（不可回退）** |
+| 回退 | 面板内一次「回退到此版」＝**内联确认**后走 `curator.undo`（与斜杠命令同一条写通道）；结果句直接显示 curator 的原话，随后重读列表 |
+| 命令面 | `/evolution skill history` 现在**分两组**列：正文版本 ＋ `Support-file versions (history only — undo restores SKILL.md, not these bytes)`（此前文件版本混在"内容版本"里） |
+| 拒绝面 | `skill undo --to <文件版本>` **在读取字节之前**就按名拒绝（`holds a SUPPORT FILE's bytes…`），不再由 frontmatter 校验以看不懂的理由挡回 |
+| 安装面 | `all` bundle 多一行 `@lmzhen/dsh-evolution-skill-history`（纯客户端面，与 `evolution-settings-ui` 同类；`host`／`preset` 表不含它），聚合包 `dsh-evolution-all` 随之多一个依赖 |
+
+### 不动的（契约）
+
+- **模型可见文本**：零改动——本版没有 prompt／tool schema／工具结果文案变化（面板是人的面）。
+- **写通道**：仍只有 `curator.undo` 一条；新包的 `src/` 里 `writeText|writeFile|node:fs` 命中数为 **0**（面板与路由不直接写盘）。
+- **斜杠命令**：两条命令的解析路径与既有文案逐字不变，只有 `skill history` 的分组渲染改了。
+- **版本视图只准有一个家**：本版**不**新增 ④ 命令富视图／⑤ 工具卡／⑥a 右栏标签／⑥d DOM 注入——家族内 `sidebar.panellist` 的注册只有这一处。
+- **平台槽契约**：`sidebar.panellist`（list／root）与 `main`（keyed／root）用**同一个 id**；面板**不绑定会话**（契约原文 "other keys receive no Session binding"），它取的是全局事实。
+- **G6（面板里的只读占用行）决定不做**（2026-09-27 用户口径）：占用一旦可见就得配套"清理/适配"那条新功能，因此占用继续只写在 `evolution-core/README.md`。
+
+### 事实层的一处修正（0.10.0 的已知缺口）
+
+> **症状**：索引把**附带文件版本**与**正文版本**混在同一编号空间——`skill history` 会把 `write_file` 行当"内容版本"列出；`undo --to` 会把文件字节当正文写（被 frontmatter 校验挡住，但理由说不清）；两条链还让 `orderVersions` 退回追加顺序。
+> **改法（不加字段）**：core 新增**一个派生谓词** `versionTarget(action)`（`content`／`support`／`other`，未知 action **fail-closed**）＋ `partitionVersions()`（两条链分开、各自按链重建顺序）；`curator.undo` 对 support 版本**按名拒绝**、默认目标跳过 support；命令面与面板消费同一分组。
+> **为什么不在条目里加字段**：那要动 7 处 `audit()` 调用点与 plan schema，且 `action` 与目标两个事实会漂移、旧条目还要默认值 ⇒ 双读路径长期存在（判断依据见判定档 §14 第 1 条）。
+
+### 新包与门禁
+
+- 新包 `@deepseek-ai/dsh-evolution-skill-history`：宿主半 4 条 loopback 路由（`/api/dsh-evolution/skill-history/{skills,versions,undo,health}`，平台同款信任栏：socket 权威＋Host loopback＋`sec-fetch-site`＋Origin 同源；`ctx.get('webServer')` 惰性，headless 装配不挂；curator **每请求解析**，缺失时答家族 E-302 原句）；浏览器半一行面板（`label` 用 thunk 跟语言；组件只拿 inject face 的纯回调，无 store、不建订阅；全部文案进 locale 字典）。
+- **type-only 导入也要声明**：`verify-dependency-closure` 把 `import type {}` 也算 value-import ⇒ `dsh-evolution-curator`／`dsh-host-webserver` 进 `peerDependencies`。
+- **面板渲染没有 CI 覆盖**（家族无 jsdom 车道）：按 `evolution-settings-ui` 的成文姿态用 `tsc` ＋ client bundle 构建 ＋ `tests/client-api.spec.ts`（唯一逻辑层）＋ 真机过一遍，并**如实写在新包 README 的 Known limitations**。
+
 ## 0.10.0 (minor) — 技能内容版本与单技能撤销 ＋ 两处判定收敛（相似度问句具名、计划规则成表）
 
 > **由来**：外部档《SKILL-ATOMIC-UNITS.md》评估（判定档 `dsh-evolution-skill-atomic-units-eval.md` §7 架构层级撞车检查、§8 屎山判定与收敛方案）后定下的四条可借项；口径是**忽略短期工程量、从效果最优化出发**，同时把**防屎山**当硬约束。批次划分、七条不变量与逐批验收见设计档 `dsh-evolution-skill-history-design.md`（本机存档）。
