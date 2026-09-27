@@ -354,6 +354,8 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
               key: skill.name,
               type: 'button',
               className: 'evo-hist-skill',
+              // The row ellipsises a long name; the full one stays reachable on hover.
+              title: skill.name,
               'aria-current': skill.name === selected ? 'true' : undefined,
               onClick: () => { open(skill.name) },
             },

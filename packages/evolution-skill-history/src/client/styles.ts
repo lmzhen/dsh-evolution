@@ -25,10 +25,11 @@ export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-skill-history/panel.css'
 
 /** The stylesheet the panel injects once. */
 export const CSS = [
-  // No font-size here: the panel is CHROME, and the setting behind `--dsh-content-font-size*` says it
-  // affects conversation content only (the platform's own surfaces declare no font-size at all). The
-  // panel therefore inherits the shell's chrome size and derives its steps with `calc(1em ± Npx)`.
-  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;color:var(--dsw-alias-label-primary)}',
+  // One step below the shell's chrome size, and NOT the setting behind `--dsh-content-font-size*`
+  // (that one says it affects conversation content only, and the platform's own surfaces never read
+  // it). The step is relative, so the panel scales with the shell, not with the conversation: the
+  // dense list needs it — at the raw chrome size `dsh-evolution-maintenance` truncates in 264px.
+  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;font-size:calc(1em - 1px);color:var(--dsw-alias-label-primary)}',
   '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 264px;width:264px;min-height:0;border-right:.5px solid var(--dsw-alias-border-l2)}',
   '.evo-hist-search{padding:12px 12px 4px}',
   '.evo-hist-search input{width:100%;box-sizing:border-box;padding:6px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}',

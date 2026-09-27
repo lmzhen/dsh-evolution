@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.4 (patch) — 修 0.13.3 的一处自伤：面板字号回到「chrome 减一档」，技能名不再被截断
+
+> **症状**：0.13.3 把面板根的 `font-size` 从 token 改成「继承 chrome 尺寸」后，正文由 13px 变 14px；左列固定 264px 已装不下 `dsh-evolution-maintenance` 与 `windows-computer-use`，真机上两行技能名分别显示成 `dsh-evolution-mai…`／`windows-computer-…`——面板里最要紧的标识被截断。
+> **口径不变，改相对量**：面板**不跟随会话内容字号**（该设置文案是「仅影响会话内容的字号」，平台自己的面也不读它），但也不必吃满 chrome 尺寸——根改 `font-size: calc(1em - 1px)`（chrome 减一档，本机 13px），标题与组标签继续在其上 `calc(1em + 2px)`／`calc(1em - 1px)`。
+> **顺带**：技能行加 `title`＝完整技能名，长名字仍可悬停读到全称。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0；vitest 全绿；门禁 **21/21**（日志前缀 `v0134a`）。真机复验见发布记录（两个技能名恢复完整显示）。
+
 ## 0.13.3 (patch) — 审美审查第二批量：层级／时间／对齐／分隔线／空态／动作词／胶囊／字号口径，左栏行按用户口径对齐邻居三行
 
 > **由来**：`dsh-evolution-ui-ux-gap-list.md` §13 的 V4–V8、V10–V12，加用户拍板的 V13（原话：「对齐邻居三行，不要对齐工作区」）。四条真缺陷（V1 描述行溢出／V2 中文句间空格／V3 差异加号配色／V9 确认态无出口）已在 0.13.2 发布。
