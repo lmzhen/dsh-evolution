@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.1 (patch) — 修 0.13.0 的面板行图标：按槽位契约取 `size`，不再用 `100%` 撑满整列
+
+> **症状**：0.13.0 把左栏「技能历史」行的 emoji 换成内联 SVG 后，真机上那枚图标**撑满整个左栏**（截图：一个占满列宽的大时钟），而它上面三行（任务看板／SSH／技能中心）是正常 18px。
+> **根因**：我把 SVG 写成 `width/height: 100%`，而平台槽位并没有给图标一个定尺的盒子（`panelGlyph` 是 content-sized 的 flex 盒）⇒ `100%` 解析成列宽。**契约是反的**：平台自己的测试与实现都把尺寸**当 prop 传进来**——`SidebarRoot.tsx` `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, …)`，平台图标照 `size={size}` 出图（`ui-sidebar/tests/panel-list.client.spec.tsx:88-93`）。
+> **另外三行是怎么做的（先读再改）**：它们**不是** `panellist` 注册——装机包里搜不到这个槽名（命中只有本包）；第三方走 **DOM 注入**进平台侧栏，并用自有 CSS 定尺：`…entryIcon svg{width:18px;height:18px;display:block}`（`@linxin666/dsh-ssh/lib/client.js`，与 task-board／skill-explorer 共用 `shared/client/sidebar-entry-core.ts`）。两种实现都指向同一个结论：**行图标的尺寸由外部给（prop 或 CSS），组件自己不许用百分比撑**。
+> **修法**：`PanelIcon(props)` 取 `props.size`（正数才用），回退值取邻近行的 **18**；SVG 用像素 `width/height`。契约与两条实现的出处写在组件 docblock 里，避免下次再犯。
+> **验证**：`tsc -b` 0；`build-client.mjs` 产出 30.59 kB（bundle 30,052→32,052 字节，含新注释）；本包不变量测试与门禁同 0.13.0。真机复验见发布记录（页面刷新／重启后核对左栏图标为 18px）。
 ## 0.13.0 (minor) — 对外界面按「事实只算一次、词只在各自字典、控件与排版走平台 token」重整：面板信息设计重写、确认卡说明用途、命令首行结论化
 
 > **由来**：用户两轮口径——① 「技能历史页面美观性很差…没有多少有助于决策的信息；创建技能的询问界面也一样」② 「检查全量对外功能里是否还有同类问题」——收敛成 `dsh-evolution-ui-ux-gap-list.md`（三轮共 22 条，P／A／C／T 四组）。本版按该档 §9 架构方案与 §10 分组计划实施 G1–G3。

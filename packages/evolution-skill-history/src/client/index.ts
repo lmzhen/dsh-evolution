@@ -22,18 +22,23 @@ export const inject = ['slots', 'locale']
 export const PANEL_ORDER = 35
 
 /**
- * The row's icon: a platform-style line glyph rather than an emoji.
+ * The row's icon: a platform-style line glyph, sized by the SIDEBAR's own contract.
  *
- * An emoji cannot follow `currentColor`, cannot match the 16/18px the sidebar hands its glyph slot,
- * and renders differently on every platform font — the sidebar's other rows are 1.5px-stroke line
- * icons, and this one now is too. The label carries the accessible name, so the glyph stays
- * decoration.
+ * The platform hands every `sidebar.panellist` occupant `{ size, active }` (`SidebarRoot.tsx`
+ * `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, …)`) and its own icons render at
+ * that size (`IconGlobeOutline14 size={size}` in the sidebar's own spec). The neighbouring rows in a
+ * shipped GUI take the OTHER route — they inject their entry into the sidebar's DOM with their own
+ * `svg { width: 18px; height: 18px }` CSS — so 18px is the size a row glyph is expected to occupy.
+ * A glyph that sizes itself from CSS (`width: 100%`) resolves against an unsized flex box and fills
+ * the column: the size must come from the prop, with the neighbours' 18 as the fallback. The label
+ * carries the accessible name, so the glyph stays decoration.
  */
-function PanelIcon(): unknown {
+function PanelIcon(props: { size?: number; active?: boolean } = {}): unknown {
+  const size = typeof props.size === 'number' && props.size > 0 ? props.size : 18
   return createElement('svg', {
     'aria-hidden': 'true',
-    width: '100%',
-    height: '100%',
+    width: String(size),
+    height: String(size),
     viewBox: '0 0 16 16',
     fill: 'none',
     stroke: 'currentColor',
