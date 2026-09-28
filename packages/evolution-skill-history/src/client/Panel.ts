@@ -525,7 +525,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
             },
             createElement('span', { className: 'evo-hist-skill-line' },
               createElement('span', { className: 'evo-hist-skill-name' }, skill.name),
-              createElement('span', { className: 'evo-hist-skill-count' }, String(skill.versions) + ' ' + face.t('versions.count')),
+              createElement('span', { className: 'evo-hist-skill-count' }, face.format('versions.count', { n: skill.versions })),
             ),
             createElement('span', { className: 'evo-hist-skill-desc' }, oneLine(skill.description) + ' · ' + face.t(stateKey(skill))
               // Last changed rides the description line: the name above must not be squeezed (it is the
