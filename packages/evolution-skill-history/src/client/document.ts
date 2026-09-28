@@ -140,9 +140,16 @@ export function DiffBody(props: { face: DocumentFace; diff: DiffState }): ReactN
   return createElement('div', { className: 'evo-doc-diff' },
     createElement('div', { className: 'evo-doc-head' },
       note({
-        children: against + ' · ' + face.format('diff.added', { n: diff.diff.linesAdded })
-          + ' · ' + face.format('diff.removed', { n: diff.diff.linesRemoved })
-          + (diff.diff.truncated ? ' · ' + face.t('diff.truncated') : ''),
+        // Four facts, four elements: the separator between them is the stylesheet's, not a character
+        // a component concatenates (W15).
+        children: [
+          createElement('span', { key: 'against', className: 'evo-doc-fact' }, against),
+          createElement('span', { key: 'added', className: 'evo-doc-fact' }, face.format('diff.added', { n: diff.diff.linesAdded })),
+          createElement('span', { key: 'removed', className: 'evo-doc-fact' }, face.format('diff.removed', { n: diff.diff.linesRemoved })),
+          diff.diff.truncated
+            ? createElement('span', { key: 'truncated', className: 'evo-doc-fact' }, face.t('diff.truncated'))
+            : null,
+        ],
       }),
       toggle),
     diffView(face, diff.diff, mode))

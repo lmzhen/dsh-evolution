@@ -53,7 +53,9 @@ export const CSS = [
   // length (W1).
   '.evo-hist-cell-line{display:flex;align-items:baseline;gap:var(--evo-space-6);min-width:0}',
   '.evo-hist-cell-meta{margin-top:var(--evo-space-2)}',
-  '.evo-hist-cell{min-width:0}',
+  // Tabular digits: counts, version numbers, ages and deltas are read DOWN a column, so a
+  // proportional `1` next to a `4` made every number's width an accident (W10).
+  '.evo-hist-cell{min-width:0;font-variant-numeric:tabular-nums}',
   '.evo-hist-slot-lead{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   '.evo-hist-slot-meta{flex:none;white-space:nowrap}',
   '.evo-hist-slot-aside{flex:none;margin-left:auto;white-space:nowrap}',
@@ -71,7 +73,9 @@ export const CSS = [
   '.evo-hist-note-text{min-width:0;white-space:pre-wrap}',
   '.evo-hist-note[data-error="true"]{color:var(--evo-tone-danger);background:var(--dsw-alias-bg-layer-2);border:var(--evo-hairline-width) solid var(--evo-tone-danger);border-radius:var(--evo-radius-control);padding:var(--evo-space-8) var(--evo-space-10)}',
   '.evo-hist-icon{flex:none;margin-top:.15em}',
-  '.evo-hist-group{margin:var(--evo-space-10) 0 var(--evo-space-2);font-size:var(--evo-type-sm);font-weight:600;color:var(--dsw-alias-label-secondary)}',
+  // A group heading is a boundary, so it takes more air above it than two rows take between them
+  // (16 against the row gap of 8+8): the ink gap alone made the two look alike (W3).
+  '.evo-hist-group{margin:var(--evo-space-16) 0 var(--evo-space-4);font-size:var(--evo-type-sm);font-weight:600;color:var(--dsw-alias-label-secondary)}',
   // A row is capped so its controls stay within reach of the text they act on: on a wide window the
   // tools used to sit ~700px away from the sentence they belonged to (W4). The cap is the reading
   // measure times one and a half, so it follows the scale rather than a window width.
@@ -100,6 +104,8 @@ export const CSS = [
   '.evo-doc-head{display:flex;align-items:center;gap:var(--evo-space-8);max-width:var(--evo-measure-read)}',
   '.evo-doc-head .evo-hist-note{flex:1 1 auto;margin:0}',
   '.evo-doc-toggle{display:flex;flex:none;align-items:center;gap:var(--evo-space-6)}',
+  // The facts of a diff header, separated by the stylesheet rather than by a character in the code.
+  '.evo-doc-fact+.evo-doc-fact::before{content:"·";margin:0 var(--evo-space-6);color:var(--dsw-alias-label-tertiary)}',
   // The SOURCE view is the platform’s code surface (a card with its own scroll), not prose: it keeps
   // the command card’s metrics, and it is the one place exact bytes are shown.
   '.evo-doc-source{margin:var(--evo-space-6) 0 var(--evo-space-2);padding:var(--evo-space-12) var(--evo-space-16);max-height:var(--evo-cap-block);overflow:auto;border:var(--evo-hairline-width) solid var(--dsw-alias-border-l1);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',

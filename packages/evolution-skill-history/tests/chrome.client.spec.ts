@@ -117,4 +117,15 @@ describe('the tool face says what it is (G3)', () => {
     expect(CSS).not.toContain('outline:2px')
     expect(CSS).not.toContain('outline:none')
   })
+
+  it('gives a group boundary more air than the gap between two rows (W3)', () => {
+    // Two rows sit 8+8 apart; a heading takes the 16px step above it, so the boundary reads as one.
+    expect(rule('.evo-hist-group')).toContain('margin:var(--evo-space-16) 0 var(--evo-space-4)')
+    expect(rule('.evo-hist-row')).toContain('padding:var(--evo-space-8) 0')
+  })
+
+  it('lines digits up between rows (W10)', () => {
+    // Every fact a reader compares down the column (count, version, age, delta) is a cell.
+    expect(rule('.evo-hist-cell')).toContain('font-variant-numeric:tabular-nums')
+  })
 })
