@@ -669,7 +669,7 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
 interface SingleWriteOutcome {
   result: SkillActionResult
   write: string | null
-  audit?: { skillName: string; action: string; before: string | null; after: string | null; summary: string }
+  audit?: { skillName: string; action: string; before: string | null; after: string | null; summary: string; path?: string }
   event?: EvolutionSkillMutatedEvent
 }
 
@@ -808,7 +808,7 @@ export class SkillLibrary {
     if (o.ghostDir === true) await this.cleanupGhostDir(path)
     let result = o.result
     if (o.write !== null && o.audit) {
-      await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary)
+      await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary, o.audit.path)
       // Design §4 item 3: the retention line, said HERE because this is the only place that still
       // holds both bodies (the write's own in-lock read) — a caller would have to re-read the file
       // and race the writers this library serializes. Feedback only: it never changes the ok flag.
@@ -1255,12 +1255,23 @@ export class SkillLibrary {
    * mutation ledger that points at it. The history failure is not silent — a deployment whose
    * history stopped growing is a degradation worth seeing once (the ledger keeps hashes either
    * way). */
-  private async audit(skillName: string, action: string, before: string | null, after: string | null, summary: string): Promise<void> {
+  private async audit(
+    skillName: string,
+    action: string,
+    before: string | null,
+    after: string | null,
+    summary: string,
+    // Which support file the bytes belong to, RELATIVE to the skill directory (absent for the body's
+    // own writes): the version entry records it so a face can name the file without guessing.
+    path?: string,
+  ): Promise<void> {
     const at = new Date().toISOString()
     let versions: RecordedVersions | null = null
     try {
       const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
-      versions = await recordVersions(this.root, this.io, { skillName, action, before, after, at }, keep)
+      // `exactOptionalPropertyTypes` is on: omit the key rather than passing an explicit undefined.
+      const input = { skillName, action, before, after, at, ...path === undefined ? {} : { path } }
+      versions = await recordVersions(this.root, this.io, input, keep)
     } catch (error) {
       if (!this.historyWarned) {
         this.historyWarned = true
@@ -2798,7 +2809,7 @@ export class SkillLibrary {
       return {
         result: { ok: true, message: `Support file "${filePath}" written to "${name}".${capAdvisory}`, path: target },
         write: content,
-        audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}` },
+        audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}`, path: filePath },
         event: { action: 'write_file', name, skillDir: dir, file: target },
       }
     }, anchor !== undefined ? () => anchorUnverifiable(name, filePath) : error => unreadableTarget(name + '/' + filePath, error))
@@ -2867,7 +2878,7 @@ export class SkillLibrary {
       await this.io.remove(target)
     }
     if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
-    await this.audit(name, 'remove_file', before, null, `removed ${filePath}`)
+    await this.audit(name, 'remove_file', before, null, `removed ${filePath}`, filePath)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
   }

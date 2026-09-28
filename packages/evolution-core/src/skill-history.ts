@@ -61,6 +61,13 @@ export interface SkillVersion {
    * (registry `skillVersionSummary`). Absent is a first-class state: the faces say so instead of
    * inventing a sentence, and a version recorded before the feature existed simply has none. */
   summary?: string
+  /**
+   * Which support file these bytes came from, RELATIVE to the skill directory (`references/foo.md`),
+   * when this entry records a support-file write or remove. Absent is a first-class state: content
+   * versions never carry it, and every entry recorded before this field existed has none — the bytes
+   * in the blob store do not carry the name, so a legacy entry stays nameless rather than guessed.
+   */
+  path?: string
 }
 
 /** One history write, carrying the content the caller already holds. */
@@ -74,6 +81,8 @@ export interface VersionRecordInput {
   at: string
   /** The one-line summary of THIS write, or undefined when the deployment does not summarize. */
   summary?: string
+  /** The support file this write touched, relative to the skill directory; undefined for content. */
+  path?: string
 }
 
 /** The version numbers one write produced; a side with no content contributes nothing. */
@@ -158,9 +167,38 @@ export function versionTarget(action: string): VersionTarget {
   return 'other'
 }
 
+/**
+ * Which artifact one INDEX ENTRY holds.
+ *
+ * {@link versionTarget} reads the ACTION, which is enough for the entries a write mints under its own
+ * label and is NOT enough for a {@link BASELINE_ACTION}: a baseline minted for a support write holds
+ * that FILE's previous bytes while its action says only "this is what was there". Two facts recover
+ * the artifact:
+ *
+ *  - `path` is written exactly when the bytes come from a support file, on BOTH entries one support
+ *    write can mint, so it decides on its own;
+ *  - an entry recorded before `path` existed has none, and the link is the evidence left: a support
+ *    write names the content it replaced through `beforeHash`, so a baseline that a support write
+ *    names as its predecessor holds that file's bytes.
+ *
+ * The inference runs only for a baseline. Every other entry keeps the action's verdict, which is also
+ * the fail-closed one for an action this module does not know.
+ * @param entry - one entry of a skill's index.
+ * @param index - the index the entry came from: the legacy link is only readable across the whole
+ *   index. Omitting it answers from `path` and the action alone.
+ * @returns the artifact class; `other` when nothing attributes the bytes.
+ */
+export function entryTarget(entry: SkillVersion, index: readonly SkillVersion[] = []): VersionTarget {
+  if (entry.path !== undefined) return 'support'
+  if (entry.action !== BASELINE_ACTION) return versionTarget(entry.action)
+  const namedBySupportWrite = index.some(candidate =>
+    SUPPORT_ACTIONS.includes(candidate.action) && candidate.beforeHash === entry.hash)
+  return namedBySupportWrite ? 'support' : 'other'
+}
+
 /** The versions of one skill, split by the artifact they hold. */
 export interface VersionGroups {
-  /** The body's versions, plus predecessors whose artifact the index cannot name. */
+  /** The body's versions, plus predecessors no evidence attributes to a support file. */
   readonly content: SkillVersion[]
   /** Support-file versions: real history, but not restorable over SKILL.md. */
   readonly support: SkillVersion[]
@@ -172,7 +210,8 @@ export interface VersionGroups {
  * Both share ONE index, so a skill that ever wrote a support file has two chains and
  * {@link orderVersions} cannot account for every entry (it falls back to the stored order). Splitting
  * first lets each group rebuild its own order, and keeps the body's chain intact by leaving every
- * entry the index cannot classify in it — a `baseline` predecessor is usually the body's first link.
+ * entry whose artifact nothing attributes in it — a `baseline` predecessor is usually the body's
+ * first link, and only the support-file baselines {@link entryTarget} recovers leave it.
  * @param versions - the stored index, oldest first as recorded.
  * @returns the two groups, each in content order when its chain is complete.
  */
@@ -180,10 +219,28 @@ export function partitionVersions(versions: readonly SkillVersion[]): VersionGro
   const content: SkillVersion[] = []
   const support: SkillVersion[] = []
   for (const entry of versions) {
-    if (versionTarget(entry.action) === 'support') support.push(entry)
+    if (entryTarget(entry, versions) === 'support') support.push(entry)
     else content.push(entry)
   }
   return { content: orderVersions(content), support: orderVersions(support) }
+}
+
+/**
+ * When this skill's content last changed: the newest `at` across BOTH chains, or null when the index
+ * holds nothing.
+ *
+ * The stored array is APPEND order and two writers of one skill can interleave, so the answer is the
+ * maximum timestamp rather than the tail. Every `at` this family writes is the same ISO-8601 UTC
+ * form, so comparing the strings is comparing the instants.
+ * @param versions - every entry the index holds, in any order.
+ * @returns the newest timestamp, or null when there is none to report.
+ */
+export function latestVersionAt(versions: readonly SkillVersion[]): string | null {
+  let newest: string | null = null
+  for (const entry of versions) {
+    if (newest === null || entry.at > newest) newest = entry.at
+  }
+  return newest
 }
 
 /** Keep nothing less than one version, whatever the deployment asks for. */
@@ -229,11 +286,23 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   // `summary` is metadata too, and BOTH branches must carry it: the explicit literal below is the
   // one a create (which has no beforeHash) takes, and recordVersions re-serializes whatever this
   // reader returned — a field dropped here is dropped for good on the next write.
+  // EVERY optional field is folded into this one object on purpose: the two returns below then differ
+  // only by the chain link, so a field added here cannot be forgotten by one of them (a field this
+  // reader drops is dropped for good on the next write).
   const summary = typeof candidate.summary === 'string' && candidate.summary !== '' ? candidate.summary : undefined
-  const base = { v: candidate.v, at: candidate.at, action: candidate.action, hash: candidate.hash, chars: candidate.chars }
+  const path = typeof candidate.path === 'string' && candidate.path !== '' ? candidate.path : undefined
+  const base: SkillVersion = {
+    v: candidate.v,
+    at: candidate.at,
+    action: candidate.action,
+    hash: candidate.hash,
+    chars: candidate.chars,
+    ...summary === undefined ? {} : { summary },
+    ...path === undefined ? {} : { path },
+  }
   return typeof candidate.beforeHash === 'string' && candidate.beforeHash !== ''
-    ? { ...base, beforeHash: candidate.beforeHash, ...summary === undefined ? {} : { summary } }
-    : { ...base, ...summary === undefined ? {} : { summary } }
+    ? { ...base, beforeHash: candidate.beforeHash }
+    : base
 }
 
 /**
@@ -297,11 +366,21 @@ export function nextHistoryIndex(
   const beforeHash = input.before === null ? null : contentHash(input.before)
   const afterHash = input.after === null ? null : contentHash(input.after)
   const grown: SkillVersion[] = [...versions]
+  // A support write names its file once and BOTH entries it can mint carry it: the baseline is that
+  // same file's previous bytes and the after-entry is this write's. A content write passes none.
+  const pathField = input.path === undefined ? {} : { path: input.path }
   // "Is the predecessor already recorded?" is asked of the WHOLE index, not of its tail: two writers
   // of one skill append after releasing the content lock, so their entries can interleave — a tail
   // test would mint a bogus baseline for a predecessor that sits two entries back.
   if (beforeHash !== null && !grown.some(entry => entry.hash === beforeHash)) {
-    grown.push({ v: nextVersion(grown), at: input.at, action: BASELINE_ACTION, hash: beforeHash, chars: input.before?.length ?? 0 })
+    grown.push({
+      v: nextVersion(grown),
+      at: input.at,
+      action: BASELINE_ACTION,
+      hash: beforeHash,
+      chars: input.before?.length ?? 0,
+      ...pathField,
+    })
   }
   if (afterHash !== null) {
     const tail = grown[grown.length - 1]
@@ -312,6 +391,7 @@ export function nextHistoryIndex(
         action: input.action,
         hash: afterHash,
         chars: input.after?.length ?? 0,
+        ...pathField,
         // The summary describes THIS write, so it rides the after-entry only: the baseline minted
         // above is the state BEFORE it and has nothing to summarize.
         ...input.summary === undefined ? {} : { summary: input.summary },

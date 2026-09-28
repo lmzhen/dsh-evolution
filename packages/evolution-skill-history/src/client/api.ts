@@ -12,6 +12,7 @@ export const HOST_ROUTES = {
   skills: '/api/dsh-evolution/skill-history/skills',
   versions: '/api/dsh-evolution/skill-history/versions',
   diff: '/api/dsh-evolution/skill-history/versions/diff',
+  body: '/api/dsh-evolution/skill-history/versions/body',
   undo: '/api/dsh-evolution/skill-history/undo',
 } as const
 
@@ -50,6 +51,11 @@ export interface VersionRow {
   readonly age: { readonly unit: string; readonly n: number }
   /** The one line the optional summarizer wrote, when the deployment turned it on. */
   readonly summary?: string
+  /**
+   * Which support file these bytes came from, relative to the skill directory. Absent on body rows,
+   * and absent on every support row recorded before the field existed (the bytes carry no name).
+   */
+  readonly path?: string
 }
 
 /** One skill that has recorded versions, with what the listing already knows about it. */
@@ -60,6 +66,20 @@ export interface SkillRow {
   readonly managed: boolean
   readonly protectedBy: string | null
   readonly protectionUnknown: boolean
+  /** When this skill's content last changed (either chain), or null when the index is empty. */
+  readonly lastAt: string | null
+  /** That moment as a bucket plus a count; null exactly when `lastAt` is. */
+  readonly age: { readonly unit: string; readonly n: number } | null
+}
+
+/** One version's whole body, as the read route hands it over. */
+export interface VersionBodyRow {
+  readonly v: number
+  /** The body, or its head when `truncated` — the reader is told rather than silently cut. */
+  readonly text: string
+  /** How long the stored body is, whatever came back. */
+  readonly chars: number
+  readonly truncated: boolean
 }
 
 /** The two chains, plus the live body hash the panel marks as "current". */
@@ -75,6 +95,7 @@ export interface SkillHistoryApi {
   readonly versions: (name: string) => Promise<VersionsPayload>
   readonly undo: (name: string, v?: number) => Promise<string>
   readonly diff: (name: string, v: number) => Promise<VersionDiffRow>
+  readonly body: (name: string, v: number) => Promise<VersionBodyRow>
 }
 
 /** A refusal the host reported, carrying its own sentence (the curator's, not ours). */
@@ -97,6 +118,7 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
     skills: async () => await request(HOST_ROUTES.skills) as readonly SkillRow[],
     versions: async (name: string) => await request(HOST_ROUTES.versions + '?name=' + encodeURIComponent(name)) as VersionsPayload,
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
+    body: async (name: string, v: number) => await request(HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionBodyRow,
     undo: async (name: string, v?: number) => {
       const data = await request(HOST_ROUTES.undo, {
         method: 'POST',

@@ -38,6 +38,13 @@ describe('skill-history client api', () => {
     expect(versions.calls[0]?.path).toBe(HOST_ROUTES.versions + '?name=my%20skill')
   })
 
+  it('reads one version\'s whole body from its own route', async () => {
+    const body = stubFetch({ ok: true, body: { ok: true, data: { v: 2, text: '# two', chars: 5, truncated: false } } })
+    const api = createSkillHistoryApi(body.fetch)
+    expect(await api.body('my skill', 2)).toEqual({ v: 2, text: '# two', chars: 5, truncated: false })
+    expect(body.calls[0]?.path).toBe(HOST_ROUTES.body + '?name=my%20skill&v=2')
+  })
+
   it('posts the undo with and without a version number', async () => {
     const stub = stubFetch({ ok: true, body: { ok: true, data: { message: 'undone to v1' } } })
     const api = createSkillHistoryApi(stub.fetch)

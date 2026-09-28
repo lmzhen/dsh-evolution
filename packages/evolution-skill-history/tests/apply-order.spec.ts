@@ -9,14 +9,16 @@ import { Context } from '@deepseek-ai/cordis'
 import * as SkillHistory from '../src/index.ts'
 import { SKILL_HISTORY_ROUTES } from '../src/routes.ts'
 
-/** A web server stand-in that records every registered path. */
-function fakeWebServer(): { paths: string[]; register: (route: { path: string }) => () => void } {
+/** A web server stand-in that records every registered path, and what its disposers release. */
+function fakeWebServer(): { paths: string[]; released: string[]; register: (route: { path: string }) => () => void } {
   const paths: string[] = []
+  const released: string[] = []
   return {
     paths,
+    released,
     register(route: { path: string }): () => void {
       paths.push(route.path)
-      return () => {}
+      return () => { released.push(route.path) }
     },
   }
 }
@@ -30,12 +32,25 @@ describe('skill-history host half: mounting order', () => {
     ctx.provide('webServer', server as never)
     await new Promise(resolve => setTimeout(resolve, 20))
     expect([...server.paths].sort()).toEqual([
+      SKILL_HISTORY_ROUTES.body,
       SKILL_HISTORY_ROUTES.diff,
       SKILL_HISTORY_ROUTES.health,
       SKILL_HISTORY_ROUTES.skills,
       SKILL_HISTORY_ROUTES.undo,
       SKILL_HISTORY_ROUTES.versions,
     ].sort())
+  })
+
+  it('releases every route when the plugin is disposed (HMR safety)', async () => {
+    const ctx = new Context()
+    const server = fakeWebServer()
+    const fiber = await ctx.plugin(SkillHistory)
+    ctx.provide('webServer', server as never)
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(server.paths).toHaveLength(6)
+    expect(server.released).toEqual([])
+    await fiber.dispose()
+    expect([...server.released].sort()).toEqual([...server.paths].sort())
   })
 
   it('stays inert — and does not throw — when no web server ever arrives', async () => {

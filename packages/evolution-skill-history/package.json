@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-history",
   "description": "Web surface for skill content history: loopback host routes plus the sidebar panel",
-  "version": "0.13.6",
+  "version": "0.14.0",
   "publishConfig": {
     "access": "public"
   },
@@ -45,7 +45,9 @@
     "@deepseek-ai/dsh-evolution-curator": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
-    "@deepseek-ai/dsh-host-webserver": "workspace:^"
+    "@deepseek-ai/dsh-host-webserver": "workspace:^",
+    "@types/react": "~18.3.1",
+    "react": "^18.2.0"
   },
   "dsh": {
     "client": {

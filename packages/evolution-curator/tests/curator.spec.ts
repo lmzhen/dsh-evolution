@@ -141,6 +141,35 @@ describe('evolution-curator', () => {
     expect(await library.read('support-skill')).toContain('Two.')
   })
 
+  it('refuses to undo a support file\'s BASELINE, whose action alone reads as a body version (0.14.0)', async () => {
+    await tempHome('dsh-curator-undo-support-baseline-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const io = nodeEvolutionIo()
+    const library = new SkillLibrary(root, io, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => `---\nname: baseline-skill\ndescription: support baseline fixture\n---\n${text}\n`
+    await library.create('baseline-skill', body('One.'))
+    // The support file exists with bytes no version recorded (a tree written before the history
+    // feature, or by hand), so the write that overwrites it mints a BASELINE for those bytes: the one
+    // entry whose action cannot say which artifact it holds. Its \`path\` can, and that is the whole
+    // reason this refusal exists — the bytes would otherwise be written over SKILL.md.
+    await io.writeText(join(root, 'baseline-skill', 'references', 'notes.md'), '# notes before history\n')
+    const wrote = await library.writeSupportFile('baseline-skill', 'references/notes.md', '# notes now\n')
+    expect(wrote.ok, wrote.message).toBe(true)
+    const versions = await ctx.evolutionCurator.history('baseline-skill')
+    const baseline = versions.find(entry => entry.action === 'baseline')
+    expect(baseline?.path).toBe('references/notes.md')
+    const refused = await ctx.evolutionCurator.undo('baseline-skill', baseline?.v)
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain("holds a SUPPORT FILE's bytes")
+    expect(refused.message).toContain('references/notes.md')
+    // The live body still holds its own content, not the support file's bytes.
+    expect(await library.read('baseline-skill')).toContain('One.')
+  })
+
   it('the default undo target skips a NEWER support-file version and lands on the body before it (0.10.1)', async () => {
     await tempHome('dsh-curator-undo-skip-support-')
     const ctx = new Context()

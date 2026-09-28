@@ -1,5 +1,17 @@
 # Changelog
 
+
+## 0.14.0 (minor) — 技能历史：版本可预览、差异可渲染、support 版本记文件名；组件车道与 N24 门禁补齐
+
+> **由来**：设计档 `dsh-evolution-skill-history-entry-options.md` §18／§18.7／§18.8 与 §17.4 的重筛结论——用户口径是「记录 file_path 最小改动 + b′ 渲染 + 重筛里所有能做的 + 2b 最近改动时间」，一次做进同一版。
+> **G0 探针（先做）**：原计划是「parser 用库（micromark/mdast）+ 自绘 renderer（b′）」。实测**平台自己已经导出一个 Markdown 组件**：`@deepseek-ai/dsh-client-ui-primitives` 的 `MarkdownText`（chat 那套 mdast 管线），而该包**就在 `PLATFORM_MODULES` 基线模块表里**。静态 import 仍然死（tsconfig paths 把平台源码拉进本包 ⇒ TS6059/TS6307，再撞本包 `react.d.ts` 的 React 类型遮蔽 ⇒ TS2305；ambient `declare module` 输给 paths 映射），但**运行时 require 走得通**：`src/client/markdown.ts` 是唯一接缝，用 `declare function require` + 本地最小接口取 `MarkdownText`，构建器靠 `external: [/^@deepseek-ai\//]` 保持裸 require。⇒ **b′ 未启用**：零第三方依赖、零内联、零许可成本（产物 34,797 → 46,828 字节，仅我们自己的代码）。渲染器缺席时返回 `{ok:false}`，调用方退回源码视图——**永不白屏**。
+> **support 版本记文件名**：索引条目新增 `path?`（**相对**技能目录，如 `references/notes.md`）。写路径把写入时就已拿到的 `filePath` 一路带到索引（`write_file`／`remove_file`），**两处铸造点都带**（baseline 是同一文件的前一版字节，after 是本写入）；`readVersionEntry` 同步重构——**所有可选字段折进一个 `base`**，两个 return 只差链环，从此不会有字段被某一条分支丢掉。**旧条目没有 path 且不可回填**（blob 是内容寻址、不带文件名），面板如实显示「（路径未记录）」。
+> **面板新增两个视图**：① 每行 `[预览]`——把该版正文交给平台 `MarkdownText` 渲染（新只读路由 `GET /versions/body`，复用 `curator.skills.readVersion`，20k 字符上限 + `truncated`）；② 差异视图的 `[源码]／[渲染]` 就地切换，渲染态把 `-`／`+` **两块各自**渲染成 Markdown（块级、语义色左边框，不做行级交错）。状态**收敛**：`openDiff + diffs` → `expanded:{v,kind}` + 双缓存，变量数不增。
+> **技能行补「最近改动时间」**：宿主用 core 的新纯函数 `latestVersionAt()`（跨正文与 support 两条链取最新 `at`，因为索引是 append 序、两个写入者可交错）算好，连同 age 桶一起下发；面板放在**第 2 行尾部**（第 1 行的技能名不吃挤压，长名字仍有行 `title` 兜底）。**「最近改动」不是「最后使用」**：使用计数仍在 usage store，照旧不进面板。
+> **质量面（§17.4 重筛的「真缺口」）**：① **jsdom 组件车道**建立（首个组件 spec：结果句不掉／两击确认＋取消／迟到响应被票据丢弃／空态与错态，4/4；spec 用 `.ts` + `createElement`，不动未验证的 JSX 配置）；② 宿主 **dispose spec**（dispose 后 6 条路由全释放）；③ **客户端注册释放 spec**（图标行／keyed 面板／locale 命名空间／样式标签，dispose 后全清，且把 inject face 的成员列表钉住）；④ **路径字面量一致 spec**（客户端路由表 ↔ 宿主 `ROUTES`，含「客户端不得发明宿主没发布的路径」）；⑤ **N24 门禁**：`verify-arch-guards` 新增「客户端半禁字面字号／字体／颜色」（带探针），并**当场修掉设置卡遗留的 7 处字面字号**（`font-size:12px/13px` → 平台 token / `calc()`）。
+> **不动的（契约）**：写通道仍只有 `curator.undo`（support 回退**不做**，本版只记录路径）；命令面保持纯文本；`HISTORY_INDEX_VERSION` **不抬**（新增字段是兼容的可选字段）；平台原语仍不静态 import。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0（含一条函数级 `no-require-imports` 豁免，家族首例，理由在行内）；门禁 **21/21**（前缀 `v0137d`，含新增的 N24 与三组新 spec）。真机复验见发布记录。
+
 ## 0.13.6 (patch) — 重发：npm 上 `dsh-skill-usage@0.13.5` 只有元数据、没有 tarball
 
 > **症状**：0.13.5 发布后本机安装报 `ERR_PNPM_FETCH_404 …/@lmzhen/dsh-skill-usage/-/dsh-skill-usage-0.13.5.tgz`；registry 的 packument 里 0.13.5 在（`latest` 也是它），但 **tarball 拉不到**（HEAD 持续 404 二十余分钟）。⇒ 装机出现 29×0.13.5 ＋ 1×0.13.4 的混装。

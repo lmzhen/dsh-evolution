@@ -181,6 +181,12 @@
  *       raw writer is exactly the class that skips it silently. Reading is out of scope:
  *       `readFileSync`/`existsSync`/`readdirSync`/`lstat` stay legal anywhere (the audit
  *       behind this rule found four such readers and no fifth writer).
+ *   N24. the CLIENT halves carry no literal TYPE or COLOUR: inside any package's
+ *       `src/client` tree, a `font-size`/`font`/`font-family` (or their
+ *       `fontSize`/`fontFamily` camel forms) whose value is neither `var(--…)`, `calc(…)` nor a
+ *       CSS-wide keyword, and any literal colour (`#rgb`/`#rrggbb`, `rgb()`/`hsl()`), fail here.
+ *       The panel stylesheet ships as a string inside the bundle, so the platform's
+ *       CSS-Modules discipline (tokens only) has to be enforced by the family instead.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -465,7 +471,27 @@ const RULES = [
   { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts' },
   { id: 'N22', title: 'settings namespaces are spelled once, in the registry' },
   { id: 'N23', title: 'durable-file writes live in the IO seam' },
+  { id: 'N24', title: 'client halves carry no literal type or colour' },
 ]
+
+/**
+ * N24 (0.14): literal type and colour inside a client half, as one finding per occurrence.
+ * @param text - the file's source.
+ * @returns every offending fragment (`font-size: 13px`, `#ff0000`, …); empty when the file is clean.
+ */
+function clientStyleLiterals(text) {
+  // Comments may discuss a literal without shipping one (`// no font-size here`).
+  const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+  const findings = []
+  for (const match of stripped.matchAll(/\b(font-size|font-family|font|fontSize|fontFamily)\s*:\s*(['"]?)([^;'"}\n,]*)/g)) {
+    const value = (match[3] ?? '').trim()
+    if (value === '' || value.startsWith('var(') || value.startsWith('calc(')) continue
+    if (/^(inherit|initial|unset|revert|revert-layer)$/.test(value)) continue
+    findings.push(match[1] + ': ' + value)
+  }
+  for (const match of stripped.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/g)) findings.push(match[0])
+  return findings
+}
 
 /** Paren-balanced argument text + top-level comma count (N13a's DI filter). */
 function callArgs(text, openParen) {
@@ -976,6 +1002,14 @@ if (process.argv.includes('--list-rules')) {
       && fsWriteImports("const fs = require('fs')").join() === '<dynamic> fs'
       && fsWriteImports("import { readFileSync } from 'fs'").length === 0
       && fsWriteImports("import { readFile } from './io.ts'").length === 0],
+    ['N24', () => clientStyleLiterals("'.x{font-size:13px}'").length === 1
+      && clientStyleLiterals("'.x{font-size:var(--dsh-content-font-size-secondary,13px)}'").length === 0
+      && clientStyleLiterals("'.x{font-size:calc(1em - 1px)}'").length === 0
+      && clientStyleLiterals("'.x{font-family:monospace}'").length === 1
+      && clientStyleLiterals("'.x{color:#ff0000}'").length === 1
+      && clientStyleLiterals("'.x{color:rgb(1,2,3)}'").length === 1
+      && clientStyleLiterals("'.x{font:inherit;color:var(--dsw-alias-label-primary)}'").length === 0
+      && clientStyleLiterals('// no font-size here\nconst x = 1').length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {
@@ -1081,6 +1115,34 @@ if (orphanKeys.length > 0) {
   violations.push(`ghost service key(s) probed but never provided: ${orphanKeys.join(', ')} (an evolution service key with zero providers makes a diagnosis silently lie)` )
 }
 
+// N24 (0.14): the client halves draw with tokens, not literals. The rule exists because the
+// panel's stylesheet is a plain string in the bundle: no build step can typecheck it.
+{
+  let clientFilesScanned = 0
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || SKIP.has(entry.name)) continue
+    const clientRoot = join(root, entry.name, 'src', 'client')
+    if (!existsSync(clientRoot)) continue
+    const walk = (dir) => {
+      for (const child of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, child.name)
+        if (child.isDirectory()) { walk(full); continue }
+        if (!/\.(ts|tsx)$/.test(child.name)) continue
+        clientFilesScanned += 1
+        const findings = clientStyleLiterals(readFileSync(full, 'utf8'))
+        if (findings.length > 0) {
+          violations.push(`literal type/colour in a client half (N24): ${relative(root, full)} — ${findings.slice(0, 4).join(' | ')} (use a --dsh-/--dsw- token or a calc() over one)`)
+        }
+      }
+    }
+    walk(clientRoot)
+  }
+  // No vacuum violation here on purpose: a tree may legitimately have no client half (the guard
+  // specs scan synthetic fixtures), and the whole-tree vacuum check above already owns the
+  // "did anything get scanned at all" class.
+  void clientFilesScanned
+}
+
 if (checkedCount === 0) {
   // V4-30 (0.3.26): the guard must never pass on an unscanned tree (the F-103
   // vacant-guard class) — a wrong root or an empty overlay fails loud.
@@ -1107,7 +1169,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), ${docFactSummary})`)
+  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), no literal type/colour in the client halves (N24), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), ${docFactSummary})`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78

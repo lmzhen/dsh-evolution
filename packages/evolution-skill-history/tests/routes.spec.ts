@@ -124,6 +124,8 @@ describe('skill-history routes: over a real socket', () => {
           managed: boolean
           protectedBy: string | null
           protectionUnknown: boolean
+          lastAt: string | null
+          age: { unit: string; n: number } | null
         }>
       }
       // The row carries what the listing already knew, so the left column can say what a skill IS.
@@ -133,6 +135,10 @@ describe('skill-history routes: over a real socket', () => {
       expect(skillBody.data[0]?.description).toContain('fixture')
       expect(typeof skillBody.data[0]?.managed).toBe('boolean')
       expect(skillBody.data[0]?.protectionUnknown).toBe(false)
+      // "Last changed" rides the same row and comes from the index this route already read: the
+      // newest entry across BOTH chains, with its age bucket (the words stay in the dictionary).
+      expect(typeof skillBody.data[0]?.lastAt).toBe('string')
+      expect(typeof skillBody.data[0]?.age?.unit).toBe('string')
       // Versions: the body chain and the support-file chain come back apart, and every row carries
       // the verdicts and the vocabulary key the panel renders (it owns no rule of its own).
       const versions = await fetch(host.origin + SKILL_HISTORY_ROUTES.versions + '?name=panel-skill')
@@ -141,7 +147,7 @@ describe('skill-history routes: over a real socket', () => {
         ok: boolean
         data: {
           content: Array<{ action: string; actionKind: string; age: { unit: string; n: number }; undoable: boolean; charsDelta?: number }>
-          support: Array<{ action: string; actionKind: string }>
+          support: Array<{ action: string; actionKind: string; path?: string }>
           liveHash: string | null
         }
       }
@@ -149,6 +155,9 @@ describe('skill-history routes: over a real socket', () => {
       expect(versionBody.data.content.map(entry => entry.actionKind)).toEqual(['create', 'update'])
       expect(versionBody.data.support.map(entry => entry.action)).toEqual(['write_file'])
       expect(versionBody.data.support.map(entry => entry.actionKind)).toEqual(['support-write'])
+      // A support row NAMES ITS FILE: the recorded path travels with the bytes, so the panel can say
+      // which file a version belongs to instead of the generic word (legacy rows have none).
+      expect(versionBody.data.support.map(entry => entry.path)).toEqual(['references/notes.md'])
       expect(typeof versionBody.data.content[0]?.age.unit).toBe('string')
       // The live content is the newest body version, so exactly that row is not undoable.
       expect(versionBody.data.content.filter(entry => ! entry.undoable)).toHaveLength(1)
@@ -172,6 +181,16 @@ describe('skill-history routes: over a real socket', () => {
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=99')).status).toBe(404)
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=x')).status).toBe(400)
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff)).status).toBe(400)
+      // The body route: one version's whole text, bounded, with the same 400/404 posture.
+      const whole = await fetch(host.origin + SKILL_HISTORY_ROUTES.body + '?name=panel-skill&v=2')
+      expect(whole.status).toBe(200)
+      const wholeBody = await whole.json() as { ok: boolean; data: { v: number; text: string; chars: number; truncated: boolean } }
+      expect(wholeBody.data.v).toBe(2)
+      expect(wholeBody.data.text).toContain('Two.')
+      expect(wholeBody.data.truncated).toBe(false)
+      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.body + '?name=panel-skill&v=99')).status).toBe(404)
+      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.body + '?name=panel-skill&v=x')).status).toBe(400)
+      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.body)).status).toBe(400)
       // A support version is refused with the curator's own sentence, not a frontmatter error.
       const refused = await fetch(host.origin + SKILL_HISTORY_ROUTES.undo, {
         method: 'POST',

@@ -120,7 +120,10 @@ export function apply(ctx: ClientContext): void {
         loadSkills: api.skills,
         loadVersions: api.versions,
         loadDiff: api.diff,
+        loadBody: api.body,
         undo: api.undo,
+        // The platform renderer takes its chrome as props; the words stay in our dictionary.
+        markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
       }) },
       SkillHistoryPanel,
     )

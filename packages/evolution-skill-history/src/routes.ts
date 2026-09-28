@@ -1,5 +1,5 @@
 /**
- * The skill-history HTTP surface: five loopback routes over the curator's read/write seam (four reads plus the one write).
+ * The skill-history HTTP surface: six loopback routes over the curator's read/write seam (five reads plus the one write).
  *
  * Layering: this module maps a route to a USE CASE and does nothing else. "Which artifact does this
  * version hold" and "how do the two chains split" live in evolution-core; the only write is
@@ -10,19 +10,26 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { contentHash, elapsedSince, errorText, partitionVersions, textDiffFacts, versionActionKind } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, elapsedSince, errorText, latestVersionAt, partitionVersions, textDiffFacts, versionActionKind } from '@deepseek-ai/dsh-evolution-core'
 
 /** Route paths. The client bundle mirrors these literals; a spec asserts the two sides agree. */
 export const SKILL_HISTORY_ROUTES = {
   skills: '/api/dsh-evolution/skill-history/skills',
   versions: '/api/dsh-evolution/skill-history/versions',
   diff: '/api/dsh-evolution/skill-history/versions/diff',
+  body: '/api/dsh-evolution/skill-history/versions/body',
   undo: '/api/dsh-evolution/skill-history/undo',
   health: '/api/dsh-evolution/skill-history/health',
 } as const
 
 /** Largest request body these routes accept (the undo payload is a name and a number). */
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024
+
+/**
+ * How much of one version's body the read route hands back. A bound on the ANSWER, not on what the
+ * deployment may store: a long skill arrives as its head plus `truncated`, so the reader is told.
+ */
+export const MAX_BODY_CHARS = 20_000
 
 /** The request facts the trust fence reads: a Node request, or the same fields in a spec fixture. */
 export interface FenceRequest {
@@ -178,10 +185,17 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
             managed: boolean
             protectedBy: string | null
             protectionUnknown: boolean
+            lastAt: string | null
+            age: ReturnType<typeof elapsedSince> | null
           }> = []
+          const now = Date.now()
           for (const skill of listed) {
             const versions = await curator.skills.listVersions(skill.name)
             if (versions.length === 0) continue
+            // "Last changed" comes from the SAME index this row already reads, across both chains, so
+            // no extra read and no second source. The words stay in the dictionary: the host answers
+            // with the bucket and the row substitutes its `time.*` key, exactly like version rows.
+            const lastAt = latestVersionAt(versions)
             withHistory.push({
               name: skill.name,
               versions: versions.length,
@@ -189,6 +203,8 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
               managed: skill.managed,
               protectedBy: skill.protectedBy,
               protectionUnknown: skill.protectionUnknown,
+              lastAt,
+              age: lastAt === null ? null : elapsedSince(lastAt, now),
             })
           }
           writeJson(res, 200, { ok: true, data: withHistory })
@@ -279,6 +295,34 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
           }
           const facts = textDiffFacts(before, after, 'SKILL.md')
           writeJson(res, 200, { ok: true, data: { v, against: previous?.v ?? null, ...facts } })
+        })
+      },
+    },
+    {
+      kind: 'exact',
+      path: SKILL_HISTORY_ROUTES.body,
+      handler: async (req, res) => {
+        if (!guard(req, res, 'GET')) return
+        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+        const name = params.get('name')?.trim() ?? ''
+        const rawV = params.get('v')?.trim() ?? ''
+        const v = Number.parseInt(rawV, 10)
+        if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name and a positive integer v are required' })
+          return
+        }
+        await withCurator(res, async (curator) => {
+          // The same read the undo path and the diff route use, so a version has ONE reader.
+          const text = await curator.skills.readVersion(name, v)
+          if (text === null) {
+            writeJson(res, 404, { ok: false, code: 'not-found', message: 'the stored content of that version could not be read' })
+            return
+          }
+          const truncated = text.length > MAX_BODY_CHARS
+          writeJson(res, 200, {
+            ok: true,
+            data: { v, text: truncated ? text.slice(0, MAX_BODY_CHARS) : text, chars: text.length, truncated },
+          })
         })
       },
     },

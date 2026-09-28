@@ -15,7 +15,8 @@
  */
 
 import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { SkillRow, VersionDiffRow, VersionRow, VersionsPayload } from './api.ts'
+import type { SkillRow, VersionBodyRow, VersionDiffRow, VersionRow, VersionsPayload } from './api.ts'
+import { renderMarkdown, type MarkdownWords } from './markdown.ts'
 
 /** The face the plugin hands the component: copy plus callbacks, never a service handle. */
 export interface PanelFace {
@@ -25,11 +26,26 @@ export interface PanelFace {
   readonly loadSkills: () => Promise<readonly SkillRow[]>
   readonly loadVersions: (name: string) => Promise<VersionsPayload>
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
+  readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number) => Promise<string>
+  /** The two words the platform Markdown renderer needs; the dictionary owns them. */
+  readonly markdownWords: MarkdownWords
 }
 
 /** What one expanded row holds: the diff, still loading, or a refusal. */
 type DiffState = { kind: 'loading' } | { kind: 'ready'; diff: VersionDiffRow } | { kind: 'failed'; message: string }
+
+/** What one expanded preview holds. */
+type BodyState = { kind: 'loading' } | { kind: 'ready'; body: VersionBodyRow } | { kind: 'failed'; message: string }
+
+/** Which expansion a row shows. Only one row is expanded at a time. */
+type OpenKind = 'diff' | 'preview'
+
+/** The one expanded row. */
+interface OpenRow {
+  readonly v: number
+  readonly kind: OpenKind
+}
 
 /** Cut a description to one line's worth of characters (the CSS ellipsises the rest). */
 function oneLine(text: string): string {
@@ -67,6 +83,22 @@ function actionNote(face: PanelFace, row: VersionRow): string | undefined {
   return undefined
 }
 
+/**
+ * The lazy-read cache without one key.
+ *
+ * A read that a later toggle superseded must leave nothing behind: `loading` is not an answer, and
+ * the cache also serves as the "do not read twice" guard, so an abandoned entry would refuse every
+ * later read of that row and leave it saying "loading" until the page is reloaded.
+ * @param current - the cache.
+ * @param key - the version whose entry is dropped.
+ * @returns a new cache without that key.
+ */
+function without<K, V>(current: ReadonlyMap<K, V>, key: K): Map<K, V> {
+  const next = new Map(current)
+  next.delete(key)
+  return next
+}
+
 /** The relative-time sentence for one row's bucket. */
 function ageText(face: PanelFace, age: VersionRow['age']): string {
   if (age.unit === 'now') return face.t('time.now')
@@ -98,23 +130,72 @@ function diffBlock(diff: VersionDiffRow): ReactNode {
   return createElement('pre', { className: 'evo-hist-pre' }, rows.length === 0 ? '±' : rows)
 }
 
+/**
+ * The same diff, both sides rendered as Markdown and stacked: the removed text first, then the
+ * added one. Block level on purpose — line-level interleaving of two rendered documents is a
+ * different (and much larger) problem, and the source view stays one click away for exact bytes.
+ * @param face - copy plus the data callbacks.
+ * @param diff - the windowed change the host reported.
+ * @returns the stacked blocks.
+ */
+function renderedBlocks(face: PanelFace, diff: VersionDiffRow): ReactNode[] | null {
+  const blocks: ReactNode[] = []
+  for (const [index, hunk] of diff.hunks.entries()) {
+    if (hunk.oldText !== '') {
+      const side = renderedSide(face, '−', 'del', hunk.oldText)
+      if (side === null) return null
+      blocks.push(createElement('div', { key: 'del-' + String(index) }, side))
+    }
+    if (hunk.newText !== '') {
+      const side = renderedSide(face, '+', 'add', hunk.newText)
+      if (side === null) return null
+      blocks.push(createElement('div', { key: 'add-' + String(index) }, side))
+    }
+  }
+  return blocks.length === 0 ? null : blocks
+}
+
+/**
+ * One diff in the mode the reader asked for, degrading to the source view when the renderer is out.
+ * @param face - copy plus the data callbacks.
+ * @param diff - the windowed change the host reported.
+ * @param mode - source or rendered.
+ * @returns the element to draw.
+ */
+function diffView(face: PanelFace, diff: VersionDiffRow, mode: 'source' | 'rendered'): ReactNode {
+  if (mode === 'rendered') {
+    const blocks = renderedBlocks(face, diff)
+    if (blocks !== null) return createElement('div', { className: 'evo-hist-render' }, blocks)
+  }
+  return diffBlock(diff)
+}
+
 /** One version row: what happened, when, how big, and what it is against. */
 function versionRow(
   face: PanelFace,
   row: VersionRow,
   confirming: number | undefined,
-  openDiff: number | undefined,
+  expanded: OpenRow | undefined,
   diff: DiffState | undefined,
+  body: BodyState | undefined,
   restore: (v: number) => void,
   cancelRestore: () => void,
-  toggleDiff: (v: number) => void,
+  toggle: (v: number, kind: OpenKind) => void,
 ): ReactNode {
+  const showing = (kind: OpenKind): boolean => expanded !== undefined && expanded.v === row.v && expanded.kind === kind
   const parts: ReactNode[] = [
     createElement('span', { key: 'v', className: 'evo-hist-row-meta' }, 'v' + String(row.v)),
     createElement('span', { key: 'action', title: actionNote(face, row) }, face.t('action.' + row.actionKind)),
     // The relative age is the scannable fact; the absolute clock is the hover text (one time, not two).
     createElement('span', { key: 'time', className: 'evo-hist-row-meta', title: localTime(row.at) }, ageText(face, row.age)),
   ]
+  // Which FILE a support version belongs to: legacy rows have no name recorded (the bytes carry
+  // none), and saying so is better than the generic word alone.
+  if (row.path !== undefined) {
+    parts.push(createElement('span', { key: 'path', className: 'evo-hist-row-meta', title: row.path }, row.path))
+  } else if (row.actionKind === 'support-write' || row.actionKind === 'support-remove') {
+    parts.push(createElement('span', { key: 'path', className: 'evo-hist-row-meta' }, face.t('path.unrecorded')))
+  }
   const delta = deltaText(face, row)
   if (delta !== null) parts.push(createElement('span', { key: 'delta', className: 'evo-hist-row-meta' }, delta))
   const actions: ReactNode[] = []
@@ -143,34 +224,96 @@ function versionRow(
       key: 'diff',
       type: 'button',
       className: 'evo-hist-button',
-      onClick: () => { toggleDiff(row.v) },
-    }, openDiff === row.v ? face.t('diff.hide') : face.t('diff.show')))
+      onClick: () => { toggle(row.v, 'diff') },
+    }, showing('diff') ? face.t('diff.hide') : face.t('diff.show')))
   }
+  // Every version can be READ as a document, support files included: that is what the body route is for.
+  actions.push(createElement('button', {
+    key: 'preview',
+    type: 'button',
+    className: 'evo-hist-button',
+    onClick: () => { toggle(row.v, 'preview') },
+  }, showing('preview') ? face.t('preview.hide') : face.t('preview.show')))
   return createElement('div', { key: String(row.v), className: 'evo-hist-row' },
     createElement('div', { className: 'evo-hist-row-body' },
       createElement('div', { className: 'evo-hist-row-title' }, parts),
       row.summary === undefined || row.summary === ''
         ? null
         : createElement('div', { className: 'evo-hist-row-summary' }, row.summary),
-      openDiff === row.v && diff !== undefined ? diffBody(face, diff) : null,
+      showing('diff') && diff !== undefined ? createElement(DiffBody, { face, diff }) : null,
+      showing('preview') && body !== undefined ? createElement(BodyView, { face, body }) : null,
     ),
     createElement('div', { className: 'evo-hist-actions' }, actions),
   )
 }
 
-/** The expanded body of one row: the diff, a loading line, or the refusal. */
-function diffBody(face: PanelFace, diff: DiffState): ReactNode {
+/** One rendered side of a diff: an "old" or "new" block under a tinted edge. */
+function renderedSide(face: PanelFace, mark: string, side: 'del' | 'add', text: string): ReactNode {
+  const rendered = renderMarkdown(text, face.markdownWords)
+  if (!rendered.ok) return null
+  return createElement('div', { className: 'evo-hist-render-block evo-hist-render-' + side },
+    createElement('span', { className: 'evo-hist-render-tag' }, mark),
+    rendered.node,
+  )
+}
+
+/**
+ * One version read as a document: the platform renderer when it is there, plain text when it is not.
+ * A preview therefore degrades to the exact bytes instead of blanking.
+ * @param props - the face and the body state to draw.
+ * @returns the element.
+ */
+function BodyView(props: { face: PanelFace; body: BodyState }): ReactNode {
+  const { face, body } = props
+  if (body.kind === 'loading') return createElement('p', { className: 'evo-hist-note' }, face.t('diff.loading'))
+  if (body.kind === 'failed') return createElement('p', { className: 'evo-hist-note', 'data-error': 'true' }, body.message)
+  const rendered = renderMarkdown(body.body.text, face.markdownWords)
+  return createElement('div', { className: 'evo-hist-preview' },
+    body.body.truncated ? createElement('p', { className: 'evo-hist-note' }, face.t('preview.truncated')) : null,
+    rendered.ok ? rendered.node : createElement('pre', { className: 'evo-hist-pre' }, body.body.text),
+  )
+}
+
+/**
+ * The expanded body of one row: the diff, a loading line, or the refusal.
+ *
+ * The source/rendered toggle is LOCAL to this view: which row is open is the panel's business, but
+ * how one open diff is displayed is not, so the state does not climb into the parent.
+ * @param props - the face and the diff state to draw.
+ * @returns the element.
+ */
+function DiffBody(props: { face: PanelFace; diff: DiffState }): ReactNode {
+  const { face, diff } = props
+  const [mode, setMode] = useState<'source' | 'rendered'>('source')
   if (diff.kind === 'loading') return createElement('p', { className: 'evo-hist-note' }, face.t('diff.loading'))
   if (diff.kind === 'failed') return createElement('p', { className: 'evo-hist-note', 'data-error': 'true' }, diff.message)
   const against = diff.diff.against === null
     ? face.t('diff.first')
     : face.format('diff.against', { n: diff.diff.against })
+  const toggle = createElement('div', { className: 'evo-hist-diff-toggle' },
+    createElement('button', {
+      key: 'source',
+      type: 'button',
+      className: 'evo-hist-button',
+      'data-tone': mode === 'source' ? 'primary' : undefined,
+      onClick: () => { setMode('source') },
+    }, face.t('diff.source')),
+    createElement('button', {
+      key: 'rendered',
+      type: 'button',
+      className: 'evo-hist-button',
+      'data-tone': mode === 'rendered' ? 'primary' : undefined,
+      onClick: () => { setMode('rendered') },
+    }, face.t('diff.rendered')),
+  )
   return createElement('div', null,
-    createElement('p', { className: 'evo-hist-note' },
-      against + ' · ' + face.format('diff.added', { n: diff.diff.linesAdded })
-      + ' · ' + face.format('diff.removed', { n: diff.diff.linesRemoved })
-      + (diff.diff.truncated ? ' · ' + face.t('diff.truncated') : '')),
-    diffBlock(diff.diff),
+    createElement('div', { className: 'evo-hist-diff-head' },
+      createElement('p', { className: 'evo-hist-note' },
+        against + ' · ' + face.format('diff.added', { n: diff.diff.linesAdded })
+        + ' · ' + face.format('diff.removed', { n: diff.diff.linesRemoved })
+        + (diff.diff.truncated ? ' · ' + face.t('diff.truncated') : '')),
+      toggle),
+    diffView(face, diff.diff, mode),
   )
 }
 
@@ -184,11 +327,12 @@ function group(face: PanelFace, title: string, entries: readonly VersionRow[], n
       face,
       entry,
       state.confirming,
-      state.openDiff,
+      state.expanded,
       state.diffs.get(entry.v),
+      state.bodies.get(entry.v),
       state.restore,
       state.cancelRestore,
-      state.toggleDiff,
+      state.toggle,
     )),
   )
 }
@@ -196,11 +340,12 @@ function group(face: PanelFace, title: string, entries: readonly VersionRow[], n
 /** The per-render state the row builders read. */
 interface RowState {
   readonly confirming: number | undefined
-  readonly openDiff: number | undefined
+  readonly expanded: OpenRow | undefined
   readonly diffs: ReadonlyMap<number, DiffState>
+  readonly bodies: ReadonlyMap<number, BodyState>
   readonly restore: (v: number) => void
   readonly cancelRestore: () => void
-  readonly toggleDiff: (v: number) => void
+  readonly toggle: (v: number, kind: OpenKind) => void
 }
 
 /**
@@ -216,8 +361,9 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [noteError, setNoteError] = useState(false)
   const [pending, setPending] = useState<number | undefined>(undefined)
   const [query, setQuery] = useState('')
-  const [openDiff, setOpenDiff] = useState<number | undefined>(undefined)
+  const [expanded, setExpanded] = useState<OpenRow | undefined>(undefined)
   const [diffs, setDiffs] = useState<ReadonlyMap<number, DiffState>>(new Map())
+  const [bodies, setBodies] = useState<ReadonlyMap<number, BodyState>>(new Map())
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
@@ -251,8 +397,9 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     setSelected(name)
     setPayload(undefined)
     setPending(undefined)
-    setOpenDiff(undefined)
+    setExpanded(undefined)
     setDiffs(new Map())
+    setBodies(new Map())
     void face.loadVersions(name).then((next) => {
       if (readTicket.current === ticket) setPayload(next)
     }).catch((error: unknown) => {
@@ -295,28 +442,45 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     }).catch(failed)
   }
 
-  const toggleDiff = (v: number): void => {
+  /**
+   * Expand one row, or collapse it: one row is open at a time, and each kind keeps its own lazy read.
+   * @param v - the version whose row was clicked.
+   * @param kind - which expansion the row should show.
+   */
+  const toggle = (v: number, kind: OpenKind): void => {
     if (selected === undefined) return
-    if (openDiff === v) {
-      setOpenDiff(undefined)
+    if (expanded !== undefined && expanded.v === v && expanded.kind === kind) {
+      setExpanded(undefined)
       return
     }
-    setOpenDiff(v)
-    if (diffs.has(v)) return
+    setExpanded({ v, kind })
+    // A cached answer costs nothing and must not invalidate a read already in flight.
+    if (kind === 'diff' ? diffs.has(v) : bodies.has(v)) return
     const name = selected
-    // The diff read takes the SAME ticket as a rows read: a slow reply for a skill the operator has
+    // Both lazy reads take the SAME ticket as a rows read: a slow reply for a skill the operator has
     // already left must not land in the next skill's map, where the version numbers would name a
-    // different body.
+    // different body (or a different file).
     const ticket = readTicket.current + 1
     readTicket.current = ticket
-    setDiffs(current => new Map(current).set(v, { kind: 'loading' }))
-    void face.loadDiff(name, v).then((diff) => {
-      if (readTicket.current !== ticket) return
-      setDiffs(current => new Map(current).set(v, { kind: 'ready', diff }))
+    const failedMessage = (error: unknown): string => face.t('error') + ': ' + (error instanceof Error ? error.message : String(error))
+    if (kind === 'diff') {
+      setDiffs(current => new Map(current).set(v, { kind: 'loading' }))
+      void face.loadDiff(name, v).then((diff) => {
+        if (readTicket.current !== ticket) { setDiffs(current => without(current, v)); return }
+        setDiffs(current => new Map(current).set(v, { kind: 'ready', diff }))
+      }).catch((error: unknown) => {
+        if (readTicket.current !== ticket) { setDiffs(current => without(current, v)); return }
+        setDiffs(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error) }))
+      })
+      return
+    }
+    setBodies(current => new Map(current).set(v, { kind: 'loading' }))
+    void face.loadBody(name, v).then((body) => {
+      if (readTicket.current !== ticket) { setBodies(current => without(current, v)); return }
+      setBodies(current => new Map(current).set(v, { kind: 'ready', body }))
     }).catch((error: unknown) => {
-      if (readTicket.current !== ticket) return
-      const message = face.t('error') + ': ' + (error instanceof Error ? error.message : String(error))
-      setDiffs(current => new Map(current).set(v, { kind: 'failed', message }))
+      if (readTicket.current !== ticket) { setBodies(current => without(current, v)); return }
+      setBodies(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error) }))
     })
   }
 
@@ -333,7 +497,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   /** Drop the pending confirmation: the button that opened it must not be the only way out. */
   const cancelRestore = (): void => { setPending(undefined) }
 
-  const rowState: RowState = { confirming: pending, openDiff, diffs, restore, cancelRestore, toggleDiff }
+  const rowState: RowState = { confirming: pending, expanded, diffs, bodies, restore, cancelRestore, toggle }
   return createElement('div', { className: 'evo-hist-root' },
     createElement('aside', { className: 'evo-hist-aside' },
       createElement('div', { className: 'evo-hist-search' },
@@ -363,7 +527,10 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
               createElement('span', { className: 'evo-hist-skill-name' }, skill.name),
               createElement('span', { className: 'evo-hist-skill-count' }, String(skill.versions) + ' ' + face.t('versions.count')),
             ),
-            createElement('span', { className: 'evo-hist-skill-desc' }, oneLine(skill.description) + ' · ' + face.t(stateKey(skill))),
+            createElement('span', { className: 'evo-hist-skill-desc' }, oneLine(skill.description) + ' · ' + face.t(stateKey(skill))
+              // Last changed rides the description line: the name above must not be squeezed (it is the
+              // row's identity, and a longer name would only truncate sooner).
+              + (skill.age === null ? '' : ' · ' + ageText(face, skill.age))),
             )),
       ),
     ),

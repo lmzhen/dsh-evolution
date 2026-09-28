@@ -15,6 +15,7 @@ import { contentHash } from '../src/mutations.ts'
 import {
   BASELINE_ACTION,
   contentRetentionFeedback,
+  entryTarget,
   HISTORY_INDEX_VERSION,
   historyIndexFile,
   loadVersions,
@@ -23,6 +24,7 @@ import {
   partitionVersions,
   parseHistoryIndex,
   readHistoryIndex,
+  latestVersionAt,
   loadVersionContent,
   recordVersions,
   normalizeVersionSummary,
@@ -193,6 +195,71 @@ describe('skill-history: the library records what it writes', () => {
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
+  })
+})
+
+describe('skill-history: a support file\'s path (batch: record where the bytes came from)', () => {
+  it('carries the path on BOTH entries one write_file can mint, and survives a re-serialization', async () => {
+    const root = await tempRoot('dsh-skill-history-path-')
+    const io = nodeEvolutionIo()
+    try {
+      // First support write: the file was never recorded, so a baseline is minted beside the after
+      // entry — BOTH describe `references/notes.md` and both must carry its name.
+      await recordVersions(root, io, {
+        skillName: 'with-support', action: 'write_file', before: 'old notes', after: 'new notes', at: 'T1', path: 'references/notes.md',
+      }, 20)
+      const first = await loadVersions(root, io, 'with-support')
+      expect(first.map(entry => entry.action)).toEqual([BASELINE_ACTION, 'write_file'])
+      expect(first.map(entry => entry.path)).toEqual(['references/notes.md', 'references/notes.md'])
+      // A second write re-serializes what the reader returned: a field this reader dropped would be
+      // gone from every earlier entry after it.
+      await recordVersions(root, io, {
+        skillName: 'with-support', action: 'write_file', before: 'new notes', after: 'newer notes', at: 'T2', path: 'references/notes.md',
+      }, 20)
+      const second = await loadVersions(root, io, 'with-support')
+      expect(second).toHaveLength(3)
+      expect(second.every(entry => entry.path === 'references/notes.md')).toBe(true)
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
+  it('leaves a legacy entry nameless instead of inventing a path, and keeps content entries nameless', async () => {
+    const root = await tempRoot('dsh-skill-history-path-legacy-')
+    const io = nodeEvolutionIo()
+    try {
+      await io.writeText(historyIndexFile(root, 'legacy'), JSON.stringify({
+        version: HISTORY_INDEX_VERSION,
+        versions: [{ v: 1, at: 'T1', action: 'write_file', hash: contentHash('bytes'), chars: 5 }],
+      }))
+      const read = await loadVersions(root, io, 'legacy')
+      expect(read).toHaveLength(1)
+      expect(read[0]!.path).toBeUndefined()
+      // Rewriting the same content mints nothing, so the nameless entry stays exactly as it was.
+      const again = await recordVersions(root, io, {
+        skillName: 'legacy', action: 'update', before: null, after: 'body', at: 'T2',
+      }, 20)
+      expect(again).not.toBeNull()
+      const after = await loadVersions(root, io, 'legacy')
+      expect(after.find(entry => entry.action === 'update')?.path).toBeUndefined()
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+})
+
+describe('skill-history: when the content last changed (latestVersionAt)', () => {
+  it('answers with the newest timestamp across both chains, whatever the stored order says', () => {
+    const mixed: SkillVersion[] = [
+      { v: 3, at: '2026-09-27T10:00:00Z', action: 'write_file', hash: 'c', chars: 1 },
+      { v: 1, at: '2026-09-27T12:00:00Z', action: 'create', hash: 'a', chars: 1 },
+      { v: 2, at: '2026-09-27T11:00:00Z', action: 'update', hash: 'b', chars: 1 },
+    ]
+    expect(latestVersionAt(mixed)).toBe('2026-09-27T12:00:00Z')
+  })
+
+  it('answers null for an index that holds nothing', () => {
+    expect(latestVersionAt([])).toBeNull()
   })
 })
 
@@ -487,5 +554,35 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
     const groups = partitionVersions(versions)
     expect(groups.content.map(entry => entry.v)).toEqual([1, 2])
     expect(groups.support.map(entry => entry.v)).toEqual([3])
+  })
+
+  it('sends a support file\'s baseline to the support group, so no row offers to write those bytes over SKILL.md', () => {
+    // The shape a support write mints when the file it overwrote had never been recorded: the
+    // baseline carries the BASELINE label, so the action alone reads as a body version.
+    const withPath: SkillVersion[] = [
+      { v: 1, at: 'T1', action: 'create', hash: 'h1', chars: 10 },
+      { v: 2, at: 'T2', action: BASELINE_ACTION, hash: 'old-notes', chars: 9, path: 'references/notes.md' },
+      { v: 3, at: 'T2', action: 'write_file', hash: 'new-notes', chars: 9, beforeHash: 'old-notes', path: 'references/notes.md' },
+    ]
+    expect(entryTarget(withPath[1]!, withPath)).toBe('support')
+    expect(partitionVersions(withPath).content.map(entry => entry.v)).toEqual([1])
+    expect(partitionVersions(withPath).support.map(entry => entry.v)).toEqual([2, 3])
+    // An entry recorded BEFORE the path existed has none: there the only evidence left is the link
+    // the support write left behind, and it attributes the bytes just as well.
+    // The path decides on its own, which is what keeps the verdict when the write that minted the
+    // baseline is not in the index any more.
+    expect(entryTarget(withPath[1]!, [withPath[0]!, withPath[1]!])).toBe('support')
+    // An entry recorded BEFORE the path existed has none: there the only evidence left is the link
+    // the support write left behind, and it attributes the bytes just as well.
+    const legacy: SkillVersion[] = [
+      { v: 1, at: 'T1', action: 'create', hash: 'h1', chars: 10 },
+      { v: 2, at: 'T2', action: BASELINE_ACTION, hash: 'old-notes', chars: 9 },
+      { v: 3, at: 'T2', action: 'write_file', hash: 'new-notes', chars: 9, beforeHash: 'old-notes' },
+    ]
+    expect(entryTarget(legacy[1]!, legacy)).toBe('support')
+    expect(partitionVersions(legacy).support.map(entry => entry.v)).toEqual([2, 3])
+    // Nothing names those bytes as a support file's: the body group keeps them, as it always did.
+    expect(entryTarget(legacy[1]!, [legacy[0]!, legacy[1]!])).toBe('other')
+    expect(partitionVersions([legacy[0]!, legacy[1]!]).content.map(entry => entry.v)).toEqual([1, 2])
   })
 })

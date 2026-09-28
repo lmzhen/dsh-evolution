@@ -77,6 +77,17 @@ export const CSS = [
   '.evo-hist-pre{margin:6px 0 2px;padding:12px 16px;max-height:260px;overflow:auto;border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
   // Added/removed use the platform's semantic pair; `--dsw-alias-brand-primary` is the primary label
   // colour (near-black in light, near-white in dark), so the pair read as red-versus-plain.
+  // The rendered diff: both sides stacked, marked by a tinted edge rather than a text colour, so
+  // the platform renderer's own type and colours stay untouched inside the block.
+  '.evo-hist-diff-head{display:flex;align-items:center;gap:8px}',
+  '.evo-hist-diff-head .evo-hist-note{flex:1 1 auto;margin:0}',
+  '.evo-hist-diff-toggle{display:flex;flex:none;align-items:center;gap:6px}',
+  '.evo-hist-preview{margin:6px 0 2px;border:.5px solid var(--dsw-alias-border-l2);border-radius:12px;padding:4px 12px 12px;background:var(--dsw-alias-bg-layer-2);max-height:420px;overflow:auto}',
+  '.evo-hist-render{display:flex;flex-direction:column;gap:8px;margin:6px 0 2px}',
+  '.evo-hist-render-block{position:relative;padding:8px 12px 8px 22px;border:.5px solid var(--dsw-alias-border-l2);border-left-width:2px;border-radius:12px;background:var(--dsw-alias-markdown-code-block);overflow-x:auto}',
+  '.evo-hist-render-del{border-left-color:var(--dsw-alias-state-error-primary)}',
+  '.evo-hist-render-add{border-left-color:var(--dsw-alias-state-success-primary)}',
+  '.evo-hist-render-tag{position:absolute;left:8px;top:8px;color:var(--dsw-alias-label-tertiary)}',
   '.evo-hist-pre-add{color:var(--dsw-alias-state-success-primary)}',
   '.evo-hist-pre-del{color:var(--dsw-alias-state-error-primary)}',
 ].join('\n')
