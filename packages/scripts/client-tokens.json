@@ -13,8 +13,9 @@
     "G0.2 settled one value, not a wide/narrow pair (\u00a715.4).",
     "leading.base = 1.5 is what both surfaces already use; the reading face\u2019s own leading is decided in G4",
     "against a screenshot, from this same token.",
-    "caps.* keep today\u2019s container limits (280 aside / 260 code block / 420 preview): G2 moves values, it",
-    "does not change them. G4 revisits the reading face\u2019s caps (W20 drops its inner scroll).",
+    "cap.* are the container limits that remain: the list column (280px) and the source view\u2019s scroll",
+    "cap (260px, the platform command card\u2019s own metric). The preview\u2019s 420px cap is GONE with W20 —",
+    "a document is read by scrolling the pane, not through a window inside it.",
     "No entry here is speculative: every value is in use in one of the two stylesheets, or is the",
     "platform value that replaces the outlier (radius.control)."
   ],
@@ -64,8 +65,7 @@
     },
     "cap": {
       "aside": { "value": "280px", "why": "the panel\u2019s list column" },
-      "block": { "value": "260px", "why": "the code block\u2019s scroll cap, from the platform command card" },
-      "preview": { "value": "420px", "why": "the preview\u2019s scroll cap (W20 revisits it in G4)" }
+      "block": { "value": "260px", "why": "the source view\u2019s scroll cap, from the platform command card" }
     }
   }
 }

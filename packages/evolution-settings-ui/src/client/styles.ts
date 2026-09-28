@@ -44,7 +44,9 @@ export const CSS = [
   '.evolution-param-hint{margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-sm);line-height:var(--evo-leading-base)}',
   '.evolution-param-value{color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evolution-param-input{width:100%;box-sizing:border-box;padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:var(--evo-type-body);line-height:var(--evo-leading-base)}',
-  '.evolution-param-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}',
+  // The family's one focus ring, the same one the history panel draws: a field that only recoloured
+  // its border left a keyboard reader with a weaker affordance than the rest of the family (W8).
+  '.evolution-param-input:focus{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evolution-param-input:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
   '.evolution-param-source{display:inline-flex;align-items:center;height:var(--evo-space-20);padding:0 var(--evo-space-6);border-radius:var(--evo-radius-chip);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-space-20)}',
   '.evolution-param-source[data-user="true"]{background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary-foreground)}',
@@ -55,7 +57,7 @@ export const CSS = [
   '.evolution-param-button[data-primary="true"]:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}',
   '.evolution-param-button:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
   '.evolution-param-select{width:100%;box-sizing:border-box;padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:var(--evo-type-sm);line-height:var(--evo-leading-base)}',
-  '.evolution-param-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}',
+  '.evolution-param-select:focus{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evolution-param-select:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
   '.evolution-param-check{width:var(--evo-space-16);height:var(--evo-space-16);margin:0;accent-color:var(--dsw-alias-brand-primary);cursor:pointer}',
   '.evolution-param-check:disabled{cursor:default;opacity:.5}',
