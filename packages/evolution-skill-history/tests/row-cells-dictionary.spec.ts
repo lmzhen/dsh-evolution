@@ -8,7 +8,7 @@
  * dictionaries, and every `{slot}` a template interpolates gets a value from the cell that named it.
  */
 import { describe, expect, it } from 'vitest'
-import { ageCopyKey, skillRowCells, versionActionKind, versionRowCells, versionRowNote } from '@deepseek-ai/dsh-evolution-core'
+import { ageCopyKey, skillRowCells, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 import type { CopyCell, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core'
 import { en, fill, zh } from '../src/client/messages.ts'
 
@@ -101,7 +101,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
   it('leaves no placeholder unfilled in a whole row', () => {
     const cells = copies(
       ...versionRowCells(version({ actionKind: 'delete', charsDelta: 9 })).title,
-      versionRowNote(version({ summary: 'a summary' })),
+      ...versionRowCells(version({ summary: 'a summary' })).meta,
       ...skillRowCells(skill()).title,
       ...skillRowCells(skill()).meta,
     )
@@ -121,7 +121,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
     const cells = copies(
       ...versionRowCells(version({ actionKind: 'delete', path: 'a.md', charsDelta: -4 })).title,
       ...versionRowCells(version({ actionKind: 'support-write' })).title,
-      versionRowNote(version({ summary: 'a summary' })),
+      ...versionRowCells(version({ summary: 'a summary' })).meta,
       ...skillRowCells(skill()).title,
       ...skillRowCells(skill()).meta,
     )

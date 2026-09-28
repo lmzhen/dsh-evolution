@@ -10,7 +10,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { contentHash, elapsedSince, errorText, latestVersionAt, partitionVersions, textDiffFacts, versionActionKind } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, displayBodyOf, elapsedSince, errorText, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 
 /** Route paths. The client bundle mirrors these literals; a spec asserts the two sides agree. */
 export const SKILL_HISTORY_ROUTES = {
@@ -187,6 +187,7 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
             protectionUnknown: boolean
             lastAt: string | null
             age: ReturnType<typeof elapsedSince> | null
+            cells: ReturnType<typeof skillRowCells>
           }> = []
           const now = Date.now()
           for (const skill of listed) {
@@ -196,7 +197,7 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
             // no extra read and no second source. The words stay in the dictionary: the host answers
             // with the bucket and the row substitutes its `time.*` key, exactly like version rows.
             const lastAt = latestVersionAt(versions)
-            withHistory.push({
+            const row = {
               name: skill.name,
               versions: versions.length,
               description: skill.description,
@@ -205,7 +206,12 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
               protectionUnknown: skill.protectionUnknown,
               lastAt,
               age: lastAt === null ? null : elapsedSince(lastAt, now),
-            })
+            }
+            // The row's INFORMATION ARCHITECTURE is decided in core, not in the browser: which fact
+            // leads, which one may be clipped and which one never may are pure functions over these
+            // facts (`skill-row-cells.ts`). A browser half cannot import core at runtime — the client
+            // build keeps every `@deepseek-ai/*` specifier external — so the cells travel with the row.
+            withHistory.push({ ...row, cells: skillRowCells(row) })
           }
           writeJson(res, 200, { ok: true, data: withHistory })
         })
@@ -247,11 +253,14 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
               ...!withDelta || previous === undefined ? {} : { charsDelta: entry.chars - previous.chars },
             }
           }
-          const content = groups.content.map((entry, index) => ({
-            ...decorate(entry, index, groups.content, true),
-            undoable: entry.hash !== liveHash,
-          }))
-          const support = groups.support.map((entry, index) => decorate(entry, index, groups.support, false))
+          const content = groups.content.map((entry, index) => {
+            const row = { ...decorate(entry, index, groups.content, true), undoable: entry.hash !== liveHash }
+            return { ...row, cells: versionRowCells(row) }
+          })
+          const support = groups.support.map((entry, index) => {
+            const row = decorate(entry, index, groups.support, false)
+            return { ...row, cells: versionRowCells(row) }
+          })
           writeJson(res, 200, { ok: true, data: { content, support, liveHash } })
         })
       },
@@ -319,9 +328,15 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
             return
           }
           const truncated = text.length > MAX_BODY_CHARS
+          const head = truncated ? text.slice(0, MAX_BODY_CHARS) : text
+          // What the version SAYS, not the bytes it stores: the frontmatter block is metadata the row
+          // and the left column already carry, and the platform renderer reads its closing `---` as a
+          // setext underline, which made the metadata line the document's biggest heading (W19). The
+          // exact bytes stay one route away, in the diff. Core owns the policy (`displayBodyOf`), and
+          // a browser half cannot import core at runtime, so the host applies it.
           writeJson(res, 200, {
             ok: true,
-            data: { v, text: truncated ? text.slice(0, MAX_BODY_CHARS) : text, chars: text.length, truncated },
+            data: { v, display: displayBodyOf(head), chars: text.length, truncated },
           })
         })
       },

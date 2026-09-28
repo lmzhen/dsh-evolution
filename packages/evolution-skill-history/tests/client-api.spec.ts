@@ -39,9 +39,9 @@ describe('skill-history client api', () => {
   })
 
   it('reads one version\'s whole body from its own route', async () => {
-    const body = stubFetch({ ok: true, body: { ok: true, data: { v: 2, text: '# two', chars: 5, truncated: false } } })
+    const body = stubFetch({ ok: true, body: { ok: true, data: { v: 2, display: '# two', chars: 5, truncated: false } } })
     const api = createSkillHistoryApi(body.fetch)
-    expect(await api.body('my skill', 2)).toEqual({ v: 2, text: '# two', chars: 5, truncated: false })
+    expect(await api.body('my skill', 2)).toEqual({ v: 2, display: '# two', chars: 5, truncated: false })
     expect(body.calls[0]?.path).toBe(HOST_ROUTES.body + '?name=my%20skill&v=2')
   })
 

@@ -146,7 +146,14 @@ describe('skill-history routes: over a real socket', () => {
       const versionBody = await versions.json() as {
         ok: boolean
         data: {
-          content: Array<{ action: string; actionKind: string; age: { unit: string; n: number }; undoable: boolean; charsDelta?: number }>
+          content: Array<{
+            action: string
+            actionKind: string
+            age: { unit: string; n: number }
+            undoable: boolean
+            charsDelta?: number
+            cells: { title: Array<{ key: string; slot: string }>; meta: Array<{ key: string; literal?: string }> }
+          }>
           support: Array<{ action: string; actionKind: string; path?: string }>
           liveHash: string | null
         }
@@ -159,6 +166,15 @@ describe('skill-history routes: over a real socket', () => {
       // which file a version belongs to instead of the generic word (legacy rows have none).
       expect(versionBody.data.support.map(entry => entry.path)).toEqual(['references/notes.md'])
       expect(typeof versionBody.data.content[0]?.age.unit).toBe('string')
+      // What each row SAYS and where each fact sits is decided in core and travels with the row, so the
+      // browser half renders cells instead of assembling a sentence (W1/W15).
+      expect(versionBody.data.content[0]?.cells.title.map(cell => cell.key)).toEqual(['v', 'action', 'time'])
+      expect(versionBody.data.content[0]?.cells.title.map(cell => cell.slot)).toEqual(['meta', 'lead', 'meta'])
+      // A size change is its own cell exactly when the row HAS a non-zero one, so the rule holds for
+      // every row rather than for the fixture's two versions (which happen to be the same length).
+      for (const row of versionBody.data.content) {
+        expect(row.cells.title.some(cell => cell.key === 'delta')).toBe(row.charsDelta !== undefined && row.charsDelta !== 0)
+      }
       // The live content is the newest body version, so exactly that row is not undoable.
       expect(versionBody.data.content.filter(entry => ! entry.undoable)).toHaveLength(1)
       // The diff route: one version against its predecessor, as facts plus the changed region.
@@ -181,12 +197,16 @@ describe('skill-history routes: over a real socket', () => {
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=99')).status).toBe(404)
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff + '?name=panel-skill&v=x')).status).toBe(400)
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.diff)).status).toBe(400)
-      // The body route: one version's whole text, bounded, with the same 400/404 posture.
+      // The body route: what one version SAYS, bounded, with the same 400/404 posture.
       const whole = await fetch(host.origin + SKILL_HISTORY_ROUTES.body + '?name=panel-skill&v=2')
       expect(whole.status).toBe(200)
-      const wholeBody = await whole.json() as { ok: boolean; data: { v: number; text: string; chars: number; truncated: boolean } }
+      const wholeBody = await whole.json() as { ok: boolean; data: { v: number; display: string; chars: number; truncated: boolean } }
       expect(wholeBody.data.v).toBe(2)
-      expect(wholeBody.data.text).toContain('Two.')
+      expect(wholeBody.data.display).toContain('Two.')
+      // W19: the frontmatter block is metadata the row already carries, and the platform renderer reads
+      // its closing fence as a setext underline, so the document a reader opens starts at its body.
+      expect(wholeBody.data.display.startsWith('---')).toBe(false)
+      expect(wholeBody.data.display).not.toContain('description:')
       expect(wholeBody.data.truncated).toBe(false)
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.body + '?name=panel-skill&v=99')).status).toBe(404)
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.body + '?name=panel-skill&v=x')).status).toBe(400)

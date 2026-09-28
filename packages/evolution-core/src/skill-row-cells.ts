@@ -113,9 +113,9 @@ function actionNote(actionKind: string): { note?: string } {
 }
 
 /**
- * The cells of one version row's title line, in reading order.
+ * The cells of one version row: the facts on the title line, the summary (if any) under it.
  * @param row - the row's facts.
- * @returns the title line (the meta line is empty: a version row is one line).
+ * @returns both lines.
  */
 export function versionRowCells(row: VersionRowFacts): RowCells {
   const title: RowCell[] = [
@@ -138,18 +138,15 @@ export function versionRowCells(row: VersionRowFacts): RowCells {
       slot: 'meta',
     })
   }
-  return { title, meta: [] }
+  const meta: RowCell[] = []
+  // The summary is the one line a deployment may or may not generate; the host sends it already
+  // verbatim, so it needs no dictionary key.
+  if (row.summary !== undefined && row.summary !== '') {
+    meta.push({ key: 'summary', literal: row.summary, tone: 'secondary', slot: 'lead' })
+  }
+  return { title, meta }
 }
 
-/**
- * The version row's second line: the optional summary, or nothing.
- * @param row - the row's facts.
- * @returns the summary cell, or undefined when the deployment does not summarize.
- */
-export function versionRowNote(row: VersionRowFacts): RowCell | undefined {
-  if (row.summary === undefined || row.summary === '') return undefined
-  return { key: 'summary', literal: row.summary, tone: 'secondary', slot: 'lead' }
-}
 
 /**
  * The cells of one skill row: the name line, then the facts that describe it.

@@ -12,7 +12,7 @@
  * of a number and its unit. `row-cells-dictionary.spec.ts` proves the two sides agree.
  */
 import { describe, expect, it } from 'vitest'
-import { ageCopyKey, skillRowCells, skillStateKey, versionRowCells, versionRowNote } from '@deepseek-ai/dsh-evolution-core'
+import { ageCopyKey, skillRowCells, skillStateKey, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 import type { CopyCell, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core'
 
 const version = (over: Partial<VersionRowFacts> = {}): VersionRowFacts => ({
@@ -78,11 +78,12 @@ describe('one version row as cells (G1)', () => {
     expect(cellOf(versionRowCells(version({ actionKind: 'patch' })).title, 'action')?.note).toBeUndefined()
   })
 
-  it('keeps the summary off the row it would widen', () => {
-    const note = versionRowNote(version({ summary: 'tightened the trigger list' }))
-    expect(note).toEqual({ key: 'summary', literal: 'tightened the trigger list', tone: 'secondary', slot: 'lead' })
-    expect(versionRowNote(version({ summary: '' }))).toBeUndefined()
-    expect(versionRowNote(version())).toBeUndefined()
+  it('puts the optional summary on its own line, verbatim', () => {
+    const cells = versionRowCells(version({ summary: 'tightened the trigger list' }))
+    expect(cells.meta).toEqual([{ key: 'summary', literal: 'tightened the trigger list', tone: 'secondary', slot: 'lead' }])
+    // No summary (or an empty one) means no second line at all, not an empty one.
+    expect(versionRowCells(version({ summary: '' })).meta).toEqual([])
+    expect(versionRowCells(version()).meta).toEqual([])
   })
 })
 

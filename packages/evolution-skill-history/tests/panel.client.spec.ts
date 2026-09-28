@@ -12,6 +12,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
+import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 import { SkillHistoryPanel, type PanelFace } from '../src/client/Panel.ts'
 import type { SkillRow, VersionRow, VersionsPayload } from '../src/client/api.ts'
 
@@ -27,14 +28,23 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve }
 }
 
+const skill = (name: string, versions: number, description: string, lastAt: string, age: { unit: string; n: number }): SkillRow => {
+  const facts = { name, versions, description, managed: true, protectedBy: null, protectionUnknown: false, age }
+  return { ...facts, lastAt, cells: skillRowCells(facts) }
+}
+
 const skills: readonly SkillRow[] = [
-  { name: 'alpha', versions: 2, description: 'first skill', managed: true, protectedBy: null, protectionUnknown: false, lastAt: 'T2', age: { unit: 'hours', n: 3 } },
-  { name: 'beta', versions: 1, description: 'second skill', managed: true, protectedBy: null, protectionUnknown: false, lastAt: 'T1', age: { unit: 'days', n: 1 } },
+  skill('alpha', 2, 'first skill', 'T2', { unit: 'hours', n: 3 }),
+  skill('beta', 1, 'second skill', 'T1', { unit: 'days', n: 1 }),
 ]
 
-const row = (v: number, undoable: boolean): VersionRow => ({
-  v, at: '2026-09-27T10:00:00Z', action: 'update', hash: 'h' + String(v), chars: 10, actionKind: 'update', age: { unit: 'hours', n: v }, undoable,
-})
+const row = (v: number, undoable: boolean): VersionRow => {
+  const facts = { v, actionKind: 'update', age: { unit: 'hours', n: v } }
+  return {
+    ...facts, at: '2026-09-27T10:00:00Z', action: 'update', hash: 'h' + String(v), chars: 10, undoable,
+    cells: versionRowCells(facts),
+  }
+}
 
 const payload = (): VersionsPayload => ({ content: [row(1, true), row(2, false)], support: [], liveHash: 'h2' })
 
@@ -47,7 +57,7 @@ function makeFace(overrides: Partial<PanelFace> = {}): PanelFace {
     loadSkills: async () => skills,
     loadVersions: async () => payload(),
     loadDiff: async () => ({ v: 1, against: null, linesAdded: 0, linesRemoved: 0, hunks: [], truncated: false }),
-    loadBody: async () => ({ v: 1, text: '# one', chars: 5, truncated: false }),
+    loadBody: async () => ({ v: 1, display: '# one', chars: 5, truncated: false }),
     undo: async () => 'UNDONE',
     ...overrides,
   }
@@ -103,23 +113,23 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     })))
     fireEvent.click(await screen.findByText('alpha'))
     fireEvent.click(screen.getByText('beta'))
-    await screen.findByText('v9')
+    await screen.findByText('row.version(9)')
     slow.resolve(payload())
     await new Promise(resolve => setTimeout(resolve, 10))
-    expect(screen.getByText('v9')).toBeTruthy()
-    expect(screen.queryByText('v1')).toBeNull()
+    expect(screen.getByText('row.version(9)')).toBeTruthy()
+    expect(screen.queryByText('row.version(1)')).toBeNull()
   })
 
   it('reads a preview again when a later toggle superseded it, instead of waiting forever', async () => {
     // The 0.14.0 review's P1-1: the superseded read left a `loading` entry in the cache, and the
     // cache doubles as the "do not read twice" guard — so that row said "loading" until a reload.
-    const slow = deferred<{ v: number; text: string; chars: number; truncated: boolean }>()
+    const slow = deferred<{ v: number; display: string; chars: number; truncated: boolean }>()
     let firstRead = true
     const loadBody = vi.fn((_name: string, v: number) => {
-      if (v !== 1) return Promise.resolve({ v, text: '# two', chars: 5, truncated: false })
+      if (v !== 1) return Promise.resolve({ v, display: '# two', chars: 5, truncated: false })
       const answer = firstRead
         ? slow.promise
-        : Promise.resolve({ v: 1, text: '# one', chars: 5, truncated: false })
+        : Promise.resolve({ v: 1, display: '# one', chars: 5, truncated: false })
       firstRead = false
       return answer
     })
@@ -131,7 +141,7 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     fireEvent.click(previews()[1]!)
     await screen.findByText('# two')
     // The abandoned reply lands late: it must leave nothing behind, or the row is dead.
-    slow.resolve({ v: 1, text: 'late', chars: 4, truncated: false })
+    slow.resolve({ v: 1, display: 'late', chars: 4, truncated: false })
     await new Promise(resolve => setTimeout(resolve, 10))
     fireEvent.click(previews()[0]!)
     await waitFor(() => { expect(loadBody).toHaveBeenLastCalledWith('alpha', 1) })

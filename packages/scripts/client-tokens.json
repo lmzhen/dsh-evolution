@@ -1,0 +1,71 @@
+{
+  "note": [
+    "The family client scale: ONE source for both browser halves (W2/W5/W6/W10/W20, G2).",
+    "Both client packages receive a GENERATED tokens.ts with identical bytes; verify-client-tokens.mjs",
+    "fails the gate when either copy drifts from this file. Browser halves cannot import evolution-core",
+    "(every @deepseek-ai/* specifier is external in build-client.mjs), so the scale is generated into the",
+    "packages rather than shared at runtime.",
+    "radius.control = 8px is the platform\u2019s own field radius: packages/client/ui-primitives/src/Input.module.css",
+    "and packages/client/ui-settings-plugins/src/client/fields.module.css both use border-radius:8px.",
+    "settings-ui\u2019s 6px was an outlier; unifying it is W6.",
+    "hairline = .5px is the hairline width both surfaces already used.",
+    "measure.read = 80ch is the single reading measure (\u2248 40em, \u2248 40 CJK glyphs at the panel type size).",
+    "G0.2 settled one value, not a wide/narrow pair (\u00a715.4).",
+    "leading.base = 1.5 is what both surfaces already use; the reading face\u2019s own leading is decided in G4",
+    "against a screenshot, from this same token.",
+    "caps.* keep today\u2019s container limits (280 aside / 260 code block / 420 preview): G2 moves values, it",
+    "does not change them. G4 revisits the reading face\u2019s caps (W20 drops its inner scroll).",
+    "No entry here is speculative: every value is in use in one of the two stylesheets, or is the",
+    "platform value that replaces the outlier (radius.control)."
+  ],
+  "groups": {
+    "type": {
+      "lg": { "value": "calc(1em + 2px)", "why": "the panel title and the settings card title today" },
+      "body": { "value": "1em", "why": "body text; the settings card rooted this in --dsh-content-font-size (W5)" },
+      "sm": { "value": "calc(1em - 1px)", "why": "the panel root size, group headings, and the card\u2019s 13px labels" },
+      "xs": { "value": "calc(1em - 2px)", "why": "the card\u2019s 12px hints, counts and errors" }
+    },
+    "space": {
+      "2": { "value": "2px" },
+      "4": { "value": "4px" },
+      "6": { "value": "6px" },
+      "8": { "value": "8px" },
+      "10": { "value": "10px" },
+      "12": { "value": "12px" },
+      "14": { "value": "14px" },
+      "16": { "value": "16px" },
+      "20": { "value": "20px" }
+    },
+    "radius": {
+      "chip": { "value": "4px", "why": "the settings card\u2019s source chip" },
+      "control": { "value": "8px", "why": "the platform\u2019s field/button radius (Input.module.css)" },
+      "surface": { "value": "12px", "why": "the panel\u2019s code block and preview cards, from the platform command card" },
+      "pill": { "value": "999px", "why": "the capsule; a state, not a control" }
+    },
+    "hairline": {
+      "width": { "value": ".5px", "why": "the hairline both surfaces draw; the LEVEL stays a platform alias (l1 container / l2 structure)" },
+      "marker": { "value": "2px", "why": "the tinted edge of one rendered diff block" }
+    },
+    "measure": {
+      "read": { "value": "80ch", "why": "the reading measure of the document face (G4)" }
+    },
+    "leading": {
+      "base": { "value": "1.5", "why": "the line height both surfaces already use" }
+    },
+    "tone": {
+      "quiet": { "value": "var(--dsw-alias-label-secondary)", "why": "a control that changes nothing" },
+      "primary": { "value": "var(--dsw-alias-brand-primary)", "why": "the one key that writes, or the field a card was overridden in" },
+      "danger": { "value": "var(--dsw-alias-state-error-primary)", "why": "refusals, failures, removed text" },
+      "success": { "value": "var(--dsw-alias-state-success-primary)", "why": "added text, a write that landed" }
+    },
+    "focus": {
+      "ring": { "value": "2px solid var(--dsw-alias-label-primary)", "why": "the platform sidebar row\u2019s inset ring; one definition, both faces" },
+      "offset": { "value": "-2px" }
+    },
+    "cap": {
+      "aside": { "value": "280px", "why": "the panel\u2019s list column" },
+      "block": { "value": "260px", "why": "the code block\u2019s scroll cap, from the platform command card" },
+      "preview": { "value": "420px", "why": "the preview\u2019s scroll cap (W20 revisits it in G4)" }
+    }
+  }
+}

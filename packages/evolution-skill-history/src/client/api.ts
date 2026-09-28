@@ -34,6 +34,36 @@ export interface VersionDiffRow {
   readonly truncated: boolean
 }
 
+/** Where a cell sits in its row: `aside` is right-aligned and is never truncated. */
+export type CellSlot = 'lead' | 'meta' | 'aside'
+
+/** The visual register a cell speaks in; the stylesheet maps it to a scale token. */
+export type CellTone = 'primary' | 'secondary' | 'tertiary'
+
+/** One cell of a row: a locale key with the values its template needs, or a verbatim fact. */
+export type RowCell =
+  | {
+    readonly key: string
+    readonly slot: CellSlot
+    readonly tone: CellTone
+    readonly note?: string
+    readonly copy: string
+    readonly values?: Readonly<Record<string, string | number>>
+  }
+  | {
+    readonly key: string
+    readonly slot: CellSlot
+    readonly tone: CellTone
+    readonly note?: string
+    readonly literal: string
+  }
+
+/** The lines one row shows: a title line, and a meta line under it. */
+export interface RowCells {
+  readonly title: readonly RowCell[]
+  readonly meta: readonly RowCell[]
+}
+
 /** One recorded version, as the host reports it. */
 export interface VersionRow {
   readonly v: number
@@ -49,6 +79,8 @@ export interface VersionRow {
   readonly actionKind: string
   /** How long ago the host recorded it, as a bucket plus a count — never a sentence. */
   readonly age: { readonly unit: string; readonly n: number }
+  /** What this row says and where each fact sits, decided in core (`skill-row-cells.ts`). */
+  readonly cells: RowCells
   /** The one line the optional summarizer wrote, when the deployment turned it on. */
   readonly summary?: string
   /**
@@ -70,13 +102,18 @@ export interface SkillRow {
   readonly lastAt: string | null
   /** That moment as a bucket plus a count; null exactly when `lastAt` is. */
   readonly age: { readonly unit: string; readonly n: number } | null
+  /** What this row says and where each fact sits, decided in core (`skill-row-cells.ts`). */
+  readonly cells: RowCells
 }
 
 /** One version's whole body, as the read route hands it over. */
 export interface VersionBodyRow {
   readonly v: number
-  /** The body, or its head when `truncated` — the reader is told rather than silently cut. */
-  readonly text: string
+  /**
+   * The text a READER sees: the body without its frontmatter block, or its head when `truncated` —
+   * the reader is told rather than silently cut. The exact bytes are the diff route's answer.
+   */
+  readonly display: string
   /** How long the stored body is, whatever came back. */
   readonly chars: number
   readonly truncated: boolean

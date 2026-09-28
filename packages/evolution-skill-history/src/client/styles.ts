@@ -1,93 +1,104 @@
 /**
  * The panel’s stylesheet, injected once behind a `<style data-plugin-css=…>` tag.
  *
- * The bundle is built outside the platform’s CSS-Modules pipeline, so it carries its own string and
- * injects it the same way the family’s settings section does. Every rule reads the platform’s design
- * tokens, and the metrics are COPIED from the platform’s own components rather than invented:
+ * Two faces, one scale. The TOOL face (`.evo-hist-*` above the divider below) is the compact list and
+ * its controls; the READING face (the rules at the end) is a version rendered as a document. Each face
+ * has its own comfort: the list may be dense and full of controls, the document may not — that is why
+ * the rules do not overlap, and why a future third face would be another block rather than an edit here
+ * (§15.2 L2b). Every colour is a platform design token, every type step and every geometry value is a
+ * family scale token (`./tokens.ts`, generated from `packages/scripts/client-tokens.json`).
  *
- * - the code block (`--dsw-font-markdown-code-block-small`, `.5px` border, `12px`, radius `12px`,
- *   `max-height: 260px`) is the platform command card’s `<pre>` (client/ui-chat/…/GenericCommandCard.module.css);
+ * The metrics themselves are COPIED from the platform’s own components rather than invented:
+ *
+ * - the code block (`--dsw-font-markdown-code-block-small`, `0.5px` border, `12px` padding, radius
+ *   `12px`, `max-height: 260px`) is the platform command card’s `<pre>` (client/ui-chat/…/GenericCommandCard.module.css);
  * - hover / focus (`--dsw-alias-interactive-bg-hover`, a 2px inset focus ring) follow the platform
  *   sidebar row (client/ui-sidebar/…/SidebarRoot.module.css);
- * - the panel’s type scale is the platform TOKEN rather than a magic number, so it follows the
- *   deployment’s content size the way the platform’s own panels do;
- * - the capsule and the field metrics follow the family’s settings card, which copied them from the
- *   platform’s settings fields in the first place.
- *
- * Geometry (widths, paddings, radii, the 260px scroll cap) is a plain number here because the platform's
- * own components write geometry the same way; what must never be a literal is TYPE and COLOUR, and
- * every size and colour below is a token or a `calc()` over one.
+ * - the field radius (`8px`) is the platform’s own Input primitive (client/ui-primitives/Input.module.css);
+ * - the panel’s type steps come from the family scale, which is relative to the shell’s chrome size —
+ *   NOT the setting behind `--dsh-content-font-size*` (that one says it affects conversation content
+ *   only, and the platform’s own surfaces never read it). The step is relative, so the panel scales
+ *   with the shell, not with the conversation: the dense list needs it — at the raw chrome size
+ *   `dsh-evolution-maintenance` truncates in 264px.
  * @module @deepseek-ai/dsh-evolution-skill-history/client
  */
+import { tokenVars } from './tokens.ts'
 
 /** Tag id that makes the injection idempotent. */
 export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-skill-history/panel.css'
 
 /** The stylesheet the panel injects once. */
 export const CSS = [
-  // One step below the shell's chrome size, and NOT the setting behind `--dsh-content-font-size*`
-  // (that one says it affects conversation content only, and the platform's own surfaces never read
-  // it). The step is relative, so the panel scales with the shell, not with the conversation: the
-  // dense list needs it — at the raw chrome size `dsh-evolution-maintenance` truncates in 264px.
-  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;font-size:calc(1em - 1px);color:var(--dsw-alias-label-primary)}',
-  // 280px, not 264: the list's 12px inset (so rows share the search field's left edge) plus the
-  // version count left `dsh-evolution-maintenance` truncated at the panel's type size.
-  '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 280px;width:280px;min-height:0;border-right:.5px solid var(--dsw-alias-border-l2)}',
-  '.evo-hist-search{padding:12px 12px 4px}',
-  '.evo-hist-search input{width:100%;box-sizing:border-box;padding:6px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}',
-  '.evo-hist-search input:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',
-  // 12px inline: the skill rows line up with the search field above them, not 6px to its left.
-  '.evo-hist-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 12px 10px}',
-  '.evo-hist-empty{padding:8px 12px;color:var(--dsw-alias-label-tertiary)}',
-  '.evo-hist-skill{display:block;width:100%;box-sizing:border-box;padding:7px 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;text-align:left;cursor:pointer}',
+  // The scale, declared on the panel root so it never leaks into the host shell.
+  tokenVars('.evo-hist-root'),
+  // ─── the tool face: the list, its rows, and the controls that act on a version ───
+  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;font-size:var(--evo-type-sm);color:var(--dsw-alias-label-primary)}',
+  '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 var(--evo-cap-aside);width:var(--evo-cap-aside);min-height:0;border-right:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
+  '.evo-hist-search{padding:var(--evo-space-12) var(--evo-space-12) var(--evo-space-4)}',
+  '.evo-hist-search input{width:100%;box-sizing:border-box;padding:var(--evo-space-6) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}',
+  '.evo-hist-search input:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
+  '.evo-hist-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:var(--evo-space-4) var(--evo-space-12) var(--evo-space-10)}',
+  // An empty list starts where a ROW starts, so the first line of an empty pane and the first line of
+  // a full one share one left edge (W16).
+  '.evo-hist-empty{padding:var(--evo-space-6) var(--evo-space-8);margin:0;color:var(--dsw-alias-label-tertiary)}',
+  '.evo-hist-skill{display:block;width:100%;box-sizing:border-box;padding:var(--evo-space-6) var(--evo-space-8);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;text-align:left;cursor:pointer}',
   '.evo-hist-skill:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-  '.evo-hist-skill:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',
+  '.evo-hist-skill:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-hist-skill[aria-current="true"]{background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-primary);font-weight:500}',
-  '.evo-hist-skill-line{display:flex;align-items:baseline;gap:6px}',
-  '.evo-hist-skill-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  '.evo-hist-skill-count{flex:none;margin-left:auto;color:var(--dsw-alias-label-tertiary)}',
-  // A BLOCK box on purpose: `text-overflow` is inert on an inline span, and the description then
-  // ran past the row's background into the pane divider (measured on the installed 0.13.1).
-  '.evo-hist-skill-desc{display:block;margin-top:2px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  // 12px both ways: the pane's first line and the aside's search field share one left edge.
-  '.evo-hist-main{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:12px 12px}',
-  '.evo-hist-head{display:flex;align-items:center;gap:10px;margin:0 0 4px}',
-  '.evo-hist-title{flex:1 1 auto;margin:0;font-size:calc(1em + 2px);font-weight:600}',
-  '.evo-hist-hint{margin:0 0 10px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
-  '.evo-hist-pane-empty{margin:2px 0 0;color:var(--dsw-alias-label-tertiary)}',
-  '.evo-hist-note{margin:0 0 10px;color:var(--dsw-alias-label-secondary);line-height:1.5;white-space:pre-wrap}',
-  '.evo-hist-note[data-error="true"]{color:var(--dsw-alias-state-error-primary)}',
-  '.evo-hist-group{margin:10px 0 2px;font-size:calc(1em - 1px);font-weight:600;color:var(--dsw-alias-label-secondary)}',
-  // Separators use the platform's dominant hairline (`border-l2`); the first row of a group carries
-  // none, so the group heading is not underlined by its own list.
-  '.evo-hist-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-top:.5px solid var(--dsw-alias-border-l2)}',
+  // One line of cells. Only the `lead` slot may be clipped, and an `aside` cell is pushed to the far
+  // edge and never shrinks: that is what keeps a row’s decision facts visible under any description
+  // length (W1).
+  '.evo-hist-cell-line{display:flex;align-items:baseline;gap:var(--evo-space-6);min-width:0}',
+  '.evo-hist-cell-meta{margin-top:var(--evo-space-2)}',
+  '.evo-hist-cell{min-width:0}',
+  '.evo-hist-slot-lead{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.evo-hist-slot-meta{flex:none;white-space:nowrap}',
+  '.evo-hist-slot-aside{flex:none;margin-left:auto;white-space:nowrap}',
+  // A tone is the register a cell speaks in, relative to the face that hosts it: `primary` is the
+  // row’s own emphasis, so the same cell reads correctly in a selected and an unselected row.
+  '.evo-hist-tone-primary{color:inherit}',
+  '.evo-hist-tone-secondary{color:var(--dsw-alias-label-secondary)}',
+  '.evo-hist-tone-tertiary{color:var(--dsw-alias-label-tertiary)}',
+  '.evo-hist-main{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:var(--evo-space-12) var(--evo-space-12)}',
+  '.evo-hist-head{display:flex;align-items:center;gap:var(--evo-space-10);margin:0 0 var(--evo-space-4)}',
+  '.evo-hist-title{flex:1 1 auto;margin:0;font-size:var(--evo-type-lg);font-weight:600}',
+  '.evo-hist-hint{margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
+  // A notice owns a surface and a glyph, so a refusal is not carried by colour alone (W13).
+  '.evo-hist-note{display:flex;align-items:flex-start;gap:var(--evo-space-6);margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
+  '.evo-hist-note-text{min-width:0;white-space:pre-wrap}',
+  '.evo-hist-note[data-error="true"]{color:var(--evo-tone-danger);background:var(--dsw-alias-bg-layer-2);border:var(--evo-hairline-width) solid var(--evo-tone-danger);border-radius:var(--evo-radius-control);padding:var(--evo-space-8) var(--evo-space-10)}',
+  '.evo-hist-icon{flex:none;margin-top:.15em}',
+  '.evo-hist-group{margin:var(--evo-space-10) 0 var(--evo-space-2);font-size:var(--evo-type-sm);font-weight:600;color:var(--dsw-alias-label-secondary)}',
+  // A row is capped so its controls stay within reach of the text they act on: on a wide window the
+  // tools used to sit ~700px away from the sentence they belonged to (W4). The cap is the reading
+  // measure times one and a half, so it follows the scale rather than a window width.
+  '.evo-hist-row{display:flex;align-items:flex-start;gap:var(--evo-space-8);padding:var(--evo-space-8) 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);max-width:calc(var(--evo-measure-read) * 1.5);color:var(--dsw-alias-label-primary)}',
   '.evo-hist-row:first-of-type{border-top:0}',
   '.evo-hist-row-body{flex:1 1 auto;min-width:0}',
-  '.evo-hist-row-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}',
-  '.evo-hist-row-meta{color:var(--dsw-alias-label-tertiary)}',
-  '.evo-hist-row-summary{margin-top:2px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
-  '.evo-hist-actions{display:flex;flex:none;align-items:center;gap:6px}',
-  // A filled chip, not an outlined one: `当前` is a state, and the outline made it look clickable
-  // next to the two real buttons beside it.
-  '.evo-hist-capsule{flex:none;padding:1px 8px;border:0;border-radius:999px;background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-secondary)}',
-  '.evo-hist-button{flex:none;font:inherit;padding:3px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:transparent;color:inherit;cursor:pointer}',
+  '.evo-hist-row-title{display:flex;align-items:baseline;gap:var(--evo-space-8);min-width:0}',
+  '.evo-hist-row-summary{margin-top:var(--evo-space-2);line-height:var(--evo-leading-base)}',
+  '.evo-hist-actions{display:flex;flex:none;align-items:center;gap:var(--evo-space-6)}',
+  // A chip is a STATE: it takes the neutral layer, not the interaction colour it used to borrow (W9).
+  '.evo-hist-chip{flex:none;padding:var(--evo-space-2) var(--evo-space-8);border-radius:var(--evo-radius-pill);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
+  // Two kinds of control, two shapes: one acts (bordered), one only reveals more (borderless, with a
+  // drawn chevron). The primary tone is reserved for the click that writes (W7/W14).
+  '.evo-hist-button{display:inline-flex;flex:none;align-items:center;gap:var(--evo-space-2);font:inherit;padding:var(--evo-space-4) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:transparent;color:inherit;cursor:pointer}',
+  '.evo-hist-button[data-kind="toggle"],.evo-hist-button[data-kind="switch"]{padding:var(--evo-space-2) var(--evo-space-4);border-color:transparent;color:var(--dsw-alias-label-secondary)}',
+  '.evo-hist-button[data-kind="switch"][aria-pressed="true"]{color:var(--dsw-alias-label-primary)}',
   '.evo-hist-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-  '.evo-hist-button:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:-2px}',
-  '.evo-hist-button[data-tone="primary"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
-  '.evo-hist-pre{margin:6px 0 2px;padding:12px 16px;max-height:260px;overflow:auto;border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
-  // Added/removed use the platform's semantic pair; `--dsw-alias-brand-primary` is the primary label
-  // colour (near-black in light, near-white in dark), so the pair read as red-versus-plain.
-  // The rendered diff: both sides stacked, marked by a tinted edge rather than a text colour, so
-  // the platform renderer's own type and colours stay untouched inside the block.
-  '.evo-hist-diff-head{display:flex;align-items:center;gap:8px}',
+  '.evo-hist-button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
+  '.evo-hist-button[data-tone="primary"]{border-color:var(--evo-tone-primary);color:var(--evo-tone-primary)}',
+  // ─── the reading face: one version as a document, and the rendered diff ───
+  '.evo-hist-diff-head{display:flex;align-items:center;gap:var(--evo-space-8)}',
   '.evo-hist-diff-head .evo-hist-note{flex:1 1 auto;margin:0}',
-  '.evo-hist-diff-toggle{display:flex;flex:none;align-items:center;gap:6px}',
-  '.evo-hist-preview{margin:6px 0 2px;border:.5px solid var(--dsw-alias-border-l2);border-radius:12px;padding:4px 12px 12px;background:var(--dsw-alias-bg-layer-2);max-height:420px;overflow:auto}',
-  '.evo-hist-render{display:flex;flex-direction:column;gap:8px;margin:6px 0 2px}',
-  '.evo-hist-render-block{position:relative;padding:8px 12px 8px 22px;border:.5px solid var(--dsw-alias-border-l2);border-left-width:2px;border-radius:12px;background:var(--dsw-alias-markdown-code-block);overflow-x:auto}',
-  '.evo-hist-render-del{border-left-color:var(--dsw-alias-state-error-primary)}',
-  '.evo-hist-render-add{border-left-color:var(--dsw-alias-state-success-primary)}',
-  '.evo-hist-render-tag{position:absolute;left:8px;top:8px;color:var(--dsw-alias-label-tertiary)}',
-  '.evo-hist-pre-add{color:var(--dsw-alias-state-success-primary)}',
-  '.evo-hist-pre-del{color:var(--dsw-alias-state-error-primary)}',
+  '.evo-hist-diff-toggle{display:flex;flex:none;align-items:center;gap:var(--evo-space-6)}',
+  '.evo-hist-pre{margin:var(--evo-space-6) 0 var(--evo-space-2);padding:var(--evo-space-12) var(--evo-space-16);max-height:var(--evo-cap-block);overflow:auto;border:var(--evo-hairline-width) solid var(--dsw-alias-border-l1);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
+  '.evo-hist-preview{margin:var(--evo-space-6) 0 var(--evo-space-2);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-surface);padding:var(--evo-space-4) var(--evo-space-12) var(--evo-space-12);background:var(--dsw-alias-bg-layer-2);max-height:var(--evo-cap-preview);overflow:auto}',
+  '.evo-hist-render{display:flex;flex-direction:column;gap:var(--evo-space-8);margin:var(--evo-space-6) 0 var(--evo-space-2)}',
+  '.evo-hist-render-block{position:relative;padding:var(--evo-space-8) var(--evo-space-12) var(--evo-space-8) var(--evo-space-20);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-left-width:var(--evo-hairline-marker);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);overflow-x:auto}',
+  '.evo-hist-render-del{border-left-color:var(--evo-tone-danger)}',
+  '.evo-hist-render-add{border-left-color:var(--evo-tone-success)}',
+  '.evo-hist-render-tag{position:absolute;left:var(--evo-space-8);top:var(--evo-space-8);color:var(--dsw-alias-label-tertiary)}',
+  '.evo-hist-pre-add{color:var(--evo-tone-success)}',
+  '.evo-hist-pre-del{color:var(--evo-tone-danger)}',
 ].join('\n')
