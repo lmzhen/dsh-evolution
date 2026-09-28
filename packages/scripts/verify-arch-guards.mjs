@@ -187,6 +187,24 @@
  *       CSS-wide keyword, and any literal colour (`#rgb`/`#rrggbb`, `rgb()`/`hsl()`), fail here.
  *       The panel stylesheet ships as a string inside the bundle, so the platform's
  *       CSS-Modules discipline (tokens only) has to be enforced by the family instead.
+ *   N25. the CLIENT halves take radii and hairlines from the family scale: a
+ *       `border-radius` that is not `var(--evo-radius-…)`/`0`/`50%`, and a `border`
+ *       width that is not `var(--evo-hairline-…)`/`0`/`none`, fail here. The scale is
+ *       `packages/scripts/client-tokens.json`, generated into both packages; before it
+ *       existed the panel and the settings card used 8/12/999 against 8/6/4.
+ *   N26. interaction COLOUR only on an element an interaction reaches: a rule whose
+ *       selector has no `:hover`/`:focus`/`:active`/`[aria-…]`/control element and whose
+ *       body names `--dsw-alias-interactive-bg-*` or `--dsw-alias-button-primary-*` fails.
+ *       The panel's state chip borrowed the interaction fill once, which made a fact read
+ *       as something to click (W9).
+ *   N27. the CLIENT halves take GEOMETRY from the scale: a padding/margin/gap/size/inset
+ *       value that carries a bare pixel length fails. `font-size` and `color` were already
+ *       covered by N24; the same drift lived on in shapes (7px against 6px, 264px against
+ *       280px). Membership is judged on the string, because jsdom resolves no `var()`.
+ *   N28. (E1 in the 0.15.0 plan) a browser half importing a Node builtin (`node:fs`, `node:path`, …) or calling a
+ *       byte-changing function (`writeFile(Sync)`, `mkdir(Sync)`, `rm(Sync)`, …) fails: the
+ *       client bundle runs in the platform's page, where neither exists, and the host half
+ *       owns every byte the family stores.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -472,6 +490,10 @@ const RULES = [
   { id: 'N22', title: 'settings namespaces are spelled once, in the registry' },
   { id: 'N23', title: 'durable-file writes live in the IO seam' },
   { id: 'N24', title: 'client halves carry no literal type or colour' },
+  { id: 'N25', title: 'client halves take radii and hairlines from the scale' },
+  { id: 'N26', title: 'interaction colour only on an element an interaction reaches' },
+  { id: 'N27', title: 'client halves take geometry from the scale' },
+  { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)' },
 ]
 
 /**
@@ -490,6 +512,120 @@ function clientStyleLiterals(text) {
     findings.push(match[1] + ': ' + value)
   }
   for (const match of stripped.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/g)) findings.push(match[0])
+  return findings
+}
+
+/** A client half's source without its comments: prose may discuss a literal without shipping one. */
+function withoutComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
+
+/**
+ * N25 (0.15): a radius or a hairline width written as a literal inside a client half.
+ *
+ * The family's two browser halves draw from ONE scale (`packages/scripts/client-tokens.json`, generated
+ * into each package): before it existed the panel and the settings card used 8/12/999 against 8/6/4 and
+ * four different hairline levels, and nothing could tell them apart. A literal here means someone went
+ * around the scale, which is exactly the drift the rule exists to stop.
+ * @param text - the file's source.
+ * @returns every offending declaration (`border-radius:6px`, `border:.5px solid …`).
+ */
+function clientScaleLiterals(text) {
+  const stripped = withoutComments(text)
+  const findings = []
+  for (const match of stripped.matchAll(/\bborder-radius\s*:\s*([^;'"}\n]+)/g)) {
+    const value = (match[1] ?? '').trim()
+    if (value.startsWith('var(--evo-radius-') || value === '0' || value === '50%' || value === 'inherit') continue
+    findings.push('border-radius: ' + value)
+  }
+  for (const match of stripped.matchAll(/\bborder(?:-(?:top|bottom|left|right))?(?:-width)?\s*:\s*([^;'"}\n]+)/g)) {
+    // In the shorthand the WIDTH is the first component; a hairline is that component, never a colour.
+    const value = (match[1] ?? '').trim()
+    const width = value.split(/\s+/)[0] ?? ''
+    if (width.startsWith('var(--evo-hairline-') || width === '0' || width === 'none') continue
+    findings.push('border: ' + value)
+  }
+  return findings
+}
+
+/** A CSS rule's selector, for the rules written as strings in a client half. */
+const CSS_RULE = /'([^'\n]*\{[^'\n]*\})'/g
+
+/** A selector that an interaction can actually reach. */
+const INTERACTIVE_SELECTOR = /:(hover|focus|focus-visible|focus-within|active)\b|\[aria-(current|pressed|expanded)|\b(button|input|select|textarea)\s*(?=[:.[,\s{])/
+
+/**
+ * N26 (0.15): an INTERACTION colour on a rule no interaction reaches.
+ *
+ * The panel's state chip borrowed `interactive-bg-active`, which made a fact read as something to
+ * click (W9); the same mistake is easy to repeat because the platform's interaction tokens are the
+ * most convenient fill in the palette. A static surface takes a layer or a label token instead.
+ * @param text - the file's source.
+ * @returns one finding per rule that borrows an interaction colour without being interactive.
+ */
+function interactionColourOffenders(text) {
+  const stripped = withoutComments(text)
+  const findings = []
+  for (const match of stripped.matchAll(CSS_RULE)) {
+    const rule = match[1] ?? ''
+    const open = rule.indexOf('{')
+    const selector = rule.slice(0, open)
+    const body = rule.slice(open)
+    const borrow = /--dsw-alias-(interactive-bg-[a-z0-9-]+|button-primary-[a-z0-9-]+)/.exec(body)
+    if (borrow === null) continue
+    if (INTERACTIVE_SELECTOR.test(selector)) continue
+    findings.push(selector.trim() + ' uses ' + borrow[0])
+  }
+  return findings
+}
+
+/** A geometry property whose value must come from the scale. */
+const GEOMETRY_PROPERTY = /\b(padding|margin|gap|row-gap|column-gap|width|height|min-width|min-height|max-width|max-height|inset|left|top|right|bottom)(?:-(?:top|right|bottom|left))?\s*:\s*([^;'"}\n]+)/g
+
+/**
+ * N27 (0.15): geometry written as a pixel literal inside a client half.
+ *
+ * `font-size` and `color` were already covered (N24); the same drift lived on in shapes — 7px against
+ * 6px insets, a 264px column against 280px, radii and gaps that only matched by luck. Scale membership
+ * is judged on the STRING, because jsdom resolves neither `var()` nor `calc()`.
+ * @param text - the file's source.
+ * @returns every declaration that carries a bare pixel length.
+ */
+function clientGeometryLiterals(text) {
+  const stripped = withoutComments(text)
+  const findings = []
+  for (const match of stripped.matchAll(GEOMETRY_PROPERTY)) {
+    const value = (match[2] ?? '').trim()
+    if (!/(^|\s)\d+(\.\d+)?px(\s|$)/.test(value)) continue
+    findings.push(match[1] + ': ' + value)
+  }
+  return findings
+}
+
+/** A browser half reaching for the host's runtime, which it does not have. */
+const NODE_SPECIFIER = /(?:^|[^\w.])((?:node:)?(?:fs|fs\/promises|path|os|child_process|worker_threads|cluster|net|http|https|dns|tls|zlib|stream|crypto|url|util|process))\s*'?/
+
+/** A call that changes bytes on disk. */
+const WRITE_CALL = /\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|mkdir|mkdirSync|rm|rmSync|rmdir|rmdirSync|unlink|unlinkSync|rename|renameSync|truncate|truncateSync|copyFile|copyFileSync|openSync|writeSync|chmod|chmodSync)\s*\(/g
+
+/**
+ * E1 (0.15): a browser half importing a Node builtin, or writing to disk.
+ *
+ * The client bundle runs in the platform's page, where neither exists: an import would become a
+ * runtime failure and a write would land in a sandbox that has no filesystem. The rule is the client
+ * half of the family's L2/L3 split — the host owns every byte (E1, §15.2 L3).
+ * @param text - the file's source.
+ * @returns every specifier and every write call found.
+ */
+function clientHostOffenders(text) {
+  const stripped = withoutComments(text)
+  const findings = []
+  for (const match of stripped.matchAll(/\bimport\s[^'\n]*'([^'\n]+)'/g)) {
+    const specifier = match[1] ?? ''
+    if (!/^(node:)?(fs|path|os|child_process|worker_threads|cluster|net|http|https|dns|tls|zlib|stream|crypto|url|util|process)(\/|$)/.test(specifier)) continue
+    findings.push('imports ' + specifier)
+  }
+  for (const match of stripped.matchAll(WRITE_CALL)) findings.push('calls ' + match[1] + '()')
   return findings
 }
 
@@ -1010,6 +1146,31 @@ if (process.argv.includes('--list-rules')) {
       && clientStyleLiterals("'.x{color:rgb(1,2,3)}'").length === 1
       && clientStyleLiterals("'.x{font:inherit;color:var(--dsw-alias-label-primary)}'").length === 0
       && clientStyleLiterals('// no font-size here\nconst x = 1').length === 0],
+    ['N25', () => clientScaleLiterals("'.x{border-radius:6px}'").length === 1
+      && clientScaleLiterals("'.x{border-radius:var(--evo-radius-control)}'").length === 0
+      && clientScaleLiterals("'.x{border-radius:50%}'").length === 0
+      && clientScaleLiterals("'.x{border:0}'").length === 0
+      && clientScaleLiterals("'.x{border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}'").length === 0
+      && clientScaleLiterals("'.x{border-top:.5px solid var(--dsw-alias-border-l2)}'").length === 1
+      && clientScaleLiterals("'.x{border-color:var(--dsw-alias-border-l2)}'").length === 0
+      && clientScaleLiterals("'.x{border-left-width:var(--evo-hairline-marker)}'").length === 0],
+    ['N26', () => interactionColourOffenders("'.chip{background:var(--dsw-alias-interactive-bg-active)}'").length === 1
+      && interactionColourOffenders("'.x:hover{background:var(--dsw-alias-interactive-bg-hover)}'").length === 0
+      && interactionColourOffenders("'.x[aria-current=true]{background:var(--dsw-alias-interactive-bg-active)}'").length === 0
+      && interactionColourOffenders("'.card-button[data-primary=true]{background:var(--dsw-alias-button-primary-fill)}'").length === 0
+      && interactionColourOffenders("'.x{background:var(--dsw-alias-bg-layer-2)}'").length === 0],
+    ['N27', () => clientGeometryLiterals("'.x{padding:7px 8px}'").length === 1
+      && clientGeometryLiterals("'.x{padding:var(--evo-space-6) var(--evo-space-8)}'").length === 0
+      && clientGeometryLiterals("'.x{max-width:calc(var(--evo-measure-read) * 1.5)}'").length === 0
+      && clientGeometryLiterals("'.x{margin:0 0 var(--evo-space-2)}'").length === 0
+      && clientGeometryLiterals("'.x{margin-top:.15em}'").length === 0
+      && clientGeometryLiterals("'.x{height:var(--evo-space-20)}'").length === 0],
+    ['N28', () => clientHostOffenders("import { readFileSync } from 'node:fs'").length === 1
+      && clientHostOffenders("import { join } from 'node:path'").length === 1
+      && clientHostOffenders("import { createElement } from 'react'").length === 0
+      && clientHostOffenders("import { renderMarkdown } from './markdown.ts'").length === 0
+      && clientHostOffenders("await writeFile(target, bytes)").length === 1
+      && clientHostOffenders('const text = readFile(path)').length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {
@@ -1141,6 +1302,42 @@ if (orphanKeys.length > 0) {
   // specs scan synthetic fixtures), and the whole-tree vacuum check above already owns the
   // "did anything get scanned at all" class.
   void clientFilesScanned
+}
+// N25/N26/N27/E1 (0.15): four more answers about the same client halves N24 walks. They are one
+// block on purpose — the rule family is "a browser half can only use what the platform gives it",
+// and splitting the walk four ways would scan the same files four times for one verdict each.
+{
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || SKIP.has(entry.name)) continue
+    const clientRoot = join(root, entry.name, 'src', 'client')
+    if (!existsSync(clientRoot)) continue
+    const walk = (dir) => {
+      for (const child of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, child.name)
+        if (child.isDirectory()) { walk(full); continue }
+        if (!/\.(ts|tsx)$/.test(child.name)) continue
+        const text = readFileSync(full, 'utf8')
+        const file = relative(root, full)
+        const scale = clientScaleLiterals(text)
+        if (scale.length > 0) {
+          violations.push(`client half draws a radius or a hairline it did not take from the scale (N25): ${file} — ${scale.slice(0, 4).join(' | ')} (use var(--evo-radius-*) / var(--evo-hairline-width))`)
+        }
+        const colour = interactionColourOffenders(text)
+        if (colour.length > 0) {
+          violations.push(`static rule borrows an interaction colour (N26): ${file} — ${colour.slice(0, 4).join(' | ')} (a state takes a layer or a label token)`)
+        }
+        const geometry = clientGeometryLiterals(text)
+        if (geometry.length > 0) {
+          violations.push(`client half writes geometry as a pixel literal (N27): ${file} — ${geometry.slice(0, 4).join(' | ')} (use var(--evo-space-*) / var(--evo-cap-*) / var(--evo-measure-read))`)
+        }
+        const host = clientHostOffenders(text)
+        if (host.length > 0) {
+          violations.push(`browser half reaches for the host runtime (N28/E1): ${file} — ${host.slice(0, 4).join(' | ')}`)
+        }
+      }
+    }
+    walk(clientRoot)
+  }
 }
 
 if (checkedCount === 0) {
