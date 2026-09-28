@@ -52,10 +52,29 @@ export type MarkdownRender =
 const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
 
 /**
+ * The renderer a module row carries, when it carries one.
+ *
+ * A React component type is NOT always a function: the platform's own `MarkdownText` is
+ * `memo(function MarkdownText …)`, and `memo` returns an OBJECT. A `typeof === 'function'` test
+ * therefore rejected the real renderer and silently degraded every view to its source — exactly
+ * what 0.14.0 shipped (measured on the installed panel 2026-09-28: `[预览]` and the rendered diff
+ * both fell back). The accepted domain is React's element-type domain: a function, or a non-null
+ * object it can mount. `tests/markdown.client.spec.ts` pins all four cases.
+ * @param row - what the client module table handed over.
+ * @returns the component, or undefined when the row carries none.
+ */
+export function rendererOf(row: { MarkdownText?: unknown }): MarkdownTextComponent | undefined {
+  const candidate = row.MarkdownText
+  if (typeof candidate === 'function') return candidate as MarkdownTextComponent
+  if (typeof candidate === 'object' && candidate !== null) return candidate as MarkdownTextComponent
+  return undefined
+}
+
+/**
  * The platform component, when this deployment's module table carries one.
  *
- * A module that IS reachable without the export is not a renderer: reporting a render for it would
- * move the failure into the render itself, where only the slot's error boundary would catch it.
+ * A row that IS reachable without a renderer is not a render: reporting one would move the failure
+ * into the render itself, where only the slot's error boundary would catch it.
  * @returns the component, or undefined when it cannot be reached.
  */
 function markdownText(): MarkdownTextComponent | undefined {
@@ -63,8 +82,7 @@ function markdownText(): MarkdownTextComponent | undefined {
     // The module table's copy, reached the way `react` is: the specifier cannot be imported as
     // source (see platform-ui.d.ts), and the loader's require is the only door to it.
     // oxlint-disable-next-line typescript/no-require-imports -- the client module table is reachable only through the loader's require
-    const row = require(PLATFORM_UI_MODULE) as { MarkdownText?: unknown }
-    return typeof row.MarkdownText === 'function' ? row.MarkdownText as MarkdownTextComponent : undefined
+    return rendererOf(require(PLATFORM_UI_MODULE) as { MarkdownText?: unknown })
   } catch {
     // No client-ui-primitives row in this deployment: stay quiet and let the caller fall back to
     // the source view rather than taking the panel down.
