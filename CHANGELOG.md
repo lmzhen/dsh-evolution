@@ -1,6 +1,19 @@
 # Changelog
 
 
+## 0.15.0 (minor) — 技能历史与设置卡的界面重整：行由 cell 决定、两面分离、家族尺度层与四条新门禁
+
+> **由来**：设计档 `dsh-evolution-ui-ux-gap-list.md` §14 的 W1–W23（分四层：缺陷／平台标准／布局力学／审美）＋ 遗留 E1／A8 ⇒ §15 架构方案与 §16 分组计划 G0–G6。这是**一次结构重整**，拆成多版会让「两面各留一半」的中间态长期存在，所以一次做完（实施记录见该档 §18）。
+> **L0 事实层（core）**：新增 `skill-row-cells.ts`——一行＝**有序 cell 列表**（`{key,slot,tone}` ＋ `copy` 键与值／`literal`），`slot∈{lead,meta,aside}`；`aside`（版本数、时间）右对齐且永不被省略号吃掉。W1 的根因是**拼接顺序**：原来 `描述 · 状态 · 时间` 拼成一行，真实技能库里每行的尾部都被裁掉。新增 `document-body.ts` 的 `displayBodyOf`（只在家族自己的 frontmatter 读取器认这块时才剥，失败开放）。
+> **L1 宿主面**：**客户端半不能 import core**（`build-client.mjs` 把 `@deepseek-ai/*` 全 external）⇒ cell 由宿主算好**随行下发**，`routes.ts` 的类型与客户端 `api.ts` 的形状互为约束；`/versions/body` 的 `text` 改为 **`display`**（frontmatter 已剥；精确字节仍在差异路由里）。
+> **L2a 尺度层**：`packages/scripts/client-tokens.json`＝九组 29 个 token（字号阶／间距阶／半径／发丝线／行宽／行距／语气／焦点环／容器上限）；`gen-client-tokens.mjs` 生成两份**字节相同**的 `src/client/tokens.ts`；`verify-client-tokens.mjs` 进 21 步门禁（第 22 步，生成物＝源 ＋ 引用必须被声明——这条当场抓到一次变量名不一致）。值有据：`radius.control=8px` 取平台自家 `ui-primitives/Input.module.css`，`280/260` 沿用现值，删掉了无出处的 420。
+> **L2b 面分离**：客户端半拆成 `atoms.ts`（`button`／`chip`／`note`／`icon`）＋`chrome.ts`（工具面：列表与动作）＋`document.ts`（阅读面：一个版本作为文档）＋`Panel.ts`（只剩状态机）；样式表按 `.evo-hist-*` / `.evo-doc-*` 两块前缀分开互不覆盖。
+> **用户可见的变化**：① 技能行的版本数与最近改动时间不会再被长描述挤掉，描述给整段、由 CSS 省略号裁、悬浮出全文；② 动作区不再离正文 ≈700px（行 `max-width: measure × 1.5`）；③ 控件有了词汇表——会做事的（有边框）／展开更多的（无边框＋自绘 V 形）／二选一的（无边框文字），**只有会写盘的那一击**是主色；④ 状态胶囊改用中性层，不再借交互色；⑤ 错误通知有容器与警示字形，不再只靠颜色；⑥ 预览是**文档**：有行宽、无卡片外壳、无内滚动（读者只碰到主列那一条滚动条），frontmatter 不再抢标题位；截断时说清「显示前 N 个字符（共 M 个）」；⑦ 设置卡不再随「对话内容字号」这个平台自家界面都不读的设置缩放，字段焦点环与面板统一；⑧ 说明段不再常驻首屏（只在右侧无内容可读时出现）。
+> **不动的（契约）**：`HISTORY_INDEX_VERSION` **不抬**（索引格式没改）；写通道仍只有 `curator.undo`；命令面保持纯文本；**不新增 npm 依赖、不建新包**；平台原语仍不静态 import（Markdown 仍是运行时接缝）。
+> **L3 门禁**：`verify-arch-guards.mjs` 新增 **N25**（半径／发丝线必须来自尺度）、**N26**（交互色只出现在交互能到达的选择器上）、**N27**（几何不得是裸像素，判据在 CSS 字符串上）、**N28**（浏览器半不 import node、不写盘），各带探针（故意违规实测 exit=1）。
+> **影响面**：**宿主半与客户端半都改**（行多带 `cells`、body 路由改字段） ⇒ 装机后**需要重启 dsh**，只刷新页面不够。
+> **验证**：`tsc -b tsconfig.host.json` 0；`oxlint packages/evolution` 0/0（301 文件）；门禁 **22/22 exit=0**（前缀 `g5a`，vitest-full 182 文件／1751 测试）；`verify-client-tokens --strict` ok（9 组 29 属性 28 引用 2 份相同）；真机复验与截图见 `dsh-evolution-0.15.0-release-record.md`。
+
 ## 0.14.1 (patch) — 热修：Markdown 渲染被自己的类型守卫挡掉了（预览与渲染差异退回源码）
 
 > **症状（真机实测，2026-09-28）**：面板的 `[预览]` 与差异视图的 `[渲染]` 都只显示**原始源码**（frontmatter 的 `---`、标题的 `#`、行内代码的反引号都原样可见），看不出任何 Markdown 渲染；宿主与客户端都是 0.14.0，两条只读路由都正常。

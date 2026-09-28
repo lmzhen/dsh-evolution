@@ -32,7 +32,7 @@ The props type is spelled the way the renderer derives it — `Omit<ParamCardFac
 
 ## Styling
 
-The design system's CSS is not exported to packages outside the platform repository, so this bundle carries its own stylesheet and injects it once behind a `<style data-plugin-css="…">` tag — the mechanism the platform's own client bundles use. Every rule reads a `--dsw-alias-*` design token, so light and dark follow the theme without a colour of our own, and the field metrics (12px padding, 6px gap, 13px label, 12px hint) copy the platform's settings fields.
+The card draws from the FAMILY's scale, not from magic numbers: `src/client/tokens.ts` is generated from `packages/scripts/client-tokens.json` (identical bytes in the history panel, which shares it), and its type steps are relative to the surface that hosts the card — `calc(1em - 2px)` for a hint, `calc(1em + 2px)` for the title — so the card no longer resizes itself with the `--dsh-content-font-size*` setting, which is documented as affecting conversation content only and which the platform's own surfaces never read. Fields take the family's single focus ring (`outline: var(--evo-focus-ring)`), the same one the history panel draws, instead of a recoloured border. The design system's CSS is not exported to packages outside the platform repository, so this bundle carries its own stylesheet and injects it once behind a `<style data-plugin-css="…">` tag — the mechanism the platform's own client bundles use. Every rule reads a `--dsw-alias-*` design token, so light and dark follow the theme without a colour of our own, and the field metrics (12px padding, 6px gap, 13px label, 12px hint) copy the platform's settings fields.
 
 ## Copy and locale
 
