@@ -1,6 +1,18 @@
 # Changelog
 
 
+## 0.15.2 (patch) — 复查调度：一条未结的通知决定「投不投」和「什么时候清零」
+
+> **由来**：界面批次收尾后，台账 §8 剩下的调度半（两消息＋标记残留）单独立项。旧实现是三处互相打补丁：队列里可以同时排多条复查提示（同 kind 就地 `replace`，还要补一个跟随唤醒桩）、计数窗口在**投递**时就清零（没跑成的复查也算跑过）、投递后按「下一个结束的回合」推断抑制（忙期里会认错回合）。三者是同一个事实的影子——平台自己就有那条队列，而插件没读它。
+> **机制（一句话）**：一条复查通知只有两种去向——被队列丢掉就立刻清零；被某个回合取走，就等那个回合结束再清零，而且那一段不再投第二条。
+> **A 记录**：新增 `src/review-notice.ts`：`{ messageId, turn }` 的状态机（纯函数，可脱宿主单测）。三条平台活事件接在插件级 `ctx.on`（`agent/inbox/inserted`／`claimed`／`discarded`；平台先例 `jobs/tool-jobs/src/index.ts:224`），按 `agent.session.id` 分键写进第十个 per-session 集合 `pendingReviewNotices`。`inserted`／`claimed` 认领（last wins），`discarded` 只结清「正是记录里那条」的通知。
+> **B 时钟**：清零从「投递成功」挪到「通知离队」：`discarded` 立刻结清；`claimed` 记下回合号，由那个回合的 `turn/end` 结清，且**那个回合不计入窗口**（它跑的正是我们自己的提示词，V7-02 的自我连锁由此堵住）。没有 `inbox` 的宿主没有任何队列事件可等 ⇒ 退回「投递即结清」（`delivery-no-inbox`）。
+> **C 闸门＋删三处**：`deliverMessage` 只对**复查提示**设闸——本会话已有未结通知时返回 `false`（调用方保留它的一次性闩锁，下一个边界再试），结果通知（`💾 Self-improvement review …`）照发。有了闸门，队列里至多一条，旧机制于是整段删掉：0.3.81 的「同 kind 就地替换」与它补的跟随唤醒桩、`(wake)` 摘要约定，以及 `skipNextCadenceFire` ＋ 它依赖的 `lastTurnStart` 表（per-session 集合 10 → 8；抑制改由「取走它的那个回合」直接识别，S2-9 的忙期误判与 PLAN-R2 的 `turns: 2` 计数一并消失）。
+> **D 兜底与可观测**：记录在内存、队列在盘上，判断同时读两边——重启后队列里还排着我那条，就按队列重建记录（否则会再排一条）；记录说「还在排队」而队列里已经没有它（事件漏过一次）就按 `queue-lost` 结清，闸门不会因一次丢事件永久关着。每次结清留一行归因：`discarded`／`turn-end`／`delivery-no-inbox`／`subagent-flush` 记 info，`queue-lost` 记 warn。
+> **不动的（契约）**：索引格式、写通道、命令面、依赖与包结构一律不动；不加参数、不加定时器、不做整卷 fold；结果通知通道不变。
+> **影响面**：**宿主半** ⇒ 装机后**需重启 dsh**，只刷新页面不够。
+> **验证**：`tsc -b tsconfig.host.json` 0；`oxlint packages/evolution` 0/0；`evolution-review` 109 测试全绿（新增 `outstanding-window.spec.ts` 7 例；删掉钉旧机制的 `inbox-replace-wake.spec.ts`／`cadence-suppression.spec.ts`，`lifecycle.spec.ts` 的 lastTurnStart 例随之退场）；门禁 **22/22 exit=0**（前缀 `rev2`）。
+
 ## 0.15.1 (patch) — 发布后复验发现的三条未落地项（W3／W10／W15）＋ 阅读面的渲染型 spec
 
 > **由来**：0.15.0 发布后拿 §16.2 的逐条映射去**代码里找落地物**（不是回看叙述），发现三条计划里已映射、代码里却没做：W3 组边界留白、W10 数字不等宽、W15 差异头仍在组件里拼分隔符。同时发现 **G4 的提交信息不实**——它声称新增 `document.client.spec.ts`，而那个文件当时并未落盘（同批一次编辑报错中止了整个程序，写在它后面的调用没跑），**0.15.0 的阅读面因此没有渲染型 spec**。
