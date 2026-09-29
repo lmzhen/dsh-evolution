@@ -23,7 +23,7 @@ import { collectReadSkillNames, evidenceKindIndex, installParamSection, paramNam
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
-import { noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
+import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
 // tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
@@ -267,8 +267,9 @@ interface InboxLike {
   readonly nextStep?: readonly PendingMessageLike[]
 }
 
-/** The parts of a pending `UserMessage` that identify where it came from. */
+/** The parts of a pending `UserMessage` the delivery path reads: its identity and its source. */
 interface PendingMessageLike {
+  readonly id: string
   readonly source?: { kind?: string; plugin?: string; form?: string; summary?: string }
 }
 
@@ -604,9 +605,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const settleNotice = async (
     sessionId: SessionId,
-    why: 'discarded' | 'turn-end' | 'delivery-no-inbox' | 'subagent-flush',
+    why: 'discarded' | 'turn-end' | 'delivery-no-inbox' | 'subagent-flush' | 'queue-lost',
   ): Promise<void> => {
     pendingReviewNotices.delete(sessionId)
+    // D 组（可观测）：每一次结清都留下归因——窗口什么时候重开、因为什么，是这条链路最难看出的
+    // 一件事。正常出口记 info；queue-lost 是「事件漏了一次」的异常，记 warn。
+    const settledLine = `dsh-evolution-review: the outstanding review notice settled (${why}) — the review window restarts`
+    if (why === 'queue-lost') ctx.logger.warn(settledLine)
+    else ctx.logger.info(settledLine)
     const stateService = ctx.get('evolutionState')
     try {
       await withReviewStateLock(sessionId, async () => {
@@ -979,6 +985,41 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const humanQueuedAhead = (inbox: InboxLike | undefined): boolean =>
     [...(inbox?.nextTurn ?? []), ...(inbox?.nextStep ?? [])].some(row => row.source?.kind === 'user')
 
+  /** The one pending row that is a notice of ours, if the host's queue holds one. */
+  const queuedNotice = (inbox: InboxLike | undefined): PendingMessageLike | undefined =>
+    [...(inbox?.nextTurn ?? []), ...(inbox?.nextStep ?? [])].find(row => isReviewNotice(row))
+
+  /**
+   * D 组（兜底）：is one of our notices still outstanding? The record is in-memory, the queue is
+   * durable, so the queue is read here as well — it is the only account that survives a restart or
+   * a mount that missed the live events.
+   *
+   * Two directions have to hold. A queue holding one of our notices with no record means the review
+   * is still waiting (rebuild the record; the `claimed`/`discarded`/`turn/end` pairing then works
+   * as usual). A record saying "still queued" while the queue no longer holds that message means the
+   * notice left without us seeing the event — settle it, or the gate would stay shut for good.
+   * @param sessionId - the session whose window is judged.
+   * @param inbox - the agent's pending-message view; without one the record is all there is.
+   * @returns true while this session must not be asked for another review.
+   */
+  const noticeIsOutstanding = (sessionId: SessionId, inbox: InboxLike | undefined): boolean => {
+    const record = pendingReviewNotices.get(sessionId)
+    const queued = queuedNotice(inbox)
+    if (record === undefined) {
+      if (queued === undefined) return false
+      pendingReviewNotices.set(sessionId, { messageId: queued.id, turn: null })
+      return true
+    }
+    // A claimed notice is outstanding until the turn that took it ends — the queue no longer holds
+    // it, so only the record can answer.
+    if (record.turn !== null) return true
+    if (queued !== undefined && queued.id === record.messageId) return true
+    void settleNotice(sessionId, 'queue-lost')
+    if (queued === undefined) return false
+    pendingReviewNotices.set(sessionId, { messageId: queued.id, turn: null })
+    return true
+  }
+
   /** Mark the delivered review prompt's session — unless human input is queued
    * ahead of it (see humanQueuedAhead). Says so once per mount: an unmarked
    * window silently downgrades that review's writes to foreground attribution. */
@@ -994,12 +1035,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   const deliverMessage = (agent: import('@deepseek-ai/dsh-agent').Agent, text: string, summary: string, reviewPrompt = false): boolean => {
-    // C 组（未结窗口）：本会话已经有一条未结的复查通知——队列里还排着它（`turn === null`），或者
-    // 取走它的那个回合还没结束——就不再投第二条。旧实现靠「同 kind 就就地替换」收敛重复，代价是
+    const wake = agent as { followup?: (message: unknown) => void }
+    const inbox = (agent as { inbox?: InboxLike }).inbox
+    // C 组（未结窗口）+ D 组（兜底）：本会话已经有一条未结的复查通知——队列里还排着它（`turn === null`），
+    // 或者取走它的那个回合还没结束——就不再投第二条。旧实现靠「同 kind 就就地替换」收敛重复，代价是
     // 被换掉的那条还要补一个唤醒桩；现在直接不投：那条还没跑完，接着再投只会让模型连着做两次复查。
-    // 返回 true ＝「已投递」：调用方的闩锁照常消费（这一段复查由那条未结的通知承担），队列不再增长。
-    // 只作用于复查提示：结果通知（Self-improvement review …）是另一回事，必须照发。
-    if (reviewPrompt && pendingReviewNotices.has(agent.session.id)) {
+    // 判断走 noticeIsOutstanding：记录缺失时按队列重建，队列里已经没有记录那条时按结清处理，闸门
+    // 因此不会因为一次漏掉的事件而永久关着。只作用于复查提示：结果通知是另一回事，必须照发。
+    if (reviewPrompt && noticeIsOutstanding(agent.session.id, inbox)) {
       if (!reviewNoticeOutstandingWarned) {
         reviewNoticeOutstandingWarned = true
         ctx.logger.warn('dsh-evolution-review: this session already has an outstanding review notice (still queued, or claimed by a turn that has not ended) — no second prompt is queued; the review runs when that one settles')
@@ -1012,8 +1055,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       content: [{ type: 'text', text }],
       source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary },
     })
-    const wake = agent as { followup?: (message: unknown) => void }
-    const inbox = (agent as { inbox?: InboxLike }).inbox
     // The wake primitive is called ON the agent: the platform Agent's
     // `followup` is a prototype method (`this.send(...)`), so a detached
     // reference loses its receiver. Bound arrow stubs in tests cannot show it.

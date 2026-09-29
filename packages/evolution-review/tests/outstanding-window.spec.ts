@@ -23,6 +23,8 @@ interface WindowFixture {
   rows: { turn: unknown[]; step: unknown[] }
   delivered: string[]
   scheduled: Array<{ kind?: string; channel?: string }>
+  /** Every `info`/`warn` line the plugin logged (the settle attributions). */
+  logs: string[]
   emitEnd: (turn: number) => void
   /** The driver claiming the head of next-turn, as the platform's `claim()` does. */
   claim: (turn: number) => void
@@ -31,12 +33,20 @@ interface WindowFixture {
   setMode: (mode: 'inject' | 'subagent') => void
 }
 
-async function mountWindow(): Promise<WindowFixture> {
+async function mountWindow(options: { seededTurn?: unknown[] } = {}): Promise<WindowFixture> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   const delivered: string[] = []
   const scheduled: Array<{ kind?: string; channel?: string }> = []
-  const rows: { turn: unknown[]; step: unknown[] } = { turn: [], step: [] }
+  const logs: string[] = []
+  const rows: { turn: unknown[]; step: unknown[] } = { turn: [...options.seededTurn ?? []], step: [] }
+  // The plugin logs the settle attribution at info (and the missed-event case at
+  // warn); the spy replaces the level so the suite stays quiet.
+  for (const level of ['info', 'warn'] as const) {
+    vi.spyOn(ctx.logger, level).mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(value => String(value)).join(' '))
+    })
+  }
   // Each emitted boundary must present a NEW tool call: the cadence fold reads
   // the session snapshot, so a static array would count once and never fire again.
   let currentTurn = 0
@@ -106,8 +116,45 @@ async function mountWindow(): Promise<WindowFixture> {
     const gone = [...rows.turn.splice(0), ...rows.step.splice(0)]
     for (const message of gone) emitQueue('agent/inbox/discarded', { message })
   }
-  return { rows, delivered, scheduled, emitEnd, claim, drop, setMode: (next) => { mode.current = next } }
+  return { rows, delivered, scheduled, logs, emitEnd, claim, drop, setMode: (next) => { mode.current = next } }
 }
+
+it('D: a record whose notice is gone from the queue settles (a lost event must not wedge the gate)', { timeout: 30_000 }, async () => {
+  const fixture = await mountWindow()
+  fixture.emitEnd(1)
+  await vi.waitFor(() => { expect(fixture.rows.turn).toHaveLength(1) })
+  // The row leaves the queue without its `discarded\` notification ever arriving
+  // (a dropped event, a host that went away mid-flight): the record still says
+  // "queued", and without this fallback the gate would never open again.
+  fixture.rows.turn.splice(0)
+  fixture.emitEnd(2)
+  await vi.waitFor(() => { expect(fixture.delivered).toHaveLength(2) })
+  expect(fixture.rows.turn).toHaveLength(1)
+  expect(fixture.logs.some(line => line.includes('(queue-lost)'))).toBe(true)
+})
+
+it('D: a restart rebuilds the record from the queue — a notice still queued is still outstanding', { timeout: 30_000 }, async () => {
+  // The shape a restart leaves behind: the queue is durable and still holds our
+  // notice, the plugin's in-memory record is gone (this mount never saw the
+  // `inserted\` notification). Without the rebuild the first boundary would queue
+  // a second copy.
+  const fixture = await mountWindow({
+    seededTurn: [{
+      id: 'restart-notice',
+      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review:combined' },
+    }],
+  })
+  fixture.emitEnd(1)
+  await new Promise(resolve => setTimeout(resolve, 200))
+  expect(fixture.delivered).toHaveLength(0)
+  expect(fixture.rows.turn).toHaveLength(1)
+  // The rebuilt record is a real one: claiming it and ending that turn settles it.
+  fixture.claim(4)
+  fixture.emitEnd(4)
+  await vi.waitFor(() => { expect(fixture.logs.some(line => line.includes('(turn-end)'))).toBe(true) })
+  fixture.emitEnd(5)
+  await vi.waitFor(() => { expect(fixture.delivered).toHaveLength(1) })
+})
 
 const promptRow = (fixture: WindowFixture): { id?: unknown; source?: { summary?: string } } =>
   fixture.rows.turn[0] as { id?: unknown; source?: { summary?: string } }
@@ -139,6 +186,7 @@ it('C: the queue dropping the notice reopens the window — the next boundary de
   // → splice(discardRemoved) → `agent/inbox/discarded`).
   fixture.drop()
   expect(fixture.rows.turn).toHaveLength(0)
+  expect(fixture.logs.some(line => line.includes('(discarded)'))).toBe(true)
   fixture.emitEnd(2)
   await vi.waitFor(() => { expect(fixture.delivered).toHaveLength(2) })
   expect(fixture.rows.turn).toHaveLength(1)
@@ -153,6 +201,7 @@ it('C: the turn that claims our notice is not counted, and the window reopens af
   // names the turn — no ordering heuristic is involved any more.
   fixture.claim(7)
   fixture.emitEnd(7)
+  await vi.waitFor(() => { expect(fixture.logs.some(line => line.includes('(turn-end)'))).toBe(true) })
   await new Promise(resolve => setTimeout(resolve, 200))
   expect(fixture.delivered).toHaveLength(1)
   expect(fixture.scheduled).toHaveLength(1)
@@ -189,6 +238,10 @@ it('C: a host without an inbox has no queue events to wait for — delivery stil
       memoryReviewModel: 'model-x', skillReviewModel: 'model-x',
     }),
   })
+  const logs: string[] = []
+  vi.spyOn(ctx.logger, 'info').mockImplementation((...args: unknown[]) => {
+    logs.push(args.map(value => String(value)).join(' '))
+  })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
   const emitEnd = (turn: number): void => {
     ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
@@ -197,6 +250,7 @@ it('C: a host without an inbox has no queue events to wait for — delivery stil
   await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
   // No queue ⇒ no claim/discard can ever arrive ⇒ the delivery itself closes the
   // window (the degradation the README documents): the next boundary delivers again.
+  expect(logs.some(line => line.includes('(delivery-no-inbox)'))).toBe(true)
   emitEnd(2)
   await vi.waitFor(() => { expect(delivered).toHaveLength(2) })
 })
@@ -216,4 +270,5 @@ it('C: the gate only guards review PROMPTS — a result notice still goes out wh
   await vi.waitFor(() => {
     expect(fixture.delivered.some(text => text.startsWith('💾 Self-improvement review:'))).toBe(true)
   }, { timeout: 15_000 })
+  expect(fixture.logs.some(line => line.includes('(subagent-flush)'))).toBe(true)
 })
