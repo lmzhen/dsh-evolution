@@ -133,6 +133,21 @@ it('D: a record whose notice is gone from the queue settles (a lost event must n
   expect(fixture.logs.some(line => line.includes('(queue-lost)'))).toBe(true)
 })
 
+it('D: a missed `turn/end` for the claiming turn still settles — a later end closes the window', { timeout: 30_000 }, async () => {
+  const fixture = await mountWindow()
+  fixture.emitEnd(1)
+  await vi.waitFor(() => { expect(fixture.rows.turn).toHaveLength(1) })
+  fixture.claim(4)
+  // Turn 4's own end never arrives. Turn numbers increase per session, so any
+  // later end proves that one already ended — without this the record would say
+  // "claimed by turn 4" for the rest of the process and the gate would stay shut.
+  fixture.emitEnd(5)
+  await vi.waitFor(() => { expect(fixture.logs.some(line => line.includes('(turn-end)'))).toBe(true) })
+  expect(fixture.delivered).toHaveLength(1)
+  fixture.emitEnd(6)
+  await vi.waitFor(() => { expect(fixture.delivered).toHaveLength(2) })
+})
+
 it('D: a restart rebuilds the record from the queue — a notice still queued is still outstanding', { timeout: 30_000 }, async () => {
   // The shape a restart leaves behind: the queue is durable and still holds our
   // notice, the plugin's in-memory record is gone (this mount never saw the

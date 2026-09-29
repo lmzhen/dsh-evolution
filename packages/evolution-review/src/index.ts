@@ -713,9 +713,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // 唯一的实质输入就是我们的提示词，interval=1 下再触发一次就是自我连锁），窗口在这个回合结束时
     // 重新开始（settle 清零）。另一个出口是「被队列丢弃」，在 foldNoticeEvent 里立刻结清。
     // 认的是那条消息本身（记录里的 turn 等于本回合号），不是「投递后第一个结束的回合」——忙期里
-    // 晚结束的旧回合因此不会误吞抑制（S2-9）。
+    // 晚结束的旧回合因此不会误吞抑制（S2-9）。回合号按会话递增，所以「本回合号已越过记录里那个」
+    // 只可能是那次 turn/end 没被我们看到：同样结清（宁可少算一个回合，也不能让闸门永久关着）。
     const outstanding = pendingReviewNotices.get(session.id)
-    const settlesHere = outstanding !== undefined && outstanding.turn !== null && outstanding.turn === event.data.turn
+    const settlesHere = outstanding !== undefined && outstanding.turn !== null && event.data.turn >= outstanding.turn
     let state: ReviewState = { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     // V24-04 (v24): the advanceReview result lives in a holder so the
     // control-flow analysis (which cannot see the lock-callback's assignment,
