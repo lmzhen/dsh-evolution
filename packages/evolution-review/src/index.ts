@@ -23,6 +23,7 @@ import { collectReadSkillNames, evidenceKindIndex, installParamSection, paramNam
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
+import { noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
 // tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
@@ -460,6 +461,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // cadence came due.
   const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, { afterTurn: number; turns?: number }>())
   const lastTurnStart = sessionState.add('lastTurnStart', new Map<SessionId, number>())
+  // A 组（未结窗口）：本会话唯一一条尚未结清的复查通知，以及取走它的回合号。三条 inbox 事件
+  // 维护它（inserted／claimed／discarded）；B 组才把「结清」接到计数清零上——本组只记录，
+  // 不改变任何投递与计数行为。
+  const pendingReviewNotices = sessionState.add('pendingReviewNotices', new Map<SessionId, ReviewNotice>())
   // V7-04 (0.3.42): the post-delivery counter reset may fail to persist (state
   // store IO failure) — delivery already happened, so warn once per session
   // about the repeat-review source instead of silently re-delivering forever.
@@ -609,6 +614,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       || skipNextCadenceFire.size >= COUNTER_SWEEP_THRESHOLD
       || cadenceResetWarned.size >= COUNTER_SWEEP_THRESHOLD
       || lastTurnStart.size >= COUNTER_SWEEP_THRESHOLD
+      || pendingReviewNotices.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
       sweepDeadSessionEntries(turnStarts, isAlive)
@@ -619,12 +625,41 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       sweepDeadSessionEntries(pendingCadenceWarned, isAlive)
       sweepDeadSessionEntries(skipNextCadenceFire, isAlive)
       sweepDeadSessionEntries(cadenceResetWarned, isAlive)
+      sweepDeadSessionEntries(pendingReviewNotices, isAlive)
       // S2.2 (v37): the review-channel marks are keyed by session as well — a
       // session with no live agent can never execute another write.
       sweepReviewChannelSessions(id => ctx.agents.get(SessionId(id)) !== undefined)
     }
     void onTurnEnd(session, event)
   })
+
+  /**
+   * Fold one inbox notification into the session's outstanding-notice record.
+   *
+   * The platform emits these on the agent scope (plain `ctx.on` receives every agent's, which is
+   * how the platform's own plugins consume them); the state machine lives in `review-notice.ts`,
+   * so this only routes the payload and keeps the sweep honest.
+   * @param kind - which notification arrived.
+   * @param payload - the agent, the message and (for a claim) the owning turn.
+   */
+  const foldNoticeEvent = (
+    kind: NoticeEventKind,
+    payload: {
+      agent: { session: { id: SessionId } }
+      message: NoticeMessage
+      turn?: number | undefined
+    },
+  ): void => {
+    const sessionId = payload.agent.session.id
+    const outcome = noticeAfter(pendingReviewNotices.get(sessionId), { kind, message: payload.message, turn: payload.turn })
+    if (outcome.notice === undefined) pendingReviewNotices.delete(sessionId)
+    else pendingReviewNotices.set(sessionId, outcome.notice)
+    // B 组：outcome.settled 在这里清零（本组刻意不接，保持零行为改变）。
+  }
+
+  ctx.on('agent/inbox/inserted', (payload) => { foldNoticeEvent('inserted', payload) })
+  ctx.on('agent/inbox/claimed', (payload) => { foldNoticeEvent('claimed', payload) })
+  ctx.on('agent/inbox/discarded', (payload) => { foldNoticeEvent('discarded', payload) })
 
   async function onTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
     // 0.3.18 (E-6): the listener is fire-and-forget (`void`), so EVERYTHING
