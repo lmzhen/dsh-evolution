@@ -20,8 +20,10 @@ it('every per-session collection in the plugin source is registered', () => {
   // The count is the tripwire: a new Map<SessionId, …> fails here until it is
   // registered (update the expectation together with the registration).
   expect(unregistered).toBe(0)
-  // A 组（未结窗口）把第九个集合加到第十个：pendingReviewNotices 也按同款在声明处注册。
-  expect(registered).toHaveLength(10)
+  // A 组（未结窗口）把集合数推到十个（pendingReviewNotices 同款在声明处注册）；C 组又把
+  // skipNextCadenceFire 与 lastTurnStart 两个集合删掉——抑制改由「取走它的回合」识别，不必再
+  // 按投递顺序记账——所以现在是八个。
+  expect(registered).toHaveLength(8)
 })
 
 it('the dispose hook delegates to the registry instead of hand-listing clears', () => {

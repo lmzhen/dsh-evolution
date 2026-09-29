@@ -98,11 +98,10 @@ describe('review channel mark (S2.2, v37 P1-2)', () => {
     // Human input is the platform's `{ kind: 'user' }` attestation.
     emitUserMessage({ kind: 'user' })
     expect(isReviewChannelSession(session.id)).toBe(false)
-    // A later review re-opens the window. The delivery woke the agent through
-    // `followup`, so the very next boundary is the V7-02 suppressed turn — the
-    // one after it delivers again.
+    // A later review re-opens the window. This fixture's agent has no `inbox`
+    // (no queue event can ever arrive), so each delivery settles the window
+    // itself and the very next boundary delivers again.
     emitEnd(2)
-    emitEnd(3)
     await vi.waitFor(() => { expect(delivered).toHaveLength(2) })
     expect(isReviewChannelSession(session.id)).toBe(true)
     clearReviewChannel(session.id)
@@ -152,7 +151,6 @@ describe('review channel mark (S2.2, v37 P1-2)', () => {
     expect(diagnostics).toHaveLength(1)
     // A later window repeats the decision but not the warning.
     emitEnd(2)
-    emitEnd(3)
     await vi.waitFor(() => { expect(delivered).toHaveLength(2) })
     expect(isReviewChannelSession(session.id)).toBe(false)
     expect(warnSpy.mock.calls.filter(call => String(call[0]).includes('BEHIND queued human input'))).toHaveLength(1)

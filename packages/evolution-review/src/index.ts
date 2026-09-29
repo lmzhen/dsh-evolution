@@ -255,45 +255,27 @@ interface MemoryLike {
 }
 
 /**
- * 0.3.81: the platform `Inbox` surface (public `Agent.inbox`,
- * `core/agent/src/runtime-types.ts`) used by the delivery path to COALESCE a
- * repeat of the same notice kind instead of queueing a second copy. A
- * structural view like the `*Like` family above: the pinned tree's own type is
- * not importable here, and every member stays optional so a host that lacks the
- * surface degrades to the plain append instead of throwing.
+ * S2-8 (FLOW1-3): the platform `Inbox` surface (public `Agent.inbox`,
+ * `core/agent/src/runtime-types.ts`) read by the delivery path to see whether
+ * HUMAN input is already queued ahead of the review prompt. A structural view
+ * like the `*Like` family above: the pinned tree's own type is not importable
+ * here, and every member stays optional so a host that lacks the surface
+ * degrades to the historical behavior instead of throwing.
  */
 interface InboxLike {
   readonly nextTurn?: readonly PendingMessageLike[]
   readonly nextStep?: readonly PendingMessageLike[]
-  /** Synchronous answer: was that row still pending (replaced) or already claimed (false)? */
-  replace?(messageId: unknown, message: unknown): boolean
 }
 
-/** The parts of a pending `UserMessage` that identify OUR notice and its kind. */
+/** The parts of a pending `UserMessage` that identify where it came from. */
 interface PendingMessageLike {
-  readonly id: unknown
   readonly source?: { kind?: string; plugin?: string; form?: string; summary?: string }
 }
 
 /**
- * Is this pending row our own notice of the SAME kind? `summary` is the kind
- * discriminator, so distinct notices (cadence review vs completion review vs
- * self-improvement) still queue side by side: a repeat of one kind replaces its
- * pending copy instead of adding a second.
- */
-function isSameKindPending(message: PendingMessageLike, summary: string): boolean {
-  const source = message.source
-  return source?.kind === 'plugin' && source.plugin === 'dsh-evolution-review'
-    && source.form === 'notice' && source.summary === summary
-}
-/**
- * v43 audit (P1-4 / FLOW1): the cadence summary MUST name the review kind.
- * The three cadence deliveries used to share the bare `auto-review` summary
- * while their prompts differ by kind (memory / skill / combined), so
- * `isSameKindPending` matched ACROSS kinds: a pending memory prompt was replaced
- * in place by a skill prompt — one kind silently lost, while the caller still
- * consumed the cadence latch and the deferred drain still emitted
- * `evolution/review-scheduled` as if both had been delivered.
+ * v43 audit (P1-4 / FLOW1): the cadence summary MUST name the review kind — it
+ * is what tells the three cadence deliveries apart (their prompts differ by
+ * kind: memory / skill / combined), both in the queue and in the session log.
  */
 const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
 
@@ -421,6 +403,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let statelessReviewStateWarned = false
   // S2-8 (FLOW1-3): the mark was withheld because human input was queued ahead.
   let channelMarkSuppressedWarned = false
+  // C 组（未结窗口）：闸门挡住一次投递时说一次就够 —— 任务期间每个边界都会被挡，逐次 warn 只会刷屏。
+  // 与 channelMarkSuppressedWarned 同款：每次挂载一条，不做 per-session 记账。
+  let reviewNoticeOutstandingWarned = false
   // Completion-channel state (E-59f): these two are deliberately NOT persisted
   // to ReviewState. A process restart resets the "session is proven-long"
   // counter and the "completion already injected" flag — which is ACCEPTED:
@@ -439,28 +424,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // fresh conversation boundary, and the deferred review is a light loss.
   const pendingCadenceReviews = sessionState.add('pendingCadenceReviews', new Map<SessionId, ReviewKind>())
   const pendingCadenceWarned = sessionState.add('pendingCadenceWarned', new Set<SessionId>())
-  // V7-02 (0.3.41): the waking delivery (followup) starts a NEW turn whose
-  // only substantive input is our own review prompt — with interval=1 that
-  // turn fires cadence again and re-delivers, an unbounded review loop. The
-  // delivered turn still accumulates (real user content arriving with it is
-  // not lost) but its cadence FIRE is suppressed; the next real turn
-  // re-arms normally. In-memory only: a restart clears the inbox queue, so
-  // the loop cannot survive it.
-  // S2-9 (FLOW1-5): the suppression belongs to the turn(s) the delivery
-  // WOKE, not to "whatever turn ends next". The platform's `turn/start` payload
-  // is only `{ turn }` (no message identity), so the available identity is
-  // ordering: a turn whose END lands after the delivery but whose START predates
-  // it is a busy-period turn and must not consume the suppression.
-  // PLAN-R2 P1-1 (2026-09-16): the value carries a `turns` counter — undefined
-  // keeps the historical single shot (the append path below), and the inbox-
-  // replace wake stub arms `turns: 2` because the platform claims ONE next-turn
-  // per driver round (agent-loop/src/inbox.ts:113), so the re-armed wake can
-  // produce TWO turns: the refreshed-prompt turn, then the stub turn appended
-  // behind it. The single entry used to be consumed by the first, leaving the
-  // stub's own 200+-char notice free to fire a whole extra review once the
-  // cadence came due.
-  const skipNextCadenceFire = sessionState.add('skipNextCadenceFire', new Map<SessionId, { afterTurn: number; turns?: number }>())
-  const lastTurnStart = sessionState.add('lastTurnStart', new Map<SessionId, number>())
+  // C 组（未结窗口）：投递后的「抑制接下来那个回合」表（skipNextCadenceFire）与它依赖的
+  // lastTurnStart 已删除。V7-02 要挡的是「我们自己的提示词唤起的那个回合」，而 pendingReviewNotices
+  // 直接带着「取走它的回合号」——按那条消息本身识别，不必从投递顺序去猜哪个回合结束算数
+  // （S2-9 的忙期误判与 PLAN-R2 的 `turns: 2` 计数随之一起消失）。
+
   // A 组（未结窗口）：本会话唯一一条尚未结清的复查通知，以及取走它的回合号。三条 inbox 事件
   // 维护它（inserted／claimed／discarded）；B 组才把「结清」接到计数清零上——本组只记录，
   // 不改变任何投递与计数行为。
@@ -582,7 +550,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // what no consumer can read.
     if (event.type === 'turn/start' && session.header.origin !== 'subagent') {
       turnStarts.set(session.id, session.seq - 1)
-      lastTurnStart.set(session.id, event.data.turn)
     }
     // S2.2 (v37): `{ kind: 'user' }` is the platform's attestation of human
     // input and ends the review window; plugin notices (our prompt included)
@@ -599,10 +566,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // in-process session-end hook to prune against (skill §15). Under size
     // pressure, drop entries whose agent is gone — they can never be read
     // again; live sessions keep their counters.
-    // PLAN S4.1 (2026-09-16, audit P2-10): `lastTurnStart` grows with every
-    // turn/start just like `turnStarts` (the two are set together at the top
-    // of this listener), so it joins both the trigger and the sweep list —
-    // without it the map grew unbounded while every sibling was pruned.
     // R2 (round-2 audit): pendingCadenceWarned is swept below but was not in
     // the trigger set — its entries lingered until another map crossed the
     // threshold.
@@ -611,19 +574,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
-      || skipNextCadenceFire.size >= COUNTER_SWEEP_THRESHOLD
       || cadenceResetWarned.size >= COUNTER_SWEEP_THRESHOLD
-      || lastTurnStart.size >= COUNTER_SWEEP_THRESHOLD
       || pendingReviewNotices.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
       sweepDeadSessionEntries(turnStarts, isAlive)
-      sweepDeadSessionEntries(lastTurnStart, isAlive)
       sweepDeadSessionEntries(cumulativeToolCalls, isAlive)
       sweepDeadSessionEntries(completionInjected, isAlive)
       sweepDeadSessionEntries(pendingCadenceReviews, isAlive)
       sweepDeadSessionEntries(pendingCadenceWarned, isAlive)
-      sweepDeadSessionEntries(skipNextCadenceFire, isAlive)
       sweepDeadSessionEntries(cadenceResetWarned, isAlive)
       sweepDeadSessionEntries(pendingReviewNotices, isAlive)
       // S2.2 (v37): the review-channel marks are keyed by session as well — a
@@ -744,27 +703,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // full pipeline serialization it only covers the state RMW, so fold
     // windows and review timing are unchanged.
     const snapshot = policy()
-    // V7-02: a turn woken by our own followup still accumulates (any real
-    // user content arriving with it stays in the window) but cannot fire —
-    // its review prompt alone must not re-trigger cadence with interval=1.
-    // S2-9 (FLOW1-5): consume only when the ENDING turn started after the
-    // delivery. A turn that started earlier and merely finishes late is the
-    // busy-period case: consuming there left the woken turn unsuppressed (a
-    // second review prompt under interval=1). `afterTurn` stays -1 on a host
-    // that never emits turn/start, which keeps the previous behavior exactly.
-    // PLAN-R2 P1-1 (2026-09-16): a hit decrements the `turns` counter instead
-    // of deleting outright — undefined (append path) still deletes on the
-    // FIRST hit, `turns: 2` (replace wake) survives it so the second woken
-    // turn (the stub) is suppressed too; the entry is deleted once the
-    // counter runs out.
-    const suppression = skipNextCadenceFire.get(session.id)
-    const skipFire = suppression !== undefined && event.data.turn > suppression.afterTurn
-    if (skipFire) {
-      if (suppression.turns === undefined || suppression.turns <= 1) skipNextCadenceFire.delete(session.id)
-      else skipNextCadenceFire.set(session.id, { afterTurn: suppression.afterTurn, turns: suppression.turns - 1 })
-    }
-    // B 组（未结窗口）：取走本插件通知的那个回合不计数——它跑的是我们自己的复查；窗口在这个回合
-    // 结束时重新开始（settle 清零）。另一个出口是「被队列丢弃」，在 foldNoticeEvent 里立刻结清。
+    // B 组（未结窗口）：取走本插件通知的那个回合不计数——它跑的是我们自己的复查（V7-02：那种回合
+    // 唯一的实质输入就是我们的提示词，interval=1 下再触发一次就是自我连锁），窗口在这个回合结束时
+    // 重新开始（settle 清零）。另一个出口是「被队列丢弃」，在 foldNoticeEvent 里立刻结清。
+    // 认的是那条消息本身（记录里的 turn 等于本回合号），不是「投递后第一个结束的回合」——忙期里
+    // 晚结束的旧回合因此不会误吞抑制（S2-9）。
     const outstanding = pendingReviewNotices.get(session.id)
     const settlesHere = outstanding !== undefined && outstanding.turn !== null && outstanding.turn === event.data.turn
     let state: ReviewState = { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
@@ -794,7 +737,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       })
       await stateService?.saveReviewState(session.id, state)
     })
-    const kind = skipFire ? null : advanced.kind
+    const kind = advanced.kind
     // Cumulative tool-call counter updates on EVERY turn/end — including turns
     // that fired a cadence review — so the completion channel's long-session
     // gate reflects the whole conversation, not only cadence-free turns.
@@ -934,10 +877,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
       return
     }
-    // B-3 (v18): a turn woken by our own followup suppresses the cadence
-    // fire above; it must not fall through to the completion channel either
-    // (the same double-review boundary the V10-13 guard protects).
-    if (skipFire) return
+    // B-3 (v18) 在未结窗口下的等价形式：取走我们那条通知的回合既不 fire 节奏通道（上面走的是
+    // settle 分支，advance 根本没跑），也不许落到完成通道——那是 V10-13 保护的同一个「一处边界
+    // 两次复查」。
+    if (settlesHere) return
     // Cadence waited; the completion channel fires once per session after a
     // task the conversation has proven long (cumulative tool-call threshold),
     // so short conversations are never adapted to at the cost of long ones.
@@ -1051,90 +994,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   const deliverMessage = (agent: import('@deepseek-ai/dsh-agent').Agent, text: string, summary: string, reviewPrompt = false): boolean => {
+    // C 组（未结窗口）：本会话已经有一条未结的复查通知——队列里还排着它（`turn === null`），或者
+    // 取走它的那个回合还没结束——就不再投第二条。旧实现靠「同 kind 就就地替换」收敛重复，代价是
+    // 被换掉的那条还要补一个唤醒桩；现在直接不投：那条还没跑完，接着再投只会让模型连着做两次复查。
+    // 返回 true ＝「已投递」：调用方的闩锁照常消费（这一段复查由那条未结的通知承担），队列不再增长。
+    // 只作用于复查提示：结果通知（Self-improvement review …）是另一回事，必须照发。
+    if (reviewPrompt && pendingReviewNotices.has(agent.session.id)) {
+      if (!reviewNoticeOutstandingWarned) {
+        reviewNoticeOutstandingWarned = true
+        ctx.logger.warn('dsh-evolution-review: this session already has an outstanding review notice (still queued, or claimed by a turn that has not ended) — no second prompt is queued; the review runs when that one settles')
+      }
+      // false ＝「这次什么都没排」：调用方据此回滚它的一次性闩锁/完成标记（true 会让它以为投递成功，
+      // 于是立刻再 emit 一次 review-scheduled，把一次复查记成 N 次）。等那条通知结清后的下一个边界再投。
+      return false
+    }
     const message = createUserMessage({
       content: [{ type: 'text', text }],
       source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary },
     })
-    // 0.3.81 (queue hygiene): a long queue can already hold OUR notice of this
-    // kind — a cadence prompt delivered while the session sits idle, then again
-    // on the next boundary, used to append a second identical request. The
-    // platform exposes the two pending lists and `replace(id, message)`, whose
-    // boolean answers "was that row still pending?" synchronously — so the
-    // repeat is swapped IN PLACE. The check-and-replace pair is synchronous (no
-    // await between), so a row cannot be claimed in between.
-    // The key is the KIND (plugin+form+summary): different notices still queue
-    // separately, and every unexpected shape — a host without `inbox`, a row
-    // already claimed by the loop, a throwing accessor — falls through to the
-    // delivery below. Coalescing can therefore only ever REPLACE a pending copy;
-    // it can never turn into a dropped delivery.
-    // PLAN S4.1 (2026-09-16, audit P2-11): the queue a row sits in IS the
-    // record of its original delivery channel — `followup` queues `next-turn`
-    // and wakes the driver, `inject` queues `next-step` and never wakes
-    // (agent-loop `send`/`followup`/`inject`). A wake is part of the delivery
-    // semantics, so a `true` return from THIS path must keep the CHANNEL
-    // contract of the row it replaces; that is the invariant the callers'
-    // latch/cadence-reset consumption is written against:
-    // - a superseded `next-turn` (waking) row is re-armed with a fresh minimal
-    //   followup wake referencing the in-place prompt — the wake is idempotent
-    //   while the original is still outstanding, and it RESCUES a row orphaned
-    //   without its wake (e.g. by a keepInbox cancel). The stub is a NEW
-    //   message because re-queuing the replaced object would collide with the
-    //   row the platform just swapped in (duplicate pending ids are rejected);
-    //   the two turns this wake can produce (the refreshed prompt claimed
-    //   first, then the stub) have their cadence fires suppressed via
-    //   `turns: 2` (PLAN-R2 P1-1, 2026-09-16), while the append path below
-    //   keeps its single one-shot. The stub's summary is suffixed so it never
-    //   becomes a coalescing target itself.
-    // - a superseded `next-step` (inject) row keeps the no-wake return: that
-    //   is exactly the documented inject bound (README, "Known Limitations" —
-    //   a pending prompt may wait for the next real user input), so the
-    //   caller's latch consumption stays truthful for that channel.
-    // With this, every `true` this function returns means "the queue holds a
-    // prompt as consumable as the channel that originally queued it", and a
-    // wake that cannot be re-armed never silently downgrades a waking delivery.
     const wake = agent as { followup?: (message: unknown) => void }
     const inbox = (agent as { inbox?: InboxLike }).inbox
-    if (inbox !== undefined && typeof inbox.replace === 'function') {
-      try {
-        const supersededTurnRow = (inbox.nextTurn ?? []).find(row => isSameKindPending(row, summary))
-        const superseded = supersededTurnRow
-          ?? (inbox.nextStep ?? []).find(row => isSameKindPending(row, summary))
-        if (superseded !== undefined && inbox.replace(superseded.id, message)) {
-          // The delivery DID happen (the queued row now carries the current
-          // prompt), so the caller's latch is consumed exactly as on the append
-          // path.
-          if (reviewPrompt) markReviewChannelForDelivery(agent, inbox)
-          if (supersededTurnRow !== undefined && typeof wake.followup === 'function') {
-            // P2-11: the replaced row entered through the WAKING channel —
-            // re-arm the wake (see the channel contract above).
-            wake.followup(createUserMessage({
-              content: [{ type: 'text', text: `[${summary}] the queued prompt ahead of this notice was refreshed in place; that copy is the current request. If this notice reaches a turn on its own, the review turn already ran — no action is needed.` }],
-              source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: `${summary} (wake)` },
-            }))
-            // V7-02: the two turns this wake can produce (the refreshed
-            // prompt claimed first, then the stub appended behind it) must
-            // not re-trigger the cadence they were woken by.
-            // PLAN-R2 P1-1 (2026-09-16): `turns: 2` — the single entry the
-            // append path arms was consumed by the refreshed-prompt turn
-            // (one next-turn claim per driver round), leaving the stub turn
-            // free to fire a whole extra review when the cadence came due.
-            skipNextCadenceFire.set(agent.session.id, { afterTurn: lastTurnStart.get(agent.session.id) ?? -1, turns: 2 })
-          }
-          return true
-        }
-      } catch (error) {
-        ctx.logger.warn(`dsh-evolution-review: inbox coalescing failed (${error instanceof Error ? error.message : String(error)}) — delivering a fresh message instead`)
-      }
-    }
     // The wake primitive is called ON the agent: the platform Agent's
     // `followup` is a prototype method (`this.send(...)`), so a detached
     // reference loses its receiver. Bound arrow stubs in tests cannot show it.
     try {
       if (params().reviewWakeInject && typeof wake.followup === 'function') {
         wake.followup(message)
-        // V7-02: the waking turn's cadence fire is suppressed once (its own
-        // review prompt must not re-trigger a review with interval=1).
-        skipNextCadenceFire.set(agent.session.id, { afterTurn: lastTurnStart.get(agent.session.id) ?? -1 })
       } else agent.inject(message)
       // S2.2 (v37): a review PROMPT makes this session the autonomous review
       // channel (a result notice does not — nothing acts on it); the mark is

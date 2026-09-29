@@ -466,14 +466,11 @@ describe('evolution-review', () => {
     emitEnd(2)
     await vi.waitFor(() => { expect(starts).toBe(1) }) // flush: first run aborts
     await vi.waitFor(() => { expect(disposed).toBe(1) })
-    // 0.3.41 (V7-02): the failed spawn fell back to a WAKING delivery — the
-    // woken turn is cadence-suppressed once, so this (artificially sent)
-    // turn does not spawn either. The single-flight guard HAS reset; the
-    // next REAL turn below spawns again.
+    // The single-flight guard HAS reset. This fixture's agent has no `inbox`
+    // (no queue event can arrive), so the fallback prompt settled its window at
+    // delivery and the next boundary is a fresh one — it spawns again, which is
+    // exactly the flag this case is about.
     emitEnd(3)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(starts).toBe(1)
-    emitEnd(4)
     await vi.waitFor(() => { expect(starts).toBe(2) }) // next flush: second run succeeds
     expect(disposed).toBe(2)
   })
@@ -500,10 +497,15 @@ async function mountReviewFixture(options: {
    * empty, which keeps the substantive gate (user/assistant chars) at zero; pass
    * role/content entries to exercise the DEFAULT thresholds without a policy. */
   surface?: Array<{ role: string; content: Array<{ type: string; text: string }> }>
-  /** 0.3.81: the platform `Agent.inbox` view. Supplying one exercises the
-   * coalescing step; the default agent has NO `inbox` at all (the older-host /
-   * degradation shape every other case in this suite already runs through). */
-  inbox?: unknown
+  /** The platform `Agent.inbox` view (the pending-message queue). The default
+   * agent has NO `inbox` at all — the degradation shape every other case in this
+   * suite runs through (there the window settles at delivery, because no queue
+   * event can ever arrive). */
+  queue?: unknown
+  /** The faithful-host shape: every delivery announces itself on the queue's
+   * live event (`agent/inbox/inserted`), which is what the outstanding-notice
+   * record is built from. Off by default — the bare stub above queues nothing. */
+  announceInserted?: boolean
   /** Batch D: the session's plan-time seq (`sessionSeqAtPlanTime = seq - 1`), and the only
    * way a case can cite an evidence seq at all. Default 1 — the shape every other case uses. */
   seq?: number
@@ -541,7 +543,14 @@ async function mountReviewFixture(options: {
     ],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => options.surface ?? [],
   } as unknown as Session
+  // The platform's live queue events, emitted through the plugin's ctx exactly
+  // as the agent loop does (inbox.ts mutate(): inserted for the new row,
+  // claimed when a boundary takes it, discarded when the queue drops it).
+  const emitInbox = (event: 'agent/inbox/inserted' | 'agent/inbox/claimed' | 'agent/inbox/discarded', payload: unknown): void => {
+    ;(ctx.emit as (name: string, data: unknown) => void)(event, payload)
+  }
   const record = (kind: 'inject' | 'followup', message: unknown): void => {
+    if (options.announceInserted === true) emitInbox('agent/inbox/inserted', { message })
     if (kind === 'followup' && options.onFollowup) options.onFollowup(message)
     else options.onInject?.(message)
   }
@@ -565,13 +574,13 @@ async function mountReviewFixture(options: {
       else options.onInject?.(message)
     }
   }
-  if (options.inbox !== undefined) (agent as { inbox: unknown }).inbox = options.inbox
+  if (options.queue !== undefined) (agent as { inbox: unknown }).inbox = options.queue
   ctx.agents.register(agent)
   const releaseStart: { current: (() => void) | undefined } = { current: undefined }
   const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
     ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: reasonKind } } } as never)
   }
-  return { ctx, session, emitEnd, releaseStart, stateBox }
+  return { ctx, session, emitEnd, emitInbox, releaseStart, stateBox }
 }
 
 /** A policy fake whose low thresholds make the single skill tool/call substantive. */
@@ -836,61 +845,14 @@ it('0.3.73: a refused wake delivery is not consumed — the review retries at th
   expect(followed).toHaveLength(1)
 })
 
-/** 0.3.81: a pending row shaped the way the platform's Inbox holds one. */
-const pendingRow = (id: string, summary: string, plugin = 'dsh-evolution-review'): unknown => ({
-  id,
-  source: { kind: 'plugin', plugin, form: 'notice', summary },
-})
-
-it('0.3.81: a repeat of the same notice kind REPLACES the pending row instead of queueing a second', async () => {
-  const replaced: Array<{ id: unknown; text: string }> = []
-  const followed: unknown[] = []
-  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
-    stateful: true,
-    onFollowup: message => followed.push(message),
-    inbox: {
-      // v43 P1-4: the summary now NAMES the kind. This fixture crosses BOTH
-      // intervals on one substantive turn, so its cadence kind is 'combined'.
-      nextTurn: [pendingRow('pending-1', 'auto-review:combined')],
-      nextStep: [pendingRow('pending-2', 'auto-review:combined')],
-      replace: (id: unknown, message: { content: Array<{ text?: string }> }) => {
-        replaced.push({ id, text: message.content.map(part => part.text ?? '').join('') })
-        return true
-      },
-    },
-  })
-  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
-  emitEnd(1)
-  await vi.waitFor(() => { expect(replaced).toHaveLength(1) })
-  // The FIRST pending row of our kind is the one swapped in place (nextTurn is
-  // read before nextStep) and the swapped body is this delivery's prompt.
-  const [swapped] = replaced
-  expect(swapped?.id).toBe('pending-1')
-  expect((swapped?.text ?? '').length).toBeGreaterThan(0)
-  // PLAN S4.1 (2026-09-16, P2-11): nothing PROMPT-shaped was appended — the
-  // repeat is still swapped in place, not queued twice — but the superseded
-  // row entered through the WAKING (next-turn) channel, so the swap is
-  // followed by exactly one fresh followup wake referencing the in-place
-  // prompt. The stub's summary is suffixed so it never becomes a coalescing
-  // target, and its body is not a second review request.
-  expect(followed).toHaveLength(1)
-  const stub = followed[0] as { source?: { summary?: string }; content?: Array<{ text?: string }> }
-  expect(stub.source?.summary).toBe('auto-review:combined (wake)')
-  expect(stub.content?.[0]?.text ?? '').toContain('refreshed in place')
-  // B 组：窗口不再由「投递」驱动 —— 在有 inbox 的宿主上，它要等这条通知被丢掉、或取走它的那个
-  // 回合结束才重新开始，所以这里不再断言投递后计数归零（两条新用例覆盖新时钟）。
-  // C 组会整段删掉「替换＋唤醒桩」这条路径：闸门保证队列里至多一条，没有东西可替换。
-  expect(stateBox.current).not.toBeNull()
-})
-
 it('B: the window restarts when the turn that claimed the notice ends — and that turn does not count', async () => {
   const delivered: Array<{ id: string }> = []
-  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+  const { ctx, emitEnd, emitInbox, stateBox } = await mountReviewFixture({
     stateful: true,
     onFollowup: message => delivered.push(message as { id: string }),
-    // 有 inbox 的宿主：投递不再结清，窗口交给队列事件（fixture 的 inbox 是桩，不发事件）。
-    inbox: { nextTurn: [], nextStep: [], replace: () => false },
+    // 有 inbox 的宿主：投递不再结清，窗口交给队列事件（fixture announceInserted 发 inserted）。
+    queue: { nextTurn: [], nextStep: [] },
+    announceInserted: true,
   })
   ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
@@ -899,7 +861,7 @@ it('B: the window restarts when the turn that claimed the notice ends — and th
   const notice = delivered[0]!
   const agent = { session: { id: SessionId('e19-fixture-session') } }
   // 平台先报「被回合 2 取走」，再报「回合 2 结束」。
-  ctx.emit('agent/inbox/claimed' as never, { agent, message: notice, turn: 2 } as never)
+  emitInbox('agent/inbox/claimed', { agent, message: notice, turn: 2 })
   emitEnd(2)
   await vi.waitFor(() => {
     const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
@@ -912,10 +874,11 @@ it('B: the window restarts when the turn that claimed the notice ends — and th
 
 it('B: a notice the queue drops settles immediately, without waiting for a turn', async () => {
   const delivered: Array<{ id: string }> = []
-  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+  const { ctx, emitEnd, emitInbox, stateBox } = await mountReviewFixture({
     stateful: true,
     onFollowup: message => delivered.push(message as { id: string }),
-    inbox: { nextTurn: [], nextStep: [], replace: () => false },
+    queue: { nextTurn: [], nextStep: [] },
+    announceInserted: true,
   })
   ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
@@ -923,58 +886,10 @@ it('B: a notice the queue drops settles immediately, without waiting for a turn'
   await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
   const before = stateBox.current as { turnsSinceMemory: number }
   expect(before.turnsSinceMemory).toBeGreaterThan(0) // 投递本身不再清零（B 组的分界）
-  ctx.emit('agent/inbox/discarded' as never, { agent: { session: { id: SessionId('e19-fixture-session') } }, message: delivered[0] } as never)
+  emitInbox('agent/inbox/discarded', { agent: { session: { id: SessionId('e19-fixture-session') } }, message: delivered[0] })
   await vi.waitFor(() => {
     expect((stateBox.current as { turnsSinceMemory: number }).turnsSinceMemory).toBe(0)
   })
-})
-
-it('0.3.81: only the SAME kind coalesces — another notice or another plugin still queues', async () => {
-  const replaced: unknown[] = []
-  const followed: unknown[] = []
-  const { ctx, emitEnd } = await mountReviewFixture({
-    stateful: true,
-    onFollowup: message => followed.push(message),
-    inbox: {
-      // Same plugin but a DIFFERENT kind ('memory' while the delivery is
-      // 'combined') — the v43 P1-4 regression: a pre-fix build replaced this
-      // row in place and the memory review was silently lost. A foreign plugin
-      // carrying the SAME summary must be ignored too.
-      nextTurn: [pendingRow('pending-other-kind', 'auto-review:memory')],
-      nextStep: [pendingRow('pending-foreign', 'auto-review:combined', 'someone-else')],
-      replace: (id: unknown) => { replaced.push(id); return true },
-    },
-  })
-  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
-  emitEnd(1)
-  await vi.waitFor(() => { expect(followed).toHaveLength(1) })
-  // Nothing was replaced: the memory-kind row is still pending, untouched.
-  expect(replaced).toHaveLength(0)
-  const delivered = followed[0] as { source?: { summary?: string } }
-  expect(delivered.source?.summary).toBe('auto-review:combined')
-})
-
-it('0.3.81: a refused coalesce (row already claimed) degrades to a fresh delivery', async () => {
-  const replaced: unknown[] = []
-  const followed: unknown[] = []
-  const { ctx, emitEnd } = await mountReviewFixture({
-    stateful: true,
-    onFollowup: message => followed.push(message),
-    inbox: {
-      nextTurn: [pendingRow('pending-1', 'auto-review:combined')],
-      nextStep: [],
-      // The platform answers false when the row is no longer pending (the loop
-      // claimed it between our read and the replace) — the delivery must NOT be
-      // dropped in that case.
-      replace: (id: unknown) => { replaced.push(id); return false },
-    },
-  })
-  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
-  emitEnd(1)
-  await vi.waitFor(() => { expect(followed).toHaveLength(1) })
-  expect(replaced).toEqual(['pending-1'])
 })
 
 it('0.3.45: the review output schema stays inside the raw JSON-Schema type whitelist (V8-01)', () => {
@@ -995,38 +910,6 @@ it('0.3.45: the review output schema stays inside the raw JSON-Schema type white
     }
   }
   visit(REVIEW_OUTPUT_SCHEMA)
-})
-
-it('0.3.41: interval=1 waking delivery cannot self-drive — the injected wake turn fires once suppressed (V7-02)', async () => {
-  const deliveries: string[] = []
-  const { ctx, emitEnd } = await mountReviewFixture({
-    stateful: true,
-    onInject: (message) => {
-      const box = message as { content?: Array<{ type: string; text: string }> } | null
-      deliveries.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
-    },
-  })
-  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-  await ctx.plugin(Review, {
-    reviewEnabled: true,
-    memoryInterval: 1,
-    skillInterval: 1,
-    reviewMode: 'inject',
-  })
-  const settle = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 20)) }
-  // turn1 (real turn): threshold fires (first ever) → exactly one delivery,
-  // and the followup marks the woken turn for one-shot fire suppression.
-  emitEnd(1); await settle()
-  expect(deliveries).toHaveLength(1)
-  // turn2 (the woken turn): without V7-02 its own cadence would fire again
-  // (interval=1, its review prompt alone is substantive) and deliver a second
-  // copy — an unbounded review loop. The suppression must keep it at one.
-  emitEnd(2); await settle()
-  expect(deliveries).toHaveLength(1)
-  // turn3 (the next REAL turn): a new threshold crossing delivers again — the
-  // suppression is one-shot, normal cadence activity is not starved.
-  emitEnd(3); await settle()
-  expect(deliveries).toHaveLength(2)
 })
 
 it('0.3.48: a completing-turn cross of the second threshold delivers the combined review, not the stale latch (V8-04)', async () => {
