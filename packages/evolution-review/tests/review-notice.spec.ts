@@ -49,9 +49,10 @@ describe('one outstanding review notice per session (A)', () => {
       .toEqual({ notice: current, settled: false })
     expect(noticeAfter(current, { kind: 'discarded', message: ours('m2') }))
       .toEqual({ notice: undefined, settled: true })
-    // Nothing tracked, nothing to settle: a restart plus a cancel must stay a no-op.
+    // Nothing tracked: this discard is about a notice whose `inserted` we never saw (late mount) —
+    // it must settle too, or that window would never restart.
     expect(noticeAfter(undefined, { kind: 'discarded', message: ours('m2') }))
-      .toEqual({ notice: undefined, settled: false })
+      .toEqual({ notice: undefined, settled: true })
   })
 
   it('keeps a steered notice outstanding: remove and reinsert are one gesture', () => {

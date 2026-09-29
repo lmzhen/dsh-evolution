@@ -878,11 +878,55 @@ it('0.3.81: a repeat of the same notice kind REPLACES the pending row instead of
   const stub = followed[0] as { source?: { summary?: string }; content?: Array<{ text?: string }> }
   expect(stub.source?.summary).toBe('auto-review:combined (wake)')
   expect(stub.content?.[0]?.text ?? '').toContain('refreshed in place')
-  // A coalesced delivery DID happen, so the caller's latch is consumed exactly
-  // as on the append path.
-  const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
-  expect(saved.turnsSinceMemory).toBe(0)
-  expect(saved.turnsSinceSkill).toBe(0)
+  // B 组：窗口不再由「投递」驱动 —— 在有 inbox 的宿主上，它要等这条通知被丢掉、或取走它的那个
+  // 回合结束才重新开始，所以这里不再断言投递后计数归零（两条新用例覆盖新时钟）。
+  // C 组会整段删掉「替换＋唤醒桩」这条路径：闸门保证队列里至多一条，没有东西可替换。
+  expect(stateBox.current).not.toBeNull()
+})
+
+it('B: the window restarts when the turn that claimed the notice ends — and that turn does not count', async () => {
+  const delivered: Array<{ id: string }> = []
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    onFollowup: message => delivered.push(message as { id: string }),
+    // 有 inbox 的宿主：投递不再结清，窗口交给队列事件（fixture 的 inbox 是桩，不发事件）。
+    inbox: { nextTurn: [], nextStep: [], replace: () => false },
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
+  const notice = delivered[0]!
+  const agent = { session: { id: SessionId('e19-fixture-session') } }
+  // 平台先报「被回合 2 取走」，再报「回合 2 结束」。
+  ctx.emit('agent/inbox/claimed' as never, { agent, message: notice, turn: 2 } as never)
+  emitEnd(2)
+  await vi.waitFor(() => {
+    const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
+    expect(saved.turnsSinceMemory).toBe(0)
+    expect(saved.turnsSinceSkill).toBe(0)
+  })
+  // 取走它的那个回合不计数 ⇒ 它不会自己触发下一次投递（旧实现的自我连锁在这里被堵住）。
+  expect(delivered).toHaveLength(1)
+})
+
+it('B: a notice the queue drops settles immediately, without waiting for a turn', async () => {
+  const delivered: Array<{ id: string }> = []
+  const { ctx, emitEnd, stateBox } = await mountReviewFixture({
+    stateful: true,
+    onFollowup: message => delivered.push(message as { id: string }),
+    inbox: { nextTurn: [], nextStep: [], replace: () => false },
+  })
+  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMode: 'inject' }) })
+  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
+  emitEnd(1)
+  await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
+  const before = stateBox.current as { turnsSinceMemory: number }
+  expect(before.turnsSinceMemory).toBeGreaterThan(0) // 投递本身不再清零（B 组的分界）
+  ctx.emit('agent/inbox/discarded' as never, { agent: { session: { id: SessionId('e19-fixture-session') } }, message: delivered[0] } as never)
+  await vi.waitFor(() => {
+    expect((stateBox.current as { turnsSinceMemory: number }).turnsSinceMemory).toBe(0)
+  })
 })
 
 it('0.3.81: only the SAME kind coalesces — another notice or another plugin still queues', async () => {
@@ -1041,9 +1085,13 @@ it('0.3.48: a throwing review-scheduled listener cannot skip the counter reset (
   emitEnd(1, 'blocked')
   emitEnd(2) // flush: subagent succeeds → schedule emit throws → protection domain
   await vi.waitFor(() => { expect(delivered).toHaveLength(1) }) // the result notice still lands
-  const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
-  expect(saved.turnsSinceMemory).toBe(0) // reset NOT skipped by the throwing listener
-  expect(saved.turnsSinceSkill).toBe(0)
+  // B 组：清零是「结清」的后果（无 inbox 的宿主上＝投递即结清），并且是异步的 —— 等它落地。
+  // 断言不变：抛错的监听者不能把清零跳掉。
+  await vi.waitFor(() => {
+    const saved = stateBox.current as { turnsSinceMemory: number; turnsSinceSkill: number }
+    expect(saved.turnsSinceMemory).toBe(0)
+    expect(saved.turnsSinceSkill).toBe(0)
+  })
   expect(warnSpy.mock.calls.some(([message]) => String(message).includes('review-scheduled emit failed'))).toBe(true)
 })
 
@@ -1089,7 +1137,7 @@ it('0.3.42: a failed counter-reset persist warns once instead of repeating silen
   emitEnd(1)
   await vi.waitFor(() => { expect(delivered).toHaveLength(1) }) // delivery itself succeeded
   await vi.waitFor(() => {
-    expect(warnSpy.mock.calls.some(([message]) => String(message).includes('could not be persisted after a delivered review'))).toBe(true)
+    expect(warnSpy.mock.calls.some(([message]) => String(message).includes('could not be restarted after a settled review'))).toBe(true)
   })
 })
 

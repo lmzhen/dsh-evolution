@@ -71,8 +71,9 @@ export function isReviewNotice(message: NoticeMessage): boolean {
  *
  * `inserted` and `claimed` ADOPT the message (last wins): a message of ours that the queue holds or
  * a turn is running is outstanding by definition, whether or not a record survived a restart.
- * `discarded` settles only the notice we were tracking: an event about an older message must not
- * reset a window that belongs to the current one.
+ * `discarded` settles whatever we were tracking — or nothing, when the delivery's `inserted` was
+ * never seen — and ignores only the stale case: a record naming a DIFFERENT message means the
+ * current notice is still queued, so that window must not be reset.
  * @param current - the session's record before this event.
  * @param event - the inbox notification and its message.
  * @returns the record afterwards, and whether the tracked notice settled.
@@ -88,7 +89,11 @@ export function noticeAfter(
     case 'claimed':
       return { notice: { messageId: event.message.id, turn: event.turn ?? null }, settled: false }
     case 'discarded':
-      if (current?.messageId !== event.message.id) return { notice: current, settled: false }
+      // A record naming a DIFFERENT message is a stale event (the current notice is still queued):
+      // ignore it. With no record at all, this discard IS about one of our notices — the one whose
+      // `inserted` we never saw (a late mount, or a host that does not emit it) — and it must settle
+      // too, or the window it belonged to would never restart.
+      if (current !== undefined && current.messageId !== event.message.id) return { notice: current, settled: false }
       return { notice: undefined, settled: true }
   }
 }

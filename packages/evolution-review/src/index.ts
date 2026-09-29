@@ -634,6 +634,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   })
 
   /**
+   * Settle the session's outstanding notice: drop the record and restart the counting window.
+   *
+   * The window restarts when the notice LEAVES — either the queue dropped it unrun (`discarded`) or
+   * the turn that claimed it ended. The reset runs under the state lock and re-loads the persisted
+   * record before zeroing (V24-04): the in-memory snapshot may be turns old by then, and writing it
+   * back would roll a later turn's counters away.
+   * @param sessionId - the session whose notice settled.
+   * @param why - which exit settled it; carried into the warning only, the effect is the same.
+   */
+  const settleNotice = async (
+    sessionId: SessionId,
+    why: 'discarded' | 'turn-end' | 'delivery-no-inbox' | 'subagent-flush',
+  ): Promise<void> => {
+    pendingReviewNotices.delete(sessionId)
+    const stateService = ctx.get('evolutionState')
+    try {
+      await withReviewStateLock(sessionId, async () => {
+        const fresh = await stateService?.loadReviewState(sessionId)
+        if (fresh === undefined || fresh === null) return
+        fresh.turnsSinceMemory = 0
+        fresh.turnsSinceSkill = 0
+        await stateService?.saveReviewState(sessionId, fresh)
+      })
+    } catch (resetError) {
+      if (!cadenceResetWarned.has(sessionId)) {
+        cadenceResetWarned.add(sessionId)
+        ctx.logger.warn(`dsh-evolution-review: the counting window could not be restarted after a settled review (${why}: ${resetError instanceof Error ? resetError.message : String(resetError)}) — the next boundary may deliver a repeat`)
+      }
+    }
+  }
+
+  /**
    * Fold one inbox notification into the session's outstanding-notice record.
    *
    * The platform emits these on the agent scope (plain `ctx.on` receives every agent's, which is
@@ -654,7 +686,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const outcome = noticeAfter(pendingReviewNotices.get(sessionId), { kind, message: payload.message, turn: payload.turn })
     if (outcome.notice === undefined) pendingReviewNotices.delete(sessionId)
     else pendingReviewNotices.set(sessionId, outcome.notice)
-    // B 组：outcome.settled 在这里清零（本组刻意不接，保持零行为改变）。
+    // 被队列丢弃（删除／取消／被替换）＝ 立刻结清，窗口从这里重新开始。
+    if (outcome.settled) void settleNotice(sessionId, 'discarded')
   }
 
   ctx.on('agent/inbox/inserted', (payload) => { foldNoticeEvent('inserted', payload) })
@@ -730,13 +763,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (suppression.turns === undefined || suppression.turns <= 1) skipNextCadenceFire.delete(session.id)
       else skipNextCadenceFire.set(session.id, { afterTurn: suppression.afterTurn, turns: suppression.turns - 1 })
     }
+    // B 组（未结窗口）：取走本插件通知的那个回合不计数——它跑的是我们自己的复查；窗口在这个回合
+    // 结束时重新开始（settle 清零）。另一个出口是「被队列丢弃」，在 foldNoticeEvent 里立刻结清。
+    const outstanding = pendingReviewNotices.get(session.id)
+    const settlesHere = outstanding !== undefined && outstanding.turn !== null && outstanding.turn === event.data.turn
     let state: ReviewState = { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
     // V24-04 (v24): the advanceReview result lives in a holder so the
     // control-flow analysis (which cannot see the lock-callback's assignment,
     // the same reason the v22 drift flag is a holder) does not narrow it to
     // the literal `null` initializer.
     const advanced: { kind: ReviewKind | null } = { kind: null }
-    await withReviewStateLock(session.id, async () => {
+    if (settlesHere) {
+      await settleNotice(session.id, 'turn-end')
+    } else await withReviewStateLock(session.id, async () => {
       state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
       advanced.kind = advanceReview(state, event.data.turn, signal, {
         memoryInterval: params().reviewMemoryInterval,
@@ -828,6 +867,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             } catch (emitError) {
               ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
             }
+            // B 组：子代理通道没有「我的队列通知」可等 —— 复查已在子代理里跑完，窗口就在这里重启。
+            // V8-03：这一句在 try/catch 之外，抛错的监听者跳不掉它（该用例钉的正是这一点）。
+            await settleNotice(session.id, 'subagent-flush')
           } else if (reviewOutcome === 'dropped') {
             // V27 R-01: nothing was queued and nothing was delivered (the queue
             // was at cap). Keep the latch — the next completed boundary retries
@@ -865,29 +907,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }
           }
         }
-        // 0.3.40 (user decision): the counting window restarts AT THE INJECTION
-        // — zero the monotonic counters and re-persist so a continued
-        // conversation starts a fresh segment from here (one injection per
-        // segment; the post-flush save is authoritative over the earlier one).
-        // V24-04 (v24): the reset runs under the state lock and re-loads the
-        // persisted record before zeroing — the in-memory `state` is turn N's
-        // snapshot and the flush may have awaited the subagent review for
-        // minutes, during which turn N+1 advanced AND saved. Writing the stale
-        // object used to roll N+1's counters and lastTurn back entirely; only
-        // the two counters are zeroed on the FRESH record now.
-        try {
-          await withReviewStateLock(session.id, async () => {
-            const fresh = await stateService?.loadReviewState(session.id) ?? state
-            fresh.turnsSinceMemory = 0
-            fresh.turnsSinceSkill = 0
-            await stateService?.saveReviewState(session.id, fresh)
-          })
-        } catch (resetError) {
-          if (!cadenceResetWarned.has(session.id)) {
-            cadenceResetWarned.add(session.id)
-            ctx.logger.warn(`dsh-evolution-review: cadence counter reset could not be persisted after a delivered review (${resetError instanceof Error ? resetError.message : String(resetError)}) — a stateful reload may re-deliver this review`)
-          }
-        }
+        // B 组：这里不再清零。计数窗口由「未结通知」的生命周期驱动——被队列丢弃时立刻结清，
+        // 或被取走的那个回合结束时结清（`settleNotice`）；投递本身不再是窗口的起点。
         // V10-13 (P2-9): same-turn mutual exclusion. With
         // skillReviewTrigger:'both' this completed turn ALREADY delivered its
         // review through the cadence flush above; falling through to the
@@ -1119,6 +1140,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // channel (a result notice does not — nothing acts on it); the mark is
       // what tool-skill-manage reads for `.pinned`/`.hermes-managed`.
       if (reviewPrompt) markReviewChannelForDelivery(agent, inbox)
+      // 没有 inbox 的宿主上没有任何队列事件可观察 ⇒ 退回改动前的行为：投递即结清。
+      if (reviewPrompt && inbox === undefined) void settleNotice(agent.session.id, 'delivery-no-inbox')
       return true
     } catch (error) {
       ctx.logger.warn(`dsh-evolution-review: review delivery failed (${error instanceof Error ? error.message : String(error)}) — nothing was queued; the review is NOT consumed and retries at the next completed boundary`)
