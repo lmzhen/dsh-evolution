@@ -939,8 +939,9 @@ function walk(dir) {
       // N12 (P5): module-scope mutable process state must be registered.
       // Known blind spot (documented; upgrade path = AST): state declared inside
       // a plugin's `apply()` body is invisible to a line rule — the family's
-      // largest cluster (evolution-review's seven turn maps plus reviewInFlight
-      // / skipNextCadenceFire / deferredFallbackReviews) lives there.
+      // largest cluster (evolution-review's eight registered per-session
+      // collections plus reviewInFlight / the one-shot warn flags /
+      // deferredFallbackReviews) lives there.
       if (rel.includes('/src/')) {
         for (const name of mutableStateBindings(text)) {
           const key = `${rel} :: ${name}`

@@ -5,6 +5,9 @@
  * from a hand-written list inside its dispose hook. The list drifted — the
  * 0.3.38-0.3.42 additions (pendingCadenceReviews, pendingCadenceWarned,
  * skipNextCadenceFire, cadenceResetWarned) were missing from it until V7-16 —
+ * the first and last of those four have since been replaced by the outstanding-
+ * notice window (0.15.2: one record per session, and the claim names the turn), so
+ * only pendingCadenceReviews, pendingCadenceWarned and cadenceResetWarned remain —
  * because nothing tied a declaration to its cleanup. Registering at the
  * declaration site removes the list: a collection clears because it was
  * registered, and tests/session-state-ownership.spec.ts fails when a new
