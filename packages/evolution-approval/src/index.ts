@@ -119,7 +119,7 @@ export type ApprovalLike = {
    * actually be staged). Optional: absent means "unknown" and callers must
    * not pre-refuse on it. */
   stageForeground?: boolean
-  registerRunner(kind: PendingKind, runner: WriteRunner): () => void
+  registerRunner(kind: PendingKind, runner: WriteRunner, preview?: WritePreview): () => void
   list(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>

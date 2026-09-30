@@ -145,7 +145,7 @@ export type AnchorVerdict = 'match' | 'drift' | 'missing'
  * @param current - the bytes the write lock read (`null` = the target is absent).
  * @returns `match` when the write may proceed, otherwise the refusal verdict.
  */
-function anchorVerdict(anchor: WriteAnchor | undefined, current: string | null): AnchorVerdict {
+export function anchorVerdict(anchor: WriteAnchor | undefined, current: string | null): AnchorVerdict {
   if (anchor === undefined) return 'match'
   if ('absent' in anchor) return current === null ? 'match' : 'drift'
   if (current === null) return 'missing'

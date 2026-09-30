@@ -19,12 +19,13 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
+import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -172,6 +173,69 @@ export function validateSkillSettings(value: SkillSettings, ceilings: Pick<Skill
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view. 0.3.23 (G4.8,
 // F-341): effectiveSessionPolicy is imported there too — the local copy is gone.
+
+/**
+ * The library surface the preview reads. The write path owns the rest (locks, gates, audit), and none
+ * of it runs here: a preview reads the CURRENT bytes and computes what the replay would store.
+ */
+type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'read' | 'readSupportFile'>
+
+/**
+ * What the staged skill write WOULD store, resolved WITHOUT writing.
+ *
+ * It lives here because this module owns what a skill operation MEANS: the bytes come from the same
+ * helpers the write path uses (`normalizeFrontmatter`, `fuzzyPatch`, the `trimEnd() + '\n'` trailing
+ * rule the library commits with), and the stage-time anchor is judged by core's own `anchorVerdict`, so
+ * the preview cannot advertise bytes the approve path then refuses. Everything it cannot resolve is an
+ * answer with a reason — never a guess and never a partial diff.
+ * @param library - the family skill library (reads only).
+ * @param args - the staged record's args: `{ operation }`.
+ * @returns the before/after pair, or why there is none to show.
+ */
+async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promise<PreviewAnswer> {
+  const wrapped = (args ?? {}) as { operation?: SkillWriteArgs }
+  const operation = wrapped.operation ?? {}
+  const name = typeof operation.name === 'string' ? operation.name.trim() : ''
+  if (name === '') return { available: false, reason: 'the staged write names no skill' }
+  const filePath = typeof operation.file_path === 'string' && operation.file_path !== '' ? operation.file_path : null
+  const path = filePath ?? 'SKILL.md'
+  const before = await (filePath === null ? library.read(name) : library.readSupportFile(name, filePath)).catch(() => null)
+  const staged = operation.staged_from_sha256
+  const anchor: WriteAnchor | undefined = typeof staged === 'string' && staged !== ''
+    ? staged === 'absent' ? { absent: true } : { sha256: staged }
+    : undefined
+  if (anchorVerdict(anchor, before) !== 'match') {
+    return { available: false, reason: 'the target changed after this write was staged — approving it would be refused' }
+  }
+  const action = typeof operation.action === 'string' ? operation.action : ''
+  /** The bytes the write path commits for a body: frontmatter normalized, one trailing newline. */
+  const bodyOnDisk = (content: string): PreviewAnswer => {
+    const norm = normalizeFrontmatter(content)
+    if (norm.issues.length > 0) return { available: false, reason: 'frontmatter cannot be auto-fixed: ' + norm.issues.join('; ') }
+    return { available: true, path, before, after: (norm.changed ? norm.content : content).trimEnd() + '\n' }
+  }
+  if (action === 'create' || action === 'update') {
+    return typeof operation.content === 'string' ? bodyOnDisk(operation.content) : { available: false, reason: '"' + action + '" carries no content' }
+  }
+  if (action === 'patch') {
+    if (before === null) return { available: false, reason: 'the skill has no body to patch' }
+    const patched = fuzzyPatch(before, operation.old_string ?? '', operation.new_string ?? '', operation.replace_all === true)
+    return patched === null
+      ? { available: false, reason: 'the staged old text is not in the current body — approving it would be refused' }
+      : bodyOnDisk(patched)
+  }
+  if (action === 'write_file') {
+    if (typeof operation.file_content !== 'string') return { available: false, reason: '"write_file" carries no content' }
+    // Support files are stored byte-verbatim (no frontmatter pass, no trailing-newline rule).
+    return { available: true, path, before, after: operation.file_content }
+  }
+  if (action === 'remove_file') {
+    return before === null
+      ? { available: false, reason: 'that support file is not there to remove' }
+      : { available: true, path, before, after: null }
+  }
+  return { available: false, reason: '"' + action + '" has no byte-level preview' }
+}
 
 interface SkillWriteArgs {
   action?: string
@@ -1085,6 +1149,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
   ctx.inject(['evolutionApproval'], (approvalCtx) => {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
+    const preview: WritePreview = async args => await previewSkillWrite(library, args)
     const dispose = approval.registerRunner('skill', (args) => {
       const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; origin?: 'foreground' | 'background_review'; libraryOrigin?: 'foreground' | 'subagent' | 'background_review' }
       const operation = wrapped.operation ?? {}
@@ -1099,7 +1164,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         })
       }
       return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
-    })
+    }, preview)
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })
 }
