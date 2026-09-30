@@ -24,6 +24,23 @@ Writes go through the client settings scope (`set`/`unset`), which carries the r
 
 The field list AND the per-field UI metadata are GENERATED from the parameter registry (`packages/scripts/gen-param-client-view.mjs` writes `src/client/generated-params.ts`): id, group, the English summary, and the E3 rows' label / hint / control / unit / values / valueLabels. The browser half therefore cannot name a parameter the Host does not register, and cannot invent a control the registry does not declare. Regenerate after every registry edit; the family gate runs the generator with `--check`.
 
+## The pending-write card
+
+One card in the same section is not a parameter namespace: **「待批写入」** lists the staged self-evolution
+writes and carries the two decisions plus a preview. It reads the approval plugin's loopback routes
+(`src/client/api.ts` + `approval-routes.ts`; the path literals are compared against the host table by a spec),
+wears the same card shell and button vocabulary as the parameter cards, and invents no state of its own.
+
+Its states are deliberately distinct: **reading** ("正在读取待批项…"), **empty** ("没有待批的写入") and
+**failed** (the reason plus a retry). Merging the first two is what once made a slow answer read as lost data
+(E7), so the state machine lives in `pending-state.ts` and the three are asserted without a browser.
+
+A decision re-reads the window instead of editing the list locally (the host owns the state) and shows the
+host's own sentence when it refuses. **Preview** opens one row at a time: the facts line (`n 行新增` /
+`n 行删除` / truncated) and the source block with `-`/`+` lines, the same shape the history panel's diff
+uses; an unavailable preview prints the host's reason. A late answer for a row the reader already left is
+dropped rather than painted under another row's heading.
+
 ## The `hooks` compartment never reaches the component
 
 A card's inject face carries `hooks: { paramSection: source }` — that is the SHELL's seat, not a prop. The renderer binds each entry to a `use<Name>` seat and hands the component the face with `hooks` REMOVED (the slot contract is `PropsHooks<face['hooks']>` plus `Omit<face, 'hooks'>`). Reading `props.hooks` therefore reads a prop that never exists, and the failure only shows up at runtime, inside the save path.
@@ -48,4 +65,4 @@ The browser half ships as the client module system's lazy CJS factory artifact (
 - The section renders plain controls styled with the design tokens rather than the platform's `@deepseek-ai/dsh-client-ui-primitives` kit: that module IS available to out-of-repo bundles (the market plugin requires it), but its prop shapes are not published, and guessing them would break the live GUI.
 - An unsaved draft lives in the card's own component state and the settings shell renders only the active section, so switching to another section drops a draft that was not saved yet. Values already written are unaffected; moving the draft into an apply-time store is the 0.7.x follow-up.
 - A deployment that overrides a field through the `evolution-policy` row does not show on the card: the card reports the deployment value the settings scope serves, while the policy snapshot can differ. That divergence stays a doctor / `/evolution params` matter.
-- The browser half has no RENDERED spec: the family specs are Node-level and the family carries no React runtime, so the card itself is covered by `tsc`, the bundle build, the gate steps and a live pass on the installed artifact (0.7.0's save defect was found exactly there). The verdict is pinned instead by `tests/settle.spec.ts` (the pure `landedWrites` decision, including the already-overridden refusal case); rendering the card with the props the renderer actually builds — no `hooks`, the bound seat stubbed — remains the follow-up that would catch the wiring in CI.
+- The parameter card has no RENDERED spec: the family specs are Node-level and the family carries no React runtime, so it is covered by `tsc`, the bundle build, the gate steps and a live pass on the installed artifact (0.7.0's save defect was found exactly there). The verdict is pinned instead by `tests/settle.spec.ts` (the pure `landedWrites` decision, including the already-overridden refusal case); rendering the card with the props the renderer actually builds — no `hooks`, the bound seat stubbed — remains the follow-up that would catch the wiring in CI.

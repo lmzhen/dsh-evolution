@@ -40,7 +40,11 @@ The row is **inert without a web server** (`ctx.get('webServer')`, not a declare
 
 **Preview** renders one version as a document, support files included (the body route above). Inside the diff view, **Source / Rendered** switches between the exact window the host computed and the same two sides rendered as Markdown — removed first, added second, each under a tinted edge. Block level on purpose: line-level interleaving of two rendered documents is a different, much larger problem, and the source view stays one click away. Only one row is expanded at a time (`expanded: {v, kind}`), and each kind keeps its own lazily-filled cache.
 
-While nothing is selected the pane says so — a line pointing at the left column, or the empty listing when no skill has a history yet.
+While nothing is selected the pane says so — a line pointing at the left column, or the empty listing when no skill has a history yet. **Reading and empty are different states** (E7, 2026-09-30): until the
+first list read lands the column says it is reading, and a FAILED read lands on the empty listing plus the error sentence instead of a spinner that never stops.
+
+A removed support file now shows up too: its removal is recorded as its own entry (see evolution-core's note),
+so the file's chain ends with a `support file removed` row whose undo restores the bytes.
 
 **The panel owns no rule and no arithmetic.** The host reports every row with its whole verdict — `undoable` (evolution-core's `entryTarget` classification against the live bytes), `actionKind` (a closed vocabulary key), `age` (a bucket plus a count), `charsDelta`, `summary` — **and the row's cells**: `evolution-core`'s `skill-row-cells.ts` decides what the row says, in which order and in which slot (`lead` / `meta` / `aside`), and the host ships that list with the row, because a browser half cannot import core at runtime. This half substitutes words from its locale dictionary and renders by slot, so a decision fact (`aside`) can no longer be eaten by the browser's ellipsis. The time, the action words and the sentences are therefore localized; the facts are computed once, host-side, so the panel and the slash commands cannot drift.
 
