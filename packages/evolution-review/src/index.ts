@@ -610,9 +610,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     pendingReviewNotices.delete(sessionId)
     // D 组（可观测）：每一次结清都留下归因——窗口什么时候重开、因为什么，是这条链路最难看出的
     // 一件事。正常出口记 info；queue-lost 是「事件漏了一次」的异常，记 warn。
-    const settledLine = `dsh-evolution-review: the outstanding review notice settled (${why}) — the review window restarts`
-    if (why === 'queue-lost') ctx.logger.warn(settledLine)
-    else ctx.logger.info(settledLine)
+    // warn, not info: this family logs at warn everywhere, and the default host level drops info — the
+    // one line that says WHY the window reopened was invisible on a real machine (E8).
+    ctx.logger.warn(`dsh-evolution-review: the outstanding review notice settled (${why}) — the review window restarts`)
     const stateService = ctx.get('evolutionState')
     try {
       await withReviewStateLock(sessionId, async () => {

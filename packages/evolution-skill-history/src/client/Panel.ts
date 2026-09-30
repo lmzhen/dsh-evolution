@@ -39,6 +39,9 @@ interface OpenRow {
  */
 export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [skills, setSkills] = useState<readonly SkillRow[]>([])
+  // Whether the first list read has LANDED. Without it an empty list renders the empty state while the
+  // answer is still in flight, and a reader cannot tell "nothing recorded" from "not read yet" (E7).
+  const [skillsLoaded, setSkillsLoaded] = useState(false)
   const [selected, setSelected] = useState<string | undefined>(undefined)
   const [payload, setPayload] = useState<VersionsPayload | undefined>(undefined)
   const [noteText, setNoteText] = useState<string | undefined>(undefined)
@@ -66,7 +69,9 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
 
   /** Read the skills again, keeping the sentence: a re-read is not an answer to anything. */
   const reloadSkills = (): void => {
-    void face.loadSkills().then(setSkills).catch(failed)
+    // `finally`, not `then`: a FAILED read is an answer too — the reader gets the empty list plus the
+    // error sentence instead of a spinner that never stops.
+    void face.loadSkills().then(setSkills).catch(failed).finally(() => { setSkillsLoaded(true) })
   }
 
   /**
@@ -214,7 +219,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       searchField(face, query, setQuery),
       createElement('div', { className: 'evo-hist-list' },
         skills.length === 0
-          ? emptyState(face.t('empty.skills'))
+          ? emptyState(face.t(skillsLoaded ? 'empty.skills' : 'loading'))
           : visible.length === 0
             ? emptyState(face.t('search.none'))
             : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) })))),
@@ -225,7 +230,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       // versions does not need to be told what a version is.
       selected === undefined
         ? [
-          emptyState(face.t(skills.length === 0 ? 'empty.skills' : 'empty.pick')),
+          emptyState(face.t(skills.length === 0 ? (skillsLoaded ? 'empty.skills' : 'loading') : 'empty.pick')),
           createElement('p', { key: 'hint', className: 'evo-hist-hint' }, face.t('hint')),
         ]
         : loaded

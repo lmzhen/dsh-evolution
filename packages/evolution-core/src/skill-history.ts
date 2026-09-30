@@ -382,6 +382,12 @@ export function nextHistoryIndex(
       ...pathField,
     })
   }
+  // A REMOVAL has no "after" bytes, so nothing below would mint an entry — and when the removed bytes
+  // were already indexed by the file's own write, the whole mutation left NO trace: the reader could not
+  // tell the file was deleted, and the `support-remove` vocabulary stayed unreachable (E2, 2026-09-30).
+  // The entry carries the bytes that were removed, labeled with the write that removed them, so a face
+  // can say "these bytes are gone" and undoing it puts them back.
+  const removalHash = afterHash === null ? beforeHash : null
   if (afterHash !== null) {
     const tail = grown[grown.length - 1]
     if (tail?.hash !== afterHash) {
@@ -397,6 +403,24 @@ export function nextHistoryIndex(
         ...input.summary === undefined ? {} : { summary: input.summary },
         // The authoritative predecessor link: what THIS write replaced, read under the write lock.
         ...beforeHash === null ? {} : { beforeHash },
+      })
+    }
+  }
+  if (removalHash !== null) {
+    const tail = grown[grown.length - 1]
+    // A baseline of the same bytes may sit right above (a removal of a file the index never saw): that
+    // entry says "we first saw these bytes", this one says "and then they were removed", and the second
+    // is what the face needs. Self-reference is deliberately omitted: the entry's own hash IS the
+    // removed content, so a `beforeHash` link would point at itself.
+    if (tail?.hash !== removalHash || tail.action !== input.action) {
+      grown.push({
+        v: nextVersion(grown),
+        at: input.at,
+        action: input.action,
+        hash: removalHash,
+        chars: input.before?.length ?? 0,
+        ...pathField,
+        ...input.summary === undefined ? {} : { summary: input.summary },
       })
     }
   }

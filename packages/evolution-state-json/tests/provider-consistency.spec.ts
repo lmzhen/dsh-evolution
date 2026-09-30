@@ -8,7 +8,10 @@ import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state-st
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-state-json cross-provider consistency (G7.4)', () => {
-  it('matches the shared provider contract', { timeout: 180_000 }, async () => {
+  // E9: 45.9s alone against a 180s budget is a ~4x margin, and a loaded machine crossed it (the same
+  // gate run showed tsc at 281s against its usual 34s). The budget guards against a HANG, it is not a
+  // performance assertion, so it moves; the assertions do not.
+  it('matches the shared provider contract', { timeout: 300_000 }, async () => {
     const root = await tempRoot('dsh-json-consistent-')
     const ctx = new Context()
     await ctx.plugin(EvolutionStateStorageRegistry)

@@ -254,7 +254,9 @@ it('C: a host without an inbox has no queue events to wait for — delivery stil
     }),
   })
   const logs: string[] = []
-  vi.spyOn(ctx.logger, 'info').mockImplementation((...args: unknown[]) => {
+  // The settle attribution is a WARN (E8: at info the default host level swallowed the one line that
+  // says why the window reopened), so this lane watches warn.
+  vi.spyOn(ctx.logger, 'warn').mockImplementation((...args: unknown[]) => {
     logs.push(args.map(value => String(value)).join(' '))
   })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
