@@ -13,4 +13,5 @@ export const APPROVAL_CLIENT_ROUTES = {
   pending: '/api/dsh-evolution/approval/pending',
   approve: '/api/dsh-evolution/approval/approve',
   reject: '/api/dsh-evolution/approval/reject',
+  preview: '/api/dsh-evolution/approval/preview',
 } as const

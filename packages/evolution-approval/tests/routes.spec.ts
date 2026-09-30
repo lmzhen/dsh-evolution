@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import { isLoopbackRequest, type FenceRequest } from '@deepseek-ai/dsh-evolution-core'
 import { APPROVAL_ROUTES, makeApprovalRoutes, type ApprovalFace } from '../src/routes.ts'
+import type { WritePreview } from '../src/index.ts'
 
 /** A pending record shaped the way the state medium hands one back. */
 function record(overrides: Partial<PendingRecord> = {}): PendingRecord {
@@ -32,6 +33,8 @@ interface Face extends ApprovalFace {
   failNext: boolean
   /** Answer a decision with a refusal (the service's business "no"). */
   refuseNext: boolean
+  /** The preview this kind's replayer registered, when the test registers one. */
+  preview: WritePreview | undefined
 }
 
 function makeFace(): Face {
@@ -39,6 +42,8 @@ function makeFace(): Face {
     calls: [],
     failNext: false,
     refuseNext: false,
+    preview: undefined,
+    previewOf: () => face.preview,
     list: async (status: PendingStatus = 'pending') => {
       face.calls.push('list:' + status)
       const all = [record(), record({ id: 'p-2', status: 'approved', summary: 'memory op' })]
@@ -205,6 +210,42 @@ describe('approval routes: the two decisions', () => {
     const noBody = await fetch(origin + APPROVAL_ROUTES.reject, { method: 'POST' })
     expect(noBody.status).toBe(400)
     expect(face.calls).toEqual([])
+  })
+})
+
+describe('approval routes: the preview', () => {
+  it('resolves one staged write into the same diff facts the history diff route uses', async () => {
+    const face = makeFace()
+    face.preview = async () => ({ available: true, path: 'SKILL.md', before: 'a\nb\n', after: 'a\nc\n' })
+    const origin = await mount(face)
+    const body = await (await fetch(origin + APPROVAL_ROUTES.preview + '?id=p-1')).json() as { ok: boolean; data: Record<string, unknown> }
+    expect(body.ok).toBe(true)
+    expect(body.data).toMatchObject({ available: true, path: 'SKILL.md', linesAdded: 1, linesRemoved: 1 })
+    expect(Array.isArray(body.data.hunks)).toBe(true)
+  })
+
+  it('passes a refusal through as an answer, and says so when the kind has no preview', async () => {
+    const refusing = makeFace()
+    refusing.preview = async () => ({ available: false, reason: 'the target changed after it was staged' })
+    const origin = await mount(refusing)
+    expect(await (await fetch(origin + APPROVAL_ROUTES.preview + '?id=p-1')).json())
+      .toMatchObject({ ok: true, data: { available: false, reason: 'the target changed after it was staged' } })
+
+    const bare = makeFace()
+    const bareOrigin = await mount(bare)
+    const bareBody = await (await fetch(bareOrigin + APPROVAL_ROUTES.preview + '?id=p-1')).json() as { ok?: unknown; data?: { available?: unknown; reason?: unknown } }
+    expect(bareBody.ok).toBe(true)
+    expect(bareBody.data?.available).toBe(false)
+    expect(String(bareBody.data?.reason)).toContain('no preview')
+  })
+
+  it('answers an unknown id as a business miss, and a missing id as a bad request', async () => {
+    const face = makeFace()
+    const origin = await mount(face)
+    const unknown = await fetch(origin + APPROVAL_ROUTES.preview + '?id=nope')
+    expect(unknown.status).toBe(200)
+    expect(await unknown.json()).toMatchObject({ ok: false, code: 'not-found' })
+    expect((await fetch(origin + APPROVAL_ROUTES.preview)).status).toBe(400)
   })
 })
 

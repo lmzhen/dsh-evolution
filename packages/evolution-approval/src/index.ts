@@ -33,6 +33,34 @@ export type { PendingKind, PendingRecord, PendingStatus }
 
 export type WriteRunner = (args: unknown) => Promise<{ ok: boolean; message: string }>
 
+/**
+ * What one staged write WOULD store, resolved by the package that owns its replay.
+ *
+ * `available: false` is a business answer, not an error: plenty of staged writes have no bytes worth
+ * showing (a request that carries no content, a target whose replay the host cannot resolve yet), and
+ * the reader is owed the reason rather than an empty diff.
+ */
+export type PreviewAnswer =
+  | {
+    readonly available: true
+    /** The artifact the bytes belong to, for the reader's label (a file name, or the skill name). */
+    readonly path: string
+    /** The bytes the replay would replace; null when the target does not exist yet. */
+    readonly before: string | null
+    /** The bytes it would write; null when the operation removes the target. */
+    readonly after: string | null
+  }
+  | { readonly available: false; readonly reason: string }
+
+/**
+ * Resolve one staged write's before/after WITHOUT running it.
+ *
+ * Registered beside the runner by the same package, and deliberately not derived from it: a preview
+ * that re-derived the bytes would drift from what the replay writes, and the family's rule is that the
+ * write path owns its own normalization (anchors, frontmatter quoting) — one home, two readers.
+ */
+export type WritePreview = (args: unknown) => Promise<PreviewAnswer>
+
 export interface ApprovalRequest {
   kind: PendingKind
   summary: string
@@ -159,6 +187,7 @@ export class EvolutionApproval extends Service {
     return this.stageForegroundConfig
   }
   private readonly runners = new Map<PendingKind, WriteRunner>()
+  private readonly previews = new Map<PendingKind, WritePreview>()
   private readonly inFlight = new Map<string, Promise<{ ok: boolean; message: string }>>()
 
   constructor(ctx: Context, config: Config = {}) {
@@ -187,14 +216,21 @@ export class EvolutionApproval extends Service {
     return this.enabled
   }
 
-  registerRunner(kind: PendingKind, runner: WriteRunner): () => void {
+  registerRunner(kind: PendingKind, runner: WriteRunner, preview?: WritePreview): () => void {
     // P3 (v3 audit): a duplicate kind would silently shadow the first runner
     // (mirroring EvolutionStateStorageRegistry.registerProvider, which throws).
     if (this.runners.has(kind)) throw new Error(`approval runner for "${kind}" is already registered`)
     this.runners.set(kind, runner)
+    if (preview !== undefined) this.previews.set(kind, preview)
     return () => {
       if (this.runners.get(kind) === runner) this.runners.delete(kind)
+      if (preview !== undefined && this.previews.get(kind) === preview) this.previews.delete(kind)
     }
+  }
+
+  /** The preview registered for `kind`, if that kind can show what its replay would write. */
+  previewOf(kind: PendingKind): WritePreview | undefined {
+    return this.previews.get(kind)
   }
 
   /**

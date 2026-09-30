@@ -14,13 +14,15 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
-import { elapsedSince, isLoopbackRequest, readJsonObject, writeJson } from '@deepseek-ai/dsh-evolution-core'
+import { elapsedSince, isLoopbackRequest, readJsonObject, textDiffFacts, writeJson } from '@deepseek-ai/dsh-evolution-core'
+import type { WritePreview } from './index.ts'
 
 /** Route paths. The browser half mirrors these literals; a spec asserts the two sides agree. */
 export const APPROVAL_ROUTES = {
   pending: '/api/dsh-evolution/approval/pending',
   approve: '/api/dsh-evolution/approval/approve',
   reject: '/api/dsh-evolution/approval/reject',
+  preview: '/api/dsh-evolution/approval/preview',
 } as const
 
 /**
@@ -52,6 +54,8 @@ export interface ApprovalFace {
   list(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>
+  /** The preview the replayer of that kind registered, when it registered one. */
+  previewOf(kind: PendingKind): WritePreview | undefined
 }
 
 /**
@@ -126,6 +130,50 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
             ...record.claimedBy === undefined ? {} : { claimedBy: record.claimedBy },
           }))
           writeJson(res, 200, { ok: true, data: rows })
+        } catch (error) {
+          writeJson(res, 200, {
+            ok: false,
+            code: 'approval-failed',
+            message: error instanceof Error ? error.message : String(error),
+          })
+        }
+      },
+    },
+    {
+      kind: 'exact',
+      path: APPROVAL_ROUTES.preview,
+      handler: async (req, res) => {
+        if (!guard(req, res, 'GET')) return
+        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+        const id = params.get('id')?.trim() ?? ''
+        if (id === '') {
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'id is required' })
+          return
+        }
+        try {
+          // Both statuses: a record whose replay is already running is exactly when a reader asks.
+          const staged = [...await approval.list('pending'), ...await approval.list('executing')]
+          const record = staged.find(candidate => candidate.id === id)
+          if (record === undefined) {
+            writeJson(res, 200, { ok: false, code: 'not-found', message: 'no staged write with id "' + id + '"' })
+            return
+          }
+          const preview = approval.previewOf(record.kind)
+          if (preview === undefined) {
+            // Not an error: plenty of staged writes have no bytes worth showing, and the reader is owed
+            // the reason rather than an empty diff.
+            writeJson(res, 200, { ok: true, data: { available: false, reason: 'a "' + record.kind + '" write has no preview' } })
+            return
+          }
+          const answer = await preview(record.args)
+          if (!answer.available) {
+            writeJson(res, 200, { ok: true, data: { available: false, reason: answer.reason } })
+            return
+          }
+          // The diff facts come from core's ONE implementation, the same one the history panel's diff
+          // route uses: the two faces describe a change with the same numbers.
+          const facts = textDiffFacts(answer.before ?? '', answer.after ?? '', answer.path)
+          writeJson(res, 200, { ok: true, data: { available: true, path: answer.path, ...facts } })
         } catch (error) {
           writeJson(res, 200, {
             ok: false,
