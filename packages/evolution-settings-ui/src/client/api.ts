@@ -1,0 +1,64 @@
+/**
+ * The approval routes this bundle calls, and the ONE place a request is made.
+ *
+ * Structural types on purpose: the browser half cannot import the host package at runtime, so the row
+ * shape is declared by what the route hands over. Every answer — including a refusal — is parsed the
+ * same way, because a refusal is a business answer the card shows as a sentence, not a transport error.
+ * @module @deepseek-ai/dsh-evolution-settings-ui/client/api
+ */
+import { APPROVAL_CLIENT_ROUTES } from './approval-routes.ts'
+
+/** One staged write, as the pending route hands it over (never the staged args). */
+export interface PendingRow {
+  readonly id: string
+  readonly kind: 'memory' | 'skill' | 'capability'
+  readonly summary: string
+  readonly createdAt: string
+  /** How long ago it was staged, in the family's `{unit, n}` closed vocabulary. */
+  readonly age: { readonly unit: string; readonly n: number }
+  readonly status: 'pending' | 'executing' | 'approved' | 'rejected'
+  readonly claimedBy?: string | undefined
+}
+
+/** What one call answered: the data, or the reason it could not be carried out. */
+export type ApprovalAnswer<T> =
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly message: string }
+
+/** How this bundle reaches the host. Injectable so a spec drives it without a server. */
+export interface ApprovalApi {
+  /** The staged writes waiting for a decision. */
+  pending: () => Promise<ApprovalAnswer<readonly PendingRow[]>>
+  /** Ask the host to replay one staged write. */
+  approve: (id: string) => Promise<ApprovalAnswer<unknown>>
+  /** Close one staged write without replaying it. */
+  reject: (id: string) => Promise<ApprovalAnswer<unknown>>
+}
+
+/** Read one JSON answer, mapping every failure onto the same refusal shape. */
+async function read<T>(doFetch: typeof fetch, path: string, init?: RequestInit): Promise<ApprovalAnswer<T>> {
+  try {
+    const response = await doFetch(path, init)
+    if (!response.ok) return { ok: false, message: 'HTTP ' + String(response.status) }
+    const body = await response.json() as { ok?: unknown; data?: unknown; message?: unknown }
+    if (body.ok === true) return { ok: true, data: body.data as T }
+    return { ok: false, message: typeof body.message === 'string' && body.message !== '' ? body.message : 'the host refused the request' }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/**
+ * Build the approval face over one fetch implementation.
+ * @param doFetch - the fetch to use (the platform's global in the browser, a fake in a spec).
+ * @returns the three calls the pending card makes.
+ */
+export function createApprovalApi(doFetch: typeof fetch): ApprovalApi {
+  const post = (path: string, id: string): Promise<ApprovalAnswer<unknown>> =>
+    read(doFetch, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+  return {
+    pending: async () => await read<readonly PendingRow[]>(doFetch, APPROVAL_CLIENT_ROUTES.pending),
+    approve: async id => await post(APPROVAL_CLIENT_ROUTES.approve, id),
+    reject: async id => await post(APPROVAL_CLIENT_ROUTES.reject, id),
+  }
+}

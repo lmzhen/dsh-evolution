@@ -25,6 +25,12 @@ declare module 'react' {
    */
   export function useState<S>(initial: S): [S, (next: S) => void]
   /**
+   * A value that survives re-renders without causing one.
+   * @param initial - the value the first render stores.
+   * @returns the holder whose `current` the component reads and writes.
+   */
+  export function useRef<T>(initial: T): { current: T }
+  /**
    * Run one effect after the render that produced it, and again when a dependency
    * changes.
    * @param effect - the effect; a returned function cleans it up.

@@ -16,7 +16,9 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { createApprovalApi } from './api.ts'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
+import { PendingCard, type PendingCardFace } from './PendingCard.ts'
 import { en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace } from './ParamCard.ts'
 import { CARD_SLOT, type ClientSeam, type ParamSectionSource } from './seam.ts'
@@ -29,6 +31,14 @@ export const inject = ['slots', 'settingsScope', 'locale']
 /** Section id and nav order (the platform's own sections sit at 0/10/15/20). */
 export const SECTION_ID = 'evolution'
 export const SECTION_ORDER = 25
+
+/**
+ * The pending-window card's slot key.
+ *
+ * The section pairs cards by key and the parameter cards use their settings namespace; this card has no
+ * namespace (its data comes from the host's approval routes), so it carries a key of its own.
+ */
+export const PENDING_CARD_KEY = 'approval-pending'
 
 /**
  * Register the locale namespace, the section and its cards.
@@ -100,5 +110,12 @@ export function apply(ctx: ClientContext): void {
         inject: face,
       }, ParamCard)
     }
+    // The staged-write window rides in the same slot with its own key: one card, no namespace.
+    const api = createApprovalApi((input, init) => fetch(input, init))
+    yield seam.slots.register({
+      name: CARD_SLOT,
+      key: PENDING_CARD_KEY,
+      inject: (): PendingCardFace => ({ t, api }),
+    }, PendingCard)
   })
 }
