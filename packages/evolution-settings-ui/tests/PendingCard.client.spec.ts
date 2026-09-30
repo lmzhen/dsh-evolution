@@ -30,6 +30,7 @@ function face(api: Partial<ApprovalApi>): { t: (key: MessageKey) => string; api:
     pending: async () => ({ ok: true, data: [] }),
     approve: async () => ({ ok: true, data: null }),
     reject: async () => ({ ok: true, data: null }),
+    preview: async () => ({ ok: true, data: { available: false, reason: 'no preview in this fixture' } }),
     ...api,
   }
   return { t: (key: MessageKey) => message(key), api: complete }
@@ -79,6 +80,39 @@ describe('the pending card', () => {
     fireEvent.click(screen.getByText(message('approvalApprove')))
     await waitFor(() => { expect(pending).toHaveBeenCalledTimes(2) })
     expect(approve).toHaveBeenCalledWith('p-1')
+    cleanup()
+  })
+
+  it('opens the preview on demand: the facts, then the source lines', async () => {
+    const preview = vi.fn(async () => ({
+      ok: true as const,
+      data: {
+        available: true as const,
+        path: 'SKILL.md',
+        linesAdded: 1,
+        linesRemoved: 1,
+        truncated: false,
+        hunks: [{ path: 'SKILL.md', oldText: 'b', newText: 'c' }],
+      },
+    }))
+    mount(face({ pending: async () => ({ ok: true, data: [row()] }), preview }))
+    await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
+    fireEvent.click(screen.getByText(message('approvalPreview')))
+    await waitFor(() => { expect(screen.getByText(message('approvalDiffAdded').replace('{n}', '1'))).toBeDefined() })
+    expect(preview).toHaveBeenCalledWith('p-1')
+    expect(screen.getByText('- b')).toBeDefined()
+    expect(screen.getByText('+ c')).toBeDefined()
+    // The same control closes it again.
+    expect(screen.getByText(message('approvalPreviewClose'))).toBeDefined()
+    cleanup()
+  })
+
+  it('shows the host reason when a preview is unavailable', async () => {
+    const preview = vi.fn(async () => ({ ok: true as const, data: { available: false as const, reason: 'the target changed after this write was staged' } }))
+    mount(face({ pending: async () => ({ ok: true, data: [row()] }), preview }))
+    await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
+    fireEvent.click(screen.getByText(message('approvalPreview')))
+    await waitFor(() => { expect(screen.getByText(message('approvalPreviewNone') + 'the target changed after this write was staged')).toBeDefined() })
     cleanup()
   })
 

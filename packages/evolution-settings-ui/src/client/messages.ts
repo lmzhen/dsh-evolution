@@ -49,6 +49,13 @@ export const zh = {
   approvalAgeHours: '{n} 小时前',
   approvalAgeDays: '{n} 天前',
   approvalAgeMonths: '{n} 个月前',
+  approvalPreview: '预览',
+  approvalPreviewClose: '收起',
+  approvalPreviewReading: '正在读取预览…',
+  approvalPreviewNone: '看不了预览：',
+  approvalDiffAdded: '{n} 行新增',
+  approvalDiffRemoved: '{n} 行删除',
+  approvalDiffCut: '改动区域已截断',
 } as const
 
 /** English copy, key for key with {@link zh}. */
@@ -88,6 +95,13 @@ export const en: Record<keyof typeof zh, string> = {
   approvalAgeHours: '{n} h ago',
   approvalAgeDays: '{n} d ago',
   approvalAgeMonths: '{n} mo ago',
+  approvalPreview: 'Preview',
+  approvalPreviewClose: 'Hide',
+  approvalPreviewReading: 'reading the preview…',
+  approvalPreviewNone: 'no preview: ',
+  approvalDiffAdded: '{n} lines added',
+  approvalDiffRemoved: '{n} lines removed',
+  approvalDiffCut: 'the changed region is truncated',
 }
 
 /**

@@ -15,7 +15,10 @@
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ApprovalApi, PendingRow } from './api.ts'
 import type { MessageKey } from './messages.ts'
-import { beginAction, endAction, failed, INITIAL_PENDING_STATE, loaded, loading, noticed, type PendingState } from './pending-state.ts'
+import {
+  beginAction, collapsed, endAction, expanded, failed, INITIAL_PENDING_STATE, loaded, loading, noticed, previewArrived,
+  type PendingState, type PreviewView,
+} from './pending-state.ts'
 
 /** Injected face: the copy seat and the host calls. No hook compartment — this card keeps its own state. */
 export interface PendingCardFace {
@@ -89,6 +92,50 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     return t(key).replace('{n}', String(row.age.n))
   }
 
+  /** Ask the host what this record would store; the answer lands only if the row is still open. */
+  const loadPreview = async (id: string): Promise<void> => {
+    const answer = await api.preview(id)
+    const view: PreviewView = answer.ok
+      ? answer.data.available ? { kind: 'ready', answer: answer.data } : { kind: 'unavailable', reason: answer.data.reason }
+      : { kind: 'failed', message: answer.message }
+    apply(current => previewArrived(current, id, view))
+  }
+
+  const togglePreview = (id: string): void => {
+    if (state.open === id) {
+      apply(collapsed)
+      return
+    }
+    apply(current => expanded(current, id))
+    void loadPreview(id)
+  }
+
+  /** The facts line, then the source view: the same shape the history panel's diff uses. */
+  const preview = (view: PreviewView): ReactNode => {
+    if (view.kind === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('approvalPreviewReading'))
+    if (view.kind === 'failed') return createElement('p', { className: 'evolution-param-error' }, view.message)
+    if (view.kind === 'unavailable') return createElement('p', { className: 'evolution-param-error' }, t('approvalPreviewNone') + view.reason)
+    const facts: ReactNode[] = [
+      createElement('span', { className: 'evolution-param-fact', key: 'added' }, t('approvalDiffAdded').replace('{n}', String(view.answer.linesAdded))),
+      createElement('span', { className: 'evolution-param-fact', key: 'removed' }, t('approvalDiffRemoved').replace('{n}', String(view.answer.linesRemoved))),
+      ...view.answer.truncated ? [createElement('span', { className: 'evolution-param-fact', key: 'cut' }, t('approvalDiffCut'))] : [],
+    ]
+    const lines: ReactNode[] = []
+    for (const hunk of view.answer.hunks) {
+      for (const [index, line] of hunk.oldText.split('\n').entries()) {
+        if (hunk.oldText === '' && line === '') continue
+        lines.push(createElement('div', { key: 'old-' + String(index), className: 'evolution-param-line-del' }, '- ' + line))
+      }
+      for (const [index, line] of hunk.newText.split('\n').entries()) {
+        if (hunk.newText === '' && line === '') continue
+        lines.push(createElement('div', { key: 'new-' + String(index), className: 'evolution-param-line-add' }, '+ ' + line))
+      }
+    }
+    return createElement('div', null,
+      createElement('p', { className: 'evolution-param-facts' }, ...facts),
+      createElement('pre', { className: 'evolution-param-source' }, ...lines.length === 0 ? ['±'] : lines))
+  }
+
   const row = (entry: PendingRow): ReactNode => {
     const busy = state.busy.includes(entry.id)
     const button = (label: MessageKey, action: 'approve' | 'reject'): ReactNode =>
@@ -103,7 +150,15 @@ export function PendingCard(props: PendingCardFace): ReactNode {
         createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
         createElement('span', { className: 'evolution-param-value' }, entry.summary)),
       createElement('p', { className: 'evolution-param-hint' }, age(entry)),
-      createElement('div', { className: 'evolution-param-actions' }, button('approvalApprove', 'approve'), button('approvalReject', 'reject')))
+      createElement('div', { className: 'evolution-param-actions' },
+        button('approvalApprove', 'approve'),
+        button('approvalReject', 'reject'),
+        createElement('button', {
+          className: 'evolution-param-button',
+          type: 'button',
+          onClick: () => { togglePreview(entry.id) },
+        }, state.open === entry.id ? t('approvalPreviewClose') : t('approvalPreview'))),
+      state.open === entry.id && state.preview !== null ? preview(state.preview) : null)
   }
 
   const body = (): ReactNode => {

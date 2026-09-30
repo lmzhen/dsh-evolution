@@ -20,6 +20,28 @@ export interface PendingRow {
   readonly claimedBy?: string | undefined
 }
 
+/** One windowed hunk of a previewed change: the region the write would touch. */
+export interface PreviewHunk {
+  readonly path: string
+  readonly oldText: string
+  readonly newText: string
+}
+
+/**
+ * What a staged write WOULD store. `available: false` carries the host's reason — plenty of records have
+ * no bytes worth showing, and the reader is owed that sentence rather than an empty diff.
+ */
+export type PreviewAnswer =
+  | {
+    readonly available: true
+    readonly path: string
+    readonly linesAdded: number
+    readonly linesRemoved: number
+    readonly hunks: readonly PreviewHunk[]
+    readonly truncated: boolean
+  }
+  | { readonly available: false; readonly reason: string }
+
 /** What one call answered: the data, or the reason it could not be carried out. */
 export type ApprovalAnswer<T> =
   | { readonly ok: true; readonly data: T }
@@ -33,6 +55,8 @@ export interface ApprovalApi {
   approve: (id: string) => Promise<ApprovalAnswer<unknown>>
   /** Close one staged write without replaying it. */
   reject: (id: string) => Promise<ApprovalAnswer<unknown>>
+  /** What that staged write would store, resolved by the host without running it. */
+  preview: (id: string) => Promise<ApprovalAnswer<PreviewAnswer>>
 }
 
 /** Read one JSON answer, mapping every failure onto the same refusal shape. */
@@ -60,5 +84,6 @@ export function createApprovalApi(doFetch: typeof fetch): ApprovalApi {
     pending: async () => await read<readonly PendingRow[]>(doFetch, APPROVAL_CLIENT_ROUTES.pending),
     approve: async id => await post(APPROVAL_CLIENT_ROUTES.approve, id),
     reject: async id => await post(APPROVAL_CLIENT_ROUTES.reject, id),
+    preview: async id => await read<PreviewAnswer>(doFetch, APPROVAL_CLIENT_ROUTES.preview + '?id=' + encodeURIComponent(id)),
   }
 }

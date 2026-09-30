@@ -7,7 +7,14 @@
  * answer has not arrived" (E7).
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/pending-state
  */
-import type { PendingRow } from './api.ts'
+import type { PendingRow, PreviewAnswer } from './api.ts'
+
+/** What one row's preview is showing while it is open. */
+export type PreviewView =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly answer: Extract<PreviewAnswer, { available: true }> }
+  | { readonly kind: 'unavailable'; readonly reason: string }
+  | { readonly kind: 'failed'; readonly message: string }
 
 /** What the card is showing right now. */
 export type PendingView =
@@ -21,10 +28,31 @@ export interface PendingState {
   readonly view: PendingView
   readonly busy: readonly string[]
   readonly notice: string | null
+  /** The row whose preview is open, or null. One at a time: a preview is a thing being read. */
+  readonly open: string | null
+  readonly preview: PreviewView | null
 }
 
 /** The state a card mounts in: still loading, nothing in flight, nothing said yet. */
-export const INITIAL_PENDING_STATE: PendingState = { view: { kind: 'loading' }, busy: [], notice: null }
+export const INITIAL_PENDING_STATE: PendingState = { view: { kind: 'loading' }, busy: [], notice: null, open: null, preview: null }
+
+/** Open one row's preview: the row is now the open one and its answer is on the way. */
+export function expanded(state: PendingState, id: string): PendingState {
+  return { ...state, open: id, preview: { kind: 'loading' } }
+}
+
+/** Close whatever preview is open. */
+export function collapsed(state: PendingState): PendingState {
+  return { ...state, open: null, preview: null }
+}
+
+/**
+ * A preview answer arrived. An answer for a row the reader has already left is DROPPED: it would
+ * otherwise paint one row's diff under another row's heading.
+ */
+export function previewArrived(state: PendingState, id: string, view: PreviewView): PendingState {
+  return state.open === id ? { ...state, preview: view } : state
+}
 
 /** The first load, or a refresh after a decision: back to loading, keeping no stale rows. */
 export function loading(state: PendingState): PendingState {

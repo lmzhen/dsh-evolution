@@ -64,6 +64,14 @@ export const CSS = [
   '.evolution-param-footer{display:flex;justify-content:flex-end;gap:var(--evo-space-8);padding:var(--evo-space-12) 0 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
   '.evolution-param-note{margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evolution-param-error{margin:0;color:var(--dsw-alias-state-error-primary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  // The preview a staged write shows before it runs: a facts line, then the SOURCE view. It borrows the
+  // history panel's diff surface on purpose (code block with its own scroll, '-'/'+' lines under the tone
+  // colours) — the two faces describe the same kind of change, so they read the same way.
+  '.evolution-param-facts{display:flex;flex-wrap:wrap;align-items:baseline;margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evolution-param-fact+.evolution-param-fact::before{content:"·";margin:0 var(--evo-space-6);color:var(--dsw-alias-label-tertiary)}',
+  '.evolution-param-source{margin:0;padding:var(--evo-space-12) var(--evo-space-16);max-height:var(--evo-cap-block);overflow:auto;border:var(--evo-hairline-width) solid var(--dsw-alias-border-l1);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
+  '.evolution-param-line-add{color:var(--evo-tone-success)}',
+  '.evolution-param-line-del{color:var(--evo-tone-danger)}',
 ].join('\n')
 
 /** The slice of the DOM the injection touches (this package typechecks without DOM lib). */

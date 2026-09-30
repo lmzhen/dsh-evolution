@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createApprovalApi, type PendingRow } from '../src/client/api.ts'
 import {
-  beginAction, endAction, failed, INITIAL_PENDING_STATE, loaded, loading, noticed,
+  beginAction, collapsed, endAction, expanded, failed, INITIAL_PENDING_STATE, loaded, loading, noticed, previewArrived,
 } from '../src/client/pending-state.ts'
 import { APPROVAL_CLIENT_ROUTES } from '../src/client/approval-routes.ts'
 
@@ -40,11 +40,13 @@ describe('the approval api maps every answer onto one shape', () => {
     const pending = await api.pending()
     await api.approve('p-1')
     await api.reject('p-2')
+    await api.preview('p-3')
     expect(pending).toMatchObject({ ok: true, data: [{ id: 'p-1' }] })
     expect(calls).toEqual([
       { url: APPROVAL_CLIENT_ROUTES.pending, method: 'GET' },
       { url: APPROVAL_CLIENT_ROUTES.approve, method: 'POST', body: JSON.stringify({ id: 'p-1' }) },
       { url: APPROVAL_CLIENT_ROUTES.reject, method: 'POST', body: JSON.stringify({ id: 'p-2' }) },
+      { url: APPROVAL_CLIENT_ROUTES.preview + '?id=p-3', method: 'GET' },
     ])
   })
 
@@ -75,6 +77,18 @@ describe('the pending card state machine', () => {
     expect(refused.notice).toBe('not in the pending window')
     expect(endAction(refused, 'p-1').busy).toEqual([])
     expect(noticed(endAction(refused, 'p-1'), null).notice).toBeNull()
+  })
+
+  it('opens one preview at a time and drops an answer for a row the reader left', () => {
+    const opened = expanded(INITIAL_PENDING_STATE, 'p-1')
+    expect(opened.open).toBe('p-1')
+    expect(opened.preview).toEqual({ kind: 'loading' })
+    const ready = previewArrived(opened, 'p-1', { kind: 'unavailable', reason: 'the target changed' })
+    expect(ready.preview).toEqual({ kind: 'unavailable', reason: 'the target changed' })
+    // A late answer for another row must not paint under the open one.
+    expect(previewArrived(opened, 'p-2', { kind: 'loading' })).toBe(opened)
+    expect(expanded(ready, 'p-2').open).toBe('p-2')
+    expect(collapsed(ready)).toMatchObject({ open: null, preview: null })
   })
 
   it('marks only the record whose decision is in flight', () => {
