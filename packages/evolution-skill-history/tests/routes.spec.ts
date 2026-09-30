@@ -10,8 +10,8 @@ import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '@deepseek-ai/dsh-evolution-curator'
-import { DEFAULT_SKILL_LIMITS, SkillLibrary, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import { MAX_REQUEST_BODY_BYTES, SKILL_HISTORY_ROUTES, isLoopbackRequest, makeSkillHistoryRoutes, type FenceRequest } from '../src/routes.ts'
+import { DEFAULT_SKILL_LIMITS, SkillLibrary, MAX_REQUEST_BODY_BYTES, isLoopbackRequest, nodeEvolutionIo, type FenceRequest } from '@deepseek-ai/dsh-evolution-core'
+import { SKILL_HISTORY_ROUTES, makeSkillHistoryRoutes } from '../src/routes.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
 
 /** A request the fence judges: only the fields the fence reads, with a loopback default. */

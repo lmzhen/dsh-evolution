@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
+    { "path": "../../host/webserver" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../evolution-state-storage" },

@@ -27,6 +27,7 @@ import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
+import { makeApprovalRoutes } from './routes.ts'
 
 export type { PendingKind, PendingRecord, PendingStatus }
 
@@ -164,6 +165,17 @@ export class EvolutionApproval extends Service {
     super(ctx, 'evolutionApproval')
     this.enabled = config.enabled ?? false
     this.stageForegroundConfig = config.stageForeground ?? true
+    // The reading face for the pending window (the settings panel's card). `ctx.inject` and not
+    // `ctx.get`: profile rows apply in file order, so the web server may not exist yet — waiting on the
+    // service mounts the routes whenever it arrives, and a profile without one stays inert.
+    this.ctx.inject(['webServer'], (scope) => {
+      scope.effect(() => {
+        const disposers = makeApprovalRoutes(this).map(route => scope.webServer.register(route))
+        return () => {
+          for (const dispose of disposers) dispose()
+        }
+      }, 'evolution-approval: routes')
+    })
   }
 
   private state(): EvolutionState {

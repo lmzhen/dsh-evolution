@@ -10,7 +10,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { contentHash, displayBodyOf, elapsedSince, errorText, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, displayBodyOf, elapsedSince, errorText, isLoopbackRequest, latestVersionAt, partitionVersions, readJsonObject, skillRowCells, textDiffFacts, versionActionKind, versionRowCells, writeJson } from '@deepseek-ai/dsh-evolution-core'
 
 /** Route paths. The client bundle mirrors these literals; a spec asserts the two sides agree. */
 export const SKILL_HISTORY_ROUTES = {
@@ -22,107 +22,11 @@ export const SKILL_HISTORY_ROUTES = {
   health: '/api/dsh-evolution/skill-history/health',
 } as const
 
-/** Largest request body these routes accept (the undo payload is a name and a number). */
-export const MAX_REQUEST_BODY_BYTES = 64 * 1024
-
 /**
  * How much of one version's body the read route hands back. A bound on the ANSWER, not on what the
  * deployment may store: a long skill arrives as its head plus `truncated`, so the reader is told.
  */
 export const MAX_BODY_CHARS = 20_000
-
-/** The request facts the trust fence reads: a Node request, or the same fields in a spec fixture. */
-export interface FenceRequest {
-  readonly headers: Record<string, string | string[] | undefined>
-  readonly socket?: { readonly remoteAddress?: string | undefined } | undefined
-}
-
-function header(request: FenceRequest, name: string): string | undefined {
-  const value = request.headers[name]
-  return typeof value === 'string' ? value : undefined
-}
-
-/** IPv4 127/8 predicate (four decimal octets, first == 127). */
-function isIPv4Loopback(value: string): boolean {
-  const parts = value.split('.')
-  return parts.length === 4 && parts[0] === '127' && parts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255)
-}
-
-/** Whether a socket remote address names the loopback range (127/8, ::1, IPv4-mapped). */
-function isLoopbackAddress(address: string | undefined): boolean {
-  if (address === undefined) return false
-  const normalized = address.toLowerCase()
-  if (normalized === '::1') return true
-  if (normalized.startsWith('::ffff:')) return isIPv4Loopback(normalized.slice(7))
-  return isIPv4Loopback(normalized)
-}
-
-/** Whether a hostname names the loopback authority (localhost, [::1], 127/8). */
-function isLoopbackHostname(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname === '[::1]') return true
-  return isIPv4Loopback(hostname)
-}
-
-/**
- * Whether one request may enter these routes.
- *
- * The same fence the platform puts on its own /api bridge, kept local because the canonical
- * implementation (packages/client/connection/src/api-request-trust.ts) is not part of that package's
- * published surface. Rules, in order: the SOCKET must be loopback (authoritative — X-Forwarded-For is
- * never trusted), the Host header must name a loopback authority (DNS-rebinding defense), an explicit
- * cross-site marker is refused, and an attached Origin must be exactly this authority.
- * @param request - the request to judge.
- * @returns true when the request may proceed.
- */
-export function isLoopbackRequest(request: FenceRequest): boolean {
-  if (!isLoopbackAddress(request.socket?.remoteAddress)) return false
-  const host = header(request, 'host')
-  if (host === undefined) return false
-  let hostUrl: URL
-  try {
-    hostUrl = new URL('http://' + host)
-  } catch {
-    return false
-  }
-  if (!isLoopbackHostname(hostUrl.hostname)) return false
-  if (header(request, 'sec-fetch-site') === 'cross-site') return false
-  const origin = header(request, 'origin')
-  if (origin === undefined) return true
-  try {
-    return new URL(origin).host === hostUrl.host
-  } catch {
-    return false
-  }
-}
-
-/** Write one JSON response. The routes own their response lifecycle, so every path ends here. */
-export function writeJson(res: ServerResponse, status: number, value: unknown): void {
-  const body = JSON.stringify(value)
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(body) })
-  res.end(body)
-}
-
-/**
- * Read one JSON request body, bounded.
- * @param req - the request.
- * @returns the parsed value, or null when the body is oversized, empty, or not JSON.
- */
-export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Uint8Array[] = []
-  let size = 0
-  for await (const chunk of req) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += buffer.byteLength
-    if (size > MAX_REQUEST_BODY_BYTES) return null
-    chunks.push(buffer)
-  }
-  if (size === 0) return null
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-  } catch {
-    return null
-  }
-}
 
 /** The curator surface the routes read: history() and the library listing, undo() as the only write. */
 export type CuratorFace = Pick<Context['evolutionCurator'], 'history' | 'undo' | 'skills'>
@@ -346,8 +250,7 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
       path: SKILL_HISTORY_ROUTES.undo,
       handler: async (req, res) => {
         if (!guard(req, res, 'POST')) return
-        const body = await readJsonBody(req)
-        const payload = body !== null && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : null
+        const payload = await readJsonObject(req)
         const name = typeof payload?.name === 'string' ? payload.name.trim() : ''
         if (name === '') {
           writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name is required' })
