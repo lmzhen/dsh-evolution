@@ -15,7 +15,7 @@ export const NS = 'evolution-settings'
 /** Chinese copy (the family's primary language). */
 export const zh = {
   title: '自进化',
-  subtitle: '下面按功能列出你能改的参数；没有列出的由安装时的配置决定。',
+  subtitle: '待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。',
   overridden: '我改过',
   deployment: '默认',
   loading: '正在读取设置…',
@@ -61,7 +61,7 @@ export const zh = {
 /** English copy, key for key with {@link zh}. */
 export const en: Record<keyof typeof zh, string> = {
   title: 'Self-evolution',
-  subtitle: 'Changeable parameters are listed by feature below; anything not listed comes from the deployment configuration.',
+  subtitle: 'Writes waiting for your decision come first; the changeable parameters are listed by feature below, and anything not listed comes from the deployment configuration.',
   overridden: 'edited by you',
   deployment: 'default',
   loading: 'reading settings…',

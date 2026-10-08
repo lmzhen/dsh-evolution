@@ -16,6 +16,16 @@ import type { ReactNode } from 'react'
 /** Our card slot, hosted by the section this bundle registers. */
 export const CARD_SLOT = 'evolution.namespace.card'
 
+/**
+ * The pending-window card's slot key.
+ *
+ * The section pairs cards by key and the parameter cards use their settings namespace; this card has no
+ * namespace (its data comes from the host's approval routes), so it carries a key of its own. The constant
+ * lives HERE and not in `index.ts` because the SECTION has to name it too, and `index.ts` already imports
+ * the section — one definition in the module both sides already share is what keeps that pair acyclic.
+ */
+export const PENDING_CARD_KEY = 'approval-pending'
+
 /** Snapshot of one settings namespace, as the client scope reports it. */
 export interface ParamSectionSnapshot {
   status: 'loading' | 'ready' | 'unavailable'

@@ -31,6 +31,13 @@ writes and carries the two decisions plus a preview. It reads the approval plugi
 (`src/client/api.ts` + `approval-routes.ts`; the path literals are compared against the host table by a spec),
 wears the same card shell and button vocabulary as the parameter cards, and invents no state of its own.
 
+The card rides that keyed slot with a key of its own (`approval-pending`): it has no namespace, so no
+namespace-driven loop can name it — and a keyed slot renders ONLY the keys its section asks for, so
+`SettingsSection` names it explicitly and puts it FIRST (it is the one card in this section that waits on a
+decision). A registration nobody asks for renders nowhere: 0.16.0 shipped exactly that, which is why
+`tests/section.client.spec.ts` now drives the real `apply()` and requires the section's `renderSlot` calls to cover
+every key the bundle registers into the slot.
+
 Its states are deliberately distinct: **reading** ("正在读取待批项…"), **empty** ("没有待批的写入") and
 **failed** (the reason plus a retry). Merging the first two is what once made a slow answer read as lost data
 (E7), so the state machine lives in `pending-state.ts` and the three are asserted without a browser.

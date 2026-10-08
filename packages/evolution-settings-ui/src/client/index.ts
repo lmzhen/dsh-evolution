@@ -21,7 +21,7 @@ import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
 import { PendingCard, type PendingCardFace } from './PendingCard.ts'
 import { en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace } from './ParamCard.ts'
-import { CARD_SLOT, type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { CARD_SLOT, PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { SettingsSection } from './SettingsSection.ts'
 import { injectStyles } from './styles.ts'
 
@@ -32,13 +32,8 @@ export const inject = ['slots', 'settingsScope', 'locale']
 export const SECTION_ID = 'evolution'
 export const SECTION_ORDER = 25
 
-/**
- * The pending-window card's slot key.
- *
- * The section pairs cards by key and the parameter cards use their settings namespace; this card has no
- * namespace (its data comes from the host's approval routes), so it carries a key of its own.
- */
-export const PENDING_CARD_KEY = 'approval-pending'
+/** The pending-window card's key, re-exported from `seam.ts` (the section names it as well). */
+export { PENDING_CARD_KEY }
 
 /**
  * Register the locale namespace, the section and its cards.

@@ -1,6 +1,16 @@
 # Changelog
 
 
+## 0.16.1 (patch) — 待批写入卡真的出现了：keyed slot 只渲染被点名的键
+
+> **由来**：0.16.0 的真机验收第一步就没过——设置「自进化」里**根本没有那张卡**。用一个真 Chrome（同一台机器、同一个宿主）无头打开页面点开设置：DOM 里只有 5 张参数卡、零个 `/api/dsh-evolution/approval/*` 请求；而宿主**确实在服务** 0.16.0 的客户端半（把 `/plugins/??…` 那份拼接 bundle 拉下来，`approval-pending`／`evolution-param-facts`／四条路由字面量都在里面，15.2 MB，200）。所以不是装机、不是缓存，是代码。
+> **根因**：`SettingsSection` 只对 `CLIENT_PARAM_SECTIONS` 里的命名空间逐个 `renderSlot(CARD_SLOT, {}, { entryKey })`，而 keyed slot **只渲染被点名的键**；待批卡注册的键是 `approval-pending`，没有任何一处 `renderSlot` 点它的名 ⇒ 注册了、永远不渲染。0.16.0 的卡片 spec 拦不住：它直接把 `PendingCard` 组件配一个 face 渲染，看不见「section 有没有问这个键」。
+> **修法**：`PENDING_CARD_KEY` 挪进 `seam.ts`（注册处与 section 共用一个常量，避免 `index.ts ↔ SettingsSection` 成环），`SettingsSection` 显式点名它并**放在最前**（这里唯一等人决定的卡），副标题相应改为「待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。」
+> **护栏**：新增 `tests/section.client.spec.ts`——驱动真实的 `apply()`（假 shell 收集注册），要求 section 的 `renderSlot` 覆盖**每一个**注册进该 slot 的键。把 0.16.0 的写法放回去，它当场红：`AssertionError: expected [ 'evolution-curator', …(4) ] to include 'approval-pending'`。
+> **验证**：`evolution-settings-ui` 4 文件／21 用例全绿（含新 spec）；门禁 22/22（前缀 `p4`）。
+> **真机（真 Chrome ＋ 真宿主）**：卡以「待批写入｜2 项待批」出现在「自进化」**最上面**，两行各带 技能 chip／摘要／年龄（「12 分钟前」）与 批准・拒绝・预览；点预览得「1 行新增／1 行删除」＋ `-`/`+` 两块；点批准后**卡片自行重读**为「1 项待批」、该行消失，且写入真的落盘（`SKILL.md` 出现补丁文本）；再拒绝剩下那条 → 「没有待批的写入」；对已被别处结清的旧行点批准，卡片如实显示宿主原话 `Pending write "…" is not in the pending window (rotated or resolved).`。截图 `D:\dsh\_shots\accept-0*.png`。
+> **更正 0.16.0 验收点⑤的表述**：附带文件**不能**回退（属 §5 D2「明确不做」）——`POST /undo {v:<support 版本>}` 返回 200 但 `code=undo-refused`，宿主原话「undo restores the body only… copy the blob back over that file to restore them」。正确判据＝删除行可见（`support-remove`，带 `path`・`chars`，hash＝被删字节）＋ 字节留在历史库 ＋ 回退只对正文生效（正文回退实测可用）。
+> **影响面**：**只改客户端半** ⇒ 装机后**刷新页面**即可（不必重启宿主；实测直接替换盘上的 `lib/client.js` 后新开页面即生效）。
 ## 0.16.0 (minor) — 待批写入看得见了：面板里能列、能批、能看预览（顺带清掉三条老欠账）
 
 > **由来**：台账 §3 的 B1（待批项可见性）与 B2（审批 diff 预览）是两条挂账——卡在「客户端半能否调宿主服务」这个前置上；0.14.0 的路由链（技能历史「回退」→ `curator.undo`）把它解开了，本批就做这一件。顺带清掉同批的 E2／E7／E8／E9。
