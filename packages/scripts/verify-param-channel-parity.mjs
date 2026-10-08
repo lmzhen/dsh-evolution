@@ -11,8 +11,10 @@
  * id-shaped literal those channels carry is a registry id; that every E3 row is a field of
  * its OWNER's row Config schema AND carries .volatile() — since G1 the platform validates
  * a settings write against that row Config (the profile entry's config), and only a
- * volatile field is writable at all — so a registered knob has somewhere to land and a
- * way to change; and that the generated artifacts carry EXACTLY the registry's ids, so a
+ * volatile field is writable at all, and that the owner turns the platform's own auto-generated
+ * form OFF (`settings.configure({ auto: false })`) — otherwise that row carries two pages editing
+ * it — so a registered knob has somewhere to land, a way to change, and exactly one page;
+ * and that the generated artifacts carry EXACTLY the registry's ids, so a
  * hand edit in either one fails here even before the byte-level freshness check runs.
  *
  * Canonical names only: a deprecated alias must never appear in a writable
@@ -176,7 +178,16 @@ for (const owner of Object.keys(namespaces)) {
       problems.push('owner-config: ' + owner + ' marks "' + key + '" .volatile(), which the registry does not carry as an E3 row of this owner — add the row or drop the marker')
     }
   }
-  notes.push(owner + ' row Config: ' + fields.size + ' key(s), ' + volatile.length + ' volatile')
+  // The THIRD leg of the writability triplet (plan D5: the row must appear ∧ be writable ∧ not be
+  // duplicated): without `settings.configure({ auto: false })` the platform keeps its own
+  // auto-generated form for that row mounted next to the family's card — the user gets two pages
+  // editing one row, and a write on the wrong one looks like it was ignored. It is one line per
+  // owner, so the guard reads it directly instead of trusting the G1 batch's commit message.
+  const autoOff = /settings\.configure\(\{\s*auto:\s*false\s*\}\)/.test(text)
+  if (!autoOff) {
+    problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but never calls settings.configure({ auto: false }) — the platform auto form stays mounted beside our card (two pages for one row)')
+  }
+  notes.push(owner + ' row Config: ' + fields.size + ' key(s), ' + volatile.length + ' volatile' + (autoOff ? ', auto:false' : ''))
 }
 // The generated artifacts must carry EXACTLY the ids they are generated from:
 // the client field list is the E3 rows, the document is every row.

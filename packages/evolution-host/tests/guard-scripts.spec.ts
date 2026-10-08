@@ -648,8 +648,20 @@ describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
     const extra = await gate()
     expect(extra?.code).toBe(1)
     expect(extra?.stderr).toContain('marks "somethingElse" .volatile(), which the registry does not carry as an E3 row of this owner')
-    // An ordinary deployment field stays legal beside them.
-    await writeFile(join(owner, 'index.ts'), rowConfig('reviewSkillInterval: z.number().volatile()', "root: z.string().default('')"), 'utf8')
+    // The THIRD leg (plan D5): the field is volatile, but the owner never turns the platform's
+    // own auto-generated form off — that row then carries two pages editing it, and a write on
+    // the wrong one reads as "my change was ignored".
+    await writeFile(join(owner, 'index.ts'), rowConfig('reviewSkillInterval: z.number().volatile()'), 'utf8')
+    const autoOn = await gate()
+    expect(autoOn?.code).toBe(1)
+    expect(autoOn?.stderr).toContain('never calls settings.configure({ auto: false })')
+    // An ordinary deployment field stays legal beside them, once the auto form is off.
+    await writeFile(
+      join(owner, 'index.ts'),
+      rowConfig('reviewSkillInterval: z.number().volatile()', "root: z.string().default('')")
+        + 'const disposer = settings.configure({ auto: false })\n',
+      'utf8',
+    )
     const clean = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
     expect(clean.stdout).toContain('verify-param-channel-parity: OK')
   })
