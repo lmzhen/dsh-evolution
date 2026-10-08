@@ -548,7 +548,10 @@ describe('layered installer', () => {
     // checkout used to pin the host repo's root version (0.1.x) here, so the
     // assertion stays VERSION-AGNOSTIC: any caret range on the family version
     // is correct, and hardcoding a minor (`^0.3.`) broke on the 0.4.0 bump.
-    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+$/)
+    // A PRERELEASE family version pins as `^0.17.0-rc.1` (the installer's version regex accepts the
+    // suffix, and node-semver's `^` on a prerelease still admits that version's stable release).
+    // The stable-only pattern this used to assert failed the moment the family shipped an rc.
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/)
   }, 60_000)
 
   it('D-4 (v18): a profile name with no shipped template seeds DEFAULT_PROFILE_BUNDLES', async () => {
@@ -785,7 +788,7 @@ describe('layered installer', () => {
       dependencies?: Record<string, string>
       dsh?: { profile?: { bundles?: string[] } }
     }
-    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+$/)
+    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/)
     expect(before.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-host')
     // P1-3: the journal records what the installer wrote.
     const journalPath = join(home, 'profiles', 'evo-test', '.evolution-install.json')
