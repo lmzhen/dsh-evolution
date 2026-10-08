@@ -23,16 +23,34 @@ async function mount(config: Record<string, unknown> = {}) {
 
 describe('memory-files G3.1 numeric clamping', () => {
   const parse = (input: unknown): unknown => (MemoryFiles.Config as unknown as (i: unknown) => unknown)(input)
+  /** G1: a volatile field parses into a live reference; the test reads its value. */
+  const plainField = (input: unknown, key: string): unknown => {
+    const field = (parse(input) as Record<string, unknown>)[key]
+    return typeof field === 'object' && field !== null && 'get' in field ? (field as { get(): unknown }).get() : field
+  }
 
   it('schema rejects 0/negative but lets NaN/Infinity through (.min(1))', () => {
     for (const field of FIELDS) {
       expect(() => parse({ [field]: 0 }), `${field} 0`).toThrow()
       expect(() => parse({ [field]: -1 }), `${field} -1`).toThrow()
     }
-    const nan = parse({ memoryCharLimit: NaN }) as { memoryCharLimit: number }
-    expect(Number.isNaN(nan.memoryCharLimit)).toBe(true)
-    const inf = parse({ maxConsolidationFailures: Infinity }) as { maxConsolidationFailures: number }
-    expect(inf.maxConsolidationFailures).toBe(Infinity)
+    expect(Number.isNaN(plainField({ memoryCharLimit: NaN }, 'memoryCharLimit'))).toBe(true)
+    expect(plainField({ maxConsolidationFailures: Infinity }, 'maxConsolidationFailures')).toBe(Infinity)
+  })
+
+  // G1: the four E3 registry keys are the row's live fields — the loader hands the
+  // plugin a reference whose value it updates in place, which is what makes a
+  // committed settings edit apply without a restart. The deprecated aliases stay
+  // plain deployment fields (they are never user-writable).
+  it('G1: the E3 keys parse into live references, the deprecated aliases stay plain', () => {
+    const canonical = plainField({ memoryChars: 5000, userChars: 900, addDatePrefix: true, maxConsolidationFailures: 4 }, 'memoryChars')
+    expect(canonical).toBe(5000)
+    expect(plainField({ userChars: 900 }, 'userChars')).toBe(900)
+    expect(plainField({ addDatePrefix: true }, 'addDatePrefix')).toBe(true)
+    expect(plainField({ maxConsolidationFailures: 4 }, 'maxConsolidationFailures')).toBe(4)
+    const parsed = parse({ memoryChars: 5000 }) as Record<string, unknown>
+    expect(typeof (parsed.memoryChars as { get?: unknown }).get, 'the canonical key is a reference').toBe('function')
+    expect(typeof parsed.memoryCharLimit, 'the alias is a plain deployment field').toBe('number')
   })
 
   it('assembly applies a NaN numeric config without crashing and keeps the provider working', async () => {

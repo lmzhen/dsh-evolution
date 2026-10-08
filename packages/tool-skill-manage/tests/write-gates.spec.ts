@@ -389,7 +389,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     const sessionId = 'wg-confirm-live'
     const session = { id: sessionId, header: {}, snapshotEvents: () => [] }
     const live = { id: sessionId, session, ctx, inject: () => {} } as unknown as Agent
-    ctx.agents.register(live)
+    await ctx.agents.register(live)
     const { asked, routing } = mountQuestions(ctx, () => ['Create'], agent => agent === live)
     // A structural copy carrying the same session id: the platform rejects it as CALLER_NOT_LIVE,
     // so the gate has to route through the registry's live root instead.

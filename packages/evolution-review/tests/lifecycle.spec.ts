@@ -33,7 +33,7 @@ describe('evolution-review lifecycle guards', () => {
     })
 
     const session = ctx.sessions.create(SessionId('review-dispose'))
-    ctx.agents.register({
+    await ctx.agents.register({
       id: session.id,
       session,
       ctx,
@@ -48,8 +48,11 @@ describe('evolution-review lifecycle guards', () => {
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     // V6-53 (0.3.39): the threshold turn only STASHES the review — the subagent
-    // runs at the NEXT completed boundary (the flush). Append a second
-    // completed turn/end to drive the flush.
+    // runs at the NEXT completed boundary (the flush). Append a second completed
+    // turn to drive the flush: its own `turn/start` opens an EMPTY window (G4: the
+    // projection resets the window at the boundary, so a turn with no content
+    // cannot re-fire the cadence).
+    session.append('turn/start', { turn: 2 })
     session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
     // V6-53 (0.3.39): the review runs at the END-flush — settle, then assert the

@@ -22,7 +22,10 @@
  * was dropped — and nothing reported the loss.
  * @module @deepseek-ai/dsh-evolution-core
  */
+import type { Context } from '@deepseek-ai/cordis'
+import type { Session } from '@deepseek-ai/dsh-session'
 import { collectReadSkillNames } from './tool-dispatch.ts'
+import { sessionReadNames } from './session-projection.ts'
 
 /** The session-log accessor the platform exposes (0.1.5 on; `session.events` before it). */
 export interface EvolutionSessionLogView {
@@ -33,14 +36,23 @@ export interface EvolutionSessionLogView {
 /**
  * The skill names ONE session read, or `undefined` when its log is not readable.
  *
+ * Two readers, in this order: the family's `evolutionReads` projection for a platform `Session`
+ * (0.2.x's live read — the deprecated synchronous log read is gone from production), then the
+ * STRUCTURAL accessor for a view that is not a `Session` at all. The tool path's exec view may be a
+ * bare stub, which is what this module exists for; a real Session always takes the first path.
+ *
  * `undefined` is NOT an empty set: a caller that must decide (the tool path's read-before-write
  * gate) can then keep its previous behavior instead of refusing every write in a composition whose
  * session objects expose no log at all.
+ * @param ctx - a context of the runtime.
  * @param session - the session whose reads are wanted; `undefined` when the call carries none.
  * @returns the names read through a non-failed `skill` dispatch, or `undefined` when unreadable.
  */
-export function sessionReadSkillNames(session: EvolutionSessionLogView | undefined): ReadonlySet<string> | undefined {
-  const events = session?.snapshotEvents?.()
+export function sessionReadSkillNames(ctx: Context, session: EvolutionSessionLogView | undefined): ReadonlySet<string> | undefined {
+  if (session === undefined) return undefined
+  const projected = sessionReadNames(ctx, session as Session)
+  if (projected !== undefined) return projected
+  const events = session.snapshotEvents?.()
   return events === undefined ? undefined : collectReadSkillNames(events)
 }
 

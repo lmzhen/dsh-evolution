@@ -4,8 +4,8 @@
  *
  * Modes:
  *   host     install @deepseek-ai/dsh-evolution-host as a profile bundle
- *   agent    install the Evolution agent preset under $DSH_HOME/.agent-presets/evolution
- *            (or .agent-presets/evolution-ptc with --base ptc)
+ *   agent    install the Evolution agent preset ROW into the profile's own patch
+ *            ($DSH_HOME/profiles/<p>/cordis.patch.yml; --base ptc picks another base)
  *   layered  host + agent
  *   oneclick install the compatibility @deepseek-ai/dsh-evolution-preset bundle
  *
@@ -17,7 +17,7 @@
 
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
@@ -163,21 +163,23 @@ export function profileDirectory(home, profile) {
 /**
  * The agent-preset BASES a layered install can compose the Evolution preset on.
  *
- * A base names the runtime platform preset whose rows are prepended verbatim
- * (`<base>/agent.cordis.yml`); the evolution delta is identical for every base,
- * so a variant differs only in which platform composition it follows, the
- * preset id it occupies under `$DSH_HOME/.agent-presets/`, and the display
- * metadata it publishes. This table is the single authority for all three: the
- * composition resolver, the destination directory, the metadata source, the
- * refusal sweeps, and uninstall all read it, so a variant cannot be half-added
- * (a directory one consumer knows and another does not is exactly the stranded
- * / double-mounted preset this installer keeps re-learning).
+ * A base names the runtime platform preset whose rows are merged verbatim
+ * (`packages/bundle/web-app/presets/<base>.patch.yml`); the evolution delta is
+ * identical for every base, so a variant differs only in which platform
+ * composition it follows, the preset id it registers under, and the display
+ * copy it publishes. This table is the single authority for all four: the base
+ * patch resolver, the preset/row ids, the published display copy, and the
+ * refusal sweeps all read it, so a variant cannot be half-added (an id one
+ * consumer knows and another does not is exactly the stranded / double-mounted
+ * preset this installer keeps re-learning).
  *
- * The preset id is the DIRECTORY name and must satisfy the platform's own
- * `PRESET_ID` (`packages/preset/agent-presets/src/preset.ts`, `/^[a-z0-9][a-z0-9-]*$/`).
- * The id also decides display copy: the platform resolves localized text for
- * its SHIPPED ids only, so a family variant must publish its own `name` /
- * `description` / `order` in `metadata`.
+ * The id must satisfy the platform's own `PRESET_ID`
+ * (`packages/preset/agent-preset-registry/src/preset.ts`, `/^[a-z0-9][a-z0-9-]*$/`).
+ * The id also decides display copy: the platform resolves localized text for its
+ * SHIPPED ids only — a preset that publishes no `name` is looked up in the
+ * dictionary by id and falls back to the bare id
+ * (`packages/preset/agent-preset-registry/src/display.ts:47-72`) — so a family
+ * variant publishes its own `name` / `description` / `order`.
  */
 // 0.3.75 (v41 P2-26 sibling): the table lives in the agent package's
 // bases.json, which is ALSO what `/evolution preset install --base` reads at
@@ -186,7 +188,7 @@ export function profileDirectory(home, profile) {
 // `--base` value, the platform composition directory, and the agent-preset
 // registry id the runtime composes against.
 export const AGENT_PRESET_BASES = Object.freeze(Object.fromEntries(
-  readAgentPresetTable().bases.map(base => [base.name, Object.freeze({ id: base.id, metadata: base.metadata, requires: base.requires, unsupported: base.unsupported })]),
+  readAgentPresetTable().bases.map(base => [base.name, Object.freeze({ id: base.id, display: Object.freeze({ ...base.display }), requires: base.requires, unsupported: base.unsupported })]),
 ))
 
 /**
@@ -229,8 +231,17 @@ function readAgentPresetTable() {
     throw new Error(`install-layered: ${path} carries no bases[] — refusing to install without a preset table`)
   }
   const table = bases.map(base => {
-    if (typeof base?.name !== 'string' || typeof base?.id !== 'string' || typeof base?.metadata !== 'string') {
-      throw new Error(`install-layered: ${path} entry ${JSON.stringify(base)} needs name/id/metadata strings`)
+    if (typeof base?.name !== 'string' || typeof base?.id !== 'string') {
+      throw new Error(`install-layered: ${path} entry ${JSON.stringify(base)} needs name/id strings`)
+    }
+    // The display copy is REQUIRED, not decorative: the platform localizes its
+    // own shipped ids only, so a variant without a name lists as its bare id.
+    const display = base.display
+    if (display === null || typeof display !== 'object'
+      || typeof display.name !== 'string' || display.name === ''
+      || typeof display.description !== 'string' || display.description === ''
+      || !Number.isInteger(display.order)) {
+      throw new Error(`install-layered: ${path} entry "${base.name}" needs display { name, description, order } (name/description strings, order integer)`)
     }
     // G1-② (0.3.78): the optional ability fields are validated, never ignored —
     // a mistyped requires/unsupported would silently turn a refusal into an
@@ -241,7 +252,7 @@ function readAgentPresetTable() {
     if (base.unsupported !== undefined && (typeof base.unsupported !== 'string' || base.unsupported === '')) {
       throw new Error(`install-layered: ${path} entry "${base.name}" needs unsupported as a non-empty reason string`)
     }
-    const entry = { name: base.name, id: base.id, metadata: base.metadata }
+    const entry = { name: base.name, id: base.id, display: { name: display.name, description: display.description, order: display.order } }
     if (base.requires !== undefined) entry.requires = { service: base.requires.service }
     if (base.unsupported !== undefined) entry.unsupported = base.unsupported
     return entry
@@ -309,23 +320,23 @@ export function resolveAgentPresetBases(selection = undefined) {
   return Object.keys(AGENT_PRESET_BASES).filter(base => names.has(base)).map(base => resolveAgentPresetBase(base))
 }
 
-export function agentPresetDirectory(home, base = DEFAULT_AGENT_PRESET_BASE) {
-  return join(home, '.agent-presets', resolveAgentPresetBase(base).id)
+/** The row id one base's preset occupies in a composition. The platform ships
+ * `preset-standard` for id `standard` (`packages/bundle/web-app/presets/standard.patch.yml`), so a
+ * family preset id mirrors that spelling. */
+export function presetRowId(id) {
+  return `preset-${id}`
 }
 
-/**
- * Every family preset directory under one DSH_HOME, in table order.
- *
- * The install/uninstall existence sweeps ask "does this home carry ANY family
- * preset?", which is not the same question as "does it carry the base I am
- * installing?" — the family preset is HOME-GLOBAL and sibling bases coexist on
- * disk, so a sweep narrowed to one base would let a second install (or a
- * one-click bundle) proceed beside a preset the user already has.
- * @param home - the resolved DSH_HOME.
- * @returns one `{ base, directory }` per {@link AGENT_PRESET_BASES} entry.
- */
-export function agentPresetDirectories(home) {
-  return Object.keys(AGENT_PRESET_BASES).map(base => ({ base, directory: agentPresetDirectory(home, base) }))
+/** The composition identity of one base's row: the row id a profile patch is matched by, plus the
+ * preset id and display copy the platform registry serves. */
+export function presetIdentity(entry) {
+  return { rowId: presetRowId(entry.id), id: entry.id, name: entry.display.name, description: entry.display.description, order: entry.display.order }
+}
+
+/** The profile's own patch layer — the file a family preset row is written to
+ * (`packages/boot/app-boot/src/profile.ts`, `PROFILE_PATCH_FILENAME`). */
+export function profilePatchPath(home, profile = 'web') {
+  return join(profileDirectory(home, profile), 'cordis.patch.yml')
 }
 
 function scopedName(packageName) {
@@ -395,27 +406,26 @@ async function copyPackage(source, destination) {
  * packages are always `@deepseek-ai`-scoped (only the family packages are
  * scope-rewritten at publish).
  *
- * FROZEN COPY of the platform's `PROFILE_TEMPLATES` +
- * `DEFAULT_PROFILE_PATCH_RELOAD` (`packages/boot/app-boot/src/profile.ts`).
- * The installer runs BEFORE any dsh profile exists, so it cannot ask the
- * platform — this table is a snapshot by design, and
- * `scripts/verify-platform-contract.mjs --upstream <platform-tree>` is the
- * probe that turns it red when the platform's table moves. */
+ * FROZEN COPY of the platform's `PROFILE_TEMPLATES` + `DEFAULT_PROFILE_BUNDLES`
+ * (`packages/boot/app-boot/src/profile.ts`). The installer runs BEFORE any dsh
+ * profile exists, so it cannot ask the platform — this table is a snapshot by
+ * design, and `scripts/verify-platform-contract.mjs --upstream <platform-tree>`
+ * compares it name by name and bundle by bundle with the platform's table. */
 const PROFILE_SEED_TEMPLATES = {
-  acp: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-app'], patchReload: 'startup' },
-  web: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'], patchReload: 'live' },
-  headless: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'], patchReload: 'startup' },
-  sdk: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'], patchReload: 'startup' },
+  acp: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-app'] },
+  web: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'] },
+  headless: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'] },
+  sdk: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'] },
   // The platform's `sdk-minimal` template carries the sdk package alone.
-  'sdk-minimal': { bundles: ['@deepseek-ai/dsh-sdk-minimal'], patchReload: 'startup' },
+  'sdk-minimal': { bundles: ['@deepseek-ai/dsh-sdk-minimal'] },
 }
-/** Upstream `DEFAULT_PROFILE_BUNDLES` / `DEFAULT_PROFILE_PATCH_RELOAD`: a
- * profile name with no shipped template gets the base row and live reload. */
-const DEFAULT_SEED_TEMPLATE = { bundles: ['@deepseek-ai/dsh-base'], patchReload: 'live' }
+/** Upstream `DEFAULT_PROFILE_BUNDLES`: a profile name with no shipped template
+ * gets the base row. */
+const DEFAULT_SEED_TEMPLATE = { bundles: ['@deepseek-ai/dsh-base'] }
 
 /** The platform template a profile name resolves to.
  * @param profile - the profile name.
- * @returns the template's bundles and patch-file lifecycle. */
+ * @returns the template's bundles. */
 function profileSeed(profile) {
   return Object.prototype.hasOwnProperty.call(PROFILE_SEED_TEMPLATES, profile)
     ? PROFILE_SEED_TEMPLATES[profile]
@@ -436,7 +446,6 @@ async function ensureProfile(home, profile) {
       dsh: {
         profile: {
           bundles: [...seed.bundles],
-          patchReload: seed.patchReload,
         },
       },
     }, null, 2) + '\n')
@@ -588,65 +597,143 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
   return removed
 }
 
+/** What `DSH_AGENT_PRESET_ROOT` must name: a directory holding the platform base preset patches
+ * under their shipped file names (`<base>.patch.yml`) — e.g. a copy of a same-version platform
+ * tree's `packages/bundle/web-app/presets/`. The desktop application is the shape that needs it:
+ * its platform packages live inside `resources/app.asar`, so no plain
+ * `node_modules/@deepseek-ai/dsh-web-app/presets/` exists on disk. */
+export const AGENT_PRESET_ROOT_HINT = 'point DSH_AGENT_PRESET_ROOT at a directory holding <base>.patch.yml (copy it out of a same-version dsh tree: packages/bundle/web-app/presets/)'
+
+/** The platform bundle that ships the base preset patches
+ * (`presets/*.patch.yml` in its `files`/`exports` and `dsh.bundle.patch`). */
+const PLATFORM_BUNDLE_PACKAGE = '@deepseek-ai/dsh-web-app'
+
+/** The Electron resource layouts a desktop installation exposes its unpacked packages under. */
+const DESKTOP_RESOURCE_SHAPES = [
+  ['resources', 'app.asar.unpacked'],
+  ['resources', 'app', 'resources', 'app.asar.unpacked'],
+]
+
+/** Subdirectories of one directory, or none when it does not exist: a missing level is an ordinary
+ * miss on a candidate walk, not a failure. */
+function listDirectories(dir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name)
+  } catch {
+    return []
+  }
+}
+
+/** Installation roots a desktop/Electron tree may sit at. */
+function desktopInstallRoots(fromDir) {
+  const roots = []
+  const localAppData = process.env.LOCALAPPDATA
+  if (process.platform === 'win32' && localAppData) roots.push(join(localAppData, 'Programs', 'DeepSeek Harness'))
+  for (let level = fromDir; level !== dirname(level); level = dirname(level)) {
+    if (existsSync(join(level, 'resources', 'app.asar.unpacked'))) roots.push(level)
+  }
+  return roots
+}
+
+/** Every `@deepseek-ai/dsh-*` preset patch under one unpacked Electron resource root. */
+function probeDesktopScope(resourceRoot, file, probes) {
+  const scopeRoot = join(resourceRoot, 'dsh', 'node_modules', '@deepseek-ai')
+  for (const name of listDirectories(scopeRoot)) {
+    if (!name.startsWith('dsh-')) continue
+    const path = join(scopeRoot, name, 'presets', file)
+    probes.push(path)
+    if (existsSync(path)) return path
+  }
+  return undefined
+}
+
 /**
- * Locate the runtime platform composition for one agent-preset BASE.
+ * Resolve the platform PATCH FILE one agent-preset BASE names.
  *
- * `base` selects the platform preset the generated family preset follows; the
- * caller passes a name already validated by {@link resolveAgentPresetBase}, so
- * an unknown base fails there, before any resolution work — never here by
+ * 0.2.x replaced the preset directory with a declarative row, and the base a
+ * family row is merged into is the bundle patch layer that declares it
+ * (`packages/bundle/web-app/presets/<base>.patch.yml`, listed in that package's
+ * `dsh.bundle.patch`). `base` is already validated by
+ * {@link resolveAgentPresetBase}, so an unknown base fails there — never here by
  * silently reading `standard`.
  *
- * Discovery order (rc.53 — the preset must follow the RUNTIME platform, not a
- * vendored baseline; v33 G2.1 — ask the platform first):
- *   1. `DSH_AGENT_PRESET_ROOT` (explicit, points at an agent-presets root);
- *   2. `node_modules/@deepseek-ai/dsh-agent-presets/presets` — the 0.1.5+
- *      shipped-preset location (the platform resolves it through
- *      `SHIPPED_PRESET_ROOT`, and the CLI package no longer publishes
- *      `config/`);
- *   3. `packages/preset/agent-presets/presets` — the 0.1.5 SOURCE-checkout
- *      location (the presets left the CLI package in 0.1.5);
- *   4. `apps/cli/config/agent-presets/...` — the pre-0.1.5 source/CLI-package
- *      location, kept as a fallback;
- *   5. the globally installed `@deepseek-ai/dsh` (npm root -g), in the nested
- *      `dsh/node_modules/@deepseek-ai/dsh-agent-presets/presets` form npm
- *      actually produces, the sibling `dsh-agent-presets/presets` form, and the
- *      legacy `dsh/config/agent-presets` form.
- * Fails loud otherwise: a preset built from a guessed baseline would silently
- * mismatch the platform it runs on.
+ * Discovery order:
+ *   1. `DSH_AGENT_PRESET_ROOT` (explicit; an ANSWER, not the head of a chain);
+ *   2. the target profile's own `node_modules/<bundle>/presets/` — the bundles
+ *      that profile actually mounts;
+ *   3. the desktop/Electron installation tree, whose only readable form is the
+ *      unpacked resource scope (`<install>/resources/app.asar.unpacked/dsh/node_modules/@deepseek-ai/`,
+ *      each `dsh-<name>/presets/` directory under it) — the platform packages
+ *      themselves are inside `app.asar`;
+ *   4. walking up from this script: every `presets/` directory of a checkout's
+ *      bundle packages, then every `@deepseek-ai/dsh-<name>/presets/` directory
+ *      of an installed tree;
+ *   5. the global npm root (`%APPDATA%/npm/node_modules` on Windows, `npm root -g`
+ *      elsewhere), in the nested `dsh/node_modules/@deepseek-ai/dsh-*` form npm
+ *      produces and the sibling form.
+ *
+ * Fails loud otherwise, naming EVERY probed shape and the one escape that always
+ * works: a base composed from another base's rows would mount rows the user did
+ * not ask for, with nothing in the output saying so.
+ * @param base - the base name (the preset patch's file stem).
+ * @param profileDir - the target profile directory, or undefined.
+ * @param bundles - bundle package names the target profile mounts.
+ * @returns the patch file's absolute path.
  */
-async function resolveRuntimeComposition(base) {
-  const compositionName = join(base, 'agent.cordis.yml')
-  const direct = (root) => join(root, compositionName)
-  /** Candidate agent-preset roots under one tree level, platform form first. */
-  const rootsAt = (level) => [
-    join(level, 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
-    // v33 G0 (post-migration sweep): the 0.1.5 SOURCE layout. The presets left
-    // the CLI package, so `apps/cli/config/agent-presets` no longer exists in a
-    // 0.1.5 checkout and this branch — not the node_modules one, which needs a
-    // linked workspace — is what a source tree actually has.
-    join(level, 'packages', 'preset', 'agent-presets', 'presets'),
-    join(level, 'apps', 'cli', 'config', 'agent-presets'),
-  ]
-
-  // An explicit root is an ANSWER, not the head of a fallback chain: a preset
-  // root that carries no `<base>` directory fails here instead of continuing to
-  // the walk-up, so an operator pointing the installer at one tree never gets
-  // another tree's composition under the requested base.
-  const explicit = process.env.DSH_AGENT_PRESET_ROOT?.trim()
-  if (explicit) {
-    const path = direct(explicit)
-    if (!existsSync(path)) throw new Error(`DSH_AGENT_PRESET_ROOT is set but ${path} does not exist`)
-    return await readFile(path, 'utf8')
+async function resolveBasePresetPatch(base, profileDir, bundles = []) {
+  const file = `${base}.patch.yml`
+  const probes = []
+  const probe = (path) => {
+    probes.push(path)
+    return existsSync(path) ? path : undefined
   }
 
+  // An explicit root is an ANSWER, not the head of a fallback chain: an operator
+  // pointing the installer at one tree must never get another tree's rows under
+  // the requested base.
+  const explicit = process.env.DSH_AGENT_PRESET_ROOT?.trim()
+  if (explicit) {
+    const path = join(explicit, file)
+    if (!existsSync(path)) {
+      throw new Error(`install-layered: DSH_AGENT_PRESET_ROOT is set but ${path} does not exist — ${AGENT_PRESET_ROOT_HINT}`)
+    }
+    return path
+  }
+
+  if (profileDir !== undefined && existsSync(profileDir)) {
+    for (const name of new Set([PLATFORM_BUNDLE_PACKAGE, ...bundles])) {
+      const found = probe(join(profileDir, 'node_modules', ...name.split('/'), 'presets', file))
+      if (found !== undefined) return found
+    }
+  }
+
+  const scriptDir = dirname(fileURLToPath(import.meta.url))
   // Walk upward from this script: mirror layout (packages/scripts) and the
   // upstream overlay layout (packages/evolution/scripts) both reach the tree
   // root within a few levels.
-  const scriptDir = dirname(fileURLToPath(import.meta.url))
   for (let level = scriptDir; level !== dirname(level); level = dirname(level)) {
-    for (const root of rootsAt(level)) {
-      const path = direct(root)
-      if (existsSync(path)) return await readFile(path, 'utf8')
+    const bundleRoot = join(level, 'packages', 'bundle')
+    for (const name of listDirectories(bundleRoot)) {
+      const found = probe(join(bundleRoot, name, 'presets', file))
+      if (found !== undefined) return found
+    }
+    const scopeRoot = join(level, 'node_modules', '@deepseek-ai')
+    for (const name of listDirectories(scopeRoot)) {
+      if (!name.startsWith('dsh-')) continue
+      const found = probe(join(scopeRoot, name, 'presets', file))
+      if (found !== undefined) return found
+    }
+  }
+
+  // The desktop installation tree is probed LAST (0.2.x G6 review, P2): it is a copy of SOME
+  // platform version, while the tree this script lives in is the one the profile is being built
+  // against. Eager desktop roots composed a family preset from another tree's rows.
+  for (const root of desktopInstallRoots(dirname(fileURLToPath(import.meta.url)))) {
+    for (const shape of DESKTOP_RESOURCE_SHAPES) {
+      const resourceRoot = join(root, ...shape)
+      const found = probe(join(resourceRoot, 'dsh', 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', file))
+        ?? probeDesktopScope(resourceRoot, file, probes)
+      if (found !== undefined) return found
     }
   }
 
@@ -663,15 +750,14 @@ async function resolveRuntimeComposition(base) {
       ]
       for (const root of roots) {
         for (const candidate of [
-          // The npm GLOBAL shape: `dsh-agent-presets` is a DEPENDENCY of the CLI
-          // package, so npm nests it under `dsh/node_modules/...`; the sibling
-          // form below only exists when the user installed it separately.
-          join(root, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
-          join(root, '@deepseek-ai', 'dsh-agent-presets', 'presets'),
-          join(root, '@deepseek-ai', 'dsh', 'config', 'agent-presets'),
+          // The npm GLOBAL shape: the platform packages are DEPENDENCIES of the
+          // CLI package, so npm nests them under `dsh/node_modules/...`; the
+          // sibling form below only exists when they were installed separately.
+          join(root, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', file),
+          join(root, '@deepseek-ai', 'dsh-web-app', 'presets', file),
         ]) {
-          const path = direct(candidate)
-          if (existsSync(path)) return await readFile(path, 'utf8')
+          const found = probe(candidate)
+          if (found !== undefined) return found
         }
       }
     } else {
@@ -681,12 +767,11 @@ async function resolveRuntimeComposition(base) {
       // surface and quoting hazards the rest of the file deliberately avoids).
       const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim()
       for (const candidate of [
-        join(globalRoot, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets'),
-        join(globalRoot, '@deepseek-ai', 'dsh-agent-presets', 'presets'),
-        join(globalRoot, '@deepseek-ai', 'dsh', 'config', 'agent-presets'),
+        join(globalRoot, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', file),
+        join(globalRoot, '@deepseek-ai', 'dsh-web-app', 'presets', file),
       ]) {
-        const path = direct(candidate)
-        if (existsSync(path)) return await readFile(path, 'utf8')
+        const found = probe(candidate)
+        if (found !== undefined) return found
       }
     }
   } catch {
@@ -694,16 +779,286 @@ async function resolveRuntimeComposition(base) {
   }
 
   throw new Error(
-    `install-layered: cannot find the runtime platform '${base}' agent preset — install a dsh whose `
-    + `agent-presets package ships it, set DSH_AGENT_PRESET_ROOT, or run from a source checkout. `
-    + 'A base with no runtime composition is refused rather than composed from another preset: the '
-    + 'generated preset must follow the platform it runs on. DSH 0.1.5+ ships the presets '
-    + 'inside the dsh-agent-presets package — probed as '
-    + '<tree>/node_modules/@deepseek-ai/dsh-agent-presets/presets, '
-    + '<tree>/packages/preset/agent-presets/presets (source checkout), and the global '
-    + '<npm-root>/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-presets/presets; '
-    + 'pre-0.1.5 platforms kept them at apps/cli/config/agent-presets.',
+    `install-layered: cannot find the runtime platform '${base}' preset patch — no candidate carries `
+    + `presets/${file}. A base with no runtime patch is refused rather than composed from another `
+    + `base: the generated preset must follow the platform it runs on. Probed (in order): ${probes.join(', ')}. `
+    + `On a desktop install the platform packages live inside resources/app.asar, so no plain file `
+    + `exists — ${AGENT_PRESET_ROOT_HINT}.`,
   )
+}
+
+/**
+ * The row list a platform base preset patch carries under `config.plugins`, dedented to column 0.
+ *
+ * Twin of core's `basePresetPlugins` (`evolution-core/src/preset-composition.ts`; the parity case
+ * in `evolution-core/tests/preset-composition.spec.ts` pins the bytes). The preset's own list is
+ * the SHALLOWEST `plugins:` line: a child row may carry a key by that name far deeper.
+ * @param patchText - the base preset patch file's text.
+ * @returns the plugin rows, dedented and newline-terminated.
+ */
+export function basePresetPlugins(patchText) {
+  const lines = patchText.split('\n')
+  let at = -1
+  let indent = Number.POSITIVE_INFINITY
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^(\s*)plugins:\s*$/.exec(lines[index] ?? '')
+    const width = match?.[1]?.length
+    if (width === undefined) continue
+    if (width < indent) {
+      indent = width
+      at = index
+    }
+  }
+  if (at < 0) throw new Error('install-layered: the base preset patch carries no `plugins:` list')
+  const block = []
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() === '') {
+      block.push(line)
+      continue
+    }
+    if (line.length - line.trimStart().length <= indent) break
+    block.push(line)
+  }
+  while (block.length > 0 && block[block.length - 1]?.trim() === '') block.pop()
+  const widths = block.filter(line => line.trim() !== '').map(line => line.length - line.trimStart().length)
+  const dedent = widths.length === 0 ? 0 : Math.min(...widths)
+  return block.map(line => line.slice(0, dedent).trim() === '' ? line.slice(dedent) : line).join('\n') + '\n'
+}
+
+/** The platform package a DECLARATIVE preset row names (0.2.x replaced preset directories with it). */
+export const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-agent-preset'
+
+/**
+ * The declarative preset row for one base: the platform base rows plus the family delta, under
+ * `config.plugins`, with the row id `mergePresetRow` matches by.
+ *
+ * Twin of core's `composePresetRow`. The override anchors are defined against a column-0 `- id:`
+ * row, so {@link generateAgentPreset} runs first and the indentation that puts the rows under
+ * `plugins:` comes last.
+ * @param baseComposition - the platform base rows (from {@link basePresetPlugins}).
+ * @param deltaComposition - the family delta rows.
+ * @param identity - row id, preset id, display fields and order.
+ * @returns the row text, newline-terminated.
+ */
+
+/**
+ * Drop the blank lines that merely separate block-sequence items, keeping the ones INSIDE a block
+ * literal (`key: |` / `>`): there a blank line is part of the value, and filtering it flattened a
+ * platform base preset's multi-paragraph prompt into one paragraph (G6 review, P1).
+ * @param text - the composition rows.
+ * @returns the rows with the separating blank lines removed.
+ */
+function denseBlockSequence(text) {
+  const out = []
+  let scalarIndent = -1
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    const indent = line.length - line.trimStart().length
+    if (scalarIndent >= 0 && trimmed !== '' && indent <= scalarIndent) scalarIndent = -1
+    if (scalarIndent < 0) {
+      const match = /^(\s*)[\w".-]+:\s*[|>]/.exec(line)
+      if (match !== null) scalarIndent = (match[1] ?? '').length
+    }
+    if (trimmed === '' && scalarIndent < 0) continue
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
+export function composePresetRow(baseComposition, deltaComposition, identity) {
+  const composed = generateAgentPreset(baseComposition, deltaComposition)
+  const plugins = denseBlockSequence(composed)
+    .split('\n')
+    // A kept blank line stays BLANK: indenting it would add trailing spaces to a block scalar's
+    // value (the shape the platform's own base patches use is a truly empty line).
+    .map(line => (line === '' ? '' : '      ' + line))
+    .join('\n')
+  return [
+    '- id: ' + identity.rowId,
+    "  name: '" + AGENT_PRESET_PACKAGE + "'",
+    '  config:',
+    '    id: ' + identity.id,
+    // No trailing commas: the row is YAML, and the platform's own patch parser
+    // rejects a JSON-style comma after a block mapping entry (pinned by the parse
+    // case in evolution-host/tests/installer-preset-base.spec.ts). Byte-identical
+    // with core's composePresetRow.
+    '    name: ' + JSON.stringify(identity.name),
+    '    description: ' + JSON.stringify(identity.description),
+    '    order: ' + String(identity.order),
+    '    plugins:',
+    plugins,
+    '',
+  ].join('\n')
+}
+
+/**
+ * Wrap a composed row as the patch entry a profile patch needs.
+ *
+ * A plain patch entry OVERRIDES the row with the same id and adds nothing, so a preset the platform
+ * does not ship has to arrive inside an `insert` entry
+ * (`packages/boot/app-boot/tests/user-patches.spec.ts:47-64`).
+ * @param row - the row text, as {@link composePresetRow} returns it.
+ * @returns the patch entry text, newline-terminated.
+ */
+export function composePresetInsert(row) {
+  const body = row.replace(/\s+$/, '').split('\n').map(line => '    ' + line).join('\n')
+  return `- insert:\n${body}\n`
+}
+
+/**
+ * The patch entry a profile patch receives for one base: the platform base rows, the family delta,
+ * and the wrapper. Twin of core's `composePresetEntry`.
+ * @param basePatchText - the platform base preset patch's text.
+ * @param deltaComposition - the family delta rows.
+ * @param identity - row id, preset id, display fields and order.
+ * @returns the patch entry text, newline-terminated.
+ */
+export function composePresetEntry(basePatchText, deltaComposition, identity) {
+  return composePresetInsert(composePresetRow(basePresetPlugins(basePatchText), deltaComposition, identity))
+}
+
+/**
+ * The span of one row id: the enclosing column-0 list item and the row's own first line.
+ *
+ * An installer-written row sits inside `- insert:` (four spaces deeper); a row the Web editor saved
+ * is that column-0 item itself. Both are replaced whole, so the span reaches back to the enclosing
+ * item and forward to the next one.
+ * @param lines - the patch text's lines.
+ * @param rowId - the row id to locate.
+ * @returns the span, or null when the patch carries no such row.
+ */
+function rowBlockSpan(lines, rowId) {
+  const rowRe = new RegExp('^\\s*- id:\\s*' + rowId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$')
+  const rowStart = lines.findIndex(line => rowRe.test(line))
+  if (rowStart < 0) return null
+  let start = rowStart
+  while (start > 0 && !/^- /.test(lines[start] ?? '')) start -= 1
+  let end = lines.length
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (/^- /.test(lines[index] ?? '')) {
+      end = index
+      break
+    }
+  }
+  return { start, end, rowStart }
+}
+
+/** The text of one row's own patch item, or null when the patch carries no such row — the
+ * comparison unit for {@link checkAgentPresetFreshness}. Twin of core's `presetRowBlock`. */
+export function presetRowBody(block) {
+  const lines = block.split('\n')
+  if (!/^- insert:\s*$/.test(lines[0] ?? '')) return block
+  return lines.slice(1).map(line => (line.startsWith('    ') ? line.slice(4) : line)).join('\n')
+}
+
+/** The row body of a patch block, `- insert:` unwrapped — the unit a freshness comparison needs
+ * (twin of core's `presetRowBody`): a block found at column 0 and a generated `- insert:` entry
+ * describe the same row and must compare equal (G6 review, P2). */
+export function presetRowBlock(patchText, rowId) {
+  const lines = patchText.split('\n')
+  const span = rowBlockSpan(lines, rowId)
+  if (span === null) return null
+  const block = lines.slice(span.start, span.end)
+  while (block.length > 0 && (block[block.length - 1] ?? '').trim() === '') block.pop()
+  return block.join('\n') + '\n'
+}
+
+/** The empty patch list the platform seeds a profile patch with. */
+export const EMPTY_PATCH_SEED = '[]'
+
+/** The seed in any spelling the platform accepts (`[]`, `[ ]`, `[] # empty`). */
+const EMPTY_PATCH_SEED_RE = /^\s*\[\s*\](\s*#.*)?\s*$/
+
+/** Drop trailing blank lines only: a kept line's own terminator (a CRLF file's `\r`) is never touched. */
+function trimTrailingBlankLines(lines) {
+  const out = [...lines]
+  while (out.length > 0 && (out[out.length - 1] ?? '').trim() === '') out.pop()
+  return out
+}
+
+/** The text to write when a patch is left with no entries: the platform's own seed
+ * (`packages/boot/app-boot/src/profile.ts`, `PROFILE_PATCH_FILENAME`), never a zero-byte file. */
+export function presetPatchText(patchText) {
+  return patchText.trim() === '' ? `${EMPTY_PATCH_SEED}\n` : patchText
+}
+
+/**
+ * Merge one generated entry into a patch (a profile patch) by row id.
+ *
+ * Idempotent by construction: an existing row with the same `- id:` is REPLACED whole — its block
+ * is the enclosing column-0 list item, so an installer-written row inside `- insert:` and a
+ * Web-editor-saved row at column 0 are both matched by {@link rowBlockSpan} — and anything else in
+ * the patch stays byte-identical, because the patch usually carries rows this installer knows
+ * nothing about. A missing row is appended; the platform's empty-list seed `[]` is REPLACED rather
+ * than extended (a block sequence appended after a complete flow sequence is not parsable YAML).
+ * @param patchText - the current patch text (`''` for a fresh one).
+ * @param row - the entry text, as {@link composePresetEntry} returns it.
+ * @param rowId - the row id to replace or append.
+ * @returns the merged patch text, newline-terminated.
+ */
+export function mergePresetRow(patchText, row, rowId) {
+  const lines = patchText.split('\n')
+  const block = row.replace(/\s+$/, '').split('\n')
+  const span = rowBlockSpan(lines, rowId)
+  if (span === null) {
+    // Only the SEAM is normalized. The platform seed (`[]`, `[ ]`, `[] # empty`) is a COMPLETE flow
+    // sequence a block sequence may not follow, so that one line goes; every other byte the author
+    // wrote stays — a blank line inside a block scalar (`section: |`) is part of the VALUE, and
+    // filtering the whole file rewrote user content on install (G6 review, P1).
+    const seedIndex = lines.findIndex(line => EMPTY_PATCH_SEED_RE.test(line))
+    const base = seedIndex >= 0 ? [...lines.slice(0, seedIndex), ...lines.slice(seedIndex + 1)] : [...lines]
+    const kept = trimTrailingBlankLines(base)
+    return (kept.length === 0 ? block : [...kept, ...block]).join('\n') + '\n'
+  }
+  const merged = [...lines.slice(0, span.start), ...block, ...lines.slice(span.end)]
+  // Same byte discipline on the replace path: no global blank-line collapsing, and no `\s+$` trim
+  // (it ate the trailing \r of a CRLF file's last line).
+  return trimTrailingBlankLines(merged).join('\n') + '\n'
+}
+
+/**
+ * Remove one row from a patch, taking its `- insert:` item with it when that item holds nothing
+ * else (an empty insert entry is left-over structure the platform would keep parsing).
+ * @param patchText - the patch text to edit.
+ * @param rowId - the row id to remove.
+ * @returns the patch text, newline-terminated; byte-identical when the id is absent.
+ */
+export function removePresetRow(patchText, rowId) {
+  const lines = patchText.split('\n')
+  const span = rowBlockSpan(lines, rowId)
+  if (span === null) return patchText
+  const rowLine = lines[span.rowStart] ?? ''
+  const rowIndent = rowLine.length - rowLine.trimStart().length
+  const nested = rowIndent > 0
+  const siblings = lines.slice(span.start + 1, span.end).filter((line) => {
+    const width = line.length - line.trimStart().length
+    return width === rowIndent && line.trimStart().startsWith('- ')
+  }).length
+  // A nested row inside an entry that holds others is removed alone — before it
+  // or after it alike; the entry itself goes when it held nothing else.
+  const cut = nested && siblings > 1
+    ? { start: span.rowStart, end: rowSiblingEnd(lines, span.rowStart, span.end) }
+    : span
+  const kept = [...lines.slice(0, cut.start), ...lines.slice(cut.end)]
+  const text = kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '')
+  return text === '' ? '' : text + '\n'
+}
+
+/** The end of one nested row's own block inside a patch entry.
+ * @param lines - the patch text's lines.
+ * @param rowStart - the row's `- id:` line.
+ * @param itemEnd - the enclosing item's end.
+ * @returns the index of the next sibling row, or the item's end. */
+function rowSiblingEnd(lines, rowStart, itemEnd) {
+  const indent = (lines[rowStart] ?? '').length - (lines[rowStart] ?? '').trimStart().length
+  for (let index = rowStart + 1; index < itemEnd; index += 1) {
+    const line = lines[index] ?? ''
+    if (line.trim() === '') continue
+    const width = line.length - line.trimStart().length
+    if (width === indent && line.trimStart().startsWith('- ')) return index
+    if (width < indent) return index
+  }
+  return itemEnd
 }
 
 /**
@@ -729,12 +1084,12 @@ function rowIds(composition) {
 }
 
 /**
- * Build the installed Evolution preset composition: the runtime platform
- * composition's rows verbatim, then the evolution delta. The BASE is the
- * caller's business (`resolveRuntimeComposition` reads `<base>/agent.cordis.yml`
- * from the AGENT_PRESET_BASES table); this function sees only the two text
- * fragments, so it composes every base identically. The delta stays the only
- * evolution-owned text, so the preset tracks every platform version.
+ * Compose the runtime platform base rows with the evolution delta. The BASE is
+ * the caller's business (`resolveBasePresetPatch` reads the base's patch from the
+ * AGENT_PRESET_BASES table, and `basePresetPlugins` dedents its row list); this
+ * function sees only the two text fragments, so it composes every base
+ * identically. The delta stays the only evolution-owned text, so the preset
+ * tracks every platform version.
  *
  * N-5 collision guard: an id present in BOTH fragments would mount twice
  * (worse, the duplicate could shadow the platform row). Fails loud; the
@@ -837,61 +1192,78 @@ function applyRowOverride(lines, override) {
   return lines
 }
 
-async function installAgentPreset(home, dryRun, force, runtimeComposition, base) {
-  const entry = resolveAgentPresetBase(base)
-  const destination = agentPresetDirectory(home, entry.base)
-  // v21 (S-3): the composition is resolved by install() BEFORE any profile
-  // mutation and passed in here — resolution failures now abort before the
-  // host side has committed anything.
-  // DSH_EVOLUTION_DELTA_PATH lets tests (and one-off builds) inject the delta
-  // fragment; the packaged evolution-agent/agent.cordis.yml stays the default.
-  const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
-  const deltaComposition = await readFile(deltaPath, 'utf8')
-  // V10-14 (P1-2): the cap injection runs INSIDE generateAgentPreset (on the
-  // COMPOSED output, after the collision guard) — core composePresetComposition
-  // applies the byte-identical rule, and installer.spec pins the parity. The
-  // rule holds for EVERY base: the PTC preset carries its own config-less
-  // `tool-skill` row, so the injection is base-agnostic by construction.
-  const composition = generateAgentPreset(runtimeComposition, deltaComposition)
-  // The `exists && !force` result must be reported identically in dry-run and
-  // real mode — a dry-run always claiming installed:true hides an already
-  // present preset (F-354). Only the write is skipped in dry-run.
-  if (existsSync(destination) && !force) {
-    return { destination, installed: false, reason: 'exists; use --force to overwrite' }
-  }
-  if (!dryRun) {
-    await mkdir(destination, { recursive: true })
-    // Atomic write (F-354): a crash mid-write must not leave a truncated
-    // agent.cordis.yml for the loader to parse.
-    const tmp = join(destination, 'agent.cordis.yml.tmp')
-    await writeFile(tmp, composition)
-    await rename(tmp, join(destination, 'agent.cordis.yml'))
-    // R-08 (V10): preset.yml gets the SAME tmp+rename atomic write as
-    // agent.cordis.yml above — F-354 previously protected only half of the
-    // transaction, so a crash could leave a truncated preset.yml behind.
-    // The metadata file comes from the base's table row: the variant must
-    // publish its own display text (name/description/order) — the platform
-    // localizes SHIPPED preset ids only, so a variant that shipped the
-    // standard base's metadata would list beside it as a second "Evolution"
-    // with no way to tell which preset follows which platform composition.
-    const presetTmp = join(destination, `${entry.metadata}.tmp`)
-    await writeFile(presetTmp, await readFile(join(packageSourceRoot(), 'evolution-agent', entry.metadata)))
-    await rename(presetTmp, join(destination, 'preset.yml'))
-  }
-  return { destination, installed: true, base: entry.base }
+/** The delta fragment a run composes: the packaged `evolution-agent/agent.cordis.yml`, or the
+ * `DSH_EVOLUTION_DELTA_PATH` override tests and one-off builds use. */
+function agentDeltaPath() {
+  return process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
 }
 
 /**
- * G3-①: does the generated preset on disk still describe THIS platform?
+ * Write one base's preset ROW into the target profile's own patch layer.
  *
- * A generated variant is an INSTALL-TIME SNAPSHOT: it embeds the platform
- * composition of the day it was written, so a platform change or a family
- * upgrade leaves a file silently describing a platform that no longer exists.
- * This recomputes what a fresh install would write and reports the comparison.
- * It never repairs: overwriting a snapshot the user may have hand-tuned is a
- * decision only the user can make.
+ * 0.2.x replaced the preset directory with a declarative composition row
+ * (`packages/preset/agent-preset/src/index.ts`), so the deliverable is an
+ * `- insert:` entry in `profiles/<p>/cordis.patch.yml` — the same file the
+ * platform's Web editor saves preset edits to
+ * (`packages/boot/app-boot/src/profile.ts`, `PROFILE_PATCH_FILENAME`).
+ *
+ * V10-14 (P1-2): the cap injection runs INSIDE composePresetEntry (on the
+ * COMPOSED rows, after the collision guard) — core `composePresetRow` applies
+ * the byte-identical rule and `evolution-core/tests/preset-composition.spec.ts`
+ * pins the parity. The rule holds for EVERY base: the PTC preset carries its own
+ * config-less `tool-skill` row, so the injection is base-agnostic.
+ *
+ * The `already current` and `exists` results are reported identically in
+ * dry-run and real mode — a dry-run always claiming installed:true hides a
+ * skipped write (F-354). Only the write itself is skipped in dry-run.
+ * @param home - the resolved DSH_HOME.
+ * @param profile - the target profile name.
+ * @param dryRun - report without writing.
+ * @param force - overwrite a row that is not a fresh generation.
+ * @param basePatchPath - the platform base preset patch this run composes.
+ * @param base - the base name.
+ * @returns the row's report: `{ patchPath, rowId, presetId, installed, reason? }`.
+ */
+async function installAgentPreset(home, profile, dryRun, force, basePatchPath, base) {
+  const entry = resolveAgentPresetBase(base)
+  const identity = presetIdentity(entry)
+  const patchPath = profilePatchPath(home, profile)
+  const deltaComposition = await readFile(agentDeltaPath(), 'utf8')
+  const basePatchText = await readFile(basePatchPath, 'utf8')
+  const current = existsSync(patchPath) ? await readFile(patchPath, 'utf8') : ''
+  const merged = mergePresetRow(current, composePresetEntry(basePatchText, deltaComposition, identity), identity.rowId)
+  const report = { patchPath, rowId: identity.rowId, presetId: identity.id, installed: false }
+  // `already current` is the idempotent re-run: the block on disk IS what a fresh
+  // generation writes, so the row is the family's and nothing needs to move.
+  if (merged === current) return { ...report, reason: 'already current' }
+  // A block that differs is a snapshot only the user can decide to replace —
+  // the same posture `--check-presets` takes.
+  if (!force && presetRowBlock(current, identity.rowId) !== null) {
+    return { ...report, reason: 'exists; use --force to overwrite' }
+  }
+  if (!dryRun) {
+    // The patch file and its directory are part of the deliverable now: seed
+    // them the way the platform does (`[]` + the profile template).
+    await ensureProfile(home, profile)
+    await writeManifestAtomic(patchPath, merged)
+  }
+  return { ...report, installed: true }
+}
+
+/**
+ * G3-①: does the installed preset ROW still describe THIS platform?
+ *
+ * A generated row is an INSTALL-TIME SNAPSHOT: it embeds the platform rows of
+ * the day it was written, so a platform change or a family upgrade leaves a
+ * block silently describing a platform that no longer exists. This recomputes
+ * what a fresh install would write and compares it with the block in the
+ * profile patch. It never repairs: overwriting a snapshot the user may have
+ * hand-tuned is a decision only the user can make.
+ *
+ * A base whose profile patch carries no block is `absent` and is never
+ * resolved: the base patch is read only when there is something to compare.
  * @param options - `home`/`env` resolved like the other entry points, `profile` (default 'web').
- * @returns one `{ base, id, destination, status }` record per INSTALLABLE base.
+ * @returns one `{ base, id, patchPath, status }` record per INSTALLABLE base.
  */
 export async function checkAgentPresetFreshness(options = {}) {
   const home = options.home ?? resolveHome(options.env)
@@ -900,25 +1272,27 @@ export async function checkAgentPresetFreshness(options = {}) {
   // this deployment cannot install has no fresh install to compare against, so
   // it is SKIPPED rather than reported stale.
   const profileDir = profileDirectory(home, profile)
-  const bundles = existsSync(profileDir) ? detectInstalledBundles(profileDir, warnManifest) : []
+  // Same reader as the install-time refusal: the family-filtered `detectInstalledBundles` cannot
+  // see `dsh-web-app`, so a cordis row used to be skipped here (G6 review, P1).
+  const bundles = profileBundleRows(profileDir)
+  const patchPath = profilePatchPath(home, profile)
+  const patchText = existsSync(patchPath) ? await readFile(patchPath, 'utf8') : ''
   const bases = []
   for (const name of Object.keys(AGENT_PRESET_BASES)) {
     if (baseUnavailableReason({ name, ...AGENT_PRESET_BASES[name] }, bundles) !== undefined) continue
     const entry = resolveAgentPresetBase(name)
-    const destination = agentPresetDirectory(home, entry.base)
+    const block = presetRowBlock(patchText, presetRowId(entry.id))
     // `absent` is not an error: the user may simply not have installed this base.
-    const compositionPath = join(destination, 'agent.cordis.yml')
-    if (!existsSync(compositionPath)) {
-      bases.push({ base: entry.base, id: entry.id, destination, status: 'absent' })
+    if (block === null) {
+      bases.push({ base: entry.base, id: entry.id, patchPath, status: 'absent' })
       continue
     }
-    // Replay the install path READ-ONLY: this base's runtime composition plus the
-    // same delta (DSH_EVOLUTION_DELTA_PATH honored) through the same generator,
-    // compared byte-for-byte with the file on disk.
-    const deltaPath = process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
-    const fresh = generateAgentPreset(await resolveRuntimeComposition(entry.base), await readFile(deltaPath, 'utf8'))
-    const onDisk = await readFile(compositionPath, 'utf8')
-    bases.push({ base: entry.base, id: entry.id, destination, status: fresh === onDisk ? 'fresh' : 'differs' })
+    // Replay the install path READ-ONLY: this base's platform patch plus the
+    // same delta (DSH_EVOLUTION_DELTA_PATH honored) through the same composer,
+    // compared byte-for-byte with the block in the patch.
+    const basePatchText = await readFile(await resolveBasePresetPatch(entry.base, profileDir, bundles), 'utf8')
+    const fresh = composePresetEntry(basePatchText, await readFile(agentDeltaPath(), 'utf8'), presetIdentity(entry))
+    bases.push({ base: entry.base, id: entry.id, patchPath, status: presetRowBody(fresh) === presetRowBody(block) ? 'fresh' : 'differs' })
   }
   return { bases }
 }
@@ -999,57 +1373,33 @@ export async function uninstall(options = {}) {
     }
   }
   if (mode === 'agent' || mode === 'layered') {
-    // P2-42 (v11): report the real outcome — dry-run or an absent preset
-    // directory does not mean "deleted".
+    // P2-42 (v11): report the real outcome — a dry-run, or a patch with no
+    // family row, does not mean "deleted".
     // v21 (S-1): the journal records whether THIS installer installed the
-    // preset — a pre-existing preset (exists && !force skip) must survive the
-    // uninstall of a preset-less host install.
+    // preset — a row it declined to overwrite (`--force` was not given) must
+    // survive the uninstall of a preset-less host install.
     const presetSkippedByInstall = journal !== null && journal.agentPreset === false
-    // Which preset directories this run owns. With no `--base` the uninstall
-    // is not narrowed: every family preset directory is an installer-generated
-    // home-global artifact of this family, and a variant left behind after
-    // "uninstall" would keep mounting family model rows for any session that
-    // selects it. Naming a base narrows the reverse action to that variant.
+    // Which preset ROWS this run owns. With no `--base` the uninstall is not
+    // narrowed: every family preset row in this profile's patch is an
+    // installer-generated artifact of this family, and a variant left behind
+    // after "uninstall" would keep mounting family model rows for any session
+    // that selects it. Naming a base narrows the reverse action to that variant.
     const presetSelection = options.bases !== undefined && options.bases.length > 0 ? options.bases : options.base
     const presetTargets = presetSelection === undefined
-      ? agentPresetDirectories(home)
-      : resolveAgentPresetBases(presetSelection).map(entry => ({ base: entry.base, directory: agentPresetDirectory(home, entry.base) }))
-    const presentPresets = presetTargets.filter(entry => existsSync(entry.directory))
-    // v31 INST-04: the preset is HOME-GLOBAL — before deleting it, sweep the
-    // other profiles the same way the install side (PRE-1) does. Another
-    // profile carrying bundle rows or a preset-owning journal means its
-    // sessions still mount the preset's model rows.
-    let otherProfileStillUsesPreset = false
-    if (!presetSkippedByInstall && presentPresets.length > 0) {
-      const profilesDir = join(home, 'profiles')
-      if (existsSync(profilesDir)) {
-        for (const entry of await readdir(profilesDir, { withFileTypes: true })) {
-          if (!entry.isDirectory()) continue
-          // v32 INST-08: case-insensitive (Windows) — a `Web` vs `web`
-          // spelling must not make the sweep probe the profile being
-          // uninstalled as if it were "another profile".
-          if (profileDirectory(home, entry.name).toLowerCase() === profileDir.toLowerCase()) continue
-          const others = detectInstalledBundles(join(profilesDir, entry.name), (warnError) => {
-            console.warn(`install-layered: ${warnError instanceof Error ? warnError.message : String(warnError)}`)
-          })
-          if (others.length > 0) { otherProfileStillUsesPreset = true; break }
-          // OPT-02 (2026-09): `readInstallJournal` is async — the missing
-          // await made `otherJournal` a Promise, `?.agentPreset` was always
-          // undefined, and the v31 INST-04 guard never fired for exactly its
-          // target case (a journal-only profile with no bundle rows). The
-          // uninstall sweep then deleted the home-global Evolution preset
-          // while another profile's journal said it still owns it.
-          const otherJournal = await readInstallJournal(join(profilesDir, entry.name))
-          if (otherJournal?.agentPreset === true) { otherProfileStillUsesPreset = true; break }
-        }
-      }
-    }
-    if (!dryRun && presentPresets.length > 0 && !presetSkippedByInstall && !otherProfileStillUsesPreset) {
-      for (const entry of presentPresets) await rm(entry.directory, { recursive: true, force: true })
+      ? Object.keys(AGENT_PRESET_BASES).map(entry => resolveAgentPresetBase(entry))
+      : resolveAgentPresetBases(presetSelection)
+    // The row lives in THIS profile's own patch layer (0.2.x), so the reverse
+    // action reads that one file — no other profile is consulted, and removing
+    // the row here leaves every other profile untouched by construction.
+    const patchPath = profilePatchPath(home, profile)
+    const patchText = existsSync(patchPath) ? await readFile(patchPath, 'utf8') : ''
+    const presentPresets = presetTargets.filter(entry => presetRowBlock(patchText, presetRowId(entry.id)) !== null)
+    if (!dryRun && presentPresets.length > 0 && !presetSkippedByInstall) {
+      let text = patchText
+      for (const entry of presentPresets) text = removePresetRow(text, presetRowId(entry.id))
+      await writeManifestAtomic(patchPath, presetPatchText(text))
       result.removedAgentPreset = true
       result.removedPresetBases = presentPresets.map(entry => entry.base)
-    } else if (otherProfileStillUsesPreset) {
-      console.warn('install-layered: the home-global Evolution preset was KEPT — another profile still carries evolution bundles or a preset-owning journal')
     }
   }
   // v22 (R-2): the journal is consumed and deleted INSIDE the replaying mode
@@ -1103,6 +1453,30 @@ export function detectInstalledBundles(profileDir, warn = () => {}) {
   }
 }
 
+/** Every bundle package name the profile's manifest mounts, scope-agnostic and as written — the
+ * candidate list the base-patch resolver probes under that profile's `node_modules`.
+ * @param profileDir - the profile directory.
+ * @returns the bundle rows; empty when the manifest is missing or torn. */
+function profileBundleRows(profileDir) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
+    const bundles = Array.isArray(manifest?.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
+    return bundles.filter(entry => typeof entry === 'string' && entry.trim() !== '')
+  } catch {
+    return []
+  }
+}
+
+/** The family preset rows one profile patch carries, in table order.
+ * @param patchText - the profile patch text.
+ * @returns one `{ base, rowId }` per base whose row is present. */
+export function profilePresetRows(patchText) {
+  return Object.keys(AGENT_PRESET_BASES)
+    .map(name => resolveAgentPresetBase(name))
+    .map(entry => ({ base: entry.base, rowId: presetRowId(entry.id) }))
+    .filter(entry => presetRowBlock(patchText, entry.rowId) !== null)
+}
+
 export function detectInstalledAllBundle(profileDir) {
   // P3 (v15/v16): exact-segment tail match — a loose substring would
   // false-positive on `dsh-evolution-allowlist`.
@@ -1143,7 +1517,10 @@ export async function install(options = {}) {
     // not-yet-created profile has no bundle rows to read — that is "no web-app",
     // not a crash.
     const bundleDir = profileDirectory(home, profile)
-    const bundles = existsSync(bundleDir) ? detectInstalledBundles(bundleDir, warnManifest) : []
+    // The installability judgement asks the SAME question doctor asks (`profileBundles`): which
+    // bundles does this profile mount. `detectInstalledBundles` filters to the FAMILY bundle tails,
+    // so it can never answer `dsh-web-app` and refused every `--base cordis` install (G6 review, P1).
+    const bundles = profileBundleRows(bundleDir)
     const reason = baseUnavailableReason({ name: entry.base, ...AGENT_PRESET_BASES[entry.base] }, bundles)
     if (reason !== undefined) throw new Error(`install-layered: ${reason}`)
   }
@@ -1153,31 +1530,23 @@ export async function install(options = {}) {
   const needsAgent = mode === 'agent' || mode === 'layered'
   const needsCompat = mode === 'oneclick'
 
-  // v21 (S-3): resolve the runtime preset composition BEFORE any profile
-  // mutation — the old order committed bundle rows/copies and only tried to
-  // build the preset afterwards, leaving a half-installed profile (host
-  // mounted, preset missing) when the resolution failed. Resolution is
-  // read-only and the "reported up front" intent at installAgentPreset now
-  // actually holds.
-  // One runtime composition per selected base: each variant follows the
-  // platform composition of ITS base (the ptc variant composes the platform's
-  // ptc preset, not the standard one).
-  const runtimeCompositions = new Map()
-  if (needsAgent) {
-    for (const entry of presetEntries) runtimeCompositions.set(entry.base, await resolveRuntimeComposition(entry.base))
-  }
-
-  // v21 (S-5): agent mode never writes the profile (its deliverable is the
-  // preset directory) — do not CREATE one as a side effect. ensureProfile
-  // used to run unconditionally, seeding a fresh DSH_HOME with a web profile
-  // carrying a dependency-less bundle row that violates this script's own
-  // D-3 rule. Read-only probes (conflict checks) tolerate a missing profile.
-  // v31 INST-07: pure path resolution here — ensureProfile moved BELOW the
-  // refusal sweep, so a refused install no longer leaves a freshly seeded
-  // empty profile behind (v21 S-5 closed agent mode; this closes
-  // host/layered/oneclick).
+  // v21 (S-3): resolve the platform base PATCH before any profile mutation — the
+  // old order committed bundle rows/copies and only tried to build the preset
+  // afterwards, leaving a half-installed profile (host mounted, preset missing)
+  // when the resolution failed. Resolution is read-only, and a base with no
+  // runtime patch aborts the run here.
+  // One patch per selected base: each variant follows the platform rows of ITS
+  // base (the ptc variant composes the platform's ptc preset, not the standard
+  // one).
   const profileDir = profileDirectory(home, profile)
-  const profileReady = !dryRun && mode !== 'agent'
+  const profileReady = !dryRun
+  const basePatches = new Map()
+  if (needsAgent) {
+    const bundles = profileBundleRows(profileDir)
+    for (const entry of presetEntries) {
+      basePatches.set(entry.base, await resolveBasePresetPatch(entry.base, profileDir, bundles))
+    }
+  }
   const result = { mode, form: deploymentFormOf(mode), home, profile, profileDir, base: presetBase, bases: presetEntries.map(entry => entry.base), copied: [], missingEntrypoints: [], bundle: null, agentPreset: null, agentPresets: [] }
   // v21 (S-1): the bundle-dependency outcome, recorded onto the journal at the
   // end of the run (null in dry-run — no journal is written then anyway).
@@ -1186,6 +1555,14 @@ export async function install(options = {}) {
   // dependency row (the base record) and once after the preset phase (with
   // the refreshed preset accounting). Reads the mutable closables at call
   // time, so each write describes the state reached so far.
+  // The preset record is ROW-scoped (0.2.x): a directory path is not what a
+  // later uninstall reads, the patch file and the row id are. Every row this run
+  // left carrying a fresh generation — written now, or already byte-identical —
+  // is family-owned, which is what `agentPreset` summarizes for the modes that
+  // never reach the preset phase.
+  const ownedPresetRows = () => result.agentPresets
+    .filter(entry => entry.installed === true || entry.reason === 'already current')
+    .map(entry => ({ patchPath: entry.patchPath, rowId: entry.rowId, presetId: entry.presetId }))
   const journalPayload = (presetInstalled) => ({
     version: 1,
     scope: EVOLUTION_SCOPE,
@@ -1194,6 +1571,7 @@ export async function install(options = {}) {
     dependencyRange: dependencyInfo?.dependencyRange,
     copied: result.copied.map(entry => entry.packageName),
     agentPreset: presetInstalled,
+    agentPresetRows: ownedPresetRows(),
     at: new Date().toISOString(),
   })
   // v23 (BR-3/BR-4): the PRIOR journal's accounting. A reinstall must not
@@ -1230,51 +1608,32 @@ export async function install(options = {}) {
         + 'Choose ONE: keep the one-click bundle, or uninstall it and install the host bundle + agent preset.',
       )
     }
-    // v22 (PRE-1): the two checks above probe only the TARGET profile, but the
-    // Evolution agent preset is a HOME-GLOBAL artifact
-    // ($DSH_HOME/.agent-presets/<base id> — see AGENT_PRESET_BASES). An
-    // evolution-all / one-click row in ANY OTHER profile of this DSH_HOME
-    // composes the same startup double-mount once the user selects the
-    // preset, so the exclusion has to sweep every profile in the home.
-    const profilesRoot = join(home, 'profiles')
-    const conflictingProfiles = []
-    if (existsSync(profilesRoot)) {
-      for (const entry of await readdir(profilesRoot, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue
-        const dir = profileDirectory(home, entry.name)
-        if (dir === profileDir) continue
-        for (const name of detectInstalledBundles(dir, warnManifest)) {
-          if (/(?:^|\/)dsh-evolution-(all|preset)$/.test(String(name).trim())) {
-            conflictingProfiles.push(`${entry.name}: ${name}`)
-          }
-        }
-      }
-    }
-    if (conflictingProfiles.length > 0) {
-      throw new Error(
-        `install-layered: other profile(s) in this DSH_HOME already carry a full-model-rows bundle — ${conflictingProfiles.join('; ')}. `
-        + 'The Evolution agent preset is HOME-GLOBAL and would double-mount those model rows at startup. '
-        + 'Uninstall the bundle there, or keep using that profile instead of the layered preset.',
-      )
-    }
+    // No cross-profile sweep: a preset ROW lives in the target profile's own
+    // patch layer (0.2.x), so an evolution-all / one-click row in ANOTHER
+    // profile mounts its model rows in that profile only and cannot double-mount
+    // with this one.
   }
 
   if (needsHost || needsCompat) {
     const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick
     // D-1 (v18): the one-click preset bundle mounts the four model rows at
-    // profile root; an existing agent preset mounts the same rows in preset
-    // scope. Refuse unless --force explicitly confirms.
+    // profile root; a family preset ROW mounts the same rows in preset scope.
+    // Refuse unless --force explicitly confirms.
     // The sweep covers EVERY base: a family preset of any variant mounts the
     // same model rows in preset scope, so a one-click install beside it
     // double-mounts exactly as the standard-base preset would. Narrowing this
     // to the base being installed is how a variant becomes an escape hatch.
-    const existingPresets = agentPresetDirectories(home).filter(entry => existsSync(entry.directory))
+    // It is a PER-PROFILE question now: the row is written into this profile's
+    // patch, and another profile's row cannot double-mount here.
+    const targetPatchPath = profilePatchPath(home, profile)
+    const targetPatch = existsSync(targetPatchPath) ? await readFile(targetPatchPath, 'utf8') : ''
+    const existingPresets = profilePresetRows(targetPatch)
     if (needsCompat && existingPresets.length > 0 && !force) {
       throw new Error(
-        `install-layered: the DSH_HOME already carries an Evolution agent preset (${existingPresets.map(entry => entry.directory).join(', ')}). `
+        `install-layered: profile "${profile}" already carries an Evolution agent preset row (${existingPresets.map(entry => `${entry.base} → ${entry.rowId}`).join(', ')} in ${targetPatchPath}). `
         + 'The one-click preset bundle and the layered agent preset are mutually exclusive install targets (E-33) — '
         + 'both mount the same model rows. Choose ONE '
-        + '(remove the preset directory or pass --force to override explicitly).',
+        + '(remove the preset row or pass --force to override explicitly).',
       )
     }
     // P1-3 (v11): evolution-all is the DEFAULT full bundle — installing host
@@ -1346,7 +1705,7 @@ export async function install(options = {}) {
 
   if (needsAgent) {
     for (const entry of presetEntries) {
-      result.agentPresets.push(await installAgentPreset(home, dryRun, force, runtimeCompositions.get(entry.base), entry.base))
+      result.agentPresets.push(await installAgentPreset(home, profile, dryRun, force, basePatches.get(entry.base), entry.base))
     }
     // `agentPreset` stays the FIRST variant's report: it is the field the
     // journal, the CLI summary and the doctor have always read, and a
@@ -1360,14 +1719,14 @@ export async function install(options = {}) {
   // preserved (a skipped preset still exists on disk and its uninstall
   // deliverable must not be lost to a host/oneclick reinstall).
   if (!dryRun && result.bundle !== null) {
-    const installedAny = result.agentPresets.some(entry => entry.installed === true)
-    await writeInstallJournal(profileDir, journalPayload(installedAny || priorJournal?.agentPreset === true))
+    const ownedAny = result.agentPresets.some(entry => entry.installed === true || entry.reason === 'already current')
+    await writeInstallJournal(profileDir, journalPayload(ownedAny || priorJournal?.agentPreset === true))
   }
-  // v31 INST-03: `--mode agent` installs the home-global preset with NO
+  // v31 INST-03: `--mode agent` installs the profile-level preset row with NO
   // bundle row — the old `result.bundle !== null` gate never journaled it, so
   // a later layered uninstall read `agentPreset:false` and left the preset
   // stranded while reporting a clean removal. Journal the ownership.
-  if (!dryRun && result.bundle === null && result.agentPresets.some(entry => entry.installed === true)) {
+  if (!dryRun && result.bundle === null && result.agentPresets.some(entry => entry.installed === true || entry.reason === 'already current')) {
     await writeInstallJournal(profileDir, journalPayload(true))
   }
 
@@ -1423,7 +1782,10 @@ function parseArgs(argv) {
     // platform composition the user switches between) — `bases` is the
     // selection, while `base` stays the single-name API the library callers use.
     else if (arg === '--base') options.bases.push(next())
-    else if (arg === '--home') options.home = resolve(next())
+    // The same normalization `$DSH_HOME` gets: PowerShell/cmd do NOT expand a literal `~` for a
+  // native command, so `resolve('~/.dsh')` used to install into `<cwd>/~/.dsh` — a tree no runtime
+  // reads (G6 review, P2).
+  else if (arg === '--home') options.home = resolveHome({ ...process.env, DSH_HOME: next() })
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
     // `--check-presets` is a FLAG, not a mode: it reports on the presets already
@@ -1463,9 +1825,9 @@ if (isMain) {
     } else if (options.checkPresets) {
       const report = await checkAgentPresetFreshness(options)
       for (const entry of report.bases) {
-        console.log(`preset:   ${entry.destination}  ${entry.status === 'differs' ? 'DIFFERS' : entry.status}`)
+        console.log(`preset:   ${entry.id}  ${entry.patchPath}  ${entry.status === 'differs' ? 'DIFFERS' : entry.status}`)
       }
-      console.log('check:    DIFFERS means the file on disk is an install-time snapshot of a platform that has moved; re-run the installer to regenerate it (this check only reports, it never overwrites).')
+      console.log('check:    DIFFERS means the row in the profile patch is an install-time snapshot of a platform that has moved; re-run the installer to regenerate it (this check only reports, it never overwrites).')
       // Any difference is a nonzero exit so a script can gate on staleness; a
       // merely absent preset is not a difference (the user may not want it).
       if (report.bases.some(entry => entry.status === 'differs')) process.exitCode = 1
@@ -1494,7 +1856,7 @@ if (isMain) {
         console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
       }
       for (const preset of result.agentPresets ?? []) {
-        console.log(`preset:   ${preset.destination}${preset.installed ? '' : ` (${preset.reason})`}`)
+        console.log(`preset:   ${preset.rowId} → ${preset.patchPath}${preset.installed ? '' : ` (${preset.reason})`}`)
       }
       if (options.dryRun) console.log('dry-run:  no files were written')
     }

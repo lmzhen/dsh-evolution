@@ -94,7 +94,7 @@
       },
       "must": [
         {
-          "text": "| `--base` | Platform composition (read verbatim) | Installed preset id | Metadata file |"
+          "text": "| `--base` | Platform base patch (read verbatim) | Preset id | Row id | Display copy |"
         }
       ],
       "forbid": [

@@ -156,7 +156,7 @@
 # WHOLE-CONFIG REPLACEMENT (v33 G2.3): an override's `config` replaces the base
 # entry's config as a whole, so every platform key NOT set below falls back to
 # that row's schema default. Platform keys for this row
-# (0.1.5-rc.2 `session-query-sqlite` Config): path, openAt, journalMode,
+# (0.2.0-rc.2 `session-query-sqlite` Config): path, openAt, journalMode,
 # defaultLimit, maxLimit, snippetChars, readWindowMax, persistedReadConcurrency,
 # preparedSessionCacheSize.
 # verify-declared-config.mjs --upstream recomputes this list from the platform
@@ -189,7 +189,7 @@
 # replacement is safe; if upstream adds fields there, copy them.
 # WHOLE-CONFIG REPLACEMENT (v33 G2.3): an override's `config` replaces the base
 # entry's config as a whole, so every platform key NOT set below falls back to
-# that row's schema default. Platform keys for this row (0.1.5-rc.2
+# that row's schema default. Platform keys for this row (0.2.0-rc.2
 # `tool-skill` Config): catalogDescriptionMaxLength.
 # verify-declared-config.mjs --upstream recomputes this list from the platform
 # source and fails when the row gains a key this comment does not name.

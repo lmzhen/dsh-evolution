@@ -14,26 +14,30 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 
 it('S2-10 (FLOW1-6): an op that lands after the deadline is reported to the model', { timeout: 30_000 }, async () => {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   const delivered: string[] = []
   const applied: unknown[] = []
-  const session = {
+  // G4: the review's turn window comes from the family's session projection, so the stub must be
+  // foldable (dense seq-stamped log) and every append must announce the event it appends.
+  const session = projectable({
     id: SessionId('s2-10-late-landing'),
     seq: 1,
     header: { origin: undefined },
     snapshotEvents: () => [{ type: 'tool/call', data: { turn: 1, step: 2, callId: 'c1', name: 'skill', arguments: '{}' } }],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-  } as unknown as Session
+  }) as unknown as Session
   const collect = (message: unknown): void => {
     const box = message as { content?: Array<{ type: string; text: string }> } | null
     delivered.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
   }
   const agent = { id: session.id, session, inject: collect } as unknown as Agent
   ;(agent as { followup: unknown }).followup = collect
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   ctx.provide('subagents', {
     start: async () => ({
       result: Promise.resolve({
@@ -66,7 +70,7 @@ it('S2-10 (FLOW1-6): an op that lands after the deadline is reported to the mode
   })
   ctx.on('evolution/plan-applied', (payload: unknown) => { applied.push(payload) })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'subagent', reviewTimeoutMs: 10 })
-  ctx.emit('session/event', session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } } as never)
+  emitSessionEvent(ctx, session, 'turn/end', { turn: 1, reason: { kind: 'completed' } })
   // The late landing is reported as its own notice — the deadline snapshot in
   // the plan-applied record cannot contain it.
   await vi.waitFor(() => {

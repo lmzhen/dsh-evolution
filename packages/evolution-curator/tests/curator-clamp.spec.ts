@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '../src/index.ts'
+import { vol } from '../../test-support/volatile-config.ts'
 
 // minIdleHours 0 = "no idle gate" (the gate guard is `> 0`); bootGraceSeconds 0
 // = "no boot grace" (setTimeout(0)). Every other numeric field is a threshold /
@@ -15,7 +16,19 @@ const MIN1 = ['intervalHours', 'staleAfterDays', 'archiveAfterDays', 'qualityWar
 const ALL = [...MIN0, ...MIN1]
 
 describe('evolution-curator G3.1 numeric clamping', () => {
-  const parse = (input: unknown): unknown => (EvolutionCurator.Config as unknown as (i: unknown) => unknown)(input)
+  /**
+   * Parse through the row schema and unwrap the volatile references (G1 §8.1): these
+   * assertions are about the VALUE the schema produced, not about the reference.
+   * @param input - the raw config as a deployment would write it.
+   * @returns the parsed fields as plain values.
+   */
+  const parse = (input: unknown): Record<string, unknown> => {
+    const parsed = (EvolutionCurator.Config as unknown as (i: unknown) => Record<string, unknown>)(input)
+    return Object.fromEntries(Object.entries(parsed).map(([key, value]) => {
+      const live = value as { get?: () => unknown } | null
+      return [key, typeof live?.get === 'function' ? live.get() : value]
+    }))
+  }
 
   it('schema: 0 is retained for min-0 fields, rejected for min-1 fields (.min matrix)', () => {
     for (const field of MIN0) {
@@ -53,7 +66,7 @@ describe('evolution-curator G3.1 numeric clamping', () => {
       await ctx.plugin(NodeIo)
       // Direct construction bypasses the schema, so healthSoftBodyChars: 0 is
       // exactly the value the assembly clamp must correct (-> default 40_000).
-      const curator = new EvolutionCurator(ctx, { healthSoftBodyChars: 0, autoStart: false })
+      const curator = new EvolutionCurator(ctx, { healthSoftBodyChars: vol(0), autoStart: false })
       const skills = curator.skills
       await skills.create('fat-skill', `---\nname: fat-skill\ndescription: f\n---\n\n${'x'.repeat(2_400)}\n`, 'foreground')
       const rows = await curator.healthView()

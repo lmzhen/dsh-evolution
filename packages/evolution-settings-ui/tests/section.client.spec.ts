@@ -16,7 +16,8 @@ import { describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/client/index.ts'
-import { CARD_SLOT, PENDING_CARD_KEY } from '../src/client/seam.ts'
+import { CLIENT_ROW_SEATS } from '../src/client/generated-params.ts'
+import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey } from '../src/client/seam.ts'
 
 /**
  * `createElement` narrowed for the renderer: this package carries its own minimal ambient React surface, so
@@ -41,7 +42,30 @@ const field = (bag: Record<string, unknown>, name: string): string => {
  * generator its callback returns, exactly as the shell mounts each yielded registration), the settings scope
  * and the locale seat.
  */
-function fakeShell(): { ctx: Parameters<typeof apply>[0]; registrations: Registration[] } {
+/**
+ * A shell whose client settings seat is present: one form per entry id, `get` memoised the
+ * way the platform's `ConfigForms` does it.
+ */
+function fakeSeat(): { get: (id: string) => unknown } {
+  const forms = new Map<string, unknown>()
+  return {
+    get: (id: string) => {
+      const existing = forms.get(id)
+      if (existing !== undefined) return existing
+      const form = {
+        getSnapshot: () => ({ status: 'ready', value: {}, base: undefined, user: {}, revision: 1, writable: true, mode: 'host' }),
+        subscribe: () => () => {},
+        set: async () => true,
+        unset: async () => true,
+        mutate: async () => true,
+      }
+      forms.set(id, form)
+      return form
+    },
+  }
+}
+
+function fakeShell(options: { seat?: boolean } = {}): { ctx: Parameters<typeof apply>[0]; registrations: Registration[] } {
   const registrations: Registration[] = []
   const ctx = {
     effect: (fn: () => unknown): (() => void) => {
@@ -49,14 +73,7 @@ function fakeShell(): { ctx: Parameters<typeof apply>[0]; registrations: Registr
       return typeof dispose === 'function' ? dispose as () => void : () => {}
     },
     locale: { register: () => () => {}, bind: () => (key: string) => key },
-    settingsScope: {
-      bind: () => ({
-        set: async () => {},
-        unset: async () => {},
-        getSnapshot: () => ({ status: 'ready', value: {}, user: {}, writable: true }),
-        subscribe: () => () => {},
-      }),
-    },
+    get: (name: string) => name === 'configForms' && options.seat !== false ? fakeSeat() : undefined,
     slots: {
       inject: (_name: string, callback: () => Generator<unknown, void, unknown>): void => {
         for (const registration of callback()) void registration
@@ -96,6 +113,47 @@ describe('the evolution settings section', () => {
     // The staged-write window is the only card here that waits on a decision, so it leads.
     expect(asked[0]).toBe(PENDING_CARD_KEY)
     expect(document.querySelector('[data-slot-key="' + PENDING_CARD_KEY + '"]')).not.toBeNull()
+    cleanup()
+  })
+
+  // G2: the platform's Plugins page opens a row's configuration through a keyed seat whose
+  // key is `<bundle package name>#<row id>`. The bundle names are the ones the release ships
+  // (the source-plane spelling is rescoped at publish), and every row the registry carries
+  // for a bundle must be registered or the page shows no form for it.
+  it('registers the per-row config seat for every (bundle, row) pair', () => {
+    const { ctx, registrations } = fakeShell()
+    apply(ctx)
+    const keys = registrations.filter(row => row.name === ROW_CONFIG_SLOT).map(row => row.key)
+    expect(keys.length).toBeGreaterThan(0)
+    for (const seat of CLIENT_ROW_SEATS) {
+      for (const rowId of seat.rows) expect(keys).toContain(rowConfigKey(seat.bundle, rowId))
+    }
+    // One registration per key: a duplicate would render the row's form twice.
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  // G2: the settings seat is PROBED. A required inject for a service the deployment did not
+  // compose leaves this whole browser half pending forever — no error, no section, no UI — so
+  // the bundle must apply cleanly on a shell that serves none, and the cards must say so
+  // rather than render a form that cannot be saved.
+  it('applies on a shell without a settings seat and says the parameters are read-only', () => {
+    const { ctx, registrations } = fakeShell({ seat: false })
+    apply(ctx)
+    const section = registrations.find(row => row.id === SECTION_ID)
+    const card = registrations.find(row => row.name === CARD_SLOT)
+    expect(section).toBeDefined()
+    expect(card).toBeDefined()
+    // Render it the way the shell does: the inject face plus the hook the renderer binds
+    // out of the face's `hooks` compartment.
+    render(h(card?.component, {
+      namespace: 'memory-files',
+      fields: [],
+      t: (key: string) => key,
+      write: async () => {},
+      clear: async () => {},
+      useParamSection: (selector: (state: unknown) => unknown) => selector({ status: 'unavailable', value: undefined, user: undefined, writable: false, reason: 'seat-missing' }),
+    }))
+    expect(document.body.textContent).toContain('seatMissing')
     cleanup()
   })
 })

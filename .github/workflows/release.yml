@@ -32,15 +32,18 @@ concurrency:
 
 env:
   NPM_SCOPE: '@lmzhen'
-  # ONE platform-version definition (N-2): the compat gate validates against
-  # the released upstream tag `dsh-v<PLATFORM_VERSION>` and the publish
-  # metadata rewrites every @deepseek-ai/dsh-* range to ^<PLATFORM_VERSION>.
-  # Both derive from this single variable, so the declared support range can
-  # never drift from the validated anchor again (the rc.54 defect: metadata
-  # said ^0.1.0-rc.6 while the compat gate validated 0.1.1-rc.2). The pinned
-  # development baseline (UPSTREAM_SHA) stays a validate-only dev anchor and
-  # must never feed release metadata.
-  PLATFORM_VERSION: 0.1.5-rc.2
+  # TWO values since G7 (§2.1), because they answer two different questions.
+  # PLATFORM_FLOOR is what the published @deepseek-ai/dsh-* ranges declare
+  # (^0.2.0-rc.1): a range must admit the whole line, including its earlier
+  # rc. PLATFORM_VERSION is the exact line the compat gate validates
+  # (`dsh-v<PLATFORM_VERSION>`) and the line the baseline tree was built from.
+  # Before the split both jobs used one value, so the metadata asserted the
+  # tested rc while the support window's earlier rc fell outside it (the same
+  # class as the rc.54 defect: metadata ^0.1.0-rc.6 vs validated 0.1.1-rc.2).
+  # The pinned development baseline (UPSTREAM_SHA) stays a validate-only dev
+  # anchor and must never feed release metadata.
+  PLATFORM_FLOOR: 0.2.0-rc.1
+  PLATFORM_VERSION: 0.2.0-rc.2
   UPSTREAM_REPO: deepseek-ai/deepseek-harness
   # Tags publish as their own semver; non-tag pushes (main) pack with a
   # semver-safe dev placeholder so the publish dry-run can parse the version.
@@ -77,6 +80,7 @@ jobs:
           upstream_repo: ${{ env.UPSTREAM_REPO }}
           upstream_ref: ${{ steps.upstream.outputs.sha }}
           platform_version: ${{ env.PLATFORM_VERSION }}
+          platform_floor: ${{ env.PLATFORM_FLOOR }}
           artifact_suffix: baseline
           copy_host_tsconfig: 'true'
           # R-10: pass the scope explicitly so the action's pack rewrite and
@@ -108,14 +112,41 @@ jobs:
           upstream_repo: ${{ env.UPSTREAM_REPO }}
           upstream_ref: dsh-v${{ env.PLATFORM_VERSION }}
           platform_version: ${{ env.PLATFORM_VERSION }}
+          platform_floor: ${{ env.PLATFORM_FLOOR }}
           artifact_suffix: released
           copy_host_tsconfig: 'false'
+          npm_scope: ${{ env.NPM_SCOPE }}
+
+  # G7 §2.3: the desktop plane. The Electron cold-boot assertion itself stays a real-machine
+  # acceptance (it needs the signed app; recorded in the G2/G3 design docs with its evidence).
+  # What a runner owns is the WINDOWS half of the install: build the family artifacts on
+  # `windows-latest`, install them into a throwaway DSH_HOME with the family's installer, and let
+  # the family's own profile guard judge what came out (bundle row, preset row, journal, no double
+  # mount). A path bug that only breaks on Windows then fails here.
+  desktop-install:
+    name: desktop install (windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/evolution-validate
+        with:
+          upstream_repo: ${{ env.UPSTREAM_REPO }}
+          upstream_ref: dsh-v${{ env.PLATFORM_VERSION }}
+          platform_version: ${{ env.PLATFORM_VERSION }}
+          platform_floor: ${{ env.PLATFORM_FLOOR }}
+          artifact_suffix: windows
+          copy_host_tsconfig: 'false'
+          install_smoke: 'true'
           npm_scope: ${{ env.NPM_SCOPE }}
 
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [validate, compat-check]
+    needs: [validate, compat-check, desktop-install]
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:

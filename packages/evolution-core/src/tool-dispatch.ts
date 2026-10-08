@@ -198,6 +198,67 @@ function readDispatchRecord(event: { type: string; data?: unknown }): DispatchRe
 }
 
 /**
+ * The ledger key of one dispatch: a scope-qualified call id.
+ *
+ * v43 audit (FLOW4-4): a normalizer shared by every session (skill-usage's live listener holds ONE
+ * process-wide instance) used the bare call id, so two sessions that produced the same id — PTC
+ * sub-call ids are short, and an id-less payload falls back to a type+payload key that is not
+ * unique by construction — collided: the second session's read was absorbed as "already seen" and
+ * never counted, and a settle in one session flipped the other's `ok`. Callers that span sessions
+ * pass the session id as `scope`.
+ * @param callId - the dispatch's call id (or its payload-derived fallback).
+ * @param scope - the owning session id, or '' for a fold that never leaves one session.
+ * @returns the key both the ledger and every projection fold dedupe on.
+ */
+export function dispatchKeyOf(callId: string, scope = ''): string {
+  return scope === '' ? callId : `${scope}:${callId}`
+}
+
+/**
+ * The pure half of the ledger: what one event says about one dispatch.
+ *
+ * The DECISION (which dispatch, and whether this event is the one that opens it) lives here and
+ * only here; carriers differ in what they keep — the class below keeps consumer-visible mutable
+ * signals, the family's `evolutionReads`/`evolutionSignals` projection units keep plain-JSON
+ * ledgers. `name` is empty on an event that only settles an already-opened dispatch (a native
+ * `tool/result`), and `outcome` is present exactly when the event carried one.
+ * @param event - one session event; any non-dispatch event answers `null`.
+ * @param scope - the owning session id, or '' for a single-session fold.
+ * @returns the step, or `null` when the event is not a dispatch.
+ */
+export function dispatchStepOf(event: { type: string; data?: unknown }, scope = ''): DispatchStep | null {
+  const record = readDispatchRecord(event)
+  if (record === null) return null
+  return {
+    key: dispatchKeyOf(record.callId, scope),
+    kind: record.kind,
+    callId: record.callId,
+    rootCallId: record.rootCallId,
+    name: record.name,
+    arguments: record.arguments,
+    ...record.outcome === undefined ? {} : { outcome: record.outcome },
+  }
+}
+
+/** One ledger step: what one event tells a fold about one dispatch. */
+export interface DispatchStep {
+  /** The scoped ledger key ({@link dispatchKeyOf}). */
+  readonly key: string
+  /** How the platform logged this dispatch (native call or PTC program). */
+  readonly kind: ToolDispatchKind
+  /** The dispatch's call id, unscoped. */
+  readonly callId: string
+  /** The program root this dispatch belongs to (its own id for a native call). */
+  readonly rootCallId: string
+  /** The dispatched tool name; empty when the event only settles a dispatch. */
+  readonly name: string
+  /** Raw arguments as logged (a JSON string natively, an object in PTC mode). */
+  readonly arguments: unknown
+  /** Present exactly when the event carried an outcome. */
+  readonly outcome?: { readonly ok: boolean }
+}
+
+/**
  * The family's single dispatch ledger: absorbs platform events in log order,
  * emits one \`ToolDispatchSignal\` per dispatch, and folds later events of the
  * same dispatch into the record it already emitted.
@@ -222,18 +283,6 @@ export class ToolDispatchNormalizer {
     this.maxTracked = options.maxTracked ?? Number.POSITIVE_INFINITY
   }
 
-  /**
-   * v43 audit (FLOW4-4): the ledger key. A normalizer shared by every session
-   * (skill-usage's live listener holds ONE process-wide instance) used the bare
-   * call id, so two sessions that produced the same id — PTC sub-call ids are
-   * short, and an id-less payload falls back to a type+payload key that is not
-   * unique by construction — collided: the second session's read was absorbed as
-   * "already seen" and never counted, and a settle in one session flipped the
-   * other's `ok`. Callers that span sessions pass the session id as `scope`.
-   */
-  private keyOf(callId: string, scope: string): string {
-    return scope === '' ? callId : `${scope}:${callId}`
-  }
 
   /**
    * Absorb one session event.
@@ -243,28 +292,27 @@ export class ToolDispatchNormalizer {
    * non-dispatch event). A \`null\` return is never a dispatch to count again.
    */
   advance(event: { type: string; data?: unknown }, scope = ''): ToolDispatchSignal | null {
-    const record = readDispatchRecord(event)
-    if (record === null) return null
-    const key = this.keyOf(record.callId, scope)
-    if (record.name === '') {
-      const existing = this.records.get(key)
-      if (existing !== undefined && record.outcome !== undefined) existing.ok = record.outcome.ok
-      return null
-    }
-    const existing = this.records.get(key)
+    const step = dispatchStepOf(event, scope)
+    if (step === null) return null
+    const existing = this.records.get(step.key)
     if (existing !== undefined) {
-      if (record.outcome !== undefined) existing.ok = record.outcome.ok
+      if (step.outcome !== undefined) existing.ok = step.outcome.ok
       return null
     }
+    // An event that only settles a dispatch this ledger never saw open carries no name:
+    // there is no signal to emit (the same answer the pre-refactor branch gave).
+    if (step.name === '') return null
     const signal: ToolDispatchSignal = {
-      kind: record.kind,
-      callId: record.callId,
-      rootCallId: record.rootCallId,
-      name: record.name,
-      arguments: record.arguments,
-      ok: record.outcome?.ok,
+      kind: step.kind,
+      callId: step.callId,
+      rootCallId: step.rootCallId,
+      name: step.name,
+      arguments: step.arguments,
+      // Explicitly `undefined` when the event carried no outcome: the signal type requires the key
+      // (`exactOptionalPropertyTypes`), and consumers read it as "pending" in exactly that case.
+      ok: step.outcome?.ok,
     }
-    this.records.set(key, signal)
+    this.records.set(step.key, signal)
     this.evict()
     // S1-E6: a former 'program-root' upgrade lived here (a PTC sub-dispatch
     // proving its parent was a run_code root) — but the platform appends the
@@ -285,13 +333,12 @@ export class ToolDispatchNormalizer {
    * @returns the dispatch this event settled, or \`null\`.
    */
   settledSignalOf(event: { type: string; data?: unknown }, scope = ''): ToolDispatchSignal | null {
-    const record = readDispatchRecord(event)
-    if (record === null || record.outcome === undefined) return null
-    const key = this.keyOf(record.callId, scope)
-    if (this.settledIds.has(key)) return null
-    const signal = this.records.get(key)
+    const step = dispatchStepOf(event, scope)
+    if (step?.outcome === undefined) return null
+    if (this.settledIds.has(step.key)) return null
+    const signal = this.records.get(step.key)
     if (signal === undefined) return null
-    this.settledIds.add(key)
+    this.settledIds.add(step.key)
     this.evict()
     return signal
   }

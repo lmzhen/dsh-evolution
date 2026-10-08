@@ -278,12 +278,29 @@ export const PARAM_NAMESPACES: Readonly<Record<string, string>> = Object.freeze(
 })
 
 /**
- * The settings namespace one owner package registers. The registry's map is the only
- * place a namespace is spelled: a package without an entry has no user layer, so a
- * missing entry must fail loud here instead of letting a package fall back to a
- * private constant that the registry never sees.
+ * The rows whose settings namespace CHANGED with the platform-line move (G3): the
+ * platform keys a settings section by the Loader entry id now, while 0.1.x let each
+ * plugin register a free-form namespace — this table is the difference, DERIVED from
+ * {@link PARAM_NAMESPACES} so freezing a row id renames it in one place.
+ *
+ * It is the migration's TARGET (`rowId`) and its SOURCE (`namespace`, the section a
+ * stored value sits in). Rows whose two names already agree are absent: there is
+ * nothing to move for them.
+ */
+export const NAMESPACE_MIGRATIONS: readonly { readonly namespace: string; readonly rowId: string }[] = Object.freeze(
+  Object.entries(PARAM_NAMESPACES)
+    .filter(([owner, namespace]) => namespace !== owner)
+    .map(([owner, namespace]) => Object.freeze({ namespace, rowId: owner })),
+)
+
+/**
+ * The LEGACY settings namespace one owner package used to register through the family's
+ * own seam (0.1.x). It is no longer what the platform calls the section: the platform
+ * derives a settings namespace from the Loader entry id, and this registry's `owner` field
+ * IS that row id, so a live lookup uses {@link paramRowId}. What remains here is the
+ * migration SOURCE (G3 moves a user layer out of this string and into the row id).
  * @param owner - owner package directory name (the map's key).
- * @returns the namespace that owner registers.
+ * @returns the legacy namespace that owner registered.
  * @throws when the owner has no entry in {@link PARAM_NAMESPACES}.
  */
 export function paramNamespace(owner: string): string {
@@ -292,24 +309,46 @@ export function paramNamespace(owner: string): string {
   return namespace
 }
 
-/** Structural view of one registered settings scope (platform Service Definition).
- * Declared locally so this module keeps its zero-import, zero-dependency shape. */
-interface SettingsScopeLike {
-  get(): unknown
-  watch(callback: (next: unknown, prev: unknown) => void): () => void
+/**
+ * The settings id one row's user layer lives under, or undefined when the owner publishes
+ * no user layer at all (a deployment-only row: its knobs are E2 and never reach a settings
+ * section). The platform derives a settings namespace from the Loader entry id and reports
+ * it in `settings.describe()` / `configForms.get(entryId)`, and an owner package's row id is
+ * its own name — spelled the same in every bundle patch.
+ *
+ * This is the id to LOOK UP with; {@link paramNamespace} keeps the legacy string the 0.1.x
+ * seam registered, which is the G3 migration source and never a live lookup key.
+ * @param owner - owner package directory name (the row id).
+ * @returns the entry id the platform reports for that row, or undefined for a row without
+ *   a user layer.
+ */
+export function paramSettingsId(owner: string): string | undefined {
+  return PARAM_NAMESPACES[owner] === undefined ? undefined : owner
 }
 
-/** Structural view of the platform settings provider; only the members the
- * family uses are named. A missing `describe` disables the user layer loudly
- * (see {@link paramSectionOverrides}) instead of reading as 'no overrides'. */
+/**
+ * The settings id of a row that MUST have a user layer (an owner reading its own section).
+ * @param owner - owner package directory name (the row id).
+ * @returns the entry id the platform reports for that row.
+ * @throws when the owner publishes no user layer.
+ */
+export function paramRowId(owner: string): string {
+  const id = paramSettingsId(owner)
+  if (id === undefined) throw new Error('no settings namespace registered for owner `' + owner + '` (add it to PARAM_NAMESPACES)')
+  return id
+}
+
+/**
+ * Structural view of the platform settings provider: only the members the family
+ * still uses are named.
+ *
+ * G1 removed the family's own settings seam (`installParamSection`): a volatile row
+ * field carries the user layer by itself, so what remains is the WRITE face
+ * (`update`) and the one read the precedence rule needs — `describe()`, for the KEY
+ * NAMES the user set. A value is never read from here. Declared locally so this module
+ * keeps its zero-import, zero-dependency shape.
+ */
 export interface SettingsProviderLike {
-  register(namespace: string, schema: unknown, options: {
-    base: unknown
-    applies?: 'live' | 'restart'
-    /** Owner-side refusal of a resolved section (cross-field rules the schema
-     * cannot express); throwing refuses the WRITE that produced the value. */
-    validate?: (value: unknown) => void
-  }): SettingsScopeLike
   /** Merge a patch into one namespace's user layer. A stale `expectedRevision`
    * rejects with the platform's SETTINGS_CONFLICT error. */
   update?(namespace: string, patch: object, expectedRevision?: number): Promise<void>
@@ -324,140 +363,6 @@ export interface SettingsProviderLike {
     /** Owner's declared effect timing. */
     applies?: 'live' | 'restart'
   }[]
-}
-
-/** Hooks a caller may supply when a section attaches to the settings service.
- * @typeParam T - the section's value type (what `validate` inspects). */
-export interface ParamSectionOptions<T extends object = object> {
-  /** Called once when the user layer turns unreadable (a warning, never silent). */
-  warn?: (message: string) => void
-  /** Called after every committed change that the reader can observe — the place
-   * to REBUILD registration-level facts (the platform's own `installSection`
-   * documents the same hook shape). Consumers that read at use time pass nothing. */
-  onChange?: () => void
-  /** Refuse a resolved section the owner could not act on: a cross-field rule the
-   * schema cannot express (the platform applies this hook to the RESOLVED section,
-   * so a user value is judged together with the deployment layer beneath it).
-   * Throwing refuses the write that produced the value. */
-  validate?: (value: T) => void
-}
-
-/** Reader for one parameter section: presence-aware user overrides. */
-export interface ParamOverrides<T extends object> {
-  /** The namespace this reader is bound to. */
-  readonly namespace: string
-  /** The user-set value for one key, or undefined when the user never set it. */
-  get<K extends keyof T & string>(key: K): T[K] | undefined
-  /** The resolved section (defaults < base < user) — display and tests. */
-  resolved(): T
-}
-
-/**
- * G3: expose one parameter section to the user layer.
- *
- * Precedence stays 'user > deployment > default': the caller keeps reading its
- * deployment carriers (policy snapshot, then the plugin row) and consults
- * {@link ParamOverrides.get} FIRST — an unset key returns undefined, so the
- * deployment value keeps winning and the family's shadowing rules survive.
- *
- * Failure posture: a provider without `describe` (or one whose describe throws)
- * leaves the user layer UNAVAILABLE and warns once — deployment values then
- * apply. Treating an unreadable user layer as 'no overrides' would silently
- * ignore a setting the user did write, so the warning names it.
- * @typeParam T - the section's value type.
- * @param provider - the platform settings provider, or undefined when absent.
- * @param namespace - namespace to register.
- * @param schema - schemastery schema the platform validates against.
- * @param base - composition base layer (the plugin row's values).
- * @param options - warning sink and the change hook.
- * @returns a reader bound to the namespace.
- */
-export function paramSectionOverrides<T extends object>(
-  provider: SettingsProviderLike | undefined,
-  namespace: string,
-  schema: unknown,
-  base: T,
-  options: ParamSectionOptions<T> = {},
-): ParamOverrides<T> {
-  if (provider === undefined) return unavailableOverrides(namespace, base)
-  const scope = options.validate === undefined
-    ? provider.register(namespace, schema, { base, applies: 'live' })
-    : provider.register(namespace, schema, { base, applies: 'live', validate: options.validate as (value: unknown) => void })
-  const warn = options.warn ?? ((): void => {})
-  let user: Record<string, unknown> | undefined = readUserLayer(provider, namespace)
-  if (user === undefined) warn('settings provider for ' + namespace + ' exposes no readable user layer; deployment values apply')
-  scope.watch(() => {
-    const next = readUserLayer(provider, namespace)
-    if (next === undefined) {
-      warn('settings provider for ' + namespace + ' stopped exposing its user layer; deployment values apply')
-      user = undefined
-      options.onChange?.()
-      return
-    }
-    user = next
-    options.onChange?.()
-  })
-  return {
-    namespace,
-    get: <K extends keyof T & string>(key: K): T[K] | undefined =>
-      user === undefined ? undefined : user[key] as T[K] | undefined,
-    resolved: () => (scope.get() ?? base) as T,
-  }
-}
-
-/** The pre-provider reader: no user layer, deployment values only. */
-function unavailableOverrides<T extends object>(namespace: string, base: T): ParamOverrides<T> {
-  return { namespace, get: () => undefined, resolved: () => base }
-}
-
-/** Read the raw user section, or undefined when the provider cannot report it. */
-function readUserLayer(provider: SettingsProviderLike, namespace: string): Record<string, unknown> | undefined {
-  if (provider.describe === undefined) return undefined
-  try {
-    return provider.describe({ redactSecrets: false }).find(entry => entry.ns === namespace)?.user ?? {}
-  } catch {
-    return undefined
-  }
-}
-
-/** Minimal structural view of the cordis context used to attach a section.
- * The callback takes `unknown` on purpose: cordis's own `inject` declares a
- * `Context` parameter, and a callback accepting `unknown` is assignable to it
- * (parameter contravariance) while a narrower shape is not. */
-export interface SettingsHostLike {
-  inject(names: string[], callback: (ctx: unknown) => void): unknown
-}
-
-/**
- * Attach a parameter section through the optional settings service.
- * @typeParam T - the section's value type.
- * @param host - the plugin context (structurally typed).
- * @param namespace - namespace to register.
- * @param schema - schemastery schema the platform validates against.
- * @param base - composition base layer (the plugin row's values).
- * @param options - warning sink and the change hook.
- * @returns a reader that follows the provider when it appears.
- */
-export function installParamSection<T extends object>(
-  host: SettingsHostLike,
-  namespace: string,
-  schema: unknown,
-  base: T,
-  options: ParamSectionOptions<T> = {},
-): ParamOverrides<T> {
-  let current = unavailableOverrides(namespace, base)
-  host.inject(['settings'], (injected) => {
-    const settings = (injected as { settings: SettingsProviderLike }).settings
-    current = paramSectionOverrides(settings, namespace, schema, base, options)
-    // The section is live from the moment it attaches, so consumers that cached
-    // a derived fact before the provider existed rebuild it now.
-    options.onChange?.()
-  })
-  return {
-    namespace,
-    get: key => current.get(key),
-    resolved: () => current.resolved(),
-  }
 }
 
 /**

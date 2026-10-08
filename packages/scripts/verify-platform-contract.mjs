@@ -127,8 +127,10 @@ const CONTRACT_ANCHORS = [
   {
     id: 'session-format-version',
     file: 'packages/core/session/src/types.ts',
-    anchor: 'export const SESSION_FORMAT_VERSION = 3',
-    consumer: 'evolution-review persistence fixtures (v3 headers; re-recorded with the 0.1.5 fixture rewrite)',
+    // v33 recorded 3 (the 0.1.5 line); the 0.2.x line is 4 and ships the released v3→v4
+    // migration (`packages/session/session-format-v3-to-v4`), so the family's fixtures write v4.
+    anchor: 'export const SESSION_FORMAT_VERSION = 4',
+    consumer: 'evolution-review persistence fixtures (v4 headers; the v3 logs they used to write are migrated on read)',
     finding: 'P2-B1',
   },
   {
@@ -180,6 +182,62 @@ const CONTRACT_ANCHORS = [
     consumer: 'none — the family consumes the service, never extends it',
     finding: 'P2-F2',
   },
+  {
+    id: 'schemastery-volatile',
+    file: 'vendor/schemastery/src/index.ts',
+    anchor: 'Schema.prototype.volatile = function volatile() {',
+    consumer: 'every family row Config: `.volatile()` is what makes a field user-writable (G1); the vendored 3.18.2 on the older line has no such method',
+    finding: 'G1 / S2',
+  },
+  {
+    id: 'settings-volatile-surface-rule',
+    file: 'packages/settings/settings/src/index.ts',
+    anchor: 'const form = volatileForm(schema)',
+    consumer: 'the parameter surface itself: a row whose schema declares no volatile field is SKIPPED by describe(), so a row without `.volatile()` has no writable parameter face (G1)',
+    finding: 'G1 / D2',
+  },
+  {
+    id: 'settings-service-name',
+    file: 'packages/settings/settings/src/index.ts',
+    anchor: "super(ownerContext, 'settings')",
+    consumer: "the G1 write path (`settings.update(ns, patch)`) and the service detector in this script — the owner receiver is not `ctx`, which is why the old regex reported `settings` missing",
+    finding: 'G1 / D2',
+  },
+  {
+    id: 'config-editor-service-name',
+    file: 'packages/boot/config-editor/src/index.ts',
+    anchor: "super(ownerContext, 'configEditor')",
+    consumer: 'user-layer reads: `configuration()` gives { entry, inherited, override } for the G3 migration and the G5 diagnostics; namespace === row id',
+    finding: 'G3 / G5',
+  },
+  {
+    id: 'plugin-inventory-read',
+    file: 'packages/host/plugin-inventory/src/index.ts',
+    anchor: 'export async function readPluginInventory(ctx: Context): Promise<PluginInventorySnapshot> {',
+    consumer: 'the G5 diagnostics read surface: per-entry enabled/fiberPhase and the agentPresets roster with its own `broken` verdict',
+    finding: 'G5',
+  },
+  {
+    id: 'plugin-row-config-slot',
+    file: 'packages/client/ui-plugin-manager/src/client/index.ts',
+    anchor: "'plugins.row.config': { kind: 'keyed', scope: 'root' },",
+    consumer: 'the G2 client seat: a keyed root slot the Plugins page renders per row (`summary` and `page` views)',
+    finding: 'G2',
+  },
+  {
+    id: 'plugin-row-config-key',
+    file: 'packages/client/ui-plugin-manager/src/client/config-ledger.ts',
+    anchor: 'export function rowConfigKey(bundle: string, rowId: string): string {',
+    consumer: 'the exact key the family registers its per-row parameter form under (`<bundle>#<rowId>`)',
+    finding: 'G2',
+  },
+  {
+    id: 'config-forms-client-service',
+    file: 'packages/client/ui-settings/src/client/config-form.ts',
+    anchor: 'configForms: ConfigForms',
+    consumer: 'the G2 client seam: `ctx.get(\'configForms\')` is the optional probe that replaced the removed `settingsScope`; injecting it when absent would leave the entry pending and fail the all-or-nothing client boot',
+    finding: 'G2 / D1',
+  },
 ]
 
 /** Directories never worth scanning for platform facts. */
@@ -187,7 +245,10 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'lib', 'dist', 'tests', 'cove
 
 /** Both shapes a Cordis service registration takes: a `Service` subclass
  * (`super(ctx, 'name')`) and a plain `ctx.provide('name', value)`. */
-const SERVICE_DECLARATION = /(?:super\(ctx,\s*|\.provide\()'([^']+)'/g
+// The receiver of `super(...)` is not always called `ctx` (0.2.x's SettingsForms does
+// `super(ownerContext, 'settings')`), and a detector that only recognized `ctx` reported a
+// platform-provided service as missing. Any identifier/qualified name is accepted.
+const SERVICE_DECLARATION = /(?:super\(\s*[A-Za-z_$][\w$.]*\s*,\s*|\.provide\()'([^']+)'/g
 
 /**
  * Walk a tree and hand every `.ts` source to `visit`.
@@ -380,11 +441,13 @@ const SEMANTIC_ASSERTIONS = [
     finding: 'N16',
   },
   {
-    id: 'session-format-version-is-3',
+    id: 'session-format-version-is-4',
     file: 'packages/core/session/src/types.ts',
     kind: 'text',
-    anchor: 'export const SESSION_FORMAT_VERSION = 3',
-    consumer: 'evolution-review persistence fixtures (v3 headers); the value, not just the declaration',
+    // The value, not just the declaration: a format bump with the same text would still change
+    // what a persisted family log means, so the version is recorded as its own anchor.
+    anchor: 'export const SESSION_FORMAT_VERSION = 4',
+    consumer: 'evolution-review persistence fixtures (v4 headers)',
     finding: 'P2-B1',
   },
   {
@@ -497,6 +560,192 @@ for (const entry of DISPATCH_WRITE_SITES) {
 // Checks with no recorded anchor behind them: this is the set that stays fatal
 // under --accept-recorded.
 const drift = []
+
+// Red line 13 (checklist item 18): the installer's `PROFILE_SEED_TEMPLATES` is a
+// hand-copied snapshot of the platform's `PROFILE_TEMPLATES` and of the manifest
+// `initProfile` writes, taken because the installer runs before any profile
+// exists. A text anchor cannot see a template name, a bundle list or a seed field
+// move; the 0.1.5 copy that stored `patchReload` was exactly the drift a presence
+// anchor misses, so both tables are compared name by name and the seed's fields
+// key by key.
+const PLATFORM_PROFILE_SOURCE = 'packages/boot/app-boot/src/profile.ts'
+const FAMILY_INSTALLER_SOURCE = 'scripts/install-layered.mjs'
+
+/**
+ * Drop line and block comments, skipping quoted strings, so a scan can read the
+ * code alone: an apostrophe inside a comment (\`platform's\`) otherwise reads as an
+ * unterminated string and unbalances the brace walk below.
+ * @param text - the source text to read.
+ * @returns the same text with its comments removed.
+ */
+function stripComments(text) {
+  let out = ''
+  let quote = ''
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    if (quote !== '') {
+      out += char
+      if (char === quote && text[index - 1] !== '\\') quote = ''
+      continue
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      quote = char
+      out += char
+      continue
+    }
+    if (char === '/' && text[index + 1] === '/') {
+      while (index < text.length && text[index] !== '\n') index += 1
+      out += '\n'
+      continue
+    }
+    if (char === '/' && text[index + 1] === '*') {
+      index += 2
+      while (index < text.length && !(text[index] === '*' && text[index + 1] === '/')) index += 1
+      index += 1
+      continue
+    }
+    out += char
+  }
+  return out
+}
+
+/**
+ * The text inside the brace-delimited literal that `marker` opens, braces
+ * excluded. Call it on {@link stripComments} output.
+ * @param text - the source text to read.
+ * @param marker - the literal that precedes the opening brace.
+ * @returns the literal's body, or null when the marker or its brace is missing.
+ */
+function literalBody(text, marker) {
+  const at = text.indexOf(marker)
+  if (at < 0) return null
+  const start = text.indexOf('{', at + marker.length)
+  if (start < 0) return null
+  let depth = 0
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) return text.slice(start + 1, index)
+    }
+  }
+  return null
+}
+/**
+ * The keys declared at an object literal's outermost level: those at the body's
+ * own minimum indentation, so a nested literal's keys stay out of the set.
+ * @param body - the literal's text, braces excluded.
+ * @returns the key names in source order.
+ */
+function topLevelKeys(body) {
+  const rows = [...body.matchAll(/^([ \t]+)([A-Za-z_$][\w$]*):/gm)]
+  if (rows.length === 0) return []
+  const indent = Math.min(...rows.map(row => row[1].length))
+  return rows.filter(row => row[1].length === indent).map(row => row[2])
+}
+
+/**
+ * The keys written inside a literal body, inline or one per line.
+ * @param body - the literal's text, braces excluded.
+ * @returns the key names in source order.
+ */
+function inlineKeys(body) {
+  return [...body.matchAll(/([A-Za-z_$][\w$]*)\s*:/g)].map(match => match[1])
+}
+
+/**
+ * One template entry per name, read from a table's own literal: the entry's key
+ * names and its `bundles` list.
+ * @param text - the source text holding the table.
+ * @param marker - the literal that opens the table.
+ * @returns template name to `{ keys, bundles }`, or null when the table is not there.
+ */
+function bundleTable(text, marker) {
+  const body = literalBody(text, marker)
+  if (body === null) return null
+  const table = new Map()
+  for (const match of body.matchAll(/(?:^|\n)\s*(?:'([\w-]+)'|([\w-]+)):\s*\{([^}]*)\}/g)) {
+    const entry = match[3]
+    table.set(match[1] ?? match[2], {
+      keys: inlineKeys(entry),
+      bundles: [...(/bundles:\s*\[([^\]]*)\]/.exec(entry)?.[1] ?? '').matchAll(/'([^']+)'/g)].map(item => item[1]),
+    })
+  }
+  return table
+}
+
+let seedSnapshotChecks = 0
+const platformProfilePath = join(upstream, ...PLATFORM_PROFILE_SOURCE.split('/'))
+const familyInstallerPath = join(familyRoot, ...FAMILY_INSTALLER_SOURCE.split('/'))
+if (!existsSync(platformProfilePath) || !existsSync(familyInstallerPath)) {
+  drift.push(`the installer's profile seed snapshot cannot be compared: ${PLATFORM_PROFILE_SOURCE} or ${FAMILY_INSTALLER_SOURCE} is missing from the tree pair`)
+} else {
+  const platformProfileText = stripComments(readFileSync(platformProfilePath, 'utf8'))
+  const familyInstallerText = stripComments(readFileSync(familyInstallerPath, 'utf8'))
+  const platformTemplates = bundleTable(platformProfileText, 'export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = ')
+  const familyTemplates = bundleTable(familyInstallerText, 'const PROFILE_SEED_TEMPLATES = ')
+  if (platformTemplates === null || familyTemplates === null) {
+    drift.push('the profile template table moved: PROFILE_TEMPLATES (platform) or PROFILE_SEED_TEMPLATES (installer) is no longer a literal table of `bundles` lists')
+  } else {
+    seedSnapshotChecks += platformTemplates.size
+    for (const [name, template] of platformTemplates) {
+      const copy = familyTemplates.get(name)
+      if (copy === undefined) {
+        drift.push(`platform profile template \`${name}\` ([${template.bundles.join(', ')}]) is missing from the installer's PROFILE_SEED_TEMPLATES`)
+        continue
+      }
+      if (copy.bundles.join(', ') !== template.bundles.join(', ')) {
+        drift.push(`profile template \`${name}\` bundles drifted: platform [${template.bundles.join(', ')}] vs installer [${copy.bundles.join(', ')}]`)
+      }
+      if (copy.keys.join(', ') !== template.keys.join(', ')) {
+        const extra = copy.keys.filter(key => !template.keys.includes(key))
+        const absent = template.keys.filter(key => !copy.keys.includes(key))
+        drift.push(`profile template \`${name}\` fields drifted: platform {${template.keys.join(', ')}} vs installer {${copy.keys.join(', ')}}`
+          + (extra.length > 0 ? ` — the installer stores ${extra.join(', ')}, which the platform template does not declare` : '')
+          + (absent.length > 0 ? ` — the installer omits ${absent.join(', ')}` : ''))
+      }
+    }
+    for (const name of familyTemplates.keys()) {
+      if (!platformTemplates.has(name)) drift.push(`installer profile template \`${name}\` does not exist on the platform — a self-created \`${name}\` profile would seed a bundle list this line does not ship`)
+    }
+  }
+  seedSnapshotChecks += 1
+  const platformDefault = /export const DEFAULT_PROFILE_BUNDLES[^=]*=\s*\[([^\]]*)\]/.exec(platformProfileText)
+  const familyDefault = /const DEFAULT_SEED_TEMPLATE = \{\s*bundles:\s*\[([^\]]*)\]/.exec(familyInstallerText)
+  const platformDefaultBundles = platformDefault === null ? [] : [...platformDefault[1].matchAll(/'([^']+)'/g)].map(item => item[1])
+  const familyDefaultBundles = familyDefault === null ? [] : [...familyDefault[1].matchAll(/'([^']+)'/g)].map(item => item[1])
+  if (platformDefaultBundles.length === 0 || familyDefaultBundles.length === 0) {
+    drift.push('the default profile bundles moved: DEFAULT_PROFILE_BUNDLES (platform) or DEFAULT_SEED_TEMPLATE (installer) is no longer a literal bundle list')
+  } else if (platformDefaultBundles.join(', ') !== familyDefaultBundles.join(', ')) {
+    drift.push(`the default profile bundles drifted: platform [${platformDefaultBundles.join(', ')}] vs installer [${familyDefaultBundles.join(', ')}]`)
+  }
+  seedSnapshotChecks += 1
+  const platformSeed = literalBody(platformProfileText, 'const manifest: ProfileManifest & { private: boolean } = ')
+  const familySeed = literalBody(familyInstallerText, 'await writeManifestAtomic(manifestPath, JSON.stringify(')
+  if (platformSeed === null || familySeed === null) {
+    drift.push('the profile seed write moved: initProfile (platform) or ensureProfile (installer) no longer writes a literal manifest')
+  } else {
+    const platformKeys = topLevelKeys(platformSeed)
+    const familyKeys = topLevelKeys(familySeed)
+    if (platformKeys.join(', ') !== familyKeys.join(', ')) {
+      drift.push(`the seeded profile manifest key set drifted: initProfile writes {${platformKeys.join(', ')}} vs the installer's {${familyKeys.join(', ')}}`)
+    } else {
+      const platformDsh = literalBody(platformSeed, 'dsh: ')
+      const familyDsh = literalBody(familySeed, 'dsh: ')
+      const profileKeysOf = (body) => {
+        const profile = body === null ? null : literalBody(body, 'profile: ')
+        return profile === null ? [] : inlineKeys(profile)
+      }
+      const platformProfileKeys = profileKeysOf(platformDsh)
+      const familyProfileKeys = profileKeysOf(familyDsh)
+      if (platformProfileKeys.join(', ') !== familyProfileKeys.join(', ')) {
+        drift.push(`the seeded \`dsh.profile\` key set drifted: initProfile writes {${platformProfileKeys.join(', ')}} vs the installer's {${familyProfileKeys.join(', ')}} — a field the platform does not read is a snapshot it never honors`)
+      }
+    }
+  }
+  console.log(`verify-platform-contract: profile seed snapshot — ${seedSnapshotChecks} check(s) against ${PLATFORM_PROFILE_SOURCE} (template bundles, default bundles, manifest keys)`)
+}
 
 const packages = platformPackages()
 const importedByPackage = new Map()
@@ -687,7 +936,7 @@ if (citationChecks === 0) {
 }
 for (const finding of citationFindings) recordedDrift.push('platform-citation ' + finding)
 
-console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${writeSiteChecks} dispatch write site(s), ${semanticChecks} semantic assertion(s), ${citationChecks} platform citation(s) (${citationFindings.length} broken), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
+console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${writeSiteChecks} dispatch write site(s), ${seedSnapshotChecks} profile seed check(s), ${semanticChecks} semantic assertion(s), ${citationChecks} platform citation(s) (${citationFindings.length} broken), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
 if (recordedDrift.length > 0) {
   const label = acceptRecorded
     ? 'accepted recorded difference(s) — each is accounted for by the anchor, semantic-assertion or citation record'

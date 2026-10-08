@@ -17,6 +17,30 @@ async function runInstaller(home: string, mode: string, profile = 'evo-test', ex
   return run(process.execPath, [installer, '--mode', mode, '--profile', profile, '--home', home, ...extra], { env: { ...process.env, ...env } })
 }
 
+/**
+ * Write one platform base preset patch fixture under an explicit preset root, in the form the
+ * platform ships (`packages/bundle/web-app/presets/<base>.patch.yml`: one `- insert:` entry whose
+ * row carries `config.plugins`).
+ * @param rootDir - the directory `DSH_AGENT_PRESET_ROOT` names.
+ * @param base - the base name (the file's stem).
+ * @param rows - the plugin row lines, at column 0.
+ */
+async function writeBasePatch(rootDir: string, base: string, rows: string[]): Promise<void> {
+  await mkdir(rootDir, { recursive: true })
+  await writeFile(join(rootDir, `${base}.patch.yml`), [
+    `# ${base} base patch fixture`,
+    '- insert:',
+    '    - id: preset-fixture',
+    "      name: '@deepseek-ai/dsh-agent-preset'",
+    '      config:',
+    '        id: fixture',
+    '        order: 1',
+    '        plugins:',
+    ...rows.map(row => '          ' + row),
+    '',
+  ].join('\n'))
+}
+
 /** PLAN S5.8 (2026-09-16, audit P2-26): the packages root the installer
  * resolves its staging against (`<pkg>/tests/../../` = the overlay root in the
  * dev tree and `packages/evolution/` in the mirror layout — the same
@@ -73,26 +97,31 @@ describe('layered installer', () => {
       )).resolves.toContain('evolution-state-json')
     }
 
-    const presetDir = join(home, '.agent-presets', 'evolution')
-    const composition = await readFile(join(presetDir, 'agent.cordis.yml'), 'utf8')
-    // rc.53: the installed preset is GENERATED from the runtime platform's
-    // standard rows + the evolution delta — standard rows verbatim first
-    // (persona is one), then the delta's model tools.
-    expect(composition).toContain('- id: persona')
-    expect(composition.indexOf('- id: persona')).toBeLessThan(composition.indexOf('- id: tool-memory'))
-    expect(composition).toContain('- id: tool-memory')
-    expect(composition).toContain('- id: evolution-skill-catalog')
+    // 0.2.x: the preset is a ROW in the profile's own patch layer, composed from
+    // the runtime platform's standard base rows + the evolution delta — base rows
+    // first (persona is one), then the delta's model tools.
+    const patchFile = join(profileDir, 'cordis.patch.yml')
+    const patch = await readFile(patchFile, 'utf8')
+    expect(patch).toContain('- insert:')
+    expect(patch).toContain("    - id: preset-evolution\n      name: '@deepseek-ai/dsh-agent-preset'")
+    expect(patch).toContain('        id: evolution\n')
+    expect(patch).toContain('        name: "Evolution"\n')
+    const pluginIds = (loadOverlayPatches('test', patchFile)
+      .flatMap(row => (row as { insert?: Array<{ config?: { plugins?: Record<string, unknown>[] } }> }).insert ?? [])
+      .flatMap(item => item.config?.plugins ?? []))
+      .map(row => rowId(row))
+    expect(pluginIds).toContain('persona')
+    expect(pluginIds.indexOf('persona')).toBeLessThan(pluginIds.indexOf('tool-memory'))
+    expect(pluginIds).toContain('tool-memory')
+    expect(pluginIds).toContain('evolution-skill-catalog')
 
     // V10-14 (P1-2): the 60-char catalog cap must be INJECTED onto the
     // standard-sourced `tool-skill` row — the session-visible instance mounts
     // in the preset scope, which no profile patch can reach. Exact-row match
     // (`tool-skill`, not the delta's `tool-skill-manage`).
-    const capStart = composition.search(/^- id: tool-skill$/m)
-    expect(capStart).toBeGreaterThanOrEqual(0)
-    const rowEnd = composition.indexOf('\n- id:', capStart)
-    const toolSkillBlock = composition.slice(capStart, rowEnd === -1 ? undefined : rowEnd)
-    expect(toolSkillBlock).toContain('catalogDescriptionMaxLength: 60')
-    expect(toolSkillBlock).toContain('V10-14')
+    const toolSkill = patch.slice(patch.indexOf('          - id: tool-skill\n'), patch.indexOf('          - id: tool-memory\n'))
+    expect(toolSkill).toContain('catalogDescriptionMaxLength: 60')
+    expect(toolSkill).toContain('V10-14')
 
     const patchRows = insertedRows(loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')))
     expect(rowIds(patchRows)).toContain('evolution-review')
@@ -132,10 +161,8 @@ describe('layered installer', () => {
 
   it('rejects a delta that collides with runtime standard rows (N-5)', async () => {
     const home = await tempRoot('dsh-installer-n5-')
-    const standard = '# runtime standard\n- id: persona\n- id: tool-session-query\n- id: dsh-tools\n'
     const delta = '# evolution delta\n- id: tool-memory\n- id: tool-session-query\n'
-    await mkdir(join(home, 'preset', 'standard'), { recursive: true })
-    await writeFile(join(home, 'preset', 'standard', 'agent.cordis.yml'), standard)
+    await writeBasePatch(join(home, 'preset'), 'standard', ['- id: persona', '- id: tool-session-query', '- id: dsh-tools'])
     await writeFile(join(home, 'delta.yml'), delta)
     const error = await runInstaller(home, 'layered', 'evo-n5', ['--dry-run'], {
       DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
@@ -147,10 +174,8 @@ describe('layered installer', () => {
 
   it('keeps both rows under the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (N-5)', async () => {
     const home = await tempRoot('dsh-installer-n5b-')
-    const standard = '- id: persona\n- id: tool-session-query\n'
     const delta = '- id: tool-memory\n- id: tool-session-query\n'
-    await mkdir(join(home, 'preset', 'standard'), { recursive: true })
-    await writeFile(join(home, 'preset', 'standard', 'agent.cordis.yml'), standard)
+    await writeBasePatch(join(home, 'preset'), 'standard', ['- id: persona', '- id: tool-session-query'])
     await writeFile(join(home, 'delta.yml'), delta)
     const { stderr } = await runInstaller(home, 'layered', 'evo-n5b', ['--dry-run'], {
       DSH_AGENT_PRESET_ROOT: join(home, 'preset'),
@@ -286,9 +311,7 @@ describe('layered installer', () => {
   // packageSourceRoot() on the code path (the delta is read from the staging).
   it('P2-26 (S5.8): a scoped install refuses a staging built for another scope', async () => {
     const home = await tempRoot('dsh-installer-scope-a-')
-    const presetRoot = join(home, 'preset', 'standard')
-    await mkdir(presetRoot, { recursive: true })
-    await writeFile(join(presetRoot, 'agent.cordis.yml'), '- id: persona\n')
+    await writeBasePatch(join(home, 'preset'), 'standard', ['- id: persona'])
     await withStaging({ version: await familyVersion(), scope: '@deepseek-ai', createdAt: 'fixture', gitSha: '' }, async () => {
       await expect(runInstaller(home, 'agent', 'evo-scope', ['--dry-run'], {
         EVOLUTION_SCOPE: '@lmzhen',
@@ -310,9 +333,7 @@ describe('layered installer', () => {
 
   it('P2-26 (S5.8): a scoped install refuses a pre-S5.8 staging manifest without a scope field', async () => {
     const home = await tempRoot('dsh-installer-scope-b-')
-    const presetRoot = join(home, 'preset', 'standard')
-    await mkdir(presetRoot, { recursive: true })
-    await writeFile(join(presetRoot, 'agent.cordis.yml'), '- id: persona\n')
+    await writeBasePatch(join(home, 'preset'), 'standard', ['- id: persona'])
     // Missing field = unverifiable scope: refused fail-loud (same strength as
     // the F-213 stale-version refusal), never installed on faith.
     await withStaging({ version: await familyVersion(), createdAt: 'fixture', gitSha: '' }, async () => {
@@ -330,9 +351,7 @@ describe('layered installer', () => {
 
   it('P2-26 (S5.8): a staging whose scope matches EVOLUTION_SCOPE installs', async () => {
     const home = await tempRoot('dsh-installer-scope-c-')
-    const presetRoot = join(home, 'preset', 'standard')
-    await mkdir(presetRoot, { recursive: true })
-    await writeFile(join(presetRoot, 'agent.cordis.yml'), '- id: persona\n')
+    await writeBasePatch(join(home, 'preset'), 'standard', ['- id: persona'])
     await withStaging({ version: await familyVersion(), scope: '@lmzhen', createdAt: 'fixture', gitSha: '' }, async () => {
       // The scope check passes and the install proceeds down the real path:
       // the delta is read from the staging and the preset is generated.
@@ -480,10 +499,24 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'agent', 'evo-test', ['--dry-run'])).rejects.toThrow(/one-click preset bundle/)
   }, 30_000)
 
-  it('D-1 (v18): --mode oneclick refuses when an Evolution agent preset exists', async () => {
+  it('D-1 (v18): --mode oneclick refuses when the profile patch carries an Evolution preset row', async () => {
     const home = await tempRoot('dsh-installer-d1b-')
-    await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
-    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/agent preset/)
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: [] } } }), 'utf8')
+    await writeFile(join(profileDir, 'cordis.patch.yml'), [
+      '- insert:',
+      '    - id: preset-evolution',
+      "      name: '@deepseek-ai/dsh-agent-preset'",
+      '      config:',
+      '        id: evolution',
+      '',
+    ].join('\n'), 'utf8')
+    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/agent preset row/)
+    // ...and the exclusion is per profile: the same row in ANOTHER profile's patch
+    // mounts nothing in this one, so the install proceeds.
+    await rm(join(profileDir, 'cordis.patch.yml'))
+    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).resolves.toBeTruthy()
   }, 30_000)
 
   it('D-2 (v18): uninstalling host from a one-click profile keeps the packages (no phantom row)', async () => {
@@ -530,13 +563,13 @@ describe('layered installer', () => {
     expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-evolution-host'])
   }, 60_000)
 
-  it('G2.1 (v33): resolves the preset from the 0.1.5 shipped location, not the legacy CLI config dir', async () => {
-    // 0.1.5 ships the agent presets INSIDE the platform package
-    // (`node_modules/@deepseek-ai/dsh-agent-presets/presets/`, the package's
-    // SHIPPED_PRESET_ROOT) and stopped publishing the CLI's `config/`
-    // directory. The overlay below carries only the shipped location, so the
-    // installer must find it there; a resolution that still only knew the
-    // legacy path would fail the preset install entirely.
+  it('G6: resolves the base patch from a bundle package beside the script (the source-checkout shape)', async () => {
+    // The platform ships each base preset as a bundle patch layer
+    // (`packages/bundle/web-app/presets/<base>.patch.yml`, declared in that
+    // package's `dsh.bundle.patch`), so the installer walks up to the bundle
+    // packages of the tree it runs in. The overlay below carries only that
+    // location, so a resolution that still looked for a preset directory would
+    // fail the install entirely.
     const tree = await tempRoot('dsh-installer-shipped-')
     const scripts = join(tree, 'packages', 'evolution', 'scripts')
     const home = join(tree, 'home')
@@ -551,16 +584,27 @@ describe('layered installer', () => {
     for (const entry of await readdir(scriptsDir)) {
       if (entry.endsWith('.mjs')) await cp(join(scriptsDir, entry), join(scripts, entry))
     }
-    const shippedRoot = join(tree, 'packages', 'evolution', 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets')
-    await mkdir(join(shippedRoot, 'standard'), { recursive: true })
-    const shippedComposition = '# v33-G2.1 platform-shipped standard composition\n- id: persona\n- id: tool-session-query\n'
-    await writeFile(join(shippedRoot, 'standard', 'agent.cordis.yml'), shippedComposition)
+    const shippedRoot = join(tree, 'packages', 'bundle', 'web-app', 'presets')
+    await mkdir(shippedRoot, { recursive: true })
+    const shippedPatch = [
+      '# platform-shipped standard base patch',
+      '- insert:',
+      '    - id: preset-standard',
+      "      name: '@deepseek-ai/dsh-agent-preset'",
+      '      config:',
+      '        id: standard',
+      '        order: 1',
+      '        plugins:',
+      '          - id: persona',
+      '          - id: tool-session-query',
+      '',
+    ].join('\n')
+    await writeFile(join(shippedRoot, 'standard.patch.yml'), shippedPatch)
     const delta = join(tree, 'delta.yml')
     await writeFile(delta, '# evolution delta\n- id: tool-memory\n')
-    // A real install also copies the preset container manifest from the family
-    // package, so the overlay carries a minimal one.
+    // A real install also copies the agent package's own data files from the
+    // family source, so the overlay carries minimal ones.
     await mkdir(join(tree, 'packages', 'evolution', 'evolution-agent'), { recursive: true })
-    await writeFile(join(tree, 'packages', 'evolution', 'evolution-agent', 'preset.yml'), 'name: Evolution\ndescription: overlay fixture\norder: 10\n')
     // 0.3.75: the base table is a DATA file the installer reads from the agent
     // package — the overlay carries the real one, and a missing table is a
     // loud failure by design (never a silent fallback to `standard`).
@@ -574,23 +618,29 @@ describe('layered installer', () => {
     await run(process.execPath, [
       join(scripts, 'install-layered.mjs'), '--mode', 'agent', '--profile', 'g21', '--home', home,
     ], { env: { ...process.env, DSH_EVOLUTION_DELTA_PATH: delta } })
-    const composition = await readFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'utf8')
-    // The generated preset starts with the standard rows VERBATIM, so its first
-    // line identifies which composition was resolved.
-    expect(composition.split('\n')[0]).toBe(shippedComposition.split('\n')[0])
-    expect(composition).toContain('- id: tool-memory')
+    const patch = await readFile(join(home, 'profiles', 'g21', 'cordis.patch.yml'), 'utf8')
+    // The composed row carries the base patch's rows VERBATIM first, so the
+    // delta's model tool follows them.
+    expect(patch).toContain('          - id: persona')
+    expect(patch.indexOf('          - id: persona')).toBeLessThan(patch.indexOf('          - id: tool-memory'))
+    expect(patch).toContain('          - id: tool-session-query')
+    // The base patch file's own comment line is NOT part of the plugin list: the
+    // composer reads `config.plugins`, not the file.
+    expect(patch).not.toContain('# platform-shipped standard base patch')
   }, 60_000)
 
-  it('G2.2 (v33): a self-created profile carries the platform template bundles and patch reload', async () => {
+  it('G2.2 (v33): a self-created profile carries the platform template bundles', async () => {
     // The installer creates a profile before `dsh` ever touches it, so it seeds
-    // the platform's `PROFILE_TEMPLATES[name]` by hand. The 0.1.5 table has
-    // five names and a `patchReload` field; without them a self-created
-    // `sdk-minimal` profile would mount only the base row (D-4's original
-    // defect, one generation later).
+    // the platform's `PROFILE_TEMPLATES[name]` by hand: five names whose bundle
+    // lists decide which rows a self-created `sdk-minimal` profile mounts
+    // (D-4's original defect, one generation later). The seeded manifest holds
+    // `dsh.profile.bundles` alone, like the platform's `initProfile`; the 0.1.5
+    // line's extra `patchReload` field is gone on 0.2.x, where the user patch
+    // layer hot-reloads on long-lived surfaces without a per-profile switch.
     const home = await tempRoot('dsh-installer-seed-')
     await runInstaller(home, 'host', 'sdk-minimal')
     const minimal = JSON.parse(await readFile(join(home, 'profiles', 'sdk-minimal', 'package.json'), 'utf8')) as {
-      dsh?: { profile?: { bundles?: string[]; patchReload?: string } }
+      dsh?: { profile?: { bundles?: string[] } }
     }
     // sdk-minimal's template is the single sdk package — no base row. The row
     // the install itself mounts is appended after the seeded template.
@@ -598,19 +648,18 @@ describe('layered installer', () => {
       '@deepseek-ai/dsh-sdk-minimal',
       '@deepseek-ai/dsh-evolution-host',
     ])
-    expect(minimal.dsh?.profile?.patchReload).toBe('startup')
+    expect(Object.keys(minimal.dsh?.profile ?? {})).toEqual(['bundles'])
 
     await runInstaller(home, 'host', 'web')
     const web = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as {
-      dsh?: { profile?: { bundles?: string[]; patchReload?: string } }
+      dsh?: { profile?: { bundles?: string[] } }
     }
     expect(web.dsh?.profile?.bundles).toEqual([
       '@deepseek-ai/dsh-base',
       '@deepseek-ai/dsh-web-app',
       '@deepseek-ai/dsh-evolution-host',
     ])
-    // Only `web` ships live patch reload.
-    expect(web.dsh?.profile?.patchReload).toBe('live')
+    expect(Object.keys(web.dsh?.profile ?? {})).toEqual(['bundles'])
   }, 60_000)
 
   // v33 REG-02 / v31 INST-01/02/05 / v18 D-11: the five `packages/scripts/*.mjs`
@@ -644,20 +693,43 @@ describe('layered installer', () => {
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 60_000)
 
-  it('OPT-02: uninstalling profile B KEEPS the home-global preset while profile A carries only a preset-owning journal (INST-04)', async () => {
-    // The exact shape the v31 INST-04 sweep guard exists for: profile A has a
-    // journal with `agentPreset: true` and NO bundle rows. Before OPT-02 the
-    // sweep's `readInstallJournal` call was missing its await — `otherJournal`
-    // was a Promise, `?.agentPreset` was always undefined, and B's uninstall
-    // deleted the shared preset out from under A's sessions.
+  it('INST-04: uninstalling profile B leaves profile A\'s preset row untouched (the row is per profile)', async () => {
+    // A preset ROW lives in one profile's own patch layer, so a reverse action in
+    // profile B cannot reach profile A at all. This pins that isolation: A's row
+    // survives B's uninstall, and the journal records the row it wrote.
     const home = await tempRoot('dsh-installer-journal-')
-    await runInstaller(home, 'agent', 'evo-a')
-    const journalA = JSON.parse(await readFile(join(home, 'profiles', 'evo-a', '.evolution-install.json'), 'utf8')) as { agentPreset?: boolean }
+    const presetRoot = join(home, 'preset')
+    await mkdir(presetRoot, { recursive: true })
+    await writeFile(join(presetRoot, 'standard.patch.yml'), [
+      '# standard base patch fixture',
+      '- insert:',
+      '    - id: preset-standard',
+      "      name: '@deepseek-ai/dsh-agent-preset'",
+      '      config:',
+      '        id: standard',
+      '        order: 1',
+      '        plugins:',
+      '          - id: persona',
+      '          - id: tool-skill',
+      '',
+    ].join('\n'))
+    const env = { DSH_AGENT_PRESET_ROOT: presetRoot }
+    await runInstaller(home, 'agent', 'evo-a', [], env)
+    const patchA = join(home, 'profiles', 'evo-a', 'cordis.patch.yml')
+    const journalA = JSON.parse(await readFile(join(home, 'profiles', 'evo-a', '.evolution-install.json'), 'utf8')) as {
+      agentPreset?: boolean
+      agentPresetRows?: Array<{ patchPath: string; rowId: string; presetId: string }>
+    }
     expect(journalA.agentPreset).toBe(true)
-    await runInstaller(home, 'layered', 'evo-b')
+    // The journal records the ROW (patch path, row id, preset id), which is what a
+    // later uninstall reads — a directory path would name nothing on this line.
+    expect(journalA.agentPresetRows).toEqual([{ patchPath: patchA, rowId: 'preset-evolution', presetId: 'evolution' }])
+    await runInstaller(home, 'layered', 'evo-b', [], env)
     await runInstaller(home, 'layered', 'evo-b', ['--uninstall'])
-    // The home-global preset survives because A still owns it.
-    expect(existsSync(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'))).toBe(true)
+    // Profile A's row survives: B's reverse action only ever reads B's patch.
+    expect(existsSync(patchA)).toBe(true)
+    expect(await readFile(patchA, 'utf8')).toContain('preset-evolution')
+    expect(await readFile(join(home, 'profiles', 'evo-b', 'cordis.patch.yml'), 'utf8')).toBe('[]\n')
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }, 120_000)
 

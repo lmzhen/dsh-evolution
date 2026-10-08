@@ -3,15 +3,24 @@
  * @module @deepseek-ai/dsh-evolution-review
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createHash, randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+// 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
+// map: each producer declares its own kind in its own module, and there is no shared
+// catch-all plugin kind (llm/src/message.ts:103-115).
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'evolution-review': { kind: 'evolution-review' } & ContextFormed
+  }
+}
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, foldTurn, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
@@ -19,7 +28,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { collectReadSkillNames, evidenceKindIndex, installParamSection, paramNamespace, readDispatchSignal, readNumberParam, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
+import { paramRowId, readDispatchSignal, sessionAudited, sessionEvidenceIndex, sessionReadNames, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
@@ -27,8 +36,8 @@ import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, 
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
 // tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
-// core's events-based collectReadSkillNames, imported above. Re-exported so this package's
-// published surface keeps naming the rule.
+// core's reader (the `evolutionReads` projection for a real Session, the structural accessor for a
+// bare stub view). Re-exported so this package's published surface keeps naming the rule.
 export { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 import { SessionScopedState } from './session-state.ts'
@@ -57,7 +66,7 @@ export const inject = ['agents']
 // commands/maintenance).
 
 export interface Config {
-  reviewEnabled?: boolean
+  reviewEnabled?: Volatile<boolean>
   /** How the flush delivers the review: `'inject'` (default since 0.3.74) hands
    * the review prompt to the PARENT agent — waking it through the same
    * followup-first channel — so the review runs on the parent's model against
@@ -70,16 +79,21 @@ export interface Config {
    * at full price. Deployments that prefer the clean-context split switch the
    * POLICY row (`evolution-policy`): the mounted policy snapshot shadows this
    * row's value, which the plugin reports once at load (v37 P2-24). */
-  reviewMode?: 'subagent' | 'inject'
-  /** Shadowed by the policy snapshot in every shipped composition — configure
-   * `reviewMemoryInterval` on the `evolution-policy` row instead (v37 P2-24).
-   * Deprecated alias (G0/S0.3): still readable, refused by writes; removed 0.7.0. */
-  /** Review cadence in TOOL CALLS (signals.ts: a turn advances by its tool-call count, minimum 1,
-   * or by 1 when the turn itself carried the memory signal). */
+  reviewMode?: Volatile<'subagent' | 'inject'>
+  /** Review cadence in TOOL CALLS — the CANONICAL registry id (G1, signals.ts:
+   * a turn advances by its tool-call count, minimum 1, or by 1 when the turn
+   * itself carried the memory signal). Shadowed by the policy snapshot in every
+   * shipped composition — configure `reviewMemoryInterval` on the
+   * `evolution-policy` row instead (v37 P2-24). */
+  reviewMemoryInterval?: Volatile<number | undefined>
+  /** Skill-channel review cadence — the CANONICAL registry id (G1); shadowed by
+   * the policy snapshot like the memory cadence. */
+  reviewSkillInterval?: Volatile<number | undefined>
+  /** Deprecated alias of `reviewMemoryInterval` (G0/S0.3): still readable,
+   * refused by writes; removed 0.7.0. */
   memoryInterval?: number
-  /** Shadowed by the policy snapshot in every shipped composition — configure
-   * `reviewSkillInterval` on the `evolution-policy` row instead. Deprecated
-   * alias (G0/S0.3): still readable, refused by writes; removed 0.7.0. */
+  /** Deprecated alias of `reviewSkillInterval` (G0/S0.3): still readable,
+   * refused by writes; removed 0.7.0. */
   skillInterval?: number
   /**
    * Tools the one-shot review subagent may use. Only actually-existing tools
@@ -103,14 +117,14 @@ export interface Config {
    * 'completion' does NOT mean "cadence off", and 'both' is effectively
    * "completion on top of the always-on cadence". The mutually-exclusive
    * channel reading in earlier docs was wrong. */
-  skillReviewTrigger?: 'cadence' | 'completion' | 'both'
+  skillReviewTrigger?: Volatile<'cadence' | 'completion' | 'both'>
   /** Cumulative session tool calls before a session counts as proven-long for the completion channel. */
-  skillReviewCompletionMinToolCalls?: number
+  skillReviewCompletionMinToolCalls?: Volatile<number>
   /** 0.3.40: deliver the deferred review with a WAKING inject for a summary the
    * model starts immediately (agent.followup — same send() queue, wakeup bit
    * differs). Default true; false degrades to the non-waking inject (the
    * summary then waits for the next driver wake). */
-  reviewWakeInject?: boolean
+  reviewWakeInject?: Volatile<boolean>
   /** V10-11 (P2-7): skill tree root for the review's direct skill writes.
    * Empty (the default) resolves through `resolveSkillsRoot` to the shared
    * default root — the historical behavior. A custom root keeps review-created
@@ -131,12 +145,24 @@ export interface Config {
   sessionScoped?: boolean
 }
 
-export const Config: z<Config> = z.object({
-  reviewEnabled: z.boolean().default(true),
+// G1: the seven E3 keys carry `.volatile()`, so the platform hands the plugin a
+// stable reference it updates in place and the settings surface edits them live. The
+// schema keeps NO annotation: a volatile field's output is a reference, which the
+// annotated `z<Config>` reading cannot express (TS2375).
+export const Config = z.object({
+  reviewEnabled: z.boolean().default(true).volatile(),
   // 0.3.74: default is 'inject' — see the Config JSDoc. 'subagent' stays a
   // first-class opt-in for deployments that want the parent context kept clean
   // or a dedicated review model.
-  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject'),
+  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject').volatile(),
+  // G1: the canonical registry ids, merged into the row Config. No .default(): a
+  // schema default would fill the canonical key and make the deprecated alias
+  // below unreachable through the alias fallback (resolveReviewRowSettings resolves
+  // the default after it).
+  reviewMemoryInterval: z.number().min(1).volatile(),
+  reviewSkillInterval: z.number().min(1).volatile(),
+  // Deprecated row aliases (PARAM_ALIASES): still read as the fallback spelling,
+  // refused by writes, removed 0.7.0. Deployment-only (no `.volatile()`).
   memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),
@@ -159,10 +185,10 @@ export const Config: z<Config> = z.object({
   // (it STRIPS an unmatching value and keeps the default), so the runtime
   // degradation is silent by design; the union keeps the TYPE surface closed
   // for config authors.
-  skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER),
-  reviewWakeInject: z.boolean().default(true),
+  skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER).volatile(),
+  reviewWakeInject: z.boolean().default(true).volatile(),
   sessionScoped: z.boolean().default(false),
-  skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
+  skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS).volatile(),
   // V10-11 (P2-7): empty string keeps the default root (resolveSkillsRoot
   // trims and falls back) — the schema default mirrors the Config contract.
   // E-7 (v18) → V27 G2.4: `root` is canonical. The retired `skillsRoot` alias
@@ -293,41 +319,69 @@ const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
 // A per-turn warn on an intentionally stateless deployment is still noise.
 
 /**
- * G3.1 (0.3.23): clamp the numeric review config at assembly so a 0/negative/
- * NaN/±Infinity value falls back to the package default instead of folding as a
- * "disabled" special value (a 0 interval would fire a review every turn; NaN
- * folds as NaN into the cadence/timeout). The schema `.min(1)` guards the
- * loader path; this clamp also covers NaN/±Infinity (which schemastery lets a
- * bare number schema through) and direct construction. `reviewMaxDepth` clamps
- * to at least 1 because 0 is the historical 0.3.1 maximum-depth defect (a 0
- * rejects the spawn outright). Warn once when a user-supplied value had to be
- * corrected.
+ * G3.1 (0.3.23): clamp one numeric review knob so a 0/negative/NaN/±Infinity value
+ * falls back to the package default instead of folding as a "disabled" special value
+ * (a 0 interval would fire a review every turn; NaN folds as NaN into the
+ * cadence/timeout). The schema `.min(1)` guards the loader path; this clamp also
+ * covers NaN/±Infinity (which schemastery lets a bare number schema through) and
+ * programmatic assembly. `reviewMaxDepth` clamps to at least 1 because 0 is the
+ * historical 0.3.1 maximum-depth defect (a 0 rejects the spawn outright). The warning
+ * fires once per key: a live field is read at every use, so an assembly-time list
+ * would repeat on each read.
+ * @param warned - the keys this caller already warned about.
+ * @param warn - the warning sink.
+ * @param name - the config key, for the warning.
+ * @param value - the value as supplied, or its volatile reference.
+ * @param fallback - the package default a corrected value falls back to.
+ * @param min - the smallest value the engine can act on.
+ * @param max - the largest value the carrier can hold, when bounded.
+ * @returns the value the engine may use.
  */
-/** F5 (P2-16, v11): the clamp sets exactly these seven numeric fields — the
+function clampField(
+  warned: Set<string>,
+  warn: (message: string) => void,
+  name: string,
+  value: number | Volatile<number | undefined> | undefined,
+  fallback: number,
+  min: number,
+  max?: number,
+): number {
+  const current = typeof value === 'object' ? value.get() : value
+  const result = clampedNumber(current, fallback, max === undefined ? { min } : { min, max })
+  if (current !== undefined && result !== current && !warned.has(name)) {
+    warned.add(name)
+    warn(`${name} provided an invalid value; falling back to the default`)
+  }
+  return result
+}
+
+/** F5 (P2-16, v11): the clamp sets exactly these four numeric fields — the
  * old `as Required<Config>` lied about `reviewToolAllow` etc. being populated
- * (`[...undefined]` TypeErrors under a direct `apply(ctx, {})`). */
+ * (`[...undefined]` TypeErrors under a direct `apply(ctx, {})`).
+ * G1: the seven E3 keys left this list — they are live and resolved at USE time by
+ * {@link resolveReviewRowSettings}, which clamps its own numerics. */
 type ClampedReviewConfig = Config & {
-  memoryInterval: number
-  skillInterval: number
   reviewTimeoutMs: number
   reviewContextMessages: number
   reviewMessageChars: number
   reviewMaxDepth: number
-  skillReviewCompletionMinToolCalls: number
 }
 
+/**
+ * The DEPLOYMENT layer of this row, clamped once at assembly: the restart-only
+ * numerics (registry tier E2) whose consumers read them from this snapshot. The
+ * seven E3 keys are NOT resolved here — they are live (G1 §8.3), and
+ * {@link resolveReviewRowSettings} reads them at every use.
+ * @param rawConfig - the row config as the platform resolved it.
+ * @param ctx - the plugin context, for the clamp warning.
+ * @returns the deployment layer with its numerics clamped.
+ */
 export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedReviewConfig {
-  const clamped: string[] = []
-  const field = (name: keyof Config, value: number | undefined, fallback: number, min: number, max?: number): number => {
-    const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
-    if (value !== undefined && result !== value) clamped.push(name)
-    return result
-  }
-  const config = Object.assign({}, rawConfig, {
-    // G0/S0.4: the row carrier may spell either the legacy alias (today) or the
-    // canonical policy id (once G3 widens the schema) — one rule, one helper.
-    memoryInterval: field('memoryInterval', readNumberParam(rawConfig, 'reviewMemoryInterval'), DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
-    skillInterval: field('skillInterval', readNumberParam(rawConfig, 'reviewSkillInterval'), DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+  const warned = new Set<string>()
+  const warn = (message: string): void => { ctx.logger.warn('dsh-evolution-review: ' + message) }
+  const field = (name: string, value: number | undefined, fallback: number, min: number, max?: number): number =>
+    clampField(warned, warn, name, value, fallback, min, max)
+  return Object.assign({}, rawConfig, {
     // B-2 (v18): the 32-bit ceiling is enforced here as well as in the schema
     // (the schema may be bypassed by a programmatic assembly; clampedNumber
     // also catches NaN/±Infinity, which z.number() lets through).
@@ -335,12 +389,7 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
     reviewContextMessages: field('reviewContextMessages', rawConfig.reviewContextMessages, DEFAULT_REVIEW_CONTEXT_MESSAGES, 1),
     reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, DEFAULT_REVIEW_MESSAGE_CHARS, 1),
     reviewMaxDepth: field('reviewMaxDepth', rawConfig.reviewMaxDepth, 1, 1),
-    skillReviewCompletionMinToolCalls: field('skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
   })
-  if (clamped.length > 0) {
-    ctx.logger.warn(`dsh-evolution-review: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
-  }
-  return config
 }
 
 /** v30 REV-04/REV-02: read the policy snapshot off the (optional) policy
@@ -374,19 +423,39 @@ export interface ReviewSettings {
   reviewWakeInject: boolean
 }
 
-/** Schema the platform validates the user layer against; defaults mirror the
- * core constants so an empty document resolves to today's behaviour. */
-export const REVIEW_SETTINGS_SCHEMA: z<ReviewSettings> = z.object({
-  reviewSkillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
-  reviewMemoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
-  skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER),
-  skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS),
-  reviewEnabled: z.boolean().default(true),
-  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject'),
-  reviewWakeInject: z.boolean().default(true),
-})
+/**
+ * This row's review knobs as they stand RIGHT NOW (G1 §8.3) — the base layer of the
+ * precedence chain. The seven E3 keys are live: the platform hands each one a
+ * reference it updates in place, so a committed settings edit needs neither a restart
+ * nor a watcher. The deprecated cadence aliases stay the fallback spelling of the two
+ * interval keys, and every numeric field is clamped (G3.1).
+ * @param rawConfig - the row config as the platform resolved it.
+ * @param warn - sink for the once-per-key clamp warning.
+ * @returns the row layer of the review knobs.
+ */
+export function resolveReviewRowSettings(rawConfig: Config, warn: (message: string) => void): ReviewSettings {
+  const warned = new Set<string>()
+  return {
+    reviewSkillInterval: clampField(warned, warn, 'reviewSkillInterval', rawConfig.reviewSkillInterval?.get() ?? rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+    reviewMemoryInterval: clampField(warned, warn, 'reviewMemoryInterval', rawConfig.reviewMemoryInterval?.get() ?? rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
+    skillReviewTrigger: rawConfig.skillReviewTrigger?.get() ?? DEFAULT_SKILL_REVIEW_TRIGGER,
+    skillReviewCompletionMinToolCalls: clampField(warned, warn, 'skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
+    reviewEnabled: rawConfig.reviewEnabled?.get() ?? true,
+    reviewMode: rawConfig.reviewMode?.get() ?? 'inject',
+    reviewWakeInject: rawConfig.reviewWakeInject?.get() ?? true,
+  }
+}
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
+  // G1: suppress the platform's auto-generated settings page for this row (the
+  // family renders its own card from the registry). Probed, not assumed: a host
+  // without the capability still loads.
+  ctx.inject(['settings'], (injected) => {
+    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }) => unknown } }).settings
+    if (typeof settings?.configure !== 'function') return
+    const disposer = settings.configure({ auto: false })
+    if (typeof disposer === 'function') ctx.effect(() => disposer as () => void, 'dsh-evolution-review: settings presentation')
+  })
   if (!verifyPromptBundle(PROMPT_BUNDLE)) {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
   }
@@ -399,7 +468,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // site; the dispose hook clears what was registered instead of a hand-written
   // list (V7-16 fixed such a list after four additions were missing from it).
   const sessionState = new SessionScopedState()
-  const turnStarts = sessionState.add('turnStarts', new Map<SessionId, number>())
+  // G4: no `turnStarts` map any more — the turn window is the family's `evolutionSignals`
+  // projection, which resets itself at `turn/start` (the map existed only to remember that seq).
+  // G4: the review digest's tool evidence is a BOUNDED tail of dispatch frames, appended as they
+  // arrive. Re-reading the session log at every review was the last synchronous log read; the
+  // platform's `deriveMessages()` carries native tool blocks, but a PTC sub-dispatch is log-only
+  // (it never becomes a message), so the family keeps its own tail instead of losing that evidence.
+  const dispatchDigest = sessionState.add('dispatchDigest', new Map<SessionId, ReviewDispatchFrame[]>())
   // P3 (v15): per-mount one-shot for the stateless warn (was module-level).
   let statelessReviewStateWarned = false
   // S2-8 (FLOW1-3): the mark was withheld because human input was queued ahead.
@@ -457,58 +532,82 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let reviewInFlight = false
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
-  // G3/S3.1: the USER layer sits above the deployment carriers. `params()` is the
-  // one reader of the review group's behaviour knobs: it consults the user layer
-  // first (only for keys the user actually set), then the policy snapshot, then
-  // this row — the precedence the design fixes (user > deployment > default).
-  // Consumers call it at USE time, so a committed settings change is live.
-  // The base layer is this row's resolved configuration; the two optional
-  // members fall back to the schema defaults their own Config declares.
-  const settingsBase: ReviewSettings = {
-    reviewSkillInterval: config.skillInterval,
-    reviewMemoryInterval: config.memoryInterval,
-    skillReviewTrigger: config.skillReviewTrigger ?? DEFAULT_SKILL_REVIEW_TRIGGER,
-    skillReviewCompletionMinToolCalls: config.skillReviewCompletionMinToolCalls,
-    reviewEnabled: config.reviewEnabled ?? true,
-    reviewMode: config.reviewMode ?? 'inject',
-    reviewWakeInject: config.reviewWakeInject ?? true,
+  /**
+   * This row's knobs as they stand right now (G1 §8.3): the live fields are resolved
+   * per call, so a committed edit needs neither a restart nor a watcher.
+   * @returns the row layer of the review settings.
+   */
+  const rowSettings = (): ReviewSettings =>
+    resolveReviewRowSettings(rawConfig, (message) => { ctx.logger.warn('dsh-evolution-review: ' + message) })
+  /**
+   * The keys the user set in this row's namespace (G1 §8.4-A). This is the ONLY
+   * remaining read of the settings user layer, and it reads KEY NAMES, never values:
+   * the platform resolves the user layer into the row's live fields, so the value
+   * comes from `rowSettings()`.
+   * @returns the keys present in this row's user layer.
+   */
+  const userSetKeys = (): ReadonlySet<string> => {
+    const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
+    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('evolution-review'))
+    return new Set(Object.keys(entry?.user ?? {}))
   }
-  const overrides = installParamSection<ReviewSettings>(
-    ctx,
-    paramNamespace('evolution-review'),
-    REVIEW_SETTINGS_SCHEMA,
-    settingsBase,
-    // No onChange: every consumer reads params() at use time.
-    { warn: (message) => { ctx.logger.warn('dsh-evolution-review: ' + message) } },
-  )
+  // G3/S3.1 + G1: the USER layer sits above the deployment carriers. `params()` is the
+  // one reader of the review group's behaviour knobs: a key the user set (its value
+  // arrived through the row's live field), then the policy snapshot, then this row —
+  // the precedence the design fixes (user > deployment > default). Consumers call it
+  // at USE time, so a committed settings change is live.
   const params = (): ReviewSettings => {
+    const row = rowSettings()
+    const userSet = userSetKeys()
     const snapshot = policy()
+    // Only these three knobs have a policy carrier; the other four end at the row.
+    const pick = (key: 'reviewSkillInterval' | 'reviewMemoryInterval'): number => {
+      if (userSet.has(key)) return row[key]
+      return snapshot?.[key] ?? row[key]
+    }
+    const mode = (): 'subagent' | 'inject' => {
+      if (userSet.has('reviewMode')) return row.reviewMode
+      return snapshot?.reviewMode ?? row.reviewMode
+    }
     return {
-      reviewSkillInterval: overrides.get('reviewSkillInterval') ?? snapshot?.reviewSkillInterval ?? config.skillInterval,
-      reviewMemoryInterval: overrides.get('reviewMemoryInterval') ?? snapshot?.reviewMemoryInterval ?? config.memoryInterval,
-      skillReviewTrigger: overrides.get('skillReviewTrigger') ?? config.skillReviewTrigger ?? DEFAULT_SKILL_REVIEW_TRIGGER,
-      skillReviewCompletionMinToolCalls: overrides.get('skillReviewCompletionMinToolCalls') ?? config.skillReviewCompletionMinToolCalls,
-      reviewEnabled: overrides.get('reviewEnabled') ?? config.reviewEnabled ?? true,
-      // The two booleans/unions are optional on the row type, so the chain ends
-      // at the schema default the plugin's own Config declares.
-      reviewMode: overrides.get('reviewMode') ?? snapshot?.reviewMode ?? config.reviewMode ?? 'inject',
-      reviewWakeInject: overrides.get('reviewWakeInject') ?? config.reviewWakeInject ?? true,
+      reviewSkillInterval: pick('reviewSkillInterval'),
+      reviewMemoryInterval: pick('reviewMemoryInterval'),
+      skillReviewTrigger: row.skillReviewTrigger,
+      skillReviewCompletionMinToolCalls: row.skillReviewCompletionMinToolCalls,
+      reviewEnabled: row.reviewEnabled,
+      reviewMode: mode(),
+      reviewWakeInject: row.reviewWakeInject,
     }
   }
 
-  // S2.2 (v37 P2-24): the policy snapshot shadows these three row fields in
-  // every shipped composition (host/all/preset). The loader fills schema
-  // defaults into the config, so "this row set a value" is the observable
-  // "differs from that schema default"; say so once when the service is there.
+  // S2.2 (v37 P2-24) + G1: the policy snapshot shadows these three row knobs in every
+  // shipped composition (host/all/preset). "This row set a value" is read as "the live
+  // reference resolves to a value" for the canonical key, and as "differs from that
+  // schema default" for a deprecated alias (the loader fills the alias default in). A
+  // key the USER set is excluded: that value wins over the policy (G1 §8.4-A), so
+  // reporting it as ineffective would be false.
   const schemaDefaults = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: Config } } })['~standard'].validate({}).value
-  const shadowedRowFields = (['reviewMode', 'memoryInterval', 'skillInterval'] as const)
-    .filter(field => rawConfig[field] !== undefined && rawConfig[field] !== schemaDefaults[field])
+  /** The value the schema fills in when nobody sets the key — for a volatile field the
+   * reference is always present, so this is what "the row set nothing" resolves to. */
+  const SHADOW_DEFAULTS = { reviewMode: 'inject', reviewMemoryInterval: DEFAULT_REVIEW_MEMORY_INTERVAL, reviewSkillInterval: DEFAULT_REVIEW_SKILL_INTERVAL } as const
+  const rowSupplied = (id: keyof typeof SHADOW_DEFAULTS, alias?: 'memoryInterval' | 'skillInterval'): boolean => {
+    const canonical: unknown = rawConfig[id]?.get()
+    if (canonical !== undefined && canonical !== SHADOW_DEFAULTS[id]) return true
+    return alias !== undefined && rawConfig[alias] !== undefined && rawConfig[alias] !== schemaDefaults[alias]
+  }
+  const shadowedRowFields = ([
+    ['reviewMode', undefined],
+    ['reviewMemoryInterval', 'memoryInterval'],
+    ['reviewSkillInterval', 'skillInterval'],
+  ] as const)
+    .filter(([id, alias]) => !userSetKeys().has(id) && rowSupplied(id, alias))
+    .map(([id]) => id)
   if (shadowedRowFields.length > 0) {
     let shadowWarned = false
     const warnShadowed = (): void => {
       if (shadowWarned) return
       shadowWarned = true
-      ctx.logger.warn(`dsh-evolution-review: this row sets ${shadowedRowFields.join(', ')}, but the mounted evolution-policy service overrides all three — these row values have no effect. Set them on the evolution-policy row instead.`)
+      ctx.logger.warn(`dsh-evolution-review: this row sets ${shadowedRowFields.join(', ')}, but the mounted evolution-policy service overrides ${shadowedRowFields.length === 1 ? 'it' : 'them'} — these row values have no effect. Set them on the evolution-policy row instead.`)
     }
     // The mounted service shadows them; a host without it keeps the row values,
     // so the warning must wait for the service rather than assume the default.
@@ -545,13 +644,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // original preset — the family acting on a session that never opted in.
     // A deployment that declares no session scoping is unaffected by construction.
     if (!sessionAudited(ctx, session.id, config.sessionScoped)) return
-    // v20 (C-5): subagent sessions never reach the fold — the turn/end handler
-    // early-returns on `origin === 'subagent'` BEFORE the delete — so their
-    // entries used to sit in the map until the 128-threshold sweep. Don't set
-    // what no consumer can read.
-    if (event.type === 'turn/start' && session.header.origin !== 'subagent') {
-      turnStarts.set(session.id, session.seq - 1)
-    }
+    appendDispatchFrame(dispatchDigest, session.id, event)
     // S2.2 (v37): `{ kind: 'user' }` is the platform's attestation of human
     // input and ends the review window; plugin notices (our prompt included)
     // never do. `data` crosses the durable log, so the guard tolerates garbage.
@@ -570,7 +663,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // R2 (round-2 audit): pendingCadenceWarned is swept below but was not in
     // the trigger set — its entries lingered until another map crossed the
     // threshold.
-    const sweepDue = turnStarts.size >= COUNTER_SWEEP_THRESHOLD
+    const sweepDue = cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
+      || dispatchDigest.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceWarned.size >= COUNTER_SWEEP_THRESHOLD
       || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
@@ -579,8 +673,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       || pendingReviewNotices.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
       const isAlive = (id: SessionId): boolean => ctx.agents.get(id) !== undefined
-      sweepDeadSessionEntries(turnStarts, isAlive)
       sweepDeadSessionEntries(cumulativeToolCalls, isAlive)
+      sweepDeadSessionEntries(dispatchDigest, isAlive)
       sweepDeadSessionEntries(completionInjected, isAlive)
       sweepDeadSessionEntries(pendingCadenceReviews, isAlive)
       sweepDeadSessionEntries(pendingCadenceWarned, isAlive)
@@ -685,8 +779,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (session.header.origin === 'subagent') return
     const agent = ctx.agents.get(session.id)
     if (!agent) return
-    const signal = foldTurn(session, turnStarts.get(session.id) ?? Math.max(0, session.seq - 1))
-    turnStarts.delete(session.id)
+    // 0.2.x: the turn window comes from the family's `evolutionSignals` projection — the same
+    // `foldTurnEvent` fold, driven once per committed event and reset at `turn/start` — instead of
+    // re-reading the session log at every boundary.
+    const signal = sessionTurnSignals(ctx, session)
+    if (signal === undefined) {
+      // The session view is not foldable (a structural stub, or a host without the registry):
+      // there is no measurement, and an unmeasured boundary must not advance the cadence.
+      ctx.logger.warn('dsh-evolution-review: the session cannot be projected (no evolutionSignals state) — this turn is not counted')
+      return
+    }
     // R7 (v35): no cast — the evolution-state module augmentation types this
     // service, so the hand-written shape (and its drift risk) is gone.
     const stateService = ctx.get('evolutionState')
@@ -1054,7 +1156,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     const message = createUserMessage({
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary },
+      source: { kind: 'evolution-review', form: 'notice', summary },
     })
     // The wake primitive is called ON the agent: the platform Agent's
     // `followup` is a prototype method (`this.send(...)`), so a detached
@@ -1277,6 +1379,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         signal as { toolCalls: number; userChars: number; assistantChars: number },
         config.reviewContextMessages,
         config.reviewMessageChars,
+        dispatchDigest.get(session.id) ?? [],
       ))
       const agentOptions: Record<string, string> = { model }
       if (config.reviewProvider) agentOptions.provider = config.reviewProvider
@@ -1317,7 +1420,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // a frame that did not exist (or was not yet substantive) when the plan was authored.
       // `undefined` when the log carries no seq at all (a stub session): the class rule then has
       // nothing to say, which is not the same answer as "every frame is a boundary".
-      const substantiveEvidenceSeqs = evidenceKindIndex(session.snapshotEvents())
+      // 0.2.x: the boundary complement comes from the family's evolutionEvidence projection
+      // (evidence.ts keeps the pure reader and the one classification table both paths share).
+      const substantiveEvidenceSeqs = sessionEvidenceIndex(ctx, session)
       const run = await subagents.start('spawn', {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: reviewText }],
@@ -1374,7 +1479,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // `skill` reads are visible to read-before-write (session events of
         // the child never reach the parent; the child session must be read
         // before dispose).
-        const childReads = run.localAgent ? collectReadSkillNames(run.localAgent.session.snapshotEvents()) : new Set<string>()
+        const childReads = run.localAgent ? (sessionReadNames(ctx, run.localAgent.session) ?? new Set<string>()) : new Set<string>()
         const plan: unknown = result.structured
         const policyFingerprint = fingerprintPolicy(snapshot)
         const validation = validateEvolutionPlan(plan as EvolutionPlan, {
@@ -1398,7 +1503,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // (read-before-write, matching the original Hermes background guard).
         // Union of the PARENT session's reads and the review SUBAGENT's own reads.
         const acceptedSkillOps = validation.accepted.skillOps ?? []
-        const readNames = new Set<string>([...collectReadSkillNames(session.snapshotEvents()), ...childReads])
+        // The projection answers the parent's reads; `undefined` (an unfoldable view) falls back to
+        // the child's own reads alone, the same "cannot classify" posture the tool gate documents.
+        const readNames = new Set<string>([...(sessionReadNames(ctx, session) ?? new Set<string>()), ...childReads])
         const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
         const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
           .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
@@ -2046,8 +2153,45 @@ function staleRefusal(result: SkillActionResult, name: string, filePath?: string
 const COUNTER_SWEEP_THRESHOLD = 128
 
 /**
+ * Dispatch frames kept per session for the review digest.
+ *
+ * The digest renders at most 12 tool lines and pairs a result with the call that opened it, so 128
+ * frames (≈64 dispatches) is far more than the renderer can spend — and unlike the whole-log scan it
+ * replaced, the memory this holds is bounded per session rather than proportional to the log.
+ */
+const DISPATCH_DIGEST_FRAMES = 128
+
+/** One dispatch frame the review digest can render (a native call/result or a PTC sub-dispatch). */
+interface ReviewDispatchFrame {
+  readonly type: string
+  readonly data?: unknown
+}
+
+/**
+ * Keep one dispatch-relevant frame in a session's bounded digest.
+ *
+ * A frame is kept when the family's dispatch vocabulary recognizes it as opening a dispatch
+ * (`readDispatchSignal`) or as answering one (`resultCallIdOf`) — the two shapes the digest renders.
+ * Everything else (message frames, boundaries, chunks) is not evidence and is not copied.
+ * @param digest - the per-session digest map.
+ * @param id - the owning session.
+ * @param event - the committed session event.
+ */
+function appendDispatchFrame(
+  digest: Map<SessionId, ReviewDispatchFrame[]>,
+  id: SessionId,
+  event: { type: string; data?: unknown },
+): void {
+  if (readDispatchSignal(event) === null && resultCallIdOf(event) === null) return
+  const frames = digest.get(id) ?? []
+  frames.push({ type: event.type, ...event.data === undefined ? {} : { data: event.data } })
+  if (frames.length > DISPATCH_DIGEST_FRAMES) frames.splice(0, frames.length - DISPATCH_DIGEST_FRAMES)
+  digest.set(id, frames)
+}
+
+/**
  * Remove every entry whose session is no longer live (rc.42 audit P1-10):
- * `turnStarts` / `cumulativeToolCalls` / `completionInjected` are keyed by
+ * `cumulativeToolCalls` / `completionInjected` / `pendingCadenceReviews` are keyed by
  * SessionId with no platform session-end hook to prune against, so they grew
  * unbounded over a long-lived host. Works for maps and sets; returns the
  * number of removed entries.
@@ -2204,6 +2348,7 @@ export function buildReviewRequest(
   signal: { toolCalls: number; userChars: number; assistantChars: number },
   maxMessages: number,
   maxMessageChars: number,
+  dispatchTail: readonly ReviewDispatchFrame[] = [],
 ): string {
   const messages: string[] = []
   const surface = session.deriveMessages()
@@ -2226,15 +2371,13 @@ export function buildReviewRequest(
   // for a PTC settle, which carries its own name/arguments — from the payload
   // itself), and the corresponding call event is skipped.
   const toolLines: string[] = []
-  const events = session.snapshotEvents()
+  // G4: the frames come from the caller's bounded per-session digest (the review's own
+  // `session/event` tail, `appendDispatchFrame`), which is what replaced re-reading the session log
+  // here. The digest IS the window R3 described, so no `length - 2_000` trim is needed, and PTC
+  // sub-dispatches keep their evidence — they never derive a platform message.
+  const events = dispatchTail
   const callIdentity = new Map<string, { name: string; argsRaw: string }>()
-  // R3 note (round-2 audit): the scan is bounded to a tail window — identity
-  // only matters for results the 12-line backward loop renders, and an
-  // unbounded full-log scan per review build cost O(all events) plus a
-  // stringify per dispatch on very long sessions. A result whose call lies
-  // OLDER than the window renders headless (same as an orphan result).
-  const identityWindowStart = Math.max(0, events.length - 2_000)
-  for (let index = events.length - 1; index >= identityWindowStart; index -= 1) {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index] as { type?: string; data?: unknown } | undefined
     const opened = readDispatchSignal(event)
     if (opened === null || callIdentity.has(opened.callId)) continue

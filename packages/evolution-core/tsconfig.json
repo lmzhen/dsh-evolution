@@ -2,6 +2,7 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     { "path": "../../../vendor/cordis" },
-    { "path": "../../core/session" }
+    { "path": "../../core/session" },
+    { "path": "../../session/session-projection" }
   ]
 }

@@ -24,7 +24,9 @@
  *   tool path and the review's plan path), `drift-signals.ts`, `skill-health.ts`,
  *   `preset-composition.ts`, `prompts.ts`, `learn-prompt.ts`,
  *   `evolution-events.ts`, `evidence.ts` (which session frames count as content, for the plan
- *   path's evidence-class report), `io.ts` (the ctx.evolutionIo seam itself).
+ *   path's evidence-class report), `session-projection.ts` (the live per-session units the family's
+ *   log-shaped readers read instead of re-reading the session log), `io.ts` (the ctx.evolutionIo
+ *   seam itself).
  * @module @deepseek-ai/dsh-evolution-core
  */
 
@@ -59,6 +61,7 @@ export * from './skill-reads.ts'
 export * from './skill-row-cells.ts'
 export * from './document-body.ts'
 export * from './evidence.ts'
+export * from './session-projection.ts'
 export * from './drift-signals.ts'
 export * from './skill-history.ts'
 export * from './skill-store.ts'
@@ -68,5 +71,6 @@ export * from './tool-dispatch.ts'
 export * from './usage.ts'
 export * from './constants.ts'
 export * from './params.ts'
+export * from './namespace-migration.ts'
 export * from './numeric.ts'
 export * from './opt-in.ts'

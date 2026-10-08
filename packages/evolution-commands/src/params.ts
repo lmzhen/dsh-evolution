@@ -3,13 +3,13 @@
  * surface, so one text answers "which parameters exist, who may write them, and
  * did I already override this one".
  *
- * The join key is the OWNER PACKAGE: core's `PARAM_NAMESPACES` maps a package to
- * the one namespace it registers, and `settings.describe()` reports that
- * namespace's raw user section (a key's PRESENCE is the override) plus the
- * resolved value. Everything here is pure; the command handler supplies the data.
+ * The join key is the OWNER PACKAGE: `settings.describe()` keys a section by the Loader
+ * entry id, which is the row id (core's `paramSettingsId` names that mapping), and reports
+ * that section's raw user section (a key's PRESENCE is the override) plus the resolved
+ * value. Everything here is pure; the command handler supplies the data.
  * @module @deepseek-ai/dsh-evolution-commands/params
  */
-import { PARAM_EXPOSURE, PARAM_GROUP_LABELS, PARAM_NAMESPACES, type ParamExposure } from '@deepseek-ai/dsh-evolution-core'
+import { PARAM_EXPOSURE, PARAM_GROUP_LABELS, paramSettingsId, type ParamExposure } from '@deepseek-ai/dsh-evolution-core'
 
 /** One registered namespace, as `settings.describe()` reports it. */
 export interface ParamSectionView {
@@ -54,7 +54,7 @@ export function paramSurfaceRows(
 ): ParamSurfaceRow[] {
   return entries.map((entry) => {
     const base = { id: entry.id, group: entry.group, tier: entry.tier, applies: entry.applies, owner: entry.owner }
-    const namespace = PARAM_NAMESPACES[entry.owner]
+    const namespace = paramSettingsId(entry.owner)
     const section = namespace === undefined ? undefined : sections.get(namespace)
     if (section === undefined) return { ...base, source: 'unregistered' as const, value: undefined }
     const user = section.user

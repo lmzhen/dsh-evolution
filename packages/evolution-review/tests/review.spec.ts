@@ -5,6 +5,9 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { Config, REVIEW_OUTPUT_SCHEMA } from '../src/index.ts'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
+import { mutableVol, plainValue, vol } from '../../test-support/volatile-config.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 
@@ -21,15 +24,17 @@ describe('evolution-review', () => {
     expect(ctx.get('agents')).toBeDefined()
   })
 
+  // G1: these three keys are volatile, so a parsed field is a live reference —
+  // `plainValue` reads what the plugin would read at its use site.
   it('0.3.74: reviewMode defaults to inject — the parent delivers against its own warm prefix', () => {
-    const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { reviewMode: string } } } })['~standard'].validate({}).value
-    expect(value.reviewMode).toBe('inject')
+    const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { reviewMode: { get(): string } } } } })['~standard'].validate({}).value
+    expect(plainValue(value.reviewMode)).toBe('inject')
   })
 
   it('defaults the completion channel to both with a long-conversation threshold', () => {
-    const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { skillReviewTrigger: string; skillReviewCompletionMinToolCalls: number } } } })['~standard'].validate({}).value
-    expect(value.skillReviewTrigger).toBe('cadence')
-    expect(value.skillReviewCompletionMinToolCalls).toBe(20)
+    const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { skillReviewTrigger: { get(): string }; skillReviewCompletionMinToolCalls: { get(): number } } } } })['~standard'].validate({}).value
+    expect(plainValue(value.skillReviewTrigger)).toBe('cadence')
+    expect(plainValue(value.skillReviewCompletionMinToolCalls)).toBe(20)
   })
 
   it('completion fires once for a completed turn on a proven-long session', () => {
@@ -529,18 +534,25 @@ async function mountReviewFixture(options: {
       },
     })
   }
+  // G4: the plan path's evidence index comes from the family's session projection, which folds
+  // the session's OWN log through `snapshotEvents(from, to)` / `eventAt(seq)` / `seq`. The log
+  // is therefore dense and seq-stamped from 0 (frame 0 is the tool/call the foldTurn comment
+  // below names; `options.events` carry their own seqs and continue it).
+  const log: Array<Record<string, unknown>> = [
+    { type: 'tool/call', seq: 0, time: 0, data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: options.skillArguments ?? '{}' } },
+    ...(options.events ?? []),
+  ]
   const session = {
     id: SessionId('e19-fixture-session'),
     // seq=1 ⇒ foldTurn starts at 0 and scans the tool/call below (substantive).
     seq: options.seq ?? 1,
+    inheritedEventCount: 0,
     header: { origin: undefined },
     // v33 G0.1: the fixture presents the post-0.1.5 accessor. The removed
     // `events` getter made every production reader throw inside the pipeline,
     // which surfaced as "no review was scheduled/injected" instead of an error.
-    snapshotEvents: () => [
-      { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: options.skillArguments ?? '{}' } },
-      ...(options.events ?? []),
-    ],
+    snapshotEvents: (from = 0, to = log.length) => log.slice(from, to),
+    eventAt: (seq: number) => log[seq],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => options.surface ?? [],
   } as unknown as Session
   // The platform's live queue events, emitted through the plugin's ctx exactly
@@ -575,10 +587,14 @@ async function mountReviewFixture(options: {
     }
   }
   if (options.queue !== undefined) (agent as { inbox: unknown }).inbox = options.queue
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   const releaseStart: { current: (() => void) | undefined } = { current: undefined }
   const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: reasonKind } } } as never)
+    // G4: a real append carries the next seq — the projection registry indexes a session's log
+    // by seq (`eventAt(seq)`, `drive`), so the fixture's own log grows with what it announces.
+    const event = { type: 'turn/end', seq: log.length, time: Date.now(), data: { turn, reason: { kind: reasonKind } } }
+    log.push(event)
+    ctx.emit('session/event', session, event as never)
   }
   return { ctx, session, emitEnd, emitInbox, releaseStart, stateBox }
 }
@@ -602,27 +618,20 @@ function reviewPolicy() {
   }
 }
 
-// G3/S3.1: the user settings layer sits ABOVE the deployment carriers, and a
-// committed change is visible to the NEXT turn (no restart). The provider here
-// mirrors what settings-file does: register, describe the raw user section, and
-// fire the registered watchers when the document changes.
-it('G3/S3.1: a user-layer reviewSkillInterval overrides the row on the next turn', async () => {
+// G3/S3.1 + G1: the user settings layer sits ABOVE the deployment carriers, and a
+// committed change is visible to the NEXT turn (no restart). The platform resolves a
+// user value into the row's LIVE field and reports the raw user section through
+// `describe()`; the test drives both halves the way settings-file does when it
+// commits an edit (the row is assembled directly so the reference can be moved).
+it('G3/S3.1 + G1: a user-layer reviewSkillInterval overrides the row on the next turn', async () => {
   const injected: unknown[] = []
   const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
   let user: Record<string, unknown> = {}
-  const watchers: Array<() => void> = []
-  const registrations: Array<{ ns: string; applies: string | undefined }> = []
+  const userInterval = mutableVol<number | undefined>(undefined)
   // The platform types `settings` through its own module augmentation, which this
   // package deliberately does not depend on; provide through an unknown boundary
   // (`.call(ctx, ...)` keeps the receiver — an unbound reference trips oxlint).
   ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'settings', {
-    register: (ns: string, _schema: unknown, options: { base: unknown; applies?: string }) => {
-      registrations.push({ ns, applies: options.applies })
-      return {
-        get: () => ({ ...(options.base as Record<string, unknown>), ...user }),
-        watch: (callback: () => void) => { watchers.push(callback); return () => {} },
-      }
-    },
     describe: () => [{ ns: 'evolution-review', user }],
   })
   // Substantive turn, but the ROW interval (10) cannot fire on one turn, and the
@@ -631,14 +640,20 @@ it('G3/S3.1: a user-layer reviewSkillInterval overrides the row on the next turn
   ctx.provide('evolutionPolicy', {
     get: () => ({ ...reviewPolicy(), reviewMemoryInterval: undefined, reviewSkillInterval: undefined }),
   })
-  await ctx.plugin(Review, { reviewEnabled: true, reviewMode: 'inject', memoryInterval: 10, skillInterval: 10 })
+  Review.apply(ctx, {
+    reviewEnabled: vol(true),
+    reviewMode: vol<'subagent' | 'inject'>('inject'),
+    memoryInterval: 10,
+    skillInterval: 10,
+    reviewSkillInterval: userInterval.ref,
+  })
   emitEnd(1)
   await new Promise(resolve => setTimeout(resolve, 50))
   expect(injected, 'the row interval alone must not fire').toHaveLength(0)
-  expect(registrations, 'the review section is registered as a live section').toEqual([{ ns: 'evolution-review', applies: 'live' }])
-  // The user edits the settings document: publish, then the NEXT turn fires.
+  // The user edits the settings document: the value lands in the live field and the
+  // raw section names the key, then the NEXT turn fires.
   user = { reviewSkillInterval: 1 }
-  for (const callback of watchers) callback()
+  userInterval.set(1)
   emitEnd(2)
   await vi.waitFor(() => { expect(injected).toHaveLength(1) })
 })
@@ -1115,30 +1130,36 @@ async function mountTwoSessions() {
   const scheduled: Array<{ sessionId: string; channel?: string | undefined }> = []
   ctx.on('evolution/review-scheduled', e => scheduled.push(e))
 
-  const mk = (id: string) => {
+  // 0.2.x: `agents.register` is an awaitable effect ("Await the registration before
+  // using the agent" — core/agent/src/index.ts:437), so the helper is async.
+  const mk = async (id: string) => {
     const injected: string[] = []
     let failFollowup = false
-    const session = {
+    // G4: the cadence window comes from the family's session projection, so this stub is foldable
+    // and every boundary appends the frames it narrates.
+    const session = projectable({
       id: SessionId(id),
       seq: 1,
       header: { origin: undefined },
-      snapshotEvents: () => [{ type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } }],
+      snapshotEvents: () => [{ type: 'tool/call', data: { turn: 0, step: 1, callId: 'c0', name: 'skill', arguments: '{}' } }],
       deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-    } as unknown as Session
+    }) as unknown as Session
     const agent = {
       id: session.id,
       session,
       inject: (_message: unknown) => { if (failFollowup) throw new Error('followup boom'); injected.push(id) },
       followup: (_message: unknown) => { if (failFollowup) throw new Error('followup boom'); injected.push(id) },
     } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
-      ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: reasonKind } } } as never)
+      emitSessionEvent(ctx, session, 'turn/start', { turn })
+      emitSessionEvent(ctx, session, 'tool/call', { turn, step: 1, callId: 'c' + String(turn), name: 'skill', arguments: '{}' })
+      emitSessionEvent(ctx, session, 'turn/end', { turn, reason: { kind: reasonKind } })
     }
     return { id, injected, emitEnd, setFail: (value: boolean) => { failFollowup = value } }
   }
-  const y = mk('y-cadence')
-  const x = mk('x-completion')
+  const y = await mk('y-cadence')
+  const x = await mk('x-completion')
 
   let releaseY!: (value: { text: string; structured: null }) => void
   const yResult = new Promise<{ text: string; structured: null }>((resolve) => { releaseY = resolve })

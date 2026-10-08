@@ -147,9 +147,10 @@ pins the equality).
 | `/evolution skills refresh` | 丢弃目录缓存并重新读取技能树 |
 | `/evolution learn [request]` | 向本会话发一条学习请求 |
 | `/evolution maintain [--timeout=<ms> \| --facts]` | 运行一次维护扫描（--facts 为 0 token 预览） |
+| `/evolution migrate` | 把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」） |
 | `/evolution policy set <id> <value> [--expect <revision>]` | 通过设置服务写入一个你可改的参数 (E3 only; E1/E2 stay in cordis.yml) |
 | `/evolution params [--group <name>] [--json]` | 列出全部参数：分组、档位、生效时机、来源与当前值（--json feeds scripts) |
-| `/evolution preset install [--base <name>[,<name>...]]` | 按指定基础生成自进化 Agent 预设到用户 root (bases from the agent package's bases.json) |
+| `/evolution preset install [--base <name>[,<name>...]]` | 把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json） |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | 把技能正文的一节移到 references 文件 |
 | `/evolution replay` | 比较不同会话与重启之间的计划结果（从活动记录回填） |
 
@@ -176,7 +177,7 @@ pins the equality).
 | DSH_EVOLUTION_ALLOW_ROW_COLLISIONS | plugin code (core env.ts) | `1` downgrades delta-row collision from fail-loud to warn+keep-both |
 | EVOLUTION_SCOPE | source installers only (`install-layered.mjs`, `test-support/row-contract.ts`) | scope written into generated profile/preset rows; defaults to the package's own scope. Plugin runtime never reads it |
 | DSH_EVOLUTION_DELTA_PATH | source installers only (`install-layered.mjs`) | overrides the agent-preset delta fragment path the layered installer composes from; default stays the packaged `evolution-agent/agent.cordis.yml`. Plugin runtime never reads it |
-| DSH_AGENT_PRESET_ROOT | source installers only (`install-layered.mjs`) | overrides the `.agent-presets` root the preset variants install into; must exist when set. Plugin runtime never reads it |
+| DSH_AGENT_PRESET_ROOT | source installers only (`install-layered.mjs`) | points at a directory holding the platform base preset patches (`<base>.patch.yml`) for installs whose platform packages are not on disk (the desktop app's `app.asar`); when set it must hit. Plugin runtime never reads it |
 | DSH_EVOLUTION_ARCH_STRICT | guard scripts only (`verify-arch-guards.mjs`) | `1` makes the architecture-duplication guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
 | DSH_EVOLUTION_DECLARED_CONFIG_STRICT | guard scripts only (`verify-declared-config.mjs`) | `1` makes the declared-config-reach guard fail loud instead of warn (same effect as `--strict`). Plugin runtime never reads it |
 
@@ -225,8 +226,8 @@ Installer equivalent: `install-layered --mode variant` (the historical
 
 > **One-time step (V7-06):** before a session can select the `Evolution`
 > preset, run `/evolution preset install` once in a session on any preset —
-> it writes `.agent-presets/evolution/` so the preset actually exists in the
-> profile. See the Chinese README for the same flow; without this step a
+> it writes the `Evolution` preset ROW into the profile's patch layer so the
+> preset actually exists in the profile. See the Chinese README for the same flow; without this step a
 > `dsh plugin add`-installed host is mounted but the preset is absent.
 
 ### ② Attach install — profile-level (one-click)

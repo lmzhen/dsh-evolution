@@ -17,6 +17,8 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { clearReviewChannel, isReviewChannelSession } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 
 /** Default thresholds (3 tool calls / 200 user chars) reached by the fixture. */
 const SURFACE = [
@@ -32,7 +34,9 @@ async function fixture(options: {
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  const session = {
+  // G4: the review reads the turn window from the family's session projection, so the stub must be
+  // foldable and every append must announce the event it appends.
+  const session = projectable({
     id: SessionId('s22-review-channel-session'),
     seq: 1,
     header: { origin: undefined },
@@ -42,7 +46,7 @@ async function fixture(options: {
       { type: 'tool/call', data: { turn: 1, step: 3, callId: 'c3', name: 'skill', arguments: '{}' } },
     ],
     deriveMessages: () => SURFACE,
-  } as unknown as Session
+  }) as unknown as Session
   const record = (message: unknown): void => { options.onDelivery?.(message) }
   // Prototype methods reaching `this`, like the platform's ReactLoopAgent.
   const agent = new (class {
@@ -53,7 +57,7 @@ async function fixture(options: {
     forward(message: unknown): void { record(message) }
   })() as unknown as Agent
   if (options.inbox !== undefined) (agent as { inbox?: unknown }).inbox = options.inbox
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   await ctx.plugin(Review, {
     reviewEnabled: true,
     memoryInterval: 1,
@@ -61,13 +65,10 @@ async function fixture(options: {
     ...options.reviewMode === undefined ? {} : { reviewMode: options.reviewMode },
   })
   const emitEnd = (turn: number): void => {
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
+    emitSessionEvent(ctx, session, 'turn/end', { turn, reason: { kind: 'completed' } })
   }
   const emitUserMessage = (source: unknown): void => {
-    ctx.emit('session/event', session, {
-      type: 'user/message',
-      data: { id: 'm1', role: 'user', content: [{ type: 'text', text: 'hello' }], source },
-    } as never)
+    emitSessionEvent(ctx, session, 'user/message', { id: 'm1', role: 'user', content: [{ type: 'text', text: 'hello' }], source })
   }
   return { ctx, session, emitEnd, emitUserMessage }
 }
@@ -91,9 +92,9 @@ describe('review channel mark (S2.2, v37 P1-2)', () => {
     emitEnd(1)
     await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
     expect(isReviewChannelSession(session.id)).toBe(true)
-    // The review prompt itself is a plugin-sourced user/message — replaying it
+    // The review prompt itself is a producer-sourced user/message — replaying it
     // must not clear the very window it opened.
-    emitUserMessage({ kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review' })
+    emitUserMessage({ kind: 'evolution-review', form: 'notice', summary: 'auto-review' })
     expect(isReviewChannelSession(session.id)).toBe(true)
     // Human input is the platform's `{ kind: 'user' }` attestation.
     emitUserMessage({ kind: 'user' })

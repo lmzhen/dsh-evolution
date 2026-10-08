@@ -11,7 +11,7 @@
 |---|---|---|---|
 | E0 | 无人 | 代码常量 | 随版本 |
 | E1 | 无人 | 只读可见（dump／`/evolution params`） | — |
-| E2 | 部署方 | `cordis.yml` 行／补丁层 | 本部署 patchReload=live |
+| E2 | 部署方 | `cordis.yml` 行／补丁层 | 补丁层在长驻面热重载 |
 | E3 | 本机用户 | `settings.yaml`／GUI 卡／`/evolution policy set` | 见 applies 列 |
 | E4 | 安装者 | 安装器开关／`row-overrides.json` | 装完固化 |
 

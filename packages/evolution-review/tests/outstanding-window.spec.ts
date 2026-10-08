@@ -18,6 +18,9 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { NATIVE_CALL_EVENT } from '@deepseek-ai/dsh-evolution-core'
+import { emitTurnBoundary, projectable } from '../../test-support/projection-session.ts'
 
 interface WindowFixture {
   rows: { turn: unknown[]; step: unknown[] }
@@ -47,19 +50,19 @@ async function mountWindow(options: { seededTurn?: unknown[] } = {}): Promise<Wi
       logs.push(args.map(value => String(value)).join(' '))
     })
   }
-  // Each emitted boundary must present a NEW tool call: the cadence fold reads
-  // the session snapshot, so a static array would count once and never fire again.
-  let currentTurn = 0
-  const session = {
+  // G4: the cadence window comes from the family's session projection, which folds the frames the
+  // spec ANNOUNCES — a mutable closure the old snapshot read no longer counts. Each boundary below
+  // appends its own `turn/start` + tool call + `turn/end`, exactly as the loop does.
+  const session = projectable({
     id: SessionId('window-fixture-session'),
     seq: 1,
     header: { origin: undefined },
     snapshotEvents: () => [{
       type: 'tool/call',
-      data: { turn: currentTurn, step: 2, callId: 'c' + String(currentTurn), name: 'skill', arguments: '{}' },
+      data: { turn: 0, step: 2, callId: 'c0', name: 'skill', arguments: '{}' },
     }],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-  } as unknown as Session
+  }) as unknown as Session
   const collect = (message: unknown): void => {
     const box = message as { content?: Array<{ type: string; text?: string }> } | null
     delivered.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text ?? '' : '')
@@ -79,7 +82,7 @@ async function mountWindow(options: { seededTurn?: unknown[] } = {}): Promise<Wi
     followup: (message: unknown): void => { rows.turn.push(message); collect(message); emitQueue('agent/inbox/inserted', { message }) },
     inject: (message: unknown): void => { rows.step.push(message); collect(message); emitQueue('agent/inbox/inserted', { message }) },
   } as unknown as Agent
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   ctx.provide('subagents', {
     start: async () => ({
       result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'ok' } }),
@@ -105,10 +108,7 @@ async function mountWindow(options: { seededTurn?: unknown[] } = {}): Promise<Wi
   })
   ctx.on('evolution/review-scheduled', (payload: unknown) => { scheduled.push(payload as { kind?: string; channel?: string }) })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject', reviewTimeoutMs: 2_000 })
-  const emitEnd = (turn: number): void => {
-    currentTurn = turn
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
-  }
+  const emitEnd = (turn: number): void => { emitTurnBoundary(ctx, session, turn, NATIVE_CALL_EVENT) }
   const claim = (turn: number): void => {
     for (const message of rows.turn.splice(0, 1)) emitQueue('agent/inbox/claimed', { message, turn })
   }
@@ -156,7 +156,7 @@ it('D: a restart rebuilds the record from the queue — a notice still queued is
   const fixture = await mountWindow({
     seededTurn: [{
       id: 'restart-notice',
-      source: { kind: 'plugin', plugin: 'dsh-evolution-review', form: 'notice', summary: 'auto-review:combined' },
+      source: { kind: 'evolution-review', form: 'notice', summary: 'auto-review:combined' },
     }],
   })
   fixture.emitEnd(1)
@@ -230,20 +230,21 @@ it('C: a host without an inbox has no queue events to wait for — delivery stil
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   const delivered: unknown[] = []
-  const session = {
+  // G4: same as the first fixture — the window is folded from announced frames.
+  const session = projectable({
     id: SessionId('window-no-inbox'),
     seq: 1,
     header: { origin: undefined },
     snapshotEvents: () => [{ type: 'tool/call', data: { turn: 0, step: 2, callId: 'c0', name: 'skill', arguments: '{}' } }],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-  } as unknown as Session
+  }) as unknown as Session
   const agent = {
     id: session.id,
     session,
     inject: (message: unknown) => { delivered.push(message) },
     followup: (message: unknown) => { delivered.push(message) },
   } as unknown as Agent
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   ctx.provide('evolutionPolicy', {
     get: () => ({
       reviewMode: 'inject' as const, substantiveMinToolCalls: 1, substantiveMinUserChars: 0, substantiveMinAgentChars: 0,
@@ -260,9 +261,7 @@ it('C: a host without an inbox has no queue events to wait for — delivery stil
     logs.push(args.map(value => String(value)).join(' '))
   })
   await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewMode: 'inject' })
-  const emitEnd = (turn: number): void => {
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
-  }
+  const emitEnd = (turn: number): void => { emitTurnBoundary(ctx, session, turn, NATIVE_CALL_EVENT) }
   emitEnd(1)
   await vi.waitFor(() => { expect(delivered).toHaveLength(1) })
   // No queue ⇒ no claim/discard can ever arrive ⇒ the delivery itself closes the

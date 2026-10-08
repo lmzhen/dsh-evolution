@@ -8,13 +8,24 @@ import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+// 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
+// map: each producer declares its own kind in its own module, and there is no shared
+// catch-all plugin kind (llm/src/message.ts:103-115).
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
+  }
+}
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, PARAM_NAMESPACES, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, composePresetComposition, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, type EvolutionIoLike, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, type EvolutionIoLike, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
+import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
+import { PROFILE_PATCH_FILENAME, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
 import { renderHelpText, renderHint } from './registry.ts'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -473,7 +484,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // contract evolution-review already ships (V7-03).
           const message = createUserMessage({
             content: [{ type: 'text', text: buildLearnPrompt(request) }],
-            source: { kind: 'plugin', plugin: 'dsh-evolution-commands', form: 'notice', summary: 'learn request' },
+            source: { kind: 'evolution-commands', form: 'notice', summary: 'learn request' },
           })
           // 0.3.73: call the wake primitive ON the agent. Reading it into a local
           // (the 0.3.68 form) detaches the receiver, and the platform Agent's
@@ -752,24 +763,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               return err(`Refusing to install the layered Evolution preset: "${allBundle ?? presetBundle}" is installed in this home — its model rows (tool-memory / tool-skill-manage / tool-session-query / skill-catalog) would double-mount with the preset's and the profile fails loud at startup. Keep ONE: remove the ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'} before installing the layered preset (see /evolution doctor).`)
             }
           }
-          // 0.3.14 (P1-1): the published install delivers the Evolution agent
-          // preset package (ships agent.cordis.yml/preset.yml) as part of the
-          // dependency closure, but nothing auto-copies it into
-          // ~/.dsh/.agent-presets/evolution — this command performs that
-          // delivery explicitly, idempotently and reversibly.
-          // 0.3.15 (P1-1 follow-up): the agent-preset registry mounts the
-          // composition file VERBATIM, so the delivered agent.cordis.yml must
-          // be the runtime `standard` composition + the delta — 0.3.14 copied
-          // the delta alone, which would produce an agent with only the delta
-          // rows (no tools, no persona).
+          // The deliverable is one ROW in the target profile's own patch layer
+          // (0.2.x): the platform registry reads declared presets out of the
+          // composition, and a preset the platform does not ship has to arrive
+          // inside an `- insert:` entry — a plain entry would only override a row
+          // of the same id (packages/boot/app-boot/tests/user-patches.spec.ts:47-64).
+          // The base rows come from the bundle patch that declares the platform
+          // preset; the row is composed by core's composer, so this path and the
+          // source installer emit the same bytes.
           try {
             const source = resolveAgentPresetDir(import.meta.url)
             const table = readAgentPresetBases(source)
             // v41: the selection is a LIST (comma-separated) — a user who
             // switches between the standard and ptc platform presets wants both
-            // variants on disk, generated against the SAME runtime platform in
-            // one pass. Every name is resolved before anything is written, so a
-            // typo in the second entry cannot leave the first variant installed.
+            // variants, generated against the SAME runtime platform in one pass.
+            // Every name is resolved before anything is written, so a typo in
+            // the second entry cannot leave the first variant installed.
             const requestedRaw = presetInstall[1] ?? table.defaultBase
             const requested = [...new Set(requestedRaw.split(',').map(part => part.trim()).filter(part => part !== ''))]
             if (requested.length === 0) {
@@ -783,54 +792,51 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               }
               selected.push(entry)
             }
-            // 0.3.78 (G1-②): the SAME two refusals the installer applies, read from
-            // the same table — a base registered as unsupported, or one whose
-            // platform composition injects a service this deployment does not
-            // provide, must not produce a preset that refuses to mount later.
-            const rawBases = JSON.parse(readFileSync(join(source, 'bases.json'), 'utf8')) as {
-              bases?: Array<{ name?: string; requires?: { service?: string }; unsupported?: string }>
-            }
             const deltaPath = join(source, 'agent.cordis.yml')
             if (!existsSync(deltaPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
-            const registry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
-            if (!registry) return err('Agent preset registry not mounted — cannot compose the Evolution preset against the runtime standard.')
+            const profile = presetProfileTarget(ctx)
+            if (profile === undefined) return err('No profile is mounted in this process, so there is no profile patch to write the preset row into — run the command in a session started by `dsh --profile <name>`.')
+            const delta = readFileSync(deltaPath, 'utf8')
+            const current = existsSync(profile.patchPath) ? readFileSync(profile.patchPath, 'utf8') : ''
+            let merged = current
             const written: string[] = []
             for (const base of selected) {
-              const ability = rawBases.bases?.find(candidate => candidate.name === base.name)
-              if (typeof ability?.unsupported === 'string') {
-                return err(`Base "${base.name}" is registered as UNSUPPORTED: ${ability.unsupported}`)
+              // 0.3.78 (G1-②): the SAME two refusals the installer applies, read
+              // from the same table — a base registered as unsupported, or one
+              // whose platform composition injects a service this deployment does
+              // not provide, must not produce a preset that refuses to mount
+              // later. Service presence is asked of the runtime itself, which is
+              // exactly the reason a mount would refuse.
+              if (typeof base.unsupported === 'string') {
+                return err(`Base "${base.name}" is registered as UNSUPPORTED: ${base.unsupported}`)
               }
-              const requiredService = ability?.requires?.service
-              if (typeof requiredService === 'string'
-                && (ctx as unknown as { get(name: string): unknown }).get(requiredService) === undefined) {
+              const requiredService = base.requires?.service
+              if (typeof requiredService === 'string' && ctx.get(requiredService) === undefined) {
                 return err(`Base "${base.name}" requires the "${requiredService}" service, which this deployment does not provide — the generated preset would refuse to mount.`)
               }
-              const target = join(evolutionRoot(), '.agent-presets', base.id)
-              const presetPath = join(source, base.metadata)
-              if (!existsSync(presetPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
-              const platform = await registry.read(base.name)
-              const composition = composePresetComposition(platform, readFileSync(deltaPath, 'utf8'))
-              mkdirSync(target, { recursive: true })
-              // S6.3 (E-40): commit both files atomically — each staged to a
-              // sibling `<name>.tmp` then renamed into place, a pre-existing file
-              // keeping a single `.bak`. A failure while staging either file (a
-              // write that throws) removes the staged temps and leaves the
-              // previous composition untouched, so a half-updated preset (one new
-              // file, one old) is impossible.
-              atomicWriteFiles(target, [
-                { name: 'agent.cordis.yml', content: composition },
-                // A3 (audit P1-3): the platform preset discovery reads EXACTLY
-                // `preset.yml` for metadata (agent-presets/src/metadata.ts
-                // `METADATA_FILE`); `base.metadata` names the variant SOURCE
-                // file (`preset.<variant>.yml` in the package), but the WRITTEN
-                // name must be the platform's, or the picker shows the bare id
-                // with no description/order. Same rename the install-layered
-                // path has always done — the two install surfaces now agree.
-                { name: 'preset.yml', content: readFileSync(presetPath) },
-              ], undefined, (message) => { ctx.logger.warn(message) })
-              written.push(`${base.name} → ${target}`)
+              const basePatch = resolvePresetBasePatch(base.name, profile)
+              const rowId = presetRowId(base.id)
+              const entryText = composePresetEntry(readFileSync(basePatch, 'utf8'), delta, {
+                rowId,
+                id: base.id,
+                name: base.display.name,
+                description: base.display.description,
+                order: base.display.order,
+              })
+              const next = mergePresetRow(merged, entryText, rowId)
+              written.push(next === merged ? `${base.name} → ${profile.patchPath} (already current)` : `${base.name} → ${rowId} in ${profile.patchPath}`)
+              merged = next
             }
-            return ok(`Evolution agent preset installed (${written.join('; ')}). Restart the session switcher to select it.`)
+            if (merged !== current) {
+              // S6.3 (E-40): commit atomically — the file is staged to a sibling
+              // `<name>.tmp` and renamed into place, a pre-existing file keeping a
+              // single `.bak`, so a failed write leaves the previous patch (and
+              // every session that reads it) untouched.
+              atomicWriteFiles(dirname(profile.patchPath), [
+                { name: PROFILE_PATCH_FILENAME, content: presetPatchText(merged) },
+              ], undefined, (message) => { ctx.logger.warn(message) })
+            }
+            return ok(`Evolution agent preset row installed (${written.join('; ')}). Restart the session switcher to select it.`)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }
@@ -993,7 +999,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (entry.tier !== 'E3') {
             return err(errorText('e-314-id-is-a-deployment', { a1: id, a2: entry.tier, a3: entry.owner }))
           }
-          const namespace = PARAM_NAMESPACES[entry.owner]
+          // The platform keys the section by the Loader entry id (the row id), never by the
+          // legacy namespace the 0.1.x seam registered: see core's `paramSettingsId`.
+          const namespace = paramSettingsId(entry.owner)
           if (namespace === undefined) {
             return err(errorText('e-315-id-has-no-user', { a1: id, a2: entry.owner }))
           }
@@ -1031,6 +1039,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             wasOverridden: descriptor.user !== undefined && Object.hasOwn(descriptor.user, id),
           }))
         }
+        if (input === 'migrate') {
+          // G3: the platform's own legacy import only handles ITS sections; the family's old
+          // namespaces are left in the renamed document. Idempotent by construction (equal
+          // values write nothing), so this is safe to run as often as the operator likes.
+          const attempt = await migrateFromContext(ctx)
+          if (!attempt.ok) {
+            if (attempt.problem === 'settings') return err(errorText('e-311-no-settings-service-is'))
+            if (attempt.problem === 'home') return err(errorText('e-320-the-profile-home-is-not'))
+            return err(errorText('e-321-no-io-provider-is'))
+          }
+          return ok(renderNamespaceMigration(attempt.outcome))
+        }
         if (input === 'doctor' || input === 'doctor --json') {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
           // mounted services, pending count. `--json` feeds scripts.
@@ -1048,11 +1068,54 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     commandCtx.effect(() => commands.register(evolutionCommand))
   })
+  // G3: the platform's own legacy import knows only ITS entries, so a family section left in
+  // the old document is never picked up by it. Run the (idempotent) migration once per mount,
+  // from whichever trigger first has every prerequisite: the settings seat arriving (`inject`
+  // fires with the service mounted), or the loader settling (the boot composition, which is
+  // where the settings document comes from). The measured reason for two: an attempt anchored
+  // only to a boot-time moment found the seat missing and wrote nothing, while the same code
+  // run later migrated the same document — so the trigger, not the logic, was wrong. A failed
+  // attempt re-arms the guard for the next trigger; a successful one never runs again.
+  // Nothing here may fail a boot: a missing seat, an unresolvable home or an IO error warns once.
+  let migrationRunning = false
+  const runMigrationOnce = (): void => {
+    if (migrationRunning) return
+    migrationRunning = true
+    void (async () => {
+      try {
+        const attempt = await migrateFromContext(ctx)
+        if (!attempt.ok) {
+          migrationRunning = false
+          ctx.logger.warn('evolution-commands: the legacy settings migration cannot run here (no %s) — run /evolution migrate after that service is mounted', attempt.problem)
+          return
+        }
+        const { outcome } = attempt
+        if (outcome.source !== undefined && outcome.report !== undefined && outcome.report.written.length > 0) {
+          ctx.logger.info('evolution-commands: migrated the legacy settings document (%s)', renderNamespaceMigration(outcome))
+        }
+      } catch (error) {
+        migrationRunning = false
+        ctx.logger.warn('evolution-commands: the legacy settings migration did not run — %s', error instanceof Error ? error.message : String(error))
+      }
+    })()
+  }
+  // The settings service is what the migration writes through, so its availability IS the
+  // trigger. Neither the service name nor the seat type is a declared edge of this plugin (the
+  // family reads the settings surface through core's structural view), so the injection goes
+  // through a narrow view of `inject`: one name, one callback, no new dependency edge.
+  type SettingsSeatInjection = { inject: (names: readonly string[], callback: () => void) => unknown }
+  const seatInjection = ctx as unknown as SettingsSeatInjection
+  seatInjection.inject(['settings'], () => { runMigrationOnce() })
+  void (async () => {
+    const loader = (ctx.root as { loader?: { await?(): Promise<unknown> } }).loader
+    try { await loader?.await?.() } catch { /* the loader reports its own failure; ours only needs a moment to try */ }
+    runMigrationOnce()
+  })()
 }
 
 /**
  * 0.3.14 (P1-1): locate the installed `dsh-evolution-agent-preset` package
- * (the delivery container for agent.cordis.yml/preset.yml). Resolution order:
+ * (the delivery container for agent.cordis.yml/bases.json). Resolution order:
  * npm-name sibling (published profile layout), dev-tree sibling (source/test
  * layout), then module resolution. The package dir name differs from the npm
  * name (`evolution-agent` vs `@lmzhen/dsh-evolution-agent-preset` — the rc.44
@@ -1063,16 +1126,48 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
  * each of them is what kept this path on `standard` while the installer knew
  * `ptc` too. Fails loud: a missing table is an incomplete install, never a
  * silent fallback to the default base. */
-function readAgentPresetBases(source: string): { defaultBase: string; entries: Array<{ name: string; id: string; metadata: string }> } {
+function readAgentPresetBases(source: string): {
+  defaultBase: string
+  entries: Array<{
+    name: string
+    id: string
+    display: { name: string; description: string; order: number }
+    requires?: { service: string }
+    unsupported?: string
+  }>
+} {
   const path = join(source, 'bases.json')
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as { default?: unknown; bases?: unknown }
   if (!Array.isArray(parsed.bases) || parsed.bases.length === 0) throw new Error(`${path} carries no bases[]`)
   const entries = parsed.bases.map((raw) => {
-    const entry = raw as { name?: unknown; id?: unknown; metadata?: unknown }
-    if (typeof entry.name !== 'string' || typeof entry.id !== 'string' || typeof entry.metadata !== 'string') {
-      throw new Error(`${path} entry ${JSON.stringify(raw)} needs name/id/metadata strings`)
+    const entry = raw as { name?: unknown; id?: unknown; display?: unknown; requires?: unknown; unsupported?: unknown }
+    if (typeof entry.name !== 'string' || typeof entry.id !== 'string') {
+      throw new Error(`${path} entry ${JSON.stringify(raw)} needs name/id strings`)
     }
-    return { name: entry.name, id: entry.id, metadata: entry.metadata }
+    // The display copy is the row's PUBLISHED identity: the platform localizes
+    // its own shipped ids only (agent-preset-registry/src/display.ts:47-72), so a
+    // row without a name lists as its bare id.
+    const display = entry.display as { name?: unknown; description?: unknown; order?: unknown } | null | undefined
+    if (display === null || typeof display !== 'object'
+      || typeof display.name !== 'string' || display.name === ''
+      || typeof display.description !== 'string' || display.description === ''
+      || typeof display.order !== 'number' || !Number.isInteger(display.order)) {
+      throw new Error(`${path} entry "${entry.name}" needs display { name, description, order }`)
+    }
+    const requires = entry.requires as { service?: unknown } | null | undefined
+    if (requires !== undefined && (requires === null || typeof requires !== 'object' || typeof requires.service !== 'string')) {
+      throw new Error(`${path} entry "${entry.name}" needs requires.service as a string`)
+    }
+    if (entry.unsupported !== undefined && (typeof entry.unsupported !== 'string' || entry.unsupported === '')) {
+      throw new Error(`${path} entry "${entry.name}" needs unsupported as a non-empty reason string`)
+    }
+    return {
+      name: entry.name,
+      id: entry.id,
+      display: { name: display.name, description: display.description, order: display.order },
+      ...(requires === undefined ? {} : { requires: { service: requires.service as string } }),
+      ...(entry.unsupported === undefined ? {} : { unsupported: entry.unsupported }),
+    }
   })
   const declared = parsed.default
   if (typeof declared !== 'string' || !entries.some(entry => entry.name === declared)) {
@@ -1088,7 +1183,7 @@ function resolveAgentPresetDir(importMetaUrl: string): string {
   // candidate `join(dir, '..', 'dsh-evolution-agent-preset')` pointed INSIDE
   // this package in every layout (dead path).
   const overlayCandidate = join(dir, '..', '..', 'evolution-agent')
-  if (existsSync(join(overlayCandidate, 'agent.cordis.yml')) && existsSync(join(overlayCandidate, 'preset.yml'))) return overlayCandidate
+  if (existsSync(join(overlayCandidate, 'agent.cordis.yml')) && existsSync(join(overlayCandidate, 'bases.json'))) return overlayCandidate
   try {
     return dirname(createRequire(importMetaUrl).resolve('@deepseek-ai/dsh-evolution-agent-preset/package.json'))
   } catch {

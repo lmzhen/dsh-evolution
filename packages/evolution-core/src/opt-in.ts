@@ -15,8 +15,9 @@
  * model tools are visible in its scope. Mounted at profile root they are visible
  * to every session; mounted inside a variant preset they are visible only to the
  * agents that joined that preset's standing scope — every registration inside a
- * preset files into that agent's layer
- * (packages/preset/agent-presets/src/mount.ts:4-13).
+ * preset files into that agent's layer — in 0.2.x the preset is an ordinary row and its
+ * child rows stay in that agent's own layer (`packages/preset/agent-preset/src/index.ts`,
+ * `static [EntryGroup.key] = true`).
  *
  * `sessionScoped` is what a deployment declares: true means "act only on a
  * session that carries the family's model tools", which is the right question in

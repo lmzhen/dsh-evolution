@@ -4,7 +4,7 @@ import { createToolResultMessage, createUserMessage, ToolCallId } from '@deepsee
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { foldTurn, nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { foldTurnEvents, nodeEvolutionIo, sessionTurnSignals, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
@@ -108,7 +108,7 @@ describe('G0.3: the migrated session accessor reads a real session log', () => {
     })
 
     const session = ctx.sessions.create(SessionId('session-accessor-g03'))
-    ctx.agents.register({
+    await ctx.agents.register({
       id: session.id,
       session,
       ctx,
@@ -140,13 +140,15 @@ describe('G0.3: the migrated session accessor reads a real session log', () => {
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
-    // ── 1. evolution-core `foldTurn` over the real log ───────────────────────
+    // ── 1. the whole-log fold and the LIVE projection agree on the real log ──
     // `substantive` is decided later by `advanceReview` against the plate's
-    // thresholds, so it stays false here: foldTurn's own output is the counters.
-    const signals = foldTurn(session, 0)
+    // thresholds, so it stays false here: the fold's own output is the counters.
+    const signals = foldTurnEvents(session.snapshotEvents(), 0)
     expect(signals.toolCalls).toBe(1)
     expect(signals.skillSignal).toBe(true)
     expect(signals.userChars).toBeGreaterThan(0)
+    // G4: production reads this window from the projection — same fold, driven per event.
+    expect(sessionTurnSignals(ctx, session)).toEqual(signals)
 
     // ── 2. evolution-curator pre-run gate (`recentSessionActive`) ─────────────
     const curatorRun = await ctx.evolutionCurator.run()
@@ -221,7 +223,7 @@ describe('v37 P7a: the read credit over a PTC-only session log', () => {
       skillInterval: 1,
     })
     const session = ctx.sessions.create(SessionId('session-ptc-p7a'))
-    ctx.agents.register({ id: session.id, session, ctx, inject: () => {} } as unknown as Agent)
+    await ctx.agents.register({ id: session.id, session, ctx, inject: () => {} } as unknown as Agent)
 
     // A REAL log in the PTC vocabulary ONLY: the run_code sub-dispatch pair for
     // the skill read, a substantive user turn, and the completed boundaries.
@@ -250,9 +252,10 @@ describe('v37 P7a: the read credit over a PTC-only session log', () => {
 
     // The sub-dispatch is a PROGRAM dispatch: it must not inflate the
     // model-facing call counter, but it must raise the skill signal.
-    const signals = foldTurn(session, 0)
+    const signals = foldTurnEvents(session.snapshotEvents(), 0)
     expect(signals.toolCalls).toBe(0)
     expect(signals.skillSignal).toBe(true)
+    expect(sessionTurnSignals(ctx, session)).toEqual(signals)
 
     session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
     await expect.poll(() => applied.length, { timeout: 10_000, interval: 50 }).toBeGreaterThan(0)

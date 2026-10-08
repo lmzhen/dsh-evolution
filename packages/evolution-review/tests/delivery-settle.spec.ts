@@ -22,6 +22,8 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 
 interface Fixture {
   ctx: Context
@@ -44,12 +46,14 @@ async function mount(labels: string[]): Promise<Fixture> {
   const emitEnd = (label: string, turn: number): void => {
     turns.set(label, turn)
     const session = sessions.get(label) as Session
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
+    emitSessionEvent(ctx, session, 'turn/end', { turn, reason: { kind: 'completed' } })
   }
   const sessions = new Map<string, Session>()
   for (const label of labels) {
     const id = SessionId(label)
-    const session = {
+    // G4: the review reads the turn window from the family's session projection, so the stub must
+    // be foldable (dense seq-stamped log) and every append must announce the event it appends.
+    const session = projectable({
       id,
       seq: 1,
       header: { origin: undefined },
@@ -58,7 +62,7 @@ async function mount(labels: string[]): Promise<Fixture> {
         data: { turn: turns.get(label) ?? 0, step: 2, callId: label + '-' + String(turns.get(label) ?? 0), name: 'skill', arguments: '{}' },
       }],
       deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-    } as unknown as Session
+    }) as unknown as Session
     sessions.set(label, session)
     // No `followup`: delivery then goes through agent.inject, whose throw is
     // what a refused delivery looks like to the caller (warn + return false).
@@ -71,7 +75,7 @@ async function mount(labels: string[]): Promise<Fixture> {
         delivered.push(typeof message === 'object' && box?.content?.[0] ? box.content[0].text : '')
       },
     } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
   }
   let starts = 0
   const hangingRun = { result: new Promise(() => {}), dispose: async () => {} }

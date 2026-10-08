@@ -191,7 +191,9 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(error?.code).toBe(1)
     expect(error?.stderr).toContain('web-app-disables-tool-skill')
     expect(error?.stderr).toContain('tools-get-scope-doc')
-    expect(error?.stderr).toContain('session-format-version-is-3')
+    // The anchor id follows the recorded format version: the 0.2.x line is v4, so the id is -is-4
+    // (the sentry names the id, not the value, to stay independent of the number itself).
+    expect(error?.stderr).toContain('session-format-version-is-4')
     expect(error?.stderr).toContain('known-tool-event-vocabulary')
     // The citation scan reads comments, docs and manifests, not just sources: a
     // recognized citation must be reported with the path it cites.
@@ -612,27 +614,114 @@ describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
     expect(aliased?.stderr).toContain('DEPRECATED alias "memoryInterval"')
   })
 
-  // C3b (0.8.0): the registry says a row is E3 and the card offers it, but the write
-  // lands in the OWNER's section schema. A row that schema does not declare is a knob
-  // whose write has nowhere to land; the reverse - a schema key nobody registered - is a
-  // knob the registry, the cards, the doctor and the document all miss. Both directions
-  // are pinned here, and the fixed tree has to come back clean.
-  it('fails when an E3 row is missing from its owner section schema', async () => {
+  // C3b (0.8.0) + G1: the registry says a row is E3 and the card offers it, but the write
+  // lands in the OWNER's row Config — the carrier the platform validates a settings write
+  // against (config-editor/src/index.ts:103) — and only a field marked `.volatile()` is
+  // writable at all (`volatileForm` skips a row that declares none, `isVolatilePath`
+  // refuses the write). A row the Config does not declare, or declares without the marker,
+  // is a knob whose write has nowhere to land. The reverse direction is pinned too: a
+  // volatile field the registry does not carry as an E3 row of that owner is a writable
+  // knob the cards, the doctor and the document all miss. The fixed tree must come back
+  // clean.
+  it('fails when an E3 row is missing from its owner row Config or is not volatile', async () => {
     const root = await tempRoot('guard-owner-schema-')
     await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
     const namespaces = "export const PARAM_NAMESPACES = Object.freeze({\n  'evolution-review': 'evolution-review',\n})\n"
     await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]) + namespaces, 'utf8')
     const owner = join(root, 'evolution-review', 'src')
     await mkdir(owner, { recursive: true })
-    const schemaOf = (key: string): string => 'export const REVIEW_SETTINGS_SCHEMA: z<object> = z.object({\n  ' + key + ': z.number(),\n})\n'
-    await writeFile(join(owner, 'index.ts'), schemaOf('somethingElse'), 'utf8')
-    const missing = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
-      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    const rowConfig = (...fields: string[]): string => 'export const Config = z.object({\n' + fields.map(field => '  ' + field + ',\n').join('') + '})\n'
+    const gate = (): Promise<{ code?: number; stdout?: string; stderr?: string } | null> => run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stdout?: string; stderr?: string })
+    await writeFile(join(owner, 'index.ts'), rowConfig('somethingElse: z.number()'), 'utf8')
+    const missing = await gate()
     expect(missing?.code).toBe(1)
-    expect(missing?.stderr).toContain('registers "reviewSkillInterval" as E3 but REVIEW_SETTINGS_SCHEMA has no such key')
-    expect(missing?.stderr).toContain('declares "somethingElse"')
-    await writeFile(join(owner, 'index.ts'), schemaOf('reviewSkillInterval'), 'utf8')
+    expect(missing?.stderr).toContain('registers "reviewSkillInterval" as E3 but its row Config declares no such key')
+    // Declared but plain: the form skips the row and the write path refuses the field,
+    // so the knob could never be changed — the marker is what makes it a live control.
+    await writeFile(join(owner, 'index.ts'), rowConfig('reviewSkillInterval: z.number()'), 'utf8')
+    const plain = await gate()
+    expect(plain?.code).toBe(1)
+    expect(plain?.stderr).toContain('registers "reviewSkillInterval" as E3 but its row Config field is not .volatile()')
+    // The reverse: a volatile field the registry does not carry as an E3 row here.
+    await writeFile(join(owner, 'index.ts'), rowConfig('reviewSkillInterval: z.number().volatile()', 'somethingElse: z.number().volatile()'), 'utf8')
+    const extra = await gate()
+    expect(extra?.code).toBe(1)
+    expect(extra?.stderr).toContain('marks "somethingElse" .volatile(), which the registry does not carry as an E3 row of this owner')
+    // An ordinary deployment field stays legal beside them.
+    await writeFile(join(owner, 'index.ts'), rowConfig('reviewSkillInterval: z.number().volatile()', "root: z.string().default('')"), 'utf8')
     const clean = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
     expect(clean.stdout).toContain('verify-param-channel-parity: OK')
+  })
+})
+// G2 sentry: the client-seat guard is the machine-checkable half of "this browser half
+// activates". A required cordis inject has no timeout, so the four failures it names are all
+// SILENT on the platform — the row stays pending and its UI never appears.
+describe('client-seat guard (G2 sentry)', () => {
+  const clientSeats = join(scripts, 'verify-client-seats.mjs')
+
+  /** One family tree with a registry, a generated client view and a platform stub. */
+  async function fixture(): Promise<string> {
+    const root = await tempRoot('guard-client-seats-')
+    // The family side: one E3 row owned by a namespace-bearing owner, its card in the
+    // generated view, and one bundle that advertises the row's page seat.
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    const namespaces = "export const PARAM_NAMESPACES = Object.freeze({\n  'evolution-review': 'evolution-review',\n})\n"
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]) + namespaces, 'utf8')
+    await mkdir(join(root, 'evolution-settings-ui', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'),
+      "export const CLIENT_PARAM_SECTIONS = [\n  { namespace: 'evolution-review', fields: [] },\n]\n\n" +
+      "export const CLIENT_ROW_SEATS = [\n  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-review'] },\n]\n", 'utf8')
+    // The view's own package declares a client half; its entry requires no service (the
+    // guard accepts an empty inject and only demands the declaration exists).
+    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'index.ts'), 'export const inject: string[] = []\n', 'utf8')
+    await writeFile(join(root, 'evolution-settings-ui', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-settings-ui', dsh: { client: { platform: 'web' } } }), 'utf8')
+    // The seat names a bundle package, so the fixture carries the bundle manifest too.
+    await mkdir(join(root, 'evolution-all'), { recursive: true })
+    await writeFile(join(root, 'evolution-all', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-all', dsh: { bundle: { patch: './cordis.patch.yml' } } }).replace('evolution-all', 'evolution-all'), 'utf8')
+    // The platform side: one client service, so the provided-name rule has something true
+    // to agree with.
+    await mkdir(join(root, 'upstream', 'packages', 'client', 'ui-slots', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'upstream', 'packages', 'client', 'ui-slots', 'src', 'client', 'registry.ts'),
+      "export class SlotRegistry { constructor(ctx) { super(ctx, 'slots') } }\n", 'utf8')
+    await writeFile(join(root, 'upstream', 'packages', 'client', 'ui-slots', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-client-ui-slots' }), 'utf8')
+    return root
+  }
+
+  /** One client package: its manifest's informational edges and its inject line. */
+  async function client(root: string, dir: string, inject: string, reads: string, edges: string[] = []): Promise<void> {
+    await mkdir(join(root, dir, 'src', 'client'), { recursive: true })
+    await writeFile(join(root, dir, 'package.json'), JSON.stringify({ name: '@deepseek-ai/' + dir, dsh: { client: { platform: 'web', inject: edges } } }), 'utf8')
+    await writeFile(join(root, dir, 'src', 'client', 'index.ts'), inject + '\n', 'utf8')
+    // The read lives in a SIBLING source, the way a seam module declares the seats it uses
+    // (the guard looks beyond the entry file: the inject line itself is not a read).
+    await writeFile(join(root, dir, 'src', 'client', 'seam.ts'), reads + '\n', 'utf8')
+  }
+
+  it('passes on a tree whose client halves only require provided, read services', async () => {
+    const root = await fixture()
+    await client(root, 'good-client', "export const inject = ['slots']", 'export const use = seam.slots', ['@deepseek-ai/dsh-client-ui-slots'])
+    const ok = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
+    expect(ok.stdout).toContain('verify-client-seats: OK')
+  })
+
+  it('fails on a dropped service, a dead inject name, a phantom edge and a missing card', async () => {
+    const root = await fixture()
+    // A: the name a platform generation dropped (this exact one killed a family row once).
+    await client(root, 'dropped-service', "export const inject = ['settingsScope']", 'export const use = seam.settingsScope')
+    // B: a name no source reads — the leftover of a seam change.
+    await client(root, 'dead-inject', "export const inject = ['slots', 'ghostService']", 'export const use = seam.slots')
+    // D: an informational edge to a client package the target line does not ship.
+    await client(root, 'phantom-edge', "export const inject = ['slots']", 'export const use = seam.slots', ['@deepseek-ai/dsh-client-ui-gone'])
+    // C: an E3 row whose card never made it into the generated view.
+    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'),
+      'export const CLIENT_PARAM_SECTIONS = []\n\nexport const CLIENT_ROW_SEATS = []\n', 'utf8')
+    const failed = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(failed?.code).toBe(1)
+    expect(failed?.stderr).toContain('inject requires "settingsScope", which no client service of the platform line provides')
+    expect(failed?.stderr).toContain('inject requires "ghostService" but no client source reads it')
+    expect(failed?.stderr).toContain('dsh.client.inject names "@deepseek-ai/dsh-client-ui-gone"')
+    expect(failed?.stderr).toContain('evolution-review: has registry rows but no card in the generated client view')
   })
 })

@@ -20,6 +20,24 @@ inputs:
       staged manifests actually carry it (N-2). The compat job calls it with
       the same version as its upstream_ref (`dsh-v<platform_version>`).
     required: true
+  platform_floor:
+    description: >-
+      PLATFORM_FLOOR the published peer ranges declare (the earliest rc of the
+      validated line, e.g. ^0.2.0-rc.1 while platform_version is 0.2.0-rc.2).
+      Empty means the same as platform_version (single-line releases that ship
+      one rc). The floor is what prepare-release writes into every
+      @deepseek-ai/dsh-* range and what the range guard asserts (G7 §2.1).
+    required: false
+    default: ''
+  install_smoke:
+    description: >-
+      'true' additionally installs the packed family into a throwaway
+      DSH_HOME with the family's own installer and lets the profile guard
+      judge the result. The desktop job sets it: the Electron cold-boot
+      assertion needs the signed app (a real-machine step), while the WINDOWS
+      half of the install path is exactly what CI can own.
+    required: false
+    default: 'false'
   artifact_suffix:
     description: Suffix for the uploaded artifacts (baseline / released)
     required: false
@@ -209,6 +227,7 @@ runs:
       working-directory: upstream
       env:
         PLATFORM_VERSION: ${{ inputs.platform_version }}
+        PLATFORM_FLOOR: ${{ inputs.platform_floor }}
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
         # A tag packs its own semver; a main push packs the dev placeholder
@@ -216,6 +235,9 @@ runs:
         # `--dev-build` declares that (v21 S-4 reconciliation is skipped there,
         # and that staging is never published: the publish job is tag-gated).
         ARGS=(--scope "$NPM_SCOPE" --version "${RELEASE_VERSION#v}" --platform-version "$PLATFORM_VERSION")
+        # G7 §2.1: the FLOOR is a separate input — it is what the published ranges declare, so
+        # omitting it would publish ^<tested-line> and refuse the line's earlier rc.
+        if [[ -n "$PLATFORM_FLOOR" ]]; then ARGS+=(--platform-floor "$PLATFORM_FLOOR"); fi
         if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
         node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
 
@@ -224,13 +246,17 @@ runs:
       working-directory: upstream
       env:
         PLATFORM_VERSION: ${{ inputs.platform_version }}
+        PLATFORM_FLOOR: ${{ inputs.platform_floor }}
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
         # R-10: --our-scope is passed EXPLICITLY from the same scope the pack
         # rewrite used — the guard's '@lmzhen' default is no longer an
         # independent second definition that can silently drift.
+        # G7 §2.1: the guard asserts the FLOOR (what the ranges must admit), not the tested
+        # line — passing the tested line here was how a range could exclude its own line's rc.
+        RANGE_FLOOR="${PLATFORM_FLOOR:-$PLATFORM_VERSION}"
         node packages/evolution/scripts/verify-platform-ranges.mjs \
-          --platform-version "$PLATFORM_VERSION" \
+          --platform-version "$RANGE_FLOOR" \
           --manifest-dir packages/evolution/.release-staging \
           --our-scope "$NPM_SCOPE"
 
@@ -295,6 +321,43 @@ runs:
           packages/evolution --strict --upstream .
         node packages/evolution/scripts/verify-platform-contract.mjs \
           packages/evolution --upstream .
+
+    - name: Verify the family guard set (G5/G6)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The guards the family's own gate runs on the build line and this action did not. Each is
+        # line-independent (it reads the overlay tree), and each covers a silent-failure class: a
+        # parameter channel that drifted from the registry, a browser seat nobody mounts, a bundle
+        # row nobody declares, a doc fact that moved. `--upstream .` is the checked-out platform.
+        node packages/evolution/scripts/verify-param-registry.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-bundle-rows.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-param-channel-parity.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-client-tokens.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-client-seats.mjs packages/evolution --strict --upstream .
+        node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
+        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict --require-repo-docs
+        node packages/evolution/scripts/verify-package-discovery.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-family-tool-names.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-skill-roots.mjs packages/evolution --strict
+
+    - name: Install smoke into a throwaway DSH_HOME (desktop plane)
+      if: inputs.install_smoke == 'true'
+      shell: bash
+      working-directory: upstream
+      env:
+        NPM_SCOPE: ${{ inputs.npm_scope }}
+      run: |
+        # G7 §2.3: the Windows half of the install path. The Electron cold-boot assertion needs
+        # the signed app and stays a real-machine step (recorded in the G2/G3 design docs); what a
+        # runner CAN own is that the installer produces a profile its own guard accepts on Windows
+        # paths — bundle row, preset row, journal, and no double mount.
+        HOME_DIR="$(mktemp -d)"
+        node packages/evolution/scripts/install-layered.mjs \
+          --home "$HOME_DIR" --profile web --mode layered
+        node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
+        test -f "$HOME_DIR/profiles/web/.evolution-install.json"
+        test -f "$HOME_DIR/profiles/web/cordis.patch.yml"
 
     - name: Publish dry-run
       shell: bash

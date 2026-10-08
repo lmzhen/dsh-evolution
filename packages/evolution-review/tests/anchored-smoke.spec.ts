@@ -55,7 +55,7 @@ describe('anchored-standard review smoke', () => {
       ctx,
       inject: () => {},
     } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
 
     session.append('turn/start', { turn: 1 })
     session.append('user/message', createUserMessage({
@@ -175,7 +175,7 @@ describe('anchored-standard review smoke', () => {
         ctx,
         inject: () => {},
       } as unknown as Agent
-      ctx.agents.register(agent)
+      await ctx.agents.register(agent)
 
       session.append('turn/start', { turn: 1 })
       // The parent session READ doomed-skill this session (read-before-write
@@ -300,7 +300,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       })
       const session = ctx.sessions.create(SessionId('stale-session'))
       const agent = { id: session.id, session, ctx, inject: () => {} } as unknown as Agent
-      ctx.agents.register(agent)
+      await ctx.agents.register(agent)
       session.append('turn/start', { turn: 1 })
       session.append('tool/call', {
         turn: 1, step: 0, callId: ToolCallId('read-target'),
@@ -381,7 +381,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       })
       const session = ctx.sessions.create(SessionId('prot-session'))
       const agent = { id: session.id, session, ctx, inject: () => {} } as unknown as Agent
-      ctx.agents.register(agent)
+      await ctx.agents.register(agent)
       session.append('turn/start', { turn: 1 })
       session.append('tool/call', {
         turn: 1, step: 0, callId: ToolCallId('read-guarded'),
@@ -470,7 +470,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       })
       const session = ctx.sessions.create(SessionId(`${name}-session`))
       const agent = { id: session.id, session, ctx, inject: () => {} } as unknown as Agent
-      ctx.agents.register(agent)
+      await ctx.agents.register(agent)
       session.append('turn/start', { turn: 1 })
       // Read-before-write: the parent session read the skill with its PAIRED
       // successful result (REV-06(a)) — the same shape TEST-01 uses, and what
@@ -576,7 +576,7 @@ describe('review tool filter probe (I-6)', () => {
     })
     const session = ctx.sessions.create(SessionId('i6-review-session'))
     const agent = { id: session.id, session, ctx, inject: () => {} } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     session.append('turn/start', { turn: 1 })
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'I prefer concise answers and want you to remember that preference. '.repeat(6) }],

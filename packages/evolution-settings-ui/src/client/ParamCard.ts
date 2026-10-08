@@ -6,7 +6,7 @@
  * settings scope and its snapshot are declared by the shape the renderer hands
  * over (\`getSnapshot\`/\`subscribe\`, status/value/user/writable).
  *
- * Layout and behaviour follow the platform's own settings fields: a collapsed card
+ * header (namespace title, change count, chevron), then one block per field —
  * header (namespace title, change count, chevron), then one block per field —
  * label with its unit and source chip, a control HOLDING THE CURRENT VALUE, the
  * Chinese hint — and one 放弃修改/保存 pair at the card's foot. The control is
@@ -161,16 +161,36 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
  * @param props - the card data, its callbacks, and the bound section hook.
  * @returns the card.
  */
-export function ParamCard(props: ParamCardProps): ReactNode {
-  const { t, fields, write, clear, namespace } = props
+/** Props of the shared body: the card's own data plus the row state it renders. */
+export interface ParamCardViewProps {
+  namespace: string
+  fields: readonly ClientParamField[]
+  t: (key: MessageKey) => string
+  write: (field: string, value: unknown) => Promise<void>
+  clear: (field: string) => Promise<void>
+  /** The current row state, from whichever source owns it (the bound hook or the page). */
+  snapshot: ParamSectionSnapshot
+}
+
+/**
+ * Render one row's card body from a supplied snapshot.
+ * @param props - the card data, its callbacks, and the row state to render.
+ * @returns the card.
+ */
+export function ParamCardView(props: ParamCardViewProps): ReactNode {
+  const { t, fields, write, clear, namespace, snapshot } = props
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [pending, setPending] = useState<readonly PendingWrite[] | null>(null)
-  const snapshot = props.useParamSection((state: ParamSectionSnapshot) => state)
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
-  if (snapshot.status === 'unavailable') return createElement('p', { className: 'evolution-param-note' }, t('unavailable'))
+  // Two different absences: this UI has no settings seat at all, or the seat serves no
+  // such row. They read the same on screen only if we let them, and the operator's next
+  // move differs (compose the settings surface vs compose the row).
+  if (snapshot.status === 'unavailable') {
+    return createElement('p', { className: 'evolution-param-note' }, t(snapshot.reason === 'seat-missing' ? 'seatMissing' : 'unavailable'))
+  }
   const user = isSection(snapshot.user) ? snapshot.user : {}
   const value = isSection(snapshot.value) ? snapshot.value : {}
   const disabled = !snapshot.writable
@@ -264,3 +284,22 @@ export function ParamCard(props: ParamCardProps): ReactNode {
       : null,
   )
 }
+
+/**
+ * The card as our own section renders it: the row state comes from the hook seat the
+ * renderer binds out of the inject face's `hooks` compartment (components never hold a
+ * subscription of their own).
+ * @param props - the card data, its callbacks, and the bound row hook.
+ * @returns the card.
+ */
+export function ParamCard(props: ParamCardProps): ReactNode {
+  return ParamCardView({
+    namespace: props.namespace,
+    fields: props.fields,
+    t: props.t,
+    write: props.write,
+    clear: props.clear,
+    snapshot: props.useParamSection((state: ParamSectionSnapshot) => state),
+  })
+}
+

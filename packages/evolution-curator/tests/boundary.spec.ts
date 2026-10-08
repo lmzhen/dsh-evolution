@@ -3,6 +3,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+// G4: the idleness gate reads the family's session projection, so the spec mounts the registry
+// the platform's base bundle mounts (a real host always has it).
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import EvolutionCurator from '../src/index.ts'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
 import { tempHome } from '../../test-support/temp-home.ts'
@@ -16,9 +20,24 @@ afterEach(() => {
   else process.env.DSH_HOME = REAL_DSH_HOME
 })
 
-async function mount(_home: string, config: ConstructorParameters<typeof EvolutionCurator>[1] = {}) {
+/** The config fields this spec drives — the deployment-facing shape (G1 §8.2): plain values. */
+interface SpecConfig {
+  enabled?: boolean
+  root?: string
+  intervalHours?: number
+  staleAfterDays?: number
+  archiveAfterDays?: number
+  minIdleHours?: number
+  minIdleFailOpen?: boolean
+  llmReview?: boolean
+  autoStart?: boolean
+}
+
+async function mount(_home: string, config: SpecConfig = {}) {
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(NodeIo)
   await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, ...config })
   return ctx
@@ -58,13 +77,16 @@ describe('evolution-curator boundaries', () => {
       releasePendingClaim: async () => {},
     })
     let listCalls = 0
+    // G4: the idleness gate reads the family's evolutionActivity projection, which folds the
+    // session's own log — so the presented session is a REAL one (the projection is the
+    // post-0.1.5 read of exactly the log the loop appends).
+    const recent = ctx.sessions.create(SessionId('curator-recent-session'))
+    recent.append('turn/start', { turn: 1 })
     ctx.provide('agents', {
       list: () => {
         listCalls += 1
         if (listCalls === 1) return []
-        // v33 G0.1: the double presents the post-0.1.5 accessor; the removed
-        // `events` getter made this stub fail with a TypeError instead.
-        return [{ session: { snapshotEvents: () => [{ type: 'turn/start', seq: 1, time: Date.now(), data: { turn: 1 } }] } }]
+        return [{ session: recent }]
       },
     })
     // v32 TEST-02 (CUR-04): a live skill with NO usage sidecar must get its

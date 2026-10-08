@@ -50,15 +50,6 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     ],
   },
   {
-    namespace: 'evolution-memory',
-    fields: [
-      { id: 'memoryChars', group: 'memory', doc: 'Character budget the memory store enforces for MEMORY.md.', label: '记忆库上限', hint: '长期记忆文件（MEMORY.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
-      { id: 'userChars', group: 'memory', doc: 'Character budget the memory store enforces for USER.md.', label: '用户画像上限', hint: '用户画像文件（USER.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
-      { id: 'addDatePrefix', group: 'memory', doc: 'Prefix stored memory entries with their date heading.', label: '记忆条目加日期', hint: '写入时在条目开头加上日期。', control: 'switch', unit: '', values: [], valueLabels: [] },
-      { id: 'maxConsolidationFailures', group: 'memory', doc: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败重试', hint: '合并记忆连续失败多少次后停止。', control: 'number', unit: '次', values: [], valueLabels: [] },
-    ],
-  },
-  {
     namespace: 'evolution-review',
     fields: [
       { id: 'reviewSkillInterval', group: 'review', doc: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', label: '技能检查间隔', hint: '每累计多少次工具调用检查一次技能：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到技能则只算 1 次。', control: 'number', unit: '次', values: [], valueLabels: [] },
@@ -71,7 +62,22 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     ],
   },
   {
-    namespace: 'evolution-skills',
+    namespace: 'memory-files',
+    fields: [
+      { id: 'memoryChars', group: 'memory', doc: 'Character budget the memory store enforces for MEMORY.md.', label: '记忆库上限', hint: '长期记忆文件（MEMORY.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
+      { id: 'userChars', group: 'memory', doc: 'Character budget the memory store enforces for USER.md.', label: '用户画像上限', hint: '用户画像文件（USER.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
+      { id: 'addDatePrefix', group: 'memory', doc: 'Prefix stored memory entries with their date heading.', label: '记忆条目加日期', hint: '写入时在条目开头加上日期。', control: 'switch', unit: '', values: [], valueLabels: [] },
+      { id: 'maxConsolidationFailures', group: 'memory', doc: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败重试', hint: '合并记忆连续失败多少次后停止。', control: 'number', unit: '次', values: [], valueLabels: [] },
+    ],
+  },
+  {
+    namespace: 'tool-memory',
+    fields: [
+      { id: 'entryPreviewChars', group: 'memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', hint: '列表里每条记忆最多显示多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
+    ],
+  },
+  {
+    namespace: 'tool-skill-manage',
     fields: [
       { id: 'skillContentChars', group: 'write-caps', doc: 'Character cap on a SKILL.md body (tighten-only).', label: '技能文件正文上限', hint: '技能 Markdown 正文最多多少字符（只能调小）。', control: 'number', unit: '字符', values: [], valueLabels: [] },
       { id: 'maxSkillFileBytes', group: 'write-caps', doc: 'Byte cap on one support file (tighten-only).', label: '附带文件大小上限', hint: '技能附带文件单个最大多少字节（只能调小）。', control: 'number', unit: '字节', values: [], valueLabels: [] },
@@ -85,10 +91,22 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
       { id: 'skillWriteConfirmTimeoutSeconds', group: 'write-caps', doc: 'Seconds the confirmation waits for an answer in timeout mode before the write is cancelled.', label: '确认等待秒数', hint: '选「超时自动取消」时，等多少秒没人回答就取消这次写入。', control: 'number', unit: '秒', values: [], valueLabels: [] },
     ],
   },
-  {
-    namespace: 'evolution-tool-memory',
-    fields: [
-      { id: 'entryPreviewChars', group: 'memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', hint: '列表里每条记忆最多显示多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
-    ],
-  },
+]
+
+
+/**
+ * One bundle that mounts family rows: the plugins.row.config key of a row is
+ * <bundle package name>#<row id>. The names are the SOURCE-plane spellings -
+ * the release rescopes them with every other package literal.
+ */
+export interface ClientRowSeat {
+  bundle: string
+  rows: readonly string[]
+}
+
+/** Every (bundle, row) pair the Plugins page can open a configuration page for. */
+export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [
+  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-curator', 'evolution-review', 'memory-files'] },
+  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
 ]

@@ -21,24 +21,24 @@ verification on this platform line — is §5:
 `dsh plugin --profile web add @lmzhen/dsh-evolution-all`. The other forms exist
 for shrinking (`host`), per-session tools (the layered variant), or
 compatibility (the one-click preset). The matrix below says which of them have
-actually been exercised on `0.1.5-rc.2` — read the status column as evidence,
+actually been exercised on `0.2.0-rc.2` — read the status column as evidence,
 not as expectation.
 
-### Install-form status against the validated platform line (`0.1.5-rc.2`)
+### Install-form status against the validated platform line (`0.2.0-rc.2`)
 
 Column 2 names the install mode; the M1–M4 vocabulary — what each number means —
 is defined once in the root `README.md` §Install modes (M1-M4) and is cited here,
-not restated. Column 3 says whether the form was EXERCISED on `0.1.5-rc.2` or
+not restated. Column 3 says whether the form was EXERCISED on `0.2.0-rc.2` or
 only judged from the source diff — a form is "已验证" only when an install ran
 against that line.
 
-| Form | Install mode | Status on `0.1.5-rc.2` | Basis |
+| Form | Install mode | Status on `0.2.0-rc.2` | Basis |
 |---|---|---|---|
-| §1 ① Variant — layered (`--mode variant` / `layered`, source checkout) | M4 | **部分已验证** | preset resolution now probes the 0.1.5 shipped location first and is covered by `installer.spec.ts` (G2.1); the profile write path itself is unchanged and still only exercised on the dev tree |
-| §2 Host-only (`--mode host`) | M3 | **未验证**（源码级判定） | the host bundle inserts only family rows and overrides two platform base rows (`session-query-sqlite`, `tool-skill`), whose key sets `verify-declared-config.mjs --upstream` recomputes from the platform source; no `0.1.5-rc.2` install has been run |
+| §1 ① Variant — layered (`--mode variant` / `layered`, source checkout) | M4 | **已验证**（lab，2026-10-09） | install into an isolated `DSH_HOME`: 31 packages copied into `profiles/<p>/node_modules`, the `preset-evolution` row written into the profile patch, `/evolution doctor` reported `install form: layered (deployment: variant …)`, and the desktop host booted clean with the family rows mounted |
+| §2 Host-only (`--mode host`) | M3 | **已验证**（lab，2026-10-09） | the Plugins page listed `@deepseek-ai/dsh-evolution-host` as `20 个 · 19 运行中` (per-row state visible, `evolution-state-domain` off by design); the two platform rows it overrides (`session-query-sqlite`, `tool-skill`) have their key sets recomputed from the platform source by `verify-declared-config.mjs --upstream` |
 | §3 Agent-only (`--mode agent`) | M4 (preset half — the host side is §2) | **部分已验证** | same preset-resolution coverage as §1 |
-| §4 ② Attach — one-click (`--mode attach` / `oneclick`, `@lmzhen/dsh-evolution-preset`) | M1 (compatibility spelling of the same profile-root plane — NOT the host-only M3) | **未验证**（源码级判定） | the bundle's row set is §2's plus the four model rows, and the only platform row it inserts is `tool-session-query`; no `0.1.5-rc.2` install has been run |
-| §5 Production (`dsh plugin add @lmzhen/dsh-evolution-all`) | M1 | **已验证** | real installs on a `0.1.5-rc.2` host: `dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.3.70` (2026-09-12) `…@0.3.83` → exit 0 (2026-09-16, pnpm 8.3s) `…@0.4.0` → exit 0 (2026-09-16, pnpm 6.7s) and `…@0.4.1` → exit 0 (2026-09-17, pnpm 8.1s); in each case the profile resolved the bundle's closure to that version's installed family packages (`0.4.0`: 28/28 `import()` ok, 773-line dump; `0.4.1`: 28/28 `import()` ok, 784-line dump; `0.6.1`, 2026-09-18, pnpm 29.1s: 29 packages under `node_modules/@lmzhen` all at `0.6.1` with no mixed versions, 29/29 `import()` ok — the closure carries the runtime plugins, while `@lmzhen/dsh-evolution-preset` ships as an agent-preset artifact and does not land in `node_modules`), and `dsh --profile web --dump-config` is exit 0 with no duplicate (207 ids through 0.4.1; `0.6.1`: 209 ids / 787 lines, including the composed card row `- id: evolution-settings-ui`; `0.7.0`, 2026-09-19, pnpm 8.9s: 29 packages all at `0.7.0`, 29/29 `import()` ok, 801 lines / 210 ids; **`0.8.0`, 2026-09-22, pnpm 14.6s: 29 packages all at `0.8.0` (histogram `{0.8.0: 29}`, zero mixed versions), 29/29 `import()` ok, 801 lines / 210 ids — the same id set as `0.7.0`, so the convergence batch moved no row and no parameter**). Published ranges are `^0.1.5-rc.2` (see `scripts/verify-platform-ranges.mjs`) |
+| §4 ② Attach — one-click (`--mode attach` / `oneclick`, `@lmzhen/dsh-evolution-preset`) | M1 (compatibility spelling of the same profile-root plane — NOT the host-only M3) | **未验证**（源码级判定） | the bundle's row set is §2's plus the four model rows, and the only platform row it inserts is `tool-session-query`; this BUNDLE has not been installed on `0.2.0-rc.2` — the same profile-root plane is exercised through §5, which mounts the same rows |
+| §5 Production (`dsh plugin add @lmzhen/dsh-evolution-all`) | M1 | **部分已验证**（0.2.x：同一 profile-root 平面由本地安装器在 lab 上装过并跑通客户端半侧；`dsh plugin add` 这条命令本身尚未在 `0.2.0-rc.2` 上跑过——历史证据见右列） | real installs on a `0.1.5-rc.2` host: `dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.3.70` (2026-09-12) `…@0.3.83` → exit 0 (2026-09-16, pnpm 8.3s) `…@0.4.0` → exit 0 (2026-09-16, pnpm 6.7s) and `…@0.4.1` → exit 0 (2026-09-17, pnpm 8.1s); in each case the profile resolved the bundle's closure to that version's installed family packages (`0.4.0`: 28/28 `import()` ok, 773-line dump; `0.4.1`: 28/28 `import()` ok, 784-line dump; `0.6.1`, 2026-09-18, pnpm 29.1s: 29 packages under `node_modules/@lmzhen` all at `0.6.1` with no mixed versions, 29/29 `import()` ok — the closure carries the runtime plugins, while `@lmzhen/dsh-evolution-preset` ships as an agent-preset artifact and does not land in `node_modules`), and `dsh --profile web --dump-config` is exit 0 with no duplicate (207 ids through 0.4.1; `0.6.1`: 209 ids / 787 lines, including the composed card row `- id: evolution-settings-ui`; `0.7.0`, 2026-09-19, pnpm 8.9s: 29 packages all at `0.7.0`, 29/29 `import()` ok, 801 lines / 210 ids; **`0.8.0`, 2026-09-22, pnpm 14.6s: 29 packages all at `0.8.0` (histogram `{0.8.0: 29}`, zero mixed versions), 29/29 `import()` ok, 801 lines / 210 ids — the same id set as `0.7.0`, so the convergence batch moved no row and no parameter**). Published ranges are `^0.1.5-rc.2` (see `scripts/verify-platform-ranges.mjs`) |
 
 Reading the matrix: "未验证" is a statement about evidence, not about expected
 behaviour — the source-level judgement for the still-open cells is that the
@@ -119,13 +119,15 @@ skill rows, so the family has no foothold there either.
 
 ## Prerequisites
 
-- **Validated platform line: DSH `0.1.5-rc.2`.** This family does not support
-  two platform generations at once: `0.1.1-rc.2` and earlier are outside the
-  support window. The published `@deepseek-ai/dsh-*` ranges are `^0.1.5-rc.2`,
-  which under node-semver's prerelease rule does not admit an earlier
-  prerelease line — an older platform fails at dependency resolution, not at
-  runtime. `release.yml`'s `PLATFORM_VERSION` is the single definition of that
-  anchor; `scripts/verify-platform-ranges.mjs` asserts it.
+- **Validated platform line: DSH `0.2.0-rc.2`.** This family does not support
+  two platform generations at once: `0.1.x` and earlier are outside the support
+  window. The published `@deepseek-ai/dsh-*` ranges are `^0.2.0-rc.1`
+  (`PLATFORM_FLOOR`), which under node-semver's prerelease rule admits this
+  line including its earlier rc but no earlier line — an older platform fails
+  at dependency resolution, not at runtime. `release.yml` carries BOTH values
+  (`PLATFORM_FLOOR` = what the ranges declare, `PLATFORM_VERSION` = the line
+  the gate validates and builds against); `scripts/verify-platform-ranges.mjs`
+  asserts the floor against the staged manifests.
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
   or a published `@deepseek-ai/dsh-evolution-host` bundle available to pnpm.
 - For the local installer below: Node 22.19+ or 24+ (the repository's
@@ -163,11 +165,12 @@ This performs:
    `<home>/profiles/<profile>/node_modules/@deepseek-ai/...`;
 2. adds `@deepseek-ai/dsh-evolution-host` to
    `<home>/profiles/<profile>/package.json` `dsh.profile.bundles`;
-3. copies the `Evolution` agent preset to
-   `<home>/.agent-presets/evolution/` (`--base ptc` installs the ptc variant to
-   `<home>/.agent-presets/evolution-ptc/` instead — the base names the runtime
-   platform composition and the installed directory, and the table behind both
-   is `evolution-agent/bases.json`).
+3. writes the `Evolution` agent-preset ROW into
+   `<home>/profiles/<profile>/cordis.patch.yml` as one `- insert:` block
+   (`--base ptc` writes the ptc variant's row `preset-evolution-ptc` instead — the
+   base names both the platform base patch the rows are read from and the row id,
+   and the table behind both is `evolution-agent/bases.json`). 0.2.x removed the
+   preset directory, so no `.agent-presets/` tree is produced.
 
 The installer is source-layout aware: if a package's `lib/index.js` has not
 been built yet it prints an `unbuilt:` warning. Boot such a profile with the
@@ -247,13 +250,12 @@ mutually exclusive with it.
 > releases.
 
 The agent preset is assembled by the installer (`install-layered.mjs`) or the
-host-runner's preset generation — V6-03 (0.3.34): do NOT hand-copy
-`evolution-agent/agent.cordis.yml` into `$DSH_HOME/.agent-presets/evolution/`.
-That file is a DELTA (4 model-tool rows, see its own header) and the
-`.agent-presets` discovery mounts whichever `agent.cordis.yml` it finds as the
-COMPLETE composition — a hand-copied delta would mount an agent missing every
-standard row. Use `dsh plugin add` + the installer (or copy only a
-standard+delta SYNTHESIZED composition when a manual path is truly needed).
+host-runner's preset generation — V6-03 (0.3.34): do NOT hand-write
+`evolution-agent/agent.cordis.yml` into the profile patch. That file is a DELTA
+(4 model-tool rows, see its own header) and the preset ROW is mounted as the
+COMPLETE composition — a hand-written delta would mount an agent missing every
+standard row. Use `dsh plugin add` + the installer, or `/evolution preset install`
+(write only a standard+delta SYNTHESIZED row when a manual path is truly needed).
 The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
 which reads the same `evolution-agent/bases.json` table and writes one variant
 per named base in a single pass.

@@ -1,6 +1,20 @@
 # Changelog
 
 
+## 0.17.0 (minor) — 平台线跳到 0.2.0-rc.2：参数面、客户端座位、命名空间、诊断面、发布口径全量对齐
+
+> **由来**：0.2.x 一次改掉了四件家族赖以工作的机制——参数面（`z` 配置改成 `.volatile()` 活引用）、客户端设置座位（客户端插件从平台自带的表单读，行配置页按 `<bundle>#<rowId>` 挂）、设置命名空间（行 id 就是命名空间，旧的 `evolution-*` 字符串不再指向任何东西）、agent preset（目录式取消，改成 profile patch 里的一条 `dsh-agent-preset` 声明）。不做完这四件，家族在新线上是「装得上、点不动、配不了、迁不走」。
+> **G1 参数面归位**：E3 参数一律 `.volatile()`；`params.ts` 新增 `paramSettingsId(owner)`（行 id → 设置命名空间），`PARAM_NAMESPACES` 降级为**只读的迁移源**——旧字符串的唯一用途是把老配置搬到新行上。
+> **G2 客户端半侧**：插件页的**行配置页**座位（`plugins.row.config`，键 `<bundle>#<rowId>`）与设置里的**自进化分区**并存，两者共用同一张参数卡；座位缺失时只读降级并写明原因，不画死控件。
+> **G3 命名空间迁移**：新增 `/evolution migrate` 与**启动一次性迁移**——平台的一次性导入只认它自己表里的 section，家族的旧 section 会原样留在被改名的文档里；现在它们按行 id 归一（含 6 条别名键），**存量值赢、等值零写入**（第二次跑不动 revision）、未知键拒绝并报因，doctor 多一段「旧文档里还有几项没迁」。
+> **G4 会话读法**：全家族不再 `snapshotEvents()`，改成 host-only 的投影单元（活动、证据、读名、回合信号）＋ review 自己的有界 dispatch 尾巴。
+> **G5 诊断面归位**：doctor 的安装形态／行与服务在场／参数面三段改读**平台自己的读面**（`pluginManager.listBundles/listPlugins`、`configEditor.configuration`、插件清单），跨 profile 聚合保留但明确标注「不是本运行时挂载面」；读面缺席给一行明确判词，不静默、不退回自扫。
+> **G6 安装与打包轴**：安装器／命令面／doctor 全部改成**声明式 preset 行**；行台账按新线重录；profile 种子与平台表逐键比对（模板、字段集、bundle 列表、默认模板、种子键集）。
+> **G7 发布与门禁**：**floor 与被测线拆成两个量**——发布出去的 `@deepseek-ai/dsh-*` range 声明 `^0.2.0-rc.1`（收得住整条线），门禁构建并验证 `0.2.0-rc.2`；唯一出口是 `prepare-release.mjs --platform-floor`，唯一把它们绑在一起的检查是门禁末两步（真跑一次打包再按 floor 判 67 条 range）。
+> **护栏**：门禁加到 **25 步**（新增 `release-rehearsal` ＋ `verify-platform-ranges`），CI 补上家族那 10 个此前只在本地跑的守卫与一个 `desktop-install`（`windows-latest`：临时 `DSH_HOME` 装一次、再用 profile 守卫判它产出的 profile），成为 `publish` 的 `needs`。
+> **验证**：家族测试全绿（190 文件／1829+ 用例）；门禁 **25/25**；`verify-platform-ranges: OK — 67 platform range(s) all ^0.2.0-rc.1`；`verify-declared-config --upstream` 54 可达 0 违规 0 漂移；`verify-platform-contract` 245 条平台引用 0 断。
+> **真机（桌面 0.2.0-rc.2 宿主 ＋ 隔离 `DSH_HOME`）**：安装 6 次复现；客户端半侧出现（侧栏「技能历史」、设置「自进化」、行页「配置 @deepseek-ai/dsh-memory-files」）；行页改键落盘（`memoryChars` 1234→1500）；`/evolution migrate` 在真实文档上写出、第二次零写入、存量值赢；doctor 三段与平台插件页逐项一致。
+> **文档**：README／README.zh／两处 INSTALL／三个 bundle patch 的平台锚点全部刷到 `0.2.0-rc.2` 与 `^0.2.0-rc.1`，并写清两个值的分工。
 ## 0.16.1 (patch) — 待批写入卡真的出现了：keyed slot 只渲染被点名的键
 
 > **由来**：0.16.0 的真机验收第一步就没过——设置「自进化」里**根本没有那张卡**。用一个真 Chrome（同一台机器、同一个宿主）无头打开页面点开设置：DOM 里只有 5 张参数卡、零个 `/api/dsh-evolution/approval/*` 请求；而宿主**确实在服务** 0.16.0 的客户端半（把 `/plugins/??…` 那份拼接 bundle 拉下来，`approval-pending`／`evolution-param-facts`／四条路由字面量都在里面，15.2 MB，200）。所以不是装机、不是缓存，是代码。

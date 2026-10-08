@@ -10,9 +10,10 @@ Skeleton: `templates/base/bases-row.json.tmpl`.
 ## Checklist
 
 - [ ] Add the row to `packages/evolution-agent/bases.json`: `name` (the
-      `--base` value = the platform composition directory = the installed preset
-      id source), `id` (the `.agent-presets/<id>/` directory), `metadata`
-      (the `preset.<name>.yml` file you ship next to it).
+      `--base` value = the platform base patch's file stem), `id` (the preset id;
+      the composed row's id is `preset-<id>`), `display: { name, description, order }`
+      (what the picker renders — an id the platform did not ship is rendered from the
+      row itself, so there is no metadata file to ship).
 - [ ] If the platform composition needs a service the family does not mount, say
       so in the row: `requires: { service: '<platformService>' }`. If the base
       cannot work at all, register `unsupported: '<reason>'` instead of leaving
@@ -20,7 +21,7 @@ Skeleton: `templates/base/bases-row.json.tmpl`.
       paths must refuse it by name BEFORE any write: `install-layered.mjs` and
       `evolution-commands` share `baseUnavailableReason()` (the 0.3.78 TDZ
       incident: the refusal used to run before `profileDir` existed).*
-- [ ] Ship the metadata file (`preset.<name>.yml`) beside `agent.cordis.yml`.
+- [ ] Nothing else ships: the display copy lives in the row (`display`), not in a `preset.<name>.yml` file — those were deleted with the preset directory in 0.2.x.
 - [ ] Update the table in the fact's home, `evolution-agent/README.md`
       §Preset variants — the doc and `bases.json` are checked against each other.
       — *`verify-doc-facts.mjs` (N19 `preset-bases`) fails a base the home does

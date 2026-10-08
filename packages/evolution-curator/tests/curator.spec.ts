@@ -10,6 +10,7 @@ import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { DEFAULT_SKILL_LIMITS, SkillLibrary, blobPath, computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, historyIndexFile, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, parseHistoryIndex, saveSuppressedNames, saveUsage, loadUsage, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 import { tempHome } from '../../test-support/temp-home.ts'
+import { vol } from '../../test-support/volatile-config.ts'
 
 // v21 (T-8): most tests below set DSH_HOME and restore it only on the SUCCESS
 // path — one failing assertion used to leak a temp-dir DSH_HOME into every
@@ -1827,7 +1828,7 @@ Body of ${name}.
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
     // Direct construction bypasses the schema `.min(1)`; the assembly clamp
     // must warn loudly.
-    new EvolutionCurator(ctx, { enabled: false, intervalHours: 0, staleAfterDays: NaN })
+    new EvolutionCurator(ctx, { enabled: false, intervalHours: 0, staleAfterDays: vol(NaN) })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
   })

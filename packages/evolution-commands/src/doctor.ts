@@ -12,7 +12,11 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { composePresetComposition, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, PARAM_NAMESPACES, resolveParamId, scopedProbeReport, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, presetRowBlock, presetRowBody, presetRowId, resolveParamId, scopedProbeReport, type EvolutionIoLike, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
+import { readLegacyDocumentState } from './migration.ts'
+import { readPlatformView } from './platform-view.ts'
+import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
+import { FAMILY_PRESET_ID_STEM, resolvePresetBasePatch, type PresetProfileTarget } from './preset-source.ts'
 
 /** D-6 (v18): exact-segment tail match (the loose substring form matched a
  * hypothetical `dsh-evolution-allowlist`). */
@@ -27,9 +31,11 @@ export const EVOLUTION_BUNDLE_TAILS = new Set(['dsh-evolution-all', 'dsh-evoluti
  * "absent" is the user simply not using that base (never an action); "unknown"
  * is a comparison that could not run, kept distinct from a verified "fresh". */
 export interface PresetFreshnessRow {
-  /** Agent-preset base name (the id the platform registry read() takes). */
+  /** Profile whose patch layer carries (or lacks) the row. */
+  profile: string
+  /** Agent-preset base name — the `--base` value the row was composed for. */
   base: string
-  /** Install destination <home>/.agent-presets/<base.id> that was compared. */
+  /** The profile patch compared: `<home>/profiles/<profile>/cordis.patch.yml`. */
   destination: string
   status: 'fresh' | 'differs' | 'absent' | 'unknown'
   /** Why the comparison could not run — set on unknown rows only. */
@@ -61,52 +67,143 @@ export interface ScopedProbeCheck {
 }
 
 /**
+ * G5: which of the three family bundle forms a bundle-name list carries.
+ * @param bundles - package names.
+ * @returns one flag per form.
+ */
+function familyForms(bundles: readonly string[]): { full: boolean; host: boolean; preset: boolean } {
+  return {
+    full: bundles.some(name => tailOf(name) === 'dsh-evolution-all'),
+    host: bundles.some(name => tailOf(name) === 'dsh-evolution-host'),
+    preset: bundles.some(name => tailOf(name) === 'dsh-evolution-preset'),
+  }
+}
+
+/**
+ * G5: the live Loader entry carrying one family row.
+ * @param plugins - the platform's entry list.
+ * @param rowId - the row id the family knows.
+ * @returns the entry, or undefined when this runtime carries no such row.
+ */
+function familyRow(plugins: readonly PlatformPlugin[], rowId: string): PlatformPlugin | undefined {
+  return plugins.find(entry => entry.entryId === rowId || entry.entryId.endsWith(':' + rowId) || entry.moduleName === rowId)
+}
+
+/**
+ * G5: the platform's own agent-preset verdicts.
+ *
+ * Only `broken` survives from the two candidates the design named. The other one — a row two
+ * presets both declare — was measured on a real deployment and dropped: every platform base
+ * composes the SAME base rows, so `persona` / `agent-instructions` / … are declared by every
+ * preset in a perfectly healthy install, which buries the one case worth reporting (the family's
+ * own bundle-vs-preset double mount, which the conflict matrix below already owns).
+ * @param presets - the inventory's preset list, or undefined without that surface.
+ * @returns one line per finding.
+ */
+function presetIssues(presets: readonly PlatformPreset[] | undefined): string[] {
+  if (presets === undefined) return []
+  const issues: string[] = []
+  for (const preset of presets) {
+    if (preset.broken !== undefined) issues.push(`agent preset \`${preset.id}\` is BROKEN (${preset.broken}) — the platform could not compose it`)
+  }
+  return issues
+}
+
+/**
  * S4.3: the parameter-surface divergences a RUNNING deployment can show and the
  * build-time guards cannot. Three classes, each with its own move:
  *  - a user override (the effective value is no longer the deployment's),
  *  - a deprecated alias still written in a user section (writes refuse it),
  *  - a declared user-writable parameter whose owner publishes no user layer in
  *    this composition (the registry promises a face this deployment never mounts).
- * An unreadable settings surface is reported AS SUCH: silence would read as "no
- * divergences", which is the one claim this section exists to check.
- * @param ctx - the plugin context; the settings service is read optionally.
+ * G5: the two layers and the live rows come from the platform (`configEditor.configuration()`,
+ * `pluginManager.listPlugins()`); the registry side (which spellings are deprecated, which rows
+ * declare an E3 parameter) stays the family's own table. A surface that is not mounted is
+ * reported AS SUCH: silence would read as "no divergences", the one claim this section checks.
+ * @param platform - the platform view.
  * @returns one readable line per divergence, empty when there is nothing to compare.
  */
-function paramDivergences(ctx: { get(name: string): unknown }): string[] {
-  const provider = ctx.get('settings') as SettingsProviderLike | undefined
-  if (provider?.describe === undefined) return []
-  let descriptors: { ns: string; user?: Record<string, unknown> }[]
-  try {
-    descriptors = provider.describe({ redactSecrets: false })
-  } catch (error) {
-    return [`settings surface unreadable (${error instanceof Error ? error.message : String(error)}) — parameter divergences were NOT checked`]
+function paramDivergences(platform: PlatformView): string[] {
+  if (platform.configuration === undefined) {
+    return ['the platform configuration surface (configEditor.configuration) is not mounted here — parameter divergences were NOT checked']
   }
   const issues: string[] = []
-  const registered = new Map(descriptors.map(descriptor => [descriptor.ns, descriptor.user ?? {}]))
-  for (const [namespace, user] of registered) {
-    const keys = Object.keys(user)
-    if (keys.length > 0) {
-      const shown = keys.slice(0, 5).map(key => `${key}=${JSON.stringify(user[key])}`)
-      const more = keys.length > shown.length ? ` and ${keys.length - shown.length} more` : ''
-      issues.push(`user override: ${namespace} sets ${keys.length} parameter(s) — ${shown.join(', ')}${more}`)
-    }
+  for (const row of platform.configuration) {
+    const override = asMapping(row.override)
+    if (override === undefined) continue
+    const keys = Object.keys(override)
+    if (keys.length === 0) continue
+    // The platform hands over the ENTRY, not an id: name it the way the plugin page does.
+    const entryId = row.entry.options?.id ?? row.entry.options?.name ?? '(unnamed entry)'
+    const shown = keys.slice(0, 5).map(key => `${key}=${JSON.stringify(override[key])}`)
+    const more = keys.length > shown.length ? ` and ${keys.length - shown.length} more` : ''
+    issues.push(`user override: ${entryId} sets ${keys.length} parameter(s) — ${shown.join(', ')}${more}`)
     for (const key of keys) {
       if (!isDeprecatedParamId(key)) continue
-      issues.push(`deprecated name: ${namespace} still writes "${key}" — write "${resolveParamId(key)}" instead (writes refuse the alias; it is removed in 0.7.0)`)
+      issues.push(`deprecated name: ${entryId} still writes "${key}" — write "${resolveParamId(key)}" instead (writes refuse the alias; it is removed in 0.7.0)`)
     }
   }
+  // The reachability half needs the platform's live rows: a declared E3 parameter whose owning
+  // row this runtime does not carry is a promise the deployment never mounts.
+  if (platform.plugins === undefined) {
+    issues.push('the platform plugin-row surface (pluginManager.listPlugins) is not mounted here — declared-but-unreachable parameters were NOT checked')
+    return issues
+  }
+  const live = liveRowTails(platform.plugins)
   const unreachable = PARAM_EXPOSURE.filter(entry => entry.tier === 'E3')
     .filter((entry) => {
-      const namespace = PARAM_NAMESPACES[entry.owner]
-      return namespace === undefined || !registered.has(namespace)
+      const namespace = paramSettingsId(entry.owner)
+      return namespace === undefined || !live.has(namespace)
     })
     .map(entry => entry.id)
   if (unreachable.length > 0) {
     const shown = unreachable.slice(0, 6).join(', ')
     const more = unreachable.length > 6 ? ` (+${unreachable.length - 6} more)` : ''
-    issues.push(`declared user-writable but unreachable here: ${shown}${more} — the owning package publishes no user layer in this composition`)
+    issues.push(`declared user-writable but unreachable here: ${shown}${more} — the owning row is not mounted in this runtime`)
   }
   return issues
+}
+
+/**
+ * The row id a Loader entry id ends in (`include:memory-files` → `memory-files`).
+ * @param plugins - the platform's entry list.
+ * @returns the tails, plus every module name the platform reported.
+ */
+function liveRowTails(plugins: readonly PlatformPlugin[]): ReadonlySet<string> {
+  const ids = new Set<string>()
+  for (const entry of plugins) {
+    ids.add(entry.entryId)
+    ids.add(entry.entryId.slice(entry.entryId.lastIndexOf(':') + 1))
+    if (entry.moduleName !== undefined) ids.add(entry.moduleName)
+  }
+  return ids
+}
+
+/**
+ * Read a value as a plain mapping (an override layer with no keys is not a divergence).
+ * @param value - the parsed layer.
+ * @returns the mapping, or undefined for anything else.
+ */
+function asMapping(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+}
+
+/** G3 (stage 8): what the family's LEGACY settings document still holds.
+
+ * Read-only: the boot migration and `/evolution migrate` write; doctor only answers whether
+ * anything is left. `none` (a document with no family section) and `absent` (no document) are
+ * different findings — the first means the values were never the family's, the second that the
+ * platform's import already took the file away.
+ */
+export interface LegacyMigrationRow {
+  /** `migrated` = every family value sits on its row; `pending` = some do not; `none` = the
+   * document carries no family section; `absent` = no legacy document under this home;
+   * `unavailable` = no settings seat or no IO seam to read through. */
+  readonly state: 'migrated' | 'pending' | 'none' | 'absent' | 'unavailable'
+  /** The document the verdict came from, when one was read. */
+  readonly source: string | undefined
+  /** Keys still waiting for their row, as `rowId.key`. */
+  readonly pending: readonly string[]
 }
 
 export interface DoctorReport {
@@ -165,6 +262,21 @@ export interface DoctorReport {
    * whose cross-session consumers are inert for every session stops looking
    * healthy. See {@link ScopedProbeCheck}. */
   scopedProbe: ScopedProbeCheck
+  /** G3 (stage 8): the legacy settings document's remaining work. */
+  legacy: LegacyMigrationRow
+  /** G5: the family bundles the RUNNING profile selects, per the platform's `listBundles()`;
+   * null when that surface is not mounted — `bundles` then carries the cross-profile aggregate. */
+  runtimeBundles: string[] | null
+  /** G5: where the install form came from. `aggregate` = the cross-profile scan (the surface
+   * was absent), so the form describes every profile on the machine, not this runtime. */
+  formSource: 'platform' | 'aggregate'
+  /** G5: the platform's own preset verdicts (see {@link presetIssues}). */
+  presetIssues: string[]
+  /** G5: family bundles this profile INSTALLS without selecting them (`enabled: false`) — the
+   * plugin page lists those too, so doctor names them instead of leaving a visible mismatch. */
+  dormantBundles: string[]
+  /** G5: where the review row's presence came from: the live entry, or the aggregate inference. */
+  serviceSource: 'platform' | 'bundles'
   actions: string[]
 }
 
@@ -282,7 +394,8 @@ function memoryInterpolationIssues(home: string): string[] {
 /** G3-② (B2): the family delta container. An optionalDependency of this
  * package, so resolution may legitimately fail; every failure degrades to
  * "unknown" — the doctor never throws.
- * Platform anchor: agentPresets.read(id) — preset/agent-presets/src/index.ts:501. */
+ * Platform anchor: `packages/boot/app-boot/src/profile.ts` — a family preset is a ROW in the
+ * profile's own patch layer there (`PROFILE_PATCH_FILENAME`), never a preset directory. */
 const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-evolution-agent-preset'
 
 /** Resolve one asset the package declares in its exports map.
@@ -305,15 +418,28 @@ function resolveAgentPresetAsset(asset: string): string | null {
  * (minimal) as a double-mount participant.
  * @param path - resolved bases.json.
  * @returns the rows, or null when the table is unreadable or malformed. */
-function readAgentPresetBases(path: string): Array<{ name: string; id: string; unsupported?: string }> | null {
+function readAgentPresetBases(path: string): Array<BaseRow> | null {
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as { bases?: unknown }
     if (!Array.isArray(parsed.bases)) return null
-    const rows: Array<{ name: string; id: string; unsupported?: string }> = []
+    const rows: BaseRow[] = []
     for (const raw of parsed.bases) {
-      const entry = raw as { name?: unknown; id?: unknown; unsupported?: unknown }
+      const entry = raw as { name?: unknown; id?: unknown; display?: unknown; requires?: unknown; unsupported?: unknown }
       if (typeof entry.name !== 'string' || typeof entry.id !== 'string') return null
-      rows.push({ name: entry.name, id: entry.id, ...(typeof entry.unsupported === 'string' ? { unsupported: entry.unsupported } : {}) })
+      const display = entry.display as { name?: unknown; description?: unknown; order?: unknown } | null | undefined
+      if (display === null || typeof display !== 'object'
+        || typeof display.name !== 'string' || typeof display.description !== 'string'
+        || typeof display.order !== 'number' || !Number.isInteger(display.order)) return null
+      const requires = entry.requires as { service?: unknown } | null | undefined
+      rows.push({
+        name: entry.name,
+        id: entry.id,
+        display: { name: display.name, description: display.description, order: display.order },
+        ...(requires !== null && typeof requires === 'object' && typeof requires.service === 'string'
+          ? { requires: { service: requires.service } }
+          : {}),
+        ...(typeof entry.unsupported === 'string' ? { unsupported: entry.unsupported } : {}),
+      })
     }
     return rows.length > 0 ? rows : null
   } catch {
@@ -323,81 +449,137 @@ function readAgentPresetBases(path: string): Array<{ name: string; id: string; u
   }
 }
 
-/** Preset directories already on disk, used to keep an installed variant
- * VISIBLE when the base table itself could not be read.
- * @param root - the .agent-presets directory.
- * @returns the directory names; empty when nothing is installed. */
-function installedPresetIds(root: string): string[] {
-  const ids: string[] = []
+/** One base row of the family table, as the doctor reads it. */
+interface BaseRow {
+  name: string
+  id: string
+  display: { name: string; description: string; order: number }
+  requires?: { service: string }
+  unsupported?: string
+}
+
+/** The profile patch file name (`packages/boot/app-boot/src/profile.ts`,
+ * `PROFILE_PATCH_FILENAME`). */
+const PROFILE_PATCH_FILENAME = 'cordis.patch.yml'
+
+/** Every profile directory under one DSH_HOME, by name.
+ * @param home - resolved DSH_HOME.
+ * @returns `{ profile, dir }` per directory under `profiles/` that carries a manifest.
+ */
+function profileDirectories(home: string): Array<{ profile: string; dir: string }> {
+  const out: Array<{ profile: string; dir: string }> = []
+  const root = join(home, 'profiles')
   let entries: Dirent[]
   try {
     entries = readdirSync(root, { withFileTypes: true })
   } catch {
-    // No .agent-presets yet (or an unreadable one): there is no installed
-    // variant to compare, which the caller renders as no rows at all.
-    return ids
+    // No profiles yet: nothing is installed, which is the caller's `none` form.
+    return out
   }
-  for (const entry of entries) if (entry.isDirectory()) ids.push(entry.name)
-  return ids
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+    // `profiles/node_modules` is created by app-boot on every launch and never
+    // holds a manifest (S2.1): it is not a profile.
+    if (entry.name === 'node_modules') continue
+    const dir = join(root, entry.name)
+    if (!existsSync(join(dir, 'package.json'))) continue
+    out.push({ profile: entry.name, dir })
+  }
+  return out
+}
+
+/** The bundle rows one profile manifest mounts (scope-agnostic, as written).
+ * @param profileDir - the profile directory.
+ * @returns the bundle names; empty when the manifest is missing or torn.
+ */
+function profileBundles(profileDir: string): string[] {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: unknown } } }
+    const bundles = manifest.dsh?.profile?.bundles
+    return Array.isArray(bundles) ? bundles.filter((name): name is string => typeof name === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** The profile patch text, or `''` when the profile has none.
+ * @param profileDir - the profile directory.
+ * @returns the patch text.
+ */
+function profilePatchText(profileDir: string): string {
+  try {
+    return readFileSync(join(profileDir, PROFILE_PATCH_FILENAME), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/** Whether a base's `requires.service` precondition is met by one profile's bundles — the same
+ * judgement the installer applies (`baseUnavailableReason`), read from the same rows.
+ * @param base - the table row.
+ * @param bundles - the profile's bundle names.
+ * @returns true when the base can be installed here.
+ */
+function baseInstallable(base: BaseRow, bundles: string[]): boolean {
+  if (typeof base.unsupported === 'string') return false
+  const service = base.requires?.service
+  if (typeof service !== 'string' || service === '') return true
+  return bundles.some(name => name.trim().endsWith('dsh-web-app'))
 }
 
 /**
- * S1-F1: ids of the family's DELIVERED layered presets — every
- * `.agent-presets/<id>/agent.cordis.yml` artifact that can actually carry the
- * family model rows. The detection used to probe ONLY the default base id
- * (`evolution`), so a `--base ptc|cordis` layered install was invisible:
- * installForm degraded to `none`/`host` and the action ladder recommended
- * installing `evolution-all` on top — the exact double-mount the doctor exists
- * to prevent (V27 G6.4 closed it for the default id only).
+ * S1-F1: ids of the family's INSTALLED preset rows — every declared preset row in a profile patch
+ * that can actually carry the family model rows.
  *
- * A directory counts only when the base table names it as a SUPPORTED family
- * base (the `unsupported` minimal base carries no model rows and cannot
- * double-mount anything). When the table itself cannot be read, every
- * delivered artifact counts — the visible-by-directory posture of
- * {@link probePresetFreshness}: flag rather than stay silent.
- * @param root - the `.agent-presets` home directory.
- * @returns installed family base ids whose `agent.cordis.yml` is on disk.
+ * The artifact is a declared preset ROW in a profile's own patch layer, so this probe reads that
+ * file (`PROFILE_PATCH_FILENAME`) in every profile of the home. A probe narrowed to one base id
+ * leaves a `--base ptc|cordis` install invisible: installForm then degrades to `none`/`host` and
+ * the action ladder recommends installing `evolution-all` on top — the exact double-mount the
+ * doctor exists to prevent.
+ *
+ * A row counts only when the base table names its id as a SUPPORTED family base (the `unsupported`
+ * minimal base carries no model rows and cannot double-mount anything). When the table itself
+ * cannot be read, any `preset-<family stem>*` row counts — the flag-rather-than-stay-silent
+ * posture of {@link probePresetFreshness}.
+ * @param home - resolved DSH_HOME.
+ * @returns installed family base ids, in profile-then-table order.
  */
-function installedLayeredPresetIds(root: string): string[] {
-  const delivered = installedPresetIds(root).filter(id => existsSync(join(root, id, 'agent.cordis.yml')))
-  if (delivered.length === 0) return []
+function installedLayeredPresetIds(home: string): string[] {
   const basesPath = resolveAgentPresetAsset('bases.json')
   const bases = basesPath === null ? null : readAgentPresetBases(basesPath)
-  if (bases === null) {
-    // S2-O4: table unreadable, so base ids cannot arbitrate — fall back to a
-    // content marker instead of counting every delivered directory: a
-    // family-generated composition references at least one `@deepseek-ai/dsh-*`
-    // package, a foreign preset does not. (Fail-safe posture kept: the marker
-    // is cheap, and flagging a doubtful artifact still beats staying silent.)
-    return delivered.filter((id) => {
-      try {
-        return readFileSync(join(root, id, 'agent.cordis.yml'), 'utf8').includes('@deepseek-ai/dsh-')
-      } catch {
-        return false
+  const ids = new Set<string>()
+  for (const { dir } of profileDirectories(home)) {
+    const text = profilePatchText(dir)
+    if (text === '') continue
+    if (bases === null) {
+      // Table unreadable, so base ids cannot arbitrate: match the family's own
+      // row-id stem, which every shipped base shares (`evolution-agent/bases.json`).
+      for (const match of text.matchAll(/^\s*- id:\s*(preset-[a-z0-9-]+)\s*$/gm)) {
+        if (match[1]?.startsWith(`preset-${FAMILY_PRESET_ID_STEM}`)) ids.add(match[1].slice('preset-'.length))
       }
-    })
+      continue
+    }
+    for (const base of bases) {
+      if (typeof base.unsupported === 'string') continue
+      if (presetRowBlock(text, presetRowId(base.id)) !== null) ids.add(base.id)
+    }
   }
-  const supported = new Set(bases.filter(row => row.unsupported === undefined).map(row => row.id))
-  return delivered.filter(id => supported.has(id))
+  return [...ids]
 }
 
 /**
  * G3-② (B2): recompute what a fresh generation would write for every
  * installed variant and compare it byte-for-byte with the file on disk.
  *
- * The recomputation goes through composePresetComposition — the SAME rule
- * /evolution preset install and install-layered.mjs apply (collision guard +
- * row-overrides.json), so doctor cannot disagree with the installer about what
- * "fresh" means. Read-only by contract: the snapshot is never rewritten.
+ * The recomputation goes through composePresetEntry — the SAME composer
+ * /evolution preset install and install-layered.mjs apply (base patch rows +
+ * collision guard + row-overrides.json), so doctor cannot disagree with the
+ * installer about what "fresh" means. Read-only by contract: the snapshot is
+ * never rewritten.
  * @param home - resolved DSH_HOME.
- * @param registry - the platform agent-preset registry, undefined when unmounted.
- * @returns one row per base in the family bases.json.
+ * @returns one row per profile × installable base of the family bases.json.
  */
-async function probePresetFreshness(
-  home: string,
-  registry: { read(id: string): Promise<string> } | undefined,
-): Promise<PresetFreshnessRow[]> {
-  const presetsRoot = join(home, '.agent-presets')
+function probePresetFreshness(home: string): PresetFreshnessRow[] {
   const basesPath = resolveAgentPresetAsset('bases.json')
   // The package's OWN delta: DSH_EVOLUTION_DELTA_PATH is documented as a
   // source-installer knob (README), so this session-side comparison must not
@@ -415,56 +597,67 @@ async function probePresetFreshness(
       deltaFailure = `${deltaPath} could not be read (${error instanceof Error ? error.message : String(error)})`
     }
   }
+  const profiles = profileDirectories(home)
   if (bases === null) {
-    // No table means no base can be NAMED, but an installed variant is still
-    // visible by directory — report it as unknown instead of silently clean.
+    // No table means no base can be NAMED, but an installed row is still
+    // visible in the patch — report it as unknown instead of silently clean.
     const tablePath = basesPath ?? `${AGENT_PRESET_PACKAGE}/bases.json`
-    return installedPresetIds(presetsRoot).map(id => ({
-      base: id,
-      destination: join(presetsRoot, id),
-      status: 'unknown' as const,
-      detail: `the family base table could not be read (${tablePath}) — a fresh generation cannot be recomputed`,
-    }))
+    return profiles.flatMap(({ profile, dir }) => {
+      const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+      const text = profilePatchText(dir)
+      return [...text.matchAll(/^\s*- id:\s*(preset-[a-z0-9-]+)\s*$/gm)]
+        .map(match => match[1] as string)
+        .map(id => ({
+          profile,
+          base: id.slice('preset-'.length),
+          destination: patchPath,
+          status: 'unknown' as const,
+          detail: `the family base table could not be read (${tablePath}) — a fresh generation cannot be recomputed`,
+        }))
+    })
   }
   const rows: PresetFreshnessRow[] = []
-  for (const base of bases) {
-    const destination = join(presetsRoot, base.id)
-    const compositionPath = join(destination, 'agent.cordis.yml')
-    // Not installed is not an error: the user may simply not use this base.
-    if (!existsSync(compositionPath)) {
-      rows.push({ base: base.name, destination, status: 'absent' })
-      continue
+  for (const { profile, dir } of profiles) {
+    const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+    const text = profilePatchText(dir)
+    const bundles = profileBundles(dir)
+    for (const base of bases) {
+      // A base this deployment cannot install has no fresh generation to compare
+      // against, so it is SKIPPED rather than reported stale.
+      if (!baseInstallable(base, bundles)) continue
+      // Not installed is not an error: the user may simply not use this base.
+      const block = presetRowBlock(text, presetRowId(base.id))
+      if (block === null) {
+        rows.push({ profile, base: base.name, destination: patchPath, status: 'absent' })
+        continue
+      }
+      if (delta === null) {
+        rows.push({ profile, base: base.name, destination: patchPath, status: 'unknown', detail: deltaFailure })
+        continue
+      }
+      // The base patch is read only here: an absent row above needs no platform
+      // file, so a home with no family preset never fails this probe. The
+      // module-graph candidate inside the resolver reaches the running
+      // installation, which is the same one every profile of this home mounts.
+      const target: PresetProfileTarget = { profile, profileDir: dir, patchPath, bundles }
+      let fresh: string
+      try {
+        fresh = composePresetEntry(readFileSync(resolvePresetBasePatch(base.name, target), 'utf8'), delta, {
+          rowId: presetRowId(base.id),
+          id: base.id,
+          name: base.display.name,
+          description: base.display.description,
+          order: base.display.order,
+        })
+      } catch (error) {
+        rows.push({ profile, base: base.name, destination: patchPath, status: 'unknown', detail: error instanceof Error ? error.message : String(error) })
+        continue
+      }
+      // Compare ROW BODIES: the block in the patch is the enclosing item (column 0 for a row the
+      // Web editor saved, `- insert:` for one the installer wrote), the recomputation is always an
+      // `- insert:` entry — comparing them raw called every editor-saved row stale forever.
+      rows.push({ profile, base: base.name, destination: patchPath, status: presetRowBody(fresh) === presetRowBody(block) ? 'fresh' : 'differs' })
     }
-    if (registry === undefined) {
-      rows.push({ base: base.name, destination, status: 'unknown', detail: 'the platform agent-preset registry is not mounted, so the runtime composition cannot be read' })
-      continue
-    }
-    if (delta === null) {
-      rows.push({ base: base.name, destination, status: 'unknown', detail: deltaFailure })
-      continue
-    }
-    let platform: string
-    try {
-      platform = await registry.read(base.name)
-    } catch (error) {
-      rows.push({ base: base.name, destination, status: 'unknown', detail: `the runtime composition for base "${base.name}" could not be read (${error instanceof Error ? error.message : String(error)})` })
-      continue
-    }
-    let fresh: string
-    try {
-      fresh = composePresetComposition(platform, delta)
-    } catch (error) {
-      rows.push({ base: base.name, destination, status: 'unknown', detail: `a fresh generation refused to compose (${error instanceof Error ? error.message : String(error)})` })
-      continue
-    }
-    let onDisk: string
-    try {
-      onDisk = readFileSync(compositionPath, 'utf8')
-    } catch (error) {
-      rows.push({ base: base.name, destination, status: 'unknown', detail: `${compositionPath} could not be read (${error instanceof Error ? error.message : String(error)})` })
-      continue
-    }
-    rows.push({ base: base.name, destination, status: fresh === onDisk ? 'fresh' : 'differs' })
   }
   return rows
 }
@@ -474,6 +667,32 @@ async function probePresetFreshness(
  * only `get` is enough); `home` defaults to the evolution root so tests can
  * point doctor at a temp DSH_HOME.
  */
+/**
+ * The legacy settings document's remaining work, for the doctor report.
+ *
+ * Every failure mode is a verdict, not an exception: a deployment without the settings seat
+ * or the family IO seam reports `unavailable`, and an unreadable document is reported through
+ * the same warn channel the boot migration uses.
+ * @param ctx - the context (services), read structurally.
+ * @param home - the profile home the legacy document sits in.
+ * @returns the row the report renders.
+ */
+async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: string): Promise<LegacyMigrationRow> {
+  const settings = ctx.get('settings') as SettingsProviderLike | undefined
+  const io = (ctx.get('evolutionIo') as { provider?(): EvolutionIoLike } | undefined)?.provider?.()
+  if (settings?.describe === undefined || io === undefined) return { state: 'unavailable', source: undefined, pending: [] }
+  try {
+    const state = await readLegacyDocumentState({ home, io, settings })
+    if (state === undefined) return { state: 'absent', source: undefined, pending: [] }
+    if (state.sections === 0) return { state: 'none', source: state.source, pending: [] }
+    return { state: state.pending.length > 0 ? 'pending' : 'migrated', source: state.source, pending: state.pending }
+  } catch (error) {
+    const logger = (ctx as { logger?: { warn(message: string, ...rest: unknown[]): void } }).logger
+    logger?.warn('evolution-commands: the legacy settings document could not be read — %s', error instanceof Error ? error.message : String(error))
+    return { state: 'unavailable', source: undefined, pending: [] }
+  }
+}
+
 export async function diagnose(
   ctx: { get(name: string): unknown },
   options: { home?: string } = {},
@@ -494,26 +713,35 @@ export async function diagnose(
   })
   const has = (name: string) => ctx.get(name) !== undefined
   // G3-② (B2): the variant half of the report. Computed before the action
-  // ladder so a stale snapshot contributes its own regeneration step; the
-  // registry probe is the same optional-service read the preset installer does.
-  const presetRegistry = ctx.get('agentPresets') as { read(id: string): Promise<string> } | undefined
-  const presetFreshness = await probePresetFreshness(home, presetRegistry)
+  // ladder so a stale snapshot contributes its own regeneration step. The
+  // comparison reads the profile patches and the platform base patches — the
+  // same two files the installer writes and reads.
+  const presetFreshness = probePresetFreshness(home)
 
-  const full = bundles.some(name => tailOf(name) === 'dsh-evolution-all')
-  const host = bundles.some(name => tailOf(name) === 'dsh-evolution-host')
-  const preset = bundles.some(name => tailOf(name) === 'dsh-evolution-preset')
+  // G5: the RUNNING profile's form comes from the platform's own bundle surface when it is
+  // mounted. The cross-profile enumeration above stays for the N13 question ("which forms
+  // exist on this machine") and is labelled as aggregation wherever it is rendered.
+  const platform = await readPlatformView(ctx)
+  // `enabled` is the platform's own "selected in this profile" flag: an INSTALLED dependency that
+  // no `dsh.profile.bundles` entry selects is not mounted, so it is not part of the runtime form.
+  const familyBundleRows = platform.bundles?.filter(row => tailOf(row.name).startsWith('dsh-evolution-'))
+  const runtimeBundles = familyBundleRows === undefined ? undefined : familyBundleRows.filter(row => row.enabled).map(row => row.name)
+  const dormantBundles = familyBundleRows?.filter(row => !row.enabled).map(row => row.name) ?? []
+  const runtimeFlags = runtimeBundles === undefined ? undefined : familyForms(runtimeBundles)
+  const aggregateFlags = familyForms(bundles)
+  const forms = runtimeFlags ?? aggregateFlags
+  const full = forms.full
+  const host = forms.host
+  const preset = forms.preset
   // V25-07/V26-02 (v25/v26): the layered side is detected by its DELIVERED
-  // ARTIFACT (`agent.cordis.yml`, the file `/evolution preset install` and the
-  // layered installer both write) rather than bare directory existence — an
-  // empty or stale leftover directory must not report a layered install or
-  // flag a healthy deployment. ONE detection feeds installForm AND every
-  // layered conflict row.
-  // S1-F1: the artifact is enumerated across EVERY installed family base —
-  // the old single-directory probe (`{home}/.agent-presets/evolution`) was
-  // blind to `--base ptc|cordis` layered installs and misdirected them into
-  // the `all`-on-top advice below.
-  const presetDir = join(home, '.agent-presets')
-  const layeredIds = installedLayeredPresetIds(presetDir)
+  // ARTIFACT — the declared preset ROW `/evolution preset install` and the
+  // layered installer both write — rather than bare marker existence, so a
+  // stale leftover cannot report a layered install or flag a healthy deployment.
+  // ONE detection feeds installForm AND every layered conflict row.
+  // S1-F1: the artifact is enumerated across EVERY installed family base — the
+  // old single-id probe was blind to `--base ptc|cordis` installs and
+  // misdirected them into the `all`-on-top advice below.
+  const layeredIds = installedLayeredPresetIds(home)
   const presetDirInstalled = layeredIds.length > 0
   const layeredArtifactLabel = presetDirInstalled ? layeredIds.join(', ') : 'evolution'
   const layered = host && presetDirInstalled
@@ -546,7 +774,11 @@ export async function diagnose(
   // P0-1 fix (v11): `evolutionReview` is NOT a provided service — review only
   // registers session-event hooks. Infer its presence from the install form
   // (any of the three bundles carries the review row) instead of a ghost key.
-  const reviewMounted = full || host || preset
+  // G5: with the platform's row surface mounted, "the review row is here" is a platform fact
+  // (row present AND enabled), not an inference from which bundles are installed. Without that
+  // surface (a trimmed base, or the headless plane) the inference stays, labelled in the report.
+  const reviewRow = platform.plugins === undefined ? undefined : familyRow(platform.plugins, 'evolution-review')
+  const reviewMounted = reviewRow?.enabled ?? (full || host || preset)
   const services = {
     review: reviewMounted,
     curator: has('evolutionCurator'),
@@ -612,7 +844,7 @@ export async function diagnose(
   if (mountConflicts.length > 0) actions.push('Resolve the conflict first: keep exactly one of evolution-all / evolution-host / evolution-preset / layered.')
   else if (undecidable) actions.push('The install form is UNDECIDABLE (see the DEGRADED row above): an unreadable profiles directory or profile manifest hides whatever is installed, so this report must not add or remove a bundle. Fix the reported read failure, then re-run /evolution doctor.')
   else if (installForm === 'none') actions.push('Install the default full bundle: dsh plugin --profile web add @lmzhen/dsh-evolution-all')
-  else if (installForm === 'preset-only') actions.push(`The Evolution preset is delivered but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or remove .agent-presets/${layeredArtifactLabel} if the layered layout is no longer wanted.`)
+  else if (installForm === 'preset-only') actions.push(`The Evolution preset row is installed but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or drop the row (${layeredArtifactLabel}) from the profile patch if the layered layout is no longer wanted.`)
   else if (installForm === 'layered') actions.push('Variant form (session opt-in): model tools follow the Evolution preset, and a session on a platform original preset carries no family rows; add @lmzhen/dsh-evolution-all instead if every session should have them.')
   const env = envIssues()
   if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')
@@ -624,9 +856,15 @@ export async function diagnose(
   // flight — the flat "the approving run crashed" story steered operators into
   // rejecting a live run (the F-204 divergence). Dual attribution, matching
   // the pending-view hint and the approve surface.
+  const presetIssueRows = presetIssues(platform.presets)
+  if (presetIssueRows.length > 0) actions.push('Resolve the agent-preset finding above: a broken preset composes no session, and a row two presets declare is resolved by layer order (keep the declaration in one preset).')
+  const legacy = await legacyMigrationRow(ctx, home)
+  if (legacy.state === 'pending') {
+    actions.push(`The legacy settings document still holds ${legacy.pending.length} family value(s) — /evolution migrate moves them onto their rows (the document itself is left alone, so nothing is lost)`)
+  }
   const memoryIssues = memoryInterpolationIssues(home)
   const budgetIssues = memoryBudgetIssues(ctx)
-  const paramIssues = paramDivergences(ctx)
+  const paramIssues = paramDivergences(platform)
   const queryIssues = await sessionQueryIssues(ctx)
   if (queryIssues.length > 0) actions.push('Session search is degraded: isolate the session named above (or wait for the platform fix described in the family maintenance notes) before retrying the same query')
   if (paramIssues.length > 0) actions.push('Review the parameter divergences above: /evolution params shows every row with its source, /evolution policy set writes a user value, and a declared-but-unreachable row needs its owning plugin row mounted in this profile.')
@@ -647,12 +885,18 @@ export async function diagnose(
   // neither may be dressed up as advice to re-run the installer.
   for (const row of presetFreshness) {
     if (row.status !== 'differs') continue
-    actions.push(`Preset variant ${row.destination} DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+    actions.push(`Preset row for base "${row.base}" in ${row.destination} DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
   }
 
   return {
     installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, paramIssues, queryIssues, services,
-    pendingCount, executingCount, presetFreshness, scopedProbe, actions,
+    pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
+    runtimeBundles: runtimeBundles ?? null,
+    formSource: runtimeFlags === undefined ? 'aggregate' : 'platform',
+    presetIssues: presetIssueRows,
+    dormantBundles,
+    serviceSource: reviewRow === undefined ? 'bundles' : 'platform',
+    actions,
   }
 }
 
@@ -785,18 +1029,43 @@ function scopedProbeLine(check: ScopedProbeCheck): string {
   return `scoped rows: ${rows}, probe=${check.verdict} (${detail})`
 }
 
+/**
+ * One line for the legacy settings document's state.
+ * @param row - the report's legacy row.
+ * @returns the rendered line.
+ */
+function legacyLine(row: LegacyMigrationRow): string {
+  if (row.state === 'unavailable') return 'legacy settings: unknown — no settings seat or no family IO seam is mounted here'
+  if (row.state === 'absent') return 'legacy settings: no settings.yaml / settings.yaml.imported under this home'
+  if (row.state === 'none') return `legacy settings: ${row.source ?? '(unknown)'} carries no family section`
+  if (row.state === 'migrated') return `legacy settings: every family value sits on its row (${row.source ?? '(unknown)'})`
+  const shown = row.pending.slice(0, 6).join(', ')
+  const more = row.pending.length > 6 ? ` (+${row.pending.length - 6} more)` : ''
+  return `legacy settings: ${row.pending.length} family value(s) still on ${row.source ?? '(unknown)'}: ${shown}${more} — /evolution migrate moves them`
+}
+
 export function renderDoctorText(report: DoctorReport): string {
-  const lines = [
-    `Evolution doctor — install form: ${report.installForm} (deployment: ${report.deploymentForm})`,
+  // `null` marks a line this report does not carry (a fact that is not true here); the join drops it.
+  const lines: (string | null)[] = [
+    `Evolution doctor — install form: ${report.installForm} (deployment: ${report.deploymentForm}; from ${report.formSource === 'platform' ? "this runtime's bundle surface" : 'the cross-profile aggregate'})`,
+    // G5: the RUNNING profile's own bundle list, from the platform. `unknown` is a verdict, not
+    // an empty list: a trimmed base without `pluginManager` must not read as "no bundles".
+    report.runtimeBundles === null
+      ? 'runtime bundles: unknown — the platform bundle surface (pluginManager.listBundles) is not mounted here'
+      : `runtime bundles (this profile): ${report.runtimeBundles.length > 0 ? report.runtimeBundles.join(', ') : '(none)'}`,
+    report.dormantBundles.length === 0
+      ? null
+      : `installed but not selected: ${report.dormantBundles.join(', ')} — the Plugins page lists them; this runtime mounts neither`,
     `bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
     // v29 DOC-01: `review` is INFERRED from installed bundles across all
     // profiles (no runtime probe exists) — the render now says so, per the
     // docblock's promise, so a multi-profile machine cannot pass disk evidence
     // off as a mounted service.
-    `services: review=${report.services.review} (inferred from bundles, all profiles) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
+    `services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
     // S0-4 (v43 G-1 / J-1): appended beside the service line it qualifies; the
     // existing lines keep their order and wording.
     scopedProbeLine(report.scopedProbe),
+    legacyLine(report.legacy),
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
     `executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`,
   ]
@@ -810,8 +1079,9 @@ export function renderDoctorText(report: DoctorReport): string {
       : row.status === 'differs'
         ? 'DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate'
         : `unknown — a fresh generation could not be recomputed (${row.detail ?? 'reason not recorded'})`
-    lines.push(`preset:   ${row.destination}  ${verdict}`)
+    lines.push(`preset:   ${row.base} → ${row.destination}  ${verdict}`)
   }
+  if (report.presetIssues.length > 0) lines.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))
@@ -819,5 +1089,5 @@ export function renderDoctorText(report: DoctorReport): string {
   if (report.paramIssues.length > 0) lines.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
   if (report.queryIssues.length > 0) lines.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
-  return lines.join('\n')
+  return lines.filter((line): line is string => line !== null).join('\n')
 }

@@ -20,6 +20,7 @@ export const zh = {
   deployment: '默认',
   loading: '正在读取设置…',
   unavailable: '这个功能没有启动（对应的插件没有安装）',
+  seatMissing: '这个界面没有提供设置服务，参数只能看不能改',
   readonly: '本次会话不允许写入设置（临时运行模式）',
   apply: '保存',
   reset: '恢复默认值',
@@ -66,6 +67,7 @@ export const en: Record<keyof typeof zh, string> = {
   deployment: 'default',
   loading: 'reading settings…',
   unavailable: 'this feature is not running (its plugin is not installed)',
+  seatMissing: 'this shell serves no settings surface, so the parameters cannot be edited here',
   readonly: 'settings cannot be written in this session (temporary mode)',
   apply: 'Save',
   reset: 'Reset to default',
@@ -110,11 +112,13 @@ export const en: Record<keyof typeof zh, string> = {
  * title is presentation, the namespace is the join key.
  */
 export const NAMESPACE_TITLES: Readonly<Record<string, string>> = Object.freeze({
+  // Keyed by ROW ID (the platform's settings namespace is the Loader entry id); the
+  // legacy namespace strings never appear here — see the registry's PARAM_NAMESPACES.
   'evolution-review': 'cardReview',
-  'evolution-memory': 'cardMemory',
-  'evolution-tool-memory': 'cardToolMemory',
+  'memory-files': 'cardMemory',
+  'tool-memory': 'cardToolMemory',
   'evolution-curator': 'cardCurator',
-  'evolution-skills': 'cardSkills',
+  'tool-skill-manage': 'cardSkills',
 })
 
 /** One message key. */

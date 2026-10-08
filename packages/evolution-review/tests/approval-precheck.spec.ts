@@ -79,7 +79,7 @@ describe('review approval pre-check (P1-9)', () => {
     // control that proves the pipeline actually RAN (without it, a broken
     // fixture that never triggered the pipeline also passed `applied === 0`).
     const injected: string[] = []
-    ctx.agents.register({
+    await ctx.agents.register({
       id: session.id,
       session,
       ctx,

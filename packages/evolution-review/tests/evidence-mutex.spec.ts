@@ -5,6 +5,8 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -246,7 +248,9 @@ async function mountReviewFixture(options: {
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  const session = {
+  // G4: the review's turn window comes from the family's session projection, so the stub is
+  // decorated into a foldable one (dense seq-stamped log) and appends announce themselves.
+  const session = projectable({
     id: SessionId('v10-review-fixture'),
     seq: 1,
     header: { origin: undefined },
@@ -256,12 +260,12 @@ async function mountReviewFixture(options: {
       ...(options.events ?? []),
     ],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-  } as unknown as Session
+  }) as unknown as Session
   const agent = { id: session.id, session, inject: (message: unknown) => { options.onInject?.(message) } } as unknown as Agent
   ;(agent as { followup: unknown }).followup = (message: unknown) => { options.onFollowup?.(message) }
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   const emitEnd = (turn: number, reasonKind: 'completed' | 'blocked' = 'completed'): void => {
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: reasonKind } } } as never)
+    emitSessionEvent(ctx, session, 'turn/end', { turn, reason: { kind: reasonKind } })
   }
   return { ctx, session, emitEnd }
 }

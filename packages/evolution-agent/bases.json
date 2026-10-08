@@ -4,17 +4,29 @@
     {
       "name": "standard",
       "id": "evolution",
-      "metadata": "preset.yml"
+      "display": {
+        "name": "Evolution",
+        "description": "Standard coding agent plus durable memory and skill evolution tools.",
+        "order": 10
+      }
     },
     {
       "name": "ptc",
       "id": "evolution-ptc",
-      "metadata": "preset.ptc.yml"
+      "display": {
+        "name": "Evolution PTC",
+        "description": "Based on the platform ptc preset plus the Evolution family rows - durable memory and skill evolution tools, with run_code as the model's composition surface.",
+        "order": 11
+      }
     },
     {
       "name": "cordis",
       "id": "evolution-cordis",
-      "metadata": "preset.cordis.yml",
+      "display": {
+        "name": "Evolution Cordis",
+        "description": "Based on the platform cordis preset plus the Evolution family rows - the self-modification toolset with durable memory and skill evolution. Needs a deployment that provides dynamicCordisRunner (the web-app bundle).",
+        "order": 12
+      },
       "requires": {
         "service": "dynamicCordisRunner"
       }
@@ -22,7 +34,11 @@
     {
       "name": "minimal",
       "id": "evolution-minimal",
-      "metadata": "preset.minimal.yml",
+      "display": {
+        "name": "Evolution Minimal",
+        "description": "Registered but UNSUPPORTED - the platform minimal composition carries no tool-skill row, so the family skill surface has nothing to attach to.",
+        "order": 13
+      },
       "unsupported": "the platform minimal composition is only persona + persistent-shell: it carries no tool-skill row, so the family skill surface (and the 60-char cap injection) has nothing to attach to"
     }
   ]

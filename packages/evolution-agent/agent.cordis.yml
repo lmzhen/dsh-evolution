@@ -3,8 +3,8 @@
 # This file is the incremental part of the Evolution preset, NOT a full
 # composition. `install-layered.mjs` (agent/layered modes; V6-52, 0.3.37 —
 # oneclick installs the preset BUNDLE row instead of writing this file)
-# generates the installed preset at
-# `$DSH_HOME/.agent-presets/evolution/agent.cordis.yml`
+# generates the installed preset as ONE `- insert:` row inside the target profile's own patch
+# (`<home>/profiles/<profile>/cordis.patch.yml`; 0.2.x removed the preset directory)
 # by concatenating the RUNTIME platform's `standard` preset composition with
 # this delta (rc.53): the standard rows come from the dsh being installed
 # against, so the preset follows whatever platform version the user actually

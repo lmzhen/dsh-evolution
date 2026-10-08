@@ -3,7 +3,7 @@
  * runtime modes.
  *
  * The PTC case drives the REAL platform ToolRuntime (\`mode: 'ptc'\`) with a stub
- * CodeRuntime, so the log under test is the platform's own output rather than a
+ * PtcRuntime, so the log under test is the platform's own output rather than a
  * transcription. The native case transcribes the agent-loop's two append points
  * (core/agent-loop/src/tool-calls.ts:264 and :282), which is where the native
  * vocabulary is written — the registry itself appends nothing for a
@@ -15,8 +15,8 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { TOOL_RUNTIME_SCHEDULER, ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
-import { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
-import type { CodeRunRequest, CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
+import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
+import type { PtcRunRequest, PtcRunResult, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
 import {
   DISPATCH_EVENT_TYPES,
   NATIVE_CALL_EVENT,
@@ -37,11 +37,16 @@ import {
 import { observeEvent, type TurnSignals } from '../src/signals.ts'
 
 /** A one-line program that reads two skills through the SDK's \`tools\` namespace. */
-class ProbeCodeRuntime extends CodeRuntime {
+class ProbePtcRuntime extends PtcRuntime {
   readonly language = 'typescript'
   readonly isolation = 'dispatch-spec'
-  async run(request: CodeRunRequest): Promise<CodeRunResult> {
-    const namespace = request.bindings.find(entry => entry.global === 'tools')
+  // 0.2.x split the provider contract: resolve() supplies the directory and deadline a
+  // run may assume, run() executes only resolved inputs (ptc-runtime/src/index.ts:137-150).
+  resolve(request: PtcRunRequest): PtcRunSpec {
+    return { ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: request.timeoutMs ?? null }
+  }
+  async run(spec: PtcRunSpec): Promise<PtcRunResult> {
+    const namespace = spec.bindings.find(entry => entry.global === 'tools')
     if (namespace === undefined) return { logs: [], error: { kind: 'exception', message: 'no tools namespace' } }
     const first = await namespace.functions['skill']!({ name: 'demo-skill' })
     const second = await namespace.functions['skill']!({ name: 'demo-skill' })
@@ -72,7 +77,7 @@ async function ptcLog(): Promise<LoggedEvent[]> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, {})
-  await ctx.plugin(ProbeCodeRuntime)
+  await ctx.plugin(ProbePtcRuntime)
   await ctx.plugin(ToolRuntime, { mode: 'ptc' })
   ctx.tools.register(skillTool())
   const session = ctx.sessions.create(SessionId('spec-ptc'))

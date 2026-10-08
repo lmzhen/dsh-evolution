@@ -1,13 +1,71 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { tempHome, tempRoot } from '../../test-support/temp-home.ts'
 import { captureCommands } from '../../test-support/commands-stub.ts'
+
+/** One row of the family base table (evolution-agent/bases.json) — the SAME table
+ * `/evolution preset install` and install-layered.mjs read. */
+interface FamilyBase {
+  name: string
+  id: string
+  display: { name: string; description: string; order: number }
+}
+
+const FAMILY_BASES = (JSON.parse(readFileSync(new URL('../../evolution-agent/bases.json', import.meta.url), 'utf8')) as { bases: FamilyBase[] }).bases
+
+/** One base-table row by base NAME, or a loud fixture error. */
+function familyBase(name: string): FamilyBase {
+  const row = FAMILY_BASES.find(candidate => candidate.name === name)
+  if (row === undefined) throw new Error(`fixture: bases.json carries no base named "${name}"`)
+  return row
+}
+
+/** The base composition rows as a platform bundle patch carries them
+ * (`packages/bundle/web-app/presets/<base>.patch.yml`: one `insert` entry whose preset row
+ * holds the composition under `config.plugins`).
+ * @param rows - the base composition's rows at column 0.
+ * @returns the patch text.
+ */
+function basePatchText(rows: string): string {
+  const indented = rows.trimEnd().split('\n')
+    .map(line => line.trim() === '' ? '' : `          ${line}`)
+    .join('\n')
+  return `- insert:\n    - id: preset-base\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: base\n        plugins:\n${indented}\n`
+}
+
+/** Seed one base's platform patch where the resolver reads it: the profile's own
+ * `node_modules` candidate (`<profileDir>/node_modules/@deepseek-ai/dsh-web-app/presets/<base>.patch.yml`).
+ * @param profileDir - the profile directory the command writes into.
+ * @param base - the base name (`standard` / `ptc` / `cordis`).
+ * @param rows - the base composition's rows at column 0.
+ */
+async function seedPlatformBase(profileDir: string, base: string, rows: string): Promise<void> {
+  const path = join(profileDir, 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', `${base}.patch.yml`)
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, basePatchText(rows), 'utf8')
+}
+
+/** The profile patch one install writes into (`PROFILE_PATCH_FILENAME`). */
+function profilePatchPath(dir: string): string {
+  return join(dir, 'cordis.patch.yml')
+}
+
+/** The launcher-owned profile facts the command writes through (`profileContext`). */
+function profileContext(name: string, dir: string): { name: string; dir: string; patchPath: string; startedBundles: string[] } {
+  return { name, dir, patchPath: profilePatchPath(dir), startedBundles: [] }
+}
+
+/** Composition rows as they read inside the profile patch: every non-blank line indented under
+ * `config.plugins` (6 spaces in the row + 4 for the `- insert:` entry). */
+function inPatch(rows: string): string {
+  return rows.trim().split('\n').filter(line => line.trim() !== '').map(line => `          ${line}`).join('\n')
+}
 
 describe('evolution-commands', () => {
   it('loads without the commands service mounted', async () => {
@@ -107,10 +165,11 @@ describe('evolution-commands', () => {
     expect(withRequest.text).toContain('Follow it now')
     expect(injected).toHaveLength(0)
     expect(followed).toHaveLength(1)
-    const message = followed[0] as { content: Array<{ text?: string }>; source?: { plugin?: string }; role?: string }
+    const message = followed[0] as { content: Array<{ text?: string }>; source?: { kind?: string }; role?: string }
     // UserMessage contract: role is required and minted by createUserMessage.
     expect(message.role).toBe('user')
-    expect(message.source?.plugin).toBe('dsh-evolution-commands')
+    // 0.2.x: the source kind is the producer's OWN kind (no shared `plugin` field).
+    expect(message.source?.kind).toBe('evolution-commands')
     expect(message.content?.[0]?.text).toContain('distill the auth flow from <url>')
     expect(message.content?.[0]?.text).toContain('skill_manage')
     // Empty argument falls back to the "what we just did" guidance.
@@ -570,113 +629,123 @@ describe('evolution-commands', () => {
     expect(spaced.kind).toBe('success')
   })
 
-  it('preset install composes the runtime standard + delta into the user preset dir (0.3.15)', async () => {
+  it('preset install composes the runtime standard + delta into the profile patch row (0.3.15)', async () => {
     const home = await tempHome('evo-commands-preset-')
+    const profileDir = join(home, 'profiles', 'web')
     const ctx = new Context()
     let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    // 0.3.53: the standard fixture carries a tool-skill row so the
-    // /evolution preset install path is proven to inject the V10-14 cap —
-    // the npm user's ONLY preset generation path (install-layered is the
-    // source-tree tool), and P1-2's symptom lived here before this batch.
+    // 0.2.x: the base is the bundle patch layer that declares the platform's own
+    // preset (`packages/bundle/web-app/presets/standard.patch.yml`), resolved from
+    // the profile's own node_modules. 0.3.53: it carries a tool-skill row so the
+    // /evolution preset install path is proven to inject the V10-14 cap — the npm
+    // user's ONLY preset generation path (install-layered is the source-tree tool),
+    // and P1-2's symptom lived here before this batch.
     const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
-    ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
+    await seedPlatformBase(profileDir, 'standard', standardFixture)
+    // The launcher-owned profile facts: the row lands in THIS profile's own patch
+    // layer — the file the platform's Web editor also saves preset edits to.
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
     const result = await handler!.handler({ rawInput: 'preset install' })
     expect(result.kind).toBe('success')
-    const target = join(home, '.agent-presets', 'evolution')
-    const composed = readFileSync(join(target, 'agent.cordis.yml'), 'utf8')
-    // The registry mounts the composition verbatim: the written file is the
-    // standard rows + the delta, NEVER the delta alone (0.3.14 defect shape).
+    expect(result.text).toContain(patchPath)
+    const patch = readFileSync(patchPath, 'utf8')
+    // The delivered artifact is ONE `- insert:` entry carrying the declarative row:
+    // `- insert:` is what ADDS a row (a plain entry only overrides the same id).
+    expect(patch).toContain("- insert:\n    - id: preset-evolution\n      name: '@deepseek-ai/dsh-agent-preset'\n")
+    // The registry mounts the row's plugin list verbatim: the standard rows + the
+    // delta, NEVER the delta alone (0.3.14 defect shape).
     const delta = readFileSync(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url), 'utf8')
-    expect(composed).toContain(standardFixture.replace(/\s+$/, ''))
-    expect(composed).toContain(delta.trim())
+    expect(patch).toContain('          - id: agent-loop\n            name: "@deepseek-ai/dsh-agent-loop"')
+    expect(patch).toContain('          - id: tools\n            name: "@deepseek-ai/dsh-tools"')
+    expect(patch).toContain(inPatch(delta))
     // V10-14 cap injection rides the composer (0.3.53) — the generated
     // preset-scope tool-skill row carries the 60-char cap.
-    expect(composed).toContain('- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  # V10-14')
-    expect(composed).toContain('catalogDescriptionMaxLength: 60')
-    expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.yml', import.meta.url), 'utf8'))
-    expect(existsSync(join(target, 'preset.yml'))).toBe(true)
+    expect(patch).toContain('          - id: tool-skill\n            name: "@deepseek-ai/dsh-tool-skill"\n            # V10-14')
+    expect(patch).toContain('catalogDescriptionMaxLength: 60')
+    // A3 → 0.2.x: the display metadata is a LITERAL inside the row (the picker
+    // localizes the platform's own shipped ids only), so the variant lists under its
+    // published name instead of the bare id. The four preset*.yml metadata files have
+    // no reader on this line — there is no second filename to disagree about.
+    const standard = familyBase('standard')
+    expect(patch).toContain(`        id: evolution\n        name: ${JSON.stringify(standard.display.name)}\n        description: ${JSON.stringify(standard.display.description)}\n        order: ${standard.display.order}`)
+    // The directory mechanism is gone: nothing lands under `.agent-presets`.
+    expect(existsSync(join(home, '.agent-presets'))).toBe(false)
   })
 
   it('preset install --base ptc writes the ptc variant from the shared base table (0.3.75)', async () => {
     const home = await tempHome('evo-commands-preset-ptc-')
+    const profileDir = join(home, 'profiles', 'web')
     const ctx = new Context()
     let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     // The base table is evolution-agent/bases.json — the SAME file
     // install-layered.mjs reads. The npm path used to hardcode `standard`, so
-    // the ptc variant was unreachable here; the registry id is the base name.
-    const platformFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
-    const reads: string[] = []
-    ctx.provide('agentPresets', { read: async (id: string) => { reads.push(id); if (id !== 'ptc') throw new Error(`unknown preset ${id}`); return platformFixture } })
+    // the ptc variant was unreachable here; the base NAME selects the platform patch.
+    const platformFixture = '- id: tools\n  name: "@deepseek-ai/dsh-tools"\n  config:\n    mode: ptc\n'
+    await seedPlatformBase(profileDir, 'ptc', platformFixture)
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
     const result = await handler!.handler({ rawInput: 'preset install --base ptc' })
     expect(result.kind).toBe('success')
-    expect(reads).toEqual(['ptc'])
-    const target = join(home, '.agent-presets', 'evolution-ptc')
-    expect(readFileSync(join(target, 'agent.cordis.yml'), 'utf8')).toContain(platformFixture.trim())
-    // A3 (audit P1-3): the variant's metadata is written under the platform's
-    // OWN metadata filename (`preset.yml` — agent-presets metadata.ts
-    // METADATA_FILE), with the variant's CONTENT. The former behavior wrote
-    // `preset.ptc.yml`, a name the platform never reads, so the picker showed
-    // the bare id with no description/order. The installer path has always
-    // renamed to preset.yml; both surfaces must agree.
-    expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.ptc.yml', import.meta.url), 'utf8'))
-    expect(existsSync(join(target, 'preset.ptc.yml'))).toBe(false)
+    const patch = readFileSync(patchPath, 'utf8')
+    // The ptc variant is its OWN row id, composed from the ptc base patch.
+    expect(patch).toContain('    - id: preset-evolution-ptc\n')
+    expect(patch).toContain('          - id: tools\n            name: "@deepseek-ai/dsh-tools"\n            config:\n              mode: ptc')
+    expect(patch).not.toContain('          - id: agent-loop')
+    // A3 (audit P1-3) → 0.2.x: the variant's display metadata travels as LITERALS
+    // inside the row, the only place the picker reads it. The former behavior wrote
+    // a metadata file under a name the platform never reads (so the picker showed the
+    // bare id with no description/order); on this line there is no metadata file and
+    // no second filename to disagree about.
+    const ptc = familyBase('ptc')
+    expect(patch).toContain(`        id: evolution-ptc\n        name: ${JSON.stringify(ptc.display.name)}\n        description: ${JSON.stringify(ptc.display.description)}\n        order: ${ptc.display.order}`)
     const unknown = await handler!.handler({ rawInput: 'preset install --base nonsense' })
     expect(unknown.kind).toBe('error')
     expect(unknown.text).toContain('bases.json')
   })
 
-  it('preset install --base standard,ptc writes BOTH variants, and a typo writes NEITHER (v41)', async () => {
+  it('preset install --base standard,ptc writes BOTH rows, and a typo writes NEITHER (v41)', async () => {
     const home = await tempHome('evo-commands-preset-multi-')
+    const profileDir = join(home, 'profiles', 'web')
     const ctx = new Context()
     let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    // One platform composition per base, so a variant composed from the WRONG
-    // base is visible in the written file.
+    // One platform base patch per base, so a variant composed from the WRONG
+    // base is visible in the written row.
     const fixtures: Record<string, string> = {
       standard: '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n',
       ptc: '- id: tools\n  name: "@deepseek-ai/dsh-tools"\n  config:\n    mode: ptc\n',
     }
-    const reads: string[] = []
-    ctx.provide('agentPresets', {
-      read: async (id: string) => {
-        reads.push(id)
-        const fixture = fixtures[id]
-        if (fixture === undefined) throw new Error(`unknown preset ${id}`)
-        return fixture
-      },
-    })
+    await seedPlatformBase(profileDir, 'standard', fixtures.standard as string)
+    await seedPlatformBase(profileDir, 'ptc', fixtures.ptc as string)
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-multi-skills-')) })
     const result = await handler!.handler({ rawInput: 'preset install --base standard,ptc' })
     expect(result.kind).toBe('success')
-    // Each variant composes ITS OWN platform preset, in table order.
-    expect(reads).toEqual(['standard', 'ptc'])
-    const standardDir = join(home, '.agent-presets', 'evolution')
-    const ptcDir = join(home, '.agent-presets', 'evolution-ptc')
-    expect(readFileSync(join(standardDir, 'agent.cordis.yml'), 'utf8')).toContain(fixtures.standard!.trim())
-    expect(readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')).toContain(fixtures.ptc!.trim())
-    expect(readFileSync(join(standardDir, 'agent.cordis.yml'), 'utf8')).not.toContain('mode: ptc')
-    // A3: each variant's metadata lands under the platform's `preset.yml`
-    // name (the only filename the picker reads), carrying the variant's OWN
-    // content — the ptc dir must NOT keep a `preset.ptc.yml` the platform
-    // would never read.
-    expect(readFileSync(join(ptcDir, 'preset.yml'), 'utf8')).toBe(readFileSync(new URL('../../evolution-agent/preset.ptc.yml', import.meta.url), 'utf8'))
-    expect(existsSync(join(ptcDir, 'preset.ptc.yml'))).toBe(false)
+    const patch = readFileSync(patchPath, 'utf8')
+    // Each variant composes ITS OWN platform base patch, in table order.
+    expect(patch).toContain('          - id: agent-loop\n            name: "@deepseek-ai/dsh-agent-loop"')
+    expect(patch).toContain('          - id: tools\n            name: "@deepseek-ai/dsh-tools"\n            config:\n              mode: ptc')
+    expect(patch.indexOf('    - id: preset-evolution\n')).toBeLessThan(patch.indexOf('    - id: preset-evolution-ptc\n'))
+    // The standard row must not carry the ptc base's composition.
+    expect(presetRowBlock(patch, presetRowId('evolution'))).not.toContain('mode: ptc')
+    expect(presetRowBlock(patch, presetRowId('evolution-ptc'))).toContain('mode: ptc')
 
     // Every name is resolved before anything is written: the typo aborts the
-    // whole request and the two healthy variants stay exactly as they were.
-    const before = readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')
+    // whole request and the two healthy rows stay exactly as they were.
+    const before = readFileSync(patchPath, 'utf8')
     const typo = await handler!.handler({ rawInput: 'preset install --base standard,ptc,nonsense' })
     expect(typo.kind).toBe('error')
     expect(typo.text).toContain('nonsense')
-    expect(reads).toEqual(['standard', 'ptc'])
-    expect(readFileSync(join(ptcDir, 'agent.cordis.yml'), 'utf8')).toBe(before)
+    expect(readFileSync(patchPath, 'utf8')).toBe(before)
   })
 
   it('G1-② (0.3.78): refuses an unsupported base and one whose required service is absent', async () => {
@@ -688,11 +757,14 @@ describe('evolution-commands', () => {
     // evolution-all bundle — every other preset-install case in this file does
     // the same for the same reason.
     const home = await tempHome('evo-commands-ability-')
+    const profileDir = join(home, 'profiles', 'web')
     const ctx = new Context()
     let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    ctx.provide('agentPresets', { read: async (id: string) => `# ${id}\n- id: persona\n- id: tool-skill\n` })
+    await seedPlatformBase(profileDir, 'cordis', '- id: persona\n- id: tool-skill\n')
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-ability-skills-')) })
     const unsupported = await handler!.handler({ rawInput: 'preset install --base minimal' })
     expect(unsupported.kind).toBe('error')
@@ -703,22 +775,27 @@ describe('evolution-commands', () => {
     ctx.provide('dynamicCordisRunner', {})
     const allowed = await handler!.handler({ rawInput: 'preset install --base cordis' })
     expect(allowed.kind).toBe('success')
-    expect(existsSync(join(home, '.agent-presets', 'evolution-cordis', 'agent.cordis.yml'))).toBe(true)
+    expect(readFileSync(patchPath, 'utf8')).toContain('    - id: preset-evolution-cordis\n')
   })
 
   it('preset install fails loud when delta rows collide with the runtime standard (0.3.15)', async () => {
-    await tempHome('evo-commands-preset-')
+    const home = await tempHome('evo-commands-preset-')
+    const profileDir = join(home, 'profiles', 'web')
     const ctx = new Context()
     let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    // A standard that already carries tool-memory would mount the row twice
+    // A standard base that already carries tool-memory would mount the row twice
     // if merged — the composition must refuse instead of shadowing it.
-    ctx.provide('agentPresets', { read: async () => '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n' })
+    await seedPlatformBase(profileDir, 'standard', '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n')
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
     const result = await handler!.handler({ rawInput: 'preset install' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('collide')
+    // The refusal happens before any write: a refused install leaves no artifact behind.
+    expect(existsSync(patchPath)).toBe(false)
   })
 
   it('maintain --facts renders the facts block with zero subagent calls and no cooldown', async () => {
@@ -846,38 +923,36 @@ describe('evolution-commands', () => {
     expect(registry).toHaveLength(0)
   })
 
-  it('preset install commits atomically: a second-file write failure leaves the previous composition usable (S6.3 E-40)', async () => {
+  it('preset install commits atomically: a failing staged write leaves the previous profile patch usable (S6.3 E-40)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-atomic-'))
     const skillsRoot = await mkdtemp(join(tmpdir(), 'evo-commands-preset-atomic-skills-'))
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = home
     try {
-      const target = join(home, '.agent-presets', 'evolution')
-      await mkdir(target, { recursive: true })
+      const profileDir = join(home, 'profiles', 'web')
+      const patchPath = profilePatchPath(profileDir)
       // Seed an existing installation so we can prove it survives an update.
-      const oldComposition = 'OLD agent.cordis.yml\n'
-      const oldPreset = 'OLD preset.yml\n'
-      await writeFile(join(target, 'agent.cordis.yml'), oldComposition, 'utf8')
-      await writeFile(join(target, 'preset.yml'), oldPreset, 'utf8')
-      // The second staged file collides with a directory, so its write throws
-      // EISDIR — a deterministic "second write fails" on Windows and POSIX.
-      await mkdir(join(target, 'preset.yml.tmp'))
+      const oldPatch = "- insert:\n    - id: some-other-row\n      name: '@some/other-plugin'\n"
+      await mkdir(profileDir, { recursive: true })
+      await writeFile(patchPath, oldPatch, 'utf8')
+      await seedPlatformBase(profileDir, 'standard', '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n')
+      // The staged write collides with a directory, so it throws EISDIR — a
+      // deterministic "the write cannot complete" on Windows and POSIX. The ONE
+      // file this install writes is the profile patch itself now.
+      await mkdir(`${patchPath}.tmp`)
       const ctx = new Context()
       let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
       ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      const standardFixture = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n'
-      ctx.provide('agentPresets', { read: async (id: string) => { if (id !== 'standard') throw new Error(`unknown preset ${id}`); return standardFixture } })
+      ctx.provide('profileContext', profileContext('web', profileDir))
       await ctx.plugin(Commands, { root: skillsRoot })
       const result = await handler!.handler({ rawInput: 'preset install' })
       expect(result.kind).toBe('error')
       expect(result.text).toContain('Preset install failed')
-      // The previous composition is untouched — no half-updated preset.
-      expect(readFileSync(join(target, 'agent.cordis.yml'), 'utf8')).toBe(oldComposition)
-      expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(oldPreset)
-      // Neither staged temp leaked.
-      expect(existsSync(join(target, 'agent.cordis.yml.tmp'))).toBe(false)
-      expect(existsSync(join(target, 'preset.yml.tmp'))).toBe(false)
+      // The previous patch is untouched — no half-updated artifact — and the commit
+      // phase never started, so no backup was taken either.
+      expect(readFileSync(patchPath, 'utf8')).toBe(oldPatch)
+      expect(existsSync(`${patchPath}.bak`)).toBe(false)
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome

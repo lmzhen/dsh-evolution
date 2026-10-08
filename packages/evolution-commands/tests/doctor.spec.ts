@@ -1,14 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import { composePresetComposition, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetEntry, mergePresetRow, presetRowId, removePresetRow, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doctor.ts'
 
 const stub = { get: () => undefined }
+
+/** G3 (stage 8): a context carrying the two seats the legacy-document segment reads — the
+ * platform settings seat (one row's user layer) and the family IO seam over a home whose
+ * `settings.yaml` is the only file it can read. */
+function legacyStub(home: string, user: Record<string, unknown>): { get(name: string): unknown } {
+  const document = join(home, 'settings.yaml')
+  return {
+    get: (name: string): unknown => name === 'settings'
+      ? { describe: (): { ns: string; user: Record<string, unknown> }[] => [{ ns: 'memory-files', user }], update: async (): Promise<void> => {} }
+      : name === 'evolutionIo'
+        ? { provider: (): { readText(path: string): Promise<string | null> } => ({ readText: async (path: string) => path === document && existsSync(document) ? await readFile(document, 'utf8') : null }) }
+        : undefined,
+  }
+}
 
 /** G3-② (B2): the delta and the base table doctor compares against, resolved
  * from the installed family package through the same export a user install uses. */
@@ -16,20 +30,90 @@ function familyAsset(asset: string): string {
   return fileURLToPath(import.meta.resolve(`@deepseek-ai/dsh-evolution-agent-preset/${asset}`))
 }
 
-/** G3-② (B2): the runtime platform registry stub. It carries the
- * `- id: tool-skill` row the composer injects the 60-char cap onto, so the
- * fixture exercises the shared row-overrides table as well as the composition. */
-const PLATFORM_COMPOSITION = [
-  '- id: tool-skill',
-  "  name: '@deepseek-ai/dsh-skill-catalog'",
+/** G3-② (B2): the platform base preset patch a delivered row composes from — the shape a
+ * bundle ships (`packages/bundle/web-app/presets/<base>.patch.yml`): one `insert` entry whose
+ * preset row carries the base composition under `config.plugins`. It holds the
+ * `- id: tool-skill` row the composer injects the 60-char cap onto, so the fixture exercises
+ * the shared row-overrides table as well as the composition. */
+const PLATFORM_BASE_PATCH = [
+  '- insert:',
+  '    - id: preset-standard',
+  "      name: '@deepseek-ai/dsh-agent-preset'",
+  '      config:',
+  '        id: standard',
+  '        plugins:',
+  '          - id: tool-skill',
+  "            name: '@deepseek-ai/dsh-skill-catalog'",
   '',
-  '- id: persona',
-  "  text: 'harness persona'",
+  '          - id: persona',
+  "            text: 'harness persona'",
   '',
 ].join('\n')
 
-function presetRegistry(composition: string): { get(name: string): unknown } {
-  return { get: (name: string) => name === 'agentPresets' ? { read: async () => composition } : undefined }
+/** One row of the family base table (evolution-agent/bases.json) — the SAME table
+ * `/evolution preset install` takes its row identity from. */
+interface BaseRow {
+  name: string
+  id: string
+  display: { name: string; description: string; order: number }
+}
+
+const FAMILY_BASES = (JSON.parse(readFileSync(familyAsset('bases.json'), 'utf8')) as { bases: BaseRow[] }).bases
+
+/** One base-table row by base NAME, or a loud fixture error. */
+function familyBase(name: string): BaseRow {
+  const row = FAMILY_BASES.find(candidate => candidate.name === name)
+  if (row === undefined) throw new Error(`fixture: bases.json carries no base named "${name}"`)
+  return row
+}
+
+/** The profile patch a family row is delivered into (`PROFILE_PATCH_FILENAME`). */
+function profilePatch(home: string, profile = 'web'): string {
+  return join(home, 'profiles', profile, 'cordis.patch.yml')
+}
+
+/** Where the platform base patch of one base lives for a profile: the resolver's own
+ * profile-relative candidate (`<profileDir>/node_modules/@deepseek-ai/dsh-web-app/presets/<base>.patch.yml`). */
+function platformBasePatch(home: string, base: string, profile = 'web'): string {
+  return join(home, 'profiles', profile, 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', `${base}.patch.yml`)
+}
+
+/**
+ * Deliver the 0.2.x preset artifact: ONE `- insert:` row carrying the declarative
+ * `@deepseek-ai/dsh-agent-preset` row in the target profile's own patch layer — the file the
+ * platform's Web editor saves preset edits to and the doctor reads. The row goes through the
+ * SAME core functions the installer applies (`composePresetEntry` + `mergePresetRow`) from the
+ * same family rows, so a fixture cannot describe an artifact the installer would never write.
+ * @param home - the DSH_HOME whose profile receives the row.
+ * @param base - the base NAME from bases.json (`standard` / `ptc` / `cordis` / `minimal`).
+ * @param profile - the profile whose patch receives the row; defaults to `web`.
+ * @param options - `basePatch: null` withholds the platform base patch the row was composed
+ * against (a delivered row outliving the platform tree it describes); a string seeds THAT text.
+ * @returns the profile patch path the row landed in.
+ */
+async function deliverPresetRow(
+  home: string,
+  base: string,
+  profile = 'web',
+  options: { basePatch?: string | null } = {},
+): Promise<string> {
+  const row = familyBase(base)
+  if (options.basePatch !== null) {
+    const seeded = platformBasePatch(home, base, profile)
+    await mkdir(dirname(seeded), { recursive: true })
+    await writeFile(seeded, options.basePatch ?? PLATFORM_BASE_PATCH, 'utf8')
+  }
+  const entry = composePresetEntry(PLATFORM_BASE_PATCH, readFileSync(familyAsset('agent.cordis.yml'), 'utf8'), {
+    rowId: presetRowId(row.id),
+    id: row.id,
+    name: row.display.name,
+    description: row.display.description,
+    order: row.display.order,
+  })
+  const patchPath = profilePatch(home, profile)
+  const current = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : ''
+  await writeFile(patchPath, mergePresetRow(current, entry, presetRowId(row.id)), 'utf8')
+  return patchPath
 }
 
 async function makeProfile(home: string, profile: string, bundles: string[]): Promise<void> {
@@ -71,16 +155,17 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  it('T-WB2: host-only without a preset dir reports host; with the dir reports layered', async () => {
+  it('T-WB2: host-only without the delivered row reports host; with it reports layered', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-host-'))
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
       expect((await diagnose(stub, { home })).installForm).toBe('host')
-      // V26-02 (v25/v26): 'layered' keys on the DELIVERED artifact — a bare
-      // empty directory is not a layered install.
-      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      // V26-02 (v25/v26): 'layered' keys on the DELIVERED artifact — a profile
+      // patch holding no family row (here the platform's own empty-list seed) is
+      // not a layered install.
+      await writeFile(profilePatch(home), '[]\n', 'utf8')
       expect((await diagnose(stub, { home })).installForm).toBe('host')
-      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      await deliverPresetRow(home, 'standard')
       expect((await diagnose(stub, { home })).installForm).toBe('layered')
       // ...and the product name for that layout: the variant form, in which a
       // session on a platform original preset carries no family rows at all.
@@ -90,18 +175,18 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  it('V27 G6.4: all × a delivered preset dir is flagged without the host bundle; a bare dir is not', async () => {
+  it('V27 G6.4: all × a delivered preset row is flagged without the host bundle; a bare patch is not', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-all-presetdir-'))
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
-      // A bare leftover directory is not an install (same artifact rule as the
-      // preset-bundle case above).
-      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      // A leftover profile patch with no family row is not an install (same
+      // artifact rule as the preset-bundle case above).
+      await writeFile(profilePatch(home), '[]\n', 'utf8')
       expect((await diagnose(stub, { home })).conflicts).toEqual([])
       // The delivered preset artifact + `all` double-mounts the four model rows
       // even when evolution-host is absent — the old `full && layered` condition
       // required host and stayed silent for exactly this combination.
-      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      await deliverPresetRow(home, 'standard')
       const report = await diagnose(stub, { home })
       expect(report.conflicts.some(conflict => conflict.includes('evolution-all and the layered Evolution preset'))).toBe(true)
       expect(report.actions[0]).toContain('Resolve the conflict first')
@@ -113,18 +198,19 @@ describe('doctor (WB2, 0.3.55)', () => {
   it('S1-F1: a ptc/cordis layered install is detected like the default base, not misread as none', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-ptc-layered-'))
     try {
-      // host + `--base ptc` artifact = layered (the old probe saw only the
-      // default `evolution` dir and reported 'host').
+      // host + the `--base ptc` row = layered (the old probe saw only the
+      // default `evolution` row and reported 'host').
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
-      await mkdir(join(home, '.agent-presets', 'evolution-ptc'), { recursive: true })
-      await writeFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      await deliverPresetRow(home, 'ptc')
       const hostReport = await diagnose(stub, { home })
       expect(hostReport.installForm).toBe('layered')
       expect(hostReport.deploymentForm).toBe('variant')
-      // ptc artifact with NO bundle = preset-only (used to read as 'none' and
-      // the action ladder then recommended installing `all` on top — the
-      // exact double-mount this report exists to prevent).
-      await rm(join(home, 'profiles'), { recursive: true, force: true })
+      // The ptc row with NO evolution bundle = preset-only (used to read as 'none'
+      // and the action ladder then recommended installing `all` on top — the exact
+      // double-mount this report exists to prevent). The artifact lives in the
+      // profile's own patch layer now, so this state is the profile that outlived
+      // its bundles rather than a home without a profile.
+      await makeProfile(home, 'web', [])
       const onlyReport = await diagnose(stub, { home })
       expect(onlyReport.installForm).toBe('preset-only')
       expect(onlyReport.actions[0]).toContain('double-mounts the model rows')
@@ -139,19 +225,21 @@ describe('doctor (WB2, 0.3.55)', () => {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
       // ptc IS a supported family base: the conflict the default id raises
       // must raise here too.
-      await mkdir(join(home, '.agent-presets', 'evolution-ptc'), { recursive: true })
-      await writeFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      await deliverPresetRow(home, 'ptc')
       expect((await diagnose(stub, { home })).conflicts.some(conflict => conflict.includes('evolution-ptc'))).toBe(true)
       // minimal carries NO family model rows (unsupported in bases.json) — it
       // cannot double-mount, so all + minimal stays healthy.
-      await rm(join(home, '.agent-presets', 'evolution-ptc'), { recursive: true, force: true })
-      await mkdir(join(home, '.agent-presets', 'evolution-minimal'), { recursive: true })
-      await writeFile(join(home, '.agent-presets', 'evolution-minimal', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      const patchPath = profilePatch(home)
+      await writeFile(patchPath, removePresetRow(readFileSync(patchPath, 'utf8'), presetRowId('evolution-ptc')), 'utf8')
+      await deliverPresetRow(home, 'minimal')
       expect((await diagnose(stub, { home })).conflicts).toEqual([])
-      // A FOREIGN preset directory is not a family layered install either.
-      await rm(join(home, '.agent-presets', 'evolution-minimal'), { recursive: true, force: true })
-      await mkdir(join(home, '.agent-presets', 'some-other-plugin'), { recursive: true })
-      await writeFile(join(home, '.agent-presets', 'some-other-plugin', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      // A FOREIGN preset row is not a family layered install either.
+      await writeFile(patchPath, removePresetRow(readFileSync(patchPath, 'utf8'), presetRowId('evolution-minimal')), 'utf8')
+      await writeFile(patchPath, mergePresetRow(
+        readFileSync(patchPath, 'utf8'),
+        "- insert:\n    - id: preset-some-other-plugin\n      name: '@some/other-plugin'\n",
+        'preset-some-other-plugin',
+      ), 'utf8')
       expect((await diagnose(stub, { home })).conflicts).toEqual([])
     } finally {
       await rm(home, { recursive: true, force: true })
@@ -168,16 +256,16 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  it('V25-07/V24-11: preset bundle × a POPULATED layered preset dir is flagged; a bare empty preset dir is not', async () => {
+  it('V25-07/V24-11: preset bundle × a POPULATED layered preset row is flagged; a bare patch is not', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-layered-'))
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-preset'])
-      // A bare/empty leftover directory is NOT a layered install — no conflict
-      // (V25-07: detection keys on the delivered agent.cordis.yml artifact).
-      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
+      // A leftover profile patch with no family row is NOT a layered install — no
+      // conflict (V25-07: detection keys on the delivered agent-preset row artifact).
+      await writeFile(profilePatch(home), '[]\n', 'utf8')
       expect((await diagnose(stub, { home })).conflicts).toEqual([])
       // The delivered artifact flips it into a real double-mount.
-      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      await deliverPresetRow(home, 'standard')
       const report = await diagnose(stub, { home })
       expect(report.conflicts.some(c => c.includes('layered Evolution preset'))).toBe(true)
     } finally {
@@ -195,8 +283,8 @@ describe('doctor (WB2, 0.3.55)', () => {
       const home = await mkdtemp(join(tmpdir(), 'doctor-shadow-warn-'))
       try {
         await makeProfile(home, 'web', [bundle])
-        await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
-        await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+        await writeFile(profilePatch(home), '[]\n', 'utf8')
+        await deliverPresetRow(home, 'standard')
         const report = await diagnose(stub, { home })
         const row = report.conflicts.find(conflict => conflict.includes('layered Evolution preset'))
         expect(row, bundle).toBeDefined()
@@ -238,6 +326,150 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
+  it('reports the legacy settings document, and what is still unmigrated (G3)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-'))
+    try {
+      await writeFile(join(home, 'settings.yaml'), 'evolution-memory:\n  memoryCharLimit: 2200\nui-chat:\n  transcriptView: standard\n', 'utf8')
+      const report = await diagnose(legacyStub(home, {}), { home })
+      expect(report.legacy.state).toBe('pending')
+      expect(report.legacy.pending).toEqual(['memory-files.memoryChars'])
+      const text = renderDoctorText(report)
+      expect(text).toContain('legacy settings: 1 family value(s) still on')
+      expect(text).toContain('/evolution migrate moves them')
+      expect(report.actions.join('\n')).toContain('/evolution migrate')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the legacy document as settled once every value sits on its row (G3)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-done-'))
+    try {
+      await writeFile(join(home, 'settings.yaml'), 'evolution-memory:\n  memoryCharLimit: 2200\n', 'utf8')
+      const report = await diagnose(legacyStub(home, { memoryChars: 2200 }), { home })
+      expect(report.legacy.state).toBe('migrated')
+      expect(renderDoctorText(report)).toContain('every family value sits on its row')
+      expect(report.actions.join('\n')).not.toContain('/evolution migrate')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a document without a family section, and no document at all (G3)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-none-'))
+    try {
+      await writeFile(join(home, 'settings.yaml'), 'ui-chat:\n  transcriptView: standard\n', 'utf8')
+      const none = await diagnose(legacyStub(home, {}), { home })
+      expect(none.legacy.state).toBe('none')
+      expect(renderDoctorText(none)).toContain('carries no family section')
+      await rm(join(home, 'settings.yaml'), { force: true })
+      expect((await diagnose(legacyStub(home, {}), { home })).legacy.state).toBe('absent')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the legacy document as unknown when the settings seat or the IO seam is absent (G3)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-no-seat-'))
+    try {
+      expect((await diagnose(stub, { home })).legacy.state).toBe('unavailable')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+  it('G5: takes the install form and the review row from the platform surfaces (G5)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-g5-'))
+    try {
+      const view = {
+        get: (name: string): unknown => name === 'pluginManager'
+          ? {
+            listBundles: (): unknown[] => [
+              { name: '@lmzhen/dsh-evolution-all', enabled: true, installed: false, optional: false, removable: true, rows: [], overrides: [] },
+              { name: '@lmzhen/dsh-evolution-host', enabled: false, installed: true, optional: false, removable: true, rows: [], overrides: [] },
+            ],
+            listPlugins: (): unknown[] => [{ entryId: 'include:evolution-review', enabled: true, fiberPhase: 'active' }],
+          }
+          : undefined,
+      }
+      const report = await diagnose(view, { home })
+      expect(report.installForm).toBe('full')
+      expect(report.formSource).toBe('platform')
+      expect(report.runtimeBundles).toEqual(['@lmzhen/dsh-evolution-all'])
+      // Installed but NOT selected: the plugin page lists it, this runtime mounts nothing of it.
+      expect(report.dormantBundles).toEqual(['@lmzhen/dsh-evolution-host'])
+      expect(report.serviceSource).toBe('platform')
+      expect(report.services.review).toBe(true)
+      // The cross-profile aggregate answers a DIFFERENT question and stays empty on this home.
+      expect(report.bundles).toEqual([])
+      const text = renderDoctorText(report)
+      expect(text).toContain('runtime bundles (this profile): @lmzhen/dsh-evolution-all')
+      expect(text).toContain('(the live row, this runtime)')
+      expect(text).toContain('installed but not selected: @lmzhen/dsh-evolution-host')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('G5: a family row the platform reports as off is not a mounted review row', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-g5-off-'))
+    try {
+      const view = {
+        get: (name: string): unknown => name === 'pluginManager'
+          ? { listPlugins: (): unknown[] => [{ entryId: 'include:evolution-review', enabled: false }] }
+          : undefined,
+      }
+      const report = await diagnose(view, { home })
+      expect(report.serviceSource).toBe('platform')
+      expect(report.services.review).toBe(false)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('G5: reports the platform\'s broken preset, and not the base rows every preset shares', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-g5-presets-'))
+    try {
+      const view = {
+        get: (name: string): unknown => name === 'pluginInventory'
+          ? {
+            list: async (): Promise<unknown> => ({
+              entries: [],
+              agentPresets: [
+                { id: 'standard', rows: [{ entryId: 'persona', moduleName: 'x', enabled: true }] },
+                { id: 'evolution', rows: [{ entryId: 'persona', moduleName: 'x', enabled: true }, { entryId: 'tool-memory', moduleName: 'y', enabled: true }, { entryId: null, moduleName: 'z' }] },
+                { id: 'ptc', broken: 'missing base', rows: [] },
+              ],
+            }),
+          }
+          : undefined,
+      }
+      const report = await diagnose(view, { home })
+      // `persona` is declared by two presets — measured on a real deployment, EVERY preset
+      // composes the same base rows, so that is the healthy steady state and not a finding.
+      expect(report.presetIssues).toHaveLength(1)
+      const text = renderDoctorText(report)
+      expect(text).toContain('agent presets:')
+      expect(text).toContain('is BROKEN (missing base)')
+      expect(text).not.toContain('declared by')
+      expect(report.actions.join('\n')).toContain('agent-preset finding')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('G5: without the platform surfaces the report says unknown instead of claiming none', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-g5-absent-'))
+    try {
+      const report = await diagnose(stub, { home })
+      expect(report.runtimeBundles).toBeNull()
+      expect(report.formSource).toBe('aggregate')
+      expect(report.serviceSource).toBe('bundles')
+      expect(report.presetIssues).toEqual([])
+      expect(renderDoctorText(report)).toContain('runtime bundles: unknown — the platform bundle surface')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
   it('renders a human-readable report that ends with next steps', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-render-'))
     try {
@@ -290,15 +522,15 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  it('OPT-23: a delivered preset dir with NO bundles reports preset-only — and never advises installing all', async () => {
+  it('OPT-23: a delivered preset row with NO bundles reports preset-only — and never advises installing all', async () => {
     // V27 G6.4's real state: the host bundle was removed after a layered
-    // install, leaving the self-contained delta preset. The old form ladder
-    // reported `none` and its advice installed all — the exact
+    // install, leaving the self-contained delta preset row in the profile patch.
+    // The old form ladder reported `none` and its advice installed all — the exact
     // all × preset double-mount this report flags.
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-only-'))
     try {
-      await mkdir(join(home, '.agent-presets', 'evolution'), { recursive: true })
-      await writeFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'rows: []', 'utf8')
+      await makeProfile(home, 'web', [])
+      await deliverPresetRow(home, 'standard')
       const report = await diagnose(stub, { home })
       expect(report.installForm).toBe('preset-only')
       expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
@@ -418,73 +650,82 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  it('G3-② (B2): a variant matching a fresh generation is fresh; a hand-edited one DIFFERS and is left untouched', async () => {
-    // The variant is an INSTALL-TIME snapshot of the platform composition: the
-    // file mounts fine while describing a platform that has moved on, and only a
-    // recompute against the live composition can tell the two apart.
+  it('G3-② (B2): a row matching a fresh generation is fresh; a hand-edited one DIFFERS and is left untouched', async () => {
+    // The row is an INSTALL-TIME snapshot of the platform composition: it mounts
+    // fine while describing a platform that has moved on, and only a recompute
+    // against the live platform base patch can tell the two apart.
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-fresh-'))
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
-      const delta = readFileSync(familyAsset('agent.cordis.yml'), 'utf8')
-      const destination = join(home, '.agent-presets', 'evolution')
-      const compositionPath = join(destination, 'agent.cordis.yml')
-      await mkdir(destination, { recursive: true })
-      await writeFile(compositionPath, composePresetComposition(PLATFORM_COMPOSITION, delta), 'utf8')
+      const patchPath = await deliverPresetRow(home, 'standard')
 
-      const report = await diagnose(presetRegistry(PLATFORM_COMPOSITION), { home })
+      const report = await diagnose(stub, { home })
       const row = report.presetFreshness.find(entry => entry.base === 'standard')
-      expect(row?.destination).toBe(destination)
+      expect(row?.destination).toBe(patchPath)
       expect(row?.status).toBe('fresh')
-      expect(report.actions.some(action => action.includes(destination))).toBe(false)
-      expect(renderDoctorText(report)).toContain(`${destination}  fresh`)
+      expect(report.actions.some(action => action.includes(patchPath))).toBe(false)
+      expect(renderDoctorText(report)).toContain(`${patchPath}  fresh`)
 
-      // One hand-edited line is the whole failure: the file still mounts, but it
+      // One hand-edited line is the whole failure: the row still mounts, but it
       // no longer describes a generation this platform can produce.
-      const edited = `${readFileSync(compositionPath, 'utf8')}# hand edit\n`
-      await writeFile(compositionPath, edited, 'utf8')
-      const stale = await diagnose(presetRegistry(PLATFORM_COMPOSITION), { home })
+      const edited = `${readFileSync(patchPath, 'utf8')}# hand edit\n`
+      await writeFile(patchPath, edited, 'utf8')
+      const stale = await diagnose(stub, { home })
       expect(stale.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('differs')
-      expect(stale.actions.some(action => action.includes(destination))).toBe(true)
+      expect(stale.actions.some(action => action.includes(patchPath))).toBe(true)
       // The line a user reads: pinned verbatim, destination included.
-      expect(renderDoctorText(stale)).toContain(`preset:   ${destination}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+      expect(renderDoctorText(stale)).toContain(`preset:   standard → ${patchPath}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
       // READ-ONLY: reporting an install-time snapshot never rewrites it.
-      expect(readFileSync(compositionPath, 'utf8')).toBe(edited)
+      expect(readFileSync(patchPath, 'utf8')).toBe(edited)
     } finally {
       await rm(home, { recursive: true, force: true })
     }
   })
 
-  it('G3-② (B2): a directory without the composition is absent; an unmounted or failing registry is unknown', async () => {
+  it('G3-② (B2): a patch without the row is absent; an unresolvable or malformed platform base is unknown', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-unknown-'))
     try {
-      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
-      const destination = join(home, '.agent-presets', 'evolution')
-      const compositionPath = join(destination, 'agent.cordis.yml')
-      await mkdir(destination, { recursive: true })
-      // A leftover directory is not an installed variant (the artifact rule the
-      // install-form check already uses) and is nothing to act on either.
-      const absent = await diagnose(presetRegistry(PLATFORM_COMPOSITION), { home })
-      expect(absent.presetFreshness.map(entry => entry.base)).toEqual(expect.arrayContaining(['standard', 'ptc', 'cordis', 'minimal']))
+      // The web-app bundle is mounted so every SUPPORTED base is enumerated: cordis
+      // needs it for its `requires.service` precondition, and minimal is skipped as
+      // registered-unsupported (it carries no family model rows to compare).
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host', '@deepseek-ai/dsh-web-app'])
+      const patchPath = profilePatch(home)
+      // A profile patch without the row is not an installed variant (the artifact
+      // rule the install-form check already uses) and is nothing to act on either.
+      const absent = await diagnose(stub, { home })
+      expect(absent.presetFreshness.map(entry => entry.base)).toEqual(expect.arrayContaining(['standard', 'ptc', 'cordis']))
       expect(absent.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('absent')
-      expect(absent.actions.some(action => action.includes(destination))).toBe(false)
-      expect(renderDoctorText(absent)).not.toContain(destination)
+      expect(absent.actions.some(action => action.includes(patchPath))).toBe(false)
+      expect(renderDoctorText(absent)).not.toContain(patchPath)
 
-      await writeFile(compositionPath, 'rows: []\n', 'utf8')
-      // No registry mounted: one half of the comparison is missing, so the
-      // variant is unknown — never a fake fresh.
-      const unmounted = await diagnose(stub, { home })
-      const unmountedRow = unmounted.presetFreshness.find(entry => entry.base === 'standard')
-      expect(unmountedRow?.status).toBe('unknown')
-      expect(unmountedRow?.detail).toContain('registry is not mounted')
-      expect(unmounted.actions.some(action => action.includes(destination))).toBe(false)
-      expect(renderDoctorText(unmounted)).toContain('could not be recomputed')
+      // The row is delivered, but the platform base patch it describes is not on
+      // disk (the desktop shape: the platform packages live inside app.asar) — one
+      // half of the comparison is missing, so the row is unknown, never a fake fresh.
+      const root = await mkdtemp(join(tmpdir(), 'doctor-preset-root-'))
+      const previousRoot = process.env.DSH_AGENT_PRESET_ROOT
+      process.env.DSH_AGENT_PRESET_ROOT = root
+      try {
+        await deliverPresetRow(home, 'standard', 'web', { basePatch: null })
+        const unmounted = await diagnose(stub, { home })
+        const unmountedRow = unmounted.presetFreshness.find(entry => entry.base === 'standard')
+        expect(unmountedRow?.status).toBe('unknown')
+        expect(unmountedRow?.detail).toContain('standard.patch.yml does not exist')
+        expect(unmounted.actions.some(action => action.includes(patchPath))).toBe(false)
+        expect(renderDoctorText(unmounted)).toContain('could not be recomputed')
+      } finally {
+        if (previousRoot === undefined) delete process.env.DSH_AGENT_PRESET_ROOT
+        else process.env.DSH_AGENT_PRESET_ROOT = previousRoot
+        await rm(root, { recursive: true, force: true })
+      }
 
-      // A registry that fails the read (a preset root it cannot open) degrades
-      // the same way instead of reporting the file as clean.
-      const failing = { get: (name: string) => name === 'agentPresets' ? { read: async () => { throw new Error('EACCES: unreadable preset root') } } : undefined }
-      const failedRow = (await diagnose(failing, { home })).presetFreshness.find(entry => entry.base === 'standard')
+      // A platform base patch that exists but cannot produce a composition (no
+      // `plugins:` list) degrades the same way instead of reporting the row as clean.
+      const malformed = platformBasePatch(home, 'standard')
+      await mkdir(dirname(malformed), { recursive: true })
+      await writeFile(malformed, '- insert:\n    - id: preset-standard\n', 'utf8')
+      const failedRow = (await diagnose(stub, { home })).presetFreshness.find(entry => entry.base === 'standard')
       expect(failedRow?.status).toBe('unknown')
-      expect(failedRow?.detail).toContain('EACCES: unreadable preset root')
+      expect(failedRow?.detail).toContain('carries no `plugins:` list')
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -684,10 +925,16 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
     const home = await mkdtemp(join(tmpdir(), 'doctor-params-'))
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
-      const settings = {
-        describe: () => [{ ns: 'evolution-review', user: { reviewSkillInterval: 30, skillInterval: 5 }, value: {} }],
+      // G5: both layers come from the platform's config editor, and the live rows from its
+      // plugin manager — the family no longer derives either one from the settings seat.
+      const view = {
+        get: (name: string): unknown => name === 'configEditor'
+          ? { configuration: (): unknown[] => [{ entry: { options: { id: 'evolution-review' } }, inherited: {}, override: { reviewSkillInterval: 30, skillInterval: 5 } }] }
+          : name === 'pluginManager'
+            ? { listPlugins: (): unknown[] => [{ entryId: 'include:evolution-review', enabled: true }] }
+            : undefined,
       }
-      const report = await diagnose({ get: (name: string) => name === 'settings' ? settings : undefined }, { home })
+      const report = await diagnose(view, { home })
       expect(report.paramIssues.some(line => line.startsWith('user override: evolution-review sets 2 parameter(s)'))).toBe(true)
       expect(report.paramIssues.some(line => line.includes('deprecated name: evolution-review still writes "skillInterval" — write "reviewSkillInterval"'))).toBe(true)
       expect(report.paramIssues.some(line => line.includes('declared user-writable but unreachable here:'))).toBe(true)
@@ -700,19 +947,21 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
     }
   })
 
-  it('S4.3: an unreadable settings surface is a finding, an absent one is not', async () => {
+  it('S4.3/G5: a missing platform surface is a named finding, never silence', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-params-none-'))
     try {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
-      // Absent service: nothing to compare, so no section and no action.
+      // No configuration surface at all: the section says so instead of rendering as silence.
       const absent = await diagnose(stub, { home })
-      expect(absent.paramIssues).toEqual([])
-      expect(renderDoctorText(absent)).not.toContain('parameters:')
-      // Present but throwing: silence would read as "no divergences".
-      const broken = await diagnose({ get: () => ({ describe: () => { throw new Error('describe unavailable') } }) }, { home })
-      expect(broken.paramIssues).toHaveLength(1)
-      expect(broken.paramIssues[0]).toContain('settings surface unreadable')
-      expect(broken.paramIssues[0]).toContain('NOT checked')
+      expect(absent.paramIssues).toHaveLength(1)
+      expect(absent.paramIssues[0]).toContain('configEditor.configuration')
+      expect(absent.paramIssues[0]).toContain('NOT checked')
+      expect(renderDoctorText(absent)).toContain('parameters:')
+      // The row surface is a second, separate fact: the reachability half cannot run without it.
+      const noRows = await diagnose({ get: (name: string) => name === 'configEditor' ? { configuration: (): unknown[] => [] } : undefined }, { home })
+      expect(noRows.paramIssues).toHaveLength(1)
+      expect(noRows.paramIssues[0]).toContain('listPlugins')
+      expect(noRows.paramIssues[0]).toContain('NOT checked')
     } finally {
       await rm(home, { recursive: true, force: true })
     }

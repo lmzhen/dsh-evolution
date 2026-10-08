@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { cordisRows, rowId, rowName } from '../../test-support/cordis-rows.ts'
@@ -13,44 +12,28 @@ import { AGENT_EVOLUTION_ROW_NAMES } from '../../test-support/row-contract.ts'
 // vendoring one baseline's rows forever. The full assembly (standard rows
 // verbatim + delta) is asserted end-to-end by evolution-host's installer.spec.
 const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../agent.cordis.yml', import.meta.url))))
-const preset = readFileSync(fileURLToPath(new URL('../preset.yml', import.meta.url)), 'utf8')
-// The PTC variant's display metadata. It is a SECOND metadata file, not a
-// second package: the composition (the delta) is base-independent, so only the
-// metadata differs between `--base standard` and `--base ptc`
-// (AGENT_PRESET_BASES in packages/scripts/install-layered.mjs).
-const ptcPreset = readFileSync(fileURLToPath(new URL('../preset.ptc.yml', import.meta.url)), 'utf8')
+
+// 0.2.x (G6): the four `preset*.yml` metadata files are GONE. A declarative
+// preset row carries its own display copy — the platform looks a non-shipped id
+// up in no dictionary and renders the row's literal `name`/`description`
+// (`packages/preset/agent-preset-registry/src/display.ts`) — so the family keeps
+// one table for id, display copy and precondition instead of four files:
+// `bases.json`, the SAME table install-layered.mjs and /evolution preset install read.
+const table = JSON.parse(readFileSync(fileURLToPath(new URL('../bases.json', import.meta.url)), 'utf8')) as {
+  default?: string
+  bases?: Array<{
+    name?: string
+    id?: string
+    display?: { name?: string; description?: string; order?: number }
+    requires?: { service?: string }
+    metadata?: unknown
+  }>
+  metadata?: unknown
+}
+const bases = table.bases ?? []
 const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as {
   files?: string[]
   exports?: Record<string, string>
-}
-
-/** The `key: value` pairs of one preset metadata file (`preset.yml` is flat). */
-function metadataFields(text: string): Record<string, string> {
-  const fields: Record<string, string> = {}
-  for (const line of text.split('\n')) {
-    const match = /^([a-z]+):\s*(.+)$/.exec(line)
-    if (match?.[1] !== undefined && match[2] !== undefined) fields[match[1]] = match[2].trim()
-  }
-  return fields
-}
-
-/**
- * The platform's shipped `ptc` metadata, resolved by walking up to
- * `packages/preset/agent-presets/presets` the way the installer resolves it.
- * The family suite runs inside the platform monorepo, so this is the real
- * runtime text the variant must NOT duplicate.
- * @returns the shipped ptc preset metadata, or undefined when no platform preset
- * root is reachable (the family mirror run without the platform tree).
- */
-function shippedPtcMetadata(): Record<string, string> | undefined {
-  let dir = fileURLToPath(new URL('.', import.meta.url))
-  for (;;) {
-    const candidate = join(dir, 'packages', 'preset', 'agent-presets', 'presets', 'ptc', 'preset.yml')
-    if (existsSync(candidate)) return metadataFields(readFileSync(candidate, 'utf8'))
-    const parent = dirname(dir)
-    if (parent === dir) return undefined
-    dir = parent
-  }
 }
 
 describe('evolution-agent composition', () => {
@@ -87,45 +70,52 @@ describe('evolution-agent composition', () => {
     expect(rows.every(row => Object.values(AGENT_EVOLUTION_ROW_NAMES).includes(rowName(row)))).toBe(true)
   })
 
-  it('ships preset metadata for the roster', () => {
-    expect(preset).toContain('name: Evolution')
-    expect(preset).toContain('Standard coding agent')
-  })
-
-  it('ships PTC variant metadata that names the base it is composed on', () => {
-    const variant = metadataFields(ptcPreset)
-    expect(variant.name).toBe('Evolution PTC')
-    expect(variant.description).toContain('Based on the platform ptc preset')
-    expect(variant.description).toContain('family rows')
-    expect(variant.order).toBe('11')
-  })
-
-  it('publishes variant metadata distinct from both the standard base and the shipped ptc preset', () => {
-    const variant = metadataFields(ptcPreset)
-    const standard = metadataFields(preset)
-    // Distinct from the family's own standard-base metadata: a roster row that
-    // repeated it would list two presets a user cannot tell apart.
-    expect(variant.name).not.toBe(standard.name)
-    expect(variant.description).not.toBe(standard.description)
-    // Distinct from the PLATFORM's shipped ptc metadata, which the platform
-    // resolves through its own localized copy keys before our file is read:
-    // the variant lists after the family preset and never claims its name/order.
-    const shipped = shippedPtcMetadata()
-    if (shipped !== undefined) {
-      expect(variant.name).not.toBe(shipped.name)
-      expect(variant.order).not.toBe(shipped.order)
-      expect(variant.description).not.toBe(shipped.description)
-      expect(Number(variant.order)).toBeGreaterThan(Number(shipped.order))
+  it('carries one display copy per base, and no metadata file behind it', () => {
+    expect(table.default).toBe('standard')
+    expect(bases.length).toBeGreaterThan(0)
+    // The four `preset*.yml` files are gone (0.2.x reads the row, not a file):
+    // a `metadata` field reappearing here means a second source of truth is back.
+    expect(table.metadata).toBeUndefined()
+    for (const base of bases) {
+      expect(base.metadata).toBeUndefined()
+      expect(typeof base.name).toBe('string')
+      expect(typeof base.id).toBe('string')
+      expect(base.id?.startsWith('evolution')).toBe(true)
+      expect(typeof base.display?.name).toBe('string')
+      expect(typeof base.display?.description).toBe('string')
+      expect(typeof base.display?.order).toBe('number')
     }
+    // Ids and display names are what the picker lists: duplicates would render
+    // two presets a user cannot tell apart, or two rows claiming one id.
+    for (const key of ['id', 'name'] as const) {
+      const values = bases.map(base => (key === 'id' ? base.id : base.display?.name))
+      expect(new Set(values).size).toBe(values.length)
+    }
+    const orders = bases.map(base => base.display?.order)
+    expect(new Set(orders).size).toBe(orders.length)
   })
 
-  it('ships and exports the variant metadata (the installer reads it from this package)', () => {
-    // The installer copies the metadata its base table names
-    // (AGENT_PRESET_BASES.<base>.metadata) out of THIS package. A file left out
-    // of the files/exports lists disappears from the published tarball and a
-    // scoped install then has no metadata to write.
-    expect(manifest.files).toContain('preset.ptc.yml')
-    expect(manifest.files).toContain('preset.yml')
-    expect(manifest.exports?.['./preset.ptc.yml']).toBe('./preset.ptc.yml')
+  it('names the ptc variant after the platform base it is composed on', () => {
+    const ptc = bases.find(base => base.name === 'ptc')
+    expect(ptc?.display?.name).toBe('Evolution PTC')
+    expect(ptc?.display?.description).toContain('Based on the platform ptc preset')
+    expect(ptc?.display?.description).toContain('family rows')
+    // The variant lists after the family's default preset and after the
+    // platform's own shipped presets, never claiming their names.
+    const standard = bases.find(base => base.name === 'standard')
+    expect(Number(ptc?.display?.order)).toBeGreaterThan(Number(standard?.display?.order))
+    expect(ptc?.display?.name).not.toBe(standard?.display?.name)
+  })
+
+  it('publishes bases.json and no preset*.yml from the package', () => {
+    // The installer reads the table out of THIS package; a file left out of the
+    // files/exports lists disappears from the published tarball, and a scoped
+    // install then has no base table to compose from.
+    expect(manifest.files).toContain('bases.json')
+    expect(manifest.exports?.['./bases.json']).toBe('./bases.json')
+    const deadFiles = (manifest.files ?? []).filter(file => /^preset.*\.ya?ml$/.test(file))
+    expect(deadFiles).toEqual([])
+    const deadExports = Object.keys(manifest.exports ?? {}).filter(key => /preset.*\.ya?ml$/.test(key))
+    expect(deadExports).toEqual([])
   })
 })

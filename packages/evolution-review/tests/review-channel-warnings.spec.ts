@@ -15,6 +15,8 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 
 /** Capture what the plugin logs during load — the disclosure surface. */
 function captureWarns(ctx: Context): string[] {
@@ -29,24 +31,52 @@ function captureWarns(ctx: Context): string[] {
 const SHADOW_MARK = 'have no effect'
 const LEDGER_MARK = 'NO evolution/plan-applied ledger entry'
 
-async function load(rowConfig: Record<string, unknown>, policyReviewMode?: 'inject' | 'subagent') {
+async function load(rowConfig: Record<string, unknown>, policyReviewMode?: 'inject' | 'subagent', user?: Record<string, unknown>) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   if (policyReviewMode !== undefined) ctx.provide('evolutionPolicy', { get: () => ({ reviewMode: policyReviewMode }) })
+  if (user !== undefined) {
+    // G1: the settings user layer reaches the plugin two ways — the VALUE through the
+    // row's live field, the KEY NAMES through `describe()`. This suite exercises the
+    // naming half only; the value half needs a row assembled by hand (review.spec.ts).
+    ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'settings', {
+      describe: () => [{ ns: 'evolution-review', user }],
+    })
+  }
   const warns = captureWarns(ctx)
   await ctx.plugin(Review, { reviewEnabled: false, ...rowConfig })
   return { ctx, warns }
 }
 
 describe('review row config shadowing (S2.2, v37 P2-24)', () => {
-  it('a row-level reviewMode/memoryInterval/skillInterval is reported once', async () => {
+  it('a row-level reviewMode/reviewMemoryInterval/reviewSkillInterval is reported once', async () => {
     const { warns } = await load({ reviewMode: 'subagent', memoryInterval: 5, skillInterval: 7 }, 'inject')
     const shadowWarns = warns.filter(line => line.includes(SHADOW_MARK))
     expect(shadowWarns).toHaveLength(1)
+    // G1: the report names the CANONICAL registry ids (the ids a deployment writes),
+    // whether the row spelled them or their deprecated aliases.
     expect(shadowWarns[0]).toContain('reviewMode')
-    expect(shadowWarns[0]).toContain('memoryInterval')
-    expect(shadowWarns[0]).toContain('skillInterval')
+    expect(shadowWarns[0]).toContain('reviewMemoryInterval')
+    expect(shadowWarns[0]).toContain('reviewSkillInterval')
     expect(shadowWarns[0]).toContain('evolution-policy row')
+  })
+
+  // G1 §8.4-A: a key the USER set now wins over the policy, so listing it here would
+  // tell the user their effective choice has no effect.
+  it('G1: a key the user set is left out of the shadow report', async () => {
+    const { warns } = await load({ reviewMode: 'subagent', memoryInterval: 5 }, 'inject', { reviewMode: 'subagent' })
+    const shadowWarns = warns.filter(line => line.includes(SHADOW_MARK))
+    expect(shadowWarns).toHaveLength(1)
+    expect(shadowWarns[0]).not.toContain('reviewMode')
+    expect(shadowWarns[0]).toContain('reviewMemoryInterval')
+  })
+
+  // G1: a volatile field always resolves (its schema default is filled in), so the
+  // "did the row set this" test compares against that default — the row that sets
+  // nothing must stay silent, which is the whole point of the disclosure.
+  it('G1: a volatile field left at its default is not reported', async () => {
+    const { warns } = await load({}, 'inject')
+    expect(warns.filter(line => line.includes(SHADOW_MARK))).toHaveLength(0)
   })
 
   it('no row-level value means no shadow warning', async () => {
@@ -76,16 +106,17 @@ describe('inject channel ledger disclosure (S2.2, v37 P1-1c)', () => {
 
   it('the disclosure is per LOAD, not per review boundary', async () => {
     const { ctx, warns } = await load({ memoryInterval: 1, skillInterval: 1 })
-    const session = {
+    // G4: the review's turn window comes from the family's session projection.
+    const session = projectable({
       id: SessionId('s22-ledger-warn-session'),
       seq: 1,
       header: { origin: undefined },
       snapshotEvents: () => [{ type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'skill', arguments: '{}' } }],
       deriveMessages: () => [],
-    } as unknown as Session
-    ctx.agents.register({ id: session.id, session, inject: () => {} } as unknown as Agent)
+    }) as unknown as Session
+    await ctx.agents.register({ id: session.id, session, inject: () => {} } as unknown as Agent)
     for (const turn of [1, 2, 3]) {
-      ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
+      emitSessionEvent(ctx, session, 'turn/end', { turn, reason: { kind: 'completed' } })
     }
     expect(warns.filter(line => line.includes(LEDGER_MARK))).toHaveLength(1)
   })

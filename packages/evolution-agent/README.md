@@ -12,25 +12,32 @@ Agent preset exposing memory and skill evolution tools to a session
 
 `agent.cordis.yml` here is a DELTA: the four evolution model-tool rows and nothing else.
 The installed preset is GENERATED at install time by `packages/scripts/install-layered.mjs`
-(agent / layered modes), which prepends the RUNTIME platform composition the `--base` names
-and writes the result to `$DSH_HOME/.agent-presets/<id>/agent.cordis.yml`. No platform row is
-vendored — the preset follows whichever platform the user actually has.
+(agent / layered modes) or by `/evolution preset install`, which prepends the RUNTIME platform
+composition the `--base` names and writes the result as ONE `- insert:` row in the target
+profile's own patch layer (`<home>/profiles/<profile>/cordis.patch.yml`). No platform row is
+vendored — the preset follows whichever platform the user actually has. 0.2.x removed the preset
+DIRECTORY: a preset is an ordinary composition row (`packages/preset/agent-preset/src/index.ts`),
+so no `.agent-presets/` tree is produced any more.
 
-| `--base` | Platform composition (read verbatim) | Installed preset id | Metadata file |
-|---|---|---|---|
-| `standard` (default) | `<platform>/standard/agent.cordis.yml` | `evolution` | `preset.yml` |
-| `ptc` | `<platform>/ptc/agent.cordis.yml` | `evolution-ptc` | `preset.ptc.yml` |
-| `cordis` (`requires: dynamicCordisRunner`) | `<platform>/cordis/agent.cordis.yml` | `evolution-cordis` | `preset.cordis.yml` |
-| `minimal` (unsupported) | — | `evolution-minimal` | `preset.minimal.yml` |
+| `--base` | Platform base patch (read verbatim) | Preset id | Row id | Display copy |
+|---|---|---|---|---|
+| `standard` (default) | `presets/standard.patch.yml` | `evolution` | `preset-evolution` | `Evolution` |
+| `ptc` | `presets/ptc.patch.yml` | `evolution-ptc` | `preset-evolution-ptc` | `Evolution PTC` |
+| `cordis` (`requires: dynamicCordisRunner`) | `presets/cordis.patch.yml` | `evolution-cordis` | `preset-evolution-cordis` | `Evolution Cordis` |
+| `minimal` (unsupported) | — | `evolution-minimal` | `preset-evolution-minimal` | `Evolution Minimal` |
 
-The `Metadata file` column names the per-variant metadata SOURCE in THIS
-package (`bases.json` `metadata`). Both install paths write that file's
-CONTENT as the platform's own `preset.yml` inside the installed preset
-directory — `preset.yml` is the ONLY metadata filename the picker reads
-(agent-presets `METADATA_FILE`), so a variant installed as `preset.ptc.yml`
-would show a bare id with no description/order.
+The base patches are the platform's own shipped presets
+(`packages/bundle/web-app/presets/<base>.patch.yml`); inside the desktop app they live in
+`resources/app.asar`, so `DSH_AGENT_PRESET_ROOT` can point at a same-version copy.
 
-`bases.json` in this package is the single table behind all four columns: the installer
+There is no metadata FILE any more. A declarative row carries its own display copy, and the
+platform renders an id it did not ship from the row itself
+(`packages/preset/agent-preset-registry/src/display.ts`), so both install paths write `name`,
+`description` and `order` into the row out of `bases.json` `display` — a variant without them
+shows the bare id. The four former `preset*.yml` files were deleted with the directory
+mechanism.
+
+`bases.json` in this package is the single table behind every column above: the installer
 (`AGENT_PRESET_BASES`) and the host command (`/evolution preset install --base <name>`) both
 read THIS file, so a base cannot be half-added (a directory one consumer knows about and
 another does not) and the two install paths cannot disagree. It also carries `default`. A base whose

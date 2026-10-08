@@ -18,15 +18,15 @@
  * @module @deepseek-ai/dsh-tool-skill-manage
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, installParamSection, paramNamespace, policyStageLimits, readNumberParam, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import type { CitationPolicy, ParamOverrides, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import type { CitationPolicy, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
@@ -54,17 +54,26 @@ const GUIDANCE_WITH_GUARD = `${SKILLS_GUIDANCE}{{${PROTECTED_SKILLS_VARIABLE}}}`
 export interface Config {
   /** Skill tree root; empty uses $DSH_HOME/skills. Align with skill-usage/catalog rows. */
   root?: string
-  maxSkillNameLength?: number
-  maxDescriptionLength?: number
-  /** Read cap for SKILL.md writes. Same semantic as the policy row's
-   * `skillContentChars` (the canonical id, G0/S0.2) — but NO automatic
-   * shadowing today: this row's value is what the write paths use, which is
-   * what the G3 unification has to close. Deprecated alias (G0/S0.3): still
-   * readable, refused by writes; removed in 0.7.0. */
+  maxSkillNameLength?: Volatile<number>
+  maxDescriptionLength?: Volatile<number>
+  /** Read cap for SKILL.md writes — the CANONICAL registry id (G1) and a LIVE row
+   * field; the deprecated alias below is the fallback spelling. No schema default:
+   * the alias carries it, and a default on the canonical key would fill it and make
+   * the alias unreachable. */
+  skillContentChars?: Volatile<number | undefined>
+  /** Refuse a move that would leave a dangling reference, or verify it — the
+   * CANONICAL registry id (G1). The user layer sits above the policy stages,
+   * which sit above this row. */
+  citationPolicy?: Volatile<CitationPolicy | undefined>
+  /** Warn about an oversize support file, or refuse the write — the CANONICAL
+   * registry id (G1). */
+  supportFileCharPolicy?: Volatile<SupportFileCharPolicy | undefined>
+  /** Deprecated alias of `skillContentChars` (G0/S0.3): still readable, refused
+   * by writes; removed in 0.7.0. */
   maxSkillContentChars?: number
-  maxSkillFileBytes?: number
+  maxSkillFileBytes?: Volatile<number>
   /** When true, create/update refuse a description over the 60-char authoring bar (default: advisory feedback only). */
-  descriptionStrict?: boolean
+  descriptionStrict?: Volatile<boolean>
   /** V10-03 (P2-18): threat-scan exemption labels forwarded to the skill
    * write path (core `ScanOptions.excludeLabels`). Default empty — the
    * strict ANY-hit-blocks behavior is unchanged; deployments opt in per
@@ -74,40 +83,53 @@ export interface Config {
    * catalog resolves to a NON-family source (project/custom sources outrank
    * the family tree) is REFUSED instead of warned about. Default false —
    * warn only, keeping the family tree an autonomous evolution zone. */
-  strictCrossSource?: boolean
+  strictCrossSource?: Volatile<boolean>
   /** Content versions retained per skill (skill-history.ts). E2: a deployment value on this row,
    * like the four caps above — the settings layer deliberately has no card for it (retention is
    * storage policy, not an authoring knob). */
   skillVersionKeep?: number
   /** What the ONE confirmation before a create or a bare delete does (registry `skillWriteConfirm`).
    * Default `auto`: an unattended run must not park a tool call on a question nobody will answer. */
-  skillWriteConfirm?: WriteConfirmMode
+  skillWriteConfirm?: Volatile<WriteConfirmMode>
   /** Seconds a `timeout`-mode prompt waits for an answer before the write is cancelled. */
-  skillWriteConfirmTimeoutSeconds?: number
+  skillWriteConfirmTimeoutSeconds?: Volatile<number>
 }
 
-export const Config: z<Config> = z.object({
+// G1: the ten E3 keys carry `.volatile()`, so the platform hands the plugin a stable
+// reference it updates in place and the settings surface edits them live. The schema
+// keeps NO annotation: a volatile field's output is a reference, which the annotated
+// `z<Config>` reading cannot express (TS2375).
+export const Config = z.object({
   root: z.string().default(''),
   // 0.3.18 (S4.6, T-13): lower bound 1 — a 0/negative limit rejected every
   // write with a meaningless message instead of failing at configuration time.
-  maxSkillNameLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxNameLength),
-  maxDescriptionLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxDescriptionLength),
+  maxSkillNameLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxNameLength).volatile(),
+  maxDescriptionLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxDescriptionLength).volatile(),
+  // G1: the canonical registry ids, merged into the row Config. No .default() on
+  // skillContentChars: a schema default would fill the canonical key and make the
+  // deprecated alias below unreachable (rowSettings resolves the default after it).
+  skillContentChars: z.number().min(1).volatile(),
+  citationPolicy: z.union([z.const('verify'), z.const('refuse')]).volatile(),
+  supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).volatile(),
+  // Deprecated alias of skillContentChars (PARAM_ALIASES): the fallback spelling,
+  // refused by writes, removed 0.7.0. Deployment-only (no `.volatile()`).
   maxSkillContentChars: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
-  maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
-  descriptionStrict: z.boolean().default(false),
+  maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes).volatile(),
+  descriptionStrict: z.boolean().default(false).volatile(),
   // V10-03 (P2-18): default empty — the strict ANY-hit-blocks threat scan is
   // unchanged unless a deployment explicitly opts labels in.
   threatExemptLabels: z.array(z.string()).default([]),
   // OPT-19 (plan D3): default warn-only on cross-source same-name writes.
-  strictCrossSource: z.boolean().default(false),
-  // skill-history.ts: how many content versions each skill keeps. Lower bound 1 — the history
-  // trim would otherwise drop the version it just recorded.
+  strictCrossSource: z.boolean().default(false).volatile(),
+  // skill-history.ts: how many content versions each skill keeps. E2 (restart-only):
+  // storage policy, not an authoring knob — it stays out of the live set on purpose.
+  // Lower bound 1 — the history trim would otherwise drop the version it just recorded.
   skillVersionKeep: z.number().min(1).default(DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
   // The write-admission confirmation (0.12.0). The DEFAULT is `auto`: a background pass, a
   // scheduled review or a headless session has nobody to answer a question, and a tool call parked
   // on one blocks the run. `ask` restores the wait-forever behaviour; `timeout` asks and cancels.
-  skillWriteConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default(DEFAULT_WRITE_CONFIRM_MODE),
-  skillWriteConfirmTimeoutSeconds: z.number().min(1).default(DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
+  skillWriteConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default(DEFAULT_WRITE_CONFIRM_MODE).volatile(),
+  skillWriteConfirmTimeoutSeconds: z.number().min(1).default(DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS).volatile(),
 })
 
 /** Write behaviour a user may change (G3/S3.4). Field names are the CANONICAL
@@ -137,35 +159,28 @@ export interface SkillSettings {
   skillWriteConfirmTimeoutSeconds: number
 }
 
-/** Schema the platform validates the user layer against; defaults mirror the core
- * constants and the row schema, so an empty document resolves to today's behaviour. */
-export const SKILLS_SETTINGS_SCHEMA: z<SkillSettings> = z.object({
-  skillContentChars: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
-  maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
-  maxSkillNameLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxNameLength),
-  maxDescriptionLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxDescriptionLength),
-  descriptionStrict: z.boolean().default(false),
-  strictCrossSource: z.boolean().default(false),
-  citationPolicy: z.union([z.const('verify'), z.const('refuse')]).default(DEFAULT_CITATION_POLICY),
-  supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).default(DEFAULT_SUPPORT_FILE_CHAR_POLICY),
-  skillWriteConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default(DEFAULT_WRITE_CONFIRM_MODE),
-  skillWriteConfirmTimeoutSeconds: z.number().min(1).default(DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
-})
-
 /** The four caps a user may only tighten, in schema order (the sentry reads it). */
 export const SKILL_SETTINGS_CAPS = ['skillContentChars', 'maxSkillFileBytes', 'maxSkillNameLength', 'maxDescriptionLength'] as const
 
 /**
- * Refuse a resolved section whose cap sits ABOVE the deployment's allocation.
+ * Refuse a candidate config whose cap sits ABOVE the value in effect.
  * Windows have no single-field bound the schema could express, and a user who
- * widened one would spend a budget the deployment set for the whole library.
- * @param value - the resolved section the platform hands the owner.
- * @param ceilings - the deployment values (the plugin row, after its clamps).
+ * widened one would spend a budget the deployment set for the whole library. The
+ * platform runs this rule through the config waterfall on every candidate BEFORE it
+ * is written (config-editor/src/index.ts:103), so a widening write is refused
+ * instead of stored, and the ceiling is the value in effect at that moment.
+ * @param candidate - the caps of the candidate config; an absent key is unconstrained.
+ * @param ceilings - the caps in effect before the write.
+ * @throws when a candidate cap exceeds its ceiling.
  */
-export function validateSkillSettings(value: SkillSettings, ceilings: Pick<SkillSettings, (typeof SKILL_SETTINGS_CAPS)[number]>): void {
+export function validateSkillSettings(
+  candidate: Partial<Pick<SkillSettings, (typeof SKILL_SETTINGS_CAPS)[number]>>,
+  ceilings: Pick<SkillSettings, (typeof SKILL_SETTINGS_CAPS)[number]>,
+): void {
   for (const key of SKILL_SETTINGS_CAPS) {
-    if (value[key] > ceilings[key]) {
-      throw new Error(`${key} may only be tightened: ${value[key]} exceeds the deployment value ${ceilings[key]}`)
+    const next = candidate[key]
+    if (next !== undefined && next > ceilings[key]) {
+      throw new Error(`${key} may only be tightened: ${next} exceeds the deployment value ${ceilings[key]}`)
     }
   }
 }
@@ -366,6 +381,15 @@ function policySnapshotOf(source: unknown): ({ protectedSkillNames?: readonly st
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
+  // G1: suppress the platform's auto-generated settings page for this row (the
+  // family renders its own card from the registry). Probed, not assumed: a host
+  // without the capability still loads.
+  ctx.inject(['settings'], (injected) => {
+    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }) => unknown } }).settings
+    if (typeof settings?.configure !== 'function') return
+    const disposer = settings.configure({ auto: false })
+    if (typeof disposer === 'function') ctx.effect(() => disposer as () => void, 'tool-skill-manage: settings presentation')
+  })
   // Hermes SKILLS_GUIDANCE parity: when the system-prompt service is mounted,
   // register the skills guidance section exactly when THIS tool mounts (i.e.
   // when `skill_manage` is actually available to the model — the DSH analogue
@@ -489,90 +513,94 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
   }
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-  // V6-06 (0.3.35): the numeric limits go through the assembly-time clamp so a
-  // 0/negative/NaN/±Infinity value falls back to the package default instead
-  // of silently disabling the limit (`limit > NaN` is always false). The
-  // schema `.min(1)` rejects 0/negative at load; this clamp also covers
-  // NaN/±Infinity. Warn once when a user-supplied value had to be corrected.
-  const numericClamped: string[] = []
-  const limit = (name: string, value: number | undefined, fallback: number): number => {
-    const result = clampedNumber(value, fallback, { min: 1 })
-    if (value !== undefined && result !== value) numericClamped.push(name)
+  // V6-06 (0.3.35): the numeric limits go through a clamp so a 0/negative/NaN/±Infinity
+  // value falls back to the package default instead of silently disabling the limit
+  // (`limit > NaN` is always false). The schema `.min(1)` rejects 0/negative at load;
+  // this clamp also covers NaN/±Infinity. G1 §8.3: the read happens at USE time, so the
+  // correction warns once per KEY per mount instead of once at assembly.
+  const clampedKeys = new Set<string>()
+  const limit = (name: string, value: number | Volatile<number | undefined> | undefined, fallback: number): number => {
+    const current = typeof value === 'object' ? value.get() : value
+    const result = clampedNumber(current, fallback, { min: 1 })
+    if (current !== undefined && result !== current && !clampedKeys.has(name)) {
+      clampedKeys.add(name)
+      ctx.logger.warn(`tool-skill-manage: ${name} provided an invalid value; falling back to the default`)
+    }
     return result
   }
-  // V10-03 (P2-18): forward the threat-exemption allowlist through the
-  // library's `threatExemptLabels` option (→ core
-  // `ScanOptions.excludeLabels`). No behavioral fork: absent config stays
-  // `[]` (strict scan).
-  const libraryOptions: SkillLimits = {
-    // 0.5.0 (§16.7): the write-behaviour STAGES come from the deployment policy
-    // snapshot, so cordis.yml can select a stage without a code change.
-    ...policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy'))),
-    maxNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
-    maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
-    // G0/S0.4: alias-aware read (canonical `skillContentChars` resolves too).
-    maxSkillContentChars: limit('maxSkillContentChars', readNumberParam(rawConfig, 'skillContentChars'), DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+  /**
+   * This row's write knobs as they stand RIGHT NOW (G1 §8.3) — the base layer of the
+   * precedence chain. The ten E3 keys are live references the platform updates in
+   * place, and the deprecated `maxSkillContentChars` alias stays the fallback spelling
+   * of `skillContentChars`. Every numeric field is clamped (V6-06).
+   * @returns the row layer of the write settings.
+   */
+  const rowSettings = (): SkillSettings => ({
+    skillContentChars: limit('maxSkillContentChars', rawConfig.skillContentChars?.get() ?? rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
-    // skill-history.ts (batch A): the same assembly-time clamp covers 0/negative/NaN.
-    versionKeep: limit('skillVersionKeep', rawConfig.skillVersionKeep, DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
+    maxSkillNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
+    maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
+    descriptionStrict: rawConfig.descriptionStrict?.get() ?? false,
+    strictCrossSource: rawConfig.strictCrossSource?.get() ?? false,
+    citationPolicy: rawConfig.citationPolicy?.get() ?? DEFAULT_CITATION_POLICY,
+    supportFileCharPolicy: rawConfig.supportFileCharPolicy?.get() ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+    skillWriteConfirm: rawConfig.skillWriteConfirm?.get() ?? DEFAULT_WRITE_CONFIRM_MODE,
+    skillWriteConfirmTimeoutSeconds: limit('skillWriteConfirmTimeoutSeconds', rawConfig.skillWriteConfirmTimeoutSeconds, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
+  })
+  /**
+   * The keys the user set in this row's namespace (G1 §8.4-A). This is the ONLY
+   * remaining read of the settings user layer, and it reads KEY NAMES, never values:
+   * the platform resolves the user layer into the row's live fields, so the value
+   * comes from `rowSettings()`.
+   * @returns the keys present in this row's user layer.
+   */
+  const userSetKeys = (): ReadonlySet<string> => {
+    const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
+    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('tool-skill-manage'))
+    return new Set(Object.keys(entry?.user ?? {}))
   }
-  // G3/S3.4: the library reads `this.limits.<field>` at EVERY use site, so the
-  // object it was handed is the live surface — a committed settings change
-  // REWRITES it instead of rebuilding the library (a rebuild would drop the
-  // in-process serial chain and re-copy the threat allowlist).
-  // Named at the call site: the construction guard reads `limits:` as the
-  // explicit decision (a shorthand property reads as 'took the defaults').
-  const libraryLimits: SkillLimits = { ...libraryOptions }
-  const library = newSkillLibrary({ config: rawConfig, io, limits: libraryLimits, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
-  // V7-12 (0.3.43): the warn must run AFTER the limit() calls above — the
-  // former position evaluated the always-empty array before any limit ran,
-  // so an invalid config value was never surfaced.
-  if (numericClamped.length > 0) {
-    ctx.logger.warn(`tool-skill-manage: ${numericClamped.join(', ')} provided an invalid value; falling back to the default`)
-  }
-  // G3/S3.4: the USER layer sits above the deployment carriers. `settings()` is the
-  // one reader of this group's knobs — user > policy snapshot (the stages) > row >
-  // the schema default the row resolved to — and the library limits are rewritten
-  // from it on every committed change, so a write cap or a stage takes effect at
-  // the NEXT write with no restart.
-  const settingsBase: SkillSettings = {
-    skillContentChars: libraryLimits.maxSkillContentChars,
-    maxSkillFileBytes: libraryLimits.maxSkillFileBytes,
-    maxSkillNameLength: libraryLimits.maxNameLength,
-    maxDescriptionLength: libraryLimits.maxDescriptionLength,
-    descriptionStrict: rawConfig.descriptionStrict ?? false,
-    strictCrossSource: rawConfig.strictCrossSource ?? false,
-    citationPolicy: libraryLimits.citationPolicy ?? DEFAULT_CITATION_POLICY,
-    supportFileCharPolicy: libraryLimits.supportFileCharPolicy ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY,
-    skillWriteConfirm: rawConfig.skillWriteConfirm ?? DEFAULT_WRITE_CONFIRM_MODE,
-    skillWriteConfirmTimeoutSeconds: rawConfig.skillWriteConfirmTimeoutSeconds ?? DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS,
-  }
-  // The reader lives in a holder: attaching the section can fire `onChange`
-  // inside this same tick, before the assignment below completes.
-  const section: { overrides?: ParamOverrides<SkillSettings> } = {}
+  /**
+   * G3/S3.4 + G1: the USER layer sits above the deployment carriers. `settings()` is
+   * the one reader of this group's knobs — a key the user set (whose value arrived
+   * through the row's live field), then the policy STAGES, then this row. Consumers
+   * read it at USE time, so a committed change takes effect at the NEXT write with no
+   * restart.
+   * @returns the resolved write settings.
+   */
   const settings = (): SkillSettings => {
+    const row = rowSettings()
     const stages = policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy')))
-    // `overridden` answers 'did the user set this key'; `pick` fills the gap with
-    // the deployment value, and the stages keep the policy snapshot between them.
-    const overridden = <K extends keyof SkillSettings>(key: K): SkillSettings[K] | undefined => section.overrides?.get(key)
-    const pick = <K extends keyof SkillSettings>(key: K): SkillSettings[K] => overridden(key) ?? settingsBase[key]
-    // A user value stays inside its bound: the schema `.min(1)` rejects 0 and
-    // negatives, and a NaN/±Infinity value (which passes that check) falls back
-    // to the deployment value rather than disabling a cap (`limit > NaN` is false).
-    const cap = (value: number, lower: number): number => clampedNumber(value, lower, { min: 1 })
+    const userSet = userSetKeys()
+    // Only these two knobs have a policy stage; the rest end at the row.
     return {
-      skillContentChars: cap(pick('skillContentChars'), settingsBase.skillContentChars),
-      maxSkillFileBytes: cap(pick('maxSkillFileBytes'), settingsBase.maxSkillFileBytes),
-      maxSkillNameLength: cap(pick('maxSkillNameLength'), settingsBase.maxSkillNameLength),
-      maxDescriptionLength: cap(pick('maxDescriptionLength'), settingsBase.maxDescriptionLength),
-      descriptionStrict: pick('descriptionStrict'),
-      strictCrossSource: pick('strictCrossSource'),
-      citationPolicy: overridden('citationPolicy') ?? stages.citationPolicy ?? settingsBase.citationPolicy,
-      supportFileCharPolicy: overridden('supportFileCharPolicy') ?? stages.supportFileCharPolicy ?? settingsBase.supportFileCharPolicy,
-      skillWriteConfirm: pick('skillWriteConfirm'),
-      skillWriteConfirmTimeoutSeconds: pick('skillWriteConfirmTimeoutSeconds'),
+      ...row,
+      citationPolicy: userSet.has('citationPolicy') ? row.citationPolicy : (stages.citationPolicy ?? row.citationPolicy),
+      supportFileCharPolicy: userSet.has('supportFileCharPolicy') ? row.supportFileCharPolicy : (stages.supportFileCharPolicy ?? row.supportFileCharPolicy),
     }
   }
+  // G3/S3.4 + G1: the library reads `this.limits.<field>` at EVERY use site, so the
+  // object it was handed is the live surface — a resolved change REWRITES it instead
+  // of rebuilding the library (a rebuild would drop the in-process serial chain and
+  // re-copy the threat allowlist). `applyLimits()` is the ONE materialization step:
+  // it runs at mount and at the top of every tool call (G1 §8.3 — read at use time,
+  // no watcher). V10-03 (P2-18): the threat-exemption allowlist goes to the library
+  // as its own option (→ core `ScanOptions.excludeLabels`); absent config stays `[]`.
+  // Named at the call site: the construction guard reads `limits:` as the explicit
+  // decision (a shorthand property reads as 'took the defaults').
+  const libraryLimits: SkillLimits = {
+    maxNameLength: DEFAULT_SKILL_LIMITS.maxNameLength,
+    maxDescriptionLength: DEFAULT_SKILL_LIMITS.maxDescriptionLength,
+    maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars,
+    maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes,
+    referenceRewrite: DEFAULT_REFERENCE_REWRITE_POLICY,
+    archiveRetention: DEFAULT_ARCHIVE_RETENTION_POLICY,
+    supportFileCharPolicy: DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+    // skill-history.ts (batch A): the same clamp covers 0/negative/NaN. E2 — the
+    // steady value, not a per-call one.
+    versionKeep: limit('skillVersionKeep', rawConfig.skillVersionKeep, DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
+  }
+  const library = newSkillLibrary({ config: rawConfig, io, limits: libraryLimits, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
+  /** Write the CURRENT resolved settings into the library's live limits object. */
   const applyLimits = (): void => {
     const resolved = settings()
     // Read the deployment carriers at apply time too: a policy edit lands on the
@@ -594,28 +622,25 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       supportFileCharPolicy: resolved.supportFileCharPolicy,
     })
   }
-  section.overrides = installParamSection<SkillSettings>(
-    ctx,
-    paramNamespace('tool-skill-manage'),
-    SKILLS_SETTINGS_SCHEMA,
-    settingsBase,
-    {
-      warn: (message) => { ctx.logger.warn('dsh-evolution-skills: ' + message) },
-      // The caps ride the platform's owner hook: a resolved section that widens
-      // one is refused at the WRITE, and the deployment value stays the ceiling.
-      validate: (value) => {
-        validateSkillSettings(value, {
-          skillContentChars: settingsBase.skillContentChars,
-          maxSkillFileBytes: settingsBase.maxSkillFileBytes,
-          maxSkillNameLength: settingsBase.maxSkillNameLength,
-          maxDescriptionLength: settingsBase.maxDescriptionLength,
-        })
-      },
-      onChange: () => { applyLimits() },
-    },
-  )
-  // A provider that attached inside this tick fired `onChange` before the holder
-  // held the reader; apply once more so an initial user section is not missed.
+  // G1 §0.3 + §8.5 step 4: the tighten-only rule the old settings `validate` hook
+  // enforced now rides the platform's config waterfall. The platform runs this hook on
+  // every candidate BEFORE it is written (config-editor/src/index.ts:103), so a
+  // widening write is refused instead of stored; the ceiling is the value in effect at
+  // that moment (this row, user layer included) — the deployment's allocation, as long
+  // as no widening write ever landed. The fiber guard keeps a child fiber's candidate
+  // out of this row's decision (precedent: packages/llm/llm-pi-ai/src/index.ts:172-181).
+  ctx.on('internal/config', function (this: Fiber, _previous: unknown, next: () => unknown) {
+    const value = next()
+    if (this !== ctx.fiber) return value
+    const ceilings = rowSettings()
+    validateSkillSettings(value as Partial<Pick<SkillSettings, (typeof SKILL_SETTINGS_CAPS)[number]>>, {
+      skillContentChars: ceilings.skillContentChars,
+      maxSkillFileBytes: ceilings.maxSkillFileBytes,
+      maxSkillNameLength: ceilings.maxSkillNameLength,
+      maxDescriptionLength: ceilings.maxDescriptionLength,
+    })
+    return value
+  })
   applyLimits()
   // OPT-19 (plan D3) + v39 scope correction: a scope-less `skills.list()` reads
   // the GLOBAL layer only, so a PRESET-mounted catalog (the family's own provider
@@ -998,6 +1023,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // F-06: `session` is optional in the exec contract too — the
     // defensive chaining below is only honest if the type says so.
     async execute(args: SkillWriteArgs, exec: SkillToolExec) {
+      // G1 §8.3: the resolved write settings are materialized for the LIBRARY here, at
+      // the one entry every mutation goes through — a committed settings or policy
+      // edit takes effect at the next call, with no restart and no watcher.
+      applyLimits()
       // Single-source origin table (rc.44 M2-2.3): the APPROVAL surface treats
       // every delegated subagent as the review channel, while the LIBRARY
       // surface keeps the Hermes distinction - a delegated subagent write is
@@ -1055,7 +1084,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         args,
         origin: libraryOrigin,
         protectedNames: protectedSkillNamesOf(),
-        readNames: sessionReadSkillNames(exec.agent?.session),
+        readNames: sessionReadSkillNames(ctx, exec.agent?.session),
         confirm: async request => confirmSkillWrite(request, exec),
         // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.
         confirmMode: settings().skillWriteConfirm,

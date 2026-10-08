@@ -3,8 +3,8 @@ import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
-import { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
-import type { CodeRunRequest, CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
+import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
+import type { PtcRunRequest, PtcRunResult, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 // `dsh-evolution-io-node` is a FUNCTION plugin (named `name`/`inject`/`apply`,
 // no default export), so it is mounted as a namespace; the two service packages
@@ -261,7 +261,7 @@ describe('skill-usage', () => {
   it('v37 P7a: counts a skill read dispatched inside a run_code program (PTC modality)', async () => {
     const root = await tempRoot('dsh-usage-ptc-')
     // The REAL platform PTC stack: ToolRuntime in 'ptc' mode plus the run_code
-    // bridge, with a stub CodeRuntime whose program calls the SDK's skill
+    // bridge, with a stub PtcRuntime whose program calls the SDK's skill
     // binding. The sidecar consumes the same session/event stream the platform
     // produces — before P7a it matched 'tool/call', which the PTC bridge never
     // writes, so the view counter stayed at zero and the observation window
@@ -269,7 +269,7 @@ describe('skill-usage', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt, {})
-    await ctx.plugin(PtcProbeCodeRuntime)
+    await ctx.plugin(PtcProbeRuntime)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
@@ -422,12 +422,16 @@ describe('skill-usage', () => {
   })
 })
 
-/** Stub CodeRuntime: runs a one-line program that reads ONE skill through the SDK binding. */
-class PtcProbeCodeRuntime extends CodeRuntime {
+/** Stub PtcRuntime: runs a one-line program that reads ONE skill through the SDK binding. */
+class PtcProbeRuntime extends PtcRuntime {
   readonly language = 'typescript'
   readonly isolation = 'p7a-spec'
-  async run(request: CodeRunRequest): Promise<CodeRunResult> {
-    const namespace = request.bindings.find(entry => entry.global === 'tools')
+  // 0.2.x provider contract: resolve() fixes the directory and deadline, run() executes them.
+  resolve(request: PtcRunRequest): PtcRunSpec {
+    return { ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: request.timeoutMs ?? null }
+  }
+  async run(spec: PtcRunSpec): Promise<PtcRunResult> {
+    const namespace = spec.bindings.find(entry => entry.global === 'tools')
     if (namespace === undefined) return { logs: [], error: { kind: 'exception', message: 'no tools namespace' } }
     const value = await namespace.functions['skill']!({ name: 'ptc-read' })
     return { value, logs: [] }

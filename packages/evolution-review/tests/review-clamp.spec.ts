@@ -4,6 +4,7 @@ import { Config } from '../src/index.ts'
 import * as Review from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { DEFAULT_REVIEW_MEMORY_INTERVAL } from '@deepseek-ai/dsh-evolution-core'
+import { vol } from '../../test-support/volatile-config.ts'
 
 // Every numeric field below clamps to at least 1: a 0 interval would fire a
 // review every turn, a 0 timeout means AbortSignal.timeout(0) (aborts
@@ -40,27 +41,31 @@ describe('evolution-review G3.1 numeric clamping', () => {
     const clamped = Review.clampReviewConfig({ reviewTimeoutMs: 0, reviewMaxDepth: 0, memoryInterval: NaN }, ctx)
     // reviewTimeoutMs 0 → the 120 000 default (NOT "no timeout": AbortSignal.timeout(0)
     // aborts immediately). reviewMaxDepth 0 → 1 (the 0.3.1 spawn-reject defect).
-    // memoryInterval NaN → DEFAULT_REVIEW_MEMORY_INTERVAL.
     expect(clamped.reviewTimeoutMs).toBe(120_000)
     expect(clamped.reviewMaxDepth).toBe(1)
-    expect(clamped.memoryInterval).toBe(DEFAULT_REVIEW_MEMORY_INTERVAL)
+    // G1: the deprecated cadence alias is the live interval key's fallback spelling,
+    // so it is clamped by the row resolver (which warns through the same sink shape).
+    const warn = (message: string): void => { ctx.logger.warn('dsh-evolution-review: ' + message) }
+    const row = Review.resolveReviewRowSettings({ memoryInterval: NaN }, warn)
+    expect(row.reviewMemoryInterval).toBe(DEFAULT_REVIEW_MEMORY_INTERVAL)
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
   })
 
 
-  it('G0/S0.4: a row spelling the canonical ids resolves exactly like the alias', async () => {
+  it('G0/S0.4 + G1: a row spelling the canonical ids resolves exactly like the alias', async () => {
     const ctx = new Context()
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
-    // The canonical ids (`reviewSkillInterval`/`reviewMemoryInterval`) reach the
-    // row carrier once G3 widens the schema; the alias-aware read makes both
-    // spellings resolve to the same number already, with no clamp warning.
-    const clamped = Review.clampReviewConfig(
-      { reviewSkillInterval: 30, reviewMemoryInterval: 12 } as unknown as Review.Config,
-      ctx,
-    )
-    expect(clamped.skillInterval).toBe(30)
-    expect(clamped.memoryInterval).toBe(12)
+    // G1: the canonical ids are LIVE fields, so the loader hands the plugin a
+    // reference (modelled by `vol`) — the resolver reads the canonical key first and
+    // falls back to the deprecated alias, resolving both spellings to one number.
+    const warn = (message: string): void => { ctx.logger.warn('dsh-evolution-review: ' + message) }
+    const canonical = Review.resolveReviewRowSettings({ reviewSkillInterval: vol(30), reviewMemoryInterval: vol(12) }, warn)
+    expect(canonical.reviewSkillInterval).toBe(30)
+    expect(canonical.reviewMemoryInterval).toBe(12)
+    const aliased = Review.resolveReviewRowSettings({ skillInterval: 30, memoryInterval: 12 }, warn)
+    expect(aliased.reviewSkillInterval).toBe(30)
+    expect(aliased.reviewMemoryInterval).toBe(12)
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
   })

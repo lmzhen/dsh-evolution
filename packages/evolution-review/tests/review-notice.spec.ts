@@ -8,12 +8,19 @@
  * outstanding, and an event about an OLDER message can never settle the current one.
  */
 import { describe, expect, it } from 'vitest'
-import { isReviewNotice, noticeAfter, REVIEW_NOTICE_PLUGIN, type ReviewNotice } from '../src/review-notice.ts'
+import { isReviewNotice, noticeAfter, REVIEW_NOTICE_KIND, REVIEW_NOTICE_LEGACY_KIND, type ReviewNotice } from '../src/review-notice.ts'
 
 /** One notice of ours, in the shape the platform reports (durable source fields only). */
 const ours = (id: string) => ({
   id,
-  source: { kind: 'plugin', plugin: REVIEW_NOTICE_PLUGIN, form: 'notice' },
+  source: { kind: REVIEW_NOTICE_KIND, form: 'notice' },
+})
+
+/** A notice this plugin persisted BEFORE the 0.2.x line, read back through the platform's
+ * session-format v3→v4 rewrite of the shared `{ kind: 'plugin', plugin }` source. */
+const migrated = (id: string) => ({
+  id,
+  source: { kind: REVIEW_NOTICE_LEGACY_KIND, form: 'notice' },
 })
 
 /** A human message, or another plugin's notice: not ours to track. */
@@ -22,9 +29,10 @@ const foreign = (id: string, source: Record<string, string> = { kind: 'user' }) 
 describe('one outstanding review notice per session (A)', () => {
   it('recognizes its own notices by the durable source, not by a remembered id', () => {
     expect(isReviewNotice(ours('m1'))).toBe(true)
+    expect(isReviewNotice(migrated('m1')), 'a pre-0.2.x notice stays ours through the v3→v4 rewrite').toBe(true)
     expect(isReviewNotice(foreign('m1'))).toBe(false)
-    expect(isReviewNotice(foreign('m1', { kind: 'plugin', plugin: 'other-plugin', form: 'notice' }))).toBe(false)
-    expect(isReviewNotice(foreign('m1', { kind: 'plugin', plugin: REVIEW_NOTICE_PLUGIN, form: 'relay' }))).toBe(false)
+    expect(isReviewNotice(foreign('m1', { kind: 'hooks-codex', form: 'notice' }))).toBe(false)
+    expect(isReviewNotice(foreign('m1', { kind: REVIEW_NOTICE_KIND, form: 'relay' }))).toBe(false)
     expect(isReviewNotice({ id: 'm1' })).toBe(false)
   })
 

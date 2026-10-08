@@ -26,7 +26,8 @@ async function mount(rawInput: string, options: FakeOptions = {}): Promise<{ kin
   ctx.provide('settings', {
     describe: () => [
       { ns: 'evolution-review', revision: options.revision ?? 4, user: options.user ?? {}, value: { reviewSkillInterval: 10, reviewEnabled: true, reviewMode: 'inject' } },
-      { ns: 'evolution-skills', revision: 7, user: {}, value: { descriptionStrict: false, skillContentChars: 100_000 } },
+      // The settings id is the row id (the Loader entry id), not the legacy namespace.
+      { ns: 'tool-skill-manage', revision: 7, user: {}, value: { descriptionStrict: false, skillContentChars: 100_000 } },
     ],
     update: async (namespace: string, patch: object, expected?: number) => {
       if (options.conflict === true) {

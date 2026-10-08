@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
-import { cordisRows, rowIds } from '../../test-support/cordis-rows.ts'
+import { cordisRows, rowId, rowIds } from '../../test-support/cordis-rows.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 // Every case below spawns the installer (it ships no type declarations, so the
@@ -39,58 +39,72 @@ async function callInstaller(body: string): Promise<unknown> {
   return JSON.parse(Buffer.from(stdout, 'base64').toString('utf8'))
 }
 
-/** Ids of every top-level `- id:` row, in file order. */
-function rowIdList(composition: string): string[] {
-  const ids: string[] = []
-  for (const line of composition.split('\n')) {
-    const match = /^- id:\s*(\S+)\s*$/.exec(line)
-    if (match?.[1] !== undefined) ids.push(match[1])
-  }
-  return ids
-}
-
-/** How many times each row id appears — the duplicate-row probe. */
-function idCounts(composition: string): Map<string, number> {
-  const counts = new Map<string, number>()
-  for (const id of rowIdList(composition)) counts.set(id, (counts.get(id) ?? 0) + 1)
-  return counts
-}
-
-/**
- * The runtime agent-preset root, resolved the way the installer resolves it
- * (walk up until `packages/preset/agent-presets/presets` appears) so this spec
- * works from both family layouts.
- * @returns the absolute directory holding the shipped presets.
- */
-function platformPresetRoot(): string {
-  let dir = dirname(fileURLToPath(import.meta.url))
-  for (;;) {
-    const candidate = join(dir, 'packages', 'preset', 'agent-presets', 'presets')
-    if (existsSync(candidate)) return candidate
-    const parent = dirname(dir)
-    if (parent === dir) throw new Error('platform agent-preset root not found above the spec')
-    dir = parent
-  }
-}
-
 async function runInstaller(home: string, mode: string, extra: string[] = [], env: Record<string, string> = {}) {
   return run(process.execPath, [installer, '--mode', mode, '--profile', 'evo-base', '--home', home, ...extra], {
     env: { ...process.env, ...env },
   })
 }
 
+/** The patch file the family preset row is written to — the profile's own layer
+ * (`packages/boot/app-boot/src/profile.ts`, `PROFILE_PATCH_FILENAME`). */
+function patchPath(home: string): string {
+  return join(home, 'profiles', 'evo-base', 'cordis.patch.yml')
+}
+
 /**
- * The status word `--check-presets` printed for one destination, or undefined.
- * The destination and the status are separated by two spaces, and the match is
- * on the whole destination: `evolution` must not answer for `evolution-ptc`.
- * @param stdout - the check run's stdout.
- * @param destination - the preset directory to look up.
- * @returns `fresh` | `DIFFERS` | `absent`, or undefined when no line names it.
+ * One platform base preset patch in its SHIPPED form: a single `- insert:` entry whose row carries
+ * the preset's plugin list under `config.plugins`
+ * (`packages/bundle/web-app/presets/standard.patch.yml`).
+ * @param headline - the fixture's first comment line, which identifies the file in the output.
+ * @param rowLines - the plugin row lines, at column 0.
+ * @returns the patch text.
  */
-function presetStatus(stdout: string, destination: string): string | undefined {
+function basePatch(headline: string, rowLines: string[]): string {
+  return [
+    headline,
+    '- insert:',
+    '    - id: preset-fixture',
+    "      name: '@deepseek-ai/dsh-agent-preset'",
+    '      config:',
+    '        id: fixture',
+    '        order: 1',
+    '        plugins:',
+    ...rowLines.map(line => '          ' + line),
+    '',
+  ].join('\n')
+}
+
+/**
+ * The `config.plugins` rows of the first inserted entry in one patch file, parsed by the
+ * platform's own loader — the only reader that can tell a mountable patch from text with the right
+ * substrings.
+ * @param path - the patch file.
+ * @returns the plugin rows.
+ */
+function insertedPlugins(path: string): Record<string, unknown>[] {
+  const patches = loadOverlayPatches('test', path)
+  const entry = patches.find(row => Array.isArray((row as { insert?: unknown }).insert))
+  const inserted = (entry as { insert?: Array<{ config?: { plugins?: Record<string, unknown>[] } }> } | undefined)?.insert
+  const plugins = inserted?.[0]?.config?.plugins
+  if (!Array.isArray(plugins)) throw new Error(`${path} carries no inserted preset row with config.plugins`)
+  return plugins
+}
+
+/** Ids of the plugin rows one patch file's inserted preset declares. */
+function insertedPluginIds(path: string): (string | undefined)[] {
+  return insertedPlugins(path).map(row => rowId(row))
+}
+
+/** The writer's report line for one preset row, or undefined when none names it. */
+function presetLine(stdout: string, rowIdText: string): string | undefined {
+  return stdout.split('\n').find(line => line.startsWith('preset:') && line.includes(rowIdText))
+}
+
+/** The status word `--check-presets` printed for one preset id, or undefined. */
+function presetStatus(stdout: string, id: string): string | undefined {
   for (const line of stdout.split('\n')) {
-    const match = /^preset:\s+(.*?)\s{2}(\S+)\s*$/.exec(line)
-    if (match?.[1] === destination) return match[2]
+    const match = /^preset:\s+(\S+)\s+(.*?)\s{2}(\S+)\s*$/.exec(line)
+    if (match?.[1] === id) return match[3]
   }
   return undefined
 }
@@ -119,28 +133,23 @@ async function treeSnapshot(root: string): Promise<string[]> {
   return records
 }
 
-const STANDARD_FIXTURE = [
-  '# runtime standard fixture',
+/** Write one base patch fixture per base name and return the preset root. */
+async function presetRootWith(home: string, fixtures: Record<string, string>): Promise<string> {
+  const root = join(home, 'preset')
+  await mkdir(root, { recursive: true })
+  for (const [base, text] of Object.entries(fixtures)) await writeFile(join(root, `${base}.patch.yml`), text)
+  return root
+}
+
+const STANDARD_FIXTURE = basePatch('# runtime standard fixture', [
   '- id: persona',
   '  name: "@deepseek-ai/dsh-persona"',
   '',
   '- id: tool-skill',
   '  name: "@deepseek-ai/dsh-tool-skill"',
-  '',
-].join('\n')
+])
 
-const DELTA_FIXTURE = [
-  '# evolution delta fixture',
-  '- id: tool-memory',
-  '  name: "@deepseek-ai/dsh-tool-memory"',
-  '',
-  '- id: tool-session-query',
-  '  name: "@deepseek-ai/dsh-tool-session-query"',
-  '',
-].join('\n')
-
-const PTC_FIXTURE = [
-  '# runtime ptc fixture',
+const PTC_FIXTURE = basePatch('# runtime ptc fixture', [
   '- id: persona',
   '  name: "@deepseek-ai/dsh-persona"',
   '',
@@ -154,29 +163,9 @@ const PTC_FIXTURE = [
   '',
   '- id: present',
   '  name: "@deepseek-ai/dsh-tool-present"',
-  '',
-].join('\n')
+])
 
-/**
- * The installed `standard`-base preset for the fixture pair above: captured
- * from the installer BEFORE the `--base` parameterization and frozen here. It
- * is the byte-identity pin for the default path — a change to the destination
- * directory, the composition source, the metadata source, or the V10-14 cap
- * injection moves these bytes.
- */
-const DEFAULT_BASE_GOLDEN = [
-  '# runtime standard fixture',
-  '- id: persona',
-  '  name: "@deepseek-ai/dsh-persona"',
-  '',
-  '- id: tool-skill',
-  '  name: "@deepseek-ai/dsh-tool-skill"',
-  '  # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
-  '  # this preset-scope row is the session-visible instance and no profile',
-  '  # patch can reach it. Remove only to run the platform default (500).',
-  '  config:',
-  '    catalogDescriptionMaxLength: 60',
-  '',
+const DELTA_FIXTURE = [
   '# evolution delta fixture',
   '- id: tool-memory',
   '  name: "@deepseek-ai/dsh-tool-memory"',
@@ -189,173 +178,204 @@ const DEFAULT_BASE_GOLDEN = [
 /** The four family delta rows every generated preset must carry. */
 const FAMILY_DELTA_IDS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog']
 
+/** The identity the installer composes for one base, as the row it writes. */
+const IDENTITY = {
+  rowId: 'preset-evolution',
+  id: 'evolution',
+  name: 'Evolution',
+  description: 'Standard coding agent plus durable memory and skill evolution tools.',
+  order: 10,
+}
+
+/**
+ * The installed `standard`-base row for the fixture pair above, captured from the
+ * installer BEFORE the `--base` parameterization and frozen here. It is the
+ * byte-identity pin for the default path — a change to the destination file, the
+ * base-patch source, the composition rule, or the V10-14 cap injection moves
+ * these bytes.
+ */
+const DEFAULT_BASE_GOLDEN = [
+  '- insert:',
+  '    - id: preset-evolution',
+  "      name: '@deepseek-ai/dsh-agent-preset'",
+  '      config:',
+  '        id: evolution',
+  '        name: "Evolution"',
+  '        description: "Standard coding agent plus durable memory and skill evolution tools."',
+  '        order: 10',
+  '        plugins:',
+  '          - id: persona',
+  '            name: "@deepseek-ai/dsh-persona"',
+  '          - id: tool-skill',
+  '            name: "@deepseek-ai/dsh-tool-skill"',
+  '            # V10-14: Hermes 60-char catalog cap — injected by the preset composer (P1-2);',
+  '            # this preset-scope row is the session-visible instance and no profile',
+  '            # patch can reach it. Remove only to run the platform default (500).',
+  '            config:',
+  '              catalogDescriptionMaxLength: 60',
+  '          # evolution delta fixture',
+  '          - id: tool-memory',
+  '            name: "@deepseek-ai/dsh-tool-memory"',
+  '          - id: tool-session-query',
+  '            name: "@deepseek-ai/dsh-tool-session-query"',
+  '',
+].join('\n')
+
 describe('agent preset bases (--base standard|ptc)', () => {
-  it('keeps the default base byte-identical to the pre-parameterization output', async () => {
+  it('composes the golden row for the fixture pair, and keeps one default base', async () => {
     const composed = await callInstaller(
-      `return installer.generateAgentPreset(${JSON.stringify(STANDARD_FIXTURE)}, ${JSON.stringify(DELTA_FIXTURE)})`,
+      `return installer.composePresetEntry(${JSON.stringify(STANDARD_FIXTURE)}, ${JSON.stringify(DELTA_FIXTURE)}, ${JSON.stringify(IDENTITY)})`,
     )
     expect(composed).toBe(DEFAULT_BASE_GOLDEN)
     // One default, one table: the default base is a NAME resolved through
     // resolveAgentPresetBase, not a per-call-site fallback that could answer
     // differently at each site.
-    const resolved = await callInstaller("return [installer.DEFAULT_AGENT_PRESET_BASE, installer.resolveAgentPresetBase().base, installer.resolveAgentPresetBase('standard').base]")
+    const resolved = await callInstaller('return [installer.DEFAULT_AGENT_PRESET_BASE, installer.resolveAgentPresetBase().base, installer.resolveAgentPresetBase("standard").base]')
     expect(resolved).toEqual(['standard', 'standard', 'standard'])
-    const directories = await callInstaller("return installer.agentPresetDirectories('H').map(entry => entry.base + ':' + entry.directory)")
-    expect(directories).toEqual([
-      `standard:${join('H', '.agent-presets', 'evolution')}`,
-      `ptc:${join('H', '.agent-presets', 'evolution-ptc')}`,
-      `cordis:${join('H', '.agent-presets', 'evolution-cordis')}`,
-      `minimal:${join('H', '.agent-presets', 'evolution-minimal')}`,
+    // The row id and the shipped display copy are derived from the table, so a
+    // base cannot be half-added.
+    const identities = await callInstaller('return Object.keys(installer.AGENT_PRESET_BASES).map(name => installer.presetIdentity(installer.resolveAgentPresetBase(name)))')
+    expect(identities).toEqual([
+      { rowId: 'preset-evolution', id: 'evolution', name: 'Evolution', description: 'Standard coding agent plus durable memory and skill evolution tools.', order: 10 },
+      { rowId: 'preset-evolution-ptc', id: 'evolution-ptc', name: 'Evolution PTC', description: "Based on the platform ptc preset plus the Evolution family rows - durable memory and skill evolution tools, with run_code as the model's composition surface.", order: 11 },
+      { rowId: 'preset-evolution-cordis', id: 'evolution-cordis', name: 'Evolution Cordis', description: 'Based on the platform cordis preset plus the Evolution family rows - the self-modification toolset with durable memory and skill evolution. Needs a deployment that provides dynamicCordisRunner (the web-app bundle).', order: 12 },
+      { rowId: 'preset-evolution-minimal', id: 'evolution-minimal', name: 'Evolution Minimal', description: 'Registered but UNSUPPORTED - the platform minimal composition carries no tool-skill row, so the family skill surface has nothing to attach to.', order: 13 },
     ])
   })
 
-  it('installs the default base into .agent-presets/evolution, byte-for-byte', async () => {
+  it('installs the default base as a row in the profile patch, byte-for-byte', async () => {
     const home = await tempRoot('dsh-preset-base-default-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
     // The frozen golden is the fixture PAIR, so the CLI wiring is pinned with
     // the same delta fixture the golden was captured with.
     const deltaPath = join(home, 'delta.fixture.yml')
     await writeFile(deltaPath, DELTA_FIXTURE)
     await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot, DSH_EVOLUTION_DELTA_PATH: deltaPath })
-    expect(await readFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'utf8')).toBe(DEFAULT_BASE_GOLDEN)
-    // The standard base publishes the package's own metadata, unchanged.
-    expect(await readFile(join(home, '.agent-presets', 'evolution', 'preset.yml'), 'utf8'))
-      .toBe(await readFile(join(agentPackage, 'preset.yml'), 'utf8'))
-    // A default install writes no variant directory.
-    expect(existsSync(join(home, '.agent-presets', 'evolution-ptc'))).toBe(false)
+    expect(await readFile(patchPath(home), 'utf8')).toBe(DEFAULT_BASE_GOLDEN)
+    // A default install writes the default base's row alone.
+    expect(await readFile(patchPath(home), 'utf8')).not.toContain('preset-evolution-ptc')
   })
 
-  it('composes the runtime ptc rows plus the family delta under --base ptc, vendoring nothing', async () => {
+  it('G6: the written row parses under the platform loader and carries base + delta rows', async () => {
+    // The text-level assertions above cannot tell a mountable patch from text
+    // with the right substrings: the platform's own reader runs the Loader YAML
+    // dialect (!!js and all) and is the only acceptance a patch really has. A
+    // parse failure throws out of loadOverlayPatches — it is never caught here.
+    const home = await tempRoot('dsh-preset-base-parse-')
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
+    const { stdout } = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetLine(stdout, 'preset-evolution')).toContain(patchPath(home))
+
+    const baseRows = insertedPlugins(join(presetRoot, 'standard.patch.yml'))
+    const plugins = insertedPlugins(patchPath(home))
+    // A family row's plugin list is exactly the platform base rows followed by the
+    // family delta rows — a dropped, duplicated or reordered source fails here.
+    expect(plugins.map(row => rowId(row))).toEqual([...baseRows.map(row => rowId(row)), ...FAMILY_DELTA_IDS])
+    expect(plugins).toHaveLength(baseRows.length + FAMILY_DELTA_IDS.length)
+    // The preset identity the registry serves came through the same parse.
+    const entry = loadOverlayPatches('test', patchPath(home)).find(row => Array.isArray((row as { insert?: unknown }).insert)) as {
+      insert: Array<{ id: string; config: { id: string; name: string; description: string; order: number } }>
+    }
+    expect(entry.insert[0]?.id).toBe('preset-evolution')
+    expect(entry.insert[0]?.config).toMatchObject({ id: 'evolution', name: 'Evolution', order: 10 })
+    // The whole patch is a valid entry list for the loader, and the row it carries
+    // is the only top-level item: a row at column 0 would be read as an OVERRIDE
+    // of an existing platform row instead of a new preset.
+    expect(rowIds(cordisRows(loadOverlayPatches('test', patchPath(home))))).toEqual([])
+    // The V10-14 cap still lands on the base's own tool-skill row.
+    const toolSkill = plugins.find(row => rowId(row) === 'tool-skill')
+    expect(toolSkill).toMatchObject({ config: { catalogDescriptionMaxLength: 60 } })
+  })
+
+  it('composes the runtime ptc base rows plus the family delta under --base ptc, vendoring nothing', async () => {
     const home = await tempRoot('dsh-preset-base-ptc-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await mkdir(join(presetRoot, 'ptc'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
-    await writeFile(join(presetRoot, 'ptc', 'agent.cordis.yml'), PTC_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE, ptc: PTC_FIXTURE })
     await runInstaller(home, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
 
-    const composition = await readFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'utf8')
+    const patch = await readFile(patchPath(home), 'utf8')
     // The delta is base-independent: the SHARED evolution-agent composition.
-    const deltaIds = rowIdList(await readFile(join(agentPackage, 'agent.cordis.yml'), 'utf8'))
+    const deltaIds = rowIds(cordisRows(loadOverlayPatches('test', join(agentPackage, 'agent.cordis.yml'))))
     expect(deltaIds).toEqual(FAMILY_DELTA_IDS)
-
-    // 1. The platform ptc rows come first and VERBATIM, so the first line
-    //    identifies which runtime composition was read.
-    expect(composition.split('\n')[0]).toBe(PTC_FIXTURE.split('\n')[0])
-    expect(composition.indexOf('- id: persona')).toBeLessThan(composition.indexOf('- id: tool-memory'))
-    //    The rows that make the base PTC rather than standard.
-    expect(composition).toContain('- id: tool-presentation')
-    expect(composition).toContain('mode: ptc')
-    expect(composition).toContain('- id: present')
-    // 2. ...and the standard runtime composition was NOT the source.
-    expect(composition).not.toContain(STANDARD_FIXTURE.split('\n')[0])
-    // 3. Every family delta row is present exactly once.
-    for (const id of FAMILY_DELTA_IDS) expect(idCounts(composition).get(id)).toBe(1)
-    // 4. Nothing is vendored and nothing is duplicated: the generated row-id
-    //    LIST is exactly the platform ids followed by the delta ids. A base
-    //    that repeated a platform row, dropped one, or reordered the sources
-    //    fails here.
-    expect(rowIdList(composition)).toEqual([...rowIdList(PTC_FIXTURE), ...deltaIds])
-    expect(rowIdList(PTC_FIXTURE).filter(id => deltaIds.includes(id))).toEqual([])
-    for (const count of idCounts(composition).values()) expect(count).toBe(1)
-    // The generated file is an ENTRY LIST the platform loader mounts verbatim,
-    // so it must parse under the loader's own YAML dialect (!!js and all);
-    // a text-level assertion alone cannot tell a mountable file from a broken
-    // one with the right substrings.
-    const parsed = rowIds(cordisRows(loadOverlayPatches('test', join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'))))
-    expect(parsed).toEqual([...rowIdList(PTC_FIXTURE), ...deltaIds])
-    // 5. The V10-14 cap still lands on the PTC preset's own tool-skill row.
-    const capStart = composition.search(/^- id: tool-skill$/m)
-    expect(capStart).toBeGreaterThanOrEqual(0)
-    const rowEnd = composition.indexOf('\n- id:', capStart)
-    expect(composition.slice(capStart, rowEnd === -1 ? undefined : rowEnd)).toContain('catalogDescriptionMaxLength: 60')
-
-    // 6. The variant publishes its OWN display metadata — the platform
-    //    localizes shipped preset ids only, so copied text would list as a
-    //    second, indistinguishable "Evolution".
-    const variant = await readFile(join(home, '.agent-presets', 'evolution-ptc', 'preset.yml'), 'utf8')
-    expect(variant).toBe(await readFile(join(agentPackage, 'preset.ptc.yml'), 'utf8'))
-    expect(variant).toContain('name: Evolution PTC')
-    expect(variant).toContain('Based on the platform ptc preset')
-    expect(variant).toContain('family rows')
-    expect(variant).not.toBe(await readFile(join(agentPackage, 'preset.yml'), 'utf8'))
-    // 7. The variant install touched no other base's directory.
-    expect(existsSync(join(home, '.agent-presets', 'evolution'))).toBe(false)
+    // 1. The ptc base's rows come first and VERBATIM, and the standard fixture was
+    //    NOT the source.
+    expect(insertedPluginIds(patchPath(home))).toEqual([...insertedPluginIds(join(presetRoot, 'ptc.patch.yml')), ...deltaIds])
+    expect(patch).not.toContain(STANDARD_FIXTURE.split('\n')[0] ?? '# runtime standard fixture')
+    expect(patch).toContain('mode: ptc')
+    expect(patch).toContain('preset-evolution-ptc')
+    // 2. Nothing is vendored and nothing is duplicated.
+    expect(insertedPluginIds(patchPath(home)).filter(id => id === 'tool-presentation')).toHaveLength(1)
+    const ptcPlugins = insertedPlugins(patchPath(home))
+    expect(ptcPlugins).toHaveLength(insertedPlugins(join(presetRoot, 'ptc.patch.yml')).length + deltaIds.length)
+    // 3. The variant publishes its OWN display copy — the platform localizes
+    //    shipped preset ids only, so copied text would list as a second,
+    //    indistinguishable "Evolution".
+    const variant = (loadOverlayPatches('test', patchPath(home)).find(row => Array.isArray((row as { insert?: unknown }).insert)) as {
+      insert: Array<{ config: { id: string; name: string; description: string; order: number } }>
+    }).insert[0]?.config
+    expect(variant).toMatchObject({ id: 'evolution-ptc', name: 'Evolution PTC', order: 11 })
+    expect(variant?.description).toContain('Based on the platform ptc preset')
+    expect(variant?.name).not.toBe('Evolution')
+    // 4. The ptc-variant install wrote no standard row.
+    expect(patch).not.toContain('preset-evolution\n')
   })
 
-  it('one pass with --base standard,ptc writes both variants, each following ITS OWN runtime composition', async () => {
+  it('one pass with --base standard,ptc writes both rows into the one profile patch', async () => {
     const home = await tempRoot('dsh-preset-base-multi-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await mkdir(join(presetRoot, 'ptc'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
-    await writeFile(join(presetRoot, 'ptc', 'agent.cordis.yml'), PTC_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE, ptc: PTC_FIXTURE })
     await runInstaller(home, 'agent', ['--base', 'standard,ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
 
-    // The whole point of a multi-base install: two files, each composed from the
-    // platform composition of its OWN base — never one composition copied under
-    // two names (the ptc variant carries the ptc rows, the standard one does
-    // not).
-    const standardComposition = await readFile(join(home, '.agent-presets', 'evolution', 'agent.cordis.yml'), 'utf8')
-    const ptcComposition = await readFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'utf8')
-    expect(standardComposition.split('\n')[0]).toBe(STANDARD_FIXTURE.split('\n')[0])
-    expect(ptcComposition.split('\n')[0]).toBe(PTC_FIXTURE.split('\n')[0])
-    expect(standardComposition).not.toContain('- id: tool-presentation')
-    expect(ptcComposition).toContain('mode: ptc')
-    // The metadata follows the base as well: a variant must publish its own
-    // display text, never the standard preset's.
-    expect(await readFile(join(home, '.agent-presets', 'evolution', 'preset.yml'), 'utf8'))
-      .toBe(await readFile(join(agentPackage, 'preset.yml'), 'utf8'))
-    expect(await readFile(join(home, '.agent-presets', 'evolution-ptc', 'preset.yml'), 'utf8'))
-      .toBe(await readFile(join(agentPackage, 'preset.ptc.yml'), 'utf8'))
-
+    // The whole point of a multi-base install: two rows, each composed from the
+    // base patch of its OWN base — never one composition copied under two names.
+    const patch = await readFile(patchPath(home), 'utf8')
+    expect(patch).toContain('preset-evolution\n')
+    expect(patch).toContain('preset-evolution-ptc\n')
+    const entries = loadOverlayPatches('test', patchPath(home))
+    const ids = entries.flatMap(row => ((row as { insert?: Array<{ id: string }> }).insert ?? []).map(item => item.id))
+    expect(ids).toEqual(['preset-evolution', 'preset-evolution-ptc'])
+    type Entry = { insert: Array<{ config: { plugins: Record<string, unknown>[] } }> }
+    const standardPlugins = (entries[0] as Entry).insert[0]?.config.plugins ?? []
+    const ptcPlugins = (entries[1] as Entry).insert[0]?.config.plugins ?? []
+    expect(standardPlugins.map(row => rowId(row))).not.toContain('tool-presentation')
+    expect(ptcPlugins.map(row => rowId(row))).toContain('tool-presentation')
     // The selection is a SET resolved in table order, so repeats and a reversed
     // spelling produce the same run.
     const resolved = await callInstaller("return installer.resolveAgentPresetBases(['ptc', 'standard,ptc']).map(entry => entry.base)")
     expect(resolved).toEqual(['standard', 'ptc'])
   })
 
-  it('composes the RUNTIME platform ptc preset (no fixture root) with the family delta', async () => {
-    // Without DSH_AGENT_PRESET_ROOT the installer resolves the agent-preset
-    // root by walking up from its own location — inside this monorepo, the real
-    // platform tree. This is the acceptance target: the RUNTIME ptc preset plus
-    // the family delta. If a future platform stops shipping `ptc`, --base ptc
-    // must fail loud rather than compose another base, and this case is where
-    // that contract is re-decided deliberately.
+  it('composes the RUNTIME platform ptc preset patch (no fixture root) with the family delta', async () => {
+    // Without DSH_AGENT_PRESET_ROOT the installer resolves the base patch by
+    // walking up to the platform tree's bundle packages — inside this monorepo,
+    // the real platform. This is the acceptance target: the RUNTIME ptc preset
+    // plus the family delta. If a future platform stops shipping `ptc`,
+    // --base ptc must fail loud rather than compose another base, and this case
+    // is where that contract is re-decided deliberately.
     const home = await tempRoot('dsh-preset-base-runtime-')
     const { stdout } = await runInstaller(home, 'agent', ['--base', 'ptc'])
-    expect(stdout).toContain(join(home, '.agent-presets', 'evolution-ptc'))
+    expect(stdout).toContain(patchPath(home))
 
-    const root = platformPresetRoot()
-    const platformPtc = join(root, 'ptc', 'agent.cordis.yml')
-    const platformStandard = join(root, 'standard', 'agent.cordis.yml')
-    expect(existsSync(platformPtc)).toBe(true)
-    const platform = await readFile(platformPtc, 'utf8')
-    const composition = await readFile(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'), 'utf8')
-    const delta = await readFile(join(agentPackage, 'agent.cordis.yml'), 'utf8')
-    expect(rowIdList(composition)).toEqual([...rowIdList(platform), ...rowIdList(delta)])
+    const platformPtc = platformBasePatch('ptc')
+    const platformStandard = platformBasePatch('standard')
+    const delta = join(agentPackage, 'agent.cordis.yml')
+    expect(insertedPluginIds(patchPath(home))).toEqual([...insertedPluginIds(platformPtc), ...rowIds(cordisRows(loadOverlayPatches('test', delta)))])
+    expect(insertedPlugins(patchPath(home))).toHaveLength(insertedPlugins(platformPtc).length + FAMILY_DELTA_IDS.length)
     // No row appears twice: a vendored platform row (or a delta row absorbed
     // into the platform fragment) would double-mount the model tool.
-    for (const [id, count] of idCounts(composition)) expect([id, count]).toEqual([id, 1])
-    // The generated file parses under the platform loader's own YAML dialect.
-    expect(rowIds(cordisRows(loadOverlayPatches('test', join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml')))))
-      .toEqual(rowIdList(composition))
+    const ids = insertedPluginIds(patchPath(home))
+    for (const id of ids) expect(ids.filter(candidate => candidate === id)).toHaveLength(1)
     // Base selection proved by content: the presentation row is PTC's, and the
-    // sibling standard preset does not carry it at all.
-    expect(rowIdList(platform)).toContain('tool-presentation')
-    expect(rowIdList(await readFile(platformStandard, 'utf8'))).not.toContain('tool-presentation')
-    expect(composition).toContain('- id: tool-presentation')
-    expect(composition).toContain('mode: ptc')
-    expect(composition).toContain('- id: present')
+    // sibling standard base patch does not carry it at all.
+    expect(insertedPluginIds(platformPtc)).toContain('tool-presentation')
+    expect(insertedPluginIds(platformStandard)).not.toContain('tool-presentation')
+    const patch = await readFile(patchPath(home), 'utf8')
+    expect(patch).toContain('tool-presentation')
+    expect(patch).toContain('mode: ptc')
+    expect(patch).toContain('preset-evolution-ptc')
   })
 
   it('names the two product forms: --mode variant = layered, --mode attach = oneclick (0.3.77)', async () => {
     const home = await tempRoot('dsh-preset-form-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
     // The product names are ALIASES of the historical modes, not a second mode
     // table: variant resolves to layered (host bundle + generated preset) and
     // attach to the one-click preset bundle. The summary names the form, so an
@@ -376,11 +396,11 @@ describe('agent preset bases (--base standard|ptc)', () => {
     // REGISTERED with their reason instead of failing later at mount: minimal has
     // no skill landing surface at all, cordis needs a provider only a web-app
     // deployment mounts. The installer judges the latter from the target
-    // profile's bundle rows; the command (same table) asks ctx.get for the
-    // service itself.
+    // profile's bundle rows because it cannot see the runtime service store;
+    // the command (same table) asks ctx.get for the service itself.
     const probe = await callInstaller(
       'const q = (name, bundles) => String(installer.baseUnavailableReason({ name, ...installer.AGENT_PRESET_BASES[name] }, bundles))'
-      + '; return [q(\'minimal\', []), q(\'cordis\', []), q(\'cordis\', [\'@deepseek-ai/dsh-web-app\']), q(\'standard\', [])]',
+      + "; return [q('minimal', []), q('cordis', []), q('cordis', ['@deepseek-ai/dsh-web-app']), q('standard', [])]",
     ) as string[]
     expect(probe[0]).toContain('UNSUPPORTED')
     expect(probe[1]).toContain('dynamicCordisRunner')
@@ -391,7 +411,7 @@ describe('agent preset bases (--base standard|ptc)', () => {
     const error = await runInstaller(home, 'agent', ['--base', 'minimal'])
       .then(() => null, (caught: unknown) => caught as { stderr?: string })
     expect(error?.stderr).toContain('UNSUPPORTED')
-    expect(existsSync(join(home, '.agent-presets'))).toBe(false)
+    expect(existsSync(join(home, 'profiles'))).toBe(false)
   })
 
   it('refuses an unknown base by name, before any write', async () => {
@@ -401,16 +421,16 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(error).not.toBeNull()
     expect(error?.stderr).toContain('unknown agent-preset base')
     expect(error?.stderr).toContain('standard, ptc')
-    // Fail-loud means no half-state: nothing under .agent-presets at all.
-    expect(existsSync(join(home, '.agent-presets'))).toBe(false)
+    // Fail-loud means no half-state: no profile and no patch at all.
+    expect(existsSync(join(home, 'profiles'))).toBe(false)
 
     // A typo in the SECOND name of a multi-base selection writes nothing: every
-    // name is resolved before the first variant is composed.
+    // name is resolved before the first row is composed.
     const mixedHome = await tempRoot('dsh-preset-base-unknown2-')
     const mixed = await runInstaller(mixedHome, 'agent', ['--base', 'standard,nonsense'])
       .then(() => null, (caught: unknown) => caught as { stderr?: string })
     expect(mixed?.stderr).toContain('unknown agent-preset base')
-    expect(existsSync(join(mixedHome, '.agent-presets'))).toBe(false)
+    expect(existsSync(join(mixedHome, 'profiles'))).toBe(false)
 
     // A value-less --base is a usage error, not a silent default.
     const missing = await runInstaller(home, 'agent', ['--base'])
@@ -423,42 +443,47 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(resolved).toEqual(['<threw>', '<threw>', '<threw>', 'ptc', 'standard', '<threw>', '<threw>'])
   })
 
-  it('refuses --base ptc when the runtime carries no ptc composition', async () => {
-    // An explicit preset root is an answer, not the head of a fallback chain:
-    // a standard-only root must NOT satisfy --base ptc.
+  it('refuses --base ptc when the explicit preset root carries no ptc patch', async () => {
+    // An explicit root is an answer, not the head of a fallback chain: a
+    // standard-only root must NOT satisfy --base ptc.
     const home = await tempRoot('dsh-preset-base-missing-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
     const error = await runInstaller(home, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
       .then(() => null, (caught: unknown) => caught as { stderr?: string })
-    expect(error?.stderr).toContain(join(presetRoot, 'ptc', 'agent.cordis.yml'))
-    expect(existsSync(join(home, '.agent-presets'))).toBe(false)
+    expect(error?.stderr).toContain(join(presetRoot, 'ptc.patch.yml'))
+    expect(error?.stderr).toContain('DSH_AGENT_PRESET_ROOT')
+    // The failure names the escape that always works on a desktop install, whose
+    // platform packages live inside resources/app.asar.
+    expect(error?.stderr).toContain('packages/bundle/web-app/presets/')
   })
 
-  it('sees a variant preset when refusing a one-click install (E-33 sweep covers every base)', async () => {
+  it('sees an installed variant row when refusing a one-click install (E-33 sweep covers every base)', async () => {
     const home = await tempRoot('dsh-preset-base-e33-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'ptc'), { recursive: true })
-    await writeFile(join(presetRoot, 'ptc', 'agent.cordis.yml'), PTC_FIXTURE)
+    const presetRoot = await presetRootWith(home, { ptc: PTC_FIXTURE })
     await runInstaller(home, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    expect(existsSync(join(home, '.agent-presets', 'evolution-ptc', 'agent.cordis.yml'))).toBe(true)
-    // The one-click bundle mounts the same model rows at profile root, so it
-    // must refuse beside a preset of ANY base — a sweep narrowed to the default
+    expect(existsSync(patchPath(home))).toBe(true)
+    // The one-click bundle mounts the same model rows at profile root, so it must
+    // refuse beside a preset row of ANY base — a sweep narrowed to the default
     // base would install straight into the double mount.
     const error = await runInstaller(home, 'oneclick')
       .then(() => null, (caught: unknown) => caught as { stderr?: string })
-    expect(error?.stderr).toContain('already carries an Evolution agent preset')
-    expect(error?.stderr).toContain('evolution-ptc')
+    expect(error?.stderr).toContain('already carries an Evolution agent preset row')
+    expect(error?.stderr).toContain('preset-evolution-ptc')
+    // ...and the exclusion is PER PROFILE: a row in another profile's patch cannot
+    // double-mount anything here, so a second profile installs normally.
+    const other = await tempRoot('dsh-preset-base-e33-other-')
+    const otherRoot = await presetRootWith(other, { ptc: PTC_FIXTURE })
+    await runInstaller(other, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: otherRoot })
+    const sibling = await run(process.execPath, [installer, '--mode', 'oneclick', '--profile', 'second', '--home', other])
+    expect(sibling.stdout).toContain('bundle:   @deepseek-ai/dsh-evolution-preset')
   })
 
   it('keeps the base table and the shipped assets consistent (structure, not prose)', async () => {
-    // One table, four consumers (composition source, destination, metadata,
+    // One table, four consumers (base patch, row identity, display copy, refusal
     // sweeps). These assertions are what stop a base from being added half-way:
-    // an id the platform would refuse as a directory name, or a metadata file
-    // the package does not ship, fails here instead of at a user's first
-    // install.
-    const table = await callInstaller('return installer.AGENT_PRESET_BASES') as Record<string, { id: string; metadata: string }>
+    // an id the platform would refuse, or display copy the picker cannot read,
+    // fails here instead of at a user's first install.
+    const table = await callInstaller('return installer.AGENT_PRESET_BASES') as Record<string, { id: string; display: { name: string; description: string; order: number } }>
     // 0.3.78 (G1-②): the table also REGISTERS the two platform bases the family
     // cannot derive a variant from, each with the reason it cannot.
     expect(Object.keys(table)).toEqual(['standard', 'ptc', 'cordis', 'minimal'])
@@ -467,68 +492,73 @@ describe('agent preset bases (--base standard|ptc)', () => {
     // the npm path stayed on `standard` while the installer knew `ptc`.
     const basesJson = JSON.parse(await readFile(join(agentPackage, 'bases.json'), 'utf8')) as {
       default: string
-      bases: Array<{ name: string; id: string; metadata: string; requires?: { service: string }; unsupported?: string }>
+      bases: Array<{
+        name: string
+        id: string
+        display: { name: string; description: string; order: number }
+        requires?: { service: string }
+        unsupported?: string
+      }>
     }
     // toMatchObject, not toEqual: the table may carry the ability fields
     // (requires/unsupported, 0.3.78) that the runtime command also reads; the
     // identity fields are the ones every consumer must agree on.
     for (const base of basesJson.bases) {
-      expect(table[base.name], base.name).toMatchObject({ id: base.id, metadata: base.metadata })
+      expect(table[base.name], base.name).toMatchObject({ id: base.id, display: base.display })
     }
     expect(Object.keys(table)[0]).toBe(basesJson.default)
-    // The platform's own PRESET_ID (packages/preset/agent-presets/src/preset.ts):
-    // an id is a directory name under the preset root, so this is a containment
-    // rule rather than a style one. Inlined because evolution-host declares no
-    // dependency on dsh-agent-presets.
+    // The platform's own PRESET_ID (packages/preset/agent-preset-registry/src/preset.ts):
+    // the id is the preset identity the registry keys on. Inlined because
+    // evolution-host declares no dependency on the registry package.
     const presetId = /^[a-z0-9][a-z0-9-]*$/
-    const shipped = new Set(await readdir(agentPackage))
+    // The display copy is REQUIRED: the platform localizes its SHIPPED ids only
+    // (packages/preset/agent-preset-registry/src/display.ts:47-72), so a row
+    // without a name would list as its bare id.
     for (const entry of Object.values(table)) {
       expect(entry.id).toMatch(presetId)
-      expect(shipped.has(entry.metadata)).toBe(true)
+      expect(entry.display.name.length).toBeGreaterThan(0)
+      expect(entry.display.description.length).toBeGreaterThan(0)
+      expect(Number.isInteger(entry.display.order)).toBe(true)
     }
-    // Distinct directories: two bases sharing one id would overwrite each
-    // other's composition and list one preset twice.
+    // Distinct ids: two bases sharing one id would register one preset twice.
     expect(Object.values(table).map(entry => entry.id)).toEqual(['evolution', 'evolution-ptc', 'evolution-cordis', 'evolution-minimal'])
+    expect(Object.values(table).map(entry => entry.display.order)).toEqual([10, 11, 12, 13])
   })
 
-  it('removes every family preset directory on a base-less uninstall, one when narrowed', async () => {
+  it('removes every family preset row on a base-less uninstall, one when narrowed', async () => {
     const home = await tempRoot('dsh-preset-base-uninstall-')
-    const presetRoot = join(home, 'preset')
-    for (const [base, composition] of [['standard', STANDARD_FIXTURE], ['ptc', PTC_FIXTURE]] as const) {
-      await mkdir(join(presetRoot, base), { recursive: true })
-      await writeFile(join(presetRoot, base, 'agent.cordis.yml'), composition)
-    }
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE, ptc: PTC_FIXTURE })
     await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
     await runInstaller(home, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    expect((await readdir(join(home, '.agent-presets'))).sort()).toEqual(['evolution', 'evolution-ptc'])
+    const ids = async (): Promise<string[]> => loadOverlayPatches('test', patchPath(home))
+      .flatMap(row => ((row as { insert?: Array<{ id: string }> }).insert ?? []).map(item => item.id))
+    expect(await ids()).toEqual(['preset-evolution', 'preset-evolution-ptc'])
 
-    // A base-narrowed uninstall takes exactly that variant.
+    // A base-narrowed uninstall takes exactly that row.
     await runInstaller(home, 'agent', ['--base', 'ptc', '--uninstall'])
-    expect(await readdir(join(home, '.agent-presets'))).toEqual(['evolution'])
+    expect(await ids()).toEqual(['preset-evolution'])
 
-    // A base-less uninstall is not narrowed: a variant left behind would keep
-    // mounting family model rows for any session that selects it.
+    // A base-less uninstall is not narrowed: a row left behind would keep
+    // mounting family model rows for any session that selects it. The entry
+    // goes with its last row, and the patch keeps the platform's empty-list seed.
     await runInstaller(home, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    await runInstaller(home, 'agent', ['--uninstall'])
-    expect(existsSync(join(home, '.agent-presets', 'evolution'))).toBe(false)
-    expect(existsSync(join(home, '.agent-presets', 'evolution-ptc'))).toBe(false)
+    const removed = await runInstaller(home, 'agent', ['--uninstall'])
+    expect(removed.stdout).toMatch(/preset:\s+true/)
+    expect(await readFile(patchPath(home), 'utf8')).toBe('[]\n')
   })
 
-  it('G3-①: --check-presets reports a freshly installed variant fresh and writes nothing', async () => {
+  it('G3-①: --check-presets reports a freshly installed row fresh and writes nothing', async () => {
     const home = await tempRoot('dsh-preset-freshness-fresh-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
     await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    const destination = join(home, '.agent-presets', 'evolution')
     const before = await treeSnapshot(home)
 
     // Exit 0 is the absence of a rejection: execFile rejects on a non-zero exit.
     const { stdout } = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    expect(presetStatus(stdout, destination)).toBe('fresh')
+    expect(presetStatus(stdout, 'evolution')).toBe('fresh')
     // A base the user never installed is absent, not stale — and an unusable base
     // is not reported at all (it has no fresh install to compare against).
-    expect(presetStatus(stdout, join(home, '.agent-presets', 'evolution-ptc'))).toBe('absent')
+    expect(presetStatus(stdout, 'evolution-ptc')).toBe('absent')
     expect(stdout).not.toContain('evolution-cordis')
     expect(stdout).not.toContain('evolution-minimal')
     // The report says what a difference means, and that it is not a repair.
@@ -538,61 +568,110 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(await treeSnapshot(home)).toEqual(before)
   })
 
-  it('G3-①: --check-presets reports DIFFERS with exit 1 and never repairs the file', async () => {
+  it('G3-①: --check-presets reports DIFFERS with exit 1 and never repairs the row', async () => {
     const home = await tempRoot('dsh-preset-freshness-stale-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
     await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    const destination = join(home, '.agent-presets', 'evolution')
-    const compositionPath = join(destination, 'agent.cordis.yml')
-    // One hand-edited line stands in for every way the file can drift from what a
+    // One hand-edited line stands in for every way the row can drift from what a
     // fresh install would write: a platform change, a family upgrade, a user edit.
-    const edited = (await readFile(compositionPath, 'utf8')).replace('- id: persona', '- id: persona-edited')
-    await writeFile(compositionPath, edited)
+    const edited = (await readFile(patchPath(home), 'utf8')).replace('- id: persona', '- id: persona-edited')
+    await writeFile(patchPath(home), edited)
 
     const failure = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
       .then(() => null, (caught: unknown) => caught as { code?: number; stdout?: string })
     expect(failure).not.toBeNull()
     expect(failure?.code).toBe(1)
-    // The line NAMES the stale destination, so a user with several variants knows
-    // which file to regenerate.
-    expect(failure?.stdout).toContain(destination)
-    expect(presetStatus(failure?.stdout ?? '', destination)).toBe('DIFFERS')
-
+    // The line NAMES the stale patch, so a user with several bases knows which
+    // row to regenerate.
+    expect(failure?.stdout).toContain(patchPath(home))
+    expect(presetStatus(failure?.stdout ?? '', 'evolution')).toBe('DIFFERS')
     // "Report, never overwrite" is the whole point: the check is not a repair
     // pass, so the edit survives it and no temp file is left behind.
-    expect(await readFile(compositionPath, 'utf8')).toBe(edited)
-    expect(await readFile(compositionPath, 'utf8')).toContain('persona-edited')
-    expect((await readdir(destination)).sort()).toEqual(['agent.cordis.yml', 'preset.yml'])
-  })
-
-  it('G3-①: --check-presets reports a missing composition absent, exit 0, and skips unusable bases', async () => {
-    const home = await tempRoot('dsh-preset-freshness-absent-')
-    const presetRoot = join(home, 'preset')
-    await mkdir(join(presetRoot, 'standard'), { recursive: true })
-    await writeFile(join(presetRoot, 'standard', 'agent.cordis.yml'), STANDARD_FIXTURE)
-    await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    const destination = join(home, '.agent-presets', 'evolution')
-    // Absent is not an error: the user may simply not have kept this variant, so
-    // a removed composition must not turn into a failing check.
-    await rm(join(destination, 'agent.cordis.yml'))
-    const { stdout } = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    expect(presetStatus(stdout, destination)).toBe('absent')
-    expect(presetStatus(stdout, join(home, '.agent-presets', 'evolution-ptc'))).toBe('absent')
-    expect(existsSync(join(destination, 'agent.cordis.yml'))).toBe(false)
-
-    // The library shape behind the flag: one record per INSTALLABLE base, each
-    // carrying the directory and preset id a caller needs to act on the report.
-    // minimal (registered unsupported) and cordis (needs a web-app profile, and
-    // this home has none) are skipped rather than called stale.
-    const emptyHome = await tempRoot('dsh-preset-freshness-shape-')
-    const report = await callInstaller(`return installer.checkAgentPresetFreshness({ home: ${JSON.stringify(emptyHome)} })`) as {
-      bases: Array<{ base: string; id: string; destination: string; status: string }>
-    }
-    expect(report.bases).toEqual([
-      { base: 'standard', id: 'evolution', destination: join(emptyHome, '.agent-presets', 'evolution'), status: 'absent' },
-      { base: 'ptc', id: 'evolution-ptc', destination: join(emptyHome, '.agent-presets', 'evolution-ptc'), status: 'absent' },
+    expect(await readFile(patchPath(home), 'utf8')).toBe(edited)
+    expect((await readdir(join(patchPath(home), '..'))).sort()).toEqual([
+      '.evolution-install.json',
+      'cordis.patch.yml',
+      'package.json',
+      'pnpm-workspace.yaml',
     ])
   })
+
+  it('G3-①: --check-presets reports a removed row absent, exit 0, and skips unusable bases', async () => {
+    const home = await tempRoot('dsh-preset-freshness-absent-')
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
+    await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    // Absent is not an error: the user may simply not have kept this base, so a
+    // removed row must not turn into a failing check.
+    await writeFile(patchPath(home), '[]\n')
+    const { stdout } = await runInstaller(home, 'agent', ['--check-presets'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetStatus(stdout, 'evolution')).toBe('absent')
+    expect(presetStatus(stdout, 'evolution-ptc')).toBe('absent')
+
+    // The library shape behind the flag: one record per INSTALLABLE base, each
+    // carrying the patch a caller needs to act on the report. minimal (registered
+    // unsupported) and cordis (needs a web-app profile, and this home has none)
+    // are skipped rather than called stale.
+    const emptyHome = await tempRoot('dsh-preset-freshness-shape-')
+    const report = await callInstaller(`return installer.checkAgentPresetFreshness({ home: ${JSON.stringify(emptyHome)} })`) as {
+      bases: Array<{ base: string; id: string; patchPath: string; status: string }>
+    }
+    expect(report.bases).toEqual([
+      { base: 'standard', id: 'evolution', patchPath: join(emptyHome, 'profiles', 'web', 'cordis.patch.yml'), status: 'absent' },
+      { base: 'ptc', id: 'evolution-ptc', patchPath: join(emptyHome, 'profiles', 'web', 'cordis.patch.yml'), status: 'absent' },
+    ])
+  })
+
+  it('is idempotent: a re-run reports "already current" and never rewrites the patch', async () => {
+    const home = await tempRoot('dsh-preset-idempotent-')
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
+    await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    const installed = await readFile(patchPath(home), 'utf8')
+    const again = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetLine(again.stdout, 'preset-evolution')).toContain('already current')
+    expect(await readFile(patchPath(home), 'utf8')).toBe(installed)
+
+    // A hand-edited row is NOT silently replaced: the installer reports it and
+    // leaves it alone, exactly like --check-presets. --force is the only writer.
+    const tuned = installed.replace('- id: persona', '- id: persona-tuned')
+    await writeFile(patchPath(home), tuned)
+    const skipped = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetLine(skipped.stdout, 'preset-evolution')).toContain('use --force')
+    expect(await readFile(patchPath(home), 'utf8')).toBe(tuned)
+    const forced = await runInstaller(home, 'agent', ['--force'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(presetLine(forced.stdout, 'preset-evolution')).not.toContain('use --force')
+    expect(await readFile(patchPath(home), 'utf8')).toBe(installed)
+  })
+
+  it('dry-run resolves the base and reports the row without writing anything', async () => {
+    const home = await tempRoot('dsh-preset-dry-')
+    const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
+    const { stdout } = await runInstaller(home, 'agent', ['--dry-run'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(stdout).toContain('dry-run:  no files were written')
+    expect(presetLine(stdout, 'preset-evolution')).toContain(patchPath(home))
+    expect(presetLine(stdout, 'preset-evolution')).not.toContain('already current')
+    // The profile is not seeded as a side effect: a dry run leaves no home at all.
+    expect(existsSync(join(home, 'profiles'))).toBe(false)
+    // A dry run against a missing base patch fails like a real one.
+    const error = await runInstaller(home, 'agent', ['--base', 'ptc', '--dry-run'], { DSH_AGENT_PRESET_ROOT: presetRoot })
+      .then(() => null, (caught: unknown) => caught as { stderr?: string })
+    expect(error?.stderr).toContain('ptc.patch.yml')
+  })
 })
+
+/**
+ * The real platform base patch for one base, resolved by walking up from this
+ * spec to the bundle that ships the presets — the same shape the installer's
+ * ancestor walk uses (`packages/bundle/<name>/presets/<base>.patch.yml`).
+ * @param base - the base name.
+ * @returns the patch file's absolute path.
+ */
+function platformBasePatch(base: string): string {
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (;;) {
+    const candidate = join(dir, 'packages', 'bundle', 'web-app', 'presets', `${base}.patch.yml`)
+    if (existsSync(candidate)) return candidate
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error(`platform base patch for ${base} not found above the spec`)
+    dir = parent
+  }
+}

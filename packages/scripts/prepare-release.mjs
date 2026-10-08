@@ -7,9 +7,9 @@
  *   - --scope renames our packages, YAML rows, repository metadata and
  *     removes unpublished ./src/* export shims
  *   - --version pins the release version; --platform-version pins the
- *     published upstream platform the dsh-* ranges target (N-2 single
- *     source: one workflow variable drives both the compat gate's
- *     upstream_ref and this metadata)
+ *     published upstream platform the tree is VALIDATED against (it also
+ *     drives the compat gate's upstream_ref), while --platform-floor pins
+ *     what the dsh-* ranges require (defaults to --platform-version)
  *   - tarballs are validated before manifest/smoke artifacts are written
  *
  * Version single-source (M4 §5.3): the release workflow's environment is the
@@ -69,6 +69,11 @@ function requireArg(name) {
 const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
 const platformVersion = requireArg('--platform-version')
+// G7 §2.1: the FLOOR the published ranges declare. It is a separate value because the tested
+// line and the admitted line differ inside one line: ^0.2.0-rc.1 admits 0.2.0-rc.2, while
+// ^0.2.0-rc.2 would refuse the earlier rc of the very line the range is supposed to support.
+// Omitting the flag keeps the historical single-value behavior for one-rc releases.
+const platformFloor = arg('--platform-floor', platformVersion)
 // Explicit non-release pack (main-branch CI): never inferred from the version
 // string, so a real release that passes a wrong --version still fails below.
 const devBuild = argv.includes('--dev-build')
@@ -151,7 +156,7 @@ function releaseSpec(name, ourNames, protocol = '^') {
   // development baseline — CI guards manifest parity with the compat anchor
   // (verify-platform-ranges.mjs, N-2).
   if (name.startsWith('@deepseek-ai/dsh-')) {
-    return `^${platformVersion}`
+    return `^${platformFloor}`
   }
   // D-7 (v18): the `npm view` registry lookup that used to sit here was dead
   // for the current dependency set — all 16 external workspace deps hit a
@@ -460,11 +465,11 @@ for (const item of tarballs) {
   if (typeof bundlePatch === 'string' && !inShipped(bundlePatch)) {
     failures.push(`${item.name}: manifest dsh.bundle.patch -> ${bundlePatch} is missing from the tarball`)
   }
-  // The preset container is mountable only with BOTH compositions; the
-  // exports map is the declaration that says "this package is that container".
-  // The metadata variants come from the exports map itself, so a third base
-  // (bases.json) cannot ship a metadata file this check never heard of; the
-  // composition half of the pair stays required (mounting needs both).
+  // The preset container is mountable only with its composition; the exports
+  // map is the declaration that says "this package is that container". 0.2.x
+  // deleted the per-variant metadata files (a declarative row carries its own
+  // display copy), so the only half left to require is the composition — and a
+  // shipped preset*.yml reappearing here would be caught by this same loop.
   const presetExports = Object.keys(manifest.exports ?? {})
     .map(key => key.replace(/^\.\//, ''))
     .filter(rel => /^preset[^/]*\.ya?ml$/.test(rel))

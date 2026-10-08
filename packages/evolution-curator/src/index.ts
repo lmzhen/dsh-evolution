@@ -4,11 +4,20 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+// 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
+// map: each producer declares its own kind in its own module, and there is no shared
+// catch-all plugin kind (llm/src/message.ts:103-115).
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'evolution-curator': { kind: 'evolution-curator' } & ContextFormed
+  }
+}
 import z from '@deepseek-ai/schemastery'
-import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
@@ -16,11 +25,11 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, installParamSection, isPresent, isUnknown, paramNamespace, probeList, probeMtime, readNumberParam, releaseInstance, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, probeMtime, releaseInstance, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import type { ParamOverrides, SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
 import type { Session } from '@deepseek-ai/dsh-session'
 
@@ -39,6 +48,7 @@ const DEFAULT_CURATOR_REVIEW_TIMEOUT_MS = 120_000
 
 
 
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     evolutionCurator: EvolutionCurator
@@ -47,29 +57,31 @@ declare module '@deepseek-ai/cordis' {
 
 export interface Config {
   enabled?: boolean
+  /** Canonical registry id for the due-ness interval (see PARAM_ALIASES). */
+  curatorIntervalHours?: Volatile<number | undefined>
   /** The due-ness interval. The policy snapshot shadows it in every shipped
    * composition — configure `curatorIntervalHours` there; that name is the
    * canonical id. Deprecated alias (G0/S0.3): still readable, refused by
    * writes; removed 0.7.0. */
   intervalHours?: number
-  staleAfterDays?: number
-  archiveAfterDays?: number
+  staleAfterDays?: Volatile<number>
+  archiveAfterDays?: Volatile<number>
   /** Skill-tree root for curator scope/snapshot/archive (D2, v11) — a custom
    * root deployment (review/tool-skill-manage write another tree) must point
    * the curator at the SAME tree or lifecycle decisions land on the default
    * tree and never see the deployed skills. Empty uses skillsRoot(). */
   root?: string
   /** Spend one LLM review pass on stale candidates before the deterministic archive step. */
-  llmReview?: boolean
+  llmReview?: Volatile<boolean>
   curatorProvider?: string
   /** Quality-warned skills may turn stale after this many idle days. */
-  qualityWarnStaleAfterDays?: number
+  qualityWarnStaleAfterDays?: Volatile<number>
   /** Skip automatic runs while any session was active within this many hours (0 disables). */
-  minIdleHours?: number
+  minIdleHours?: Volatile<number>
   /** When true (default), a missing `agents` service is treated as "no active
    * session" (fail-open — the idle gate lets the run proceed); when false the
    * gate fails closed and defers the run until activity can be measured. */
-  minIdleFailOpen?: boolean
+  minIdleFailOpen?: Volatile<boolean>
   /** Skill names excluded from the automated lifecycle. */
   excludeSkillNames?: string[]
   /** Include usage records whose created_by is not 'agent' in lifecycle decisions. */
@@ -83,15 +95,15 @@ export interface Config {
   /** Seconds between host boot and the first automatic schedule check (restart catch-up). */
   bootGraceSeconds?: number
   /** Max tokens for the optional LLM nomination pass. */
-  curatorReviewMaxTokens?: number
+  curatorReviewMaxTokens?: Volatile<number>
   /** Timeout (ms) for the optional LLM nomination pass (B-10, v18). */
-  curatorReviewTimeoutMs?: number
+  curatorReviewTimeoutMs?: Volatile<number>
   /** Structure-health soft body limit (chars) — see DEFAULT_HEALTH_THRESHOLDS (rc.73 A1). */
-  healthSoftBodyChars?: number
+  healthSoftBodyChars?: Volatile<number>
   /** Structure-health stamp-density ceiling per KB — see DEFAULT_HEALTH_THRESHOLDS. */
-  healthStampDensityPerKb?: number
+  healthStampDensityPerKb?: Volatile<number>
   /** Structure-health write-ghost floor: patches at/above with zero reads (A2). */
-  healthChurnMinPatches?: number
+  healthChurnMinPatches?: Volatile<number>
 }
 
 /** Curator behaviour a user may change (G3/S3.3). Field names are the CANONICAL
@@ -133,28 +145,14 @@ interface CuratorPolicyFields {
 
 /** The section's numeric fields — the ones a malformed (NaN/Infinity) user value
  * must not reach a comparison as-is. */
+type CuratorLiveNumberKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays' | 'qualityWarnStaleAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens' | 'curatorReviewTimeoutMs' | 'healthSoftBodyChars' | 'healthStampDensityPerKb' | 'healthChurnMinPatches'
+
 type CuratorNumericKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays'
   | 'qualityWarnStaleAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens'
   | 'curatorReviewTimeoutMs' | 'healthSoftBodyChars' | 'healthStampDensityPerKb'
   | 'healthChurnMinPatches'
 
-/** Schema the platform validates the user layer against; defaults mirror the core
- * constants and the bounds mirror the row schema, so an empty document resolves to
- * today's behaviour and an out-of-range value is refused instead of clamped. */
-export const CURATOR_SETTINGS_SCHEMA: z<CuratorSettings> = z.object({
-  curatorIntervalHours: z.number().min(1).default(DEFAULT_CURATOR_INTERVAL_HOURS),
-  staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
-  archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS),
-  qualityWarnStaleAfterDays: z.number().min(1).default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
-  minIdleHours: z.number().min(0).default(DEFAULT_MIN_IDLE_HOURS),
-  minIdleFailOpen: z.boolean().default(true),
-  llmReview: z.boolean().default(false),
-  curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS),
-  curatorReviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CURATOR_REVIEW_TIMEOUT_MS),
-  healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
-  healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
-  healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
-})
+
 
 /**
  * The cross-field rule the schema cannot express (A2-17): an archive threshold
@@ -164,7 +162,7 @@ export const CURATOR_SETTINGS_SCHEMA: z<CuratorSettings> = z.object({
  * snapshot and the plugin row).
  * @param value - the resolved section the platform hands the owner.
  */
-export function validateCuratorSettings(value: CuratorSettings): void {
+export function validateCuratorSettings(value: Pick<CuratorSettings, 'archiveAfterDays' | 'staleAfterDays'>): void {
   if (value.archiveAfterDays < value.staleAfterDays) {
     throw new Error(`archiveAfterDays (${value.archiveAfterDays}) must be >= staleAfterDays (${value.staleAfterDays})`)
   }
@@ -213,22 +211,31 @@ export function gateConsolidations(
 
 export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
-  static Config: Schema<Config> = z.object({
+  static Config = z.object({
     // N6 (v12): `root` was declared on the interface and consumed by the
     // constructor (D2) but missing from the schema — schema-driven surfaces
     // (doc generation, config guard rails) could not see it.
     root: z.string().default(''),
     enabled: z.boolean().default(true),
-    intervalHours: z.number().min(1).default(DEFAULT_CURATOR_INTERVAL_HOURS),
-    staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
-    archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS),
-    llmReview: z.boolean().default(false),
+    // G1: these twelve fields are the user-writable set (registry tier E3) and carry the
+    // volatile marker, so the platform hands the plugin a live reference for each and a
+    // committed settings edit reaches the running engine.
+    // No .default(): a schema default would fill this canonical key and make the
+    // deprecated alias below unreachable. The constructor resolves the default
+    // (DEFAULT_CURATOR_INTERVAL_HOURS) after the alias fallback.
+    curatorIntervalHours: z.number().min(1).volatile(),
+    // Deprecated row alias (PARAM_ALIASES): still readable by readParam, refused by
+    // writes, removed 0.7.0. Deployment-only (no `.volatile()`).
+    intervalHours: z.number().min(1),
+    staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS).volatile(),
+    archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS).volatile(),
+    llmReview: z.boolean().default(false).volatile(),
     curatorProvider: z.string().default('deepseek-official'),
-    qualityWarnStaleAfterDays: z.number().min(1).default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
+    qualityWarnStaleAfterDays: z.number().min(1).default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS).volatile(),
     // minIdleHours 0 is a legitimate "no idle gate" (the gate guard is `> 0`),
     // so its min is 0; negative values are rejected.
-    minIdleHours: z.number().min(0).default(DEFAULT_MIN_IDLE_HOURS),
-    minIdleFailOpen: z.boolean().default(true),
+    minIdleHours: z.number().min(0).default(DEFAULT_MIN_IDLE_HOURS).volatile(),
+    minIdleFailOpen: z.boolean().default(true).volatile(),
     excludeSkillNames: z.array(z.string()).default([]),
     manageUnmanaged: z.boolean().default(false),
     pruneBuiltins: z.boolean().default(false),
@@ -241,41 +248,29 @@ export class EvolutionCurator extends Service {
     // valid-but-huge number falls back to the default instead of arming a
     // timer Node would fire immediately.
     bootGraceSeconds: z.number().min(0).default(DEFAULT_CURATOR_BOOT_GRACE_SECONDS),
-    curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS),
-    curatorReviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CURATOR_REVIEW_TIMEOUT_MS),
-    healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars),
-    healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb),
-    healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches),
+    curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS).volatile(),
+    curatorReviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CURATOR_REVIEW_TIMEOUT_MS).volatile(),
+    healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars).volatile(),
+    healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb).volatile(),
+    healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches).volatile(),
   })
 
   readonly skills: SkillLibrary
   private readonly io: EvolutionIoLike
   private readonly enabled: boolean
-  private readonly intervalHours: number
-  private readonly staleAfterDays: number
-  private readonly archiveAfterDays: number
-  private readonly llmReview: boolean
+  /** This row's live config (G1 §8.3): its volatile fields are resolved at USE time. */
+  private readonly config: Config
   /** S1-C3: one warn per instance when `llmReview` is on but the llm service
    * is absent — the channel silently degrading must be visible at least once. */
   private llmAbsentWarned = false
   private readonly curatorProvider: string
-  private readonly qualityWarnStaleAfterDays: number
-  private readonly minIdleHours: number
-  private readonly minIdleFailOpen: boolean
   private readonly excludeSkillNames: ReadonlySet<string>
   private readonly manageUnmanaged: boolean
   private readonly pruneBuiltins: boolean
   private readonly referencedSkillNames: ReadonlySet<string>
   private readonly bootGraceSeconds: number
-  private readonly curatorReviewMaxTokens: number
-  private readonly curatorReviewTimeoutMs: number
-  private readonly healthSoftBodyChars: number
-  private readonly healthStampDensityPerKb: number
-  private readonly healthChurnMinPatches: number
-  /** G3/S3.3: this row's resolved values — the base layer of the settings section. */
-  private readonly settingsBase: CuratorSettings
-  /** The user layer for this row's namespace (absent provider = deployment values). */
-  private readonly overrides: ParamOverrides<CuratorSettings>
+  /** Keys whose supplied value had to be corrected; each warns once (G3.1). */
+  private readonly clampedKeys = new Set<string>()
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
   /** B-8 (v18): set by the fiber disposer; a triggered autoCheck must not
@@ -308,6 +303,14 @@ export class EvolutionCurator extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
+    // G1: suppress the platform auto-generated page for this row (the family renders
+    // its own card). Probed, not assumed: a host without the capability still loads.
+    ctx.inject(['settings'], (injected) => {
+      const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }) => unknown } }).settings
+      if (typeof settings?.configure !== 'function') return
+      const disposer = settings.configure({ auto: false })
+      if (typeof disposer === 'function') ctx.effect(() => disposer as () => void, 'evolution-curator: settings presentation')
+    })
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
@@ -320,6 +323,7 @@ export class EvolutionCurator extends Service {
         ...policyStageLimits((this.ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
       },
     })
+    this.config = config
     this.enabled = config.enabled ?? true
     // G3.1 (0.3.23): numeric config is clamped at assembly so a 0/negative/NaN/
     // ±Infinity value falls back to the package default instead of folding as a
@@ -343,72 +347,45 @@ export class EvolutionCurator extends Service {
     if (!claim.granted) {
       this.ctx.logger.warn(`evolution-curator: this instance YIELDS — ${claim.key} is already held by ${claim.holder} IN THIS PROCESS (the claim is a module-scope Map, so it does not exclude another process); a second curator ROW over one home would run a second gate set and a second lifecycle pass over the same tree. It schedules nothing and every run() returns skipped "instance-held"; the report sweep itself is cross-process locked (v43 FLOW2-1).`)
     }
-    const clamped: string[] = []
-    const field = (name: string, value: number | undefined, fallback: number, min: number, max?: number): number => {
-      const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
-      if (value !== undefined && result !== value) clamped.push(name)
-      return result
-    }
-    // G0/S0.4: alias-aware read (canonical `curatorIntervalHours` resolves too).
-    this.intervalHours = field('intervalHours', readNumberParam(config, 'curatorIntervalHours'), DEFAULT_CURATOR_INTERVAL_HOURS, 1)
-    this.staleAfterDays = field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS, 1)
-    this.archiveAfterDays = field('archiveAfterDays', config.archiveAfterDays, DEFAULT_ARCHIVE_AFTER_DAYS, 1)
-    // A2-17 (v18): a stale threshold above the archive threshold makes the
-    // engine reactivate stale records instead of archiving them. Clamp the
-    // archive window up to the stale window and say so.
-    if (this.archiveAfterDays < this.staleAfterDays) {
-      this.ctx.logger.warn(`evolution-curator: archiveAfterDays (${this.archiveAfterDays}) < staleAfterDays (${this.staleAfterDays}); using staleAfterDays as the archive threshold`)
-      this.archiveAfterDays = this.staleAfterDays
-    }
-    this.llmReview = config.llmReview ?? false
     this.curatorProvider = config.curatorProvider ?? 'deepseek-official'
-    this.qualityWarnStaleAfterDays = field('qualityWarnStaleAfterDays', config.qualityWarnStaleAfterDays, DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS, 1)
-    this.minIdleHours = field('minIdleHours', config.minIdleHours, DEFAULT_MIN_IDLE_HOURS, 0)
-    this.minIdleFailOpen = config.minIdleFailOpen ?? true
     this.excludeSkillNames = new Set(config.excludeSkillNames ?? [])
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
-    this.bootGraceSeconds = field('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0, 3600)
-    this.curatorReviewMaxTokens = field('curatorReviewMaxTokens', config.curatorReviewMaxTokens, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1)
-    this.curatorReviewTimeoutMs = field('curatorReviewTimeoutMs', config.curatorReviewTimeoutMs, DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS)
-    this.healthSoftBodyChars = field('healthSoftBodyChars', config.healthSoftBodyChars, DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1)
-    this.healthStampDensityPerKb = field('healthStampDensityPerKb', config.healthStampDensityPerKb, DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1)
-    this.healthChurnMinPatches = field('healthChurnMinPatches', config.healthChurnMinPatches, DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1)
-    if (clamped.length > 0) {
-      this.ctx.logger.warn(`evolution-curator: ${clamped.join(', ')} provided an invalid value; falling back to the default`)
+    this.bootGraceSeconds = this.clampOnce('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0, 3600)
+    // A2-17 (v18): resolve the pair once at construction so a deployment that ships an
+    // impossible pair is visible immediately. The correction itself has ONE home —
+    // lifecycle(), which resolves the pair at USE time (G1 §8.3: no cached values).
+    const archiveAtBoot = this.rowNumber('archiveAfterDays', DEFAULT_ARCHIVE_AFTER_DAYS, 1)
+    const staleAtBoot = this.rowNumber('staleAfterDays', DEFAULT_STALE_AFTER_DAYS, 1)
+    if (archiveAtBoot < staleAtBoot) {
+      this.ctx.logger.warn(`evolution-curator: archiveAfterDays (${archiveAtBoot}) < staleAfterDays (${staleAtBoot}); using staleAfterDays as the archive threshold`)
     }
     // G3/S3.3: the USER layer sits above the deployment carriers. `settings()` is
     // the one reader of this group's behaviour knobs — the user layer first (only
     // for keys the user actually set), then the policy snapshot, then this row —
     // the precedence the design fixes (user > deployment > default). Consumers read
     // it at USE time, so a committed change needs neither a restart nor a watcher.
-    this.settingsBase = {
-      curatorIntervalHours: this.intervalHours,
-      staleAfterDays: this.staleAfterDays,
-      archiveAfterDays: this.archiveAfterDays,
-      qualityWarnStaleAfterDays: this.qualityWarnStaleAfterDays,
-      minIdleHours: this.minIdleHours,
-      minIdleFailOpen: this.minIdleFailOpen,
-      llmReview: this.llmReview,
-      curatorReviewMaxTokens: this.curatorReviewMaxTokens,
-      curatorReviewTimeoutMs: this.curatorReviewTimeoutMs,
-      healthSoftBodyChars: this.healthSoftBodyChars,
-      healthStampDensityPerKb: this.healthStampDensityPerKb,
-      healthChurnMinPatches: this.healthChurnMinPatches,
-    }
-    this.overrides = installParamSection<CuratorSettings>(
-      ctx,
-      paramNamespace('evolution-curator'),
-      CURATOR_SETTINGS_SCHEMA,
-      this.settingsBase,
-      {
-        warn: (message) => { this.ctx.logger.warn('dsh-evolution-curator: ' + message) },
-        // The cross-field rule rides the platform's owner hook: a resolved pair
-        // the engine could not act on is refused at the WRITE, not stored.
-        validate: validateCuratorSettings,
-      },
-    )
+    // G1 §0.3: the cross-field rule the schema cannot express rides the platform's
+    // config waterfall, so a candidate pair the engine could not act on is refused
+    // BEFORE the write instead of being stored (precedent:
+    // packages/llm/llm-pi-ai/src/index.ts:172-181 — the fiber guard keeps a child
+    // fiber's candidate out of this row's decision).
+    ctx.on('internal/config', function (this: Fiber, _previous: unknown, next: () => unknown) {
+      const value = next()
+      if (this !== ctx.fiber) return value
+      // A volatile row's schema cannot re-parse its own resolved config (the input
+      // side is plain numbers, the output side wraps them), so the candidate is judged
+      // as written: the shape this rule targets is a write carrying BOTH thresholds.
+      // A single-key write stays corrected at USE time by lifecycle(), which owns the
+      // one correction and warns there.
+      const archive = readNumberParam(value as object, 'archiveAfterDays')
+      const stale = readNumberParam(value as object, 'staleAfterDays')
+      if (typeof archive === 'number' && typeof stale === 'number') {
+        validateCuratorSettings({ archiveAfterDays: archive, staleAfterDays: stale })
+      }
+      return value
+    })
     this.lastRun = Date.now()
     this.ctx.effect(() => {
       return () => {
@@ -422,6 +399,100 @@ export class EvolutionCurator extends Service {
     if (config.autoStart ?? true) this.start()
   }
 
+  /**
+   * Clamp one supplied numeric value, warning once per key (G3.1).
+   * @param key - the config key, for the warning.
+   * @param value - the value as supplied by the deployment or the user.
+   * @param fallback - the package default a corrected value falls back to.
+   * @param min - the smallest value the engine can act on.
+   * @param max - the largest value the carrier can hold, when bounded.
+   * @returns the value the engine may use.
+   */
+  private clampOnce(key: string, value: number | undefined, fallback: number, min: number, max?: number): number {
+    const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
+    if (value !== undefined && result !== value && !this.clampedKeys.has(key)) {
+      this.clampedKeys.add(key)
+      this.ctx.logger.warn(`evolution-curator: ${key} provided an invalid value; falling back to the default`)
+    }
+    return result
+  }
+
+  /**
+   * One live numeric row field at USE time (G1 §8.3): the row config carries the
+   * platform-resolved layers (schema default < bundle row < profile override) and the
+   * field stays a live reference, so a committed edit applies without a watcher.
+   * @param key - the canonical registry id of the field.
+   * @returns the current plain value, or undefined when nothing supplied one.
+   */
+  private liveNumber(key: CuratorLiveNumberKey): number | undefined {
+    // G0/S0.4: the legacy spelling stays readable (PARAM_ALIASES) — the canonical
+    // volatile field wins, its plain alias field answers when nothing set the canonical one.
+    if (key === 'curatorIntervalHours') return this.config.curatorIntervalHours?.get() ?? this.config.intervalHours
+    return this.config[key]?.get()
+  }
+
+  /**
+   * One live numeric row field, clamped and warned once (G3.1).
+   * @param key - the canonical registry id of the field.
+   * @param fallback - the package default a corrected value falls back to.
+   * @param min - the smallest value the engine can act on.
+   * @param max - the largest value the carrier can hold, when bounded.
+   * @returns the value the engine may use.
+   */
+  private rowNumber(key: CuratorLiveNumberKey, fallback: number, min: number, max?: number): number {
+    return this.clampOnce(key, this.liveNumber(key), fallback, min, max)
+  }
+
+  /**
+   * One live boolean row field at USE time.
+   * @param key - the canonical registry id of the field.
+   * @param fallback - the value used when the deployment supplied none.
+   * @returns the current value.
+   */
+  private rowBoolean(key: 'minIdleFailOpen' | 'llmReview', fallback: boolean): boolean {
+    return this.config[key]?.get() ?? fallback
+  }
+
+  /**
+   * This row's resolved values — the base layer of the precedence chain (G1 §8.3).
+   * Resolved per call so a user edit is live; every numeric field is clamped.
+   * @returns the row layer of the curator's behaviour knobs.
+   */
+  private rowSettings(): CuratorSettings {
+    const number = (key: CuratorLiveNumberKey, fallback: number, min: number, max?: number): number =>
+      this.rowNumber(key, fallback, min, max)
+    return {
+      curatorIntervalHours: number('curatorIntervalHours', DEFAULT_CURATOR_INTERVAL_HOURS, 1),
+      staleAfterDays: number('staleAfterDays', DEFAULT_STALE_AFTER_DAYS, 1),
+      archiveAfterDays: number('archiveAfterDays', DEFAULT_ARCHIVE_AFTER_DAYS, 1),
+      qualityWarnStaleAfterDays: number('qualityWarnStaleAfterDays', DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS, 1),
+      minIdleHours: number('minIdleHours', DEFAULT_MIN_IDLE_HOURS, 0),
+      minIdleFailOpen: this.rowBoolean('minIdleFailOpen', true),
+      llmReview: this.rowBoolean('llmReview', false),
+      curatorReviewMaxTokens: number('curatorReviewMaxTokens', DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1),
+      curatorReviewTimeoutMs: number('curatorReviewTimeoutMs', DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
+      healthSoftBodyChars: number('healthSoftBodyChars', DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1),
+      healthStampDensityPerKb: number('healthStampDensityPerKb', DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1),
+      healthChurnMinPatches: number('healthChurnMinPatches', DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1),
+    }
+  }
+
+  /**
+   * The keys the user set in this row's namespace (G1 §8.4-A).
+   *
+   * This is the ONLY remaining read of the settings user layer, and it reads KEY
+   * NAMES, never values: the platform resolves the user layer into the row config,
+   * so a value is needed from `config` — but the precedence rule (user > policy)
+   * needs to know WHICH keys the user set, or a deployment policy would silently
+   * override the user.
+   * @returns the keys present in this row's user layer.
+   */
+  private userSetKeys(): ReadonlySet<string> {
+    const settings = this.ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
+    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('evolution-curator'))
+    return new Set(Object.keys(entry?.user ?? {}))
+  }
+
   /** The policy-snapshot carrier for this group (unmounted service = no policy). */
   private policyFields(): CuratorPolicyFields {
     const policy = this.ctx.get('evolutionPolicy') as { get(): CuratorPolicyFields | undefined } | undefined
@@ -429,19 +500,22 @@ export class EvolutionCurator extends Service {
   }
 
   /**
-   * G3/S3.3: the ONE reader of the curator's behaviour knobs. Precedence is
-   * user > policy snapshot > this row, and {@link ParamOverrides.get} returns
-   * undefined for a key the user never set, so the deployment carriers keep
-   * winning exactly as before. Read at USE time: a committed settings change is
-   * live without a restart and without a watcher.
+   * G3/S3.3 + G1: the ONE reader of the curator's behaviour knobs. Precedence is
+   * user > policy snapshot > this row: the row layer already carries the user value
+   * (a live field), and {@link userSetKeys} answers whether the user set the key —
+   * so an untouched key keeps following the deployment carriers exactly as before.
+   * Read at USE time: a committed settings change is live without a restart and
+   * without a watcher.
    * @returns the resolved section, every numeric field sanitized.
    */
   private settings(): CuratorSettings {
     const snapshot = this.policyFields()
-    const row = this.settingsBase
+    const row = this.rowSettings()
+    const userSet = this.userSetKeys()
     const pick = <K extends keyof CuratorSettings>(key: K): CuratorSettings[K] => {
-      const user = this.overrides.get(key)
-      if (user !== undefined) return user
+      // A key the user set wins over the deployment policy (G1 §8.4-A); the VALUE
+      // comes from the row config, which already carries the user layer.
+      if (userSet.has(key)) return row[key]
       const fromPolicy = snapshot[key as keyof CuratorPolicyFields]
       return (fromPolicy ?? row[key]) as CuratorSettings[K]
     }
@@ -669,7 +743,7 @@ export class EvolutionCurator extends Service {
       for await (const chunk of llm.stream({
         provider: this.curatorProvider,
         model,
-        messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-evolution-curator', form: 'notice', summary: 'curator review' } })],
+        messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'evolution-curator', form: 'notice', summary: 'curator review' } })],
         maxTokens: settings.curatorReviewMaxTokens,
         // B-10 (v18): a hung provider must not hold the control-plane mutex
         // forever; the abort lands in the existing catch (advisory empty
@@ -1670,11 +1744,20 @@ export class EvolutionCurator extends Service {
       return !settings.minIdleFailOpen
     }
     let latest = 0
+    let measured = 0
     for (const agent of agents.list()) {
-      const events = agent.session.snapshotEvents()
-      const last = events.length === 0 ? 0 : events[events.length - 1]?.time ?? 0
+      // 0.2.x: the newest event time comes from the family's evolutionActivity projection
+      // instead of folding each session log (the synchronous read is deprecated —
+      // session-projection/src/index.ts:181-198 drives the unit once per committed event).
+      const last = sessionLastEventTime(this.ctx, agent.session)
+      if (last === undefined) continue
+      measured += 1
       latest = Math.max(latest, last)
     }
+    // No session was measurable (no projection unit, or a session view the registry cannot
+    // fold): the deployment's fail-open policy answers, the branch the missing `agents`
+    // service above already takes. Measuring nothing is not the same fact as no activity.
+    if (measured === 0) return !settings.minIdleFailOpen
     return latest > 0 && Date.now() - latest < settings.minIdleHours * 3_600_000
   }
 

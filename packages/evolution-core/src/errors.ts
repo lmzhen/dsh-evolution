@@ -62,6 +62,10 @@ export const EVOLUTION_ERRORS = Object.freeze({
   'e-318-skill-write-without-a-read':
     'E-318: skill "%a1%" was not read in this session, so this write is refused. Read it with the `skill` tool first (a read that failed does not count), then repeat the write.',
   // 0.12.0: the confirmation's own deadline (`skillWriteConfirm: 'timeout'`).
+  'e-320-the-profile-home-is-not':
+    'E-320: the profile home is not reported by this host, so the legacy settings document cannot be located. /evolution migrate reads `<profile home>/settings.yaml.imported`; run it from a profile-launched session.',
+  'e-321-no-io-provider-is':
+    'E-321: no evolution-io provider is mounted, so the legacy settings document cannot be read. Mount the evolution-io row (evolution-host/evolution-all) and retry.',
   'e-319-skill-write-confirm-timed-out':
     'E-319: skill "%a1%" was not %a2% — the confirmation prompt went unanswered for %a3% second(s), so the write was cancelled. Nobody was there to decide: set `skillWriteConfirm` to `auto` to write without a prompt, keep `ask` to wait until someone answers, or raise `skillWriteConfirmTimeoutSeconds`.',
 } as const)

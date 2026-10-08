@@ -71,7 +71,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
     })
 
     const session = ctx.sessions.create(SessionId('evo-resume-e2e'))
-    ctx.agents.register({
+    await ctx.agents.register({
       id: session.id,
       session,
       ctx,
@@ -86,6 +86,10 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     // V6-53 (0.3.39): the threshold turn only STASHES the kind — the review
     // subagent runs at the NEXT completed boundary (the flush).
+    // 0.2.x validates the replayed log's lifecycle relationships
+    // (session-format-v3-to-v4/src/relationships.ts: a turn/end must match an open
+    // turn with no open step), so the second boundary is a real turn of its own.
+    session.append('turn/start', { turn: 2 })
     session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
 
     // onTurnEnd is async-void: poll until the review pipeline reported back.

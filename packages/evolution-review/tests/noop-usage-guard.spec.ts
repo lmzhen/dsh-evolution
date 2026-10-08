@@ -75,7 +75,7 @@ describe('review direct-write usage accounting', () => {
 
       const session = ctx.sessions.create(SessionId('review-noop-session'))
       const agent = { id: session.id, session, ctx, inject: () => {} } as unknown as Agent
-      ctx.agents.register(agent)
+      await ctx.agents.register(agent)
       session.append('turn/start', { turn: 1 })
       // Read-before-write: the background review may only write a skill the
       // parent session READ in this session.

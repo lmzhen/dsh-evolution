@@ -18,6 +18,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as MemoryFiles from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { mutableVol } from '../../test-support/volatile-config.ts'
 
 interface Budget {
   memoryCharLimit: number
@@ -35,19 +36,16 @@ async function context(policy?: { memoryChars: number; userChars: number }) {
   return ctx
 }
 
-/** A fake platform settings provider: register + describe + a publish helper that
- * fires the registered watchers, which is what settings-file does on an edit. */
-function provideSettings(ctx: Context, initialUser: Record<string, unknown>) {
-  let user = initialUser
-  const watchers: Array<() => void> = []
+/** A fake platform settings provider carrying only the user layer: G1 keeps one
+ * read of it — the KEY NAMES `describe()` reports, which name the winning surface.
+ * The user VALUE reaches the plugin through the row's live field, so the test
+ * supplies that value as a mutable reference (see the live case below). */
+function provideSettings(ctx: Context, user: Record<string, unknown>) {
   ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'settings', {
-    register: (_ns: string, _schema: unknown, options: { base: unknown }) => ({
-      get: () => ({ ...(options.base as Record<string, unknown>), ...user }),
-      watch: (callback: () => void) => { watchers.push(callback); return () => {} },
-    }),
-    describe: () => [{ ns: 'evolution-memory', user }],
+    // The platform's settings id is the Loader entry id, i.e. the ROW id — the legacy
+    // namespace string ('evolution-memory') is only the G3 migration source.
+    describe: () => [{ ns: 'memory-files', user }],
   })
-  return { push: (next: Record<string, unknown>) => { user = next; for (const callback of watchers) callback() } }
 }
 
 const budgetOf = (ctx: Context): Budget =>
@@ -86,7 +84,8 @@ describe('memory budget surfaces (S2-12③)', () => {
     expect(budget.userSource).toBe('policy')
     const contradiction = warnSpy.mock.calls.filter(call => String(call[0]).includes('contradicts evolution-policy'))
     expect(contradiction).toHaveLength(1)
-    expect(String(contradiction[0]![0])).toContain('memoryCharLimit=5000')
+    // G1: the warn names the CANONICAL registry id (the row may spell either).
+    expect(String(contradiction[0]![0])).toContain('memoryChars=5000')
   })
 
   it('an explicit value EQUAL to the policy is not a contradiction', async () => {
@@ -99,10 +98,22 @@ describe('memory budget surfaces (S2-12③)', () => {
     expect(warnSpy.mock.calls.filter(call => String(call[0]).includes('contradicts evolution-policy'))).toHaveLength(0)
   })
 
-  it('G3/S3.2: a user-layer budget wins, is reported as source user, and the STORE enforces it', async () => {
+  // G1: the canonical registry id is a live row field, so an explicit canonical
+  // value must win exactly like the deprecated alias does — the old read compared
+  // raw values and would have read the reference as absent.
+  it('G1: an explicit CANONICAL row value wins through its live reference', async () => {
+    const ctx = await context({ memoryChars: 2200, userChars: 1375 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-canonical-'), memoryChars: 5000 })
+    const budget = budgetOf(ctx)
+    expect(budget.memoryCharLimit).toBe(5000)
+    expect(budget.memorySource).toBe('config')
+  })
+
+  it('G3/S3.2 + G1: a user-layer budget wins, is reported as source user, and the STORE enforces it live', async () => {
     const ctx = await context({ memoryChars: 4000, userChars: 900 })
-    const settings = provideSettings(ctx, { memoryChars: 30 })
-    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-user-') })
+    provideSettings(ctx, { memoryChars: 30 })
+    const userBudget = mutableVol<number | undefined>(30)
+    MemoryFiles.apply(ctx, { root: await tempRoot('dsh-memory-user-'), memoryChars: userBudget.ref })
     const budget = budgetOf(ctx)
     expect(budget.memoryCharLimit, 'the user layer is the highest-priority surface').toBe(30)
     expect(budget.memorySource).toBe('user')
@@ -113,9 +124,9 @@ describe('memory budget surfaces (S2-12③)', () => {
     const refused = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'x'.repeat(40) }])
     expect(refused.ok).toBe(false)
     expect(refused.message).toContain('30')
-    // Live: the next committed change rebuilds the store, so a RAISED limit
-    // accepts the same entry without a restart.
-    settings.push({ memoryChars: 4000 })
+    // Live: the value is read at USE time, so the platform committing a new one
+    // rebuilds the store on the next operation — no restart and no watcher.
+    userBudget.set(4000)
     const accepted = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'y'.repeat(40) }])
     expect(accepted.ok).toBe(true)
   })

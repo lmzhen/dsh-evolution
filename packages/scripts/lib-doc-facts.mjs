@@ -81,7 +81,15 @@ function machineViolations(fact, root, docs, home) {
       return out
     }
     for (const base of table.bases ?? []) {
-      for (const value of [base.name, base.id, base.metadata]) {
+      // 0.2.x (G6): the per-variant metadata FILES are gone — a declarative preset
+      // row carries its own display copy, so the value the home must state is the
+      // row's `display` (what the picker renders) instead of a metadata file name.
+      const display = base.display ?? {}
+      if (typeof display.name !== 'string' || typeof display.description !== 'string' || typeof display.order !== 'number') {
+        out.push(`${machine.file}: base "${String(base.name)}" carries no complete display copy (name/description/order) — a 0.2.x preset row renders its own display, so a base without one shows the bare id`)
+        continue
+      }
+      for (const value of [base.name, base.id, display.name]) {
         if (!home.includes(String(value))) out.push(`${fact.home}: the base table entry "${String(value)}" (${machine.file}) is not stated in the fact's home — the doc and the table disagree`)
       }
       if (base.requires !== undefined && !home.includes(base.requires.service)) {

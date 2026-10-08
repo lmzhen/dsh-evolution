@@ -8,11 +8,12 @@
  * rows), `/evolution params` and `/evolution policy set` (the command face), the
  * doctor divergence section, and the generated artifacts (`PARAMETERS.md` plus the
  * settings-UI package's generated field list). This guard asserts that every
- * id-shaped literal those channels carry is a registry id; that every E3 row is a key of
- * its OWNER's section schema (and every schema key is a registered id), so a registered
- * knob has somewhere to land; and that the generated
- * artifacts carry EXACTLY the registry's ids, so a hand edit in either one fails
- * here even before the byte-level freshness check runs.
+ * id-shaped literal those channels carry is a registry id; that every E3 row is a field of
+ * its OWNER's row Config schema AND carries .volatile() — since G1 the platform validates
+ * a settings write against that row Config (the profile entry's config), and only a
+ * volatile field is writable at all — so a registered knob has somewhere to land and a
+ * way to change; and that the generated artifacts carry EXACTLY the registry's ids, so a
+ * hand edit in either one fails here even before the byte-level freshness check runs.
  *
  * Canonical names only: a deprecated alias must never appear in a writable
  * channel or in either generated artifact (writes refuse it, and the document
@@ -62,7 +63,7 @@ function aliasLiterals(path, aliases) {
 /**
  * The keys a schemastery `z.object({ … })` block declares (unquoted identifiers).
  * @param path - the file carrying the block.
- * @param anchor - the declaration the block belongs to (`Config`, or an owner's `<X>_SETTINGS_SCHEMA`).
+ * @param anchor - the declaration the block belongs to (an owner's `Config`).
  * @returns the declared keys.
  */
 function schemaKeys(path, anchor = 'Config') {
@@ -114,33 +115,68 @@ if (existsSync(policySchema)) {
 }
 
 
-// 3. Every E3 row must be a key of its OWNER's section schema: the platform validates
-// a write against that schema, so an id the schema does not declare is a parameter the
-// card offers (the field list is generated from the registry) whose write has nowhere
-// to land. The reverse direction matters too — a schema key nobody registered is a
-// knob the registry, the cards, the doctor and the document all miss.
-const SETTINGS_SCHEMA_ANCHOR = /export const ([A-Z_]+_SETTINGS_SCHEMA)\b/
+// 3. Every E3 row must be a field of its OWNER's row Config schema, and that field
+// must carry .volatile(): since G1 the platform validates a settings write against
+// the row Config (the profile entry's config — config-editor/src/index.ts:103), and
+// only a volatile field is writable at all (`volatileForm` skips a row that declares
+// none, and `isVolatilePath` refuses a write to a non-volatile field —
+// settings/src/schema.ts:37-47, settings/src/index.ts:388). Missing either half is a
+// knob the card offers whose write has nowhere to land. The reverse direction matters
+// too: a VOLATILE field the registry does not carry as an E3 row of that owner is a
+// writable knob the cards, the doctor and PARAMETERS.md all miss.
+const ROW_CONFIG_ANCHOR = /(?:export const Config|static Config)\b[^\n]*= z\.object\(\{/
+/**
+ * The top-level fields of a schema block: each key plus its declaration text.
+ *
+ * The field indent is read from the block (a module-level `export const Config` sits at
+ * two spaces, a class `static Config` at four), so a nested object's fields stay part
+ * of their parent's text instead of being read as top-level knobs.
+ * @param body - the schema block, closing brace included.
+ * @returns key to declaration text.
+ */
+function configFields(body) {
+  const first = /^ +[a-z][A-Za-z0-9]*:/m.exec(body)
+  if (first === null) return new Map()
+  const indent = first[0].length - first[0].trimStart().length
+  const field = new RegExp('^ {' + indent + '}([a-z][A-Za-z0-9]*):([\\s\\S]*?)(?=^ {0,' + indent + '}[a-z]|^\\s*\\})', 'gm')
+  const fields = new Map()
+  // A comment is not a declaration: strip line comments before the volatile test, or a
+  // field documented by a comment that MENTIONS the marker would read as marked.
+  for (const match of body.matchAll(field)) fields.set(match[1], match[2].replace(/^\s*\/\/.*$/gm, ''))
+  return fields
+}
 for (const owner of Object.keys(namespaces)) {
   const ownedIds = registry.entries.filter(entry => entry.owner === owner && entry.tier === 'E3').map(entry => entry.id)
   if (ownedIds.length === 0) continue
   const file = join(root, owner, 'src', 'index.ts')
   if (!existsSync(file)) {
-    problems.push('owner-schema: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but has no src/index.ts')
+    problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but has no src/index.ts')
     continue
   }
-  const anchor = SETTINGS_SCHEMA_ANCHOR.exec(readFileSync(file, 'utf8'))
+  const text = readFileSync(file, 'utf8')
+  const anchor = ROW_CONFIG_ANCHOR.exec(text)
   if (anchor === null) {
-    problems.push('owner-schema: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but publishes no <X>_SETTINGS_SCHEMA')
+    problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but publishes no row Config schema')
     continue
   }
-  const keys = schemaKeys(file, anchor[1])
+  const end = text.indexOf('})', anchor.index)
+  const body = text.slice(anchor.index, end < 0 ? undefined : end + 2)
+  const fields = configFields(body)
+  const volatile = [...fields].filter(([, declaration]) => declaration.includes('.volatile()'))
   for (const id of ownedIds) {
-    if (!keys.has(id)) problems.push('owner-schema: ' + owner + ' registers "' + id + '" as E3 but ' + anchor[1] + ' has no such key — the write has nowhere to land')
+    const declaration = fields.get(id)
+    if (declaration === undefined) {
+      problems.push('owner-config: ' + owner + ' registers "' + id + '" as E3 but its row Config declares no such key — after the seam removal the settings write would have nowhere to land')
+    } else if (!declaration.includes('.volatile()')) {
+      problems.push('owner-config: ' + owner + ' registers "' + id + '" as E3 but its row Config field is not .volatile() — the platform skips the row form and refuses the write, so the knob can never be changed')
+    }
   }
-  for (const key of keys) {
-    if (key.length >= 6 && !ids.has(key)) problems.push('owner-schema: ' + owner + ' declares "' + key + '" in ' + anchor[1] + ', which the registry does not know — add the row or drop the knob')
+  for (const [key] of volatile) {
+    if (!ownedIds.includes(key)) {
+      problems.push('owner-config: ' + owner + ' marks "' + key + '" .volatile(), which the registry does not carry as an E3 row of this owner — add the row or drop the marker')
+    }
   }
-  notes.push(owner + ' schema: ' + keys.size + ' key(s)')
+  notes.push(owner + ' row Config: ' + fields.size + ' key(s), ' + volatile.length + ' volatile')
 }
 // The generated artifacts must carry EXACTLY the ids they are generated from:
 // the client field list is the E3 rows, the document is every row.

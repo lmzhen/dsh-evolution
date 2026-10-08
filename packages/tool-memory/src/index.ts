@@ -3,32 +3,20 @@
  * @module @deepseek-ai/dsh-tool-memory
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { PARAM_NAMESPACES, clampedNumber, installParamSection, MEMORY_GUIDANCE_SECTION_ORDER, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
 /** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
 const DEFAULT_ENTRY_PREVIEW_CHARS = 200
 
-/** G3/S3.2: the memory TOOL's user-tunable display knob (canonical id).
- * `memoryEnabled` stays a deployment switch on purpose: it decides whether the
- * tool and its prompt section are REGISTERED at all, so making it live would mean
- * dynamic registration with catalog-visible effects — a structural change this
- * batch deliberately does not make (registry tier E2). */
-export interface ToolMemorySettings {
-  /** Characters of one memory entry shown in a tool result preview. */
-  entryPreviewChars: number
-}
 
-export const TOOL_MEMORY_SETTINGS_SCHEMA: z<ToolMemorySettings> = z.object({
-  entryPreviewChars: z.number().min(1).default(DEFAULT_ENTRY_PREVIEW_CHARS),
-})
 export const inject = ['tools', 'memory']
 
 /**
@@ -101,20 +89,33 @@ interface MemoryWriteArgs {
   operations?: MemoryOperationLike[] | undefined
 }
 
+/** G3/S3.2: `memoryEnabled` stays a deployment switch on purpose — it decides whether the
+ * tool and its prompt section are REGISTERED at all, so making it live would mean dynamic
+ * registration with catalog-visible effects (registry tier E2). The display knob the user
+ * may tune (`entryPreviewChars`) is a volatile row field instead (G1 §8.1). */
 export interface Config {
   memoryEnabled?: boolean
-  /** Maximum characters of each memory entry echoed back in tool results. */
-  entryPreviewChars?: number
+  /** Maximum characters of each memory entry echoed back in tool results (live reference). */
+  entryPreviewChars?: Volatile<number>
 }
 
-export const Config: z<Config> = z.object({
+export const Config = z.object({
   memoryEnabled: z.boolean().default(true),
   // 0.3.18 (S4.6, T-13): lower bound 1 — `slice(0, negative)` returned the
   // entry TAIL (semantics inversion) instead of an empty/full preview.
-  entryPreviewChars: z.number().min(1).default(DEFAULT_ENTRY_PREVIEW_CHARS),
+  entryPreviewChars: z.number().min(1).default(DEFAULT_ENTRY_PREVIEW_CHARS).volatile(),
 })
 
 export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void> {
+  // G1: suppress the platform's auto-generated settings page for this row (the
+  // family renders its own card from the registry). Probed, not assumed: a host
+  // without the capability still loads.
+  ctx.inject(['settings'], (injected) => {
+    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }) => unknown } }).settings
+    if (typeof settings?.configure !== 'function') return
+    const disposer = settings.configure({ auto: false })
+    if (typeof disposer === 'function') ctx.effect(() => disposer as () => void, 'tool-memory: settings presentation')
+  })
   // S1-B3: with the tool disabled, prior staged memory writes used to become
   // permanently unreachable — approve fell through to "No replay runner
   // registered" and released the claim back to `pending` with no way forward.
@@ -128,19 +129,21 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   // tail slice (`slice(0, negative)` inverted the preview) or an empty string
   // (`slice(0, NaN)`). The schema `.min(1)` rejects 0/negative at load; this
   // clamp also covers NaN/±Infinity.
-  const entryPreviewChars = clampedNumber(rawConfig.entryPreviewChars, DEFAULT_ENTRY_PREVIEW_CHARS, { min: 1 })
-  // G3/S3.2: the user layer may override the preview length; read at USE time so
-  // a committed change applies to the next tool result without a restart.
-  const previewOverrides = installParamSection<ToolMemorySettings>(
-    ctx,
-    PARAM_NAMESPACES['tool-memory'] ?? 'tool-memory',
-    TOOL_MEMORY_SETTINGS_SCHEMA,
-    { entryPreviewChars },
-    { warn: (message) => { ctx.logger.warn('tool-memory: ' + message) } },
-  )
-  const previewChars = (): number => previewOverrides.get('entryPreviewChars') ?? entryPreviewChars
-  if (entryPreviewChars !== (rawConfig.entryPreviewChars ?? DEFAULT_ENTRY_PREVIEW_CHARS)) {
-    ctx.logger.warn(`tool-memory: entryPreviewChars=${String(rawConfig.entryPreviewChars)} is invalid; falling back to the default ${DEFAULT_ENTRY_PREVIEW_CHARS}`)
+  // G3/S3.2 + G1 §8.3: the preview length is a VOLATILE row field — its reference carries
+  // the platform-resolved layers (schema default < bundle row < profile override) and is
+  // read at USE time, so a committed change applies to the next tool result with no
+  // restart and no watcher. The clamp covers NaN/±Infinity, which schemastery lets
+  // through; `.min(1)` rejects 0/negative at load (`slice(0, negative)` used to return
+  // the entry TAIL — the 0.3.18 inversion).
+  let previewClampWarned = false
+  const previewChars = (): number => {
+    const value = rawConfig.entryPreviewChars?.get()
+    const clamped = clampedNumber(value, DEFAULT_ENTRY_PREVIEW_CHARS, { min: 1 })
+    if (!previewClampWarned && value !== undefined && clamped !== value) {
+      previewClampWarned = true
+      ctx.logger.warn(`tool-memory: entryPreviewChars=${String(value)} is invalid; falling back to the default ${DEFAULT_ENTRY_PREVIEW_CHARS}`)
+    }
+    return clamped
   }
   // 0.3.18 (S4.3, E-67): systemPrompt is an OPTIONAL service (soft probe, the
   // M-7 doctrine — align with tool-skill-manage). A host without it still boots

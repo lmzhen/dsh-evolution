@@ -17,6 +17,9 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as Review from '../src/index.ts'
+// G4: hand-driven specs must present a session the projection registry can fold.
+import { NATIVE_CALL_EVENT } from '@deepseek-ai/dsh-evolution-core'
+import { emitTurnBoundary, projectable } from '../../test-support/projection-session.ts'
 
 it('S2-6 (FLOW1-1): a handle that never settles is abandoned — flag reset, queue drained, review-error emitted', { timeout: 30_000 }, async () => {
   const delivered: string[] = []
@@ -28,24 +31,17 @@ it('S2-6 (FLOW1-1): a handle that never settles is abandoned — flag reset, que
   await mountAgentLoopTestDependencies(ctx)
   // Each emitted turn must present NEW events: the cadence fold reads the
   // session snapshot, so a static array would count once and never fire again.
-  let currentTurn = 0
-  const session = {
+  const session = projectable({
     id: SessionId('s2-6-settle-fixture'),
     seq: 1,
     header: { origin: undefined },
-    snapshotEvents: () => [{
-      type: 'tool/call',
-      data: { turn: currentTurn, step: 2, callId: 'c' + String(currentTurn), name: 'skill', arguments: '{}' },
-    }],
+    snapshotEvents: () => [{ type: 'tool/call', data: { turn: 0, step: 2, callId: 'c0', name: 'skill', arguments: '{}' } }],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-  } as unknown as Session
+  }) as unknown as Session
   const agent = { id: session.id, session, inject: collect } as unknown as Agent
   ;(agent as { followup: unknown }).followup = collect
-  ctx.agents.register(agent)
-  const emitEnd = (turn: number): void => {
-    currentTurn = turn
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
-  }
+  await ctx.agents.register(agent)
+  const emitEnd = (turn: number): void => { emitTurnBoundary(ctx, session, turn, NATIVE_CALL_EVENT) }
 
   let starts = 0
   const hangingRun = { result: new Promise(() => {}), dispose: async () => {} }
@@ -108,24 +104,17 @@ it('PLAN S1.1 (2026-09-16): a run settling within the review timeout is consumed
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  let currentTurn = 0
-  const session = {
+  const session = projectable({
     id: SessionId('s1-1-real-latency'),
     seq: 1,
     header: { origin: undefined },
-    snapshotEvents: () => [{
-      type: 'tool/call',
-      data: { turn: currentTurn, step: 2, callId: 'c' + String(currentTurn), name: 'skill', arguments: '{}' },
-    }],
+    snapshotEvents: () => [{ type: 'tool/call', data: { turn: 0, step: 2, callId: 'c0', name: 'skill', arguments: '{}' } }],
     deriveMessages: (): Array<{ role: string; content: Array<{ type: string; text: string }> }> => [],
-  } as unknown as Session
+  }) as unknown as Session
   const agent = { id: session.id, session, inject: collect } as unknown as Agent
   ;(agent as { followup: unknown }).followup = collect
-  ctx.agents.register(agent)
-  const emitEnd = (turn: number): void => {
-    currentTurn = turn
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
-  }
+  await ctx.agents.register(agent)
+  const emitEnd = (turn: number): void => { emitTurnBoundary(ctx, session, turn, NATIVE_CALL_EVENT) }
   // The run settles only when released below — AFTER the fake clock crossed
   // the old 5s watchdog mark. A real LLM review takes seconds, far inside the
   // 120s abort deadline the start signal gives it.
@@ -201,24 +190,17 @@ it('PLAN-R2 P2-1 (2026-09-16): a reviewTimeoutMs at the int32 timer ceiling stil
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  let currentTurn = 0
-  const session = {
+  const session = projectable({
     id: SessionId('p2-1-ceiling-budget'),
     seq: 1,
     header: { origin: undefined },
-    snapshotEvents: () => [{
-      type: 'tool/call',
-      data: { turn: currentTurn, step: 2, callId: 'c' + String(currentTurn), name: 'skill', arguments: '{}' },
-    }],
+    snapshotEvents: () => [{ type: 'tool/call', data: { turn: 0, step: 2, callId: 'c0', name: 'skill', arguments: '{}' } }],
     deriveMessages(): Array<{ role: string; content: Array<{ type: string; text: string }> }> { return [] },
-  } as unknown as Session
+  }) as unknown as Session
   const agent = { id: session.id, session, inject: collect } as unknown as Agent
   ;(agent as { followup: unknown }).followup = collect
-  ctx.agents.register(agent)
-  const emitEnd = (turn: number): void => {
-    currentTurn = turn
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
-  }
+  await ctx.agents.register(agent)
+  const emitEnd = (turn: number): void => { emitTurnBoundary(ctx, session, turn, NATIVE_CALL_EVENT) }
   type StubResult = { structured: { memoryOps: unknown[]; skillOps: unknown[]; summary: string }; stopReason: string }
   let releaseRun!: (value: StubResult) => void
   const runResult = new Promise<StubResult>((resolve) => { releaseRun = resolve })
@@ -290,24 +272,17 @@ it('PLAN-R2 P2-2 (2026-09-16): a hung dispose is abandoned after the settle marg
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  let currentTurn = 0
-  const session = {
+  const session = projectable({
     id: SessionId('p2-2-hung-dispose'),
     seq: 1,
     header: { origin: undefined },
-    snapshotEvents: () => [{
-      type: 'tool/call',
-      data: { turn: currentTurn, step: 2, callId: 'c' + String(currentTurn), name: 'skill', arguments: '{}' },
-    }],
+    snapshotEvents: () => [{ type: 'tool/call', data: { turn: 0, step: 2, callId: 'c0', name: 'skill', arguments: '{}' } }],
     deriveMessages(): Array<{ role: string; content: Array<{ type: string; text: string }> }> { return [] },
-  } as unknown as Session
+  }) as unknown as Session
   const agent = { id: session.id, session, inject: collect } as unknown as Agent
   ;(agent as { followup: unknown }).followup = collect
-  ctx.agents.register(agent)
-  const emitEnd = (turn: number): void => {
-    currentTurn = turn
-    ctx.emit('session/event', session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } } as never)
-  }
+  await ctx.agents.register(agent)
+  const emitEnd = (turn: number): void => { emitTurnBoundary(ctx, session, turn, NATIVE_CALL_EVENT) }
   type StubResult = { structured: { memoryOps: unknown[]; skillOps: unknown[]; summary: string }; stopReason: string }
   const settledResult: StubResult = { structured: { memoryOps: [], skillOps: [], summary: 'no-op' }, stopReason: 'completed' }
   let starts = 0

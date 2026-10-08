@@ -22,7 +22,9 @@ it('every per-session collection in the plugin source is registered', () => {
   expect(unregistered).toBe(0)
   // A 组（未结窗口）把集合数推到十个（pendingReviewNotices 同款在声明处注册）；C 组又把
   // skipNextCadenceFire 与 lastTurnStart 两个集合删掉——抑制改由「取走它的回合」识别，不必再
-  // 按投递顺序记账——所以现在是八个。
+  // 按投递顺序记账。G4 删掉 turnStarts（回合窗口改由家族会话投影 `evolutionSignals` 按
+  // `turn/start` 自行重置，那张表原本只是替它记住起点 seq），同时新增 dispatchDigest
+  // （审查摘要的工具证据＝有界的 dispatch 帧尾巴，取代每次复查重读整份日志）。所以现在是八个。
   expect(registered).toHaveLength(8)
 })
 

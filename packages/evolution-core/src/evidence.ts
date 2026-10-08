@@ -28,6 +28,31 @@ const BOOKKEEPING_FRAME_TYPES: ReadonlySet<string> = new Set([
   'step/end',
 ])
 
+/**
+ * Whether one frame type records a boundary and carries no content.
+ *
+ * The classification table's SECOND reader: the live projection unit
+ * (`session-projection.ts`) folds the same answer per event, so the rule stays one table.
+ * @param type - a platform session-event type.
+ * @returns true for the turn/step bookends.
+ */
+export function isBookkeepingFrame(type: string): boolean {
+  return BOOKKEEPING_FRAME_TYPES.has(type)
+}
+
+/**
+ * The one question an evidence index answers: does this seq carry content?
+ *
+ * Structural on purpose — {@link evidenceKindIndex} materializes the dense set of content seqs,
+ * while the projection answers by complement over the sparse boundary seqs
+ * (`session-projection.ts`). Both satisfy this interface, and it is all the plan path reads
+ * (`evolution-plan-validator/src/index.ts:164`).
+ */
+export interface EvidenceIndex {
+  /** @param seq - a cited evidence seq. @returns true when that frame carries content. */
+  has(seq: number): boolean
+}
+
 /** One session frame, as far as the classification reads it. A platform `SessionEvent` is
  * assignable: both fields are optional here so a stub log can be classified without pretending
  * to be a full event. */

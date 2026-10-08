@@ -140,6 +140,21 @@ if (!existsSync(platform)) {
   console.error('smoke-built-entries: no platform scope at ' + platform + ' — pass --platform')
   process.exit(2)
 }
+// The family's E3 config fields are declared with `.volatile()` (G1), which the
+// platform's vendored schemastery gained with the 0.2.x line. A scope from an older
+// line cannot import a single family entry, so name THAT fact once — with the line it
+// resolved — instead of repeating one import failure per package.
+const schemasteryDir = join(platform, 'schemastery')
+if (existsSync(join(schemasteryDir, 'package.json'))) {
+  const manifest = JSON.parse(readFileSync(join(schemasteryDir, 'package.json'), 'utf8'))
+  const entry = join(schemasteryDir, manifest.module ?? manifest.main ?? 'index.js')
+  const loadedZ = existsSync(entry) ? await import(pathToFileURL(entry).href).catch(() => undefined) : undefined
+  const z = loadedZ === undefined ? undefined : (loadedZ.default ?? loadedZ)
+  if (typeof z?.number === 'function' && typeof z.number().volatile !== 'function') {
+    console.error('smoke-built-entries: the platform scope at ' + platform + ' carries @deepseek-ai/schemastery ' + manifest.version + ', which has no volatile() — the family targets the 0.2.x platform line (schemastery >= 3.18.4). Pass --platform <scope of that line>.')
+    process.exit(1)
+  }
+}
 // Reproduce the installed resolution topology WITHOUT writing into it: `@deepseek-ai` is a
 // real directory in the stage, one junction per installed platform package sits inside it,
 // and one junction per sibling package of the installed scope (`yaml`, `zod`, …) sits beside

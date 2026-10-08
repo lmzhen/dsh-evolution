@@ -33,9 +33,10 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { usage: 'skills refresh', summary: '丢弃目录缓存并重新读取技能树' },
   { usage: 'learn [request]', summary: '向本会话发一条学习请求' },
   { usage: 'maintain [--timeout=<ms> | --facts]', summary: '运行一次维护扫描（--facts 为 0 token 预览）' },
+  { usage: 'migrate', summary: '把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」）' },
   { usage: 'policy set <id> <value> [--expect <revision>]', summary: '通过设置服务写入一个你可改的参数 (E3 only; E1/E2 stay in cordis.yml)' },
   { usage: 'params [--group <name>] [--json]', summary: '列出全部参数：分组、档位、生效时机、来源与当前值（--json feeds scripts)' },
-  { usage: 'preset install [--base <name>[,<name>...]]', summary: '按指定基础生成自进化 Agent 预设到用户 root (bases from the agent package\'s bases.json)' },
+  { usage: 'preset install [--base <name>[,<name>...]]', summary: '把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json）' },
   { usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', summary: '把技能正文的一节移到 references 文件' },
   { usage: 'replay', summary: '比较不同会话与重启之间的计划结果（从活动记录回填）' },
 ]

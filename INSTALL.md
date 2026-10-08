@@ -72,12 +72,15 @@ file come from that table).
 
 ## Prerequisites
 
-- **Validated platform line: DSH `0.1.5-rc.2`.** The published
-  `@deepseek-ai/dsh-*` dependency ranges are `^0.1.5-rc.2`, and node-semver's
-  prerelease rule does not admit an earlier prerelease line, so an older
-  platform fails at dependency resolution rather than at runtime. The anchor
-  is defined once in `.github/workflows/release.yml` (`PLATFORM_VERSION`)
-  and re-derived by `packages/scripts/verify-platform-ranges.mjs`.
+- **Validated platform line: DSH `0.2.0-rc.2`.** The published
+  `@deepseek-ai/dsh-*` dependency ranges are `^0.2.0-rc.1` (`PLATFORM_FLOOR`),
+  and node-semver's prerelease rule admits this line including its earlier rc
+  but no earlier line, so an older platform fails at dependency resolution
+  rather than at runtime. Both values live in
+  `.github/workflows/release.yml` — the floor is what the ranges declare, the
+  tested line is what the gate builds against — and
+  `packages/scripts/verify-platform-ranges.mjs` re-derives the floor from the
+  staged manifests.
 - A DeepSeek Harness checkout that resolves the evolution workspace packages,
   or the published community bundle `@lmzhen/dsh-evolution-host` available to
   pnpm (see **Production install**).

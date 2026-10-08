@@ -19,7 +19,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
-import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, SKILL_ACTION_REQUIRED_FIELDS, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, SKILL_ACTION_REQUIRED_FIELDS, validateRestructureTarget, type EvidenceIndex } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
   target?: string
@@ -60,12 +60,15 @@ export interface EvolutionPlan {
 export interface ValidationContext {
   /** Upper bound for the latest valid session seq. */
   sessionSeq: number
-  /** The seqs of the frames that carry CONTENT (core `evidenceKindIndex`), or
-   * `undefined` when the caller cannot classify the log (a session whose events carry no
-   * seq). Read by the report-only `EVIDENCE_CLASS` row only: an op whose entire citation
-   * list is a bookkeeping frame (`turn/start`, `step/start`, …) becomes visible
-   * without being refused. */
-  substantiveEvidenceSeqs?: ReadonlySet<number> | undefined
+  /** Which frames carry CONTENT (core `EvidenceIndex`), or `undefined` when the caller
+   * cannot classify the log. Read by the report-only `EVIDENCE_CLASS` row only: an op whose
+   * entire citation list is a bookkeeping frame (`turn/start`, `step/start`, …) becomes
+   * visible without being refused.
+   *
+   * Two producers satisfy it: the dense whole-log reader (`evidenceKindIndex`) and the live
+   * session projection (`sessionEvidenceIndex`, the complement over boundary seqs) — the
+   * consumer asks one question (`has`), so either answers it. */
+  substantiveEvidenceSeqs?: EvidenceIndex | undefined
   maxOpsPerPlan?: number
   protectedSkillNames?: ReadonlySet<string>
   maxMemoryChars?: number

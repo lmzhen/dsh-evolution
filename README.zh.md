@@ -67,12 +67,12 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 
 | | 取值 |
 |---|---|
-| 已验证的 DSH 平台线 | **`0.1.5-rc.2`**（`PLATFORM_VERSION`；`UPSTREAM_SHA=fb2c4b9e…`） |
-| 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.1.5-rc.2` |
-| 家族版本 | `0.10.0`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
+| 已验证的 DSH 平台线 | **`0.2.0-rc.2`**（`PLATFORM_VERSION`；钉住的开发基线是 `UPSTREAM_SHA=fb2c4b9e…`） |
+| 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.2.0-rc.1`（`PLATFORM_FLOOR`） |
+| 家族版本 | `0.16.1`（npm `latest`；各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
 
-预发布 range 只认**一个**锚点，而不是一整族：`^0.1.5-rc.2` 会拒绝更晚的预发布后继版，但接受稳定版 `0.1.5`。更早的预发布线在依赖解析阶段就失败——这是支持窗口，不是 bug。
+两个值回答两个问题：`PLATFORM_FLOOR` 是发布出去的 range 声明的口径，`PLATFORM_VERSION` 是门禁实际验证的那条线。floor 必须收得住整条线——`^0.2.0-rc.1` 收得住 `0.2.0-rc.2`，而 `^0.2.0-rc.2` 会拒绝它自己验证过的那个 rc。预发布 range 仍然不跨线：更早的预发布线在依赖解析阶段就失败，这是支持窗口，不是 bug。
 
 ## 工作原理
 
@@ -218,7 +218,7 @@ dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 <details>
 <summary>维护者：上游升级对照清单</summary>
 
-1. **技能 provider 的影子 rank**：本家族的 provider 注册 `EVOLUTION_SKILL_RANK = 390`，依赖上游的 `USER_DSH_RANK`（`0.1.5-rc.2` 上是 400）排在它上面；两边都要复核。
+1. **技能 provider 的影子 rank**：本家族的 provider 注册 `EVOLUTION_SKILL_RANK = 390`，依赖上游的 `USER_DSH_RANK`（`0.1.5-rc.2` 上是 400，`0.2.0-rc.2` 上仍是 400——`packages/skill/skill-filesystem/src/index.ts:39`）排在它上面；两边都要复核。
 2. **`@deepseek-ai` 包名撞名**：发布工具会把家族包名改写成 `@lmzhen`；每个上游版本都要检查有没有和我们撞名的包。
 3. **ToolRuntime 参数冻结**：`tool.execute` 拿到的是 `deepFreeze` 过的快照：要新建对象，不要往 `args` 上赋值。
 4. **逐技能调用的 frontmatter**：影子 provider 必须继续解析和上游一样的键；它对旧键的处理口径，唯一出处是 `evolution-skill-catalog/README.md`。

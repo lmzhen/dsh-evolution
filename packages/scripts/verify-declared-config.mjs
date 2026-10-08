@@ -94,13 +94,17 @@ const PROFILE_PLANES = {
  */
 const UPSTREAM_PLANES = {
   base: {
-    disabled: ['hmr', 'skill-badge'],
+    // 0.2.x re-record: `hmr` is mounted ENABLED now (the 0.1.5 table disabled it), and
+    // `tool-plugin-manager` / `tool-ralph` joined the disabled set.
+    disabled: ['tool-plugin-manager', 'skill-badge', 'tool-ralph'],
     mounted: ['session-query-sqlite', 'tool-skill'],
-    source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; skill-badge and hmr disabled:true)',
+    source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; tool-plugin-manager, skill-badge and tool-ralph disabled:true)',
   },
   'web-app': {
+    // 0.2.x re-record: `ui-schedule` and `workflow-worker-thread` are mounted ENABLED now,
+    // and `tool-plugin-manager` / `workflow-ptc` joined the disabled set.
     disabled: [
-      'ui-schedule',
+      'tool-plugin-manager',
       'tool-bash',
       'tool-pwsh',
       'tool-jobs',
@@ -118,7 +122,7 @@ const UPSTREAM_PLANES = {
       'tool-subagent-list-agents',
       'tool-subagent',
       'tool-subagent-fork',
-      'workflow-worker-thread',
+      'workflow-ptc',
       'tool-workflow',
       'tool-ralph',
       'agent-instructions',

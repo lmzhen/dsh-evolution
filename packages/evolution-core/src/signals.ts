@@ -6,8 +6,8 @@
  * accumulated until a configured interval fires.
  */
 
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import { ToolDispatchNormalizer, isSkillToolName } from './tool-dispatch.ts'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { dispatchStepOf, isSkillToolName } from './tool-dispatch.ts'
 
 export type ReviewKind = 'memory' | 'skill' | 'combined'
 
@@ -70,82 +70,118 @@ function textOfBlock(block: unknown): string {
 }
 
 /**
- * Per-turn dispatch ledgers, keyed by the signal object they feed.
+ * The turn-window fold state: what {@link TurnSignals} carries plus its dispatch ledger.
  *
- * `observeEvent` folds ONE event at a time, so the dedup state has to outlive
- * the call. One WeakMap entry per `TurnSignals`, so a finished fold's ledger is
- * collectable with the fold itself and two concurrent turns never share one.
+ * `opened` holds one ledger key per dispatch this window already counted
+ * ({@link dispatchStepOf}). It lives in the state — not in a side table — because the state is
+ * what a live projection unit and a whole-log fold both carry between events.
  */
-const dispatchLedgers = new WeakMap<TurnSignals, ToolDispatchNormalizer>()
-
-/** The ledger folding this signal's turn, created on first use. */
-function normalizerForSignal(signal: TurnSignals): ToolDispatchNormalizer {
-  let normalizer = dispatchLedgers.get(signal)
-  if (normalizer === undefined) {
-    normalizer = new ToolDispatchNormalizer()
-    dispatchLedgers.set(signal, normalizer)
-  }
-  return normalizer
+export interface TurnFoldState extends TurnSignals {
+  /** Ledger keys this window already counted, in first-seen order. */
+  opened: string[]
 }
 
-/** Fold one session event into the current turn observation. */
-export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
-  // P1-1 (v11) carried to the remaining branches (N4, v12): the event union
-  // types `data`, but events arrive from disk — a persisted event with
-  // `data: null` / non-object used to TypeError in the user/assistant
-  // branches (the review E-6 catch then swallowed the whole turn's remaining
-  // signals, so every replay fold broke at the same point). One guard before
-  // the branch switch covers user/assistant/tool alike.
+/** The empty turn-window fold state. */
+export function initialTurnFold(): TurnFoldState {
+  return {
+    substantive: false,
+    toolCalls: 0,
+    userChars: 0,
+    assistantChars: 0,
+    memorySignal: false,
+    skillSignal: false,
+    opened: [],
+  }
+}
+
+/**
+ * Fold ONE session event into a turn-window state, purely.
+ *
+ * The one fold behind all three readers: `observeEvent` (the mutating face the live `turn/end`
+ * path uses), `foldTurn` (a whole-log window fold, kept for structural test sessions) and the
+ * family's `evolutionSignals` projection unit. P1-1/N4 guards stay: events arrive from disk, so
+ * a persisted `data: null` / non-object or a malformed `content` skips instead of throwing.
+ * @param state - the window so far.
+ * @param event - the next committed session event.
+ * @returns the next state; the same reference when the event carries nothing this fold reads.
+ */
+export function foldTurnEvent(state: TurnFoldState, event: SessionEvent): TurnFoldState {
   const data: unknown = event.data
-  if (data === null || typeof data !== 'object' || Array.isArray(data)) return
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return state
   if (event.type === 'user/message') {
     // 0.3.16 (E-49): a malformed content (not an array) used to throw here and
     // break the whole signal pipeline — guard and skip instead.
     const content = (data as { content?: unknown }).content
-    if (!Array.isArray(content)) return
+    if (!Array.isArray(content)) return state
     const text = content.map(textOfBlock).join(' ')
-    signal.userChars += text.length
-    if (CORRECTION_PATTERNS.some(pattern => pattern.test(text))) signal.memorySignal = true
-    if (FIX_PATTERNS.some(pattern => pattern.test(text))) signal.skillSignal = true
-    return
+    return {
+      ...state,
+      userChars: state.userChars + text.length,
+      memorySignal: state.memorySignal || CORRECTION_PATTERNS.some(pattern => pattern.test(text)),
+      skillSignal: state.skillSignal || FIX_PATTERNS.some(pattern => pattern.test(text)),
+    }
   }
   if (event.type === 'assistant/message') {
-    // V6-21 (0.3.37): the same content guard the user branch got in E-49 —
-    // a malformed assistant content must skip, not break the signal pipeline
-    // (the review E-6 catch used to swallow the whole turn's signals).
-    // V7-09 (0.3.44): the guard must also cover `data.message` ITSELF missing
-    // — `.content` on an absent message is the same TypeError one level up.
+    // V6-21/V7-09: the same content guard the user branch got in E-49, extended to `message`
+    // itself missing — `.content` on an absent message is the same TypeError one level up.
     const message = (data as { message?: { content?: Array<{ type: string; text?: string }> } }).message
-    if (!message || !Array.isArray(message.content)) return
+    if (!message || !Array.isArray(message.content)) return state
     const text = message.content.map(textOfBlock).join(' ')
-    signal.assistantChars += text.length
-    return
+    return { ...state, assistantChars: state.assistantChars + text.length }
   }
-  // Tool evidence (v37 P7a): the dispatch fold lives in `tool-dispatch.ts` —
-  // the ONE reader of the platform's dispatch event types. This branch used to
-  // match `tool/call` itself, so a PTC session (`tool/ptc-dispatch*`) advanced
-  // the cadence by zero tool calls and never raised the skill signal. The
-  // normalizer emits one signal per dispatch, so the start/settle pair of a PTC
-  // sub-dispatch counts once.
-  // P1-1 (v11): this branch used to be the one without a data-shape guard —
-  // a persisted event with missing/non-object `data` TypeErrors here and the
-  // review E-6 catch swallowed the whole turn's remaining signals. Since N4
-  // (v12) the shared guard above covers all three branches; the normalizer
-  // answers `null` for every payload it cannot attribute.
-  const dispatch = normalizerForSignal(signal).advance(event)
-  if (dispatch === null) return
-  // `toolCalls` is the model-facing call count the cadence weights by: a
-  // program's sub-dispatches are not model calls (the `run_code` call that owns
-  // them is logged natively and counted by its own `tool/call`), so only the
-  // native dispatches advance it — which, since the vocabulary's dead
-  // 'program-root' value was removed (S1-E6), is simply `kind !== 'program'`.
-  // Counting them all would let one 50-operation program advance the cadence
-  // by 50 turns.
-  if (dispatch.kind !== 'program') signal.toolCalls += 1
-  // The skill signal asks whether the model learned from a skill this turn,
-  // which a program's `tools.skill(...)` call does just as much as a direct
-  // read — this is the signal a PTC session used to lose entirely.
-  if (isSkillToolName(dispatch.name)) signal.skillSignal = true
+  // Tool evidence (v37 P7a): the dispatch vocabulary lives in `tool-dispatch.ts` — the ONE reader
+  // of the platform's dispatch event types — and `dispatchStepOf` is its pure half, so this fold
+  // counts one tool call per dispatch whatever the runtime mode (native or PTC).
+  // One widening assignment instead of a conditional spread: `SessionEvent`'s own type keeps `data`
+  // required, while events arriving from disk may omit it — the vocabulary takes it optional.
+  const frame: { type: string; data?: unknown } = event
+  const dispatch = dispatchStepOf(frame)
+  if (dispatch === null || dispatch.name === '' || state.opened.includes(dispatch.key)) return state
+  // `toolCalls` is the model-facing call count the cadence weights by: a program's sub-dispatches
+  // are not model calls (the `run_code` call that owns them is logged natively and counted by its
+  // own `tool/call`), so only native dispatches advance it — which, since the vocabulary's dead
+  // 'program-root' value was removed (S1-E6), is simply `kind !== 'program'`. This is the ONE
+  // modality split the family's N17 guard table registers; do not add a second copy.
+  let toolCalls = state.toolCalls
+  if (dispatch.kind !== 'program') toolCalls += 1
+  return {
+    ...state,
+    opened: [...state.opened, dispatch.key],
+    toolCalls,
+    skillSignal: state.skillSignal || isSkillToolName(dispatch.name),
+  }
+}
+
+/**
+ * Per-turn dispatch ledgers, keyed by the signal object they feed.
+ *
+ * `observeEvent` folds ONE event at a time, so the ledger has to outlive the call. One WeakMap
+ * entry per `TurnSignals`, so a finished fold's ledger is collectable with the fold itself and two
+ * concurrent turns never share one.
+ */
+const dispatchLedgers = new WeakMap<TurnSignals, readonly string[]>()
+
+/** The ledger of the turn this signal is folding; empty before its first dispatch. */
+function ledgerForSignal(signal: TurnSignals): readonly string[] {
+  return dispatchLedgers.get(signal) ?? []
+}
+
+/**
+ * Fold one session event into the current turn observation (the mutating face of
+ * {@link foldTurnEvent}: every reader shares the one fold, this one copies the result back onto
+ * the caller's signal object and keeps its ledger for the next event).
+ * @param signal - the turn observation to advance.
+ * @param event - the next committed session event.
+ */
+export function observeEvent(signal: TurnSignals, event: SessionEvent): void {
+  const next = foldTurnEvent({ ...signal, opened: [...ledgerForSignal(signal)] }, event)
+  signal.substantive = next.substantive
+  signal.toolCalls = next.toolCalls
+  signal.userChars = next.userChars
+  signal.assistantChars = next.assistantChars
+  signal.memorySignal = next.memorySignal
+  signal.skillSignal = next.skillSignal
+  dispatchLedgers.set(signal, next.opened)
 }
 
 /** Compute review cadence after `turn/end`. */
@@ -197,20 +233,26 @@ export function advanceReview(
   return null
 }
 
-/** Fold all events between two sequence boundaries into one TurnSignals. */
-export function foldTurn(session: Session, fromSeq: number): TurnSignals {
-  const signal: TurnSignals = {
-    substantive: false,
-    toolCalls: 0,
-    userChars: 0,
-    assistantChars: 0,
-    memorySignal: false,
-    skillSignal: false,
+/**
+ * Fold a log slice into one turn window, purely.
+ *
+ * The whole-log reference for {@link foldTurnEvent}: a caller that holds events (a fixture, a
+ * structural view, a replay) reads a window without touching a platform Session. Production reads
+ * the same window live from the family's `evolutionSignals` projection (`sessionTurnSignals`),
+ * which folds `foldTurnEvent` once per committed event.
+ * @param events - the log, oldest first. Pass an array, not a live iterator, when it can grow.
+ * @param fromSeq - index of the first event of the window (0 for the whole log).
+ * @returns the window's signals.
+ */
+export function foldTurnEvents(events: Iterable<SessionEvent>, fromSeq = 0): TurnSignals {
+  // Materialize once: a live iterator must not be re-entered, and `Array.isArray` on an
+  // `Iterable` would narrow to `any[]`.
+  const list: readonly SessionEvent[] = [...events]
+  let state = initialTurnFold()
+  for (let index = Math.max(0, fromSeq); index < list.length; index += 1) {
+    const event = list[index]
+    if (event) state = foldTurnEvent(state, event)
   }
-  const events = session.snapshotEvents()
-  for (let index = Math.max(0, fromSeq); index < events.length; index += 1) {
-    const event = events[index]
-    if (event) observeEvent(signal, event)
-  }
-  return signal
+  const { substantive, toolCalls, userChars, assistantChars, memorySignal, skillSignal } = state
+  return { substantive, toolCalls, userChars, assistantChars, memorySignal, skillSignal }
 }

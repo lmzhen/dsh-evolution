@@ -82,14 +82,15 @@ state onto an empty domain.
 
 | | Value |
 |---|---|
-| Validated DSH platform line | **`0.1.5-rc.2`** (`PLATFORM_VERSION`; `UPSTREAM_SHA=fb2c4b9e…`) |
-| Declared dependency window | `^0.1.5-rc.2` on every `@deepseek-ai/dsh-*` dependency/peer |
-| Family version | `0.10.0` (npm `latest`; per-form status in `packages/INSTALL.md`) |
+| Validated DSH platform line | **`0.2.0-rc.2`** (`PLATFORM_VERSION`; the pinned dev baseline is `UPSTREAM_SHA=fb2c4b9e…`) |
+| Declared dependency window | `^0.2.0-rc.1` on every `@deepseek-ai/dsh-*` dependency/peer (`PLATFORM_FLOOR`) |
+| Family version | `0.16.1` (npm `latest`; per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 
-A prerelease range admits **one** anchor, not a family of them: `^0.1.5-rc.2` rejects later prerelease
-successors while admitting stable `0.1.5`. Earlier prerelease lines fail at dependency resolution — that is
-the support window, not a bug.
+Two values answer two questions: `PLATFORM_FLOOR` is what the published range declares, `PLATFORM_VERSION` is
+the exact line the gate validates. The floor has to admit the whole line — `^0.2.0-rc.1` admits `0.2.0-rc.2`,
+while `^0.2.0-rc.2` would refuse the very rc it was tested on. A prerelease range still does not cross lines:
+an earlier prerelease line fails at dependency resolution, which is the support window, not a bug.
 
 ## How it works
 
@@ -271,7 +272,7 @@ The loops stop, your data does not: memory, skills, state, reports and approval 
 <summary>For maintainers: upstream upgrade checklist</summary>
 
 1. **Skill-provider shadow rank**. Our provider registers `EVOLUTION_SKILL_RANK = 390` and relies on the
-   upstream `USER_DSH_RANK` (400 on `0.1.5-rc.2`) sorting above it; re-verify both sides.
+   upstream `USER_DSH_RANK` (400 on `0.1.5-rc.2`, still 400 on `0.2.0-rc.2` — `packages/skill/skill-filesystem/src/index.ts:39`) sorting above it; re-verify both sides.
 2. **`@deepseek-ai` name collisions**. The release tooling rewrites family names to `@lmzhen`; check each
    upstream release for names that collide with ours.
 3. **ToolRuntime argument freeze**. `tool.execute` gets a `deepFreeze`d snapshot: build a new object rather

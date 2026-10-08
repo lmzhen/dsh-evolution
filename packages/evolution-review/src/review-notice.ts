@@ -19,15 +19,26 @@
  * @module @deepseek-ai/dsh-evolution-review/review-notice
  */
 
-/** The plugin id every notice of this plugin carries in its durable message source. */
-export const REVIEW_NOTICE_PLUGIN = 'dsh-evolution-review'
+/** The producer-owned source kind every notice of this plugin carries (0.2.x: each
+ * producer declares its own kind; there is no shared catch-all `plugin` kind). */
+export const REVIEW_NOTICE_KIND = 'evolution-review'
+
+/**
+ * The kind a notice persisted before the 0.2.x line reads back as.
+ *
+ * The platform's session-format v3→v4 migration rewrites the released shared
+ * `{ kind: 'plugin', plugin }` source into `plugin:<plugin>` for a producer its own tables do
+ * not know (session-format-v3-to-v4/src/sources.ts:59-65, :74-90), so the notices an
+ * upgraded session already carries must still be recognized — otherwise the window they
+ * belonged to would be delivered a second time.
+ */
+export const REVIEW_NOTICE_LEGACY_KIND = 'plugin:dsh-evolution-review'
 
 /** The subset of a platform message this module reads. */
 export interface NoticeMessage {
   readonly id: string
   readonly source?: {
     readonly kind?: string
-    readonly plugin?: string
     readonly form?: string
   } | undefined
 }
@@ -61,9 +72,8 @@ export interface NoticeOutcome {
  */
 export function isReviewNotice(message: NoticeMessage): boolean {
   const source = message.source
-  return source?.kind === 'plugin'
-    && source.plugin === REVIEW_NOTICE_PLUGIN
-    && source.form === 'notice'
+  if (source?.form !== 'notice') return false
+  return source.kind === REVIEW_NOTICE_KIND || source.kind === REVIEW_NOTICE_LEGACY_KIND
 }
 
 /**
