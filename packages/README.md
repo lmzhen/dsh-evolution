@@ -250,6 +250,15 @@ Installer equivalent: `install-layered --mode attach` (the historical
 `INSTALL.md`). This section owns the install mechanics; the form semantics live
 in `INSTALL.md` alone.
 
+**Why doctor assembles its own report instead of asking the platform (G5):** the platform
+publishes the pieces — `pluginManager.listBundles()` / `listPlugins()`,
+`configEditor.configuration()`, the plugin-inventory snapshot — but no AGGREGATE health check.
+That absence is a measured fact, not an impression: enumerating every service registration in the
+0.2.0-rc.2 tree (each package's `src` files, `super(<receiver>, '<name>')` plus `provide('<name>')`,
+deduplicated — 2,418 files, **143** distinct names) turns up exactly one probe-family service,
+`pluginRegistryProbe`, and nothing that reports the health of the composition as a whole. The
+family did not invent a substitute: it reads those four surfaces and renders one report.
+
 This one-click preset and the `evolution-host` bundle are ALTERNATIVE install
 targets (mutual exclusion, E-33) — install one, not both, or the shared infra
 rows mount twice. The one-click preset carries its own
