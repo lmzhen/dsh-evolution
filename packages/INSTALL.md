@@ -32,6 +32,17 @@ not restated. Column 3 says whether the form was EXERCISED on `0.2.0-rc.2` or
 only judged from the source diff — a form is "已验证" only when an install ran
 against that line.
 
+**Known boundary of the SOURCE-CHECKOUT installer on a bare CLI host** (measured 2026-10-09):
+`install-layered.mjs` copies the family's own 31 packages into the profile; rows whose `name`
+points at a PLATFORM package (the `all` bundle's `tool-session-query`, for one) resolve only if
+that package is reachable from the profile. Under the desktop app it is (the platform rides the
+app payload); under a bare `dsh` CLI home it is not, and the loader reports it the way it should:
+`dsh: warning: 1 entry did not activate — tool-session-query … failed to import`. A production
+install (`dsh plugin add @lmzhen/dsh-evolution-all`) does not have this boundary — the published
+bundle manifest declares those platform packages as dependencies, so pnpm installs them into the
+profile. If you installed from a source checkout onto a CLI-only host and see that warning, add
+the named package to the profile or switch to the production path.
+
 | Form | Install mode | Status on `0.2.0-rc.2` | Basis |
 |---|---|---|---|
 | §1 ① Variant — layered (`--mode variant` / `layered`, source checkout) | M4 | **已验证**（lab，2026-10-09） | install into an isolated `DSH_HOME`: 31 packages copied into `profiles/<p>/node_modules`, the `preset-evolution` row written into the profile patch, `/evolution doctor` reported `install form: layered (deployment: variant …)`, and the desktop host booted clean with the family rows mounted |

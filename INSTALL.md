@@ -137,6 +137,15 @@ node packages/scripts/install-layered.mjs --profile web --mode layered --uninsta
 Only the profile rows, copied packages, and the agent preset directory are
 removed. Memory, skills, state, reports, and approval history remain.
 
+**Boundary of this source-checkout path on a CLI-only host** (measured 2026-10-09): the
+installer copies the family's own 31 packages into the profile, so a row whose `name` points at
+a PLATFORM package resolves only when that package is reachable from the profile. Under the
+desktop app it is; under a bare `dsh` CLI home it is not, and the loader says so plainly —
+`dsh: warning: 1 entry did not activate — tool-session-query … failed to import`. The production
+path above has no such boundary: the published bundle manifest declares those platform packages
+as dependencies, so pnpm installs them into the profile. Seeing that warning here, add the named
+package to the profile or switch to the production install.
+
 ## Host-only install
 
 ```bash
