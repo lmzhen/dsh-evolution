@@ -50,49 +50,16 @@ env:
   RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && format('{0}', github.ref_name) || '0.0.0-main' }}
 
 jobs:
-  validate:
-    name: validate (baseline)
-    runs-on: ubuntu-latest
-    # R-12: a hung full-suite run used to occupy the runner for hours — cap
-    # the job (generous headroom over a healthy ~20-30 min run).
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-
-      - name: Read pinned upstream SHA
-        id: upstream
-        shell: bash
-        run: |
-          # P3 (v15) anchor semantics: UPSTREAM_SHA is the DEV baseline
-          # (validate-only job) and may trail the release tag by many commits;
-          # the compat job below pins the RELEASE tree via dsh-v${PLATFORM_VERSION}.
-          # A trailing SHA is expected, not an error — do not "fix" it upward
-          # without re-running the full dev-tree typecheck against the newer
-          # upstream project graph.
-          SHA="$(tr -d '[:space:]' < UPSTREAM_SHA)"
-          test -n "$SHA"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - uses: ./.github/actions/evolution-validate
-        with:
-          upstream_repo: ${{ env.UPSTREAM_REPO }}
-          upstream_ref: ${{ steps.upstream.outputs.sha }}
-          platform_version: ${{ env.PLATFORM_VERSION }}
-          platform_floor: ${{ env.PLATFORM_FLOOR }}
-          artifact_suffix: baseline
-          copy_host_tsconfig: 'true'
-          # R-10: pass the scope explicitly so the action's pack rewrite and
-          # the range guard (--our-scope) share ONE definition with this env.
-          npm_scope: ${{ env.NPM_SCOPE }}
-
-  # M4 §4.6: the published platform version (dsh-v0.1.1-rc.2) is a different
-  # commit than the pinned development baseline (UPSTREAM_SHA), so this job
-  # re-validates the family — same full chain (build/test/lint + pack +
-  # publish dry-run) — against the RELEASED upstream tag. The only overlay
-  # difference: the baseline's project graph (tsconfig.host.json) is
-  # commit-bound and is NOT copied into the released tree.
+  # G7 §2.2 (single-line release): the dev-baseline job is GONE. It validated the family against
+  # the pinned 0.1.5-era tree (`UPSTREAM_SHA`), which has no `.volatile()` in its vendored
+  # schemastery — the run after 0.17.0 failed there with 39 `Property 'volatile' does not exist`
+  # errors, which is the floor doing its job rather than a regression. The family supports ONE
+  # platform line now, so the job that re-validates the RELEASED line (compat-check below) is the
+  # one that must be green, together with the Windows install job.
+  # The full chain (build/test/lint + pack + publish dry-run + the family guard set) runs
+  # against the RELEASED upstream tag `dsh-v<PLATFORM_VERSION>` — the line the floor admits and
+  # the only platform line this family supports. Since 0.17.0 this is the Linux half of the
+  # release gate; the Windows half is `desktop-install` below.
   #
   # GATE (rc.54): after consecutive green runs (rc.52 main + rc.53 tag), this
   # job is a hard requirement of `publish` — a released-upstream
@@ -114,7 +81,6 @@ jobs:
           platform_version: ${{ env.PLATFORM_VERSION }}
           platform_floor: ${{ env.PLATFORM_FLOOR }}
           artifact_suffix: released
-          copy_host_tsconfig: 'false'
           npm_scope: ${{ env.NPM_SCOPE }}
 
   # G7 §2.3: the desktop plane. The Electron cold-boot assertion itself stays a real-machine
@@ -139,14 +105,13 @@ jobs:
           platform_version: ${{ env.PLATFORM_VERSION }}
           platform_floor: ${{ env.PLATFORM_FLOOR }}
           artifact_suffix: windows
-          copy_host_tsconfig: 'false'
           install_smoke: 'true'
           npm_scope: ${{ env.NPM_SCOPE }}
 
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [validate, compat-check, desktop-install]
+    needs: [compat-check, desktop-install]
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:

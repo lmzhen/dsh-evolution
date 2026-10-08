@@ -42,14 +42,7 @@ inputs:
     description: Suffix for the uploaded artifacts (baseline / released)
     required: false
     default: baseline
-  copy_host_tsconfig:
-    description: >-
-      'true' overlays tsconfig.host.json (the UPSTREAM_SHA-specific project
-      graph used by the baseline job); 'false' leaves the target tree's own
-      root configs untouched (required for a different upstream ref — the
-      host project graph is commit-bound and must never cross trees).
-    required: false
-    default: 'true'
+
   npm_scope:
     description: >-
       npm scope the pack rewrite and the platform-range guard use. R-10: ONE
@@ -71,39 +64,21 @@ runs:
 
     - name: Overlay mirror packages into upstream
       shell: bash
-      # R-11: inputs reach run scripts only through env indirection — direct
-      # ${{ inputs.* }} interpolation inside run blocks is a script-injection
-      # surface the moment this composite action is reused with
-      # caller-controlled inputs.
-      env:
-        COPY_HOST_TSCONFIG: ${{ inputs.copy_host_tsconfig }}
       run: |
         mkdir -p upstream/packages/evolution
-        if [ "$COPY_HOST_TSCONFIG" = "true" ]; then
-          # Baseline job: the mirror owns the root configs — it overlays the
-          # pinned dev tree (UPSTREAM_SHA checkout) with OUR base/host files
-          # (the baseline tree has no evolution alias paths otherwise).
-          #
-          # D-9 (v18) status: the copied tsconfig.host.json project graph is
-          # currently NOT consumed — build-lib runs the per-package tsconfigs
-          # and nothing runs `tsc -b tsconfig.host.json`. Wiring that gate in
-          # needs the test-file type errors it reports fixed first (the tests
-          # are only ever transpiled by esbuild today, so the host project has
-          # never been typechecked); the copy is kept so that change stays a
-          # one-line addition rather than a config rebuild.
-          cp tsconfig.base.json upstream/tsconfig.base.json
-          cp tsconfig.host.json upstream/tsconfig.host.json
-        else
-          # Released-upstream compat job (N-7 purity): the target tree is a
-          # REAL released dsh commit; its own root configs must stay untouched
-          # so the chain validates the tree as shipped. Only the evolution
-          # alias paths are injected (single source: the mirror base's
-          # evolution lines), and the script fails loudly if the released tree
-          # already declares one of those keys.
-          node packages/scripts/inject-evolution-paths.mjs \
-            upstream/tsconfig.base.json \
-            tsconfig.base.json
-        fi
+        # N-7 purity: the target tree is a REAL released dsh commit; its own root
+        # configs stay untouched so the chain validates the tree as shipped. Only the
+        # evolution alias paths are injected (single source: the mirror base's evolution
+        # lines), and the script fails loudly if the released tree already declares one.
+        #
+        # G7 (0.17.0): the baseline job that used to overlay the mirror's own
+        # `tsconfig.host.json` (the UPSTREAM_SHA project graph) is retired with the
+        # 0.1.5 line, so this is the only overlay form left. Test-file typechecking
+        # now lives in the family's own gate (`tsc -b tsconfig.host.json` on the build
+        # line, where that graph does include `packages/evolution/**`).
+        node packages/scripts/inject-evolution-paths.mjs \
+          upstream/tsconfig.base.json \
+          tsconfig.base.json
         cp -r packages/. upstream/packages/evolution/
         rm -rf upstream/packages/evolution/node_modules \
                upstream/packages/evolution/lib \
@@ -190,19 +165,11 @@ runs:
         node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000
         node node_modules/oxlint/bin/oxlint packages/evolution
 
-    - name: Typecheck the test files (G7.1, D-9)
-      if: inputs.copy_host_tsconfig == 'true'
-      shell: bash
-      working-directory: upstream
-      run: |
-        # D-9: build-lib runs the per-package `include: ["src"]` projects, so the
-        # tests were only ever TRANSPILED by esbuild — 73 type errors lived in
-        # them unnoticed. The host aggregate (`packages/*/*/tests/**/*.ts`)
-        # typechecks them; this step is the gate that keeps them honest.
-        # Skipped for the released-upstream compat job: that tree's own host
-        # aggregate is commit-bound and is not ours to run.
-        node node_modules/typescript/bin/tsc -b tsconfig.host.json
-
+    # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
+    # MIRROR's `tsconfig.host.json` against the pinned dev tree, and that graph is not ours to
+    # run on a released tree. The guard itself still runs: the family's own gate does
+    # `tsc -b tsconfig.host.json` on the build line, where the project includes
+    # `packages/evolution/**` (tests included).
     - name: Run the load-sensitive lock group at a pinned concurrency (G7.2)
       shell: bash
       working-directory: upstream
@@ -336,7 +303,10 @@ runs:
         node packages/evolution/scripts/verify-client-tokens.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-client-seats.mjs packages/evolution --strict --upstream .
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
-        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict --require-repo-docs
+        # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
+        # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs
+        # in the family's own gate against the mirror, where those files exist.
+        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-package-discovery.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-family-tool-names.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-skill-roots.mjs packages/evolution --strict

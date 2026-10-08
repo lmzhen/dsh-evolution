@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { decideTakeover, ALIVE_LOCK_TAKEOVER_MS, DEAD_LOCK_TAKEOVER_MS, EMPTY_LOCK_TAKEOVER_MS, LOCK_TEAR_TAKEOVER_MS, nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { DEAD_PID, deadLockBody } from '../../test-support/lock-fixtures.ts'
 
 // A genuinely alive foreign pid: the tests below need a LIVE holder that is NOT
 // this process (F-367 recycles our own pid leftover, and F-366 sweeps our own
@@ -63,7 +64,7 @@ it('a foreign lock overwrite mid-RMW is detected at the commit point and the RMW
       // Simulate the steal: another process took the lock and wrote its own
       // claim (dead pid -> stealable on the retry, live enough to break the
       // commit gate on this attempt).
-      await writeFile(`${target}.lock`, '999999:deadbeef').catch(() => {})
+      await writeFile(`${target}.lock`, deadLockBody()).catch(() => {})
       sawLost = true
     }
     return `${current ?? ''}x`
@@ -79,7 +80,7 @@ it('nodeEvolutionIo.writeText takes over a stale lock (1s, E-8a) and still write
   const io = nodeEvolutionIo()
   const target = join(root, 'stale.txt')
   // A pid that cannot exist: the lock is stale AND holderless (rc.66 probe).
-  await writeFile(`${target}.lock`, '999999', 'utf8')
+  await writeFile(`${target}.lock`, String(DEAD_PID), 'utf8')
   const old = new Date(Date.now() - 60_000)
   await utimes(`${target}.lock`, old, old)
   await io.writeText(target, 'fresh')

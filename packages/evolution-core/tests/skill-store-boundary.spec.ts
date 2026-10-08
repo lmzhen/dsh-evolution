@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SkillLibrary, loadMutations } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { fakeIo } from '../../test-support/fake-io.ts'
+import { deadLockBody } from '../../test-support/lock-fixtures.ts'
 const SKILL = '---\nname: boundary-skill\ndescription: Boundary test skill.\n---\n\n# Boundary\n\nKeep me.\n'
 
 describe('SkillLibrary IO boundaries', () => {
@@ -314,7 +315,7 @@ describe('V17 lock-probe and lock-sweep precision', () => {
     await io.copy('/skills/boundary-skill', '/skills/.archive/boundary-skill')
     await io.remove('/skills/boundary-skill')
     // The stranded writer lock rides in the archived entry (body pid:token).
-    io.files.set('/skills/.archive/boundary-skill/references/note.md.lock', '4242:deadbeef')
+    io.files.set('/skills/.archive/boundary-skill/references/note.md.lock', deadLockBody())
     expect(await io.exists('/skills/.archive/boundary-skill/SKILL.md')).toBe(true)
     expect(await io.exists('/skills/.archive/boundary-skill/references/note.md.lock')).toBe(true)
     const restored = await lib.restoreFromArchive('boundary-skill')

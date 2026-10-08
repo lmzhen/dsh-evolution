@@ -1,0 +1,8 @@
+# One line-ending policy for every text file, on every platform.
+#
+# The family's guards compare file CONTENT byte for byte in several places (layout sync, the
+# bundle patches vs the roster, the README command-table pin in registry.spec.ts, the packaged
+# payload). Without this file git checks text out with the platform's native endings: a Windows
+# runner gets CRLF, splitting on LF leaves a trailing CR, and a spec that passes on Linux fails
+# there — exactly what the windows-latest job caught. eol=lf makes the checkout identical.
+* text=auto eol=lf

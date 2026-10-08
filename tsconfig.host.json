@@ -114,6 +114,7 @@
     "packages/evolution/test-support/fake-io.ts",
     "packages/evolution/test-support/temp-home.ts",
     "packages/evolution/test-support/commands-stub.ts",
+    "packages/evolution/test-support/lock-fixtures.ts",
     "packages/evolution/test-support/state-stack.ts"
   ],
   "exclude": [
