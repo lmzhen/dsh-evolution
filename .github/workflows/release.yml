@@ -139,6 +139,17 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Audit the artifacts about to be published
+        shell: bash
+        env:
+          PLATFORM_FLOOR: ${{ env.PLATFORM_FLOOR }}
+        run: |
+          # Last line of defence on the DOWNLOADED bytes (the baseline artifacts this job
+          # publishes, not a fresh local pack): the same payload audit the build chain runs,
+          # now against the exact tarballs npm is about to receive.
+          node packages/evolution/scripts/audit-release-tarballs.mjs \
+            packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$PLATFORM_FLOOR"
+
       - name: Publish validated tarballs
         shell: bash
         run: |

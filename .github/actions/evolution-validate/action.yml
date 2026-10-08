@@ -208,6 +208,23 @@ runs:
         if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
         node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
 
+    - name: Audit the packed tarballs (what a user installs)
+      shell: bash
+      working-directory: upstream
+      env:
+        PLATFORM_FLOOR: ${{ inputs.platform_floor }}
+        PLATFORM_VERSION: ${{ inputs.platform_version }}
+      run: |
+        # The pack step proves pnpm can produce tarballs and the range guard reads their
+        # MANIFESTS; neither one opens a tarball. This reads the payloads: every entry file a
+        # consumer resolves exists, the scoped release dropped its ./src/* shim, the platform
+        # ranges are exactly the floor, no @deepseek-ai/dsh-evolution- literal survived the
+        # rescope, each browser half carries lib/client.js plus dsh.client, and no test /
+        # node_modules / tarball residue rode along.
+        RANGE="${PLATFORM_FLOOR:-$PLATFORM_VERSION}"
+        node packages/evolution/scripts/audit-release-tarballs.mjs \
+          packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE"
+
     - name: Verify platform version ranges (N-2 guard)
       shell: bash
       working-directory: upstream

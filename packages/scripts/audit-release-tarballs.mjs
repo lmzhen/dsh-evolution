@@ -1,0 +1,140 @@
+#!/usr/bin/env node
+/**
+ * Pre-publish audit of the packed release tarballs: the bytes a user actually installs.
+ *
+ * The publish path already proves the RANGES are right (`verify-platform-ranges`) and that pnpm
+ * can pack them (`publish-scoped.mjs --dry-run`), and neither of those opens a tarball. This looks
+ * inside every one of them: scoped identity, that each entry a consumer resolves (main / types /
+ * exports) exists in the payload, that the scoped release dropped the ./src/* shim, that the
+ * platform ranges are exactly the floor, that no @deepseek-ai/dsh-evolution- name literal survived
+ * the rescope, that each browser half carries lib/client.js plus its dsh.client declaration, and
+ * that no test / node_modules / tarball residue rode along.
+ *
+ * Usage:
+ *   node audit-release-tarballs.mjs <dist-dir> [--version <x.y.z>] [--platform-range <^x.y.z>]
+ *
+ * Both optional flags come from the release workflow's own variables (RELEASE_VERSION's tag form
+ * and PLATFORM_FLOOR), so the audit compares the packed bytes against the release's declared
+ * contract rather than against a second copy of that contract kept here.
+ */
+import { createRequire } from 'node:module'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// The `tar` on PATH is GNU tar from Git Bash on Windows, which reads a `D:\...` path as a remote
+// host spec; the npm module extracts in-process and takes the path verbatim. It is resolved from
+// the tree's own node_modules (the overlay installs it) or from a global install.
+const require = createRequire(import.meta.url)
+function loadTar() {
+  for (const candidate of ['tar', 'D:/dsh/dsh-upstream-0.2.0-rc.2-evolution/node_modules/tar']) {
+    try { return require(candidate) } catch { /* try the next candidate */ }
+  }
+  throw new Error('audit-release-tarballs: no `tar` module resolvable (the overlay installs one; otherwise npm i -g tar)')
+}
+const tar = loadTar()
+
+const argv = process.argv.slice(2)
+const distDir = argv.find((arg) => !arg.startsWith('--'))
+const flag = (name) => { const i = argv.indexOf(name); return i < 0 ? undefined : argv[i + 1] }
+const expectedVersion = flag('--version')
+const expectedPlatformRange = flag('--platform-range')
+if (distDir === undefined) {
+  console.error('usage: audit-release-tarballs.mjs <dist-dir> [--version <x.y.z>] [--platform-range <^x.y.z>]')
+  process.exit(2)
+}
+
+const tarballs = readdirSync(distDir).filter((name) => name.endsWith('.tgz')).sort()
+if (tarballs.length === 0) { console.error('audit-release-tarballs: no .tgz under ' + distDir); process.exit(2) }
+
+/** The packages whose browser half must ship as lib/client.js plus a dsh.client declaration. */
+const CLIENT_PACKAGES = new Set(['dsh-evolution-settings-ui', 'dsh-evolution-skill-history'])
+const problems = []
+const notes = []
+
+/**
+ * Every file in one extracted payload, relative to the package root.
+ * @param root - the extracted `package/` directory.
+ * @returns the payload paths, forward-slashed.
+ */
+function payloadFiles(root) {
+  const out = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else out.push(full.slice(root.length + 1).replaceAll('\\', '/'))
+    }
+  }
+  walk(root)
+  return out
+}
+
+for (const tarball of tarballs) {
+  const scratch = mkdtempSync(join(tmpdir(), 'tarball-audit-'))
+  try {
+    tar.x({ file: join(distDir, tarball), cwd: scratch, sync: true })
+    const root = join(scratch, 'package')
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+    const files = payloadFiles(root)
+    const short = manifest.name ?? tarball
+
+    if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@lmzhen/')) problems.push(short + ': name is not @lmzhen-scoped')
+    if (expectedVersion !== undefined && manifest.version !== expectedVersion) problems.push(short + ': version ' + String(manifest.version) + ' != ' + expectedVersion)
+    if (!Array.isArray(manifest.files) || manifest.files.length === 0) problems.push(short + ': no files allowlist')
+
+    const entryTargets = []
+    if (typeof manifest.main === 'string') entryTargets.push(manifest.main)
+    if (typeof manifest.types === 'string') entryTargets.push(manifest.types)
+    for (const [key, value] of Object.entries(manifest.exports ?? {})) {
+      if (key === './package.json') continue
+      if (key === './src/*') { problems.push(short + ': scoped release still exports ./src/*'); continue }
+      if (typeof value === 'string') entryTargets.push(value)
+      else for (const sub of Object.values(value ?? {})) if (typeof sub === 'string') entryTargets.push(sub)
+    }
+    for (const target of entryTargets) {
+      const clean = target.replace(/^\.\//, '')
+      if (!files.includes(clean)) problems.push(short + ': declares ' + target + ' but the payload has no such file')
+    }
+
+    for (const section of ['dependencies', 'peerDependencies']) {
+      for (const [name, range] of Object.entries(manifest[section] ?? {})) {
+        if (name.startsWith('@deepseek-ai/dsh-') && expectedPlatformRange !== undefined && range !== expectedPlatformRange) {
+          problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedPlatformRange + ')')
+        }
+        if (name.startsWith('@lmzhen/') && expectedVersion !== undefined && range !== '^' + expectedVersion) {
+          problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ^' + expectedVersion + ')')
+        }
+      }
+    }
+
+    for (const file of files) {
+      if (/^(tests|node_modules)\//.test(file)) problems.push(short + ': payload carries ' + file)
+      if (file.endsWith('.tgz')) problems.push(short + ': payload carries a tarball ' + file)
+    }
+
+    const shipped = files.filter((file) => file.startsWith('lib/') && file.endsWith('.js'))
+    for (const file of shipped) {
+      const text = readFileSync(join(root, file), 'utf8')
+      if (text.includes('@deepseek-ai/dsh-evolution-')) problems.push(short + ': ' + file + ' still carries a @deepseek-ai/dsh-evolution- literal')
+    }
+
+    const tail = short.replace('@lmzhen/', '')
+    if (CLIENT_PACKAGES.has(tail)) {
+      if (!files.includes('lib/client.js')) problems.push(short + ': browser half missing lib/client.js')
+      if (manifest.dsh?.client === undefined) problems.push(short + ': no dsh.client declaration')
+    }
+    notes.push(short + ' ' + String(manifest.version) + ' — ' + files.length + ' file(s), ' + shipped.length + ' shipped module(s)')
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+console.log('audit-release-tarballs: ' + tarballs.length + ' tarball(s) under ' + distDir)
+for (const note of notes) console.log('  ' + note)
+if (problems.length > 0) {
+  console.error('audit-release-tarballs: FAIL — ' + problems.length + ' problem(s):')
+  for (const problem of problems) console.error('  - ' + problem)
+  process.exit(1)
+}
+console.log('audit-release-tarballs: OK — every packed tarball is publishable as packed')
