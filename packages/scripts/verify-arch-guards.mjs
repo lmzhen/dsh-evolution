@@ -476,38 +476,44 @@ const DURABLE_READ_RE = /\b(?:readFile|readdir|statSync|readText|list|listFiles)
 // landed. A new entry means a new two-state read — migrate it, do not grow this.
 const SWALLOW_CATCH = new Map([])
 /** Rule registry (append-only; --list-rules prints it and the docblock must match). */
+/** Rule registry (append-only; --list-rules prints it and the docblock must match).
+ * Every entry carries its own contract: `incident` (the shape the rule exists for),
+ * `canonicalForm` (what a clean tree looks like), `vacuity` (how the rule proves it is
+ * not vacuous) and `sample` (where that proof lives). `sample: detector` means the
+ * startup self-test below covers it; `sample: pending` with a `sampleExpiry` is a
+ * registered, expiring debt — never a silent pass (the F-103 class, one level up). */
 const RULES = [
-  { id: 'N1', title: 'DSH_HOME single source (evolution-core/src only)' },
-  { id: 'N2', title: 'ApprovalPolicyLike / effectiveSessionPolicy single-sourced in evolution-approval' },
-  { id: 'N3', title: 'Config numeric fields carry a value clamp' },
-  { id: 'H2', title: 'no ghost evolution* service key (probe without provider)' },
-  { id: 'N5', title: 'evolution-core imports only the L0 seams' },
-  { id: 'N6', title: 'composition bundles carry no runtime code' },
-  { id: 'N7', title: 'new SkillLibrary() only through core\'s helper' },
-  { id: 'N8', title: 'no unpublished ./invariant companion' },
-  { id: 'N9', title: 'format-control classes built from FORMAT_CONTROL_CLASS' },
-  { id: 'N10', title: 'new platform-service probe carries a declaration anchor' },
-  { id: 'N11', title: 'ONE reader for the platform dispatch vocabulary' },
-  { id: 'N12', title: 'module-scope mutable process state is registered' },
-  { id: 'N13a', title: 'must-execute payload not on the non-waking primitive' },
-  { id: 'N13b', title: 'wake primitive called on its receiver' },
-  { id: 'N14', title: 'durable-read failure not served as absent' },
-  { id: 'N15', title: 'family Markdown code anchors resolve' },
-  { id: 'N16', title: 'platform registry read asks in the calling scope' },
-  { id: 'N17', title: 'dispatch modality is read in registered sites only' },
-  { id: 'N18', title: 'session/event consumers consult the opt-in gate' },
-  { id: 'N19', title: 'one home per family fact (docs cite, never copy)' },
-  { id: 'N20', title: 'declared persisted write sites match their writers' },
-  { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts' },
-  { id: 'N22', title: 'settings namespaces are spelled once, in the registry' },
-  { id: 'N23', title: 'durable-file writes live in the IO seam' },
-  { id: 'N24', title: 'client halves carry no literal type or colour' },
-  { id: 'N25', title: 'client halves take radii and hairlines from the scale' },
-  { id: 'N26', title: 'interaction colour only on an element an interaction reaches' },
-  { id: 'N27', title: 'client halves take geometry from the scale' },
-  { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)' },
-  { id: 'N29', title: 'a client entry reads a platform service through a callable probe' },
-  { id: 'N30', title: 'an observable source has one owner; hooks carry references' },
+  { id: 'N1', title: 'DSH_HOME single source (evolution-core/src only)', incident: 'a second file reads env.DSH_HOME and the home path forks silently', canonicalForm: 'only evolution-core resolves the home; every other package takes it from the seam', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N2', title: 'ApprovalPolicyLike / effectiveSessionPolicy single-sourced in evolution-approval', incident: 'effectiveSessionPolicy re-implemented outside evolution-approval', canonicalForm: 'one definition in evolution-approval; other packages import it', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N3', title: 'Config numeric fields carry a value clamp', incident: 'a z.number() config field with no bound, so an out-of-range value lands', canonicalForm: 'clampedNumber(min, max) or explicit .min/.max on every numeric config field', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'H2', title: 'no ghost evolution* service key (probe without provider)', incident: 'a probe for an evolutionX service key with no provider registered anywhere: a silent absent', canonicalForm: 'every probed evolution* key has a provider registration somewhere in the tree', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N5', title: 'evolution-core imports only the L0 seams', incident: 'evolution-core importing an L1 package (layer inversion)', canonicalForm: 'evolution-core imports only its L0 seams', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N6', title: 'composition bundles carry no runtime code', incident: 'a composition bundle shipping runtime code', canonicalForm: 'bundles are composition only (patch rows and preset rows)', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N7', title: 'new SkillLibrary() only through the core helper', incident: 'a package constructing SkillLibrary directly: a second construction path', canonicalForm: 'construction goes through the helper exported by evolution-core', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N8', title: 'no unpublished ./invariant companion', incident: 'an ./invariant subpath that the published manifest does not declare', canonicalForm: 'every exported subpath is declared and published', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N9', title: 'format-control classes built from FORMAT_CONTROL_CLASS', incident: 'a literal format-control class string', canonicalForm: 'classes come from FORMAT_CONTROL_CLASS', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N10', title: 'new platform-service probe carries a declaration anchor', incident: 'a new ctx.get(<platform service>) with no CONTRACT_ANCHORS entry', canonicalForm: 'each platform probe carries an anchor in the contract probe table', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N11', title: 'ONE reader for the platform dispatch vocabulary', incident: 'a second reader of the dispatch kind vocabulary', canonicalForm: 'one module owns the vocabulary and everyone else imports it', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N12', title: 'module-scope mutable process state is registered', incident: 'module-scope mutable state with no registration', canonicalForm: 'registered with owner, lifetime and evidence', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N13b', title: 'wake primitive called on its receiver', incident: 'the wake primitive detached (destructured or aliased) and then called', canonicalForm: 'the wake primitive is called on its receiver: agent.followup(message)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N14', title: 'durable-read failure not served as absent', incident: 'catch { return [] }: a read failure served as absent', canonicalForm: 'Probe<T> three states; a failure keeps its reason', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N15', title: 'family Markdown code anchors resolve', incident: 'a Markdown anchor naming a line that no longer exists', canonicalForm: 'anchors resolve; symbolic references are preferred over line numbers', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N16', title: 'platform registry read asks in the calling scope', incident: 'ctx.get(<registry>) followed by r.get(name) without a scope', canonicalForm: 'the read asks in the calling scope: r.get(name, scope)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N17', title: 'dispatch modality is read in registered sites only', incident: 'branching on dispatch.kind outside the registered sites', canonicalForm: 'the single vocabulary reader is consulted only where registered', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N18', title: 'session/event consumers consult the opt-in gate', incident: 'a session/event consumer that never consults the audited gate', canonicalForm: 'the consumer consults sessionAudited before reading the stream', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N19', title: 'one home per family fact (docs cite, never copy)', incident: 'a fact with no home, no must entry, or an empty table', canonicalForm: 'every fact carries id, home, must, and cites its machine owner', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N20', title: 'declared persisted write sites match their writers', incident: 'a writer with the wrong serialization, or a claim nobody makes', canonicalForm: 'persisted-write-inventory.json matches the writers in the tree', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts', incident: 'a literal E-3xx string outside errors.ts', canonicalForm: 'codes come from errors.ts (errorText or the code table)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N22', title: 'settings namespaces are spelled once, in the registry', incident: 'a namespace literal spelled outside PARAM_NAMESPACES', canonicalForm: 'namespaces come from the registry', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N23', title: 'durable-file writes live in the IO seam', incident: 'a durable-file write outside the IO seam', canonicalForm: 'writes go through the seam (transactIo and friends)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N24', title: 'client halves carry no literal type or colour', incident: 'font-size: 13px or #ff0000 inside a client half', canonicalForm: 'type and colour come from tokens', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N25', title: 'client halves take radii and hairlines from the scale', incident: 'a literal border-radius or hairline width', canonicalForm: 'radii and hairlines come from the scale', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N26', title: 'interaction colour only on an element an interaction reaches', incident: 'an interaction colour on a static, unreachable element', canonicalForm: 'interaction colour sits only on an element an interaction reaches', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N27', title: 'client halves take geometry from the scale', incident: 'a literal padding, gap or size inside a client half', canonicalForm: 'geometry comes from the scale', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)', incident: 'a node builtin import or a write call inside a client half', canonicalForm: 'client halves stay pure: no builtins, no writes', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N29', title: 'a client entry reads a platform service through a callable probe', incident: 'a direct property read of a platform service in a client entry', canonicalForm: 'the read goes through a callable probe', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N30', title: 'an observable source has one owner; hooks carry references', incident: 'an inline source object built per render, or a hook returning a fresh reference', canonicalForm: 'one owner per source and stable references from hooks', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
 ]
 
 /**
@@ -1125,10 +1131,28 @@ function walk(dir) {
  * detector silently matches nothing is worse than no rule: it reports a pass
  * (the F-103 vacant-guard class, one level up). */
 if (process.argv.includes('--list-rules')) {
-  for (const rule of RULES) console.log(`${rule.id}: ${rule.title}`)
+  for (const rule of RULES) {
+    const sample = rule.sample === 'detector' ? 'sample' : `PENDING ${rule.sampleExpiry}`
+    console.log(`${rule.id}: [${sample}] ${rule.title}`)
+  }
+  const pending = RULES.filter(rule => rule.sample !== 'detector').map(rule => rule.id)
+  console.log(`verify-arch-guards: ${RULES.length - pending.length}/${RULES.length} rule(s) carry a detector sample` + (pending.length > 0 ? ` — pending: [${pending.join(', ')}]` : ''))
   process.exit(0)
 }
 {
+  const incomplete = []
+  for (const rule of RULES) {
+    for (const field of ['title', 'incident', 'canonicalForm', 'vacuity']) {
+      if (typeof rule[field] !== 'string' || rule[field].trim() === '') incomplete.push(`${rule.id}.${field}`)
+    }
+    if (rule.sample === 'detector') continue
+    if (rule.sample !== 'pending') incomplete.push(`${rule.id}.sample`)
+    else if (typeof rule.sampleExpiry !== 'string' || rule.sampleExpiry.trim() === '') incomplete.push(`${rule.id}.sampleExpiry`)
+  }
+  if (incomplete.length > 0) {
+    console.error(`verify-arch-guards: rule metadata incomplete — [${incomplete.join(', ')}] (a rule without an incident, a canonical form and a stated proof of non-vacuity is not a rule)`)
+    process.exit(1)
+  }
   const selfText = readFileSync(new URL(import.meta.url), 'utf8')
   const documented = new Set([...selfText.matchAll(/^ \*   (N\d+[a-z]?|H2)\./gm)].map(match => match[1]))
   const undocumented = RULES.filter(rule => !documented.has(rule.id)).map(rule => rule.id)
@@ -1474,7 +1498,9 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), no literal type/colour in the client halves (N24), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), every client entry reads its platform seats through a callable probe (N29) and builds its observable source in the one owner module (N30), ${docFactSummary})`)
+  const uncovered = RULES.filter(entry => entry.sample !== 'detector')
+if (uncovered.length > 0) console.log(`verify-arch-guards: rule self-test coverage ${RULES.length - uncovered.length}/${RULES.length} — pending: [${uncovered.map(entry => entry.id).join(', ')}] (expiry: ${uncovered.map(entry => entry.sampleExpiry).join(', ')})`)
+console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), no literal type/colour in the client halves (N24), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), every client entry reads its platform seats through a callable probe (N29) and builds its observable source in the one owner module (N30), ${docFactSummary})`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78
