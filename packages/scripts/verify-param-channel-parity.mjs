@@ -185,9 +185,18 @@ for (const owner of Object.keys(namespaces)) {
   // auto-generated form for that row mounted next to the family's card — the user gets two pages
   // editing one row, and a write on the wrong one looks like it was ignored. It is one line per
   // owner, so the guard reads it directly instead of trusting the G1 batch's commit message.
-  const autoOff = /settings\.configure\(\{\s*auto:\s*false\s*\}\)/.test(text)
+  // v46 S1.12b (finding 6-1): the OWNER argument is part of the required shape. The previous regex
+  // demanded the single-argument call, i.e. it codified the wrong form — the platform looks the
+  // presentation up by the fiber it was registered on (settings/src/index.ts:266), so omitting the
+  // owner registers the suppression on the settings service's own fiber and a re-mounted row keeps
+  // a dead key while the auto form returns.
+  const autoOff = /settings\.configure\(\{\s*auto:\s*false\s*\},\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.fiber\s*\)/.test(text)
+  const autoOffWithoutOwner = /settings\.configure\(\{\s*auto:\s*false\s*\}\)/.test(text)
+  if (autoOffWithoutOwner) {
+    problems.push('owner-config: ' + owner + ' calls settings.configure({ auto: false }) WITHOUT an owner — pass the plugin fiber: settings.configure({ auto: false }, ctx.fiber). The presentation is looked up by the registering fiber, so without it a re-mounted row keeps a dead key')
+  }
   if (!autoOff) {
-    problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but never calls settings.configure({ auto: false }) — the platform auto form stays mounted beside our card (two pages for one row)')
+    problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but never calls settings.configure({ auto: false }, <plugin fiber>) — the platform auto form stays mounted beside our card (two pages for one row)')
   }
   notes.push(owner + ' row Config: ' + fields.size + ' key(s), ' + volatile.length + ' volatile' + (autoOff ? ', auto:false' : ''))
 }

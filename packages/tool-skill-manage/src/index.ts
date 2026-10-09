@@ -385,9 +385,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // family renders its own card from the registry). Probed, not assumed: a host
   // without the capability still loads.
   ctx.inject(['settings'], (injected) => {
-    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }) => unknown } }).settings
+    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
     if (typeof settings?.configure !== 'function') return
-    const disposer = settings.configure({ auto: false })
+    // v46 S1.12b (finding 6-1): the owner argument is what the platform looks the presentation up by.
+    // Omitting it registers the suppression on the settings service's own fiber, so a row that
+    // re-mounts keeps a dead key and the auto form can return (platform precedent:
+    // settings.configure({ auto: false }, plugin.fiber) — settings/src/index.ts:266).
+    const disposer = settings.configure({ auto: false }, ctx.fiber)
     if (typeof disposer === 'function') ctx.effect(() => disposer as () => void, 'tool-skill-manage: settings presentation')
   })
   // Hermes SKILLS_GUIDANCE parity: when the system-prompt service is mounted,

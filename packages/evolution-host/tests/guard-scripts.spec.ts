@@ -676,12 +676,24 @@ describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
     await writeFile(join(owner, 'index.ts'), rowConfig('reviewSkillInterval: z.number().volatile()'), 'utf8')
     const autoOn = await gate()
     expect(autoOn?.code).toBe(1)
-    expect(autoOn?.stderr).toContain('never calls settings.configure({ auto: false })')
+    expect(autoOn?.stderr).toContain('never calls settings.configure({ auto: false }, <plugin fiber>)')
+    // v46 S1.12b (finding 6-1): the single-argument call is the shape the guard used to demand.
+    // It is now a failure of its own: the owner argument is what the platform looks the
+    // presentation up by, so a row that re-mounts keeps a dead key.
+    await writeFile(
+      join(owner, 'index.ts'),
+      rowConfig('reviewSkillInterval: z.number().volatile()')
+        + 'const disposer = settings.configure({ auto: false })\n',
+      'utf8',
+    )
+    const noOwner = await gate()
+    expect(noOwner?.code).toBe(1)
+    expect(noOwner?.stderr).toContain('calls settings.configure({ auto: false }) WITHOUT an owner')
     // An ordinary deployment field stays legal beside them, once the auto form is off.
     await writeFile(
       join(owner, 'index.ts'),
       rowConfig('reviewSkillInterval: z.number().volatile()', "root: z.string().default('')")
-        + 'const disposer = settings.configure({ auto: false })\n',
+        + 'const disposer = settings.configure({ auto: false }, ctx.fiber)\n',
       'utf8',
     )
     const clean = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
