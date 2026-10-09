@@ -26,9 +26,9 @@ const rejected = []
 for (const dir of dirs) {
   const name = manifestName(root, dir)
   if (name === null) { unreadable.push(dir); continue }
-  // The installer compares the SCOPED name (install-layered.mjs:479 rescopes
-  // before matching); the mirror manifests carry the dev scope, so normalise
-  // both sides to the unscoped tail before applying the prefix rule.
+  // The installer compares the SCOPED name (it rescopes before matching, the
+  // prefix filter in install-layered.mjs); the mirror manifests carry the dev
+  // scope, so normalise both sides to the unscoped tail before applying the rule.
   const unscoped = name.replace(/^@[^/]+\//, '')
   if (!installerAccepts(unscoped)) rejected.push(`${dir} (${name})`)
 }

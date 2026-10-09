@@ -70,7 +70,9 @@
  *       0.3.78 (B3): the four registered debts landed on probeList/probeMtime
  *       (evolution-core/src/probe.ts) and SWALLOW_CATCH is EMPTY — the rule now
  *       bites only NEW two-state reads.
- *   N15. a family Markdown anchor (`evolution-core/src/x.ts:42`) must resolve:
+ *   N15. a family code anchor (`evolution-core/src/x.ts:42`, and since v46 S2.7 also the bare
+ *       `file.mjs:42` form when the basename is unique) must resolve in EVERY citation surface —
+ *       Markdown, script comments and source comments:
  *       the file exists and the cited line is inside it. Prose that cites code
  *       cannot fail a build, so a moved/renamed/deleted symbol leaves the
  *       document describing a tree that no longer exists — audit-v37's
@@ -575,7 +577,7 @@ const RULES = [
   { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N13b', title: 'wake primitive called on its receiver', incident: 'the wake primitive detached (destructured or aliased) and then called', canonicalForm: 'the wake primitive is called on its receiver: agent.followup(message)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N14', title: 'durable-read failure not served as absent', incident: 'catch { return [] }: a read failure served as absent', canonicalForm: 'Probe<T> three states; a failure keeps its reason', vacuity: 'an empty swallow register is clean by design; the sample carries the proof', sample: 'detector' },
-  { id: 'N15', title: 'family Markdown code anchors resolve', incident: 'a Markdown anchor naming a line that no longer exists', canonicalForm: 'anchors resolve; symbolic references are preferred over line numbers', vacuity: 'no Markdown anchor in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N15', title: 'family code anchors resolve (Markdown, scripts and source comments)', incident: 'an anchor naming a line that no longer exists, in a document, a script or a source comment', canonicalForm: 'anchors resolve in every citation surface; symbolic references are preferred over line numbers', vacuity: 'no Markdown anchor in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N16', title: 'platform registry read asks in the calling scope', incident: 'ctx.get(<registry>) followed by r.get(name) without a scope', canonicalForm: 'the read asks in the calling scope: r.get(name, scope)', vacuity: 'no registry read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N17', title: 'dispatch modality is read in registered sites only', incident: 'branching on dispatch.kind outside the registered sites', canonicalForm: 'the single vocabulary reader is consulted only where registered', vacuity: 'no modality branch in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N18', title: 'session/event consumers consult the opt-in gate', incident: 'a session/event consumer that never consults the audited gate', canonicalForm: 'the consumer consults sessionAudited before reading the stream', vacuity: 'no session/event consumer in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -951,9 +953,15 @@ function manifestPublishesInvariant(manifestPath, packageDir) {
   }
 }
 
-/** N15: family-anchored `path:line` citations in Markdown. The parser is pure
- * (self-tested at startup); resolution is the filesystem half. */
+/** N15 (v46 S2.7): family anchors in EVERY citation surface — Markdown, and the comments of the
+ * scripts and sources themselves. The bare `<name>.mjs:42` form is judged only when the basename is
+ * UNIQUE in the tree (a bare `index.ts:42` names too many files to mean anything). The guard's own
+ * detector samples are not citations, so its file is skipped by name. */
+/** N15: family-anchored `path:line` citations (a package segment then the file). */
 const FAMILY_ANCHOR_RE = /([A-Za-z0-9_./-]*[A-Za-z0-9_-]\.(?:ts|mjs|cjs|json|ya?ml))[:：](\d+)(?:[-–,，](\d+))?/g
+/** N15 (v46 S2.7): the bare `<name>.mjs:42` form, judged only for unique basenames. */
+const BARE_ANCHOR_RE = /\b([A-Za-z0-9_-]+\.(?:ts|mjs|cjs))[:：](\d+)/g
+const SELF_REL = 'scripts/verify-arch-guards.mjs'
 
 function staleAnchor(anchor, lineCount) {
   return anchor.line > lineCount
@@ -962,39 +970,57 @@ function staleAnchor(anchor, lineCount) {
 function docAnchorViolations(dir, packageDirs) {
   const out = []
   const seen = new Set()
-  const visit = (d) => {
+  const files = []
+  const byBase = new Map()
+  const collect = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       const path = join(d, entry.name)
       if (entry.isDirectory()) {
-        if (!SKIP.has(entry.name)) visit(path)
+        // `packages/docs/**` is gitignored history, not a versionable surface (the fact table's
+        // own $comment says so): a historical record keeps the anchors it was written with, the
+        // same reason CHANGELOG.md is the reason layer. Judging it would ask us to rewrite history.
+        if (!SKIP.has(entry.name) && entry.name !== 'docs') collect(path)
         continue
       }
-      if (!entry.name.endsWith('.md')) continue
-      const rel = relative(root, path).split('\\').join('/')
-      for (const match of readFileSync(path, 'utf8').matchAll(FAMILY_ANCHOR_RE)) {
-        const segments = match[1].split('/').filter(Boolean)
-        const at = segments.findIndex(segment => packageDirs.has(segment))
-        if (at < 0) continue
-        const tail = segments.slice(at).join('/')
-        // `<pkg>/<file>` is the single-src shorthand for `<pkg>/src/<file>`.
-        let target = join(root, tail)
-        if (!existsSync(target) && segments.length - at === 2) target = join(root, segments[at], 'src', segments[at + 1])
-        const anchor = { raw: match[0], line: Number(match[3] ?? match[2]) }
-        const key = rel + ' :: ' + anchor.raw + ' :: ' + anchor.line
-        if (seen.has(key)) continue
-        seen.add(key)
-        if (!existsSync(target)) {
-          out.push(`${rel}: anchor "${anchor.raw}" names no family file (looked for ${tail})`)
-          continue
-        }
-        const lineCount = readFileSync(target, 'utf8').split('\n').length
-        if (staleAnchor(anchor, lineCount)) {
-          out.push(`${rel}: anchor "${anchor.raw}" cites line ${anchor.line} of a ${lineCount}-line ${tail} — re-anchor it to the code`)
-        }
-      }
+      if (!/\.(md|ts|mjs|cjs)$/.test(entry.name)) continue
+      files.push({ path, rel: relative(root, path).split('\\').join('/') })
+      if (/\.(ts|mjs|cjs)$/.test(entry.name)) byBase.set(entry.name, (byBase.get(entry.name) ?? 0) + 1)
     }
   }
-  visit(dir)
+  collect(dir)
+  const judge = (rel, raw, tail, target, anchorLine) => {
+    const key = rel + ' :: ' + raw + ' :: ' + anchorLine
+    if (seen.has(key)) return
+    seen.add(key)
+    if (!existsSync(target)) {
+      out.push(`${rel}: anchor "${raw}" names no family file (looked for ${tail})`)
+      return
+    }
+    const lineCount = readFileSync(target, 'utf8').split('\n').length
+    if (staleAnchor({ line: anchorLine }, lineCount)) {
+      out.push(`${rel}: anchor "${raw}" cites line ${anchorLine} of a ${lineCount}-line ${tail} — re-anchor it to the code (symbols do not rot)`)
+    }
+  }
+  for (const { path, rel } of files) {
+    if (rel === SELF_REL) continue
+    const text = readFileSync(path, 'utf8')
+    for (const match of text.matchAll(FAMILY_ANCHOR_RE)) {
+      const segments = match[1].split('/').filter(Boolean)
+      const at = segments.findIndex(segment => packageDirs.has(segment))
+      if (at < 0) continue
+      const tail = segments.slice(at).join('/')
+      // `<pkg>/<file>` is the single-src shorthand for `<pkg>/src/<file>`.
+      let target = join(root, tail)
+      if (!existsSync(target) && segments.length - at === 2) target = join(root, segments[at], 'src', segments[at + 1])
+      judge(rel, match[0], tail, target, Number(match[3] ?? match[2]))
+    }
+    for (const match of text.matchAll(BARE_ANCHOR_RE)) {
+      if (byBase.get(match[1]) !== 1) continue
+      const found = files.find(file => file.path.endsWith('/' + match[1]) || file.path.endsWith('\\' + match[1]))
+      if (found === undefined) continue
+      judge(rel, match[0], match[1], found.path, Number(match[2]))
+    }
+  }
   return out
 }
 

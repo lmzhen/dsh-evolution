@@ -104,7 +104,8 @@ export function clientHalfDirs(packagesRoot) {
 }
 
 /**
- * The installer's acceptance rule, as implemented at install-layered.mjs:479.
+ * The installer's acceptance rule: the prefix filter in `install-layered.mjs`
+ * (`EVOLUTION_PREFIXES.some(prefix => scopedName(packageName).startsWith(prefix))`).
  * @param packageName - the manifest `name` (already rescoped by the caller).
  * @returns whether the installer would consider this package part of the family.
  */
