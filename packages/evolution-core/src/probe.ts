@@ -80,6 +80,25 @@ export async function probeList(io: EvolutionIoLike, dir: string): Promise<Probe
 }
 
 /**
+ * Three-state TEXT read of one file. A missing path (ENOENT/ENOTDIR, or a backend whose read
+ * answers null) is `absent`; every other failure is `unknown` with its reason. The distinction is
+ * the whole point (N14/O-7): "I could not read this file" and "this file is not there" lead to
+ * opposite decisions once a write is about to replace the bytes — treating the first as the
+ * second is how a broken store reads as empty and a rescue copy never happens.
+ * @param io - the IO seam.
+ * @param path - the file to read.
+ * @returns the probe.
+ */
+export async function probeText(io: EvolutionIoLike, path: string): Promise<Probe<string>> {
+  try {
+    const value = await io.readText(path)
+    return value === null ? probeAbsent() : probePresent(value)
+  } catch (error) {
+    return isMissingPath(error) ? probeAbsent() : probeUnknown(probeReason(error))
+  }
+}
+
+/**
  * Three-state mtime read. Absent covers both "the path is missing" and "this
  * backend has no mtime probe" — the seam cannot tell those apart, so consumers
  * that must know say so in their own log line. A stat that FAILS is unknown.

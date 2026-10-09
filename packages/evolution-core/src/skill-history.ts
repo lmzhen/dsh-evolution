@@ -29,6 +29,7 @@
 
 import { join } from 'node:path'
 import { transactIo, type EvolutionIoLike } from './io.ts'
+import { isPresent, isUnknown, probeText } from './probe.ts'
 import { contentHash } from './mutations.ts'
 
 /** Root-level history directory. Dot-prefixed so skill discovery skips it. */
@@ -541,22 +542,57 @@ export async function recordVersions(
   // posture as the activity sidecar's quarantine): deriving an index from "nothing" over a corrupt or
   // newer-reader file would drop every version it lists and orphan their blobs. If the copy itself
   // fails, the record is abandoned — the mutation stands, the old bytes stay recoverable.
-  const probe = readHistoryIndex(await io.readText(file).catch(() => null))
+  // PLAN S3.2/S3.3 (audit 1-2, P1): the probe is a THREE-state read. "Could not read" is not "no
+  // index": serving a failed read as absent skipped the rescue copy below and then let the
+  // in-lock read derive a fresh index from nothing over bytes this reader never saw. On a failed
+  // read the record is ABANDONED (the mutation stands, the bytes stay, a rescue copy is attempted
+  // out of band because copying needs no parsing).
+  const fileProbe = await probeText(io, file)
+  if (isUnknown(fileProbe)) {
+    const quarantine = `${file}.corrupt`
+    try {
+      await io.copy(file, quarantine)
+    } catch {
+      // Best-effort: the copy is a convenience, the abandoned record is the guarantee.
+    }
+    console.warn(`skill-store: ${file} could not be read (${fileProbe.reason}); its bytes were copied to ${quarantine} where possible and the version record for this write was abandoned — the mutation stands and the file is untouched`)
+    return null
+  }
+  const probe = readHistoryIndex(isPresent(fileProbe) ? fileProbe.value : null)
   if (probe.kind === 'unreadable') {
     const quarantine = `${file}.corrupt`
     await io.copy(file, quarantine)
     console.warn(`skill-store: ${file} could not be understood (malformed, foreign, or written by a newer reader); its bytes were copied to ${quarantine} and a fresh index starts from this write`)
   }
   const recorded: RecordedVersions = {}
+  let raceRefused = false
   await transactIo(io, file, (current) => {
     const state = readHistoryIndex(current)
-    // A race that turned the file unreadable between the probe and this read falls back to the probe's
-    // answer (an empty index): the copy above already preserved whatever the probe saw.
+    // The old comment here claimed the probe's copy covered a race. It only did when the probe had
+    // ALREADY seen the bytes as unreadable; a file that turned unreadable in between had no copy, and
+    // deriving the index from `[]` dropped every version it listed (and orphaned their blobs).
+    // Returning `current` unchanged is a byte-identical no-op, so the bytes survive and this record
+    // is abandoned below. Only an UNREADABLE state refuses: an ABSENT file is a skill with no
+    // history yet, and refusing there would abandon every first record (the index must be created).
+    if (state.kind === 'unreadable' && probe.kind !== 'unreadable') {
+      raceRefused = true
+      return current
+    }
     const { versions, recorded: numbers } = nextHistoryIndex(state.kind === 'ok' ? state.versions : [], input, keep)
     recorded.beforeVersion = numbers.beforeVersion
     recorded.afterVersion = numbers.afterVersion
     return JSON.stringify({ version: HISTORY_INDEX_VERSION, versions }, null, 2)
   })
+  if (raceRefused) {
+    const quarantine = `${file}.corrupt`
+    try {
+      await io.copy(file, quarantine)
+    } catch {
+      // Best-effort rescue copy; the refusal above is what protects the bytes.
+    }
+    console.warn(`skill-store: ${file} became unreadable between the probe and the locked read; its bytes were copied to ${quarantine} where possible and the version record for this write was abandoned — nothing was overwritten`)
+    return null
+  }
   return recorded
 }
 // ─── Faces of one version (0.13.0) ──────────────────────────────────────────

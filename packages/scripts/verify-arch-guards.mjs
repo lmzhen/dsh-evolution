@@ -232,6 +232,13 @@
  *       a new citation fails, and the register burns down as files are touched — the fix is the one
  *       S2.7 applied to the family's own comments, a symbol citation instead of a line number.
  *       `packages/docs/**` (the machine-local archive) is fenced by name.
+ *   N36. the EXPRESSION form of the N14 swallow is a FROZEN BASELINE. N14's regex requires the
+ *       `catch` to be followed by `{`, so `await io.readText(p).catch(() => null)` — a read
+ *       FAILURE served as ABSENT — was structurally invisible while the family's own register
+ *       claimed the class was clean. 18 such sites remain after the S3.2 migrations that mattered
+ *       (the skill-history rescue path and the archive restore's three reads); the rest are
+ *       reviewed and listed per file. A new one fails; the register only burns down, and the whole
+ *       class is scheduled for the three-state sweep (O-7).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -402,6 +409,37 @@ const PLATFORM_CITE_BASELINE = new Map([
   ['tool-memory/src/index.ts', 1],
   ['tool-skill-manage/src/index.ts', 5],
   ['tool-skill-manage/tests/skill-settings.spec.ts', 1],
+])
+
+/** N36: promise-form swallows of a durable read — the line calls a read method AND its `catch`
+ * answers an absent literal. Line-local by design (same posture as N14).
+ * @param text - one file's source.
+ * @returns the 1-based line numbers of the matches.
+ */
+function swallowedReadSites(text) {
+  const out = []
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    if (!READ_METHOD_RE.test(line)) continue
+    if (!ABSENT_CATCH_RE.test(line)) continue
+    out.push(index + 1)
+  }
+  return out
+}
+/** The read vocabulary whose failure must stay distinguishable from absence. */
+const READ_METHOD_RE = /\.(readText|readJson|readFile|size|list|mtime|exists|loadAll)\s*\(/
+/** The absent literals a swallowed read may answer with. */
+const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(?:null|undefined|false|\[\s*\]|''|"")\s*\)/
+
+/** N36's frozen baseline: reviewed expression-form swallows per file, measured after the S3.2
+ * migrations (S3.2, 2026-10). Burn-down only: migrating a site to probeText/probeList/probeMtime
+ * lowers its number here; the class itself is scheduled for the group-5 three-state sweep. */
+const SWALLOWED_READ_BASELINE = new Map([
+  ['evolution-core/src/skill-history.ts', 3],
+  ['evolution-core/src/skill-store.ts', 9],
+  ['evolution-curator/src/index.ts', 1],
+  ['evolution-feedback/src/index.ts', 1],
+  ['evolution-skill-catalog/src/index.ts', 1],
+  ['evolution-state-json/src/index.ts', 3],
 ])
 
 const APPROVAL_SRC = 'evolution-approval/src'
@@ -675,6 +713,7 @@ const RULES = [
   { id: 'N30', title: 'an observable source has one owner; hooks carry references', incident: 'an inline source object built per render, or a hook returning a fresh reference', canonicalForm: 'one owner per source and stable references from hooks', vacuity: 'no observable source in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N34', title: 'the settings user layer is read once, in evolution-core', incident: 'a package reading the settings user layer itself and taking its key names, so one key resolves two ways', canonicalForm: 'userSetKeys(ctx, paramRowId(owner)) is the only reader; consumers pass their own row id', vacuity: 'no user-layer read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N35', title: 'a platform file:line citation is a frozen baseline', incident: 'a new citation of another repository line number, which no guard here can re-derive when that file moves', canonicalForm: 'platform references cite a symbol, not a line number; the frozen register only burns down', vacuity: 'no platform citation in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N36', title: 'a promise-form swallow of a durable read is a frozen baseline', incident: 'await io.readText(p).catch(() => null): a read failure served as absent, invisible to the catch-block rule', canonicalForm: 'durable reads use the three-state probe; a reviewed expression-form swallow is listed and only burns down', vacuity: 'no expression-form swallow in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
 ]
 
 /** Guards whose vacuum face is known and NOT yet handled: a registered, expiring debt.
@@ -1306,6 +1345,14 @@ function walk(dir) {
           violations.push(`${rel}: ${cites.length - allowed} NEW platform file:line citation(s) (${cites.slice(0, 3).join(', ')}) — another repository's line numbers rot at every bump and nothing here can re-derive them (rule N35); cite the symbol instead. Frozen baseline for this file: ${allowed}`)
         }
       }
+      // N36 (S3.2, audit 1-2/A101): the expression form of the N14 swallow — see the docblock.
+      {
+        const swallowed = swallowedReadSites(text)
+        const allowedSwallows = SWALLOWED_READ_BASELINE.get(rel) ?? 0
+        if (swallowed.length > allowedSwallows) {
+          violations.push(`${rel}: ${swallowed.length - allowedSwallows} NEW read failure(s) served as absent (line ${swallowed.join(', ')}) — a durable read's failure is not "absent" (rule N36); read it with probeText/probeList/probeMtime. Frozen baseline for this file: ${allowedSwallows}`)
+        }
+      }
       // N23 (C5/B13, 0.8.0): raw durable-file writes live in the IO seam — see docblock.
       if (rel.includes('/src/') && !IO_SEAM_WRITERS.has(rel) && !RAW_WRITE_REGISTER.has(rel)) {
         for (const api of fsWriteImports(text)) {
@@ -1457,6 +1504,14 @@ if (process.argv.includes('--list-rules')) {
       && errorCodeLiterals("throw new Error(\"E-301: approval service not mounted\")").length === 1
       && errorCodeLiterals('// prose: this branch answers E-305 the same way').length === 0
       && errorCodeLiterals("const ok = errorText('e-305-this-invocation-carries-no')").length === 0],
+    ['N36', () => swallowedReadSites('const x = await io.readText(p).catch(() => null)').length === 1
+      && swallowedReadSites('const y = await this.io.readText(full).catch(() => undefined)').length === 1
+      && swallowedReadSites('await io.remove(p).catch(() => {})').length === 0
+      && swallowedReadSites('const z = await io.readText(p)').length === 0
+      // Text-level by design (same posture as N14/N35): prose that merely NAMES the shape is not a
+      // hit (no dotted call), while a commented-out call IS one — the rule cannot tell it from code.
+      && swallowedReadSites('// prose only: readText(p).catch(() => null) is the shape this rule names').length === 0
+      && swallowedReadSites('// io.readText(p).catch(() => null) is commented out here').length === 1],
     ['N35', () => platformCiteSites('/nonexistent-root', '// see core/io.ts:475 for the protocol').length === 1
       && platformCiteSites('/nonexistent-root', '// prose without a citation').length === 0
       // No third sample: whether a FAMILY anchor resolves depends on the root under test (the
@@ -1764,6 +1819,7 @@ if (violations.length > 0) {
   console.warn(violations.join('\n'))
 } else {
   if (PLATFORM_CITE_BASELINE.size > 0) console.log(`verify-arch-guards: N35 debt — ${[...PLATFORM_CITE_BASELINE.values()].reduce((sum, n) => sum + n, 0)} frozen platform line-cite(s) in ${PLATFORM_CITE_BASELINE.size} file(s); convert them to symbol citations as those files are touched (expires: group 6, the documentation pass)`)
+if (SWALLOWED_READ_BASELINE.size > 0) console.log(`verify-arch-guards: N36 debt — ${[...SWALLOWED_READ_BASELINE.values()].reduce((sum, n) => sum + n, 0)} reviewed read-swallow(s) in ${SWALLOWED_READ_BASELINE.size} file(s); migrate them to the three-state probe as those files are touched (the class is scheduled for the group-5 three-state sweep)`)
 if (GUARD_VACUITY.length > 0) console.log(`verify-arch-guards: ${GUARD_VACUITY.length} registered guard-vacuity debt(s) — ${GUARD_VACUITY.map(entry => `${entry.guard} (empty input: ${entry.emptyInput.split(':')[0]}; expires ${entry.expiry})`).join('; ')}`)
 const uncovered = RULES.filter(entry => entry.sample !== 'detector').map(entry => entry.id)
 if (uncovered.length > 0) {

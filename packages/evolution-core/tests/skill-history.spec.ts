@@ -9,7 +9,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_SKILL_LIMITS } from '../src/limits.ts'
-import { nodeEvolutionIo } from '../src/io.ts'
+import { nodeEvolutionIo, type EvolutionIoLike } from '../src/io.ts'
 import { SkillLibrary } from '../src/skill-store.ts'
 import { contentHash } from '../src/mutations.ts'
 import {
@@ -584,5 +584,31 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
     // Nothing names those bytes as a support file's: the body group keeps them, as it always did.
     expect(entryTarget(legacy[1]!, [legacy[0]!, legacy[1]!])).toBe('other')
     expect(partitionVersions([legacy[0]!, legacy[1]!]).content.map(entry => entry.v)).toEqual([1, 2])
+  })
+
+  it('PLAN S3.3 (audit 1-2): a failed index READ abandons the record, copies the bytes and never overwrites', async () => {
+    const root = await tempRoot('dsh-history-unreadable-')
+    const real = nodeEvolutionIo()
+    const file = historyIndexFile(root, 'my-skill')
+    // The bytes on disk are an index a NEWER reader wrote: unreadable here, and irreplaceable if lost.
+    const unreadable = JSON.stringify({ version: HISTORY_INDEX_VERSION + 9, versions: [{ v: 1, at: '2026-01-01T00:00:00.000Z', action: 'update', hash: 'deadbeef', chars: 3 }] })
+    const copies: string[] = []
+    const io: EvolutionIoLike = {
+      ...real,
+      readText: async (path: string) => {
+        // A read FAILURE (EIO), not a missing file: the distinction the old `.catch(() => null)` erased.
+        if (path === file) throw Object.assign(new Error('EIO: injected read failure'), { code: 'EIO' })
+        return await real.readText(path)
+      },
+      copy: async (from: string, to: string) => { copies.push(to); await real.writeText(to, unreadable) },
+    }
+    await real.writeText(file, unreadable)
+    const recorded = await recordVersions(root, io, { skillName: 'my-skill', before: null, after: 'Body v2' }, 5)
+    // The record is ABANDONED (the mutation stands), never derived from an empty read.
+    expect(recorded).toBeNull()
+    // The rescue copy was attempted...
+    expect(copies).toEqual([`${file}.corrupt`])
+    // ...and the bytes this reader could not understand are still exactly what they were.
+    expect(await real.readText(file)).toBe(unreadable)
   })
 })

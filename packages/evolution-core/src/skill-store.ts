@@ -38,7 +38,7 @@ import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
-import { isPresent, isUnknown, probeAbsent, probeList, probePresent, type Probe } from './probe.ts'
+import { isPresent, isUnknown, probeAbsent, probeList, probePresent, probeText, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
@@ -2695,10 +2695,17 @@ export class SkillLibrary {
     let chosen: string | undefined
     const unreadable: string[] = []
     for (const candidate of candidates) {
-      const marked = (await this.io.readText(join(archiveRoot, candidate, '.archive-name')).catch(() => null))?.trim()
+      // O-7 / PLAN S3.2 (audit 1-2): a read FAILURE is not "no marker" and not "no file". The
+      // marker decides only when it produced bytes, and an unreadable SKILL.md sends the candidate
+      // to `unreadable` (the list the refusal below names) instead of letting the exact-name
+      // shortcut claim it — the same A1-17 rule this file's list() already applies.
+      const markerProbe = await probeText(this.io, join(archiveRoot, candidate, '.archive-name'))
+      if (isUnknown(markerProbe)) { unreadable.push(candidate); continue }
+      const marked = isPresent(markerProbe) ? markerProbe.value.trim() : ''
       if (marked === name) { chosen = candidate; break }
-      const md = await this.io.readText(join(archiveRoot, candidate, 'SKILL.md')).catch(() => null)
-      const parsed = parseFrontmatter(md ?? '')
+      const mdProbe = await probeText(this.io, join(archiveRoot, candidate, 'SKILL.md'))
+      if (isUnknown(mdProbe)) { unreadable.push(candidate); continue }
+      const parsed = parseFrontmatter(isPresent(mdProbe) ? mdProbe.value : '')
       if (parsed?.frontmatter.name === name) { chosen = candidate; break }
       if (parsed === null && candidate === name) { chosen = candidate; break }
       if (parsed === null) unreadable.push(candidate)
@@ -2747,7 +2754,14 @@ export class SkillLibrary {
     // restore (including consolidate's rollback restores) was the one
     // mutation invisible in the audit history. before=null (absent from the
     // tree), after=the restored SKILL.md bytes (best-effort read).
-    await this.audit(name, 'restore', null, await this.io.readText(join(dest, 'SKILL.md')).catch(() => null), `restored from ${source}`)
+    // O-7 / PLAN S3.2: the audit records the restored bytes. A read FAILURE is not "no bytes" —
+    // `null` here means the file has none — so the degradation is called out instead of being
+    // written into the mutation trail as an absent `after`.
+    const restoredProbe = await probeText(this.io, join(dest, 'SKILL.md'))
+    if (isUnknown(restoredProbe)) {
+      console.warn(`evolution-skill-store: the restored SKILL.md of "${name}" could not be read back (${restoredProbe.reason}); the restore is recorded without after-bytes`)
+    }
+    await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`)
     this.notifyMutation({ action: 'restore', name, skillDir: dest })
     return { ok: true, message: `Skill "${name}" restored from .archive.`, path: dest }
   }
