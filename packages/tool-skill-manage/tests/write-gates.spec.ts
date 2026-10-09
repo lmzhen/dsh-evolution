@@ -384,6 +384,34 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     expect(warns.filter(message => message.includes('confirmation prompt'))).toHaveLength(1)
   })
 
+  it('T2-10/A25: with the approval seam staging this write, the confirmation is SKIPPED — one human gate, not two', async () => {
+    const { ctx } = await setup({ skillWriteConfirm: 'ask' })
+    // The approval stack (state → approval): the SAME foreground create now has two candidate gates.
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state-storage')).default
+    const JsonState = await import('@deepseek-ai/dsh-evolution-state-json')
+    const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
+    const home = process.env.DSH_HOME as string
+    await ctx.plugin(EvolutionStateStorage)
+    await ctx.plugin(JsonState, { root: home })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const created = await callTool(ctx, { action: 'create', name: 'one-gate', content: skillBody('one-gate') }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    // The seam staged it (the card the operator actually needs)…
+    expect(valueOf(created).message).toContain('staged')
+    // …and the confirmation gate did NOT also fire for the same write.
+    expect(asked).toHaveLength(0)
+  })
+
+  it('T2-10/A25 control: WITHOUT the seam the confirmation still fires exactly once', async () => {
+    const { ctx } = await setup({ skillWriteConfirm: 'ask' })
+    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const created = await callTool(ctx, { action: 'create', name: 'one-gate-control', content: skillBody('one-gate-control') }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    expect(asked).toHaveLength(1)
+  })
+
   it('re-resolves the registry live root when the forwarded agent is not the live instance', async () => {
     const { ctx } = await setup()
     const sessionId = 'wg-confirm-live'

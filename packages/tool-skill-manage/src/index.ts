@@ -1075,6 +1075,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const reviewOrigin = origins.approval
       const libraryOrigin: WriteOrigin = origins.library
       const sessionPolicy = effectiveSessionPolicy(ctx, exec.agent?.session)
+      /** The approval seam this write would go through (T2-10/A25: the gate decision below reads it). */
+      const approvalSeam = ctx.get('evolutionApproval') as ApprovalLike | undefined
       // OPT-19 (2026-09, plan D3): the library is pinned to the family root,
       // but the platform catalog may resolve the SAME name to a higher-rank
       // source (project-dsh / project-agents / custom all outrank the family
@@ -1104,7 +1106,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         readNames: sessionReadSkillNames(ctx, exec.agent?.session),
         confirm: async request => confirmSkillWrite(request, exec),
         // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.
-        confirmMode: settings().skillWriteConfirm,
+        //
+        // T2-10/A25: ONE human gate per write. With `skillWriteConfirm: 'ask'|'timeout'` the
+        // confirmation fired first and the approval seam then staged the SAME foreground write, so one
+        // create produced two cards in a row. The seam is the stronger gate (it holds the bytes until a
+        // decision and replays them), so the confirmation is skipped exactly when the seam will stage
+        // this write: seam mounted, enabled, and either the write is background-origin (always staged)
+        // or the deployment stages foreground writes. A session whose approval policy is 'never' has
+        // opted out of interrupts altogether — the seam allows the write outright there, which is the
+        // operator's own instruction rather than two gates collapsing into none.
+        confirmMode: (approvalSeam !== undefined
+          && approvalSeam.isEnabled !== false
+          && sessionPolicy !== 'never'
+          && (libraryOrigin === 'background_review' || approvalSeam.stageForeground !== false))
+          ? 'auto'
+          : settings().skillWriteConfirm,
         confirmTimeoutSeconds: settings().skillWriteConfirmTimeoutSeconds,
         // The card says what the target IS, not only its name: a create already holds the body it is
         // about to write, a delete can read the one it is about to archive. Lazy, so a write nobody
@@ -1129,7 +1145,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (refusal !== null) {
         return { ok: false, message: refusal, skills: [] }
       }
-      const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
+      const approval = approvalSeam
       if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
         // v23 (AP-3): full-content updates carry the stage-time content hash so
         // the replay (executeCore staleness guard) can refuse a stale overwrite.

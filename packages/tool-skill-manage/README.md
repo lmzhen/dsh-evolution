@@ -45,6 +45,14 @@ that confirmation does is the `skillWriteConfirm` parameter (`/evolution params`
 | `ask` | the question waits for as long as it takes; the answer is `Create`/`Delete` to proceed, `Cancel` (or a dismissed card) to refuse with `E-317` |
 | `timeout` | the question is asked with a deadline of `skillWriteConfirmTimeoutSeconds` (default 120 s); an unanswered prompt cancels the write with `E-319`, which names the three knobs |
 
+**One human gate per write (T2-10/A25).** When the approval seam is mounted, enabled and will stage
+this write (a background-origin write, or a deployment with `stageForeground`), the confirmation is
+SKIPPED — the approval window is the stronger gate (it holds the bytes until someone decides and replays
+them), and asking first as well asked the same question twice for one foreground write. The confirmation
+still fires exactly once when there is no such seam. A session whose approval policy is `never` has
+opted out of interrupts altogether; the seam allows the write outright there, which is that instruction
+rather than two gates collapsing into none.
+
 The deadline is enforced by the gate itself, not only by the abort signal it hands the question
 service: a prompt that outlives it returns anyway, and the timer is unref'd and cleared, so an
 answered prompt leaves neither a parked call nor a live timer behind. This gate is UX, not a
