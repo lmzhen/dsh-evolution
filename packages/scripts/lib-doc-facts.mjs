@@ -63,13 +63,30 @@ export function factTableProblems(asset) {
   return out
 }
 
+/**
+ * Read a machine owner, which may be a REPO-scope asset rather than a file under the packages
+ * root: the release workflow lives at `<repo>/.github/workflows/`, so the same declaration must
+ * resolve from the mirror (`packages` → `<repo>`) and from a build overlay that mirrors only
+ * `packages/evolution` (→ `<overlay>`). The candidate chain is root, root/.., root/../..
+ * @param root - the packages root the guard was pointed at.
+ * @param machine - the fact's `machine` entry.
+ * @returns the text plus the path it was found at, or null.
+ */
+function readMachineText(root, machine) {
+  for (const base of [root, join(root, '..'), join(root, '..', '..')]) {
+    const text = readText(join(base, machine.file))
+    if (text !== null) return { text, path: join(base, machine.file) }
+  }
+  return null
+}
+
 /** Machine owners: re-derive the value a fact states so a changed value fails. */
 function machineViolations(fact, root, docs, home) {
   const out = []
   const machine = fact.machine
   if (machine === undefined) return out
-  const file = join(root, machine.file)
-  const text = readText(file)
+  const owner = readMachineText(root, machine)
+  const text = owner === null ? null : owner.text
   if (text === null) {
     out.push(`${machine.file}: fact ${fact.id} names a machine owner that does not exist under ${root} — the fact cannot be re-derived (a missing owner is not a pass)`)
     return out
@@ -151,7 +168,13 @@ function machineViolations(fact, root, docs, home) {
     const version = /^\s*PLATFORM_VERSION:\s*(\S+)\s*$/m.exec(text)?.[1]
     const floor = /^\s*PLATFORM_FLOOR:\s*(\S+)\s*$/m.exec(text)?.[1]
     if (version === undefined) {
-      out.push(`${machine.file}: no PLATFORM_VERSION line — the validated platform line cannot be re-derived`)
+      // The owner is a REPO-scope asset. A tree that does not carry the family repository root —
+      // a build overlay that mirrors only packages/evolution and finds the PLATFORM's own
+      // release.yml — cannot re-derive the fact. Say so, the way N20 prints 「not armed」 for a
+      // tree without the write inventory, instead of inventing a violation every such layout
+      // would carry forever. The mirror's own loss of the line is caught by verify-gate-manifest,
+      // which reads the same file from the repository root and fails when it is gone.
+      console.log(`doc-facts: fact "${fact.id}" not armed in this layout — no PLATFORM_VERSION under ${machine.file} up to three levels above ${root}`)
       return out
     }
     if (!home.includes(version)) out.push(`${fact.home}: ${machine.file} pins PLATFORM_VERSION ${version}, but the home does not state that line`)
