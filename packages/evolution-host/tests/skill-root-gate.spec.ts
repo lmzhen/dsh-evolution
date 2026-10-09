@@ -49,12 +49,24 @@ describe('verify-skill-roots (S1-6)', () => {
     try { expect(exitOf(join(root, 'packages'))).toBe(1) } finally { await rm(root, { recursive: true, force: true }) }
   })
 
-  it('two rows on the SAME tree pass, and a row without a root is not a disagreement', async () => {
+  it('two rows on the SAME tree pass', async () => {
     const root = await fixture([
       { pkg: 'dsh-evolution-alpha', root: 'C:/trees/a' },
       { pkg: 'dsh-evolution-beta', root: 'C:/trees/a' },
-      { pkg: 'dsh-evolution-gamma', root: null },
     ])
     try { expect(exitOf(join(root, 'packages'))).toBe(0) } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it('PLAN S3.8: a row that declares no root keeps the DEFAULT root, so it disagrees with a declared one', async () => {
+    // The judgement reads each consumer's EFFECTIVE root — its own value, or the family default
+    // when it declares none. Comparing only the rows that DO declare a root left the guard's own
+    // subject unjudged: one row pointed at another tree while its siblings stay on the default, so
+    // the sweep audits a tree the other consumers never read. This case asserted exit 0 until S3.8
+    // reworked the judgement (A83: a gate that cannot fail on the shipped tree is a vacuum pass).
+    const root = await fixture([
+      { pkg: 'dsh-evolution-alpha', root: 'C:/trees/a' },
+      { pkg: 'dsh-evolution-gamma', root: null },
+    ])
+    try { expect(exitOf(join(root, 'packages'))).toBe(1) } finally { await rm(root, { recursive: true, force: true }) }
   })
 })
