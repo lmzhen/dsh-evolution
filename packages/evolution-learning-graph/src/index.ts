@@ -354,7 +354,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           | undefined
         const session = invocationAgent?.session
         const sessionMissing = (need: string): CommandResult | undefined => session === undefined
-          ? err(errorText('e-305-this-invocation-carries-no-2', { a1: need }))
+          ? err(errorText('e-305-this-invocation-carries-no', { a1: need }))
           : undefined
         const input = invocation.rawInput.trim()
         const detail = /^detail\s+(\S+)$/.exec(input)

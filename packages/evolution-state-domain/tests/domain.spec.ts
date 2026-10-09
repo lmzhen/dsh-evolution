@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { Context } from '@deepseek-ai/cordis'
 import { Storage, storageBackendServiceKey, type KvUnitDescriptor } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
-import EvolutionStateStorageRegistry, { REVIEW_STATE_TABLE } from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionStateStorageRegistry, { PENDING_KINDS, PENDING_STATUSES, REVIEW_STATE_TABLE } from '@deepseek-ai/dsh-evolution-state-storage'
 import * as DomainState from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
@@ -21,6 +22,20 @@ describe('evolution-state-domain', () => {
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
   })
+  it('derives the pending kind and status vocabularies from the seam contract (S2.9/1-10)', () => {
+    // The seam contract is the ONE place the vocabulary is spelled; this schema derives from it
+    // rather than restating it (1-10 found three independent copies of the same three words).
+    const shape = DomainState.pendingSchema.shape as {
+      kind: { options: readonly string[] }
+      status: { options: readonly string[] }
+    }
+    expect([...shape.kind.options]).toEqual([...PENDING_KINDS])
+    expect([...shape.status.options]).toEqual([...PENDING_STATUSES])
+    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+    expect(source).toContain('z.enum(PENDING_KINDS)')
+    expect(source).toContain('z.enum(PENDING_STATUSES)')
+  })
+
   it('returns the existing record with applied:false when already resolved to another status (E-10, 0.3.17)', async () => {
     const home = await tempRoot('dsh-state-domain-e10-')
     const ctx = new Context()

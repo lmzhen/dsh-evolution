@@ -21,7 +21,9 @@ import {
   releasedStatus,
   CURATOR_STATE_KEY,
   CURATOR_STATE_TABLE,
+  PENDING_KINDS,
   PENDING_RESOLVED_CAP as SEAM_PENDING_RESOLVED_CAP,
+  PENDING_STATUSES,
   PENDING_TABLE,
   PROVIDER_DOMAIN,
   REVIEW_STATE_SESSION_CAP,
@@ -72,16 +74,15 @@ export const curatorStateSchema = z.object({
  */
 export const pendingSchema = z.object({
   id: z.string(),
-  // 0.3.17 (S3.5, D-4): 'skill_batch' is gone — nothing ever created one, and
-  // the TYPE no longer carries it (legacy-looking values parse as unknown).
-  // 0.3.66: 'capability' stays for rows written before its producer was removed
-  // (see PendingKind) — this schema is what `open()` validates every stored
-  // record against, so one such row must not fail the whole domain at mount.
-  kind: z.union([z.literal('memory'), z.literal('skill'), z.literal('capability')]),
+  // S2.9/1-10: both vocabularies come from the seam contract (ONE source); the
+  // read-compatibility note for the producerless 'capability' member travels with
+  // PENDING_KINDS. This schema is what `open()` validates every stored record
+  // against, so one historic row must not fail the whole domain at mount.
+  kind: z.enum(PENDING_KINDS),
   summary: z.string(),
   args: z.unknown(),
   createdAt: z.string(),
-  status: z.union([z.literal('pending'), z.literal('executing'), z.literal('approved'), z.literal('rejected')]),
+  status: z.enum(PENDING_STATUSES),
   resolvedAt: z.string().optional(),
   claimedBy: z.string().optional(),
   claimedAt: z.string().optional(),
@@ -393,7 +394,7 @@ export function apply(ctx: Context): void {
       // shared by reference with the caller).
       const issue = recordIssue(PENDING_TABLE, record) ?? assertCloneable(record)
       if (issue !== null) throw new Error(`evolution-state-domain: refusing to persist an invalid pending record: ${issue}`)
-      const parsed = pendingSchema.safeParse({ ...record, args: record.args })
+      const parsed = pendingSchema.safeParse(record)
       if (!parsed.success) {
         throw new Error(`evolution-state-domain: refusing to persist an invalid pending record: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`)
       }

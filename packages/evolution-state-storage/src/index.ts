@@ -11,6 +11,9 @@ import { Context, Service } from '@deepseek-ai/cordis'
 // S3-2: the two caps live in ./constants.ts (the conformance suite reads them
 // without importing this entry); the local import feeds the pure rules below.
 import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from './constants.ts'
+// S2.9/1-10: the pending vocabulary lives in the record contract (ONE source for the types, the
+// write gate and the domain schema); this entry publishes it through the `export *` below.
+import type { PendingKind, PendingStatus } from './record-contract.ts'
 
 // S-06: the state-stack magic strings (singleton key, file names,
 // provider names, table names) are single-sourced here.
@@ -21,24 +24,6 @@ export * from './record-contract.ts'
 // party) runs `runStateProviderConsistency(provider, expect)` to check the whole
 // seam contract. It imports no test runner; the assert surface is injected.
 export * from './conformance.ts'
-
-/** 0.3.17 (S3.5, D-4): 'skill_batch' removed — nothing ever created one
- * (dead enum member); the historic value, if it ever reached disk, is read as
- * an unknown kind by consumers rather than minted here.
- *
- * 0.3.66: 'capability' is retained with NO producer — the evolution-capability
- * adapter was removed. It is a read-compatibility member: state written by an
- * install that used that adapter (≤0.3.65) still holds such records, and they
- * must keep loading, listing in `/evolution pending`, and answering approve or
- * reject. Dropping it would strand them two ways: json quarantines the row to
- * `<file>.corrupt` and refuses the resolving write, while the domain provider
- * validates every stored record at mount, so one such row fails the whole domain
- * with `invalid-record`. */
-export type PendingKind = 'memory' | 'skill' | 'capability'
-/** 0.3.17 (S3.3, E-24): 'executing' = claimed, runner in flight — a fresh
- * claim only takes 'pending', and resolve accepts 'pending'/'executing', so a
- * crash mid-approve can never double-execute the runner. */
-export type PendingStatus = 'pending' | 'executing' | 'approved' | 'rejected'
 
 /** 0.3.17 (S3.3): the claim lifecycle as ONE transition table — BOTH
  * providers (json/domain) must use these, never a hand-written copy (a second

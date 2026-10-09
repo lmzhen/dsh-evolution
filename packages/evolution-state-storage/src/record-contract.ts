@@ -28,10 +28,33 @@ export const UNKNOWN_FIELD_POLICY = 'preserve' as const
 const isNonNegInt = (value: unknown): boolean =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
 const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
-// 'capability' accepts records written by a ≤0.3.65 install; its producer was
-// removed in 0.3.66 (see PendingKind).
-const PENDING_KINDS = new Set(['memory', 'skill', 'capability'])
-const PENDING_STATUSES = new Set(['pending', 'executing', 'approved', 'rejected'])
+/** 0.3.17 (S3.5, D-4): 'skill_batch' is gone — nothing ever created one (a dead enum member). A
+ * historic value, if it ever reached disk, is read as an unknown kind by consumers rather than
+ * minted here.
+ *
+ * 0.3.66: 'capability' stays with NO producer — the evolution-capability adapter was removed. It is
+ * a read-compatibility member: state written by an install that used that adapter (≤0.3.65) still
+ * holds such records, and they must keep loading, listing in `/evolution pending`, and answering
+ * approve or reject. Dropping it would strand them two ways: json quarantines the row to
+ * `<file>.corrupt` and refuses the resolving write, while the domain provider validates every
+ * stored record at mount, so one such row fails the whole domain with `invalid-record`.
+ *
+ * S2.9/1-10: this array is the ONE source of the vocabulary — the types, the write gate below and
+ * the domain provider's schema all derive from it. A second literal copy is the E-10 drift class
+ * this module exists to end. */
+export const PENDING_KINDS = ['memory', 'skill', 'capability'] as const
+/** 0.3.17 (S3.3, E-24): 'executing' = claimed, runner in flight — a fresh claim only takes
+ * 'pending', and resolve accepts 'pending'/'executing', so a crash mid-approve can never
+ * double-execute the runner. Same one-source rule as PENDING_KINDS. */
+export const PENDING_STATUSES = ['pending', 'executing', 'approved', 'rejected'] as const
+/** The legal kind of one pending record. */
+export type PendingKind = (typeof PENDING_KINDS)[number]
+/** The legal status of one pending record. */
+export type PendingStatus = (typeof PENDING_STATUSES)[number]
+/** Membership test for the write gate (per record per write, so the Set is worth it). */
+const PENDING_KIND_SET = new Set<string>(PENDING_KINDS)
+/** Membership test for the write gate. */
+const PENDING_STATUS_SET = new Set<string>(PENDING_STATUSES)
 
 /**
  * The write gate for one record. Both providers call this before persisting,
@@ -58,7 +81,7 @@ export function recordIssue(table: SeamRecordTable, record: unknown): string | n
     return null
   }
   if (typeof value.id !== 'string') return 'id must be a string'
-  if (typeof value.kind !== 'string' || !PENDING_KINDS.has(value.kind)) return 'kind must be memory|skill|capability'
+  if (typeof value.kind !== 'string' || !PENDING_KIND_SET.has(value.kind)) return `kind must be ${PENDING_KINDS.join('|')}`
   if (typeof value.summary !== 'string') return 'summary must be a string'
   if (!Object.prototype.hasOwnProperty.call(value, 'args')) return 'args key is required (may be any cloneable value)'
   // V24-06 (v24): the key-present-but-undefined shape passes this gate, but
@@ -70,7 +93,7 @@ export function recordIssue(table: SeamRecordTable, record: unknown): string | n
   // the write gate so both media agree and the caller learns immediately.
   if (value.args === undefined) return 'args must be a cloneable value — `undefined` is dropped by the json medium and the record would be unreadable after a restart (pass {} instead)'
   if (typeof value.createdAt !== 'string') return 'createdAt must be a string'
-  if (typeof value.status !== 'string' || !PENDING_STATUSES.has(value.status)) return 'status must be pending|executing|approved|rejected'
+  if (typeof value.status !== 'string' || !PENDING_STATUS_SET.has(value.status)) return `status must be ${PENDING_STATUSES.join('|')}`
   for (const field of ['resolvedAt', 'claimedBy', 'claimedAt', 'origin', 'sessionId']) {
     if (!optionalString(value[field])) return `${field} must be a string when present`
   }

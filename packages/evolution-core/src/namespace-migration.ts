@@ -182,7 +182,6 @@ function sameValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
-/**
 /** One row's pending write: the keys that row does not carry yet. */
 export interface NamespaceMigrationWrite {
   /** The row id. */

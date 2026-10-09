@@ -13,6 +13,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import { PENDING_STATUSES } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import { elapsedSince, isLoopbackRequest, readJsonObject, textDiffFacts, writeJson } from '@deepseek-ai/dsh-evolution-core'
 import type { WritePreview } from './index.ts'
@@ -25,11 +26,9 @@ export const APPROVAL_ROUTES = {
   preview: '/api/dsh-evolution/approval/preview',
 } as const
 
-/**
- * The statuses a caller may ask for, in the order the window moves through them. Annotated with the
- * storage type so a change to that union fails to compile here instead of drifting silently.
- */
-const PENDING_STATUSES: readonly PendingStatus[] = ['pending', 'executing', 'approved', 'rejected']
+// S2.9/1-10: the statuses a caller may ask for are the SEAM'S own list (`PENDING_STATUSES` from
+// evolution-state-storage), in the order the window moves through them — a literal here was the
+// third copy of one vocabulary, and it could drift from the storage types without any error.
 
 /** What one row of the pending list carries to the browser half. */
 export interface PendingRow {
