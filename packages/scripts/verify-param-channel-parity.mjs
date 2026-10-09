@@ -85,10 +85,10 @@ const aliases = new Set(Object.keys(registry.aliases))
 
 /** The channels that spell parameter names, and what each one owes the registry. */
 const CHANNELS = [
-  { name: 'deployment-carriers', file: join(root, 'evolution-policy', 'src', 'index.ts'), writable: true },
-  { name: 'command-face', file: join(root, 'evolution-commands', 'src', 'params.ts'), writable: true },
-  { name: 'doctor-face', file: join(root, 'evolution-commands', 'src', 'doctor.ts'), writable: false },
-  { name: 'client-field-list', file: join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'), writable: true },
+  { name: 'deployment-carriers', file: join(root, 'evolution-policy', 'src', 'index.ts') },
+  { name: 'command-face', file: join(root, 'evolution-commands', 'src', 'params.ts') },
+  { name: 'doctor-face', file: join(root, 'evolution-commands', 'src', 'doctor.ts') },
+  { name: 'client-field-list', file: join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts') },
 ]
 
 const problems = []
@@ -107,13 +107,15 @@ for (const channel of CHANNELS) {
 // for one fact).
 const policySchema = join(root, 'evolution-policy', 'src', 'index.ts')
 if (existsSync(policySchema)) {
-  const declared = [...schemaKeys(policySchema)].filter(key => key !== 'default' && key in registry.aliases === false)
-  const named = declared.filter(key => key.length >= 6)
-  let carried = 0
-  for (const key of named) {
-    if (ids.has(key)) carried += 1
+  const declared = [...schemaKeys(policySchema)].filter(key => key !== 'default' && !(key in registry.aliases))
+  // The judgement is two-sided on purpose: a declared key is legal when the registry
+  // owns it OR when ALLOWED registers it as a non-parameter literal. The length
+  // heuristic that used to stand here accepted every short synonym in silence.
+  const foreign = declared.filter(key => !ids.has(key) && !ALLOWED.has(key))
+  for (const key of foreign) {
+    problems.push('deployment-carriers: ' + policySchema + ' declares "' + key + '", which is neither a registry id nor a registered non-parameter literal — a synonym declared here is a second name for one fact')
   }
-  notes.push('policy schema keys checked: ' + named.length + ' (' + carried + ' registry ids)')
+  notes.push('policy schema keys checked: ' + declared.length + ' (' + (declared.length - foreign.length) + ' registry id(s) or allowed literal(s))')
 }
 
 
