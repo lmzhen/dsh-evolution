@@ -20,7 +20,7 @@ stale side must never be copied back over this one.
    `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
    a source to copy from.
 3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
-   all 22 steps and writes one log per step plus a summary (§The gate has
+   all 23 steps and writes one log per step plus a summary (§The gate has
    the table and says which step runs in which tree).
 4. **Decide where your words live**. §Where a fact is allowed to live is the
    rule that fails a conclusion stated in two documents (N19).
@@ -53,7 +53,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  22-step gate runs it on every batch; a second copy fails and names both files.
+  23-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -105,6 +105,7 @@ Run from the two trees (never reorder or rename these steps):
 | 20 | `node packages/scripts/verify-family-tool-names.mjs packages --strict` | mirror |
 | 21 | `node packages/scripts/verify-skill-roots.mjs packages --strict` | mirror |
 | 22 | `node packages/scripts/verify-gate-manifest.mjs packages` | mirror |
+| 23 | `node packages/scripts/verify-regression-set.mjs packages --upstream <platform tree> --audit-dir <audit dir>` | mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a

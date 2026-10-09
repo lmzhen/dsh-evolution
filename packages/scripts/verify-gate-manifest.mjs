@@ -30,6 +30,7 @@ const MACHINE_LOCAL = [
 
 /** Declared in-repo checks the CI action does NOT execute (local runner only). */
 const CI_NOT_EXECUTED = [
+  { script: 'verify-regression-set.mjs', reason: 'the merge-time regression set (guards + specs + audit self-checks); the publish job runs its own subset', expiry: 'release-phase wiring: decide whether the job adopts this runner' },
   { script: 'verify-gate-manifest.mjs', reason: 'the table manifest is checked by the local runner; the publish job pins the same facts through its own steps', expiry: 'release-phase wiring: add the step to the action' },
   { script: 'smoke-built-entries.mjs', reason: 'needs an installed platform scope; the local runner executes it, the publish job does not', expiry: 'release-phase wiring: add the step to the action or mark the row local-only' },
 ]
@@ -96,6 +97,9 @@ if (platformVersion === null) problems.push('release.yml declares no PLATFORM_VE
 else {
   for (const row of tableRows) {
     for (const match of row.command.matchAll(/--upstream\s+([^\s`]+)/g)) {
+      // A `<placeholder>` argument documents the shape without naming a machine path; only a
+      // CONCRETE path can be stale, so only a concrete path is judged.
+      if (match[1].startsWith('<')) continue
       const expected = 'dsh-upstream-' + platformVersion
       if (!match[1].replace(/\\/g, '/').endsWith(expected)) {
         problems.push('row ' + row.n + ' (' + row.line + ') points --upstream at ' + match[1] + ' but release.yml declares PLATFORM_VERSION ' + platformVersion + ' (the tree must end in ' + expected + ')')

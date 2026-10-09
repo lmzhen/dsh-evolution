@@ -5,7 +5,7 @@
  * A generated file that nobody compares is a copy, not a source. This is the gate step that makes
  * `client-tokens.json` the one home of the scale: it re-renders the module and compares bytes with the
  * copy inside each browser half, so editing a generated `tokens.ts` by hand - or forgetting to
- * regenerate after a source edit - fails the 22-step gate with the exact file named.
+ * regenerate after a source edit - fails the 23-step gate with the exact file named.
  *
  * The shape rules exist for the guard that follows it (N25/N27 in verify-arch-guards): a value here
  * must be a plain CSS token - no semicolon, brace, quote or newline - because the rendered file puts it
