@@ -48,21 +48,41 @@ function unquote(value) {
   return trimmed
 }
 
-/** Walk up from `start` until a directory holding `.github/workflows` is found. */
+/**
+ * Resolve the `.github` directory that owns the release wiring.
+ *
+ * Walks up from `start` and prefers the first candidate carrying BOTH
+ * `workflows/` and `actions/`. In CI the working directory is the platform
+ * checkout (`upstream/`), which ships its own `.github/workflows` and otherwise
+ * shadows the repository root whose composite action uploads the artifacts.
+ */
 function findGithub(start) {
   let current = resolve(start)
+  let fallback
   for (;;) {
-    if (statSync(join(current, '.github', 'workflows'), { throwIfNoEntry: false })?.isDirectory() === true) return join(current, '.github')
+    const candidate = join(current, '.github')
+    if (statSync(join(candidate, 'workflows'), { throwIfNoEntry: false })?.isDirectory() === true) {
+      if (statSync(join(candidate, 'actions'), { throwIfNoEntry: false })?.isDirectory() === true) return candidate
+      fallback = fallback ?? candidate
+    }
     const parent = dirname(current)
-    if (parent === current) return undefined
+    if (parent === current) return fallback
     current = parent
+  }
+}
+
+/** Directory entries, or [] when the directory is absent. */
+function entriesOf(dir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return []
   }
 }
 
 /** List `*.yml|*.yaml` files directly inside `dir`. */
 function yamlFiles(dir) {
-  const entries = readdirSync(dir, { withFileTypes: true, recursive: false })
-  return entries.filter(entry => entry.isFile() && /\.ya?ml$/.test(entry.name)).map(entry => join(dir, entry.name))
+  return entriesOf(dir).filter(entry => entry.isFile() && /\.ya?ml$/.test(entry.name)).map(entry => join(dir, entry.name))
 }
 
 /**
@@ -159,7 +179,7 @@ function producedBy(workflow, actionDirs) {
 function check(github) {
   const actionRoot = join(github, 'actions')
   const actionDirs = new Map()
-  for (const entry of readdirSync(actionRoot, { withFileTypes: true, throwIfNoEntry: false }) ?? []) {
+  for (const entry of entriesOf(actionRoot)) {
     if (entry.isDirectory()) actionDirs.set(entry.name, yamlFiles(join(actionRoot, entry.name)))
   }
   const workflows = yamlFiles(join(github, 'workflows'))
