@@ -368,7 +368,12 @@ function platformCiteSites(root, text) {
 
 /** N35's frozen baseline: how many platform line-cites each file carried when the rule landed
  * (S2.9, after A23 surfaced the class). Burn-down only: as a file is touched, convert its cites to
- * symbol citations and lower its number here. A file absent from this map may carry none. */
+ * symbol citations and lower its number here. A file absent from this map may carry none.
+ *
+ * The map must cover EXACTLY the files the scan below reaches: this guard skips its own file
+ * (`SELF_REL`, the same exemption N15 uses), so an entry for it could never fire and would only
+ * make the register disagree with a recount (`scripts/count-platform-cites.mjs`, which applies the
+ * same exemption). */
 const PLATFORM_CITE_BASELINE = new Map([
   ['evolution-commands/src/index.ts', 3],
   ['evolution-core/src/constants.ts', 1],
@@ -392,7 +397,6 @@ const PLATFORM_CITE_BASELINE = new Map([
   ['memory-files/src/index.ts', 1],
   ['scripts/gen-param-client-view.mjs', 1],
   ['scripts/install-layered.mjs', 2],
-  ['scripts/verify-arch-guards.mjs', 5],
   ['scripts/verify-param-channel-parity.mjs', 4],
   ['scripts/verify-platform-contract.mjs', 2],
   ['tool-memory/src/index.ts', 1],
