@@ -108,6 +108,13 @@ export type WriteConfirm = (request: WriteConfirmRequest) => Promise<boolean>
  * 2026-09-26, P2), so the shape gate refuses it by name instead. */
 const SCALAR_ARG_FIELDS = ['action', 'name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const
 
+/** The scalar fields the tool schema types as BOOLEANS; the replay channel has no schema either.
+ * T2-V3/A28: `args.replace_all === true` answered "false" for anything else, so a staged
+ * `replace_all: 'yes'` silently patched only the FIRST occurrence — a wrong count with no signal.
+ * The plan channel already refuses a non-boolean `replace_all` by name (S1-C1); this is the same
+ * rule on the replay channel, so the two channels cannot disagree about one flag. */
+const FLAG_ARG_FIELDS = ['replace_all'] as const
+
 /** What every gate reads. */
 export interface WriteGateContext {
   /** The point asking: the tool's admission of a call, or its execution at the bytes. */
@@ -202,6 +209,13 @@ const ARGUMENT_SHAPE: WriteGate = {
       const value = view.scalars[field]
       if (value === undefined || value === null || typeof value === 'string') continue
       return `skill_manage: "${field}" must be a string (got ${typeof value}); refusing the write.`
+    }
+    // T2-V3/A28: the FLAGS are shapes too. A non-boolean `replace_all` used to mean "false" at the
+    // patch site, so the write landed with a different count than the caller asked for.
+    for (const field of FLAG_ARG_FIELDS) {
+      const value = view.scalars[field]
+      if (value === undefined || value === null || typeof value === 'boolean') continue
+      return `skill_manage: "${field}" must be a boolean (got ${typeof value}); refusing the write.`
     }
     return null
   },

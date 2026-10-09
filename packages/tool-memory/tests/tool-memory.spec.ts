@@ -82,6 +82,36 @@ describe('tool-memory', () => {
     expect(captured?.sessionPolicy).toBe('never')
   })
 
+  it('T2-03/A18: the replay payload gate names the offending FIELD of an operation', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    ctx.provide('approval', { overrideOf: () => 'never', config: { policy: 'ask' } })
+    let runner: ((args: unknown) => Promise<{ ok: boolean; message: string }>) | undefined
+    ctx.provide('evolutionApproval', {
+      request: async () => ({ action: 'allow', message: 'ok' }),
+      registerRunner: (_kind: string, registered: (args: unknown) => Promise<{ ok: boolean; message: string }>) => {
+        runner = registered
+        return () => {}
+      },
+    })
+    await ctx.plugin(ToolMemory, {})
+    // The registration happens inside the plugin's `inject` callback; give it its tick.
+    for (let tick = 0; tick < 10 && runner === undefined; tick += 1) await new Promise(resolve => setTimeout(resolve, 0))
+    expect(runner).toBeDefined()
+    // The replay channel executes a STORED snapshot, so a wrong field TYPE is possible even though the
+    // tool schema said string. `content` was the one field the gate did not name: the value reached the
+    // store, threw, and the approval path answered the generic "Replay runner failed" while the record
+    // stayed pending forever. The refusal must name the field and say how to dispose of the record.
+    const refused = await runner!({ target: 'memory', operations: [{ action: 'add', content: 5 }] })
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain('operations[0].content must be a string')
+    expect(refused.message).toContain('reject the record')
+  })
+
   it('S1-B1: the review-channel session mark resolves memory writes to background_review', async () => {
     // P1-2 fix: this tool used to skip the v37 S2.2 mark (unlike
     // skill_manage), so an inject-mode review's memory write resolved as

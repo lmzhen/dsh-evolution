@@ -253,10 +253,22 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     if (target !== 'memory' && target !== 'user') {
       return { ok: false, message: `memory: "target" must be "memory" or "user" (got ${String(target)}); refusing the write.`, entries: [], chars: 0, limit: 0 }
     }
-    for (const field of ['facts', 'old_text'] as const) {
+    for (const field of ['facts', 'old_text', 'content'] as const) {
       const value = (normalized as unknown as Record<string, unknown>)[field]
       if (value !== undefined && value !== null && typeof value !== 'string') {
         return { ok: false, message: `memory: "${field}" must be a string (got ${typeof value}); refusing the write.`, entries: [], chars: 0, limit: 0 }
+      }
+    }
+    // PLAN S3.6 (T2-03/A18): the OPERATION payload gets the same field gate, by INDEX and by FIELD.
+    // `content` is the documented alias of `facts` (T3-06) and was the one field the guards above
+    // did not name: a staged `operations: [{action:'add', content: 5}]` reached the store, threw, and
+    // the approval path answered the generic "Replay runner failed" while the record stayed pending
+    // forever. A payload defect can never be approved away, so the refusal says how to dispose of it.
+    for (const [index, operation] of (normalized.operations ?? []).entries()) {
+      for (const field of ['facts', 'content', 'old_text'] as const) {
+        const value = (operation as unknown as Record<string, unknown>)[field]
+        if (value === undefined || value === null || typeof value === 'string') continue
+        return { ok: false, message: `memory: operations[${index}].${field} must be a string (got ${typeof value}); refusing the write — re-approving cannot fix a payload defect, so reject the record.`, entries: [], chars: 0, limit: 0 }
       }
     }
     const result = normalized.operations

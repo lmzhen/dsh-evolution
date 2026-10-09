@@ -604,5 +604,17 @@ describe('write gates: review-fix sentinels (2026-09-26 independent review)', ()
     const absent = await replay({ name: 'missing-action' })
     expect(absent.ok).toBe(false)
     expect(absent.message).not.toContain('E-318')
+    // T2-V3/A28: the FLAGS are shapes too. `args.replace_all === true` used to answer "false" for
+    // anything else, so a stored `replace_all: 'yes'` silently patched only the first occurrence —
+    // a different count than the caller asked for, with no signal anywhere. The plan channel already
+    // refuses a non-boolean by name (S1-C1); this asserts the same rule on the replay channel.
+    await createTarget(ctx, 'flag-skill')
+    const coerced = await replay({ action: 'patch', name: 'flag-skill', old_string: 'x', new_string: 'y', replace_all: 'yes' })
+    expect(coerced.ok).toBe(false)
+    expect(coerced.message).toContain('"replace_all" must be a boolean')
+    // The boolean spelling passes the same gate (the control: the refusal is about the TYPE, not
+    // about the flag being set).
+    const boolean = await replay({ action: 'patch', name: 'flag-skill', old_string: 'x', new_string: 'y', replace_all: true })
+    expect(boolean.message).not.toContain('"replace_all" must be a boolean')
   })
 })
