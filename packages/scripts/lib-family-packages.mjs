@@ -38,8 +38,26 @@ export const EVOLUTION_BUNDLE_TAILS = [
   'dsh-evolution-preset',
 ]
 
-/** Directories under packages/ that are not publishable packages. */
-export const NON_PACKAGE_DIRS = new Set(['scripts', 'docs', 'node_modules', '.release-staging', 'dist.next'])
+/** Directories under packages/ that are not publishable packages, by NAME.
+ * v46 S1.10 (finding T7-16): the set used to name `.release-staging` — a directory the tree has
+ * not carried for releases — while the real flip leftovers are `.release-staging.next` /
+ * `.release-staging.previous`. It never mattered only because publishableDirs() ALSO required a
+ * package.json, so a leftover carrying one (a staging copy does) would have been published by the
+ * second rule while the first said it was excluded. */
+export const NON_PACKAGE_DIRS = new Set([
+  'scripts', 'docs', 'node_modules', 'dist.next',
+  '.release-staging', '.release-staging.next', '.release-staging.previous',
+])
+
+/**
+ * Is this directory excluded from publication by its NAME alone?
+ * A dot-directory is never a package (staging flips, editor and cache dirs land there).
+ * @param name - the directory name under packages/.
+ * @returns whether publication skips it.
+ */
+export function isNonPackageDir(name) {
+  return name.startsWith('.') || NON_PACKAGE_DIRS.has(name)
+}
 
 /**
  * Every publishable package directory: a directory holding a package.json.
@@ -49,8 +67,11 @@ export const NON_PACKAGE_DIRS = new Set(['scripts', 'docs', 'node_modules', '.re
  */
 export function publishableDirs(packagesRoot) {
   return readdirSync(packagesRoot, { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !NON_PACKAGE_DIRS.has(entry.name))
+    .filter(entry => entry.isDirectory() && !isNonPackageDir(entry.name))
     .map(entry => entry.name)
+    // The manifest check is the SECOND line, not the only one: the name rule above is what keeps
+    // a staging leftover from being published, and this line keeps a directory that merely lacks
+    // a manifest out of the list.
     .filter(name => existsSync(join(packagesRoot, name, 'package.json')))
     .sort()
 }
