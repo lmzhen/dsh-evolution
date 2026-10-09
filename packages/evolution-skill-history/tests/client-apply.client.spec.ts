@@ -13,12 +13,13 @@ import { NS } from '../src/client/messages.ts'
 import { PANEL_ID, type PanelBodyOptions, type PanelRowOptions } from '../src/client/seam.ts'
 
 /** A slots registry and locale seat that record contributions and hand back real disposers. */
-function fakeSeams(): {
+function fakeSeams(options: { refuseLocale?: boolean } = {}): {
   ctx: unknown
   rows: PanelRowOptions[]
   bodies: PanelBodyOptions[]
   namespaces: string[]
   faces: unknown[]
+  warnings: string[]
   dispose: () => void
 } {
   const rows: PanelRowOptions[] = []
@@ -45,14 +46,21 @@ function fakeSeams(): {
   }
   const locale = {
     register(namespace: string): () => void {
+      // The platform refuses a second registration of one namespace+locale (locale/src/client/index.ts
+      // throws); this flag replays that refusal.
+      if (options.refuseLocale === true) throw new Error('namespace "' + namespace + '" is already registered')
       namespaces.push(namespace)
       return () => { namespaces.splice(namespaces.indexOf(namespace), 1) }
     },
     bind: () => (key: string) => key,
   }
+  const warnings: string[] = []
   const ctx = {
     slots,
     locale,
+    logger: { warn: (message: string) => { warnings.push(String(message)) } },
+    // Eager: the effect body runs inside apply(), exactly like cordis — which is why a throw in it
+    // used to take the rest of the registrations with it.
     effect(effect: () => unknown): unknown { const dispose = effect(); if (typeof dispose === 'function') disposers.push(dispose as () => void); return dispose },
   }
   return {
@@ -61,6 +69,7 @@ function fakeSeams(): {
     bodies,
     namespaces,
     faces,
+    warnings,
     // The platform disposes the bundle's effects when the fiber goes: same shape here.
     dispose: () => { for (const dispose of disposers.splice(0).reverse()) dispose() },
   }
@@ -91,6 +100,22 @@ describe('skill-history client bundle: what it contributes, and what it takes ba
     const face = seams.faces[0] as Record<string, unknown>
     expect(Object.keys(face).sort()).toEqual(['format', 'loadBody', 'loadDiff', 'loadSkills', 'loadVersions', 'markdownWords', 't', 'undo'])
     for (const name of ['loadSkills', 'loadVersions', 'loadDiff', 'loadBody', 'undo']) expect(typeof face[name]).toBe('function')
+  })
+
+  it('T5-06/A61: a REFUSED dictionary registration is reported and the rest of the bundle still mounts', () => {
+    const seams = fakeSeams({ refuseLocale: true })
+    // Before the guard this threw out of apply(): no row, no body, no stylesheet — the whole panel
+    // disappeared because the seat refused one dictionary.
+    apply(seams.ctx as never)
+    expect(seams.namespaces).toEqual([])
+    expect(seams.rows).toHaveLength(1)
+    expect(seams.bodies).toHaveLength(1)
+    expect(document.querySelectorAll('style[data-plugin-css]')).toHaveLength(1)
+    // Reported, not swallowed: the failure names the namespace and says what the reader now sees.
+    expect(seams.warnings.some(line => line.includes(NS) && line.includes('falls back to the bundle'))).toBe(true)
+    // The label resolves through the bundle's own copy instead of the raw key name.
+    expect(seams.rows[0]?.label()).not.toBe('entry.label')
+    expect(seams.rows[0]?.label()).toBeTypeOf('string')
   })
 
   it('leaves nothing behind when the bundle is disposed', () => {

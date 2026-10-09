@@ -10,7 +10,7 @@
 import { createElement } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
-import { en, fill, NS, zh } from './messages.ts'
+import { en, fill, message, NS, zh } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import { SkillHistoryPanel } from './Panel.ts'
 import { PANEL_ID, type ClientSeam } from './seam.ts'
@@ -69,12 +69,31 @@ export function apply(ctx: ClientContext): void {
   const api = createSkillHistoryApi()
   // The dictionary registration is an EFFECT, not a bare call: cordis disposes it when this bundle
   // unloads (a hot reload, or the row being switched off), which is the shape the platform's own
-  // client plugins use. A seat that refuses the registration leaves the panel on the fallback copy.
+  // client plugins use.
+  //
+  // T5-06/A61: the platform THROWS when this namespace+locale is already registered (a second
+  // bundle, or a hot reload whose dispose has not run yet). The bare call let that throw escape
+  // `apply()`, so the row and body registrations below never ran — the panel vanished entirely
+  // because of a dictionary clash. The family's other client half (evolution-settings-ui) already
+  // guards the same seat; this one now matches it AND reports the failure instead of hiding it: the
+  // reader is told the label is running on the bundle's own copy, the state is not silently
+  // "registered", and every other registration continues.
+  let registered = false
   ctx.effect(() => {
-    const dispose = seam.locale.register(NS, { zh, en })
-    return dispose
+    try {
+      const dispose = seam.locale.register(NS, { zh, en })
+      registered = true
+      return dispose
+    } catch (error) {
+      ctx.logger.warn(`evolution-skill-history: the locale seat refused the "${NS}" dictionary registration (${error instanceof Error ? error.message : String(error)}) — the panel label falls back to the bundle's own copy and the remaining registrations continue`)
+      return () => {}
+    }
   }, 'evolution-skill-history: locale')
-  const t = seam.locale.bind(NS)
+  // The translator follows the same verdict: a refused registration means the seat does not know this
+  // namespace, so every key would come back as the raw key name — the bundle's own dictionary reads
+  // better and is what the panel showed before the seat existed.
+  const seatTranslator = registered ? seam.locale.bind(NS) : null
+  const t = (key: string): string => seatTranslator === null ? message('zh', key) : seatTranslator(key)
   // The panel's own stylesheet, injected once behind its tag. The bundle is built outside the
   // platform's CSS-Modules pipeline, so it carries the string itself (the family's settings section
   // does the same); the tag id keeps a hot reload from stacking copies.

@@ -66,15 +66,24 @@ function fakeSeat(): { get: (id: string) => unknown } {
   }
 }
 
-function fakeShell(options: { seat?: boolean } = {}): { ctx: Parameters<typeof apply>[0]; registrations: Registration[] } {
+function fakeShell(options: { seat?: boolean; refuseLocale?: boolean } = {}): { ctx: Parameters<typeof apply>[0]; registrations: Registration[]; warnings: string[] } {
   const registrations: Registration[] = []
+  const warnings: string[] = []
   const seat = fakeSeat()
   const ctx = {
     effect: (fn: () => unknown): (() => void) => {
       const dispose = fn()
       return typeof dispose === 'function' ? dispose as () => void : () => {}
     },
-    locale: { register: () => () => {}, bind: () => (key: string) => key },
+    logger: { warn: (message: string) => { warnings.push(String(message)) } },
+    locale: {
+      // The platform throws on a second registration of one namespace+locale; this replays it.
+      register: () => {
+        if (options.refuseLocale === true) throw new Error('namespace "evolution-settings" is already registered')
+        return () => {}
+      },
+      bind: () => (key: string) => key,
+    },
     // One seat INSTANCE per shell, the way the platform's service registry answers it: the probe
     // runs on every read, so a fresh seat per call would hide a binding bug.
     get: (name: string) => name === 'configForms' && options.seat !== false ? seat : undefined,
@@ -96,7 +105,7 @@ function fakeShell(options: { seat?: boolean } = {}): { ctx: Parameters<typeof a
       },
     },
   }
-  return { ctx: ctx as unknown as Parameters<typeof apply>[0], registrations }
+  return { ctx: ctx as unknown as Parameters<typeof apply>[0], registrations, warnings }
 }
 
 describe('the evolution settings section', () => {
@@ -279,6 +288,14 @@ describe('the row source the renderer binds', () => {
     tell()
     expect(heard).toBe(1)
     off()
-    expect(heard).toBe(1)
+  })
+
+  it('T5-06/A61: a refused dictionary registration is REPORTED and the section still registers', () => {
+    const shell = fakeShell({ refuseLocale: true })
+    // The guard was already here (unlike the sibling half before this step); what was missing is the
+    // report — a silent fallback leaves the reader wondering why the cards speak the bundle language.
+    apply(shell.ctx)
+    expect(shell.warnings.some(line => line.includes('evolution-settings') && line.includes('fall back'))).toBe(true)
+    expect(shell.registrations.some(entry => entry.name === 'settings.section')).toBe(true)
   })
 })

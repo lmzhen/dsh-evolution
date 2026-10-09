@@ -74,9 +74,13 @@ export function apply(ctx: ClientContext): void {
       const dispose = seam.locale.register(NS, { zh, en })
       registered = true
       return dispose
-    } catch {
-      // A seat that refuses the registration (an older shell, or a namespace clash)
-      // leaves the flag false and the bundle stays on its own copy below.
+    } catch (error) {
+      // A seat that refuses the registration (an older shell, or a namespace clash — the platform
+      // throws on a second registration of one namespace+locale) leaves the flag false and the bundle
+      // stays on its own copy below. T5-06/A61: REPORTED, not hidden — the other client half
+      // (evolution-skill-history) guards the same seat, and a silent fallback would leave the reader
+      // wondering why the cards speak the bundle's language instead of the UI's.
+      ctx.logger.warn(`evolution-settings-ui: the locale seat refused the "${NS}" dictionary registration (${error instanceof Error ? error.message : String(error)}) — the cards fall back to the bundle's own copy`)
       return () => {}
     }
   }, NS + ': dictionaries')
