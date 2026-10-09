@@ -118,20 +118,22 @@ jobs:
       contents: read
       id-token: write
     steps:
-      # D-10 (v18): the published bytes are the BASELINE artifacts validated by
-      # the `validate` job — the compat job only proves source compatibility
-      # against the released upstream tag and uploads a separate `-released`
-      # set. Comparing the two sets' tarball hashes is a deliberate follow-up
-      # (the audit's stronger option); until then this comment is the record of
-      # the chosen trade-off so the gap is not mistaken for full byte coverage.
+      # D-10 (v19): the published bytes are the `-released` set built and chain-validated by
+      # `compat-check` in THIS run — the same composite action the local gate runs, anchored on
+      # the released upstream tag. The v18 wording named a BASELINE set whose producing job was
+      # retired with the 0.1.5 line (`9e94073`); `publish` then downloaded a name no job uploads
+      # and failed only AFTER the release approval had been spent (v0.17.0-rc.1, 2026-10-09).
+      # `verify-release-artifacts.mjs` now pins the wiring: every name downloaded here must be
+      # produced in the same workflow. The publish job then re-audits the downloaded bytes
+      # (`audit-release-tarballs.mjs`) before they reach npm.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: evolution-dist-baseline
+          name: evolution-dist-released
           path: packages/evolution/dist
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: evolution-scripts-baseline
+          name: evolution-scripts-released
           path: packages/evolution/scripts
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -144,7 +146,7 @@ jobs:
         env:
           PLATFORM_FLOOR: ${{ env.PLATFORM_FLOOR }}
         run: |
-          # Last line of defence on the DOWNLOADED bytes (the baseline artifacts this job
+          # Last line of defence on the DOWNLOADED bytes (the released-anchor artifacts this job
           # publishes, not a fresh local pack): the same payload audit the build chain runs,
           # now against the exact tarballs npm is about to receive.
           node packages/evolution/scripts/audit-release-tarballs.mjs \

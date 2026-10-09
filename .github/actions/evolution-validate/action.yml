@@ -327,6 +327,10 @@ runs:
         node packages/evolution/scripts/verify-package-discovery.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-family-tool-names.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-skill-roots.mjs packages/evolution --strict
+        # The release wiring itself: every artifact `publish` downloads must be produced by a job
+        # in the same workflow (v0.17.0-rc.1 spent a human approval, then failed on `-baseline`,
+        # whose producing job had been retired). Walks up from the working directory for `.github`.
+        node packages/evolution/scripts/verify-release-artifacts.mjs --strict --self-test
 
     - name: Install smoke into a throwaway DSH_HOME (desktop plane)
       if: inputs.install_smoke == 'true'
