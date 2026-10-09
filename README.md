@@ -174,18 +174,12 @@ Three ways down, in increasing order of silence: **gate it** (`approval.enabled:
 gate = "≥3 tool calls **or** ≥200 user characters **or** ≥500 agent characters", curator due-ness 168 h.
 
 <details>
-<summary>Environment variables (complete list)</summary>
+<summary>Environment variables</summary>
 
-| Variable | Where read | Effect |
-|---|---|---|
-| `DSH_EVOLUTION_SESSION_QUERY` | profile config | `startup` / `first-search` / `never` (SQLite index openAt); invalid values normalize to `startup` |
-| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile config | durable index path; empty falls back to `$DSH_HOME/evolution/session-query.db` |
-| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | plugin code | `1` downgrades a preset delta-row collision from fail-loud to warn+keep-both |
-| `EVOLUTION_SCOPE` | source installers only | scope written into generated profile/preset rows; the plugin runtime never reads it |
-| `DSH_EVOLUTION_DELTA_PATH` | source installers only | overrides the agent-preset delta fragment the layered installer composes from |
-| `DSH_AGENT_PRESET_ROOT` | source installers only | overrides the `.agent-presets` root the preset variants install into; must exist when set |
-| `DSH_EVOLUTION_ARCH_STRICT` | guard scripts only | `1` makes the architecture-duplication guard fail loud (same as `--strict`) |
-| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | guard scripts only | `1` makes the declared-config-reach guard fail loud (same as `--strict`) |
+The complete list lives in ONE place: [`packages/README.md` § Environment variables](./packages/README.md) —
+every variable, the layer that reads it, its default, and its exact semantics. It is deliberately not restated
+here: the second copy is what let `DSH_AGENT_PRESET_ROOT` drift into describing an install destination instead
+of a directory holding the platform's `<base>.patch.yml` base patches.
 
 </details>
 

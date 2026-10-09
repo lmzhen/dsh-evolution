@@ -1,5 +1,5 @@
 /**
- * The approval HTTP surface: three loopback routes over the write gate's pending window.
+ * The approval HTTP surface: four loopback routes over the write gate's pending window.
  *
  * Layering: this module maps a route to a USE CASE and does nothing else. The pending window itself
  * (ids, statuses, claim/resolve rules, the replay runners) lives in this package's service and in
@@ -59,7 +59,7 @@ export interface ApprovalFace {
 }
 
 /**
- * Build the three routes over the approval service.
+ * Build the four routes over the approval service.
  * @param approval - the host's approval face (the service instance, or a spec fixture).
  * @returns the route list for `ctx.webServer.register`.
  */

@@ -95,5 +95,5 @@ name when it is unmet — the preset is never composed from another base:
 
 ## Notes and history
 
-- **Both install paths produce this variant** (0.3.75): `/evolution preset install --base ptc` (npm, `evolution-commands`) and `install-layered.mjs --base ptc` (source checkout) read the same `bases.json` and write `.agent-presets/evolution-ptc/`. It still only composes a platform that actually ships the `ptc` preset; a `standard`-only runtime is refused by name.
+- **Both install paths produce this variant** (0.3.75): `/evolution preset install --base ptc` (npm, `evolution-commands`) and `install-layered.mjs --base ptc` (source checkout) read the same `bases.json` and write the ptc row `preset-evolution-ptc` into the target profile's patch layer (0.2.x removed the `.agent-presets/` directory these paths used to write into). It still only composes a platform that actually ships the `ptc` preset; a `standard`-only runtime is refused by name.
 - The V10-14 `tool-skill` catalog-cap injection (`injectToolSkillCap`) runs on the composed output for every base, and the row-collision guard still fails loud when a delta row id appears in the platform composition.

@@ -57,14 +57,13 @@ there, never from npm:
 dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
 ```
 
-The agent preset is assembled by the installer (`install-layered.mjs`) or the
-host-runner's preset generation — V6-03 (0.3.34): do NOT hand-copy
-`evolution-agent/agent.cordis.yml` into `$DSH_HOME/.agent-presets/evolution/`.
-That file is a DELTA (4 model-tool rows, see its own header) and the
-`.agent-presets` discovery mounts whichever `agent.cordis.yml` it finds as the
-COMPLETE composition — a hand-copied delta would mount an agent missing every
-standard row. Use `dsh plugin add` + the installer (or copy only a
-standard+delta SYNTHESIZED composition when a manual path is truly needed).
+The agent preset is assembled by the installer (`install-layered.mjs`) or by
+`/evolution preset install`, and the result is ONE `- insert:` row in the target
+profile's own patch layer (`<home>/profiles/<profile>/cordis.patch.yml`).
+0.2.x removed the preset DIRECTORY: there is no `.agent-presets/` tree to hand-copy
+into any more, so the V6-03 hazard (a hand-copied DELTA mounting as the COMPLETE
+composition) cannot be triggered that way. The row-level detail has one home:
+`packages/INSTALL.md` § Layered install.
 The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
 which reads the same `evolution-agent/bases.json` table and generates one
 variant per named base in a single pass (each base's preset id and metadata
@@ -104,11 +103,12 @@ This performs:
    `<home>/profiles/<profile>/node_modules/@deepseek-ai/...`;
 2. adds `@deepseek-ai/dsh-evolution-host` to
    `<home>/profiles/<profile>/package.json` `dsh.profile.bundles`;
-3. copies the `Evolution` agent preset to
-   `<home>/.agent-presets/evolution/` (`--base ptc` installs the ptc variant to
-   `<home>/.agent-presets/evolution-ptc/` instead — the base names the runtime
-   platform composition and the installed directory, and the table behind both
-   is `evolution-agent/bases.json`).
+3. writes the `Evolution` agent-preset ROW into
+   `<home>/profiles/<profile>/cordis.patch.yml` as one `- insert:` block
+   (`--base ptc` writes the ptc variant's row `preset-evolution-ptc` instead — the
+   base names both the platform base patch the rows are read from and the row id,
+   and the table behind both is `evolution-agent/bases.json`; 0.2.x removed the
+   preset directory, so no `.agent-presets/` tree is produced).
 
 The copied scope comes from `EVOLUTION_SCOPE` (default `@deepseek-ai`, the
 overlay scope). With `EVOLUTION_SCOPE=@lmzhen` the installer reads the
@@ -134,8 +134,8 @@ Uninstall the layered layout while keeping user data:
 node packages/scripts/install-layered.mjs --profile web --mode layered --uninstall
 ```
 
-Only the profile rows, copied packages, and the agent preset directory are
-removed. Memory, skills, state, reports, and approval history remain.
+Only the profile rows (the agent preset is one of them) and the copied packages
+are removed. Memory, skills, state, reports, and approval history remain.
 
 **Boundary of this source-checkout path on a CLI-only host** (measured 2026-10-09): the
 installer copies the family's own 31 packages into the profile, so a row whose `name` points at
@@ -292,8 +292,9 @@ vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
 > against that stale checkout's copy, so a script change here is mirrored
 > there before a release (0.3.83 reconciled 58 drifted files).
 
-Uninstalling only removes the profile row or preset directory; memory, skills,
-state, reports, and approval history remain under `$DSH_HOME`.
+Uninstalling only removes the profile row (the agent preset is that row) and the
+copied packages; memory, skills, state, reports, and approval history remain
+under `$DSH_HOME`.
 
 ## Capability evolution (retired in 0.3.66)
 

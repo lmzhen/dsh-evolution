@@ -250,7 +250,7 @@ describe('approval routes: the preview', () => {
 })
 
 describe('approval routes: the browser half mirrors the host table', () => {
-  it('declares the same three literals under the same keys', () => {
+  it('declares the same four literals under the same keys', () => {
     // Read as SOURCE on purpose: the browser half cannot import this package at runtime, so the only
     // way a rename can be caught in CI is by comparing the two textual tables.
     const source = readFileSync(new URL('../../evolution-settings-ui/src/client/approval-routes.ts', import.meta.url), 'utf8')

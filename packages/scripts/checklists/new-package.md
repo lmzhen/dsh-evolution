@@ -8,10 +8,12 @@ Skeleton: `templates/package/package.json.tmpl`, `templates/package/src-index.ts
 - [ ] `packages/<pkg>/package.json`: name `@deepseek-ai/dsh-<pkg>` (publishing
       rewrites the scope to `@lmzhen`), the family `version`, `type: module`,
       the `repository` block every other manifest carries, `files` limited to
-      what ships. — *`normalize-mirror.mjs` aligns all 31 manifests (30
-      packages + the root) to the CHANGELOG head, and `verify-layout-sync.mjs`
-      fails any manifest that disagrees with it; that guard's other half
-      compares the two `scripts/` trees and runs only in the release chain.*
+      what ships. — *`normalize-mirror.mjs` aligns every package manifest plus
+      the root manifest to the CHANGELOG head (the count is deliberately not
+      written down here — it went stale once already), and
+      `verify-layout-sync.mjs` fails any manifest that disagrees with it; that
+      guard's other half compares the two `scripts/` trees and runs only in the
+      release chain.*
 - [ ] Every import has a declared dependency (`workspace:^` for family packages,
       `peerDependencies` for platform packages), and every declared dependency is
       imported. — *`verify-dependency-closure.mjs packages --strict` fails in both

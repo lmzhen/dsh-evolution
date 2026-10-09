@@ -133,18 +133,9 @@ doctor 的「参数面分歧」一节会报告两边不一致的地方。
 三种调低方式，按安静程度递增：**加闸门**（`approval.enabled: true`）、**停止评审**（`reviewEnabled: false`）、**缩到 M3**（完全没有模型工具）。几个容易让人意外的默认值：`reviewEnabled: true`、`reviewMode: 'inject'`、`reviewMemoryInterval = reviewSkillInterval = 10` 轮，substantive 门 =「≥3 次工具调用 **或** ≥200 个用户字符 **或** ≥500 个 agent 字符」，curator 到期间隔 168 h。
 
 <details>
-<summary>环境变量（完整清单）</summary>
+<summary>环境变量</summary>
 
-| 变量 | 在哪读 | 作用 |
-|---|---|---|
-| `DSH_EVOLUTION_SESSION_QUERY` | profile 配置 | `startup` / `first-search` / `never`（SQLite 索引 openAt）；非法值归一为 `startup` |
-| `DSH_EVOLUTION_SESSION_QUERY_PATH` | profile 配置 | 持久索引路径；空串回退到 `$DSH_HOME/evolution/session-query.db` |
-| `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` | 插件代码 | `1` 把预设 delta 行冲突从 fail-loud 降为 warn + 双行保留 |
-| `EVOLUTION_SCOPE` | 仅源码安装器 | 写进生成的 profile/preset 行的 scope；插件运行时不读它 |
-| `DSH_EVOLUTION_DELTA_PATH` | 仅源码安装器 | 覆盖 layered 安装器合成时读取的 agent-preset delta 片段 |
-| `DSH_AGENT_PRESET_ROOT` | 仅源码安装器 | 覆盖预设变体安装到的 `.agent-presets` 根目录；设置后该目录必须已存在 |
-| `DSH_EVOLUTION_ARCH_STRICT` | 仅守卫脚本 | `1` 让架构重复守卫 fail-loud（等同 `--strict`） |
-| `DSH_EVOLUTION_DECLARED_CONFIG_STRICT` | 仅守卫脚本 | `1` 让声明配置触达守卫 fail-loud（等同 `--strict`） |
+完整清单只有一个家：[`packages/README.md` 的 Environment variables 一节](./packages/README.md)——每个变量、读它的层、默认值、确切语义都在那里。这里刻意不复述：第二份副本正是 `DSH_AGENT_PRESET_ROOT` 漂移的原因（它指的是存放平台 `<base>.patch.yml` base patch 的目录，不是「预设安装目的地」）。
 
 </details>
 
