@@ -20,9 +20,9 @@ declare module '@deepseek-ai/dsh-llm' {
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampedNumber, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampOnce, pickWithPolicy, userSetKeys, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 // v37 P7a: the platform dispatch vocabulary is read in ONE place —
 // evolution-core's tool-dispatch module, which owns the event types, the
@@ -41,6 +41,25 @@ import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, 
 export { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 import { SessionScopedState } from './session-state.ts'
+
+/** Emit one `evolution/review-scheduled` inside its OWN protection domain (V8-03, V5-19③/F-334).
+ *
+ * Every delivery path must enter that domain, and five hand-copied try/emit/catch blocks had
+ * already drifted twice: V24-15 had to add the emit to two injection paths that never had it, and
+ * V25-02 fixed a cross-session attribution bug that lived in one of the copies. The fields, the
+ * channel and the domain now travel together.
+ * @param ctx - the plugin context the event is emitted on.
+ * @param event - the payload. `sessionId` is the session the review was scheduled FOR — on the
+ * deferred drain that is the entry's session, never the in-flight review's.
+ */
+function emitReviewScheduled(ctx: Context, event: EvolutionReviewScheduledEvent): void {
+  try {
+    ctx.emit('evolution/review-scheduled', event)
+  } catch (emitError) {
+    ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
+  }
+}
+
 
 /** S2-6 (FLOW1-1): the settle-grace margin a subagent handle gets beyond its
  * own deadline before the review abandons it. As the dispose watchdog's WHOLE
@@ -318,43 +337,6 @@ const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
 // curator's per-instance v14 flag (warn once per mount, again after re-mount).
 // A per-turn warn on an intentionally stateless deployment is still noise.
 
-/**
- * G3.1 (0.3.23): clamp one numeric review knob so a 0/negative/NaN/±Infinity value
- * falls back to the package default instead of folding as a "disabled" special value
- * (a 0 interval would fire a review every turn; NaN folds as NaN into the
- * cadence/timeout). The schema `.min(1)` guards the loader path; this clamp also
- * covers NaN/±Infinity (which schemastery lets a bare number schema through) and
- * programmatic assembly. `reviewMaxDepth` clamps to at least 1 because 0 is the
- * historical 0.3.1 maximum-depth defect (a 0 rejects the spawn outright). The warning
- * fires once per key: a live field is read at every use, so an assembly-time list
- * would repeat on each read.
- * @param warned - the keys this caller already warned about.
- * @param warn - the warning sink.
- * @param name - the config key, for the warning.
- * @param value - the value as supplied, or its volatile reference.
- * @param fallback - the package default a corrected value falls back to.
- * @param min - the smallest value the engine can act on.
- * @param max - the largest value the carrier can hold, when bounded.
- * @returns the value the engine may use.
- */
-function clampField(
-  warned: Set<string>,
-  warn: (message: string) => void,
-  name: string,
-  value: number | Volatile<number | undefined> | undefined,
-  fallback: number,
-  min: number,
-  max?: number,
-): number {
-  const current = typeof value === 'object' ? value.get() : value
-  const result = clampedNumber(current, fallback, max === undefined ? { min } : { min, max })
-  if (current !== undefined && result !== current && !warned.has(name)) {
-    warned.add(name)
-    warn(`${name} provided an invalid value; falling back to the default`)
-  }
-  return result
-}
-
 /** F5 (P2-16, v11): the clamp sets exactly these four numeric fields — the
  * old `as Required<Config>` lied about `reviewToolAllow` etc. being populated
  * (`[...undefined]` TypeErrors under a direct `apply(ctx, {})`).
@@ -380,7 +362,7 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
   const warned = new Set<string>()
   const warn = (message: string): void => { ctx.logger.warn('dsh-evolution-review: ' + message) }
   const field = (name: string, value: number | undefined, fallback: number, min: number, max?: number): number =>
-    clampField(warned, warn, name, value, fallback, min, max)
+    clampOnce(warned, warn, name, value, fallback, min, max)
   return Object.assign({}, rawConfig, {
     // B-2 (v18): the 32-bit ceiling is enforced here as well as in the schema
     // (the schema may be bypassed by a programmatic assembly; clampedNumber
@@ -436,10 +418,10 @@ export interface ReviewSettings {
 export function resolveReviewRowSettings(rawConfig: Config, warn: (message: string) => void): ReviewSettings {
   const warned = new Set<string>()
   return {
-    reviewSkillInterval: clampField(warned, warn, 'reviewSkillInterval', rawConfig.reviewSkillInterval?.get() ?? rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
-    reviewMemoryInterval: clampField(warned, warn, 'reviewMemoryInterval', rawConfig.reviewMemoryInterval?.get() ?? rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
+    reviewSkillInterval: clampOnce(warned, warn, 'reviewSkillInterval', rawConfig.reviewSkillInterval?.get() ?? rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+    reviewMemoryInterval: clampOnce(warned, warn, 'reviewMemoryInterval', rawConfig.reviewMemoryInterval?.get() ?? rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
     skillReviewTrigger: rawConfig.skillReviewTrigger?.get() ?? DEFAULT_SKILL_REVIEW_TRIGGER,
-    skillReviewCompletionMinToolCalls: clampField(warned, warn, 'skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
+    skillReviewCompletionMinToolCalls: clampOnce(warned, warn, 'skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
     reviewEnabled: rawConfig.reviewEnabled?.get() ?? true,
     reviewMode: rawConfig.reviewMode?.get() ?? 'inject',
     reviewWakeInject: rawConfig.reviewWakeInject?.get() ?? true,
@@ -543,18 +525,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const rowSettings = (): ReviewSettings =>
     resolveReviewRowSettings(rawConfig, (message) => { ctx.logger.warn('dsh-evolution-review: ' + message) })
-  /**
-   * The keys the user set in this row's namespace (G1 §8.4-A). This is the ONLY
-   * remaining read of the settings user layer, and it reads KEY NAMES, never values:
-   * the platform resolves the user layer into the row's live fields, so the value
-   * comes from `rowSettings()`.
-   * @returns the keys present in this row's user layer.
-   */
-  const userSetKeys = (): ReadonlySet<string> => {
-    const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
-    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('evolution-review'))
-    return new Set(Object.keys(entry?.user ?? {}))
-  }
+  // S2.9 (T3-10): the settings user layer is read through ONE core function
+  // (`userSetKeys`), which reads KEY NAMES and never values — the platform resolves the user
+  // layer into the row's live fields, so the value comes from `rowSettings()`.
   // G3/S3.1 + G1: the USER layer sits above the deployment carriers. `params()` is the
   // one reader of the review group's behaviour knobs: a key the user set (its value
   // arrived through the row's live field), then the policy snapshot, then this row —
@@ -562,13 +535,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // at USE time, so a committed settings change is live.
   const params = (): ReviewSettings => {
     const row = rowSettings()
-    const userSet = userSetKeys()
+    const userSet = userSetKeys(ctx, paramRowId('evolution-review'))
     const snapshot = policy()
-    // Only these three knobs have a policy carrier; the other four end at the row.
-    const pick = (key: 'reviewSkillInterval' | 'reviewMemoryInterval'): number => {
-      if (userSet.has(key)) return row[key]
-      return snapshot?.[key] ?? row[key]
-    }
+    // Only these three knobs have a policy carrier; the other four end at the row. The
+    // precedence itself is core's `pickWithPolicy` (ONE rule for both readers of the policy row).
+    const pick = (key: 'reviewSkillInterval' | 'reviewMemoryInterval'): number =>
+      pickWithPolicy(userSet, row, snapshot, key)
     const mode = (): 'subagent' | 'inject' => {
       if (userSet.has('reviewMode')) return row.reviewMode
       return snapshot?.reviewMode ?? row.reviewMode
@@ -604,7 +576,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     ['reviewMemoryInterval', 'memoryInterval'],
     ['reviewSkillInterval', 'skillInterval'],
   ] as const)
-    .filter(([id, alias]) => !userSetKeys().has(id) && rowSupplied(id, alias))
+    .filter(([id, alias]) => !userSetKeys(ctx, paramRowId('evolution-review')).has(id) && rowSupplied(id, alias))
     .map(([id]) => id)
   if (shadowedRowFields.length > 0) {
     let shadowWarned = false
@@ -667,12 +639,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // R2 (round-2 audit): pendingCadenceWarned is swept below but was not in
     // the trigger set — its entries lingered until another map crossed the
     // threshold.
+    // S2.9 (T3-11): ONE condition per swept map — the trigger list repeats each of the seven
+    // maps below and nothing else (cumulativeToolCalls was listed twice, a copy-paste residue that
+    // would have hidden a missing map behind a duplicate).
     const sweepDue = cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || dispatchDigest.size >= COUNTER_SWEEP_THRESHOLD
-      || pendingCadenceWarned.size >= COUNTER_SWEEP_THRESHOLD
-      || cumulativeToolCalls.size >= COUNTER_SWEEP_THRESHOLD
       || completionInjected.size >= COUNTER_SWEEP_THRESHOLD
       || pendingCadenceReviews.size >= COUNTER_SWEEP_THRESHOLD
+      || pendingCadenceWarned.size >= COUNTER_SWEEP_THRESHOLD
       || cadenceResetWarned.size >= COUNTER_SWEEP_THRESHOLD
       || pendingReviewNotices.size >= COUNTER_SWEEP_THRESHOLD
     if (sweepDue) {
@@ -891,18 +865,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // NOT emit `review-scheduled` — on the default inject-mode
           // deployment a consumer would have missed every cadence review.
           // Same protection domain as the emit below.
-          try {
-            ctx.emit('evolution/review-scheduled', {
-              sessionId: session.id,
-              kind: pendingKind,
-              toolCalls: signal.toolCalls,
-              userChars: signal.userChars,
-              assistantChars: signal.assistantChars,
-              channel: 'inject',
-            })
-          } catch (emitError) {
-            ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-          }
+          emitReviewScheduled(ctx, {
+            sessionId: session.id,
+            kind: pendingKind,
+            toolCalls: signal.toolCalls,
+            userChars: signal.userChars,
+            assistantChars: signal.assistantChars,
+            channel: 'inject',
+          })
         } else {
           const reviewOutcome = await trySubagentReview(session, agent, pendingKind, signal)
           if (reviewOutcome === true) {
@@ -911,18 +881,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // skip the counter reset below and re-deliver the same kind next
             // completed turn (the V7-04 double-delivery shape, entered via
             // the emit instead of the save).
-            try {
-              ctx.emit('evolution/review-scheduled', {
-                sessionId: session.id,
-                kind: pendingKind,
-                toolCalls: signal.toolCalls,
-                userChars: signal.userChars,
-                assistantChars: signal.assistantChars,
-                channel: 'subagent',
-              })
-            } catch (emitError) {
-              ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-            }
+            emitReviewScheduled(ctx, {
+              sessionId: session.id,
+              kind: pendingKind,
+              toolCalls: signal.toolCalls,
+              userChars: signal.userChars,
+              assistantChars: signal.assistantChars,
+              channel: 'subagent',
+            })
             // B 组：子代理通道没有「我的队列通知」可等 —— 复查已在子代理里跑完，窗口就在这里重启。
             // V8-03：这一句在 try/catch 之外，抛错的监听者跳不掉它（该用例钉的正是这一点）。
             await settleNotice(session.id, 'subagent-flush')
@@ -949,18 +915,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }
             // V24-15 (v24): the fallback inject previously did NOT emit —
             // unified with every other delivery path.
-            try {
-              ctx.emit('evolution/review-scheduled', {
-                sessionId: session.id,
-                kind: pendingKind,
-                toolCalls: signal.toolCalls,
-                userChars: signal.userChars,
-                assistantChars: signal.assistantChars,
-                channel: 'inject',
-              })
-            } catch (emitError) {
-              ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-            }
+            emitReviewScheduled(ctx, {
+              sessionId: session.id,
+              kind: pendingKind,
+              toolCalls: signal.toolCalls,
+              userChars: signal.userChars,
+              assistantChars: signal.assistantChars,
+              channel: 'inject',
+            })
           }
         }
         // B 组：这里不再清零。计数窗口由「未结通知」的生命周期驱动——被队列丢弃时立刻结清，
@@ -1050,19 +1012,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // V8-03 (0.3.48): protection domain (same as the flush emit above) — the
     // weaker form: the inject already happened, so a throwing listener only
     // surfaces a spurious review-error, but the family discipline applies.
-    try {
-      ctx.emit('evolution/review-scheduled', {
-        sessionId: session.id,
-        kind: 'skill',
-        toolCalls: signal.toolCalls,
-        userChars: signal.userChars,
-        assistantChars: signal.assistantChars,
-        // V24-15 (v24): the emitting delivery path, per the unified contract.
-        channel: 'completion',
-      })
-    } catch (emitError) {
-      ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-    }
+    emitReviewScheduled(ctx, {
+      sessionId: session.id,
+      kind: 'skill',
+      toolCalls: signal.toolCalls,
+      userChars: signal.userChars,
+      assistantChars: signal.assistantChars,
+      // V24-15 (v24): the emitting delivery path, per the unified contract.
+      channel: 'completion',
+    })
   }
 
   /** V7-03 (0.3.42): shared waking delivery — review prompts AND result
@@ -1703,22 +1661,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           else pendingCadenceReviews.set(entrySession, waitingKind)
           continue
         }
-        try {
-          // V25-02 (v25): attribute the emit to the ENTRY's session and use
-          // the ENTRY's captured count window — this drain runs inside the
-          // in-flight review's closure, whose session/signal belong to a
-          // different review.
-          ctx.emit('evolution/review-scheduled', {
-            sessionId: entrySession,
-            kind: waitingKind,
-            toolCalls: entryCounts.toolCalls,
-            userChars: entryCounts.userChars,
-            assistantChars: entryCounts.assistantChars,
-            channel,
-          })
-        } catch (emitError) {
-          ctx.logger.warn(`dsh-evolution-review: review-scheduled emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-        }
+        // V25-02 (v25): attribute the emit to the ENTRY's session and use
+        // the ENTRY's captured count window — this drain runs inside the
+        // in-flight review's closure, whose session/signal belong to a
+        // different review.
+        emitReviewScheduled(ctx, {
+          sessionId: entrySession,
+          kind: waitingKind,
+          toolCalls: entryCounts.toolCalls,
+          userChars: entryCounts.userChars,
+          assistantChars: entryCounts.assistantChars,
+          channel,
+        })
       }
     }
   }

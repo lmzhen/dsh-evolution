@@ -39,3 +39,38 @@ export function clampedNumber(value: number | undefined, fallback: number, opts?
   if (max !== undefined && value > max) return fallback
   return value
 }
+
+/**
+ * Clamp one numeric knob and warn ONCE per key.
+ *
+ * S2.9 (T3-10): `evolution-review` and `evolution-curator` each carried their own copy of this
+ * helper — their own once-per-key set and their own message — so the two settings readers of ONE
+ * policy row could drift apart. The logic lives here; each caller passes its own sink (and its own
+ * package prefix). A live field is read at every use, so the warning cannot be per-read.
+ *
+ * @param warned - the keys this caller already warned about.
+ * @param warn - the warning sink (each package prefixes its own name).
+ * @param name - the config key, for the warning.
+ * @param value - the value as supplied, or its volatile reference.
+ * @param fallback - the package default a corrected value falls back to.
+ * @param min - the smallest value the engine can act on.
+ * @param max - the largest value the carrier can hold, when bounded.
+ * @returns the value the engine may use.
+ */
+export function clampOnce(
+  warned: Set<string>,
+  warn: (message: string) => void,
+  name: string,
+  value: number | { get(): number | undefined } | undefined,
+  fallback: number,
+  min: number,
+  max?: number,
+): number {
+  const current = typeof value === 'object' ? value.get() : value
+  const result = clampedNumber(current, fallback, max === undefined ? { min } : { min, max })
+  if (current !== undefined && result !== current && !warned.has(name)) {
+    warned.add(name)
+    warn(`${name} provided an invalid value; falling back to the default`)
+  }
+  return result
+}

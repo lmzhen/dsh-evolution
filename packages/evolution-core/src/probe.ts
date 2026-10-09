@@ -92,3 +92,36 @@ export async function probeMtime(io: EvolutionIoLike, path: string): Promise<Pro
     return probeUnknown(probeReason(error))
   }
 }
+
+/** The timestamp a curator run report DECLARES: `startedAt` (the run's own start), then `at` (the
+ * stamp the error writer sets on every report — F-327/P2-4).
+ * @param parsed - the parsed report, or anything else.
+ * @returns epoch milliseconds, or null when neither field carries a parseable time.
+ */
+export function declaredReportStamp(parsed: unknown): number | null {
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const record = parsed as { startedAt?: unknown; at?: unknown }
+  for (const value of [record.startedAt, record.at]) {
+    if (typeof value !== 'string') continue
+    const ms = Date.parse(value)
+    if (Number.isFinite(ms)) return ms
+  }
+  return null
+}
+
+/** The time one curator run report is ordered by — ONE口径 for every reader (S2.9/T3-12): the
+ * declared stamp above, then the optional mtime probe as the fallback. `null` means "no usable
+ * time", and that single answer serves both consumers: such a report is never the LATEST (the
+ * panel) and is never DELETED (the retention sweep), which is exactly the pair of answers the two
+ * readers disagreed on when one ordered by the declared stamp and the other by mtime alone.
+ * @param io - the IO seam; a backend without `mtime` simply has no fallback.
+ * @param path - the report file the probe reads.
+ * @param parsed - the already-parsed report.
+ * @returns epoch milliseconds, or null.
+ */
+export async function reportTime(io: EvolutionIoLike, path: string, parsed: unknown): Promise<number | null> {
+  const declared = declaredReportStamp(parsed)
+  if (declared !== null) return declared
+  const probe = await probeMtime(io, path)
+  return isPresent(probe) ? probe.value : null
+}

@@ -1657,7 +1657,7 @@ Body of ${name}.
     ctx.evolutionCurator.stop()
   })
 
-  it('latestReport orders by file mtime, not by filename or startedAt (E-54)', { timeout: 20_000 }, async () => {
+  it('latestReport orders by the SAME report time the sweep uses, mtime only as the fallback (S2.9/T3-12, E-54)', { timeout: 20_000 }, async () => {
     const home = await tempHome('dsh-curator-latest-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
@@ -1672,11 +1672,11 @@ Body of ${name}.
       archived: [],
       failed: [],
     }
-    // Filename order ('aaaa' first) AND startedAt order ('aaaa' newer) both
-    // point at 'aaaa', but the mtime probe is the ordering authority (E-54):
-    // 'zzzz' carries the NEWER mtime, so latestReport must return it despite
-    // the lexicographic and startedAt disagreement (filenames are
-    // randomUUIDs — never chronological).
+    // E-54: filenames are randomUUIDs, never chronological. S2.9/T3-12: the ordering authority is
+    // the SAME time口径 the retention sweep applies (`reportTime` in core) — the declared
+    // `startedAt`/`at` first, the optional mtime probe only as the fallback. Ordering by mtime
+    // alone (the pre-fix behaviour) reported a later-STARTED run as older whenever its write
+    // landed earlier: two concurrent runs, or a copied report.
     const aPath = join(reportsRoot, 'curator-aaaa.json')
     const zPath = join(reportsRoot, 'curator-zzzz.json')
     await nodeEvolutionIo().writeText(aPath, JSON.stringify({ ...base, runId: 'startedat-new-but-mtime-old', startedAt: '2026-08-30T01:00:00.000Z', finishedAt: '2026-08-30T01:00:00.000Z' }))
@@ -1685,7 +1685,16 @@ Body of ${name}.
     await utimes(zPath, new Date('2026-08-30T00:00:00.000Z'), new Date('2026-08-30T00:00:00.000Z'))
     await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
     const report = await ctx.evolutionCurator.latestReport()
-    expect(report?.runId).toBe('mtime-new')
+    expect(report?.runId).toBe('startedat-new-but-mtime-old')
+    // The fallback is still the mtime: a pair that declares NO time at all is ordered by the
+    // probe, and the newer write wins.
+    const mPath = join(reportsRoot, 'curator-mmmm.json')
+    const nPath = join(reportsRoot, 'curator-nnnn.json')
+    await nodeEvolutionIo().writeText(mPath, JSON.stringify({ ...base, runId: 'no-stamp-old-mtime' }))
+    await nodeEvolutionIo().writeText(nPath, JSON.stringify({ ...base, runId: 'no-stamp-new-mtime' }))
+    await utimes(mPath, new Date('2026-09-05T00:00:00.000Z'), new Date('2026-09-05T00:00:00.000Z'))
+    await utimes(nPath, new Date('2026-09-06T00:00:00.000Z'), new Date('2026-09-06T00:00:00.000Z'))
+    expect((await ctx.evolutionCurator.latestReport())?.runId).toBe('no-stamp-new-mtime')
     ctx.evolutionCurator.stop()
   })
 
@@ -2246,7 +2255,9 @@ it('P2-4 (v38): a rejecting list/mtime probe cannot crash the report reader', { 
   const reports = join(home, 'evolution', 'reports')
   await mkdir(reports, { recursive: true })
   const base = nodeEvolutionIo()
-  await base.writeText(join(reports, 'curator-last.json'), JSON.stringify({ runId: 'r1', startedAt: '2026-09-11T00:00:00.000Z' }))
+  // S2.9 (T3-12): the mtime probe is the FALLBACK, so the hostile-probe fixture declares no time
+  // of its own — otherwise the declared stamp would answer without ever touching the probe.
+  await base.writeText(join(reports, 'curator-last.json'), JSON.stringify({ runId: 'r1' }))
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
   // The reader must stay a READER: a rejecting probe is contained and named,
@@ -2259,8 +2270,12 @@ it('P2-4 (v38): a rejecting list/mtime probe cannot crash the report reader', { 
   await ctx.plugin(EvolutionCurator, { enabled: false })
   const probeWarn = vi.spyOn(ctx.logger, 'warn')
   await expect(ctx.evolutionCurator.latestReport()).resolves.toBeNull()
-  expect(probeWarn.mock.calls.some(call => String(call[0]).includes('could not read a report mtime'))).toBe(true)
+  expect(probeWarn.mock.calls.some(call => String(call[0]).includes('found no usable report time'))).toBe(true)
   probeWarn.mockRestore()
+  // ...and the declared stamp does NOT need the probe at all: a report that declares its own
+  // `startedAt` is the latest even while every mtime read rejects.
+  await base.writeText(join(reports, 'curator-declared.json'), JSON.stringify({ runId: 'declared', startedAt: '2026-09-12T00:00:00.000Z' }))
+  await expect(ctx.evolutionCurator.latestReport()).resolves.toMatchObject({ runId: 'declared' })
   // The rejecting LISTING is the second read path of the same reader.
   const listCtx = new Context()
   await listCtx.plugin(EvolutionIoRegistry)

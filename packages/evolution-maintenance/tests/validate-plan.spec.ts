@@ -102,6 +102,26 @@ describe('validateAndNormalizeMaintainPlan', () => {
     ).ok).toBe(true)
   })
 
+  it('S2.9 (T3-05): an unknown signal on ONE skill does not force human review on a recommendation naming ANOTHER', () => {
+    // The retired findSignalInReport() answered with the library's first same-id signal and then
+    // the first one in the flattened skill list, so an item naming skill-b was judged by skill-a's
+    // unknown verdict — one fact, two answers, and the stricter one won.
+    const twoSkills: DriftReport = {
+      library: [{ id: 'usage_observed', verdict: 'pass', value: 'observed' }],
+      skills: [
+        { name: 'skill-a', signals: [{ id: 'quality_low', verdict: 'unknown', value: 'not-assessed' }] },
+        { name: 'skill-b', signals: [{ id: 'quality_low', verdict: 'pass', value: '0.80', threshold: '0.3' }] },
+      ],
+    }
+    const named = validItem({ names: ['skill-b'], evidence: [{ signal: 'quality_low', value: '0.80' }] })
+    const result = validateAndNormalizeMaintainPlan(validPlan([named]), twoSkills, SIGNALS)
+    expect(result.ok).toBe(true)
+    expect(result.plan.plan[0]?.needs_human).toBe(false)
+    // The gate still fires for the skill that actually carries the unknown verdict.
+    const carries = validItem({ names: ['skill-a'], evidence: [{ signal: 'quality_low', value: 'not-assessed' }] })
+    expect(validateAndNormalizeMaintainPlan(validPlan([carries]), twoSkills, SIGNALS).plan.plan[0]?.needs_human).toBe(true)
+  })
+
   it('accepts no_issues with an empty plan and rejects a non-empty one', () => {
     // V24-19 (v24): a no_issues verdict over over-signals now REQUIRES notes
     // (the silent-skip moved from the issues side to the no_issues side is

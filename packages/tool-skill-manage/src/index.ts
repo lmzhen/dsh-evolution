@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
@@ -555,18 +555,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     skillWriteConfirm: rawConfig.skillWriteConfirm?.get() ?? DEFAULT_WRITE_CONFIRM_MODE,
     skillWriteConfirmTimeoutSeconds: limit('skillWriteConfirmTimeoutSeconds', rawConfig.skillWriteConfirmTimeoutSeconds, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
   })
-  /**
-   * The keys the user set in this row's namespace (G1 §8.4-A). This is the ONLY
-   * remaining read of the settings user layer, and it reads KEY NAMES, never values:
-   * the platform resolves the user layer into the row's live fields, so the value
-   * comes from `rowSettings()`.
-   * @returns the keys present in this row's user layer.
-   */
-  const userSetKeys = (): ReadonlySet<string> => {
-    const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
-    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('tool-skill-manage'))
-    return new Set(Object.keys(entry?.user ?? {}))
-  }
+  // S2.9 (T3-10): the settings user-layer KEY read is ONE core function (`userSetKeys`); this row
+  // only names its own namespace. The review, curator and skill rows call the same reader.
   /**
    * G3/S3.4 + G1: the USER layer sits above the deployment carriers. `settings()` is
    * the one reader of this group's knobs — a key the user set (whose value arrived
@@ -578,7 +568,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const settings = (): SkillSettings => {
     const row = rowSettings()
     const stages = policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy')))
-    const userSet = userSetKeys()
+    const userSet = userSetKeys(ctx, paramRowId('tool-skill-manage'))
     // Only these two knobs have a policy stage; the rest end at the row.
     return {
       ...row,

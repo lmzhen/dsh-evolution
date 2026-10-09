@@ -7,7 +7,7 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { MemoryStoreOptions } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
@@ -273,26 +273,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // context. Queue both reads as one serialized step.
     renderContext: () => serializedWrite(() => currentStore().renderContext()),
   }
-  /**
-   * The keys the user set in this row's namespace (G1 §8.4-A). This is the ONLY
-   * remaining read of the settings user layer, and it reads KEY NAMES, never
-   * values: the platform resolves the user layer into the row's live fields, so the
-   * value comes from `budget` — but naming the winning surface needs to know
-   * whether the user set the key at all.
-   * @returns the keys present in this row's user layer.
-   */
-  const userSetKeys = (): ReadonlySet<string> => {
-    const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
-    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('memory-files'))
-    return new Set(Object.keys(entry?.user ?? {}))
-  }
+  // S2.9 (T3-10): the settings user-layer KEY read is ONE core function (`userSetKeys`); this row
+  // only names its own namespace. The review, curator and skill rows call the same reader.
   /**
    * Which surface supplied one budget.
    * @param id - the canonical registry id.
    * @returns 'user', 'config', 'policy' or 'default'.
    */
   const limitSource = (id: 'memoryChars' | 'userChars'): string => {
-    if (userSetKeys().has(id)) return 'user'
+    if (userSetKeys(ctx, paramRowId('memory-files')).has(id)) return 'user'
     if (explicitBudget(id)) return 'config'
     return (id === 'memoryChars' ? policyBudget().memory : policyBudget().user) === undefined ? 'default' : 'policy'
   }

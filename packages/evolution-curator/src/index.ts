@@ -24,8 +24,8 @@ import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deeps
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, probeMtime, releaseInstance, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, releaseInstance, reportTime, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -271,6 +271,8 @@ export class EvolutionCurator extends Service {
   private readonly bootGraceSeconds: number
   /** Keys whose supplied value had to be corrected; each warns once (G3.1). */
   private readonly clampedKeys = new Set<string>()
+  /** The clamp warning sink — the LOGIC lives in core's `clampOnce` (S2.9/T3-10), the prefix here. */
+  private readonly clampWarn = (message: string): void => { this.ctx.logger.warn('evolution-curator: ' + message) }
   private lastRun = 0
   private timer: NodeJS.Timeout | undefined
   /** B-8 (v18): set by the fiber disposer; a triggered autoCheck must not
@@ -363,7 +365,7 @@ export class EvolutionCurator extends Service {
     this.manageUnmanaged = config.manageUnmanaged ?? false
     this.pruneBuiltins = config.pruneBuiltins ?? false
     this.referencedSkillNames = new Set(config.referencedSkillNames ?? [])
-    this.bootGraceSeconds = this.clampOnce('bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0, 3600)
+    this.bootGraceSeconds = clampOnce(this.clampedKeys, this.clampWarn, 'bootGraceSeconds', config.bootGraceSeconds, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, 0, 3600)
     // A2-17 (v18): resolve the pair once at construction so a deployment that ships an
     // impossible pair is visible immediately. The correction itself has ONE home —
     // lifecycle(), which resolves the pair at USE time (G1 §8.3: no cached values).
@@ -411,24 +413,6 @@ export class EvolutionCurator extends Service {
   }
 
   /**
-   * Clamp one supplied numeric value, warning once per key (G3.1).
-   * @param key - the config key, for the warning.
-   * @param value - the value as supplied by the deployment or the user.
-   * @param fallback - the package default a corrected value falls back to.
-   * @param min - the smallest value the engine can act on.
-   * @param max - the largest value the carrier can hold, when bounded.
-   * @returns the value the engine may use.
-   */
-  private clampOnce(key: string, value: number | undefined, fallback: number, min: number, max?: number): number {
-    const result = clampedNumber(value, fallback, max === undefined ? { min } : { min, max })
-    if (value !== undefined && result !== value && !this.clampedKeys.has(key)) {
-      this.clampedKeys.add(key)
-      this.ctx.logger.warn(`evolution-curator: ${key} provided an invalid value; falling back to the default`)
-    }
-    return result
-  }
-
-  /**
    * One live numeric row field at USE time (G1 §8.3): the row config carries the
    * platform-resolved layers (schema default < bundle row < profile override) and the
    * field stays a live reference, so a committed edit applies without a watcher.
@@ -451,7 +435,7 @@ export class EvolutionCurator extends Service {
    * @returns the value the engine may use.
    */
   private rowNumber(key: CuratorLiveNumberKey, fallback: number, min: number, max?: number): number {
-    return this.clampOnce(key, this.liveNumber(key), fallback, min, max)
+    return clampOnce(this.clampedKeys, this.clampWarn, key, this.liveNumber(key), fallback, min, max)
   }
 
   /**
@@ -488,22 +472,6 @@ export class EvolutionCurator extends Service {
     }
   }
 
-  /**
-   * The keys the user set in this row's namespace (G1 §8.4-A).
-   *
-   * This is the ONLY remaining read of the settings user layer, and it reads KEY
-   * NAMES, never values: the platform resolves the user layer into the row config,
-   * so a value is needed from `config` — but the precedence rule (user > policy)
-   * needs to know WHICH keys the user set, or a deployment policy would silently
-   * override the user.
-   * @returns the keys present in this row's user layer.
-   */
-  private userSetKeys(): ReadonlySet<string> {
-    const settings = this.ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
-    const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('evolution-curator'))
-    return new Set(Object.keys(entry?.user ?? {}))
-  }
-
   /** The policy-snapshot carrier for this group (unmounted service = no policy). */
   private policyFields(): CuratorPolicyFields {
     const policy = this.ctx.get('evolutionPolicy') as { get(): CuratorPolicyFields | undefined } | undefined
@@ -522,14 +490,13 @@ export class EvolutionCurator extends Service {
   private settings(): CuratorSettings {
     const snapshot = this.policyFields()
     const row = this.rowSettings()
-    const userSet = this.userSetKeys()
-    const pick = <K extends keyof CuratorSettings>(key: K): CuratorSettings[K] => {
-      // A key the user set wins over the deployment policy (G1 §8.4-A); the VALUE
-      // comes from the row config, which already carries the user layer.
-      if (userSet.has(key)) return row[key]
-      const fromPolicy = snapshot[key as keyof CuratorPolicyFields]
-      return (fromPolicy ?? row[key]) as CuratorSettings[K]
-    }
+    // S2.9 (T3-10): the user-layer key set and the precedence rule are BOTH core functions now —
+    // the same two the review side calls — so one policy key cannot resolve two ways. A key the
+    // user set wins over the deployment policy (G1 §8.4-A); its VALUE comes from the row config,
+    // which already carries the user layer.
+    const userSet = userSetKeys(this.ctx, paramRowId('evolution-curator'))
+    const pick = <K extends keyof CuratorSettings>(key: K): CuratorSettings[K] =>
+      pickWithPolicy(userSet, row, snapshot as Partial<Record<K, CuratorSettings[K]>>, key)
     // A user value arrives as schemastery validated it, and NaN/±Infinity pass
     // that validation (G3.1 doctrine); falling back to the row value keeps a
     // malformed override from folding into a comparison or a timer.
@@ -1822,21 +1789,13 @@ export class EvolutionCurator extends Service {
       try {
         const raw = await this.io.readText(join(reportsRoot, name))
         if (raw === null) continue
-        const parsed = JSON.parse(raw) as { startedAt?: string; at?: string }
-        let startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN
-        // F-327: error reports (`curator-error-*.json`) carry no `startedAt`,
-        // so the old code never ordered them and the sweep kept them forever.
-        // Fall back to the file mtime (the write time) so they age into the
-        // retention window too and no longer accumulate unbounded.
-        if (!Number.isFinite(startedAt)) {
-          const probe = await probeMtime(this.io, join(reportsRoot, name))
-          if (isPresent(probe)) startedAt = probe.value
-        }
-        // P2-4 (v38): the mtime probe is OPTIONAL - without it the report stayed
-        // unorderable and was never recycled. The error writer stamps `at` on
-        // every report, so use it before giving up on the file.
-        if (!Number.isFinite(startedAt) && typeof parsed.at === 'string') startedAt = Date.parse(parsed.at)
-        if (Number.isFinite(startedAt)) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt })
+        // S2.9 (T3-12): the ordering time comes from ONE place (`reportTime` in core) — the
+        // declared `startedAt`, then the declared `at` (F-327/P2-4: error reports carry no
+        // `startedAt`, and the writer stamps `at` on every report), then the optional mtime probe.
+        // `latestReport` used the mtime ALONE, so the sweep's "newest" and the panel's "newest"
+        // could name different files.
+        const startedAt = await reportTime(this.io, join(reportsRoot, name), JSON.parse(raw))
+        if (startedAt !== null) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt })
         else if (!unorderableWarned) {
           // No usable timestamp at all: KEPT (never delete what we cannot
           // order), and said out loud once - this file escapes the window.
@@ -1882,28 +1841,36 @@ export class EvolutionCurator extends Service {
       return null
     }
     const names = (isPresent(listed) ? listed.value : []).filter(name => name.startsWith('curator-') && name.endsWith('.json') && !name.startsWith('curator-error-'))
-    // E-54: filenames carry randomUUIDs — lexicographic order is NOT
-    // chronological, and the old `.sort()` was a misleading no-op. Order by
-    // each file's mtime (the report write time, from the optional mtime probe);
-    // a report whose mtime is unavailable is never the latest (sorts last).
-    let latest: { name: string; mtime: number } | null = null
+    // E-54: filenames carry randomUUIDs — lexicographic order is NOT chronological, and the old
+    // `.sort()` was a misleading no-op. S2.9 (T3-12): the ordering time is the SAME one the
+    // retention sweep applies (`reportTime` in core) — the declared `startedAt`/`at` first, the
+    // optional mtime probe only as the fallback. Ordering by mtime alone let a later-started run
+    // with an earlier write (two concurrent runs, a copied report) be reported as older than the
+    // run the sweep would keep. A report with NO usable time is never the latest.
+    let latest: { name: string; at: number } | null = null
     let probeWarned = false
     for (const name of names) {
-      // mtime is an OPTIONAL probe (0.3.18, E-71): a backend without one
-      // reports null via the adapter — such a report is never the latest.
-      const probe = await probeMtime(this.io, join(reportsRoot, name))
-      if (isUnknown(probe)) {
-        // P2-4 (v38) / N14: a REJECTING probe is "unknown age" for this report
-        // only; warn once so the degradation is not silent.
+      const path = join(reportsRoot, name)
+      const raw = await this.io.readText(path)
+      if (raw === null) continue
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        // A damaged report is not a candidate; the tail read reports the same way.
+        continue
+      }
+      const at = await reportTime(this.io, path, parsed)
+      if (at === null) {
+        // P2-4 (v38) / N14: "unknown age" for this report only; warn once so the
+        // degradation is not silent.
         if (!probeWarned) {
           probeWarned = true
-          this.ctx.logger.warn(`evolution-curator: latestReport could not read a report mtime (${probe.reason}) - the affected report(s) are not eligible as the latest`)
+          this.ctx.logger.warn('evolution-curator: latestReport found no usable report time (neither a declared startedAt/at nor an mtime probe) - the affected report(s) are not eligible as the latest')
         }
         continue
       }
-      if (!isPresent(probe)) continue
-      const mtime = probe.value
-      if (latest === null || mtime > latest.mtime) latest = { name, mtime }
+      if (latest === null || at > latest.at) latest = { name, at }
     }
     if (latest === null) return null
     const raw = await this.io.readText(join(reportsRoot, latest.name))

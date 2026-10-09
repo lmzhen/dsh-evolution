@@ -369,10 +369,21 @@ export function validateAndNormalizeMaintainPlan(
   }
 
   for (const item of plan) {
-    const referencesUnknown = item.evidence.some((ev) => {
-      const signal = findSignalInReport(report, ev.signal)
-      return signal?.verdict === 'unknown'
+    // V46 S2.9 (T3-05): the unknown check reads the signals of the SKILLS THIS ITEM NAMES — the
+    // same granularity the quality_low gate above uses. `findSignalInReport` searched the library
+    // list first and then the FIRST same-id signal across all skills, so a recommendation naming
+    // skill B (quality_low = pass) was forced to human review by skill A's unknown signal: one
+    // fact, two answers, and the stricter one won. A library-level item (no names) still reads the
+    // library signals, which belong to no skill.
+    const unknownIn = (signals: ReadonlyArray<DriftSignal>): boolean =>
+      item.evidence.some(ev => findDriftSignal(signals, ev.signal)?.verdict === 'unknown')
+    const namedSkills = item.names.flatMap((name) => {
+      const skill = report.skills.find(candidate => candidate.name.trim() === name)
+      return skill === undefined ? [] : [skill]
     })
+    const referencesUnknown = namedSkills.length > 0
+      ? namedSkills.some(skill => unknownIn(skill.signals))
+      : unknownIn(report.library)
     const lowConfidence = item.confidence < 0.6
     const irreversible = item.reversibility === 'rename' || item.reversibility === 'none'
     if (!item.needs_human && (lowConfidence || irreversible || item.is_override || referencesUnknown)) {
@@ -381,11 +392,4 @@ export function validateAndNormalizeMaintainPlan(
   }
 
   return { ok: true, errors: [], plan: { verdict: verdict as MaintainVerdict, plan, notes }, forcedHuman }
-}
-
-function findSignalInReport(report: DriftReport, id: string): DriftSignal | undefined {
-  return (
-    report.library.find(signal => signal.id === id) ??
-    report.skills.flatMap(skill => skill.signals).find(signal => signal.id === id)
-  )
 }

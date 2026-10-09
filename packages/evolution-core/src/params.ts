@@ -333,6 +333,43 @@ export function paramSettingsId(owner: string): string | undefined {
  * @returns the entry id the platform reports for that row.
  * @throws when the owner publishes no user layer.
  */
+/** The keys the USER set in one row's settings namespace (G1 §8.4-A).
+ *
+ * The settings user layer is read in exactly ONE place, and it reads KEY NAMES, never values: the
+ * platform resolves the user layer into the row's live fields, so a value always comes from the
+ * row. The precedence rule (user > policy) needs to know WHICH keys the user set, or a deployment
+ * policy would silently override the user. S2.9 (T3-10): review and curator each had their own
+ * reader, so one key could be resolved two ways.
+ * @param ctx - the plugin context (a `get(name)` view is enough).
+ * @param rowId - the row's registry namespace (`paramRowId(<package>)`).
+ * @returns the keys present in that row's user layer.
+ */
+export function userSetKeys(ctx: { get(name: string): unknown }, rowId: string): ReadonlySet<string> {
+  const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
+  const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === rowId)
+  return new Set(Object.keys(entry?.user ?? {}))
+}
+
+/** ONE key's effective value, in the design's precedence (G1 §8.4-A): the user layer (whose value
+ * already arrived through the row's live field) → the deployment policy snapshot → the row itself.
+ * S2.9 (T3-10): both readers of the policy row resolve through this, so a new key cannot get one
+ * answer on the review side and another on the curator side.
+ * @param userSet - the keys the user set (see {@link userSetKeys}).
+ * @param row - the row's live fields.
+ * @param snapshot - the deployment policy snapshot, when a policy row is mounted.
+ * @param key - the key being resolved.
+ * @returns the effective value.
+ */
+export function pickWithPolicy<R extends object, K extends keyof R & string>(
+  userSet: ReadonlySet<string>,
+  row: R,
+  snapshot: Partial<Record<K, R[K]>> | undefined,
+  key: K,
+): R[K] {
+  if (userSet.has(key)) return row[key]
+  return snapshot?.[key] ?? row[key]
+}
+
 export function paramRowId(owner: string): string {
   const id = paramSettingsId(owner)
   if (id === undefined) throw new Error('no settings namespace registered for owner `' + owner + '` (add it to PARAM_NAMESPACES)')

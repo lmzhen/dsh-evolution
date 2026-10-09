@@ -219,6 +219,12 @@
  *       `getSnapshot` that builds an object per call never compares equal: React aborts the card
  *       (minified invariant #185) and the slot error boundary swaps it for an empty placeholder —
  *       which is how all five parameter cards disappeared on the 0.2.0 desktop.
+ *   N31. the settings USER LAYER is read in exactly ONE place: `evolution-core/src/params.ts`
+ *       (`userSetKeys(ctx, paramRowId(owner))`). A package that reads
+ *       `describe({ redactSecrets: false })` and takes `Object.keys(entry.user)` for itself holds a
+ *       second copy of a platform fact, and the precedence rule (user > policy > row) can then
+ *       resolve one key two ways — the four copies that had grown (review, curator, memory-files,
+ *       tool-skill-manage) each carried their own clamp-and-warn helper beside them too.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -322,6 +328,16 @@ function namespaceSplits(text) {
   const out = []
   for (const match of text.matchAll(/export const ([A-Z_]+_SETTINGS_NAMESPACE)[\s]*=/g)) out.push(match[1])
   for (const match of text.matchAll(/[\?][\?][\s]*([A-Z_]+_SETTINGS_NAMESPACE)/g)) out.push(match[1] + ' (fallback)')
+  return out
+}
+/**
+ * N31: a settings USER-LAYER key read outside evolution-core.
+ * @param text - one file's source.
+ * @returns the offending excerpt, one entry per read.
+ */
+function settingsUserLayerReads(text) {
+  const out = []
+  for (const match of text.matchAll(/Object\.keys\([A-Za-z_$][\w$]*\?\.user \?\? \{\}\)/g)) out.push(match[0])
   return out
 }
 const APPROVAL_SRC = 'evolution-approval/src'
@@ -593,6 +609,7 @@ const RULES = [
   { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)', incident: 'a node builtin import or a write call inside a client half', canonicalForm: 'client halves stay pure: no builtins, no writes', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N29', title: 'a client entry reads a platform service through a callable probe', incident: 'a direct property read of a platform service in a client entry', canonicalForm: 'the read goes through a callable probe', vacuity: 'no client entry in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N30', title: 'an observable source has one owner; hooks carry references', incident: 'an inline source object built per render, or a hook returning a fresh reference', canonicalForm: 'one owner per source and stable references from hooks', vacuity: 'no observable source in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N31', title: 'the settings user layer is read once, in evolution-core', incident: 'a package reading the settings user layer itself and taking its key names, so one key resolves two ways', canonicalForm: 'userSetKeys(ctx, paramRowId(owner)) is the only reader; consumers pass their own row id', vacuity: 'no user-layer read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
 ]
 
 /** Guards whose vacuum face is known and NOT yet handled: a registered, expiring debt.
@@ -1212,6 +1229,12 @@ function walk(dir) {
           violations.push(`${rel}: settings namespace spelled here (${split}) — the owner → namespace map in evolution-core owns it (rule N22); read it with paramNamespace(owner)`)
         }
       }
+      // N31 (S2.9/T3-10): the settings user layer has ONE reader — see the docblock.
+      if (rel.includes('/src/') && rel !== `${CORE_SRC}/params.ts`) {
+        for (const read of settingsUserLayerReads(text)) {
+          violations.push(`${rel}: reads the settings user layer here (${read}) — evolution-core's params.ts owns that read (rule N31); call userSetKeys(ctx, paramRowId(<owner>))`)
+        }
+      }
       // N23 (C5/B13, 0.8.0): raw durable-file writes live in the IO seam — see docblock.
       if (rel.includes('/src/') && !IO_SEAM_WRITERS.has(rel) && !RAW_WRITE_REGISTER.has(rel)) {
         for (const api of fsWriteImports(text)) {
@@ -1363,6 +1386,9 @@ if (process.argv.includes('--list-rules')) {
       && errorCodeLiterals("throw new Error(\"E-301: approval service not mounted\")").length === 1
       && errorCodeLiterals('// prose: this branch answers E-305 the same way').length === 0
       && errorCodeLiterals("const ok = errorText('e-305-this-invocation-carries-no')").length === 0],
+    ['N31', () => settingsUserLayerReads('return new Set(Object.keys(entry?.user ?? {}))').length === 1
+      && settingsUserLayerReads("const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('x'))").length === 0
+      && settingsUserLayerReads('// prose: the user layer is read once, in core').length === 0],
     ['N22', () => namespaceSplits("export const CURATOR_SETTINGS_NAMESPACE = 'evolution-curator'").length === 1
       && namespaceSplits("PARAM_NAMESPACES['evolution-curator'] ?? CURATOR_SETTINGS_NAMESPACE").length === 1
       && namespaceSplits("const ns = paramNamespace('evolution-curator')").length === 0
