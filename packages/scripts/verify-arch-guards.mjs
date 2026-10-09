@@ -475,6 +475,83 @@ const DURABLE_READ_RE = /\b(?:readFile|readdir|statSync|readText|list|listFiles)
 // The register stays EMPTY on purpose: it is a defect list, and the whole list
 // landed. A new entry means a new two-state read — migrate it, do not grow this.
 const SWALLOW_CATCH = new Map([])
+/** N3 (gate): bare `z.number()` config fields with no bound, one finding per line.
+ * Single-line scanning on purpose (the boundary note lives at the call site): a
+ * chained `.min()` on the next line is not consulted.
+ * @param text - the file's source.
+ * @returns the offending line numbers.
+ */
+function unclampedNumericFieldLines(text) {
+  const found = []
+  const lines = text.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i += 1) {
+    const code = (lines[i] ?? '').replace(/\/\/.*$/, '').trim()
+    if (!/z\.number\(\)/.test(code)) continue
+    if (/\.(?:min|max|finite|nonnegative)\(/.test(code)) continue
+    found.push(i + 1)
+  }
+  return found
+}
+
+/** N6: what a composition bundle file carries besides imports, re-exports and `export {}`.
+ * @param text - the file's source.
+ * @returns the residue (empty string when the file is composition only).
+ */
+function bundleRuntimeResidue(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '')
+    .replace(/import\s+(?:type\s+)?[\s\S]*?from\s*['"][^'"]+['"];?/g, '')
+    .replace(/export\s+(?:type\s+)?[\s\S]*?from\s*['"][^'"]+['"];?/g, '')
+    .replace(/export\s*\{\s*\};?/g, '')
+    .trim()
+}
+
+/** H2 (v11): probed evolution service keys with no provider anywhere (the P0-1 class).
+ * @param probed - the keys the tree probes.
+ * @param provided - the keys some package provides.
+ * @returns the ghost keys.
+ */
+function ghostServiceKeys(probed, provided) {
+  return [...probed].filter(key => !provided.has(key))
+}
+
+/** N8 (v37 S2.1 / I-3): is this package an `./invariant` companion nobody mounts?
+ * The scan supplies the facts; the decision lives here so it can be self-tested.
+ * @param hasSrcInvariant - `src/invariant.ts` exists.
+ * @param manifestPublishes - the manifest publishes `./invariant`.
+ * @returns true when the package would be reported.
+ */
+function isInvariantCompanion(hasSrcInvariant, manifestPublishes) {
+  return hasSrcInvariant || manifestPublishes
+}
+
+/** N10 (v39, S3.4 rule 4): new platform-service probes in a file that carries no anchor.
+ * The file-level exemption is a `platform` mention (the docblock owns the rationale).
+ * @param text - the file's source.
+ * @param rel - the tree-relative path.
+ * @param baseline - how many probes this file is already recorded as carrying.
+ * @returns the number of unanchored probes.
+ */
+function unanchoredPlatformProbes(text, rel, baseline) {
+  const sites = (text.match(PLATFORM_GET_RE) ?? []).length
+  if (!rel.includes('/src/') || sites <= baseline || /platform/i.test(text)) return 0
+  return sites - baseline
+}
+
+/** N11 (v37 P7a): dispatch-vocabulary sites in a file that is not the guard module.
+ * Prose is inert: comments are stripped, and only string literals short enough to BE
+ * an event type survive (longer ones are prompt text that merely mentions a type).
+ * @param text - the file's source.
+ * @returns the matched fragments.
+ */
+function dispatchVocabularySites(text) {
+  const code = text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '')
+    .replace(/(['"`])(?:\\.|(?!\1)[^\\\n])*\1/g, match => match.length <= 40 ? match : '""')
+  return [...code.matchAll(DISPATCH_EVENT_TYPE_RE)].map(match => match[0])
+}
 /** Rule registry (append-only; --list-rules prints it and the docblock must match). */
 /** Rule registry (append-only; --list-rules prints it and the docblock must match).
  * Every entry carries its own contract: `incident` (the shape the rule exists for),
@@ -483,17 +560,17 @@ const SWALLOW_CATCH = new Map([])
  * startup self-test below covers it; `sample: pending` with a `sampleExpiry` is a
  * registered, expiring debt — never a silent pass (the F-103 class, one level up). */
 const RULES = [
-  { id: 'N1', title: 'DSH_HOME single source (evolution-core/src only)', incident: 'a second file reads env.DSH_HOME and the home path forks silently', canonicalForm: 'only evolution-core resolves the home; every other package takes it from the seam', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N2', title: 'ApprovalPolicyLike / effectiveSessionPolicy single-sourced in evolution-approval', incident: 'effectiveSessionPolicy re-implemented outside evolution-approval', canonicalForm: 'one definition in evolution-approval; other packages import it', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N3', title: 'Config numeric fields carry a value clamp', incident: 'a z.number() config field with no bound, so an out-of-range value lands', canonicalForm: 'clampedNumber(min, max) or explicit .min/.max on every numeric config field', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'H2', title: 'no ghost evolution* service key (probe without provider)', incident: 'a probe for an evolutionX service key with no provider registered anywhere: a silent absent', canonicalForm: 'every probed evolution* key has a provider registration somewhere in the tree', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N5', title: 'evolution-core imports only the L0 seams', incident: 'evolution-core importing an L1 package (layer inversion)', canonicalForm: 'evolution-core imports only its L0 seams', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N6', title: 'composition bundles carry no runtime code', incident: 'a composition bundle shipping runtime code', canonicalForm: 'bundles are composition only (patch rows and preset rows)', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N7', title: 'new SkillLibrary() only through the core helper', incident: 'a package constructing SkillLibrary directly: a second construction path', canonicalForm: 'construction goes through the helper exported by evolution-core', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N8', title: 'no unpublished ./invariant companion', incident: 'an ./invariant subpath that the published manifest does not declare', canonicalForm: 'every exported subpath is declared and published', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N9', title: 'format-control classes built from FORMAT_CONTROL_CLASS', incident: 'a literal format-control class string', canonicalForm: 'classes come from FORMAT_CONTROL_CLASS', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N10', title: 'new platform-service probe carries a declaration anchor', incident: 'a new ctx.get(<platform service>) with no CONTRACT_ANCHORS entry', canonicalForm: 'each platform probe carries an anchor in the contract probe table', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
-  { id: 'N11', title: 'ONE reader for the platform dispatch vocabulary', incident: 'a second reader of the dispatch kind vocabulary', canonicalForm: 'one module owns the vocabulary and everyone else imports it', vacuity: 'pending: a detector sample asserting the incident shape is owed', sample: 'pending', sampleExpiry: 'S1.2' },
+  { id: 'N1', title: 'DSH_HOME single source (evolution-core/src only)', incident: 'a second file reads env.DSH_HOME and the home path forks silently', canonicalForm: 'only evolution-core resolves the home; every other package takes it from the seam', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N2', title: 'ApprovalPolicyLike / effectiveSessionPolicy single-sourced in evolution-approval', incident: 'effectiveSessionPolicy re-implemented outside evolution-approval', canonicalForm: 'one definition in evolution-approval; other packages import it', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N3', title: 'Config numeric fields carry a value clamp', incident: 'a z.number() config field with no bound, so an out-of-range value lands', canonicalForm: 'clampedNumber(min, max) or explicit .min/.max on every numeric config field', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'H2', title: 'no ghost evolution* service key (probe without provider)', incident: 'a probe for an evolutionX service key with no provider registered anywhere: a silent absent', canonicalForm: 'every probed evolution* key has a provider registration somewhere in the tree', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N5', title: 'evolution-core imports only the L0 seams', incident: 'evolution-core importing an L1 package (layer inversion)', canonicalForm: 'evolution-core imports only its L0 seams', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N6', title: 'composition bundles carry no runtime code', incident: 'a composition bundle shipping runtime code', canonicalForm: 'bundles are composition only (patch rows and preset rows)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N7', title: 'new SkillLibrary() only through the core helper', incident: 'a package constructing SkillLibrary directly: a second construction path', canonicalForm: 'construction goes through the helper exported by evolution-core', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N8', title: 'no unpublished ./invariant companion', incident: 'an ./invariant subpath that the published manifest does not declare', canonicalForm: 'every exported subpath is declared and published', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N9', title: 'format-control classes built from FORMAT_CONTROL_CLASS', incident: 'a literal format-control class string', canonicalForm: 'classes come from FORMAT_CONTROL_CLASS', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N10', title: 'new platform-service probe carries a declaration anchor', incident: 'a new ctx.get(<platform service>) with no CONTRACT_ANCHORS entry', canonicalForm: 'each platform probe carries an anchor in the contract probe table', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
+  { id: 'N11', title: 'ONE reader for the platform dispatch vocabulary', incident: 'a second reader of the dispatch kind vocabulary', canonicalForm: 'one module owns the vocabulary and everyone else imports it', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
   { id: 'N12', title: 'module-scope mutable process state is registered', incident: 'module-scope mutable state with no registration', canonicalForm: 'registered with owner, lifetime and evidence', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
   { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
   { id: 'N13b', title: 'wake primitive called on its receiver', incident: 'the wake primitive detached (destructured or aliased) and then called', canonicalForm: 'the wake primitive is called on its receiver: agent.followup(message)', vacuity: 'proven by its detector sample at the startup self-test', sample: 'detector' },
@@ -956,15 +1033,9 @@ function walk(dir) {
       // `z.number()` in prose still flags). The repo's current single-line
       // style keeps both at zero; change the scanning if the style changes.
       if (rel.includes('/src/')) {
-        // Split on CRLF so `\r` is not left on the line end — otherwise the
-        // comment strip below (`/\/\/.*$/`) cannot match a `//` comment on a
-        // CRLF source file, and prose mentioning `z.number()` would be flagged.
-        const lines = text.split(/\r?\n/)
-        for (let i = 0; i < lines.length; i += 1) {
-          const code = (lines[i] ?? '').replace(/\/\/.*$/, '').trim()
-          if (!/z\.number\(\)/.test(code)) continue
-          if (/\.(?:min|max|finite|nonnegative)\(/.test(code)) continue
-          violations.push(`${rel}:${i + 1}: numeric field without a value clamp (route through clampedNumber + a .min/.max schema bound)`)
+        // The line scan (and its single-line boundary) lives in unclampedNumericFieldLines.
+        for (const line of unclampedNumericFieldLines(text)) {
+          violations.push(`${rel}:${line}: numeric field without a value clamp (route through clampedNumber + a .min/.max schema bound)`)
         }
       }
       // N5 (v39): kernel import direction.
@@ -978,14 +1049,7 @@ function walk(dir) {
       // `export {}`. The invariant.ts exclusion was dropped once I-3 (S2.1)
       // deleted the 29 empty installers.
       if (BUNDLE_PKGS.has(rel.split('/')[0] ?? '') && rel.includes('/src/')) {
-        const rest = text
-          .replace(/\/\*[\s\S]*?\*\//g, '')
-          .replace(/^[ \t]*\/\/.*$/gm, '')
-          .replace(/import\s+(?:type\s+)?[\s\S]*?from\s*['"][^'"]+['"];?/g, '')
-          .replace(/export\s+(?:type\s+)?[\s\S]*?from\s*['"][^'"]+['"];?/g, '')
-          .replace(/export\s*\{\s*\};?/g, '')
-          .trim()
-        if (rest !== '') {
+        if (bundleRuntimeResidue(text) !== '') {
           violations.push(`${rel}: composition bundle carries runtime code (bundles own YAML rows only)`)
         }
       }
@@ -995,10 +1059,9 @@ function walk(dir) {
       }
       // N10 (v39, S3.4 rule ④): new platform service probe — see docblock.
       {
-        const sites = (text.match(PLATFORM_GET_RE) ?? []).length
-        const base = PLATFORM_GET_BASELINE.get(rel) ?? 0
-        if (rel.includes('/src/') && sites > base && !/platform/i.test(text)) {
-          violations.push(`${rel}: ${sites - base} new ctx.get('<platform service>') probe(s) with no platform-declaration anchor in the file (cite the platform declaration; baseline lives in PLATFORM_GET_BASELINE)`)
+        const unanchored = unanchoredPlatformProbes(text, rel, PLATFORM_GET_BASELINE.get(rel) ?? 0)
+        if (unanchored > 0) {
+          violations.push(`${rel}: ${unanchored} new ctx.get('<platform service>') probe(s) with no platform-declaration anchor in the file (cite the platform declaration; baseline lives in PLATFORM_GET_BASELINE)`)
         }
       }
       // N11 (v37 P7a): ONE reader for the platform dispatch vocabulary — see
@@ -1006,14 +1069,7 @@ function walk(dir) {
       // inert, so the raw text is stripped first; a match therefore means the
       // file really compares or passes a dispatch event type.
       if (rel !== DISPATCH_GUARD_MODULE && !DISPATCH_GUARD_TEST_SUFFIXES.some(suffix => rel.endsWith(suffix))) {
-        const code = text
-          .replace(/\/\*[\s\S]*?\*\//g, '')
-          .replace(/^[ \t]*\/\/.*$/gm, '')
-          // Keep only string literals short enough to BE an event type; longer
-          // ones are prose (prompt text, messages) that can mention a type
-          // without matching on it.
-          .replace(/(['"`])(?:\\.|(?!\1)[^\\\n])*\1/g, match => match.length <= 40 ? match : '""')
-        const sites = (code.match(DISPATCH_EVENT_TYPE_RE) ?? []).length
+        const sites = dispatchVocabularySites(text).length
         if (sites > 0) {
           violations.push(`${rel}: ${sites} platform dispatch event-type match(es) outside ${DISPATCH_GUARD_MODULE} (one vocabulary per dispatch mode; match ToolDispatchSignal.kind instead)`)
         }
@@ -1163,6 +1219,39 @@ if (process.argv.includes('--list-rules')) {
   }
 
   const detectors = [
+    // F1 discipline: every sample asserts the INCIDENT shape(s) the rule exists for
+    // AND at least one clean shape it must not bite (see the N13b note below).
+    ['N1', () => DSH_HOME_RE.test('const home = process.env.DSH_HOME')
+      && DSH_HOME_RE.test('const home = process.env[\'DSH_HOME\']')
+      && !DSH_HOME_RE.test('const home = resolveDshHome(options)')],
+    ['N2', () => COPY_RE.test('interface ApprovalPolicyLike {')
+      && COPY_RE.test('function effectiveSessionPolicy(config) {')
+      && !COPY_RE.test('import type { ApprovalPolicyLike } from \'@deepseek-ai/dsh-evolution-approval\'')],
+    ['N3', () => unclampedNumericFieldLines('const a = z.number()').length === 1
+      && unclampedNumericFieldLines('const b = z.number().min(1).max(9)').length === 0
+      && unclampedNumericFieldLines('// prose: z.number() with no bound').length === 0],
+    ['H2', () => ghostServiceKeys(['evolutionReview'], new Set()).length === 1
+      && ghostServiceKeys(['evolutionIo'], new Set(['evolutionIo'])).length === 0],
+    ['N5', () => [...'import x from \'@deepseek-ai/dsh-evolution-review\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 1
+      && [...'import x from \'@deepseek-ai/dsh-evolution-state-storage\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 0],
+    ['N6', () => bundleRuntimeResidue('import x from \'y\'\nexport {}') === ''
+      && bundleRuntimeResidue('export const LOADER = 1') !== ''
+      && bundleRuntimeResidue('// prose only\nexport * from \'y\'') === ''],
+    ['N7', () => SKILL_LIBRARY_RE.test('const lib = new SkillLibrary({ root })')
+      && !SKILL_LIBRARY_RE.test('const lib = newSkillLibrary({ root })')],
+    ['N8', () => isInvariantCompanion(true, false) && isInvariantCompanion(false, true) && !isInvariantCompanion(false, false)],
+    ['N9', () => [...'new RegExp(`[\\p{Cf}]`)'.matchAll(REGEXP_CLASS_RE)].length === 1
+      && FORMAT_CLASS_TOKEN_RE.test('\\p{Cf}')
+      && !FORMAT_CLASS_TOKEN_RE.test('a-z0-9')
+      && [...'new RegExp(`[FORMAT_CONTROL_CLASS]`)'.matchAll(REGEXP_CLASS_RE)].length === 1],
+    ['N10', () => unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 0) === 1
+      && unanchoredPlatformProbes('// platform-declaration anchor: tools\nctx.get(\'tools\')', 'pkg/src/a.ts', 0) === 0
+      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 1) === 0
+      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/tests/a.ts', 0) === 0],
+    ['N11', () => dispatchVocabularySites('if (event.type === \'tool/call\') return').length === 1
+      && dispatchVocabularySites('// prose: tool/call is the dispatch type').length === 0
+      && dispatchVocabularySites('const label = \'a long prose string that happens to mention tool/call inside it\'').length === 0
+      && dispatchVocabularySites('if (kind === NATIVE_CALL_EVENT) return').length === 1],
     ['N16', () => scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name)").length === 1
       && scopeLessReadKeys("const r = ctx.get('tools')\nr.get(name, scope)").length === 0
       && scopeLessReadKeys("const c = ctx.get('skills')\nc.list({ scope })").length === 0
@@ -1370,8 +1459,10 @@ let writeInventoryCount = 0
     const dir = join(root, entry.name)
     const manifestPath = join(dir, 'package.json')
     const hasManifest = existsSync(manifestPath)
-    if (existsSync(join(dir, 'src', 'invariant.ts'))
-      || (hasManifest && manifestPublishesInvariant(manifestPath, entry.name))) {
+    if (isInvariantCompanion(
+      existsSync(join(dir, 'src', 'invariant.ts')),
+      hasManifest && manifestPublishesInvariant(manifestPath, entry.name),
+    )) {
       companionPackages.push(entry.name)
     }
     if (hasManifest) manifestsRead += 1
@@ -1386,7 +1477,7 @@ let writeInventoryCount = 0
 
 // H2 (v11): a probed evolution service key without ANY provider is the
 // P0-1 class (doctor's evolutionReview ghost) — fail the gate.
-const orphanKeys = [...probedEvolutionKeys].filter(key => !providedEvolutionKeys.has(key))
+const orphanKeys = ghostServiceKeys(probedEvolutionKeys, providedEvolutionKeys)
 if (orphanKeys.length > 0) {
   violations.push(`ghost service key(s) probed but never provided: ${orphanKeys.join(', ')} (an evolution service key with zero providers makes a diagnosis silently lie)` )
 }
@@ -1498,8 +1589,11 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  const uncovered = RULES.filter(entry => entry.sample !== 'detector')
-if (uncovered.length > 0) console.log(`verify-arch-guards: rule self-test coverage ${RULES.length - uncovered.length}/${RULES.length} — pending: [${uncovered.map(entry => entry.id).join(', ')}] (expiry: ${uncovered.map(entry => entry.sampleExpiry).join(', ')})`)
+  const uncovered = RULES.filter(entry => entry.sample !== 'detector').map(entry => entry.id)
+if (uncovered.length > 0) {
+  console.error(`verify-arch-guards: ${uncovered.length} rule(s) still owe a detector sample: [${uncovered.join(', ')}] — a rule whose detector is never proven is worse than no rule`)
+  process.exit(1)
+}
 console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), no literal type/colour in the client halves (N24), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), every client entry reads its platform seats through a callable probe (N29) and builds its observable source in the one owner module (N30), ${docFactSummary})`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
