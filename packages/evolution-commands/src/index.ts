@@ -1053,7 +1053,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
           return ok(renderDoctorText(report))
         }
-        return ok(`自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。\n${renderHelpText()}`)
+        // T4-03 (P2): an UNMATCHED subcommand is an error. The old fallback answered
+        // `kind: 'success'` with the full help text, so `/evolution approve` (no id),
+        // `/evolution skill` and `/evolution params --group` all read as successful commands — the
+        // same silent-success shape `/evolution maintain --bogus` already refuses. Only the bare
+        // command (and an explicit `help`) answer with the list, and they still answer success.
+        if (input === '' || input === 'help') {
+          return ok(`自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。\n${renderHelpText()}`)
+        }
+        return err(`/evolution ${input} is not a subcommand this build answers (a known subcommand whose argument is missing lands here too).\n${renderHint()}`)
       },
       handler: (invocation: CommandInvocation): Promise<CommandResult> =>
         evolutionCommand.run(invocation).catch((error: unknown): CommandResult => ({

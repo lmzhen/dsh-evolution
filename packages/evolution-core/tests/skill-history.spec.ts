@@ -600,10 +600,10 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
         if (path === file) throw Object.assign(new Error('EIO: injected read failure'), { code: 'EIO' })
         return await real.readText(path)
       },
-      copy: async (from: string, to: string) => { copies.push(to); await real.writeText(to, unreadable) },
+      copy: async (_from: string, to: string) => { copies.push(to); await real.writeText(to, unreadable) },
     }
     await real.writeText(file, unreadable)
-    const recorded = await recordVersions(root, io, { skillName: 'my-skill', before: null, after: 'Body v2' }, 5)
+    const recorded = await recordVersions(root, io, { skillName: 'my-skill', action: 'update', before: null, after: 'Body v2', at: 'T1' }, 5)
     // The record is ABANDONED (the mutation stands), never derived from an empty read.
     expect(recorded).toBeNull()
     // The rescue copy was attempted...

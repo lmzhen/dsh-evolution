@@ -976,6 +976,27 @@ describe('evolution-commands', () => {
     expect(help.text).toContain('maintain [--timeout=<ms> | --facts]')
   })
 
+  it('T4-03: an unknown subcommand (or a known one missing its argument) answers ERROR, not a successful help dump', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    await ctx.plugin(Commands)
+    // The bare command still documents itself, and so does an explicit `help`.
+    for (const rawInput of ['', 'help']) {
+      const bare = await captured!.handler({ rawInput })
+      expect(bare.kind, rawInput).toBe('success')
+      expect(bare.text, rawInput).toContain('subcommands (')
+    }
+    // A known subcommand without its argument, a bare unknown word, and a flag-only form: all
+    // three used to return the help text with kind 'success', so a command that did nothing read
+    // as done. (The control is `/evolution maintain --bogus`, which always refused.)
+    for (const rawInput of ['approve', 'skill', 'params --group', 'nonsense --x']) {
+      const result = await captured!.handler({ rawInput })
+      expect(result.kind, rawInput).toBe('error')
+      expect(result.text, rawInput).toContain('is not a subcommand this build answers')
+    }
+  })
+
   // V10-09 (F-05): the recommendation count is STRUCTURED — it travels as
   // MaintainOutcome.recommendationCount (validated plan length) into the
   // maintain event. The old text-parsing contract (`/^- \[/gm` + Notes:
@@ -1385,8 +1406,13 @@ it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every sta
     expect({ rawInput, kind: result.kind }).toEqual({ rawInput, kind: 'error' })
     expect(result.text).toContain('command failed')
   }
-  // `maintain` keeps its own structured error path (pre-v28) and the help
-  // fallback never touches a service — both stay kind:error/success as before.
-  const help = await captured!.handler({ rawInput: 'definitely-not-a-subcommand' })
+  // `maintain` keeps its own structured error path (pre-v28). Unmatched input answers the
+  // T4-03 error WITHOUT touching a service — so it carries neither the fault message nor a
+  // 'success' (the help fallback used to claim one). The bare command is the success control.
+  const unmatched = await captured!.handler({ rawInput: 'definitely-not-a-subcommand' })
+  expect(unmatched.kind).toBe('error')
+  expect(unmatched.text).toContain('is not a subcommand this build answers')
+  expect(unmatched.text).not.toContain('service fault injected')
+  const help = await captured!.handler({ rawInput: '' })
   expect(help.kind).toBe('success')
 })
