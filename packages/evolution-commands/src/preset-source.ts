@@ -69,6 +69,44 @@ export function presetProfileTarget(ctx: { get(name: string): unknown }): Preset
  * read. */
 export const FAMILY_PRESET_ID_STEM = 'evolution'
 
+/** One base-table row's ability fields — the part `evolution-agent/bases.json` declares and every
+ * entry point reads. */
+export interface BaseAbilityRow {
+  /** Base name, as `--base` spells it. */
+  readonly name: string
+  /** The registration note that makes a base unsupported (it carries no family landing surface). */
+  readonly unsupported?: string
+  /** The runtime service the base's platform composition injects. */
+  readonly requires?: { readonly service?: string }
+}
+
+/**
+ * The ONE host-side answer to "can this base be used here?".
+ *
+ * Both host entry points ask it: `/evolution preset install` refuses a base through this function,
+ * and `/evolution doctor` enumerates the installable bases through it, with the SAME probe — the
+ * runtime's own answer (`ctx.get(<service>)`), which is exactly the reason a later mount would
+ * refuse. A doctor that infers the answer from bundle names instead (it did until v46 S2.8) can
+ * disagree with the write entry it tells the operator to run: a deployment that mounts the web-app
+ * bundle while the service's own row is disabled installs nothing, yet reads as installable. The
+ * source-checkout installer runs outside the host and cannot read the service store; it asks the
+ * target profile's bundle rows instead and says so (`install-layered.mjs`'s
+ * `baseUnavailableReason`).
+ * @param entry - the table row.
+ * @param servicePresent - whether a service name resolves in this deployment.
+ * @returns the refusal text, or undefined when the base is usable here.
+ */
+export function baseRefusalReason(entry: BaseAbilityRow, servicePresent: (name: string) => boolean): string | undefined {
+  if (typeof entry.unsupported === 'string' && entry.unsupported !== '') {
+    return `Base "${entry.name}" is registered as UNSUPPORTED: ${entry.unsupported}`
+  }
+  const service = entry.requires?.service
+  if (typeof service !== 'string' || service === '') return undefined
+  return servicePresent(service)
+    ? undefined
+    : `Base "${entry.name}" requires the "${service}" service, which this deployment does not provide — the generated preset would refuse to mount.`
+}
+
 /**
  * Resolve the platform base preset patch one `--base` composes.
  *

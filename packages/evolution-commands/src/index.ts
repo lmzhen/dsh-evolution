@@ -22,7 +22,7 @@ import {
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
-import { PROFILE_PATCH_FILENAME, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
+import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
 import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -801,19 +801,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             let merged = current
             const written: string[] = []
             for (const base of selected) {
-              // 0.3.78 (G1-②): the SAME two refusals the installer applies, read
-              // from the same table — a base registered as unsupported, or one
-              // whose platform composition injects a service this deployment does
-              // not provide, must not produce a preset that refuses to mount
-              // later. Service presence is asked of the runtime itself, which is
-              // exactly the reason a mount would refuse.
-              if (typeof base.unsupported === 'string') {
-                return err(`Base "${base.name}" is registered as UNSUPPORTED: ${base.unsupported}`)
-              }
-              const requiredService = base.requires?.service
-              if (typeof requiredService === 'string' && ctx.get(requiredService) === undefined) {
-                return err(`Base "${base.name}" requires the "${requiredService}" service, which this deployment does not provide — the generated preset would refuse to mount.`)
-              }
+              // 0.3.78 (G1-②), single-sourced in v46 S2.8: the two refusals live in
+              // ONE function (`baseRefusalReason`) that `/evolution doctor` reads too,
+              // and the service precondition is asked of the RUNTIME — the exact
+              // reason a later mount would refuse. The source-checkout installer asks
+              // the target profile's bundle rows instead, because it runs outside the
+              // host.
+              const refusal = baseRefusalReason(base, (name) => ctx.get(name) !== undefined)
+              if (refusal !== undefined) return err(refusal)
               const basePatch = resolvePresetBasePatch(base.name, profile)
               const rowId = presetRowId(base.id)
               const entryText = composePresetEntry(readFileSync(basePatch, 'utf8'), delta, {

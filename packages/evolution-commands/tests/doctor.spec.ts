@@ -10,6 +10,14 @@ import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doct
 
 const stub = { get: () => undefined }
 
+/** The runtime service store, as the two host entry points read it: `/evolution preset install`
+ * refuses a base through it and `/evolution doctor` enumerates installable bases through it.
+ * `stub` answers undefined for every name — a deployment that provides none of them. */
+function serviceStub(...names: string[]): { get: (name: string) => unknown } {
+  const present = new Set(names)
+  return { get: (name: string): unknown => (present.has(name) ? {} : undefined) }
+}
+
 /** G3 (stage 8): a context carrying the two seats the legacy-document segment reads — the
  * platform settings seat (one row's user layer) and the family IO seam over a home whose
  * `settings.yaml` is the only file it can read. */
@@ -88,14 +96,15 @@ function platformBasePatch(home: string, base: string, profile = 'web'): string 
  * @param base - the base NAME from bases.json (`standard` / `ptc` / `cordis` / `minimal`).
  * @param profile - the profile whose patch receives the row; defaults to `web`.
  * @param options - `basePatch: null` withholds the platform base patch the row was composed
- * against (a delivered row outliving the platform tree it describes); a string seeds THAT text.
- * @returns the profile patch path the row landed in.
+ * against (a delivered row outliving the platform tree it describes); a string seeds THAT text;
+ * `destination: 'home'` lands the row in the home layer instead of the profile's own patch.
+ * @returns the patch path the row landed in.
  */
 async function deliverPresetRow(
   home: string,
   base: string,
   profile = 'web',
-  options: { basePatch?: string | null } = {},
+  options: { basePatch?: string | null; destination?: 'profile' | 'home' } = {},
 ): Promise<string> {
   const row = familyBase(base)
   if (options.basePatch !== null) {
@@ -110,7 +119,9 @@ async function deliverPresetRow(
     description: row.display.description,
     order: row.display.order,
   })
-  const patchPath = profilePatch(home, profile)
+  // The home layer (<home>/cordis.patch.yml) is composed by the platform AFTER the profile's own
+  // patch, so a row there mounts identically (S2.8/T4-07).
+  const patchPath = options.destination === 'home' ? join(home, 'cordis.patch.yml') : profilePatch(home, profile)
   const current = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : ''
   await writeFile(patchPath, mergePresetRow(current, entry, presetRowId(row.id)), 'utf8')
   return patchPath
@@ -685,14 +696,16 @@ describe('doctor (WB2, 0.3.55)', () => {
   it('G3-② (B2): a patch without the row is absent; an unresolvable or malformed platform base is unknown', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-preset-unknown-'))
     try {
-      // The web-app bundle is mounted so every SUPPORTED base is enumerated: cordis
-      // needs it for its `requires.service` precondition, and minimal is skipped as
+      // The web-app bundle is mounted AND the runtime provides the service it brings
+      // (`dynamicCordisRunner`), so every SUPPORTED base is enumerated: cordis needs both
+      // halves (`baseRefusalReason` over `ctx.get`), and minimal is skipped as
       // registered-unsupported (it carries no family model rows to compare).
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host', '@deepseek-ai/dsh-web-app'])
+      const deployed = serviceStub('dynamicCordisRunner')
       const patchPath = profilePatch(home)
       // A profile patch without the row is not an installed variant (the artifact
       // rule the install-form check already uses) and is nothing to act on either.
-      const absent = await diagnose(stub, { home })
+      const absent = await diagnose(deployed, { home })
       expect(absent.presetFreshness.map(entry => entry.base)).toEqual(expect.arrayContaining(['standard', 'ptc', 'cordis']))
       expect(absent.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('absent')
       expect(absent.actions.some(action => action.includes(patchPath))).toBe(false)
@@ -706,7 +719,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       process.env.DSH_AGENT_PRESET_ROOT = root
       try {
         await deliverPresetRow(home, 'standard', 'web', { basePatch: null })
-        const unmounted = await diagnose(stub, { home })
+        const unmounted = await diagnose(deployed, { home })
         const unmountedRow = unmounted.presetFreshness.find(entry => entry.base === 'standard')
         expect(unmountedRow?.status).toBe('unknown')
         expect(unmountedRow?.detail).toContain('standard.patch.yml does not exist')
@@ -723,9 +736,52 @@ describe('doctor (WB2, 0.3.55)', () => {
       const malformed = platformBasePatch(home, 'standard')
       await mkdir(dirname(malformed), { recursive: true })
       await writeFile(malformed, '- insert:\n    - id: preset-standard\n', 'utf8')
-      const failedRow = (await diagnose(stub, { home })).presetFreshness.find(entry => entry.base === 'standard')
+      const failedRow = (await diagnose(deployed, { home })).presetFreshness.find(entry => entry.base === 'standard')
       expect(failedRow?.status).toBe('unknown')
       expect(failedRow?.detail).toContain('carries no `plugins:` list')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S2.8 (T4-06): the doctor asks the runtime whether a base is installable, exactly as the write entry does', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-base-service-'))
+    try {
+      // A bundle row is not the service: a profile that mounts `@deepseek-ai/dsh-web-app` while
+      // the service's own row is disabled installs nothing (the overlay shape). The freshness
+      // probe must therefore not enumerate the cordis base as installable while
+      // `/evolution preset install --base cordis` refuses it by name.
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host', '@deepseek-ai/dsh-web-app'])
+      const withoutService = await diagnose(stub, { home })
+      expect(withoutService.presetFreshness.map(entry => entry.base)).not.toContain('cordis')
+      expect(withoutService.presetFreshness.map(entry => entry.base)).toEqual(expect.arrayContaining(['standard', 'ptc']))
+      // With the service present — the ordinary web-app deployment — the same base is enumerated,
+      // so the judgement narrowed rather than dropping the base from the report.
+      const withService = await diagnose(serviceStub('dynamicCordisRunner'), { home })
+      expect(withService.presetFreshness.map(entry => entry.base)).toContain('cordis')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S2.8 (T4-07): a preset row in the HOME layer is an install, not a missing one', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-home-layer-'))
+    try {
+      // The platform composes the home layer AFTER the profile's own patch
+      // (`readProfilePatches`), so a row moved there mounts identically. Reading only
+      // `profiles/*/` reported 'host', fired no conflict row, and advised installing
+      // `evolution-all` on top of the mounted preset.
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      await deliverPresetRow(home, 'standard', 'web', { destination: 'home' })
+      const report = await diagnose(stub, { home })
+      expect(report.installForm).toBe('layered')
+      expect(report.deploymentForm).toBe('variant')
+      // The same detection feeds every layered conflict row: stacking `all` on that
+      // home-layer install is the double-mount the doctor exists to prevent.
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host', '@lmzhen/dsh-evolution-all'])
+      const stacked = await diagnose(stub, { home })
+      expect(stacked.conflicts.some(conflict => conflict.includes('evolution-all and the layered Evolution preset'))).toBe(true)
+      expect(stacked.actions[0]).toContain('Resolve the conflict first')
     } finally {
       await rm(home, { recursive: true, force: true })
     }

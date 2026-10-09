@@ -16,7 +16,7 @@ import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE,
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
 import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
-import { FAMILY_PRESET_ID_STEM, resolvePresetBasePatch, type PresetProfileTarget } from './preset-source.ts'
+import { FAMILY_PRESET_ID_STEM, PROFILE_PATCH_FILENAME, baseRefusalReason, resolvePresetBasePatch, type PresetProfileTarget } from './preset-source.ts'
 
 /** D-6 (v18): exact-segment tail match (the loose substring form matched a
  * hypothetical `dsh-evolution-allowlist`). */
@@ -458,9 +458,20 @@ interface BaseRow {
   unsupported?: string
 }
 
-/** The profile patch file name (`packages/boot/app-boot/src/profile.ts`,
- * `PROFILE_PATCH_FILENAME`). */
-const PROFILE_PATCH_FILENAME = 'cordis.patch.yml'
+/** The bundle rows one profile manifest mounts (scope-agnostic, as written) — the target a preset
+ * recompute resolves its platform base patch through.
+ * @param profileDir - the profile directory.
+ * @returns the bundle names; empty when the manifest is missing or torn.
+ */
+function profileBundles(profileDir: string): string[] {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: unknown } } }
+    const bundles = manifest.dsh?.profile?.bundles
+    return Array.isArray(bundles) ? bundles.filter((name): name is string => typeof name === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 /** Every profile directory under one DSH_HOME, by name.
  * @param home - resolved DSH_HOME.
@@ -488,17 +499,15 @@ function profileDirectories(home: string): Array<{ profile: string; dir: string 
   return out
 }
 
-/** The bundle rows one profile manifest mounts (scope-agnostic, as written).
- * @param profileDir - the profile directory.
- * @returns the bundle names; empty when the manifest is missing or torn.
+/** One optional file's text, or `''` when it is absent or unreadable.
+ * @param path - the file to read.
+ * @returns the text.
  */
-function profileBundles(profileDir: string): string[] {
+function readTextOrEmpty(path: string): string {
   try {
-    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: unknown } } }
-    const bundles = manifest.dsh?.profile?.bundles
-    return Array.isArray(bundles) ? bundles.filter((name): name is string => typeof name === 'string') : []
+    return readFileSync(path, 'utf8')
   } catch {
-    return []
+    return ''
   }
 }
 
@@ -507,35 +516,45 @@ function profileBundles(profileDir: string): string[] {
  * @returns the patch text.
  */
 function profilePatchText(profileDir: string): string {
-  try {
-    return readFileSync(join(profileDir, PROFILE_PATCH_FILENAME), 'utf8')
-  } catch {
-    return ''
-  }
+  return readTextOrEmpty(join(profileDir, PROFILE_PATCH_FILENAME))
 }
 
-/** Whether a base's `requires.service` precondition is met by one profile's bundles — the same
- * judgement the installer applies (`baseUnavailableReason`), read from the same rows.
+/** Every USER-layer patch text that can carry a family preset row: each profile's own patch, then
+ * the home layer (`<home>/cordis.patch.yml`), which the platform composes AFTER the profile layer
+ * (`readProfilePatches` in `packages/boot/app-boot/src/profile-context.ts`). A row written there
+ * mounts exactly like one in the profile patch, so a probe reading only the per-profile patches
+ * reports a home-layer install as no install at all.
+ * @param home - resolved DSH_HOME.
+ * @returns the patch texts that exist, in profile-then-home order.
+ */
+function userPatchTexts(home: string): string[] {
+  const texts = profileDirectories(home).map(({ dir }) => profilePatchText(dir))
+  texts.push(readTextOrEmpty(join(home, PROFILE_PATCH_FILENAME)))
+  return texts.filter((text) => text !== '')
+}
+
+/** Whether a base's `requires.service` precondition is met HERE — the SAME function and the SAME
+ * probe `/evolution preset install` refuses through (`baseRefusalReason` over the runtime's own
+ * service store), so the doctor and the write entry cannot reach different conclusions about one
+ * deployment.
  * @param base - the table row.
- * @param bundles - the profile's bundle names.
+ * @param servicePresent - whether a service name resolves in this runtime.
  * @returns true when the base can be installed here.
  */
-function baseInstallable(base: BaseRow, bundles: string[]): boolean {
-  if (typeof base.unsupported === 'string') return false
-  const service = base.requires?.service
-  if (typeof service !== 'string' || service === '') return true
-  return bundles.some(name => name.trim().endsWith('dsh-web-app'))
+function baseInstallable(base: BaseRow, servicePresent: (name: string) => boolean): boolean {
+  return baseRefusalReason(base, servicePresent) === undefined
 }
 
 /**
- * S1-F1: ids of the family's INSTALLED preset rows — every declared preset row in a profile patch
- * that can actually carry the family model rows.
+ * S1-F1: ids of the family's INSTALLED preset rows — every declared preset row in a USER patch
+ * layer that can actually carry the family model rows.
  *
- * The artifact is a declared preset ROW in a profile's own patch layer, so this probe reads that
- * file (`PROFILE_PATCH_FILENAME`) in every profile of the home. A probe narrowed to one base id
- * leaves a `--base ptc|cordis` install invisible: installForm then degrades to `none`/`host` and
- * the action ladder recommends installing `evolution-all` on top — the exact double-mount the
- * doctor exists to prevent.
+ * The artifact is a declared preset ROW in a user patch layer, so this probe reads every profile's
+ * own patch AND the home layer (`userPatchTexts`). A probe narrowed to one base id leaves a
+ * `--base ptc|cordis` install invisible; one narrowed to the profile layer alone (it was until v46
+ * S2.8/T4-07) leaves a home-layer install invisible — either way installForm degrades to
+ * `none`/`host` and the action ladder recommends installing `evolution-all` on top, the exact
+ * double-mount the doctor exists to prevent.
  *
  * A row counts only when the base table names its id as a SUPPORTED family base (the `unsupported`
  * minimal base carries no model rows and cannot double-mount anything). When the table itself
@@ -548,8 +567,7 @@ function installedLayeredPresetIds(home: string): string[] {
   const basesPath = resolveAgentPresetAsset('bases.json')
   const bases = basesPath === null ? null : readAgentPresetBases(basesPath)
   const ids = new Set<string>()
-  for (const { dir } of profileDirectories(home)) {
-    const text = profilePatchText(dir)
+  for (const text of userPatchTexts(home)) {
     if (text === '') continue
     if (bases === null) {
       // Table unreadable, so base ids cannot arbitrate: match the family's own
@@ -577,9 +595,10 @@ function installedLayeredPresetIds(home: string): string[] {
  * installer about what "fresh" means. Read-only by contract: the snapshot is
  * never rewritten.
  * @param home - resolved DSH_HOME.
+ * @param servicePresent - whether a service name resolves in this runtime (the write entry's probe).
  * @returns one row per profile × installable base of the family bases.json.
  */
-function probePresetFreshness(home: string): PresetFreshnessRow[] {
+function probePresetFreshness(home: string, servicePresent: (name: string) => boolean): PresetFreshnessRow[] {
   const basesPath = resolveAgentPresetAsset('bases.json')
   // The package's OWN delta: DSH_EVOLUTION_DELTA_PATH is documented as a
   // source-installer knob (README), so this session-side comparison must not
@@ -623,8 +642,9 @@ function probePresetFreshness(home: string): PresetFreshnessRow[] {
     const bundles = profileBundles(dir)
     for (const base of bases) {
       // A base this deployment cannot install has no fresh generation to compare
-      // against, so it is SKIPPED rather than reported stale.
-      if (!baseInstallable(base, bundles)) continue
+      // against, so it is SKIPPED rather than reported stale. "Cannot install" is
+      // the runtime's own answer, the same one the write entry refuses by.
+      if (!baseInstallable(base, servicePresent)) continue
       // Not installed is not an error: the user may simply not use this base.
       const block = presetRowBlock(text, presetRowId(base.id))
       if (block === null) {
@@ -716,7 +736,7 @@ export async function diagnose(
   // ladder so a stale snapshot contributes its own regeneration step. The
   // comparison reads the profile patches and the platform base patches — the
   // same two files the installer writes and reads.
-  const presetFreshness = probePresetFreshness(home)
+  const presetFreshness = probePresetFreshness(home, has)
 
   // G5: the RUNNING profile's form comes from the platform's own bundle surface when it is
   // mounted. The cross-profile enumeration above stays for the N13 question ("which forms
