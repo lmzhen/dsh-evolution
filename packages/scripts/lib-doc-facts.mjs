@@ -282,6 +282,18 @@ function machineViolations(fact, root, docs, home, repoScope) {
     }
     return out
   }
+  if (machine.kind === 'skill-name-home') {
+    // v46 S2.5b (finding T2-01): the family's canonical name is the DIRECTORY name, and the
+    // validator is what makes that true — it refuses a frontmatter `name` that differs from the
+    // expected (directory-derived) one. This re-derives that enforcement from the marker, so
+    // weakening the validator cannot leave the home's口径 sentence standing on its own. The
+    // platform's own provider publishes the frontmatter name; that divergence is what the home
+    // documents and what Decision 1 will settle.
+    if (!text.includes(machine.marker)) {
+      out.push(`${machine.file}: the marker "${machine.marker}" is gone — the validator no longer enforces that a skill's frontmatter name equals its target, so the home's name口径 may be false`)
+    }
+    return out
+  }
   out.push(`${fact.id}: unknown machine kind "${String(machine.kind)}" — N19 cannot re-derive this fact`)
   return out
 }

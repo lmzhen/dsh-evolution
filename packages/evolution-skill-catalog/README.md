@@ -28,3 +28,19 @@ through `tool-skill-manage`.
 - **`whenToUse` is published, `metadata` is not (E-11, v18).**
 - **`content` is the BODY, not the file (V27 G5.3).**
 - **Protection markers are best-effort per entry (A1-17, v18).**
+
+## Skill names (the family's口径)
+
+The family's canonical name for a skill is its **directory name**. `SKILL.md`'s frontmatter must
+carry the same `name`: `validateFrontmatter(..., expectedName)` refuses a mismatch ("Frontmatter
+name … does not match target …"), and this provider publishes `summary.name` — the scanned name the
+library derives from the directory.
+
+The platform's own `skill-filesystem` provider publishes the frontmatter `name` instead, so an entry
+whose frontmatter name differs from its directory can surface under two names: the family's catalog
+under one, the platform's under the other.
+
+**Decision 1 is open**: keep not publishing name-mismatched entries (conservative), or publish under
+the frontmatter name (thorough, and it moves the read path). Until it is decided this document
+states the behaviour that ships: the directory name wins.
+

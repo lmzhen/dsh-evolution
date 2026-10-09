@@ -41,6 +41,32 @@
   },
   "facts": [
     {
+      "id": "skill-name-home",
+      "title": "which name a skill is published under: the directory name, and the open decision",
+      "home": "evolution-skill-catalog/README.md",
+      "machine": {
+        "kind": "skill-name-home",
+        "file": "evolution-core/src/frontmatter.ts",
+        "marker": "if (expectedName && parsed.frontmatter.name !== expectedName)"
+      },
+      "must": [
+        {
+          "text": "The family's canonical name for a skill is its **directory name**."
+        },
+        {
+          "text": "**Decision 1 is open**",
+          "unique": true
+        }
+      ],
+      "forbid": [
+        {
+          "re": "the family publishes the frontmatter name",
+          "why": "the validator refuses a frontmatter name that differs from the target, and the provider publishes the scanned (directory) name — a document may not claim the opposite"
+        }
+      ],
+      "cites": []
+    },
+    {
       "id": "event-mode",
       "title": "the family's own process events: the set, and the mode each one declares",
       "home": "evolution-core/README.md",
