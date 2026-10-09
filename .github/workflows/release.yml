@@ -141,6 +141,15 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Install the tarball reader the payload audit extracts with
+        shell: bash
+        run: |
+          # A publish runner carries no node_modules: this job downloads the packed dist and the
+          # scripts artifacts only. The audit opens every tarball IN PROCESS (GNU tar on PATH
+          # mis-reads a Windows \`D:\...\` path as a remote host), so install the module where the
+          # script resolves it — \`packages/evolution/node_modules\` is on that path.
+          npm install --prefix packages/evolution --no-save --no-package-lock --ignore-scripts --no-audit --no-fund tar@7
+
       - name: Audit the artifacts about to be published
         shell: bash
         env:

@@ -20,17 +20,28 @@
 import { createRequire } from 'node:module'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // The `tar` on PATH is GNU tar from Git Bash on Windows, which reads a `D:\...` path as a remote
-// host spec; the npm module extracts in-process and takes the path verbatim. It is resolved from
-// the tree's own node_modules (the overlay installs it) or from a global install.
+// host spec; the npm module extracts in-process and takes the path verbatim. Candidates are the
+// script's own resolution chain and every ancestor `node_modules`, so the same file works in the
+// mirror (`packages/scripts`), in the overlay (`packages/evolution/scripts`) and in a CI checkout
+// where the publish job installs one deliberately.
 const require = createRequire(import.meta.url)
 function loadTar() {
-  for (const candidate of ['tar', 'D:/dsh/dsh-upstream-0.2.0-rc.2-evolution/node_modules/tar']) {
+  const candidates = ['tar']
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (let up = 0; up < 6; up += 1) {
+    candidates.push(join(dir, 'node_modules', 'tar'))
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  for (const candidate of candidates) {
     try { return require(candidate) } catch { /* try the next candidate */ }
   }
-  throw new Error('audit-release-tarballs: no `tar` module resolvable (the overlay installs one; otherwise npm i -g tar)')
+  throw new Error('audit-release-tarballs: no `tar` module resolvable (install one on the tree, e.g. npm install --no-save tar)')
 }
 const tar = loadTar()
 
