@@ -27,7 +27,7 @@ import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions,
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, probeMtime, releaseInstance, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
-import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER } from '@deepseek-ai/dsh-evolution-core'
+import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
@@ -315,6 +315,13 @@ export class EvolutionCurator extends Service {
       const disposer = settings.configure({ auto: false }, ctx.fiber)
       if (typeof disposer === 'function') ctx.effect(() => disposer as () => void, 'evolution-curator: settings presentation')
     })
+    // v46 S1.12b (finding T3-07): the curator ships model-visible text (its prompt + the dry-run
+    // banner). The bundle was only verified by the review package, so a curator-only deployment
+    // never checked the digest. Same fail-loud posture as review: refuse to curate rather than run
+    // on text whose integrity could not be established.
+    if (!verifyPromptBundle(PROMPT_BUNDLE)) {
+      throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to run the curator')
+    }
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.

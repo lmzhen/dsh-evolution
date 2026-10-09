@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -61,7 +61,13 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(20)
+  expect(PROMPT_BUNDLE_VERSION).toBe(21)
+  // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
+  // the bundle and the digest covers it.
+  expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)
+  // The digest covers the new entry: tampering with the banner alone must fail verification.
+  const tampered = { ...PROMPT_BUNDLE, prompts: { ...PROMPT_BUNDLE.prompts, curatorDryRun: 'drifted' } }
+  expect(verifyPromptBundle(tampered)).toBe(false)
 })
 
 it('maintain persona ships in the bundle with signal placeholders (011)', () => {

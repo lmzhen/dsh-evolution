@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 20
+export const PROMPT_BUNDLE_VERSION = 21
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -365,6 +365,11 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   skillPlan: SKILL_REVIEW_PLAN_PROMPT,
   combinedPlan: COMBINED_REVIEW_PLAN_PROMPT,
   curator: CURATOR_PROMPT,
+  // v46 S1.12b (finding T3-07): the curator's dry-run banner rides the bundle too. It is prepended
+  // to the curator prompt at run time and used to live outside the digest, so a drifted banner was
+  // model-visible text the integrity check could not see. The bundle digest changes with this entry
+  // (the intended fail-closed signal), and PROMPT_BUNDLE_VERSION moves 20 -> 21 with it.
+  curatorDryRun: CURATOR_DRY_RUN_BANNER,
   completion: COMPLETION_SKILL_REVIEW_PROMPT,
   maintain: MAINTAIN_PROMPT,
   // F-16: new entry — the maintain subagent's output instruction
