@@ -108,8 +108,14 @@ const devBuild = argv.includes('--dev-build')
 // compat anchor. (zod is likewise double-pinned in tsconfig.base.json + the
 // dependency manifests; a cross-checking guard for it is deliberately
 // deferred — optimization plan §5, R-06b.)
+// v46 S2.2 (finding T7-04): schemastery's floor is the CAPABILITY floor, not a convenience value —
+// `.volatile()` (the marker every family E3 field carries) exists only from the 0.2.x line's
+// vendored schemastery (3.18.4); the 0.1.5 line's 3.18.2 lacks it, and that is exactly what
+// smoke-built-entries.mjs fails on. `^3.18.1` published a range that resolves the builds the
+// family's own smoke guard rejects. verify-platform-ranges.mjs --upstream now asserts the pairing;
+// the cordis value below is a registered exception (see VENDORED_FLOOR_EXCEPTIONS there).
 const VENDORED_CORDIS_RANGE = '^4.0.1'
-const VENDORED_SCHEMASTRY_RANGE = '^3.18.1'
+const VENDORED_SCHEMASTRY_RANGE = '^3.18.4'
 
 // R-05: the workspace protocols the rewrite understands. A literal
 // `workspace:` spec that does not match must fail loud — silently shipping the

@@ -47,10 +47,41 @@ function requireArg(name) {
 }
 
 const platformVersion = requireArg('--platform-version')
+const upstream = arg('--upstream', '')
 const manifestDir = requireArg('--manifest-dir')
 const ourScope = arg('--our-scope', '@lmzhen')
 const familyPrefixes = arg('--family-prefixes', `${ourScope}/dsh-`)
 const expected = `^${platformVersion}`
+
+/** Vendored frameworks whose published range must not admit a version below the validated tree's. */
+const VENDORED = [
+  { name: '@deepseek-ai/schemastery', dir: 'schemastery' },
+  { name: '@deepseek-ai/cordis', dir: 'cordis' },
+]
+
+/**
+ * Ranges allowed to sit BELOW the validated tree's vendored version, each with its reason and the
+ * step that closes the debt (all fields required — the S1.1 register discipline). v46 S2.2: no
+ * capability floor is proven for cordis, and raising its floor would narrow what the release admits
+ * without evidence, so the debt is recorded rather than hidden.
+ */
+const VENDORED_FLOOR_EXCEPTIONS = [
+  {
+    name: '@deepseek-ai/cordis',
+    allowedFloor: '4.0.1',
+    reason: 'no capability floor is proven for cordis; the validated tree ships 4.0.4 while the range keeps the historical floor',
+    expiry: 'a batch that proves a cordis capability floor (then raise both together)',
+  },
+]
+
+/**
+ * The lower bound a caret/tilde/plain range starts at (`^3.18.1` → `3.18.1`).
+ * @param range - the declared range.
+ * @returns the floor as a version string.
+ */
+function rangeFloor(range) {
+  return range.replace(/^[\^~]/, '').trim().split(' ')[0]
+}
 
 // M-7 (v3 audit): when the publish scope IS the platform scope, family and
 // platform packages are indistinguishable by prefix — the guard would exempt
@@ -198,6 +229,51 @@ function assertSupportWindow(anchor) {
 
 assertSupportWindow(platformVersion)
 
+/**
+ * v46 S2.2 (finding T7-04): a published vendored-framework range may not admit a version BELOW the
+ * one the family was validated against — otherwise a consumer resolves a build the family's own
+ * smoke guard rejects (schemastery 3.18.2 has no `.volatile()`). Reads the vendored version from
+ * the tree the release was validated against (`--upstream`).
+ * @returns failure messages; empty when every range is honest or the tree was not given.
+ */
+function vendoredFloorFailures(upstreamRoot) {
+  const failures = []
+  if (upstreamRoot === '') return failures
+  for (const vendor of VENDORED) {
+    const manifestPath = join(upstreamRoot, 'vendor', vendor.dir, 'package.json')
+    let version
+    try { version = JSON.parse(readFileSync(manifestPath, 'utf8')).version } catch { version = undefined }
+    if (typeof version !== 'string') {
+      failures.push(`${manifestPath}: no readable version — the vendored floor for ${vendor.name} cannot be re-derived`)
+      continue
+    }
+    const exception = VENDORED_FLOOR_EXCEPTIONS.find(entry => entry.name === vendor.name)
+    for (const dir of readdirSync(manifestDir, { withFileTypes: true })) {
+      if (!dir.isDirectory()) continue
+      const file = join(manifestDir, dir.name, 'package.json')
+      let manifest
+      try { manifest = JSON.parse(readFileSync(file, 'utf8')) } catch { continue }
+      for (const section of ['dependencies', 'peerDependencies']) {
+        const range = manifest[section]?.[vendor.name]
+        if (typeof range !== 'string') continue
+        const floor = rangeFloor(range)
+        const floorVersion = parseVersion(floor)
+        const validatedVersion = parseVersion(version)
+        if (floorVersion === null || validatedVersion === null) {
+          failures.push(`${manifest.name}: cannot compare ${range} against the vendored ${version} — one of them is not a semver version`)
+          continue
+        }
+        // compareVersions orders PARSED versions, not strings (parseVersion is the door).
+        if (compareVersions(floorVersion, validatedVersion) >= 0) continue
+        const ceiling = exception === undefined ? null : parseVersion(exception.allowedFloor)
+        if (ceiling !== null && compareVersions(floorVersion, ceiling) >= 0) continue
+        failures.push(`${manifest.name}: ${section}.${vendor.name} = ${range} admits versions below the validated ${version} (${manifestPath}) — a consumer can resolve a build the family's own smoke guard rejects${exception === undefined ? '' : ` (the registered exception allows down to ${exception.allowedFloor}; this floor is lower)`}`)
+      }
+    }
+  }
+  return failures
+}
+
 const failures = []
 let checked = 0
 let scanned = 0
@@ -243,6 +319,10 @@ if (checked === 0) {
   console.error(`verify-platform-ranges: ${scanned} manifest(s) scanned under ${manifestDir} but 0 @deepseek-ai/dsh-* platform dependency ranges found — nothing to verify (vacuous pass); check the staged tree.`)
   process.exit(1)
 }
+
+const vendored = vendoredFloorFailures(upstream)
+if (upstream === '') console.log('verify-platform-ranges: vendored-floor check NOT executed (no --upstream)')
+failures.push(...vendored)
 
 if (failures.length > 0) {
   console.error(`verify-platform-ranges: ${failures.length} platform dependency range(s) drifted from ^${platformVersion}:`)
