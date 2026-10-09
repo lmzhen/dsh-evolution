@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
+import { emptyRecord, nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
@@ -827,6 +827,33 @@ describe('evolution-commands', () => {
     const second = await captured!.handler({ rawInput: 'maintain --facts' })
     expect(second.kind).toBe('success')
     expect(second.text).toContain('MECHANICAL_FACTS')
+  })
+
+  it('T3-02/A30: maintain --facts ages the skill through the shared enrichment — the retire line the probe must agree with', async () => {
+    const dir = await tempRoot('evo-commands-facts-liveness-')
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(join(skillDir, 'references'), { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody without a support-file mention\n', 'utf8')
+    await writeFile(join(skillDir, 'references', 'dead.md'), 'never read\n', 'utf8')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // Same fixture shape as the probe spec (evolution-maintenance tools.spec.ts): an observed read
+    // (the demand window is open) plus an old activity anchor (past the stale window).
+    const old = new Date(2021, 0, 1).toISOString()
+    ctx.provide('skillUsage', {
+      report: async () => new Map([['demo-skill', { ...emptyRecord(), view_count: 1, created_at: old, last_used_at: old }]]),
+    })
+    await ctx.plugin(Commands, { root })
+    const result = await captured!.handler({ rawInput: 'maintain --facts' })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('never read: references/dead.md')
+    // T3-02/A30: the facts block is the reference answer the probe must match; before the shared
+    // mapping the probe answered `retire: age unknown` for this very tree.
+    expect(result.text).toContain('retire≥30d: references/dead.md(')
+    expect(result.text).not.toContain('retire: age unknown')
   })
 
   it('maintain --facts reports a misconfigured root like the full scan instead of clean facts (S5.4 audit P2-22)', async () => {

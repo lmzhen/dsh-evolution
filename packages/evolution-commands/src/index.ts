@@ -77,7 +77,7 @@ export const Config = z.object({
 })
 
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
-import { buildEnrichment } from '@deepseek-ai/dsh-evolution-maintenance'
+import { buildEnrichment, enrichmentSnapshotOptions } from '@deepseek-ai/dsh-evolution-maintenance'
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
@@ -538,14 +538,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
-            descriptions: enrichment.descriptions,
-            supportFiles: enrichment.supportFiles,
-            quality: enrichment.quality,
-            protected: enrichment.protected,
-            catalogInvalid: enrichment.catalogInvalid,
-            demand: enrichment.demand,
-            liveness: enrichment.liveness,
-            supportChars: enrichment.supportChars,
+            // T3-02/A30: the SHARED enrichment → options mapping (the preview and the
+            // probe tool each used to spell this list out).
+            ...enrichmentSnapshotOptions(enrichment),
             // V27 M-02 evidence, same as runMaintain's onReadError.
             onReadError: (name, error) => {
               readFailures.push(name)
@@ -680,15 +675,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 // E-6 (v18): UI/session cancellation must stop the scan, not
                 // just wait for the 600s timeout.
                 signal: invocation.signal,
-                descriptions: () => enrichment.descriptions,
-                supportFiles: () => enrichment.supportFiles,
-                quality: () => enrichment.quality,
-                protected: () => enrichment.protected,
-                catalogInvalid: () => enrichment.catalogInvalid,
-                usageObserved: () => enrichment.usageObservedValue,
-                demand: () => enrichment.demand,
-                liveness: () => enrichment.liveness,
-                supportChars: () => enrichment.supportChars,
+                // T3-02/A30: one object instead of a closure per field — the scan, the
+                // preview and the probe now read the SAME enrichment through the same mapping.
+                enrichment: () => enrichment,
               },
             )
             // P2-21 (F3, v11): a FAILED scan must keep the previous successful

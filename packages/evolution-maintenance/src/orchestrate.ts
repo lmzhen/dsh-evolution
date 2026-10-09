@@ -24,10 +24,10 @@ import {
   verifyPromptBundle,
   type DriftReport,
   type DriftSkillSnapshot,
-  type SkillLiveness,
 } from '@deepseek-ai/dsh-evolution-core'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
+import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'
 import { renderFacts } from './render-facts.ts'
 import { validateAndNormalizeMaintainPlan, type ValidationResult } from './validate-plan.ts'
 
@@ -107,18 +107,10 @@ export interface MaintainOptions {
   provider?: string
   toolAllow?: readonly string[]
   redact?: ((text: string) => string) | undefined
-  supportFiles?: () => ReadonlyMap<string, readonly string[]>
-  descriptions?: () => ReadonlyMap<string, string>
-  quality?: () => ReadonlyMap<string, number>
-  protected?: () => ReadonlyMap<string, string>
-  catalogInvalid?: () => ReadonlyMap<string, boolean>
-  usageObserved?: () => boolean | undefined
-  /** Per-support-file read counts per skill (design §5.5). */
-  demand?: () => ReadonlyMap<string, Readonly<Record<string, number>>>
-  /** Idle age per skill (design §5.6). */
-  liveness?: () => ReadonlyMap<string, SkillLiveness>
-  /** Support-file char counts for files that can exceed the cap (design §16.6). */
-  supportChars?: () => ReadonlyMap<string, Readonly<Record<string, number>>>
+  /** T3-02/A30: the measured enrichment, read through {@link enrichmentSnapshotOptions} — one
+   * mapping shared with the `--facts` preview and the probe tool. A closure per field was a second
+   * account of the same facts and drifted (the probe's copy lost `liveness`). */
+  enrichment?: (() => Enrichment) | undefined
 }
 
 export interface MaintainOutcome {
@@ -274,18 +266,10 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // 0.3.11: usageObserved is threaded straight into the snapshot assembly so
     // the probe (which reads it off the snapshot) and the facts block (which
     // injects it) can never disagree (E-36).
-    const usageObserved = options.usageObserved ? options.usageObserved() : undefined
+    const enrichment = options.enrichment?.()
     const readFailures: string[] = []
     const snapshots = await snapshotFromLibrary(runtime.library, {
-      supportFiles: options.supportFiles ? options.supportFiles() : undefined,
-      descriptions: options.descriptions ? options.descriptions() : undefined,
-      quality: options.quality ? options.quality() : undefined,
-      protected: options.protected ? options.protected() : undefined,
-      catalogInvalid: options.catalogInvalid ? options.catalogInvalid() : undefined,
-      usageObserved,
-      ...(options.demand === undefined ? {} : { demand: options.demand() }),
-      ...(options.liveness === undefined ? {} : { liveness: options.liveness() }),
-      ...(options.supportChars === undefined ? {} : { supportChars: options.supportChars() }),
+      ...(enrichment === undefined ? {} : enrichmentSnapshotOptions(enrichment)),
       // E-9 (v18): a single unreadable SKILL.md is skipped with a trace.
       // V27 M-02: the trace is also the evidence that separates "empty library"
       // from "unreadable library" below.
@@ -322,7 +306,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       // Genuinely empty: no facts to review — do not spend a model call.
       return { ok: true, recommendationCount: 0, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
-    const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, usageObserved, options.redact)
+    const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, enrichment?.usageObservedValue, options.redact)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
 
     // Persona carries the full template; the prompt carries ONLY the facts

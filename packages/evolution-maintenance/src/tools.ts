@@ -14,7 +14,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { assertSkillsRootAliasRetired, newSkillLibrary, redactSecrets, resolveRootConfig, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
-import { buildEnrichment } from './enrichment.ts'
+import { buildEnrichment, enrichmentSnapshotOptions } from './enrichment.ts'
 import { snapshotFromLibrary } from './drift-scan.ts'
 
 export const name = 'evolution-maintenance-tools'
@@ -87,15 +87,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // runId-scoped snapshot store. Revisit only with a measured need
           // (a large library where probe latency becomes visible).
           const enrichment = await buildEnrichment(ctx, library)
-          const snapshots = await snapshotFromLibrary(library, {
-            descriptions: enrichment.descriptions,
-            supportFiles: enrichment.supportFiles,
-            quality: enrichment.quality,
-            protected: enrichment.protected,
-            catalogInvalid: enrichment.catalogInvalid,
-            usageObserved: enrichment.usageObservedValue,
-            demand: enrichment.demand,
-          })
+          // T3-02/A30: through the SHARED mapping — this call used to spell the option
+          // list out itself and had silently lost `liveness`, so every probe answered
+          // `retire: no-age` while the facts block listed retirement candidates.
+          const snapshots = await snapshotFromLibrary(library, enrichmentSnapshotOptions(enrichment))
           // Probe output crosses the session boundary to the maintenance
           // subagent — same redaction policy as the facts block (011 §8).
           const probe = computeProbe(signal, target, snapshots)

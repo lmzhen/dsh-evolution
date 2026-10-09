@@ -8,6 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { SnapshotOptions } from './drift-scan.ts'
 import {
   frontmatterCatalogInvalid,
   idleDays,
@@ -38,6 +39,32 @@ export interface Enrichment {
    * (design §16.6) — present only where at least one such file exists, so the
    * common measured-and-clean case adds no field. */
   supportChars: ReadonlyMap<string, Readonly<Record<string, number>>>
+}
+
+/**
+ * The ONE enrichment → snapshot-options mapping (T3-02/A30).
+ *
+ * Three callers assemble drift snapshots from the same enrichment — the full scan, the
+ * `--facts` preview, and the `maintenance_probe` tool. Kept as one function because a hand-written
+ * literal per caller is a copy that drifts: the probe's literal omitted `liveness`, so the deep-dive
+ * channel answered `retire: no-age` ("age unknown ⇒ not enough evidence") for every skill, for ever,
+ * while the facts block listed retirement candidates for the same tree. Adding a measured field to
+ * {@link Enrichment} now reaches every surface through this mapping.
+ * @param enrichment - the built enrichment maps.
+ * @returns the snapshot options carrying every field the enrichment measured.
+ */
+export function enrichmentSnapshotOptions(enrichment: Enrichment): SnapshotOptions {
+  return {
+    descriptions: enrichment.descriptions,
+    supportFiles: enrichment.supportFiles,
+    quality: enrichment.quality,
+    protected: enrichment.protected,
+    catalogInvalid: enrichment.catalogInvalid,
+    usageObserved: enrichment.usageObservedValue,
+    demand: enrichment.demand,
+    liveness: enrichment.liveness,
+    supportChars: enrichment.supportChars,
+  }
 }
 
 export async function buildEnrichment(ctx: Context, library: SkillLibrary): Promise<Enrichment> {
