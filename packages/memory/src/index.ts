@@ -102,7 +102,18 @@ export class MemoryRegistry extends Service {
   }
 
   registerProvider(provider: MemoryProvider): () => void {
-    if (this.providers.has(provider.name)) throw new Error(`memory provider "${provider.name}" already registered`)
+    // 1-8/A11: parity with the io and state-storage registries. The three registries serve ONE role
+    // (a provider table on the Service Definition side), and both siblings treat re-registering the
+    // IDENTICAL object as idempotent — they return the original dispose and do not throw, which is
+    // what lets a backend re-apply on HMR (a re-mounted row) without a crash. Memory threw
+    // `already registered` for the same sequence. A DIFFERENT object under a registered name still
+    // throws in all three.
+    const idempotent = this.providers.get(provider.name) === provider
+    if (!idempotent && this.providers.has(provider.name)) throw new Error(`memory provider "${provider.name}" already registered`)
+    if (idempotent) {
+      const existing = this.disposals.get(provider.name)
+      if (existing !== undefined) return existing
+    }
     this.providers.set(provider.name, provider)
     if (this.providerName && provider.name !== this.providerName && !this.providers.has(this.providerName) && !this.pinWarned) {
       this.pinWarned = true

@@ -90,6 +90,22 @@ describe('MemoryRegistry', () => {
     expect(ctx.memory.provider()).toBe(first)
   })
 
+  it('1-8/A11: re-registering the SAME object is idempotent, exactly like the io and state-storage registries', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    const first = ctx.memory.registerProvider(provider)
+    // The same backend re-applying (HMR of a re-mounted row) gets the ORIGINAL handle instead of a
+    // throw — before this, the identical sequence that io/state-storage accept crashed here.
+    const again = ctx.memory.registerProvider(provider)
+    expect(again).toBe(first)
+    expect(await ctx.memory.read('memory')).toEqual(['a'])
+    // A DIFFERENT object under the same name is still a conflict (the fail-loud case the throw
+    // exists for), and disposing through the returned handle leaves the registry empty.
+    expect(() => ctx.memory.registerProvider({ ...provider })).toThrow(/already registered/)
+    again()
+    expect(() => ctx.memory.read('memory')).toThrow(/no provider/)
+  })
+
   it('v35 R1: a stale dispose handle cannot remove a newer registration of the same object', async () => {
     const ctx = new Context()
     await ctx.plugin(MemoryRegistry)
