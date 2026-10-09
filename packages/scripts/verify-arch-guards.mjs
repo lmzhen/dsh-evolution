@@ -683,12 +683,10 @@ const RULES = [
  * entry without them is a bug in this register, not a note. The debt is printed on
  * every run so it cannot be forgotten silently (the F-103 vacant-guard class). */
 const GUARD_VACUITY = [
-  {
-    guard: 'verify-skill-roots.mjs',
-    emptyInput: 'declared === 0: no cordis row declares a skills root, so the only failing comparison never runs and the guard exits 0',
-    expiry: 'S3.8 (group 3)',
-    evidence: 'A83 — declared=0 distinct=0 excluded=1 with EXIT=0; the row parser also mis-attributes a root that precedes its name',
-  },
+  // EMPTY since v46 S3.8: the one entry (verify-skill-roots.mjs, expiry S3.8) is CLOSED — the
+  // guard now judges the EFFECTIVE roots of every derived skill-root consumer (non-vacuous with
+  // zero declared rows, which is the shipped state) and exits 2 when the derivation itself comes
+  // back empty. A new entry here means a guard that can only pass.
 ]
 
 /**
