@@ -22,50 +22,33 @@ export const inject = ['slots', 'locale']
 export const PANEL_ORDER = 35
 
 /**
- * The row's icon: a platform-style line glyph, whose SIZE comes from the sidebar's contract and whose
- * glyph BOX is the one the neighbouring rows draw at.
+ * The row's icon: a platform-style line glyph, drawn at the edge the sidebar asks for.
  *
- * Size: the platform hands every `sidebar.panellist` occupant `{ size, active }` (`SidebarRoot.tsx`
- * `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, …)`), so the glyph takes its size
- * from that prop; a glyph that sizes itself from CSS (`width: 100%`) resolves against an unsized flex
- * box and fills the whole column.
+ * The sidebar hands every `sidebar.panellist` occupant `{ size, active }` — its panel row renders
+ * `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, { only: id })` and owns the glyph
+ * slot, its inset and the gap to the label (`ui-sidebar/src/client/SidebarRoot.tsx`) — so the glyph
+ * takes BOTH its edge and its box from that prop, exactly as the platform's own occupants do: their
+ * `PluginsPanelIcon` and `TaskManagerIcon` hand `size` straight to their primitive.
  *
- * Box: the three rows above (task board / SSH / skill centre) are NOT slot occupants — they inject
- * plain DOM into the sidebar with their own CSS (`.entry{padding:0 10px;gap:8px}` plus a 24px icon box
- * holding an 18px glyph, `shared/client/sidebar-entry-core.ts`), so their glyph ink starts 13px into
- * the column and their label 42px. Inside the platform panel row (8px padding, 8px gap) those two
- * lines are reached by a 26px box: `8 + (26 - 16) / 2 = 13` and `8 + 26 + 8 = 42`.
- * Matching the neighbours is a CHOICE (the platform's own rows below — the workspace folders — sit at
- * 8px and 32px); it keeps the four plugin rows reading as one column. The label carries the accessible
- * name, so the glyph stays decoration.
+ * A box of our own, sized to some other row's pixels, moves this label out of the column: measured in
+ * the desktop's global panel list (2026-10-09, 0.2.0) a 26px box put the label at 56px while the
+ * platform's own rows in that list sat at 46px. The label carries the accessible name, so the glyph
+ * stays decoration.
  */
-
-/** The glyph box in px: the neighbours' 24px icon box, placed to land on their two content lines. */
-const GLYPH_BOX = 26
 
 /** The glyph's own coordinate system: every path below is drawn inside 16 units. */
 const GLYPH_UNITS = 16
 
-/**
- * Trim a computed viewBox number: three decimals stay readable and are far below one pixel.
- * @param value - the raw number.
- * @returns the value rounded to three decimals.
- */
-function round3(value: number): number {
-  return Math.round(value * 1000) / 1000
-}
+/** The edge to draw at when the sidebar hands no size: its collapsed column asks for 18. */
+const DEFAULT_GLYPH_SIZE = 18
 
 function PanelIcon(props: { size?: number; active?: boolean } = {}): unknown {
-  const size = typeof props.size === 'number' && props.size > 0 ? props.size : 18
-  // Scale the 16-unit glyph to `size` px and centre it: the viewBox widens to the number of units that
-  // fills the box, and the glyph sits in the middle of it, so the ink starts (GLYPH_BOX - size) / 2 in.
-  const units = round3((GLYPH_UNITS * GLYPH_BOX) / size)
-  const inset = round3((units - GLYPH_UNITS) / 2)
+  const size = typeof props.size === 'number' && props.size > 0 ? props.size : DEFAULT_GLYPH_SIZE
   return createElement('svg', {
     'aria-hidden': 'true',
-    width: String(GLYPH_BOX),
-    height: String(GLYPH_BOX),
-    viewBox: String(-inset) + ' ' + String(-inset) + ' ' + String(units) + ' ' + String(units),
+    width: String(size),
+    height: String(size),
+    viewBox: '0 0 ' + String(GLYPH_UNITS) + ' ' + String(GLYPH_UNITS),
     fill: 'none',
     stroke: 'currentColor',
     strokeWidth: '1.5',

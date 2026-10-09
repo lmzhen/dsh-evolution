@@ -12,12 +12,13 @@
  * resolves) and out of `tsconfig.host.json`, which includes the family's plain `tests` TypeScript files but
  * client-suffixed specs.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/client/index.ts'
 import { CLIENT_ROW_SEATS } from '../src/client/generated-params.ts'
 import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey } from '../src/client/seam.ts'
+import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/client/source.ts'
 
 /**
  * `createElement` narrowed for the renderer: this package carries its own minimal ambient React surface, so
@@ -26,7 +27,7 @@ import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey } from '../s
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
 
-interface Registration { name: string; key: string; id: string; component: unknown }
+interface Registration { name: string; key: string; id: string; component: unknown; inject: () => unknown }
 
 /** The keyed-entry filter the shell passes to `renderSlot` (only `entryKey` is used here). */
 interface SlotFilter { entryKey?: unknown }
@@ -67,20 +68,30 @@ function fakeSeat(): { get: (id: string) => unknown } {
 
 function fakeShell(options: { seat?: boolean } = {}): { ctx: Parameters<typeof apply>[0]; registrations: Registration[] } {
   const registrations: Registration[] = []
+  const seat = fakeSeat()
   const ctx = {
     effect: (fn: () => unknown): (() => void) => {
       const dispose = fn()
       return typeof dispose === 'function' ? dispose as () => void : () => {}
     },
     locale: { register: () => () => {}, bind: () => (key: string) => key },
-    get: (name: string) => name === 'configForms' && options.seat !== false ? fakeSeat() : undefined,
+    // One seat INSTANCE per shell, the way the platform's service registry answers it: the probe
+    // runs on every read, so a fresh seat per call would hide a binding bug.
+    get: (name: string) => name === 'configForms' && options.seat !== false ? seat : undefined,
     slots: {
       inject: (_name: string, callback: () => Generator<unknown, void, unknown>): void => {
         for (const registration of callback()) void registration
       },
       register: (options: unknown, component: unknown): (() => void) => {
         const bag = (options ?? {}) as Record<string, unknown>
-        registrations.push({ name: field(bag, 'name'), key: field(bag, 'key'), id: field(bag, 'id'), component })
+        const inject = bag['inject']
+        registrations.push({
+          name: field(bag, 'name'),
+          key: field(bag, 'key'),
+          id: field(bag, 'id'),
+          component,
+          inject: typeof inject === 'function' ? inject as () => unknown : () => ({}),
+        })
         return () => {}
       },
     },
@@ -155,5 +166,119 @@ describe('the evolution settings section', () => {
     }))
     expect(document.body.textContent).toContain('seatMissing')
     cleanup()
+  })
+})
+
+/**
+ * The 0.17.0 desktop failure, pinned.
+ *
+ * The renderer binds these sources through `useSyncExternalStoreWithSelector`, which compares
+ * `getSnapshot()`'s result BY REFERENCE. A projection that builds a new object per call never
+ * compares equal, so every card re-rendered until React aborted it (minified invariant #185) and
+ * the slot error boundary replaced all five of them with empty placeholders. The same seam also
+ * has to survive a seat that is not composed yet, because the section activates before the
+ * settings shell that provides its seat; a throw from `getSnapshot()` happens inside the
+ * renderer's pass, so a projection failure has to come back as a value.
+ */
+describe('the row source the renderer binds', () => {
+  /** A form whose snapshot is ONE object until a write lands, the way the platform's store does it. */
+  function fakeForm(): { form: unknown; patch: (next: Record<string, unknown>) => void; break: () => void } {
+    let raw: Record<string, unknown> = { status: 'ready', value: { memoryBudget: 1 }, user: {}, writable: true }
+    let broken = false
+    const form = {
+      getSnapshot: (): unknown => {
+        if (broken) throw new Error('fixture: projecting this row failed')
+        return raw
+      },
+      subscribe: () => () => {},
+      set: async () => true,
+      unset: async () => true,
+    }
+    return {
+      form,
+      patch: (next: Record<string, unknown>) => { raw = { ...raw, ...next } },
+      break: () => { broken = true },
+    }
+  }
+
+  /** A probe that answers one form: a settings seat that is already composed. */
+  function probeOf(form: unknown): SeatProbe {
+    return (() => ({ get: () => form })) as unknown as SeatProbe
+  }
+
+  it('hands the renderer one object per unchanged raw snapshot', () => {
+    const { form } = fakeForm()
+    const source = createSourceCache(probeOf(form)).sourceFor('memory-files')
+
+    const first = source.getSnapshot()
+    expect(first.status).toBe('ready')
+    expect(source.getSnapshot()).toBe(first)
+  })
+
+  it('re-projects when the raw snapshot moves, and only then', () => {
+    const { form, patch } = fakeForm()
+    const source = createSourceCache(probeOf(form)).sourceFor('memory-files')
+    const first = source.getSnapshot()
+
+    patch({ value: { memoryBudget: 5 } })
+    const second = source.getSnapshot()
+    expect(second).not.toBe(first)
+    expect((second.value as Record<string, unknown>)['memoryBudget']).toBe(5)
+    expect(source.getSnapshot()).toBe(second)
+  })
+
+  it('reports a failing projection as the frozen unavailable state, and logs it once', () => {
+    const { form, break: breakForm } = fakeForm()
+    const source = createSourceCache(probeOf(form)).sourceFor('memory-files')
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(source.getSnapshot().status).toBe('ready')
+      breakForm()
+
+      expect(() => source.getSnapshot()).not.toThrow()
+      expect(source.getSnapshot()).toBe(PROJECTION_FAILED)
+      expect(source.getSnapshot().reason).toBe('projection-failed')
+      expect(logged).toHaveBeenCalledTimes(1)
+    } finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('caches one source per namespace, so the renderer keeps one hook binding', () => {
+    const { form } = fakeForm()
+    const cache = createSourceCache(probeOf(form))
+
+    expect(cache.sourceFor('memory-files')).toBe(cache.sourceFor('memory-files'))
+    expect(cache.sourceFor('memory-files')).not.toBe(cache.sourceFor('memory-notes'))
+  })
+
+  it('serves a row whose seat is composed only after the source was built', () => {
+    const { form } = fakeForm()
+    const holder: { seat?: unknown } = {}
+    const source = createSourceCache((() => holder.seat) as unknown as SeatProbe).sourceFor('memory-files')
+
+    expect(source.getSnapshot()).toBe(SEAT_MISSING)
+
+    holder.seat = { get: () => form }
+    const ready = source.getSnapshot()
+    expect(ready.status).toBe('ready')
+    expect(source.getSnapshot()).toBe(ready)
+  })
+
+  it('forwards the form to its listeners and lets the last one detach', () => {
+    const { form } = fakeForm()
+    let tell: () => void = () => {}
+    const live = {
+      ...(form as Record<string, unknown>),
+      subscribe: (listener: () => void) => { tell = listener; return () => { tell = () => {} } },
+    }
+    const source = createSourceCache(probeOf(live)).sourceFor('memory-files')
+
+    let heard = 0
+    const off = source.subscribe(() => { heard += 1 })
+    tell()
+    expect(heard).toBe(1)
+    off()
+    expect(heard).toBe(1)
   })
 })

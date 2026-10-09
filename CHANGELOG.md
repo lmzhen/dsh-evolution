@@ -1,6 +1,19 @@
 # Changelog
 
 
+## 0.17.1 (patch) — 设置参数卡整片消失、侧栏行错位：两处「跨半契约的隐式假设」
+
+> **由来**：0.17.0 在桌面真机（0.2.0-rc.2 Electron ＋ CDP 直读 DOM）暴露两个界面缺陷：① 设置 →「自进化」的 6 个 group 里 5 个只剩 `<div data-slot-error="evolution.namespace.card">` 空占位，console 同一处报 5 次 `Minified React error #185`；② 左侧「全局面板」三行几何不一致——平台的 插件／自动化任务 两行字形盒 16px、标题左边缘 46px，家族「技能历史」26px／56px。
+> **根因①（快照引用）**：`evolution-settings-ui/src/client/source.ts` 的 `getSnapshot: () => sectionSnapshotOf(form.getSnapshot())` **每次调用都新建对象**。渲染器把 inject face 的 `hooks` 隔间里的裸 observable 绑成 `use<Name>`（`useSyncExternalStoreWithSelector`），而该钩子要求「事实变化前快照保持同一引用」（平台 `packages/client/AGENTS.md` 的 Reactive 纪律；平台自己的 `ConfigFormController.getSnapshot()` 文档写明同一口径）。引用每次都变 ⇒ 无限重渲染 ⇒ React #185 ⇒ 被平台的 `SlotErrorBoundary` 吞成错误占位，页面上只表现为「卡片消失」。同页的「待批写入」卡无恙，因为它的 inject face **没有 hooks 隔间**，不走 uSES。
+> **根因②（像素盒）**：`evolution-skill-history/src/client/index.ts` 用 `GLYPH_BOX = 26`，注释里把「任务看板／SSH／技能中心」三个**注入裸 DOM** 的邻居行的 24px 图标盒当成了契约；而平台通过 `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, { only: id })` 把尺寸交给占用者，平台自己的两行按 16 画。该文件**不在** 0.16.1→0.17.0 的适配清单里（适配的 30 个 src 文件里没有它），迁移时没人复核它的几何。
+> **抽象成一类**：**跨半契约的隐式假设**——家族对平台只做一跳式读取，并把自己一侧的实现细节（快照引用、像素盒）当成稳定契约；平台侧演进后不报错、不写日志，只表现为「整片消失／错位」。
+> **修法①（惰性座位＋按引用缓存的投影）**：`source.ts` 重写——座位改为**每次读时再探**的可调用探针（`SeatProbe`，apply 期不再捕获 `ctx.get('configForms')` 的结果，因为家族分区可能先于提供座位的设置外壳激活）；投影**按原始快照引用缓存**（同一原始引用返回同一对象，引用变了才重建）；投影失败返回冻结的 `PROJECTION_FAILED`（`getSnapshot` 抛异常发生在渲染器的渲染期，家族 catch 不到，只能给值）；`createSourceCache(probe)` 保证一个命名空间恒为**同一个 source 对象**（渲染器按 source 对象缓存 hook 绑定，每次渲染新建 source 会重绑并重挂载卡片）。卡片对不可用态因此有三条因：`seat-missing`／`projection-failed`／`not-served`，各有自己的白话文案。
+> **修法②（几何归座位）**：`PanelIcon` 直接用座位给的 `size` 画，删掉 `GLYPH_BOX` 与随之而来的 viewBox 缩放；字形盒、内缩与到标签的间距都归平台的行所有。
+> **护栏（接进既有门禁步骤，门禁步数不变）**：`verify-arch-guards.mjs` 新增 **N29**（客户端入口不得把平台服务读进 apply 层的绑定，必须走可调用探针）与 **N30**（observable source 单一归属：`getSnapshot` 只允许定义在 `source.ts`，`hooks` 隔间只允许引用该模块造出的对象）；`verify-client-seats.mjs` 新增 **E 段**（座位传参几何：从平台树**生成**「向占用者传 size 的座位」清单，占用者画出的 `width`/`height` 必须来自 `size`），并给该守卫加了**启动自检**——探针不再咬合就 exit 1，不留「匹配不到东西也算通过」的空转。两条新规则都带自检样例与夹具（`guard-scripts.spec.ts`：真树通过 ＋ 故意违规必红且点名位置与修法）。
+> **验证**：家族测试 193 文件／1870 用例全绿；`tsc -b tsconfig.host.json` 0 错；oxlint 0 警告 0 错；`verify-arch-guards` 31 条规则 0 违规；`verify-client-seats`（含新 E 段）OK；门禁 **26／26** 全绿（前缀 `baseline-019`：tsc-host／oxlint／vitest 193 文件 1870 用例／build-lib 31 包／smoke-built-entries／12 枚守卫／release-rehearsal 打包 31 包／verify-platform-ranges 67 条 range 全 `^0.2.0-rc.1`）。
+> **真机（桌面面；只装桌面 profile，未动 npm／web 面）**：设置 →「自进化」错误占位 0 个、参数卡 6 张、console 干净；左侧「全局面板」三行标题左边缘同为 46px。
+> **平台口径未变**：`PLATFORM_FLOOR=0.2.0-rc.1`、`PLATFORM_VERSION=0.2.0-rc.2`。
+
 ## 0.17.0 (stable) — 平台单线 0.2.x 的首个正式版
 
 > **来历**：`0.17.0-rc.1` 在 npm `next` 上跑完生产安装路径复验后抬为正式版——**包内容与 rc.1 逐字节相同**，本版差异只在版本号与 dist-tag（stable ⇒ `latest`）。

@@ -185,11 +185,15 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const [error, setError] = useState('')
   const [pending, setPending] = useState<readonly PendingWrite[] | null>(null)
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
-  // Two different absences: this UI has no settings seat at all, or the seat serves no
-  // such row. They read the same on screen only if we let them, and the operator's next
-  // move differs (compose the settings surface vs compose the row).
+  // Three different absences, told apart on screen because the operator's next move differs:
+  // this UI has no settings seat (compose the settings surface), the seat serves no such row
+  // (compose the row), or projecting that row failed (read the log). They must never read the
+  // same, and none of them may be a blank card.
   if (snapshot.status === 'unavailable') {
-    return createElement('p', { className: 'evolution-param-note' }, t(snapshot.reason === 'seat-missing' ? 'seatMissing' : 'unavailable'))
+    const key: MessageKey = snapshot.reason === 'seat-missing'
+      ? 'seatMissing'
+      : snapshot.reason === 'projection-failed' ? 'projectionFailed' : 'unavailable'
+    return createElement('p', { className: 'evolution-param-note' }, t(key))
   }
   const user = isSection(snapshot.user) ? snapshot.user : {}
   const value = isSection(snapshot.value) ? snapshot.value : {}

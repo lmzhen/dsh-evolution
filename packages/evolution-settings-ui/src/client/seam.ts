@@ -55,7 +55,7 @@ export interface ParamSectionSnapshot {
    * all, or the seat is there and serves no such row. The two read differently to the
    * operator (one is the UI's own gap, the other is a row that is not composed).
    */
-  reason?: 'seat-missing' | 'not-served'
+  reason?: 'seat-missing' | 'not-served' | 'projection-failed'
 }
 
 /** The reactive source the renderer binds to a `use<Name>` seat. */

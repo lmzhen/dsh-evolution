@@ -15,6 +15,8 @@ Two registrations, one id (`skill-history`), because that is the sidebar's contr
 
 The label is a **thunk**: the sidebar re-reads it on every projection, so a language switch follows without re-registering the row. The body receives plain callbacks through its inject face — no service handle, no subscription, and the component never sees the context.
 
+The icon draws at the edge the sidebar asks for. The seat hands every occupant `{ size, active }` and the panel row owns the glyph slot, its inset and the gap to the label — the platform's own occupants hand that same `size` straight to their primitive — so `PanelIcon` renders its 16-unit glyph at exactly that `size`. A glyph box of our own moves this label out of the column the other panel rows share; ours did, by 10px, until 0.17.1.
+
 ## The host routes
 
 | Method | Path | Use case |

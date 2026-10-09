@@ -96,6 +96,28 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(error).not.toBeNull()
     expect((error as { stderr?: string }).stderr).toContain('DSH_HOME')
   })
+  it('N29/N30: architecture guards reject a captured platform seat and a hand-rolled source', async () => {
+    const root = await tempRoot('guard-arch-client-')
+    const pkg = join(root, 'demo-ui')
+    await mkdir(join(pkg, 'src', 'client'), { recursive: true })
+    await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-demo-ui' }), 'utf8')
+    // N29: the seat read at apply time. On 0.2.0 this shape pinned every card of the row that
+    // activated before the settings shell to the empty state, silently: a missing seat is a legal
+    // answer for an optional-service read.
+    await writeFile(join(pkg, 'src', 'client', 'index.ts'),
+      "export function apply(ctx) {\n  const configForms = ctx.get('configForms')\\n  return configForms\\n}\n", 'utf8')
+    // N30: a hand-rolled source and a hooks member that is an object literal rather than a
+    // reference. The renderer compares the snapshot by reference and caches one hook binding per
+    // source object, so both spellings re-render a card until React aborts it.
+    await writeFile(join(pkg, 'src', 'client', 'card.ts'),
+      "export function face() {\n  const source = { getSnapshot: () => ({ status: 'ready' }), subscribe: () => () => {} }\n  return { hooks: { paramSection: source } }\n}\n", 'utf8')
+    const error = await run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error?.code).toBe(1)
+    expect(error?.stderr).toContain('N29')
+    expect(error?.stderr).toContain('configForms')
+    expect(error?.stderr).toContain('N30')
+  })
 
   it('event pairing reports zero orphans on the real tree and flags an unlistened emit', async () => {
     const ok = await run(process.execPath, [eventPairing, psRoot], { encoding: 'utf8' })
@@ -735,5 +757,24 @@ describe('client-seat guard (G2 sentry)', () => {
     expect(failed?.stderr).toContain('inject requires "ghostService" but no client source reads it')
     expect(failed?.stderr).toContain('dsh.client.inject names "@deepseek-ai/dsh-client-ui-gone"')
     expect(failed?.stderr).toContain('evolution-review: has registry rows but no card in the generated client view')
+  })
+
+  it('E: the seat guard rejects an occupant that draws at a box of its own', async () => {
+    const root = await fixture()
+    // The seat's caller passes the value, and the platform's own occupants hand that size to their
+    // primitive. A family row that draws at a constant of its own still renders: it just moves its
+    // label out of the column (measured on the 0.2.0 desktop, 56px against the platform rows' 46px).
+    await mkdir(join(root, 'upstream', 'packages', 'client', 'ui-sidebar', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'upstream', 'packages', 'client', 'ui-sidebar', 'src', 'client', 'SidebarRoot.tsx'),
+      "export function PanelRow({ wide }) {\n  return renderSlot('sidebar.panellist', { size: wide ? 16 : 18 }, { only: id })\\n}\n", 'utf8')
+    await mkdir(join(root, 'demo-panel', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'demo-panel', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-demo-panel', dsh: { client: { platform: 'web' } } }), 'utf8')
+    await writeFile(join(root, 'demo-panel', 'src', 'client', 'index.ts'),
+      "export const inject = []\n\nfunction PanelIcon(props: { size?: number } = {}): unknown {\n  const box = 26\\n  return createElement('svg', { width: String(box), height: String(box), 'data-size': String(props.size) })\\n}\n\\nexport function apply(slots) {\n  slots.register({ name: 'sidebar.panellist', id: 'demo' }, PanelIcon)\\n}\n", 'utf8')
+    const failed = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(failed?.code).toBe(1)
+    expect(failed?.stderr).toContain('occupant of sidebar.panellist (PanelIcon)')
+    expect(failed?.stderr).toContain('does not come from size')
   })
 })

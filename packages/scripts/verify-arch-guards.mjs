@@ -205,6 +205,18 @@
  *       byte-changing function (`writeFile(Sync)`, `mkdir(Sync)`, `rm(Sync)`, …) fails: the
  *       client bundle runs in the platform's page, where neither exists, and the host half
  *       owns every byte the family stores.
+ *   N29. a client half reads a platform service through a CALLABLE probe, never into a binding at the
+ *       apply body's level: a value captured once (`const forms = ctx.get('configForms')`) is read
+ *       before the settings shell that provides the seat exists, so the row that activates first
+ *       pins every card to the empty state for the life of its fiber — silently, because a missing
+ *       seat is a legal state for an optional-service read.
+ *   N30. an observable source has ONE owner: `getSnapshot` may be defined only in
+ *       `evolution-settings-ui/src/client/source.ts`, and a `hooks` compartment member must be a
+ *       REFERENCE to what that module built. The renderer caches one hook binding per source object
+ *       and compares the snapshot by reference, so a source built per render re-binds the hook and a
+ *       `getSnapshot` that builds an object per call never compares equal: React aborts the card
+ *       (minified invariant #185) and the slot error boundary swaps it for an empty placeholder —
+ *       which is how all five parameter cards disappeared on the 0.2.0 desktop.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -494,6 +506,8 @@ const RULES = [
   { id: 'N26', title: 'interaction colour only on an element an interaction reaches' },
   { id: 'N27', title: 'client halves take geometry from the scale' },
   { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)' },
+  { id: 'N29', title: 'a client entry reads a platform service through a callable probe' },
+  { id: 'N30', title: 'an observable source has one owner; hooks carry references' },
 ]
 
 /**
@@ -607,6 +621,68 @@ const NODE_SPECIFIER = /(?:^|[^\w.])((?:node:)?(?:fs|fs\/promises|path|os|child_
 
 /** A call that changes bytes on disk. */
 const WRITE_CALL = /\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|mkdir|mkdirSync|rm|rmSync|rmdir|rmdirSync|unlink|unlinkSync|rename|renameSync|truncate|truncateSync|copyFile|copyFileSync|openSync|writeSync|chmod|chmodSync)\s*\(/g
+
+// N29 (0.18): a platform service captured into a binding at the apply body's level. Heuristic
+// boundary (single-line, like N3): the statement's indentation is what separates an apply-time
+// capture (0-2 spaces) from a per-call read inside a callback body (4+ spaces, which is legal and
+// deliberate); a capture written at 2 spaces inside a nested block is a false positive, and one
+// indented 4 spaces at apply level is a false negative. The scope is a client half's ENTRY file.
+const SERVICE_CAPTURE_RE = /^(?: {0,2}|\t)(?:const|let|var)\s+([A-Za-z_$][\w$]*)[^=\n]*=[ \t]*ctx\.get\(/gm
+
+/** The ONE module allowed to define an observable source (N30). */
+const OBSERVABLE_OWNER = 'evolution-settings-ui/src/client/source.ts'
+
+/** A snapshot accessor written in a client half: only the owner module may spell one (N30). */
+const SNAPSHOT_DEFINITION_RE = /\bgetSnapshot\s*[:=]/g
+
+/** A `hooks` compartment, whose members must reference an owner-built source (N30). */
+const HOOKS_COMPARTMENT_RE = /\bhooks\s*:\s*\{([^}]*)\}/g
+
+/**
+ * N29 (0.18): a platform service read into a BINDING at the apply body's level, in a client entry.
+ *
+ * The renderer re-reads a card's data at render time, so a service captured once during apply is read
+ * before the settings shell that provides the seat exists. The row that activates first then pins
+ * every card to the empty state for the life of its fiber, and nothing logs: `ctx.get` is the
+ * optional-service read, and "no seat yet" is a legal answer. Read through a callable probe instead.
+ * @param text - the file's source.
+ * @returns the captured binding names, in file order.
+ */
+function platformServiceCaptures(text) {
+  const stripped = withoutComments(text)
+  return [...stripped.matchAll(SERVICE_CAPTURE_RE)].map(match => match[1])
+}
+
+/**
+ * N30 (0.18): a hand-rolled observable source inside a client half.
+ *
+ * `hooks` compartments carry BARE observables; the renderer binds each one to a `use<Name>` hook and
+ * caches that binding per SOURCE object, and it compares the snapshot BY REFERENCE. A source built per
+ * render therefore re-binds the hook, and a `getSnapshot` that builds an object per call never compares
+ * equal — React aborts the card with minified invariant #185 and the slot error boundary replaces it
+ * with an empty placeholder. Both facts live in ONE owner module, and a `hooks` member may only
+ * reference what that module built.
+ * @param text - the file's source.
+ * @returns every hand-rolled source and every non-reference hooks member found.
+ */
+function handRolledSources(text) {
+  const stripped = withoutComments(text)
+  const findings = (stripped.match(SNAPSHOT_DEFINITION_RE) ?? []).map(() => 'getSnapshot defined outside ' + OBSERVABLE_OWNER)
+  for (const match of stripped.matchAll(HOOKS_COMPARTMENT_RE)) {
+    for (const member of (match[1] ?? '').split(',')) {
+      const part = member.trim()
+      if (part === '') continue
+      const colon = part.indexOf(':')
+      if (colon < 0) {
+        findings.push('hooks carries a spread: ' + part)
+        continue
+      }
+      const value = part.slice(colon + 1).trim()
+      if (!/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(value)) findings.push('hooks member is not a reference: ' + part)
+    }
+  }
+  return findings
+}
 
 /**
  * E1 (0.15): a browser half importing a Node builtin, or writing to disk.
@@ -1172,6 +1248,20 @@ if (process.argv.includes('--list-rules')) {
       && clientHostOffenders("import { renderMarkdown } from './markdown.ts'").length === 0
       && clientHostOffenders("await writeFile(target, bytes)").length === 1
       && clientHostOffenders('const text = readFile(path)').length === 0],
+    // N29: the INCIDENT shape (a seat captured in the apply body) AND the two shapes that must pass —
+    // the callable probe that replaced it, and a per-call read inside a callback body.
+    ['N29', () => platformServiceCaptures("  const configForms = ctx.get('configForms') as ConfigFormsSeat | undefined").length === 1
+      && platformServiceCaptures("  const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined").length === 0
+      && platformServiceCaptures("    const seat = ctx.get('configForms')\n    if (seat === undefined) return").length === 0
+      && platformServiceCaptures("//  const configForms = ctx.get('configForms') in prose only").length === 0
+      && platformServiceCaptures("const seam = ctx as unknown as ClientSeam").length === 0],
+    // N30: the incident shape (a source object built inline), the reference form that must pass, and
+    // the same mistake written as a call inside the compartment.
+    ['N30', () => handRolledSources("const source = { getSnapshot: () => ({ value: 1 }), subscribe: () => () => {} }").length > 0
+      && handRolledSources("hooks: { paramSection: source }").length === 0
+      && handRolledSources("hooks: { paramSection: sources.sourceFor('memory-files') }").length > 0
+      && handRolledSources('hooks: { ...spread }').length > 0
+      && handRolledSources('// hooks: { paramSection: buildOne() } in prose only').length === 0],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {
@@ -1304,9 +1394,9 @@ if (orphanKeys.length > 0) {
   // "did anything get scanned at all" class.
   void clientFilesScanned
 }
-// N25/N26/N27/E1 (0.15): four more answers about the same client halves N24 walks. They are one
-// block on purpose — the rule family is "a browser half can only use what the platform gives it",
-// and splitting the walk four ways would scan the same files four times for one verdict each.
+// N25/N26/N27/E1/N29/N30 (0.15, 0.18): six more answers about the same client halves N24 walks. They
+// are one block on purpose — the rule family is "a browser half can only use what the platform gives
+// it", and splitting the walk six ways would scan the same files six times for one verdict each.
 {
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory() || SKIP.has(entry.name)) continue
@@ -1334,6 +1424,23 @@ if (orphanKeys.length > 0) {
         const host = clientHostOffenders(text)
         if (host.length > 0) {
           violations.push(`browser half reaches for the host runtime (N28/E1): ${file} — ${host.slice(0, 4).join(' | ')}`)
+        }
+        const fileKey = file.split('\\').join('/')
+        // N29 is scoped to the client ENTRY (the apply body): a platform seat read there can land
+        // before the plugin that provides it, while the same read inside a helper the entry calls
+        // per event is a deliberate per-call read. Documented false negative: a capture inside a
+        // helper the entry calls AT APPLY time.
+        if (/(^|\/)src\/client\/index\.ts$/.test(fileKey)) {
+          const captures = platformServiceCaptures(text)
+          if (captures.length > 0) {
+            violations.push(`client entry captures a platform service in a binding (N29): ${file} — ${captures.join(', ')} (read it through a callable probe: the settings shell that provides the seat may activate after this row)`)
+          }
+        }
+        if (fileKey !== OBSERVABLE_OWNER) {
+          const sources = handRolledSources(text)
+          if (sources.length > 0) {
+            violations.push(`client half hand-rolls an observable source (N30): ${file} — ${sources.slice(0, 3).join(' | ')} (one owner: ${OBSERVABLE_OWNER}; the renderer caches one hook binding per source object and compares the snapshot by reference)`)
+          }
         }
       }
     }
@@ -1367,7 +1474,7 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), no literal type/colour in the client halves (N24), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), ${docFactSummary})`)
+  console.log(`verify-arch-guards: OK — ${RULES.length} rule(s) clean (--list-rules prints the registry): no DSH_HOME reads outside ${CORE_SRC} (N1), single-source contracts intact (N2), all numeric fields clamped (N3), no ghost evolution* service keys (H2), no ApprovalPolicyLike/effectiveSessionPolicy copies outside ${APPROVAL_SRC} (N2), kernel imports only L0 seams (N5), composition bundles carry no runtime code (N6), every SkillLibrary built through core's helper (N7 — ${SKILL_LIBRARY_TODO.size} exception(s)), no published ./invariant companion (N8), no literal type/colour in the client halves (N24), format-control classes single-sourced (N9), no undocumented platform service probe (N10), ONE reader for the platform dispatch vocabulary (N11), every module-scope mutable store registered (N12 — ${MUTABLE_STATE.size} entries), no must-execute payload on the non-waking primitive outside the register (N13a — ${INJECT_SITES.size} debts), no wake primitive read into a local (N13b), every durable-read-failure swallow registered (N14 — ${SWALLOW_CATCH.size} entries), every family Markdown code anchor resolves (N15), every platform registry read asks in the calling scope (N16 — ${SCOPE_READ_REGISTER.size} registered global read(s)), every dispatch-modality branch registered (N17 — ${MODALITY_BRANCH_REGISTER.size} branch(es)), every session/event consumer consults the opt-in gate (N18 — ${SESSION_GATE_REGISTER.size} exception(s)), every declared persisted write site matches its writer's serialization (N20 — ${writeInventoryCount} site(s)), every client entry reads its platform seats through a callable probe (N29) and builds its observable source in the one owner module (N30), ${docFactSummary})`)
 }
 // P3-2 (v14): the N4 "dead-fallback return" listing was REMOVED. Its heuristic
 // matched `?? ''` / `?? <id>Id` textually with no type information, so all 78

@@ -35,7 +35,7 @@ import { ParamCard, type ParamCardFace } from './ParamCard.ts'
 import { RowConfigCard, type RowConfigFace } from './RowConfigCard.ts'
 import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
 import { SettingsSection } from './SettingsSection.ts'
-import { sourceFor, writeFaceFor } from './source.ts'
+import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
 
 /**
@@ -95,10 +95,15 @@ export function apply(ctx: ClientContext): void {
     }
     return bound(key)
   }
-  // G2: the client settings seat, probed (see `inject`). Without it every card renders
-  // the stated empty state and the Plugins page says the same — never a blank card and
-  // never a thrown render.
-  const configForms = ctx.get('configForms') as ConfigFormsSeat | undefined
+  // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
+  // renders the stated empty state and the Plugins page says the same — never a blank card
+  // and never a thrown render. The probe must not be captured here: this row may activate
+  // BEFORE the settings shell that declares `settings.section` and provides `configForms`,
+  // and a captured `undefined` would pin every card to the empty state for the life of the
+  // fiber. `sourceFor` reads the probe on each render, when the shell is necessarily active.
+  const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined
+  const sources = createSourceCache(probe)
+  ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')
 
   seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({
@@ -113,8 +118,8 @@ export function apply(ctx: ClientContext): void {
 
   seam.slots.inject(CARD_SLOT, function* () {
     for (const section of CLIENT_PARAM_SECTIONS) {
-      const source: ParamSectionSource = sourceFor(configForms, section.namespace)
-      const { write, clear } = writeFaceFor(configForms, section.namespace)
+      const source: ParamSectionSource = sources.sourceFor(section.namespace)
+      const { write, clear } = writeFaceFor(probe, section.namespace)
       const face = (): ParamCardFace => ({
         namespace: section.namespace,
         fields: section.fields,
