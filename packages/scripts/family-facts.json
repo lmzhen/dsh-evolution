@@ -41,6 +41,48 @@
   },
   "facts": [
     {
+      "id": "event-mode",
+      "title": "the family's own process events: the set, and the mode each one declares",
+      "home": "evolution-core/README.md",
+      "machine": {
+        "kind": "event-mode"
+      },
+      "must": [
+        {
+          "text": "## Events (the family's own, process-local)"
+        },
+        {
+          "text": "`evolution/skill-mutated`"
+        },
+        {
+          "text": "`evolution/skills-refresh`"
+        },
+        {
+          "text": "`evolution/review-scheduled`"
+        },
+        {
+          "text": "`evolution/review-error`"
+        },
+        {
+          "text": "`evolution/plan-applied`"
+        },
+        {
+          "text": "`evolution/memory-applied`"
+        },
+        {
+          "text": "the `@mode`",
+          "unique": true
+        }
+      ],
+      "forbid": [
+        {
+          "re": "There is no `evolution/",
+          "why": "the family DOES emit process events (six of them); a document may not deny the set the emit sites re-derive"
+        }
+      ],
+      "cites": []
+    },
+    {
       "id": "gate-set",
       "title": "the gate's step set: what runs where, plus the two exception registers",
       "home": "repo:CONTRIBUTING.md",

@@ -46,3 +46,23 @@ section, and importing the package root is its only entry.
 - When the backend provides `transact` (nodeEvolutionIo and the io adapter do), the constructor binds it BY DEFAULT since 0.3.27: the single-file entry points (`update`, `patch`, `writeSupportFile`, and each per-file piece of `restructure`) run their read→write inside the cross-process lock for every instantiation, so same-file concurrent writes from different processes no longer resolve to last-writer-wins there.
 - The two-phase paths deliberately stay outside that lock: `create`'s exists probe runs inside the transact when a transact backend is bound (v18), so only a transact-less custom backend can still double-pass the probe across processes; `archive`/`consolidate` are rename-based with best-effort rollback (an archive loser's rollback surfaces the raw failure when the source vanished), and `restructure`'s multi-file swap can expose an interleaved tree to a concurrent reader.
 - These residual windows are documented rather than locked: cross-process writers to the SAME skill file should serialize through the single-file paths above.
+
+## Events (the family's own, process-local)
+
+Six process events ride the cordis bus (`evolution-core/src/events.ts` declares the payloads;
+producers call `ctx.emit`, consumers `ctx.on`). They are NOT session events — appending one to a
+session log made the session unresumable (A-line P0-1), which is why the payload file says so.
+
+| event | mode today | emitted by |
+|---|---|---|
+| `evolution/skill-mutated` | emit (notification) | `evolution-core` skill store |
+| `evolution/skills-refresh` | emit (notification) | `evolution-commands` `/evolution` verbs |
+| `evolution/review-scheduled` | emit (notification) | `evolution-review` cadence paths |
+| `evolution/review-error` | emit (notification) | `evolution-review` failure paths |
+| `evolution/plan-applied` | emit (notification) | `evolution-review` after a plan lands |
+| `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
+
+The mode column is what the code does today: every one of them is an announcement, and the `@mode`
+declarations land with finding O-1 — the machine check here (`machine.kind = event-mode`) re-derives
+the SET from the emit sites, so an event added or renamed in code without this table fails N19.
+

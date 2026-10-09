@@ -64,6 +64,22 @@ export function factTableProblems(asset) {
 }
 
 /**
+ * Collect the family's own event names from the production emit sites.
+ * @param dir - a package's `src` directory.
+ * @param names - the accumulator set.
+ */
+function collectEmittedEvents(dir, names) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) { collectEmittedEvents(full, names); continue }
+    if (!entry.name.endsWith('.ts')) continue
+    const text = readText(full)
+    if (text === null) continue
+    for (const match of text.matchAll(/ctx\.emit\('(evolution\/[a-z-]+)'/g)) names.add(match[1])
+  }
+}
+
+/**
  * Read a machine owner, which may be a REPO-scope asset rather than a file under the packages
  * root: the release workflow lives at `<repo>/.github/workflows/`, so the same declaration must
  * resolve from the mirror (`packages` → `<repo>`) and from a build overlay that mirrors only
@@ -85,6 +101,32 @@ function machineViolations(fact, root, docs, home, repoScope) {
   const out = []
   const machine = fact.machine
   if (machine === undefined) return out
+  if (machine.kind === 'event-mode') {
+    // v46 S2.5 (finding O-1): the family's own event SET is re-derived from the production emit
+    // sites. The home states the set and the mode each event carries today; an event added,
+    // renamed or dropped in code without the table fails here. The group-6 rule (N33, `@mode`)
+    // reads this fact instead of restating the list.
+    const names = new Set()
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const src = join(root, entry.name, 'src')
+      if (existsSync(src)) collectEmittedEvents(src, names)
+    }
+    if (names.size === 0) {
+      out.push(`${fact.home}: no ctx.emit('evolution/…') site found under ${root} — the event set cannot be re-derived (a vacuum pass is not a pass)`)
+      return out
+    }
+    for (const name of [...names].sort()) {
+      if (!home.includes(name)) out.push(`${fact.home}: ${name} is emitted in the sources but the home does not list it — this table is the set's ONE home`)
+    }
+    // The reverse direction too: a row for an event no source emits any more is a stale entry in
+    // the set's home (the rename case, which a forwards-only check never sees).
+    const listed = new Set([...home.matchAll(/\| `(evolution\/[a-z-]+)` \|/g)].map(match => match[1]))
+    for (const name of listed) {
+      if (!names.has(name)) out.push(`${fact.home}: lists ${name}, which no production source emits — a stale row in the event set's home`)
+    }
+    return out
+  }
   const owner = readMachineText(root, machine)
   const text = owner === null ? null : owner.text
   if (text === null) {
