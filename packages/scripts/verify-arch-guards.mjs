@@ -219,12 +219,19 @@
  *       `getSnapshot` that builds an object per call never compares equal: React aborts the card
  *       (minified invariant #185) and the slot error boundary swaps it for an empty placeholder —
  *       which is how all five parameter cards disappeared on the 0.2.0 desktop.
- *   N31. the settings USER LAYER is read in exactly ONE place: `evolution-core/src/params.ts`
+ *   N34. the settings USER LAYER is read in exactly ONE place: `evolution-core/src/params.ts`
  *       (`userSetKeys(ctx, paramRowId(owner))`). A package that reads
  *       `describe({ redactSecrets: false })` and takes `Object.keys(entry.user)` for itself holds a
  *       second copy of a platform fact, and the precedence rule (user > policy > row) can then
  *       resolve one key two ways — the four copies that had grown (review, curator, memory-files,
  *       tool-skill-manage) each carried their own clamp-and-warn helper beside them too.
+ *   N35. a PLATFORM `file:line` citation is a FROZEN BASELINE. N15 resolves the family's own
+ *       anchors; a platform path names another repository's file, so its line number rots at every
+ *       upstream bump and nothing here can re-derive it. 55 such cites exist at this revision
+ *       (hand-checked then, T2-08/A23 is where they surfaced). The rule freezes the count PER FILE:
+ *       a new citation fails, and the register burns down as files are touched — the fix is the one
+ *       S2.7 applied to the family's own comments, a symbol citation instead of a line number.
+ *       `packages/docs/**` (the machine-local archive) is fenced by name.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -331,7 +338,7 @@ function namespaceSplits(text) {
   return out
 }
 /**
- * N31: a settings USER-LAYER key read outside evolution-core.
+ * N34: a settings USER-LAYER key read outside evolution-core.
  * @param text - one file's source.
  * @returns the offending excerpt, one entry per read.
  */
@@ -340,6 +347,59 @@ function settingsUserLayerReads(text) {
   for (const match of text.matchAll(/Object\.keys\([A-Za-z_$][\w$]*\?\.user \?\? \{\}\)/g)) out.push(match[0])
   return out
 }
+/**
+ * N35: PLATFORM (another repository's) `file:line` citations in this tree.
+ *
+ * A citation resolves as a family anchor when its path exists under the root; anything else names a
+ * file this repository does not own.
+ * @param root - the family root.
+ * @param text - one file's source.
+ * @returns the cited strings that do not resolve inside the family tree.
+ */
+function platformCiteSites(root, text) {
+  const out = []
+  for (const match of text.matchAll(/(?<![\w/.-])(?:packages\/)?(?:[a-z0-9-]+\/)+[A-Za-z0-9_.-]+\.(?:ts|mjs|cjs):\d+/g)) {
+    const path = match[0].replace(/:\d+$/, '').replace(/^packages\//, '')
+    if (existsSync(join(root, path))) continue
+    out.push(match[0])
+  }
+  return out
+}
+
+/** N35's frozen baseline: how many platform line-cites each file carried when the rule landed
+ * (S2.9, after A23 surfaced the class). Burn-down only: as a file is touched, convert its cites to
+ * symbol citations and lower its number here. A file absent from this map may carry none. */
+const PLATFORM_CITE_BASELINE = new Map([
+  ['evolution-commands/src/index.ts', 3],
+  ['evolution-core/src/constants.ts', 1],
+  ['evolution-core/src/io.ts', 1],
+  ['evolution-core/src/opt-in.ts', 1],
+  ['evolution-core/src/preset-composition.ts', 1],
+  ['evolution-core/src/scope.ts', 2],
+  ['evolution-core/src/session-projection.ts', 2],
+  ['evolution-core/src/tool-dispatch.ts', 4],
+  ['evolution-core/tests/preset-composition.spec.ts', 1],
+  ['evolution-core/tests/tool-dispatch.spec.ts', 2],
+  ['evolution-curator/src/index.ts', 4],
+  ['evolution-host/tests/guard-scripts.spec.ts', 1],
+  ['evolution-host/tests/installer-preset-base.spec.ts', 1],
+  ['evolution-host/tests/installer.spec.ts', 1],
+  ['evolution-maintenance/src/tools.ts', 1],
+  ['evolution-review/src/index.ts', 4],
+  ['evolution-review/src/review-notice.ts', 1],
+  ['evolution-review/tests/review.spec.ts', 1],
+  ['evolution-settings-ui/src/client/seam.ts', 1],
+  ['memory-files/src/index.ts', 1],
+  ['scripts/gen-param-client-view.mjs', 1],
+  ['scripts/install-layered.mjs', 2],
+  ['scripts/verify-arch-guards.mjs', 5],
+  ['scripts/verify-param-channel-parity.mjs', 4],
+  ['scripts/verify-platform-contract.mjs', 2],
+  ['tool-memory/src/index.ts', 1],
+  ['tool-skill-manage/src/index.ts', 5],
+  ['tool-skill-manage/tests/skill-settings.spec.ts', 1],
+])
+
 const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
 const DSH_HOME_RE = /process\.env\.DSH_HOME|process\.env\[['\"]DSH_HOME['\"]\]/
@@ -609,7 +669,8 @@ const RULES = [
   { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)', incident: 'a node builtin import or a write call inside a client half', canonicalForm: 'client halves stay pure: no builtins, no writes', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N29', title: 'a client entry reads a platform service through a callable probe', incident: 'a direct property read of a platform service in a client entry', canonicalForm: 'the read goes through a callable probe', vacuity: 'no client entry in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N30', title: 'an observable source has one owner; hooks carry references', incident: 'an inline source object built per render, or a hook returning a fresh reference', canonicalForm: 'one owner per source and stable references from hooks', vacuity: 'no observable source in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
-  { id: 'N31', title: 'the settings user layer is read once, in evolution-core', incident: 'a package reading the settings user layer itself and taking its key names, so one key resolves two ways', canonicalForm: 'userSetKeys(ctx, paramRowId(owner)) is the only reader; consumers pass their own row id', vacuity: 'no user-layer read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N34', title: 'the settings user layer is read once, in evolution-core', incident: 'a package reading the settings user layer itself and taking its key names, so one key resolves two ways', canonicalForm: 'userSetKeys(ctx, paramRowId(owner)) is the only reader; consumers pass their own row id', vacuity: 'no user-layer read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N35', title: 'a platform file:line citation is a frozen baseline', incident: 'a new citation of another repository line number, which no guard here can re-derive when that file moves', canonicalForm: 'platform references cite a symbol, not a line number; the frozen register only burns down', vacuity: 'no platform citation in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
 ]
 
 /** Guards whose vacuum face is known and NOT yet handled: a registered, expiring debt.
@@ -1229,10 +1290,18 @@ function walk(dir) {
           violations.push(`${rel}: settings namespace spelled here (${split}) — the owner → namespace map in evolution-core owns it (rule N22); read it with paramNamespace(owner)`)
         }
       }
-      // N31 (S2.9/T3-10): the settings user layer has ONE reader — see the docblock.
+      // N34 (S2.9/T3-10): the settings user layer has ONE reader — see the docblock.
       if (rel.includes('/src/') && rel !== `${CORE_SRC}/params.ts`) {
         for (const read of settingsUserLayerReads(text)) {
-          violations.push(`${rel}: reads the settings user layer here (${read}) — evolution-core's params.ts owns that read (rule N31); call userSetKeys(ctx, paramRowId(<owner>))`)
+          violations.push(`${rel}: reads the settings user layer here (${read}) — evolution-core's params.ts owns that read (rule N34); call userSetKeys(ctx, paramRowId(<owner>))`)
+        }
+      }
+      // N35 (S2.9, T2-08/A23 follow-up): platform line-cites are frozen — see the docblock.
+      if (!rel.startsWith('docs/')) {
+        const cites = platformCiteSites(root, text)
+        const allowed = PLATFORM_CITE_BASELINE.get(rel) ?? 0
+        if (cites.length > allowed) {
+          violations.push(`${rel}: ${cites.length - allowed} NEW platform file:line citation(s) (${cites.slice(0, 3).join(', ')}) — another repository's line numbers rot at every bump and nothing here can re-derive them (rule N35); cite the symbol instead. Frozen baseline for this file: ${allowed}`)
         }
       }
       // N23 (C5/B13, 0.8.0): raw durable-file writes live in the IO seam — see docblock.
@@ -1386,7 +1455,13 @@ if (process.argv.includes('--list-rules')) {
       && errorCodeLiterals("throw new Error(\"E-301: approval service not mounted\")").length === 1
       && errorCodeLiterals('// prose: this branch answers E-305 the same way').length === 0
       && errorCodeLiterals("const ok = errorText('e-305-this-invocation-carries-no')").length === 0],
-    ['N31', () => settingsUserLayerReads('return new Set(Object.keys(entry?.user ?? {}))').length === 1
+    ['N35', () => platformCiteSites('/nonexistent-root', '// see core/io.ts:475 for the protocol').length === 1
+      && platformCiteSites('/nonexistent-root', '// prose without a citation').length === 0
+      // No third sample: whether a FAMILY anchor resolves depends on the root under test (the
+      // sentry spec runs this against a sandbox copy), so that property is proven by the real-tree
+      // run instead — the register only stays quiet when every family path in it resolves.
+      && platformCiteSites('/nonexistent-root', '// the protocol lives in core, no path cited').length === 0],
+    ['N34', () => settingsUserLayerReads('return new Set(Object.keys(entry?.user ?? {}))').length === 1
       && settingsUserLayerReads("const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === paramRowId('x'))").length === 0
       && settingsUserLayerReads('// prose: the user layer is read once, in core').length === 0],
     ['N22', () => namespaceSplits("export const CURATOR_SETTINGS_NAMESPACE = 'evolution-curator'").length === 1
@@ -1686,7 +1761,8 @@ if (violations.length > 0) {
   console.warn(`verify-arch-guards [warn]: ${summary} (convergence TODO — G3.2/G4.8):`)
   console.warn(violations.join('\n'))
 } else {
-  if (GUARD_VACUITY.length > 0) console.log(`verify-arch-guards: ${GUARD_VACUITY.length} registered guard-vacuity debt(s) — ${GUARD_VACUITY.map(entry => `${entry.guard} (empty input: ${entry.emptyInput.split(':')[0]}; expires ${entry.expiry})`).join('; ')}`)
+  if (PLATFORM_CITE_BASELINE.size > 0) console.log(`verify-arch-guards: N35 debt — ${[...PLATFORM_CITE_BASELINE.values()].reduce((sum, n) => sum + n, 0)} frozen platform line-cite(s) in ${PLATFORM_CITE_BASELINE.size} file(s); convert them to symbol citations as those files are touched (expires: group 6, the documentation pass)`)
+if (GUARD_VACUITY.length > 0) console.log(`verify-arch-guards: ${GUARD_VACUITY.length} registered guard-vacuity debt(s) — ${GUARD_VACUITY.map(entry => `${entry.guard} (empty input: ${entry.emptyInput.split(':')[0]}; expires ${entry.expiry})`).join('; ')}`)
 const uncovered = RULES.filter(entry => entry.sample !== 'detector').map(entry => entry.id)
 if (uncovered.length > 0) {
   console.error(`verify-arch-guards: ${uncovered.length} rule(s) still owe a detector sample: [${uncovered.join(', ')}] — a rule whose detector is never proven is worse than no rule`)
